@@ -1,0 +1,27 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "6UYZBA546R.com.pantopus.app",
+        "paths": [
+          "/gig/*",
+          "/gigs/*",
+          "/post/*",
+          "/posts/*",
+          "/listing/*",
+          "/listings/*",
+          "/b/*",
+          "/u/*",
+          "/marketplace/*",
+          "/invite/*"
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "6UYZBA546R.com.pantopus.app"
+    ]
+  }
+}

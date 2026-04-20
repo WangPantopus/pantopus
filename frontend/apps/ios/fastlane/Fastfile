@@ -1,0 +1,68 @@
+# Pantopus iOS — Fastfile
+# https://docs.fastlane.tools
+
+default_platform(:ios)
+
+platform :ios do
+  before_all do
+    xcodegen(spec: "project.yml")
+  end
+
+  desc "Run unit + UI tests on simulator"
+  lane :test do
+    run_tests(
+      project: "Pantopus.xcodeproj",
+      scheme: "Pantopus",
+      devices: ["iPhone 15"],
+      clean: true
+    )
+  end
+
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    setup_ci if is_ci
+    match(type: "appstore", readonly: is_ci)
+
+    increment_build_number(
+      build_number: latest_testflight_build_number(initial_build_number: 0) + 1
+    )
+
+    build_app(
+      project: "Pantopus.xcodeproj",
+      scheme: "Pantopus",
+      configuration: "Release",
+      export_method: "app-store",
+      clean: true
+    )
+
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      changelog: last_git_commit[:message]
+    )
+  end
+
+  desc "Build and submit to App Store review"
+  lane :release do
+    setup_ci if is_ci
+    match(type: "appstore", readonly: is_ci)
+
+    build_app(
+      project: "Pantopus.xcodeproj",
+      scheme: "Pantopus",
+      configuration: "Release",
+      export_method: "app-store",
+      clean: true
+    )
+
+    upload_to_app_store(
+      submit_for_review: true,
+      automatic_release: false,
+      force: true,
+      precheck_include_in_app_purchases: false
+    )
+  end
+
+  error do |lane, exception|
+    UI.error("Lane #{lane} failed: #{exception.message}")
+  end
+end

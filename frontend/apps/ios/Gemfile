@@ -1,0 +1,7 @@
+source "https://rubygems.org"
+
+gem "fastlane"
+gem "xcodeproj"
+
+# Pin Ruby version so CI and local agree.
+ruby "~> 3.2"

@@ -1,0 +1,5 @@
+# Set before first TestFlight / App Store upload.
+app_identifier("app.pantopus.ios")
+apple_id("you@example.com")
+team_id("XXXXXXXXXX") # 10-char Apple developer team ID
+itc_team_id("XXXXXXXX") # App Store Connect team ID
