@@ -14,13 +14,17 @@ struct HomeView: View {
                 Section("Account") {
                     if case .signedIn(let user) = auth.state {
                         LabeledContent("Email", value: user.email)
+                            .accessibilityLabel("Email: \(user.email)")
                         LabeledContent("User ID", value: user.id)
+                            .accessibilityLabel("User ID: \(user.id)")
                     }
                 }
                 Section {
                     Button("Sign out", role: .destructive) {
                         Task { await auth.signOut() }
                     }
+                    .accessibilityIdentifier("homeSignOutButton")
+                    .accessibilityHint("Signs you out of Pantopus")
                 }
             }
             .navigationTitle("Home")

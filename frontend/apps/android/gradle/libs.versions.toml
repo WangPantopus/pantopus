@@ -35,6 +35,7 @@ playServicesMaps = "19.0.0"
 
 # Observability
 timber = "5.0.1"
+sentry = "7.18.0"
 
 # Testing
 junit = "4.13.2"
@@ -103,11 +104,17 @@ play-services-maps = { group = "com.google.android.gms", name = "play-services-m
 # Logging
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 
+# Crash reporting
+sentry-android = { group = "io.sentry", name = "sentry-android", version.ref = "sentry" }
+sentry-android-timber = { group = "io.sentry", name = "sentry-android-timber", version.ref = "sentry" }
+sentry-android-okhttp = { group = "io.sentry", name = "sentry-android-okhttp", version.ref = "sentry" }
+
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+mockk-android = { group = "io.mockk", name = "mockk-android", version.ref = "mockk" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 
 [bundles]

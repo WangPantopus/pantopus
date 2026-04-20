@@ -52,6 +52,8 @@ isProject: false
 
 # Pantopus 3 Signature Moves Implementation Plan
 
+> **Historical context:** Written while the mobile client was React Native at `frontend/apps/mobile/`. That app has been replaced by native iOS ([`frontend/apps/ios`](../frontend/apps/ios)) and Android ([`frontend/apps/android`](../frontend/apps/android)). Paths like `frontend/apps/mobile/src/...` in this plan map to the corresponding Swift/Kotlin modules; see the root README "Migration notes (from React Native)" section.
+
 ## Architecture Overview
 
 ```mermaid

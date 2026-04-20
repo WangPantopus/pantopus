@@ -1,6 +1,7 @@
 .PHONY: dev dev-all staging prod build-staging build-prod down logs clean \
-        ios-bootstrap ios-open ios-build ios-test \
-        android-bootstrap android-build android-test android-install
+        ios-bootstrap ios-open ios-build ios-test ios-lint ios-validate-env \
+        android-bootstrap android-build android-test android-install \
+        android-lint android-instrumented android-validate-env
 
 ## Development -----------------------------------------------------------------
 
@@ -32,19 +33,34 @@ ios-build:
 ios-test:
 	cd frontend/apps/ios && make test
 
+ios-lint:
+	cd frontend/apps/ios && make lint
+
+ios-validate-env:
+	cd frontend/apps/ios && make validate-env
+
 ## Android (Kotlin / Jetpack Compose) ------------------------------------------
 
 android-bootstrap:
-	cd frontend/apps/android && ./gradlew --version
+	cd frontend/apps/android && make bootstrap
 
 android-build:
-	cd frontend/apps/android && ./gradlew assembleDebug
+	cd frontend/apps/android && make build
 
 android-test:
-	cd frontend/apps/android && ./gradlew test
+	cd frontend/apps/android && make test
+
+android-instrumented:
+	cd frontend/apps/android && make instrumented
+
+android-lint:
+	cd frontend/apps/android && make lint
 
 android-install:
-	cd frontend/apps/android && ./gradlew installDebug
+	cd frontend/apps/android && make install
+
+android-validate-env:
+	cd frontend/apps/android && make validate-env
 
 ## Staging / Production --------------------------------------------------------
 

@@ -1,5 +1,7 @@
 # Payments & Payouts Thread Summary (2026-03-18)
 
+> **Historical context:** Written while the mobile client was React Native at `frontend/apps/mobile/`. That app has been replaced by native iOS ([`frontend/apps/ios`](../frontend/apps/ios)) and Android ([`frontend/apps/android`](../frontend/apps/android)). Mobile-client references below map to those native projects; see the root README "Migration notes (from React Native)" section.
+
 ## Scope
 This note summarizes what was fixed during this thread, why those fixes were needed, and what still needs hardening.
 

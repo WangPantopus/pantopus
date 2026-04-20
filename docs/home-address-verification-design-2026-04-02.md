@@ -1,5 +1,7 @@
 # Pantopus Home Address Verification Design
 
+> **Historical context:** Written while the mobile client was React Native at `frontend/apps/mobile/`. That app has been replaced by native iOS ([`frontend/apps/ios`](../frontend/apps/ios)) and Android ([`frontend/apps/android`](../frontend/apps/android)). Mobile-client references below should be mapped to those native projects; see the root README "Migration notes (from React Native)" section.
+
 Status: Draft  
 Date: 2026-04-02  
 Scope: Home onboarding, home creation, existing-home claim, unit re-validation, business/institution blocking, step-up verification, provider integrations, observability, rollout

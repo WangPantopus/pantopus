@@ -1,0 +1,13 @@
+// Pantopus.xcconfig — base build settings for Debug + Release.
+//
+// Secrets (Stripe key, Sentry DSN, etc.) are written into Config/Secrets.xcconfig
+// at bootstrap time from the local .env file. Secrets.xcconfig is gitignored.
+//
+// If you need a new variable to flow into Info.plist, declare a default here
+// and the Makefile's `env-to-xcconfig` target will overlay the value from .env.
+
+#include? "Secrets.xcconfig"
+
+// Defaults — individual keys can be overridden by Secrets.xcconfig.
+STRIPE_PUBLISHABLE_KEY = pk_test_REPLACE_ME
+SENTRY_DSN =

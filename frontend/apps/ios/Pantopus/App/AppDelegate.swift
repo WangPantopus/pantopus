@@ -17,6 +17,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        MainActor.assumeIsolated {
+            Observability.shared.start(environment: AppEnvironment.current)
+        }
         UNUserNotificationCenter.current().delegate = self
         requestNotificationPermission()
         return true
@@ -59,6 +62,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         logger.error("APNs registration failed", metadata: ["error": .string(error.localizedDescription)])
+        Task { @MainActor in Observability.shared.capture(error) }
     }
 }
 
@@ -78,6 +82,8 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     ) async {
         let userInfo = response.notification.request.content.userInfo
         logger.info("Notification tapped", metadata: ["payload": .string("\(userInfo)")])
-        // TODO: Parse `userInfo["deepLink"]` and post to a router.
+        if let deepLink = userInfo["deepLink"] as? String, let url = URL(string: deepLink) {
+            await MainActor.run { DeepLinkRouter.shared.handle(url: url) }
+        }
     }
 }

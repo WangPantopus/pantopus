@@ -1,5 +1,7 @@
 # Home Household Claim Engineering Task Breakdown
 
+> **Historical context:** Written while the mobile client was React Native at `frontend/apps/mobile/`. That app has been replaced by native iOS ([`frontend/apps/ios`](../frontend/apps/ios)) and Android ([`frontend/apps/android`](../frontend/apps/android)). Mobile tasks below should be mapped to their Swift/Kotlin equivalents; see the root README "Migration notes (from React Native)" section.
+
 ## Purpose
 
 Break the implementation spec into concrete engineering phases and tasks that can be executed without breaking unrelated app behavior.

@@ -40,6 +40,8 @@ isProject: false
 
 # Home Ownership, Identity, Residency and Dispute System
 
+> **Historical context:** Written while the mobile client was React Native at `frontend/apps/mobile/`. That app has been replaced by native iOS ([`frontend/apps/ios`](../frontend/apps/ios)) and Android ([`frontend/apps/android`](../frontend/apps/android)). Mobile paths in this plan should be mapped to those native projects; see the root README "Migration notes (from React Native)" section.
+
 ## Current State
 
 - **Database**: Supabase/PostgreSQL. Schema in `[backend/database/schema.sql](backend/database/schema.sql)`. Latest migration: `030_context_convert_system.sql`.

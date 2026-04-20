@@ -1,5 +1,7 @@
 # Authentication and Authorization Production Audit
 
+> **Historical context:** Written while the mobile client was React Native at `frontend/apps/mobile/`. That app has been replaced by native iOS ([`frontend/apps/ios`](../frontend/apps/ios)) and Android ([`frontend/apps/android`](../frontend/apps/android)). The auth/authz findings here still apply; mobile-client references should be mapped to those native projects (now using Keychain + DataStore for token storage). See the root README "Migration notes (from React Native)" section.
+
 Date: 2026-03-08
 
 Scope reviewed:

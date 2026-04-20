@@ -1,3 +1,7 @@
+# Chat / Messaging — Production Readiness Backlog
+
+> **Historical context:** Written while the mobile client was React Native at `frontend/apps/mobile/`. That app has been replaced by native iOS ([`frontend/apps/ios`](../frontend/apps/ios)) and Android ([`frontend/apps/android`](../frontend/apps/android)). Mobile references (e.g. `frontend/apps/mobile/src/hooks/useChatMessages.ts`) should be mapped to their Swift/Kotlin equivalents. See the root README "Migration notes (from React Native)" section.
+
 This is the full production-readiness backlog for the current chat/message stack, based on backend/routes/chats.js, backend/socket/chatSocketio.js, backend/database/schema.sql, backend/routes/upload.js, frontend/apps/web/src/hooks/useChatMessages.ts, and frontend/apps/mobile/src/hooks/useChatMessages.ts.
 
 1. Access Control And Data Exposure

@@ -19,12 +19,15 @@ struct LoginView: View {
                         .scaledToFit()
                         .frame(width: 64, height: 64)
                         .foregroundStyle(.tint)
+                        .accessibilityHidden(true)
                     Text("Pantopus")
                         .font(.largeTitle.bold())
+                        .accessibilityAddTraits(.isHeader)
                     Text("Your neighborhood, verified.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityElement(children: .combine)
 
                 VStack(spacing: 12) {
                     TextField("Email", text: $viewModel.email)
@@ -34,11 +37,17 @@ struct LoginView: View {
                         .autocorrectionDisabled()
                         .padding()
                         .background(Color(.systemGray6), in: .rect(cornerRadius: 12))
+                        .accessibilityIdentifier("loginEmailField")
+                        .accessibilityLabel("Email")
+                        .accessibilityHint("Enter the email address for your Pantopus account")
 
                     SecureField("Password", text: $viewModel.password)
                         .textContentType(.password)
                         .padding()
                         .background(Color(.systemGray6), in: .rect(cornerRadius: 12))
+                        .accessibilityIdentifier("loginPasswordField")
+                        .accessibilityLabel("Password")
+                        .accessibilityHint("At least six characters")
                 }
 
                 if let error = viewModel.errorMessage {
@@ -46,6 +55,8 @@ struct LoginView: View {
                         .font(.footnote)
                         .foregroundStyle(.red)
                         .multilineTextAlignment(.center)
+                        .accessibilityIdentifier("loginErrorMessage")
+                        .accessibilityLabel("Sign-in error: \(error)")
                 }
 
                 Button {
@@ -65,6 +76,9 @@ struct LoginView: View {
                 .background(Color.accentColor, in: .rect(cornerRadius: 12))
                 .foregroundStyle(.white)
                 .disabled(!viewModel.canSubmit)
+                .accessibilityIdentifier("loginSubmitButton")
+                .accessibilityLabel(viewModel.isLoading ? "Signing in" : "Sign in")
+                .accessibilityHint(viewModel.canSubmit ? "Submits the sign-in form" : "Fill in email and password to enable")
 
                 Spacer()
             }
@@ -94,6 +108,7 @@ final class LoginViewModel {
             try await auth.signIn(email: email, password: password)
         } catch {
             errorMessage = error.localizedDescription
+            Observability.shared.capture(error)
         }
     }
 }

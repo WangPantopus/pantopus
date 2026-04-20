@@ -37,6 +37,10 @@ configs:
   Debug: debug
   Release: release
 
+configFiles:
+  Debug: Config/Pantopus.xcconfig
+  Release: Config/Pantopus.xcconfig
+
 packages:
   # Stripe iOS SDK — payments (card, Apple Pay, PaymentSheet)
   Stripe:
@@ -54,6 +58,10 @@ packages:
   SwiftLog:
     url: https://github.com/apple/swift-log
     from: "1.6.0"
+  # Crash + performance reporting
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: "8.36.0"
 
 targets:
   Pantopus:
@@ -73,6 +81,8 @@ targets:
         CFBundleDisplayName: Pantopus
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        StripePublishableKey: $(STRIPE_PUBLISHABLE_KEY)
+        SentryDSN: $(SENTRY_DSN)
         LSRequiresIPhoneOS: true
         UILaunchScreen:
           UIColorName: LaunchBackground
@@ -132,6 +142,8 @@ targets:
       - package: KeychainAccess
       - package: SwiftLog
         product: Logging
+      - package: Sentry
+        product: Sentry
     scheme:
       testTargets:
         - PantopusTests

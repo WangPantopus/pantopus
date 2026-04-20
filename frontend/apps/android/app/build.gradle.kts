@@ -36,10 +36,30 @@ android {
         buildConfigField("String", "PANTOPUS_API_BASE_URL", "\"${envOr("PANTOPUS_API_BASE_URL", "http://10.0.2.2:8000")}\"")
         buildConfigField("String", "PANTOPUS_SOCKET_URL", "\"${envOr("PANTOPUS_SOCKET_URL", "http://10.0.2.2:8000")}\"")
         buildConfigField("String", "STRIPE_PUBLISHABLE_KEY", "\"${envOr("STRIPE_PUBLISHABLE_KEY", "pk_test_REPLACE_ME")}\"")
+        buildConfigField("String", "SENTRY_DSN", "\"${envOr("SENTRY_DSN", "")}\"")
+        buildConfigField("String", "PANTOPUS_ENV", "\"${envOr("PANTOPUS_ENV", "local")}\"")
 
         // Google Maps API key — read from gradle.properties, ~/.gradle/gradle.properties,
         // or the env. Never hard-code a real key here.
         manifestPlaceholders["MAPS_API_KEY"] = envOr("MAPS_API_KEY", "")
+    }
+
+    // Release signing: read from .env / ~/.gradle/gradle.properties / env vars.
+    // Falls back to the debug keystore so assembleRelease still works for
+    // smoke tests — but a real release must override these.
+    val keystoreFile = envOr("PANTOPUS_KEYSTORE_FILE", "")
+    signingConfigs {
+        if (keystoreFile.isNotEmpty() && file(keystoreFile).exists()) {
+            create("release") {
+                storeFile = file(keystoreFile)
+                storePassword = envOr("PANTOPUS_KEYSTORE_PASSWORD", "")
+                keyAlias = envOr("PANTOPUS_KEY_ALIAS", "")
+                keyPassword = envOr("PANTOPUS_KEY_PASSWORD", "")
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
     }
 
     buildTypes {
@@ -56,9 +76,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Release builds need a signingConfig. Configure one via
-            // ~/.gradle/gradle.properties (KEYSTORE_FILE, KEYSTORE_PASSWORD,
-            // KEY_ALIAS, KEY_PASSWORD) and wire in here when ready.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
@@ -136,8 +154,11 @@ dependencies {
     implementation(libs.maps.compose)
     implementation(libs.play.services.maps)
 
-    // Logging
+    // Logging + crash reporting
     implementation(libs.timber)
+    implementation(libs.sentry.android)
+    implementation(libs.sentry.android.timber)
+    implementation(libs.sentry.android.okhttp)
 
     // Testing
     testImplementation(libs.junit)
@@ -148,4 +169,7 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.mockk.android)
+    androidTestImplementation(libs.turbine)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }

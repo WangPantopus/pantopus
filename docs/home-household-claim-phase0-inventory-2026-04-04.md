@@ -1,5 +1,7 @@
 # Home Household Claim Phase 0 Inventory
 
+> **Historical context:** Written while the mobile client was React Native at `frontend/apps/mobile/`. That app has been replaced by native iOS ([`frontend/apps/ios`](../frontend/apps/ios)) and Android ([`frontend/apps/android`](../frontend/apps/android)). Mobile codepaths below should be mapped to their Swift/Kotlin equivalents; see the root README "Migration notes (from React Native)" section.
+
 ## Purpose
 
 Inventory every current codepath that reads, writes, filters, or otherwise depends on home ownership claim lifecycle semantics before implementing the v2 household claim model.

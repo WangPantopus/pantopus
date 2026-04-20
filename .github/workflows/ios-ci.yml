@@ -1,0 +1,111 @@
+name: iOS CI
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "frontend/apps/ios/**"
+      - ".github/workflows/ios-ci.yml"
+  pull_request:
+    paths:
+      - "frontend/apps/ios/**"
+      - ".github/workflows/ios-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: frontend/apps/ios
+
+jobs:
+  lint:
+    name: Lint (SwiftLint + SwiftFormat)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SwiftLint & SwiftFormat
+        run: brew install swiftlint swiftformat
+
+      - name: SwiftLint
+        run: swiftlint lint --strict
+
+      - name: SwiftFormat (lint only)
+        run: swiftformat --lint .
+
+  test:
+    name: Unit + UI tests
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_15.4.app
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Cache SPM
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('frontend/apps/ios/project.yml') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Run tests
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Pantopus.xcodeproj \
+            -scheme Pantopus \
+            -destination "platform=iOS Simulator,name=iPhone 15,OS=latest" \
+            -configuration Debug \
+            -enableCodeCoverage YES \
+            -resultBundlePath TestResults.xcresult \
+            clean test | xcbeautify
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: frontend/apps/ios/TestResults.xcresult
+          retention-days: 7
+
+  build:
+    name: Build (Debug simulator)
+    runs-on: macos-14
+    needs: lint
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_15.4.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Pantopus.xcodeproj \
+            -scheme Pantopus \
+            -destination "platform=iOS Simulator,name=iPhone 15,OS=latest" \
+            -configuration Debug \
+            build | xcbeautify

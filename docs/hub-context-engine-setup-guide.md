@@ -1,5 +1,7 @@
 # Hub Context Engine & Daily Briefing — Setup & Testing Guide
 
+> **Historical context:** Written while the mobile client was React Native at `frontend/apps/mobile/`. That app has been replaced by native iOS ([`frontend/apps/ios`](../frontend/apps/ios)) and Android ([`frontend/apps/android`](../frontend/apps/android)). Mobile-client steps should be mapped to those native projects; see the root README "Migration notes (from React Native)" section.
+
 Complete guide to setting up, testing, and verifying the Hub Today card, daily briefing push notifications, and notification preferences.
 
 ---

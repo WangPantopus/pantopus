@@ -1,5 +1,7 @@
 # Pantopus Maps Production Migration Plan
 
+> **Historical context:** Written while the mobile client was React Native at `frontend/apps/mobile/`. That app has been replaced by native iOS ([`frontend/apps/ios`](../frontend/apps/ios)) using MapKit and Android ([`frontend/apps/android`](../frontend/apps/android)) using Maps Compose. Mobile-map references in this plan should be mapped to those native SDKs; see the root README "Migration notes (from React Native)" section.
+
 Status: Draft  
 Date: 2026-03-08  
 Scope: Web maps, mobile maps, autocomplete, reverse geocoding, persistent geocoding, address verification, discovery/location UX, privacy/compliance, observability, rollout

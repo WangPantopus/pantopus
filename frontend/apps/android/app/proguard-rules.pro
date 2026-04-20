@@ -32,3 +32,7 @@
 # Stripe
 -keep class com.stripe.android.** { *; }
 -dontwarn com.stripe.android.**
+
+# Sentry — keep protocol classes so DTOs serialize correctly at runtime.
+-keep class io.sentry.** { *; }
+-dontwarn io.sentry.**

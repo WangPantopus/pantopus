@@ -56,6 +56,12 @@ final class APIClient {
                 await AuthManager.shared.handleUnauthorized()
                 throw APIError.unauthorized
             }
+            if http.statusCode >= 500 {
+                await Observability.shared.capture(
+                    message: "API \(endpoint.method.rawValue) \(endpoint.path) -> \(http.statusCode)",
+                    level: .error
+                )
+            }
             throw APIError.server(status: http.statusCode, body: message)
         }
 
@@ -68,6 +74,7 @@ final class APIClient {
             return try decoder.decode(Response.self, from: data)
         } catch {
             logger.error("Decode error for \(endpoint.path)", metadata: ["error": .string("\(error)")])
+            await Observability.shared.capture(error)
             throw APIError.decoding(underlying: error)
         }
     }

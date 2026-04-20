@@ -3,6 +3,7 @@ package app.pantopus.android.data.auth
 import app.pantopus.android.data.api.ApiService
 import app.pantopus.android.data.api.models.LoginRequest
 import app.pantopus.android.data.api.models.UserDto
+import app.pantopus.android.data.observability.Observability
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,7 +19,8 @@ import javax.inject.Singleton
 @Singleton
 class AuthRepository @Inject constructor(
     private val api: ApiService,
-    private val tokenStorage: TokenStorage
+    private val tokenStorage: TokenStorage,
+    private val observability: Observability
 ) {
     sealed interface State {
         data object Unknown : State
@@ -38,6 +40,7 @@ class AuthRepository @Inject constructor(
         }
         try {
             val user = api.me()
+            observability.identify(userId = user.id, email = user.email)
             _state.value = State.SignedIn(user)
         } catch (t: Throwable) {
             tokenStorage.clear()
@@ -52,12 +55,18 @@ class AuthRepository @Inject constructor(
             refreshToken = response.refreshToken,
             userId = response.user.id
         )
+        observability.identify(userId = response.user.id, email = response.user.email)
+        observability.track("auth.signed_in")
         _state.value = State.SignedIn(response.user)
         response.user
+    }.onFailure { t ->
+        if (t !is kotlin.coroutines.cancellation.CancellationException) observability.capture(t)
     }
 
     suspend fun signOut() {
         tokenStorage.clear()
+        observability.identify(userId = null)
+        observability.track("auth.signed_out")
         _state.value = State.SignedOut
     }
 }

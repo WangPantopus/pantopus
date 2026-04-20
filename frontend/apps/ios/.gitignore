@@ -36,6 +36,9 @@ fastlane/.env*
 .env.*
 !.env.example
 
+# Secrets materialized from .env at build time
+Config/Secrets.xcconfig
+
 # Bundler
 vendor/bundle
 

@@ -52,6 +52,7 @@ final class AuthManager {
                     Endpoint(method: .get, path: "/api/users/me")
                 )
                 self.state = .signedIn(user)
+                Observability.shared.identify(userId: user.id, email: user.email)
                 logger.info("Session restored", metadata: ["userId": .string(user.id)])
             } catch {
                 logger.info("Session restore failed, signing out", metadata: ["error": .string("\(error)")])
@@ -81,6 +82,8 @@ final class AuthManager {
 
         self.accessToken = response.accessToken
         self.state = .signedIn(response.user)
+        Observability.shared.identify(userId: response.user.id, email: response.user.email)
+        Observability.shared.track("auth.signed_in")
         logger.info("Signed in", metadata: ["userId": .string(response.user.id)])
     }
 
@@ -93,6 +96,8 @@ final class AuthManager {
         self.accessToken = nil
         self.state = .signedOut
         SocketClient.shared.disconnect()
+        Observability.shared.identify(userId: nil)
+        Observability.shared.track("auth.signed_out")
     }
 
     // MARK: - 401 handling

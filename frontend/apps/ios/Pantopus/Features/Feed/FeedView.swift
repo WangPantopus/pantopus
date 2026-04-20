@@ -14,6 +14,7 @@ struct FeedView: View {
                 switch viewModel.state {
                 case .idle, .loading:
                     ProgressView("Loading feed…")
+                        .accessibilityIdentifier("feedLoadingIndicator")
                 case .loaded(let posts):
                     List(posts) { post in
                         VStack(alignment: .leading, spacing: 6) {
@@ -25,7 +26,11 @@ struct FeedView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("\(post.authorName ?? "Anonymous") posted: \(post.content)")
+                        .accessibilityHint("Double-tap to open post")
                     }
+                    .accessibilityIdentifier("feedList")
                     .refreshable { await viewModel.load() }
                 case .error(let message):
                     ContentUnavailableView(
@@ -33,6 +38,7 @@ struct FeedView: View {
                         systemImage: "exclamationmark.triangle",
                         description: Text(message)
                     )
+                    .accessibilityIdentifier("feedErrorState")
                 }
             }
             .navigationTitle("Feed")
@@ -62,6 +68,7 @@ final class FeedViewModel {
             state = .loaded(response.posts)
         } catch {
             state = .error(error.localizedDescription)
+            Observability.shared.capture(error)
         }
     }
 }
