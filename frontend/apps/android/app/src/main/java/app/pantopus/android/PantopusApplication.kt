@@ -13,7 +13,6 @@ import javax.inject.Inject
  */
 @HiltAndroidApp
 class PantopusApplication : Application() {
-
     @Inject lateinit var observability: Observability
 
     override fun onCreate() {

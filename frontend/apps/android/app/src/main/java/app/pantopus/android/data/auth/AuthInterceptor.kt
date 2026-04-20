@@ -15,23 +15,26 @@ import javax.inject.Singleton
  * OkHttp dispatcher thread.
  */
 @Singleton
-class AuthInterceptor @Inject constructor(
-    private val tokenStorage: TokenStorage,
-    private val authRepositoryProvider: dagger.Lazy<AuthRepository>
-) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request().newBuilder().apply {
-            val token = runBlocking { tokenStorage.accessToken() }
-            if (!token.isNullOrBlank()) {
-                header("Authorization", "Bearer $token")
-            }
-            header("X-Client-Platform", "android")
-        }.build()
+class AuthInterceptor
+    @Inject
+    constructor(
+        private val tokenStorage: TokenStorage,
+        private val authRepositoryProvider: dagger.Lazy<AuthRepository>,
+    ) : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val request =
+                chain.request().newBuilder().apply {
+                    val token = runBlocking { tokenStorage.accessToken() }
+                    if (!token.isNullOrBlank()) {
+                        header("Authorization", "Bearer $token")
+                    }
+                    header("X-Client-Platform", "android")
+                }.build()
 
-        val response = chain.proceed(request)
-        if (response.code == 401) {
-            runBlocking { authRepositoryProvider.get().signOut() }
+            val response = chain.proceed(request)
+            if (response.code == 401) {
+                runBlocking { authRepositoryProvider.get().signOut() }
+            }
+            return response
         }
-        return response
     }
-}

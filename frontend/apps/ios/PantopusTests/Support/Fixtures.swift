@@ -2,13 +2,18 @@
 //  Fixtures.swift
 //  PantopusTests
 //
-//  Canonical JSON payloads + DTO builders for reuse across tests.
+//  Canonical JSON payloads + DTO builders for reuse across tests. Fixtures
+//  mirror the real backend response shape; see the route citations on each
+//  DTO under `Pantopus/Core/Networking/Models/`.
 //
 
 import Foundation
 @testable import Pantopus
 
 enum Fixtures {
+    /// Historical test fixture — a `/api/users/me`-style user row. Kept for
+    /// existing tests that exercise `UserDTO` directly. The real session
+    /// flow uses `LoginResponse` / `ProfileResponse`.
     static let userJSON = """
     {
       "id": "u_123",
@@ -18,13 +23,37 @@ enum Fixtures {
     }
     """
 
-    static func authJSON(accessToken: String = "at_test", refreshToken: String? = "rt_test") -> String {
-        let refresh = refreshToken.map { "\"\($0)\"" } ?? "null"
+    /// `POST /api/users/login` response fixture.
+    static func loginJSON(
+        accessToken: String = "at_test",
+        refreshToken: String? = "rt_test"
+    ) -> String {
+        let refreshLine = refreshToken.map { "\"refreshToken\": \"\($0)\"," } ?? ""
         return """
         {
-          "access_token": "\(accessToken)",
-          "refresh_token": \(refresh),
-          "user": \(userJSON)
+          "message": "Login successful",
+          "accessToken": "\(accessToken)",
+          \(refreshLine)
+          "expiresIn": 3600,
+          "expiresAt": 1800000000,
+          "user": {
+            "id": "u_123",
+            "email": "alice@example.com",
+            "username": "alice",
+            "name": "Alice Doe",
+            "firstName": "Alice",
+            "middleName": null,
+            "lastName": "Doe",
+            "phoneNumber": null,
+            "address": null,
+            "city": null,
+            "state": null,
+            "zipcode": null,
+            "accountType": "personal",
+            "role": "member",
+            "verified": true,
+            "createdAt": "2025-01-01T00:00:00Z"
+          }
         }
         """
     }
@@ -46,7 +75,12 @@ enum Fixtures {
     """
 
     static var sampleUser: UserDTO {
-        UserDTO(id: "u_123", email: "alice@example.com", displayName: "Alice", avatarURL: nil)
+        UserDTO(
+            id: "u_123",
+            email: "alice@example.com",
+            displayName: "Alice",
+            avatarURL: nil
+        )
     }
 }
 

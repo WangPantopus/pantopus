@@ -2,8 +2,8 @@
 //  ModelsCodingTests.swift
 //  PantopusTests
 //
-//  Locks down the JSON shape contract between the native apps and the backend.
-//  If these fail, either the backend changed or Models.swift drifted.
+//  Locks down the JSON shape contract for the Auth + Feed DTOs. More
+//  granular coverage of every P3 DTO lives in `DTODecodingTests`.
 //
 
 import XCTest
@@ -13,17 +13,17 @@ final class ModelsCodingTests: XCTestCase {
 
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()
-        d.keyDecodingStrategy = .convertFromSnakeCase
         d.dateDecodingStrategy = .iso8601
         return d
     }()
 
-    func testDecodesAuthResponse() throws {
-        let data = Data(Fixtures.authJSON().utf8)
-        let resp = try decoder.decode(AuthResponse.self, from: data)
+    func testDecodesLoginResponse() throws {
+        let data = Data(Fixtures.loginJSON().utf8)
+        let resp = try decoder.decode(LoginResponse.self, from: data)
         XCTAssertEqual(resp.accessToken, "at_test")
         XCTAssertEqual(resp.refreshToken, "rt_test")
         XCTAssertEqual(resp.user.email, "alice@example.com")
+        XCTAssertEqual(resp.user.firstName, "Alice")
     }
 
     func testDecodesFeedResponse() throws {
@@ -35,9 +35,10 @@ final class ModelsCodingTests: XCTestCase {
         XCTAssertNil(feed.nextCursor)
     }
 
-    func testAuthResponseWithoutRefreshToken() throws {
-        let data = Data(Fixtures.authJSON(refreshToken: nil).utf8)
-        let resp = try decoder.decode(AuthResponse.self, from: data)
+    func testLoginResponseWithoutRefreshToken() throws {
+        let data = Data(Fixtures.loginJSON(refreshToken: nil).utf8)
+        let resp = try decoder.decode(LoginResponse.self, from: data)
         XCTAssertNil(resp.refreshToken)
+        XCTAssertEqual(resp.accessToken, "at_test")
     }
 }

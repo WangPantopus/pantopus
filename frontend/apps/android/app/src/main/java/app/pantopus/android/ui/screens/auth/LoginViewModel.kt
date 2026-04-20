@@ -12,38 +12,40 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class LoginViewModel @Inject constructor(
-    private val authRepository: AuthRepository
-) : ViewModel() {
+class LoginViewModel
+    @Inject
+    constructor(
+        private val authRepository: AuthRepository,
+    ) : ViewModel() {
+        data class UiState(
+            val email: String = "",
+            val password: String = "",
+            val isLoading: Boolean = false,
+            val errorMessage: String? = null,
+        ) {
+            val canSubmit: Boolean
+                get() = !isLoading && email.contains('@') && password.length >= 6
+        }
 
-    data class UiState(
-        val email: String = "",
-        val password: String = "",
-        val isLoading: Boolean = false,
-        val errorMessage: String? = null
-    ) {
-        val canSubmit: Boolean
-            get() = !isLoading && email.contains('@') && password.length >= 6
-    }
+        private val _uiState = MutableStateFlow(UiState())
+        val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    private val _uiState = MutableStateFlow(UiState())
-    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+        fun onEmailChange(value: String) = _uiState.update { it.copy(email = value, errorMessage = null) }
 
-    fun onEmailChange(value: String) = _uiState.update { it.copy(email = value, errorMessage = null) }
-    fun onPasswordChange(value: String) = _uiState.update { it.copy(password = value, errorMessage = null) }
+        fun onPasswordChange(value: String) = _uiState.update { it.copy(password = value, errorMessage = null) }
 
-    fun signIn() {
-        val snapshot = _uiState.value
-        if (!snapshot.canSubmit) return
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-        viewModelScope.launch {
-            authRepository.signIn(snapshot.email, snapshot.password)
-                .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = e.message ?: "Sign-in failed") }
-                }
-                .onSuccess {
-                    _uiState.update { it.copy(isLoading = false) }
-                }
+        fun signIn() {
+            val snapshot = _uiState.value
+            if (!snapshot.canSubmit) return
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            viewModelScope.launch {
+                authRepository.signIn(snapshot.email, snapshot.password)
+                    .onFailure { e ->
+                        _uiState.update { it.copy(isLoading = false, errorMessage = e.message ?: "Sign-in failed") }
+                    }
+                    .onSuccess {
+                        _uiState.update { it.copy(isLoading = false) }
+                    }
+            }
         }
     }
-}

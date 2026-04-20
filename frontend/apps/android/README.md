@@ -21,7 +21,83 @@ Native Android app for Pantopus, built with Kotlin 2.0, Jetpack Compose, and Mat
 | Logging        | Timber                                                                    |
 | Build          | Gradle 8.9 + Kotlin DSL + version catalog (`libs.versions.toml`)          |
 | Lint / format  | detekt, ktlint                                                            |
-| Testing        | JUnit4, MockK, Turbine, Compose UI Test, Espresso                         |
+| Testing        | JUnit4, MockK, Turbine, Compose UI Test, Espresso, Paparazzi (snapshots)  |
+
+## Design tokens
+
+All Pantopus design-system tokens live in `app/src/main/java/app/pantopus/android/ui/theme/`:
+
+| File              | Entry point                               |
+|-------------------|-------------------------------------------|
+| `Color.kt`        | `PantopusColors.primary600`, …            |
+| `Spacing.kt`      | `Spacing.s4` (= 16.dp), …                 |
+| `Radii.kt`        | `Radii.xl` (= 16.dp), …                   |
+| `Shadows.kt`      | `Modifier.pantopusShadow(PantopusElevations.md)` |
+| `Typography.kt`   | `PantopusTextStyle.h1`, `PantopusTypography` (Material 3) |
+| `Theme.kt`        | `PantopusTheme { … }` — wraps Material 3 + provides `LocalPantopusTokens` |
+| `LocalPantopus.kt`| `PantopusTheme.tokens.category.handyman`, `.identity.personal`, … |
+
+Plus `app/src/main/res/values/colors.xml` mirrors every token as an Android
+color resource (`@color/pantopus_primary_600`) for status-bar tinting,
+drawable XML, and splash screens.
+
+**Call sites MUST use tokens.** PRs that add raw hex (`Color(0xFF…)`), raw
+`.dp` literals, or raw `.sp` font sizes to feature code will be rejected.
+The CI check `grep -rnE '#[0-9a-fA-F]{6,8}' app/src/main/java/app/pantopus/android/ui/screens`
+must return no hits.
+
+**Preview the gallery** in debug builds by tapping the Home screen title five
+times — opens `TokenGalleryScreen` showing every token side-by-side.
+
+**Snapshot tests** (Paparazzi) lock in the visual contract. Record new
+baselines with `./gradlew paparazziRecord` after intentional changes, then
+commit the updated PNGs under `app/src/test/snapshots/`.
+
+## Networking
+
+All HTTP calls go through the per-feature Retrofit interfaces under
+[app/src/main/java/app/pantopus/android/data/api/services/](app/src/main/java/app/pantopus/android/data/api/services/):
+`AuthApi`, `UsersApi`, `HubApi`, `HomesApi`, `MailboxApi`, `MailboxV2Api`.
+UI code never imports `retrofit2.*` directly — inject one of these
+interfaces (or a repository around it). The aggregated legacy
+`ApiService` is retained only for the existing AuthRepository and
+feed screens; new code should depend on the smaller feature APIs.
+
+- **DTOs** live under [data/api/models/](app/src/main/java/app/pantopus/android/data/api/models/)
+  grouped by feature. Every class carries a route-file citation on its
+  doc comment. Untyped payloads (provider-dependent) use
+  [`JsonValue`](app/src/main/java/app/pantopus/android/data/api/models/common/JsonValue.kt).
+- **Error taxonomy.**
+  [`NetworkError`](app/src/main/java/app/pantopus/android/data/api/net/NetworkResult.kt)
+  is a sealed hierarchy: `Unauthorized`, `Forbidden`, `NotFound`,
+  `ClientError`, `Server`, `Transport`, `Decoding`, `RetriesExhausted`.
+  Wrap calls in
+  [`safeApiCall { api.foo() }`](app/src/main/java/app/pantopus/android/data/api/net/SafeApiCall.kt)
+  to get a typed
+  [`NetworkResult`](app/src/main/java/app/pantopus/android/data/api/net/NetworkResult.kt).
+- **Retry.** OkHttp
+  [`RetryInterceptor`](app/src/main/java/app/pantopus/android/data/api/net/RetryInterceptor.kt)
+  retries idempotent GET / HEAD up to 2 additional times on 502/503/504
+  and `IOException`, with 300ms and ~900ms jittered delays.
+  Non-idempotent methods are never retried.
+- **Cache.** A 10MB on-disk OkHttp `Cache` lives at `cacheDir/pantopus-http/`;
+  OkHttp honours `ETag`, `Cache-Control`, and `If-None-Match` automatically.
+
+## Icons
+
+All icons route through the typed
+[`PantopusIcon`](app/src/main/java/app/pantopus/android/ui/theme/Icons.kt)
+enum and the `PantopusIconImage` composable — never through
+`Icons.Filled.*` or `painterResource(R.drawable.ic_lucide_*)` directly.
+The rendering layer maps each case to the closest `material-icons-extended`
+vector, falling back to hand-authored drawables in
+[`res/drawable/ic_lucide_*.xml`](app/src/main/res/drawable/) where Material
+has no close match.
+
+The `./gradlew verifyPantopusIcons` task (hooked into `check`) fails if
+feature code reaches for a Material icon or an `ic_lucide_*` drawable
+directly.
+
 
 ## Layout
 

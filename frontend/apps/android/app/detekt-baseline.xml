@@ -1,0 +1,18 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>InstanceOfCheckForException:FeedScreen.kt$FeedViewModel$t is kotlin.coroutines.cancellation.CancellationException</ID>
+    <ID>MagicNumber:AuthInterceptor.kt$AuthInterceptor$401</ID>
+    <ID>MagicNumber:NetworkModule.kt$NetworkModule$15</ID>
+    <ID>MagicNumber:NetworkModule.kt$NetworkModule$30</ID>
+    <ID>MagicNumber:Observability.kt$Observability$0.1</ID>
+    <ID>MagicNumber:SocketManager.kt$SocketManager$2_000</ID>
+    <ID>MatchingDeclarationName:LoginScreen.kt$LoginScreenTags</ID>
+    <ID>MatchingDeclarationName:PantopusNavHost.kt$Dest</ID>
+    <ID>SwallowedException:AuthRepository.kt$AuthRepository$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AuthRepository.kt$AuthRepository$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:FeedScreen.kt$FeedViewModel$t: Throwable</ID>
+    <ID>UnusedPrivateProperty:PantopusNavHost.kt$val state = authState</ID>
+  </CurrentIssues>
+</SmellBaseline>

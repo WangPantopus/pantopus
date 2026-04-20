@@ -14,12 +14,7 @@ struct LoginView: View {
             VStack(spacing: 24) {
                 Spacer()
                 VStack(spacing: 8) {
-                    Image(systemName: "house.fill")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 64, height: 64)
-                        .foregroundStyle(.tint)
-                        .accessibilityHidden(true)
+                    Icon(.home, size: 64, color: Theme.Color.primary600)
                     Text("Pantopus")
                         .font(.largeTitle.bold())
                         .accessibilityAddTraits(.isHeader)
