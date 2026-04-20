@@ -22,30 +22,35 @@ private val Context.tokenDataStore by preferencesDataStore(name = "auth_tokens")
  * intentionally simple — swap it in a follow-up PR.
  */
 @Singleton
-class TokenStorage @Inject constructor(
-    @ApplicationContext private val context: Context
-) {
-    private object Keys {
-        val ACCESS = stringPreferencesKey("access_token")
-        val REFRESH = stringPreferencesKey("refresh_token")
-        val USER_ID = stringPreferencesKey("user_id")
-    }
+class TokenStorage
+    @Inject
+    constructor(
+        @ApplicationContext private val context: Context,
+    ) {
+        private object Keys {
+            val ACCESS = stringPreferencesKey("access_token")
+            val REFRESH = stringPreferencesKey("refresh_token")
+            val USER_ID = stringPreferencesKey("user_id")
+        }
 
-    val accessTokenFlow: Flow<String?> =
-        context.tokenDataStore.data.map { it[Keys.ACCESS] }
+        val accessTokenFlow: Flow<String?> =
+            context.tokenDataStore.data.map { it[Keys.ACCESS] }
 
-    suspend fun accessToken(): String? =
-        context.tokenDataStore.data.map { it[Keys.ACCESS] }.first()
+        suspend fun accessToken(): String? = context.tokenDataStore.data.map { it[Keys.ACCESS] }.first()
 
-    suspend fun save(accessToken: String, refreshToken: String?, userId: String) {
-        context.tokenDataStore.edit { prefs ->
-            prefs[Keys.ACCESS] = accessToken
-            if (refreshToken != null) prefs[Keys.REFRESH] = refreshToken
-            prefs[Keys.USER_ID] = userId
+        suspend fun save(
+            accessToken: String,
+            refreshToken: String?,
+            userId: String,
+        ) {
+            context.tokenDataStore.edit { prefs ->
+                prefs[Keys.ACCESS] = accessToken
+                if (refreshToken != null) prefs[Keys.REFRESH] = refreshToken
+                prefs[Keys.USER_ID] = userId
+            }
+        }
+
+        suspend fun clear() {
+            context.tokenDataStore.edit { it.clear() }
         }
     }
-
-    suspend fun clear() {
-        context.tokenDataStore.edit { it.clear() }
-    }
-}

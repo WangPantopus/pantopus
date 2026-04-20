@@ -8,9 +8,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import app.pantopus.android.data.api.models.UserDto
+import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.auth.AuthRepository
-import app.pantopus.android.data.observability.Observability
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +17,6 @@ import org.junit.Rule
 import org.junit.Test
 
 class LoginScreenTest {
-
     @get:Rule val compose = createComposeRule()
 
     private fun viewModelWith(signInResult: Result<UserDto> = Result.success(sampleUser)): LoginViewModel {
@@ -68,11 +66,12 @@ class LoginScreenTest {
     }
 
     companion object {
-        val sampleUser = UserDto(
-            id = "u_123",
-            email = "alice@example.com",
-            displayName = "Alice",
-            avatarUrl = null
-        )
+        val sampleUser =
+            UserDto(
+                id = "u_123",
+                email = "alice@example.com",
+                displayName = "Alice",
+                avatarUrl = null,
+            )
     }
 }

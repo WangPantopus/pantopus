@@ -6,21 +6,28 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.paparazzi)
 }
 
 // Load local env from .env (not committed). Falls back to sensible defaults.
 val envFile = rootProject.file(".env")
-val localEnv = Properties().apply {
-    if (envFile.exists()) {
-        envFile.inputStream().use { load(it) }
+val localEnv =
+    Properties().apply {
+        if (envFile.exists()) {
+            envFile.inputStream().use { load(it) }
+        }
     }
-}
-fun envOr(key: String, default: String): String =
-    (localEnv.getProperty(key) ?: System.getenv(key) ?: default).trim()
+
+fun envOr(
+    key: String,
+    default: String,
+): String = (localEnv.getProperty(key) ?: System.getenv(key) ?: default).trim()
 
 android {
     namespace = "app.pantopus.android"
-    compileSdk = 34
+    // compileSdk bumped to 35 to satisfy transitive androidx.core 1.15 AAR
+    // metadata. targetSdk stays at 34 per the P1 platform spec.
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "app.pantopus.android"
@@ -74,7 +81,7 @@ android {
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
@@ -87,10 +94,11 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += listOf(
-            "-opt-in=kotlin.RequiresOptIn",
-            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
-        )
+        freeCompilerArgs +=
+            listOf(
+                "-opt-in=kotlin.RequiresOptIn",
+                "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            )
     }
 
     buildFeatures {
@@ -122,6 +130,8 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(platform(libs.androidx.compose.bom))
     implementation(libs.bundles.compose)
+    // Material 1 pulled in for PullRefreshIndicator (not yet in Material 3 stable).
+    implementation(libs.androidx.compose.material)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
     debugImplementation(libs.androidx.compose.ui.tooling)
@@ -165,6 +175,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockwebserver)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -172,4 +183,78 @@ dependencies {
     androidTestImplementation(libs.mockk.android)
     androidTestImplementation(libs.turbine)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+
+    // Snapshot testing (applied via the Paparazzi Gradle plugin above).
+    testImplementation(libs.paparazzi)
+}
+
+// Fail the build if feature code reaches for a Material icon or a
+// `ic_lucide_*` drawable directly — icons must route through
+// [PantopusIconImage] so we can swap the renderer in one place.
+//
+// Written with a typed Gradle task class so the configuration cache can
+// serialize it. The file collection and root directory are wired up at
+// configuration time via providers.
+abstract class VerifyPantopusIconsTask : DefaultTask() {
+    @get:InputFiles
+    abstract val sources: ConfigurableFileCollection
+
+    @get:Internal
+    abstract val rootDirectory: DirectoryProperty
+
+    @TaskAction
+    fun verify() {
+        val banned =
+            listOf(
+                Regex("""androidx\.compose\.material\.icons\."""),
+                Regex("""painterResource\([^)]*R\.drawable\.ic_lucide_"""),
+            )
+        val root = rootDirectory.get().asFile.toPath()
+        val violations = mutableListOf<String>()
+        sources.forEach { file ->
+            file.readLines().forEachIndexed { index, line ->
+                banned.forEach { pattern ->
+                    if (pattern.containsMatchIn(line)) {
+                        violations += "${root.relativize(file.toPath())}:${index + 1}: ${line.trim()}"
+                    }
+                }
+            }
+        }
+        if (violations.isNotEmpty()) {
+            throw GradleException(
+                "verifyPantopusIcons failed — feature code must use PantopusIconImage, not " +
+                    "Material icons or ic_lucide_* drawables directly:\n" +
+                    violations.joinToString("\n"),
+            )
+        }
+        logger.lifecycle("✓ verifyPantopusIcons: no stray icon usage in feature code.")
+    }
+}
+
+tasks.register<VerifyPantopusIconsTask>("verifyPantopusIcons") {
+    group = "verification"
+    description = "Reject direct Material-icon or ic_lucide_* usage outside ui/theme/Icons.kt."
+    sources.from(
+        fileTree("src/main/java/app/pantopus/android") {
+            include("**/*.kt")
+            exclude("ui/theme/Icons.kt")
+            exclude("ui/screens/_internal/**")
+        },
+    )
+    rootDirectory.set(rootProject.layout.projectDirectory)
+}
+tasks.named("check") { dependsOn("verifyPantopusIcons") }
+
+// Convenience alias so CI and the README can reference a single task name
+// regardless of which build variants exist. Delegates to the Paparazzi
+// plugin's per-variant verify task.
+tasks.register("paparazziVerify") {
+    group = "verification"
+    description = "Verify Paparazzi snapshots for the debug variant."
+    dependsOn("verifyPaparazziDebug")
+}
+tasks.register("paparazziRecord") {
+    group = "verification"
+    description = "Record new Paparazzi snapshot baselines for the debug variant."
+    dependsOn("recordPaparazziDebug")
 }

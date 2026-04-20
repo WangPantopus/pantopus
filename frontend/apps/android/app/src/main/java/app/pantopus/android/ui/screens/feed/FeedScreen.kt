@@ -28,7 +28,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.ApiService
-import app.pantopus.android.data.api.models.FeedPost
+import app.pantopus.android.data.api.models.feed.FeedPost
 import app.pantopus.android.data.observability.Observability
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,35 +44,41 @@ object FeedScreenTags {
 }
 
 @HiltViewModel
-class FeedViewModel @Inject constructor(
-    private val api: ApiService,
-    private val observability: Observability
-) : ViewModel() {
-    sealed interface UiState {
-        data object Loading : UiState
-        data class Loaded(val posts: List<FeedPost>) : UiState
-        data class Error(val message: String) : UiState
-    }
+class FeedViewModel
+    @Inject
+    constructor(
+        private val api: ApiService,
+        private val observability: Observability,
+    ) : ViewModel() {
+        sealed interface UiState {
+            data object Loading : UiState
 
-    private val _state = MutableStateFlow<UiState>(UiState.Loading)
-    val state: StateFlow<UiState> = _state.asStateFlow()
+            data class Loaded(val posts: List<FeedPost>) : UiState
 
-    init { load() }
+            data class Error(val message: String) : UiState
+        }
 
-    fun load() {
-        _state.value = UiState.Loading
-        viewModelScope.launch {
-            try {
-                val response = api.feed()
-                _state.value = UiState.Loaded(response.posts)
-            } catch (t: Throwable) {
-                if (t is kotlin.coroutines.cancellation.CancellationException) throw t
-                observability.capture(t)
-                _state.value = UiState.Error(t.message ?: "Unknown error")
+        private val _state = MutableStateFlow<UiState>(UiState.Loading)
+        val state: StateFlow<UiState> = _state.asStateFlow()
+
+        init {
+            load()
+        }
+
+        fun load() {
+            _state.value = UiState.Loading
+            viewModelScope.launch {
+                try {
+                    val response = api.feed()
+                    _state.value = UiState.Loaded(response.posts)
+                } catch (t: Throwable) {
+                    if (t is kotlin.coroutines.cancellation.CancellationException) throw t
+                    observability.capture(t)
+                    _state.value = UiState.Error(t.message ?: "Unknown error")
+                }
             }
         }
     }
-}
 
 @Composable
 fun FeedScreen(viewModel: FeedViewModel = hiltViewModel()) {
@@ -84,7 +90,7 @@ fun FeedScreen(viewModel: FeedViewModel = hiltViewModel()) {
                     .fillMaxSize()
                     .testTag(FeedScreenTags.LOADING)
                     .semantics { contentDescription = "Loading feed" },
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) { CircularProgressIndicator() }
 
         is FeedViewModel.UiState.Error ->
@@ -94,11 +100,11 @@ fun FeedScreen(viewModel: FeedViewModel = hiltViewModel()) {
                     .padding(24.dp)
                     .testTag(FeedScreenTags.ERROR)
                     .semantics { liveRegion = LiveRegionMode.Polite },
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     "Couldn't load feed: ${s.message}",
-                    color = MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
 
@@ -106,18 +112,19 @@ fun FeedScreen(viewModel: FeedViewModel = hiltViewModel()) {
             LazyColumn(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.testTag(FeedScreenTags.LIST)
+                modifier = Modifier.testTag(FeedScreenTags.LIST),
             ) {
                 items(s.posts, key = { it.id }) { post ->
                     Column(
-                        modifier = Modifier.semantics(mergeDescendants = true) {
-                            contentDescription = "${post.authorName ?: "Anonymous"} posted: ${post.content}"
-                        }
+                        modifier =
+                            Modifier.semantics(mergeDescendants = true) {
+                                contentDescription = "${post.authorName ?: "Anonymous"} posted: ${post.content}"
+                            },
                     ) {
                         Text(
                             post.authorName ?: "Anonymous",
                             style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.semantics { heading() }
+                            modifier = Modifier.semantics { heading() },
                         )
                         Text(post.content, style = MaterialTheme.typography.bodyLarge)
                         Text(post.createdAt.toString(), style = MaterialTheme.typography.bodyMedium)

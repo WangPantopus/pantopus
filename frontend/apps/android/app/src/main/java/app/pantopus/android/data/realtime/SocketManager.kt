@@ -22,63 +22,74 @@ import javax.inject.Singleton
  * - [eventsOf] exposes a given event as a cold Flow of JSON payloads.
  */
 @Singleton
-class SocketManager @Inject constructor() {
+class SocketManager
+    @Inject
+    constructor() {
+        enum class ConnectionState { Disconnected, Connecting, Connected }
 
-    enum class ConnectionState { Disconnected, Connecting, Connected }
+        private val _connectionState = MutableStateFlow(ConnectionState.Disconnected)
+        val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
-    private val _connectionState = MutableStateFlow(ConnectionState.Disconnected)
-    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
+        private var socket: Socket? = null
 
-    private var socket: Socket? = null
+        fun connect(token: String) {
+            if (socket?.connected() == true) return
+            _connectionState.value = ConnectionState.Connecting
+            val options =
+                IO.Options.builder()
+                    .setAuth(mapOf("token" to token))
+                    .setReconnection(true)
+                    .setReconnectionDelay(2_000)
+                    .setReconnectionAttempts(Integer.MAX_VALUE)
+                    .setExtraHeaders(mapOf("Authorization" to listOf("Bearer $token")))
+                    .build()
 
-    fun connect(token: String) {
-        if (socket?.connected() == true) return
-        _connectionState.value = ConnectionState.Connecting
-        val options = IO.Options.builder()
-            .setAuth(mapOf("token" to token))
-            .setReconnection(true)
-            .setReconnectionDelay(2_000)
-            .setReconnectionAttempts(Integer.MAX_VALUE)
-            .setExtraHeaders(mapOf("Authorization" to listOf("Bearer $token")))
-            .build()
-
-        val s = IO.socket(BuildConfig.PANTOPUS_SOCKET_URL, options)
-        s.on(Socket.EVENT_CONNECT) {
-            _connectionState.value = ConnectionState.Connected
-            Timber.i("Socket connected")
+            val s = IO.socket(BuildConfig.PANTOPUS_SOCKET_URL, options)
+            s.on(Socket.EVENT_CONNECT) {
+                _connectionState.value = ConnectionState.Connected
+                Timber.i("Socket connected")
+            }
+            s.on(Socket.EVENT_DISCONNECT) {
+                _connectionState.value = ConnectionState.Disconnected
+                Timber.i("Socket disconnected")
+            }
+            s.on(Socket.EVENT_CONNECT_ERROR) { args ->
+                Timber.w("Socket connect error: ${args.joinToString()}")
+            }
+            s.connect()
+            socket = s
         }
-        s.on(Socket.EVENT_DISCONNECT) {
+
+        fun disconnect() {
+            socket?.disconnect()
+            socket?.off()
+            socket = null
             _connectionState.value = ConnectionState.Disconnected
-            Timber.i("Socket disconnected")
         }
-        s.on(Socket.EVENT_CONNECT_ERROR) { args ->
-            Timber.w("Socket connect error: ${args.joinToString()}")
+
+        /**
+         * Listen to [event] as a cold Flow of JSONObject payloads.
+         * Collectors are responsible for parsing the JSON into their own types.
+         */
+        fun eventsOf(event: String): Flow<JSONObject> =
+            callbackFlow {
+                val s =
+                    socket ?: run {
+                        close()
+                        return@callbackFlow
+                    }
+                val listener =
+                    io.socket.emitter.Emitter.Listener { args ->
+                        (args.firstOrNull() as? JSONObject)?.let { trySend(it) }
+                    }
+                s.on(event, listener)
+                awaitClose { s.off(event, listener) }
+            }
+
+        fun emit(
+            event: String,
+            payload: JSONObject,
+        ) {
+            socket?.emit(event, payload)
         }
-        s.connect()
-        socket = s
     }
-
-    fun disconnect() {
-        socket?.disconnect()
-        socket?.off()
-        socket = null
-        _connectionState.value = ConnectionState.Disconnected
-    }
-
-    /**
-     * Listen to [event] as a cold Flow of JSONObject payloads.
-     * Collectors are responsible for parsing the JSON into their own types.
-     */
-    fun eventsOf(event: String): Flow<JSONObject> = callbackFlow {
-        val s = socket ?: run { close(); return@callbackFlow }
-        val listener = io.socket.emitter.Emitter.Listener { args ->
-            (args.firstOrNull() as? JSONObject)?.let { trySend(it) }
-        }
-        s.on(event, listener)
-        awaitClose { s.off(event, listener) }
-    }
-
-    fun emit(event: String, payload: JSONObject) {
-        socket?.emit(event, payload)
-    }
-}

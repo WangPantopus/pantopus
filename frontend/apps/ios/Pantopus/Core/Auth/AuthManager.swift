@@ -48,9 +48,8 @@ final class AuthManager {
             // Best-effort hydration of the current user. If this fails with
             // 401, handleUnauthorized will flip us to signedOut.
             do {
-                let user: UserDTO = try await APIClient.shared.request(
-                    Endpoint(method: .get, path: "/api/users/me")
-                )
+                let response: ProfileResponse = try await APIClient.shared.request(UsersEndpoints.profile())
+                let user = UserDTO(from: response.user)
                 self.state = .signedIn(user)
                 Observability.shared.identify(userId: user.id, email: user.email)
                 logger.info("Session restored", metadata: ["userId": .string(user.id)])
@@ -66,22 +65,20 @@ final class AuthManager {
     // MARK: - Sign in
 
     func signIn(email: String, password: String) async throws {
-        let response: AuthResponse = try await APIClient.shared.request(
-            Endpoint(
-                method: .post,
-                path: "/api/auth/login",
-                body: LoginRequest(email: email, password: password),
-                authenticated: false
-            )
+        let response: LoginResponse = try await APIClient.shared.request(
+            AuthEndpoints.login(email: email, password: password)
         )
-        try store.set(response.accessToken, for: SecureStoreKey.accessToken)
+        if let access = response.accessToken {
+            try store.set(access, for: SecureStoreKey.accessToken)
+            self.accessToken = access
+        }
         if let refresh = response.refreshToken {
             try store.set(refresh, for: SecureStoreKey.refreshToken)
         }
         try store.set(response.user.id, for: SecureStoreKey.userId)
 
-        self.accessToken = response.accessToken
-        self.state = .signedIn(response.user)
+        let user = UserDTO(from: response.user)
+        self.state = .signedIn(user)
         Observability.shared.identify(userId: response.user.id, email: response.user.email)
         Observability.shared.track("auth.signed_in")
         logger.info("Signed in", metadata: ["userId": .string(response.user.id)])
