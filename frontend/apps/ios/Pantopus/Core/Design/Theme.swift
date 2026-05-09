@@ -26,7 +26,7 @@ public enum Theme {
     /// Pantopus app, so token colors cannot be resolved without this
     /// indirection. `BundleToken` is defined inside the Pantopus target, so
     /// `Bundle(for:)` returns the app bundle at runtime and in tests.
-    static let bundle: Bundle = Bundle(for: BundleToken.self)
+    static let bundle = Bundle(for: BundleToken.self)
 
     private final class BundleToken {}
 }

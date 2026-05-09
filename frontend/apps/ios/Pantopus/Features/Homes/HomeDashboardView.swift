@@ -67,10 +67,11 @@ struct HomeDashboardView: View {
                         get: { viewModel.selectedTab },
                         set: { viewModel.selectedTab = $0 }
                     ),
-                    onQuickAction: { showPlaceholderToast(for: $0) }
-                ) {
-                    HomeOverviewSection(content: content)
-                }
+                    onQuickAction: { showPlaceholderToast(for: $0) },
+                    overview: {
+                        HomeOverviewSection(content: content)
+                    }
+                )
             },
             cta: {
                 FABCreateCTA(

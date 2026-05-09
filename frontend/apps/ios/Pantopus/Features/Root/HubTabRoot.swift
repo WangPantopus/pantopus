@@ -74,22 +74,17 @@ public struct HubTabRoot: View {
             HomeDashboardView(homeId: homeId)
         case .mailbox:
             MailboxListView(
-                viewModel: MailboxListViewModel(
-                    onOpenMail: { mailId in
-                        Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
-                    }
-                )
+                viewModel: MailboxListViewModel { mailId in
+                    Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
+                }
             )
         case .mailItemDetail(let mailId):
-            MailboxItemDetailView(
-                mailId: mailId,
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+            MailboxItemDetailView(mailId: mailId) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case .mailboxDrawers:
             MailboxDrawersView(
-                viewModel: MailboxDrawersViewModel(
-                    onOpenDrawer: { _ in /* Drawer detail lands later. */ }
-                )
+                viewModel: MailboxDrawersViewModel { _ in /* Drawer detail lands later. */ }
             )
         case .addHome:
             AddHomePlaceholder()
@@ -143,9 +138,9 @@ private struct HubPlaceholder: View {
                     .pantopusTextStyle(.body)
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 VStack(spacing: Spacing.s3) {
-                    PrimaryButton(title: "My homes", action: { onMyHomes() })
-                    GhostButton(title: "Mailbox drawers", action: { onMailboxDrawers() })
-                    GhostButton(title: "All mail", action: { onMailbox() })
+                    PrimaryButton(title: "My homes") { onMyHomes() }
+                    GhostButton(title: "Mailbox drawers") { onMailboxDrawers() }
+                    GhostButton(title: "All mail") { onMailbox() }
                 }
             }
             .padding(Spacing.s5)

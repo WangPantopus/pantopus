@@ -37,10 +37,10 @@ public struct LoginResponse: Decodable, Sendable, Hashable {
 
     private enum CodingKeys: String, CodingKey {
         case message
-        case accessToken = "accessToken"
-        case refreshToken = "refreshToken"
-        case expiresIn = "expiresIn"
-        case expiresAt = "expiresAt"
+        case accessToken
+        case refreshToken
+        case expiresIn
+        case expiresAt
         case user
     }
 }
@@ -89,13 +89,13 @@ public struct AuthenticatedUser: Decodable, Sendable, Hashable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, email, username, name
-        case firstName = "firstName"
-        case middleName = "middleName"
-        case lastName = "lastName"
-        case phoneNumber = "phoneNumber"
+        case firstName
+        case middleName
+        case lastName
+        case phoneNumber
         case address, city, state, zipcode
-        case accountType = "accountType"
+        case accountType
         case role, verified
-        case createdAt = "createdAt"
+        case createdAt
     }
 }

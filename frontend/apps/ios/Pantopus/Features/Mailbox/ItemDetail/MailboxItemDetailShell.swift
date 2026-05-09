@@ -265,16 +265,14 @@ public struct StickyCTAShelf: View {
                     GhostButton(
                         title: ghostTitle,
                         isLoading: content.ghostLoading,
-                        isEnabled: !content.primaryLoading,
-                        action: { await MainActor.run { onGhost() } }
-                    )
+                        isEnabled: !content.primaryLoading
+                    ) { await MainActor.run { onGhost() } }
                 }
                 PrimaryButton(
                     title: content.primaryTitle,
                     isLoading: content.primaryLoading,
-                    isEnabled: content.primaryEnabled && !content.ghostLoading,
-                    action: { await MainActor.run { onPrimary() } }
-                )
+                    isEnabled: content.primaryEnabled && !content.ghostLoading
+                ) { await MainActor.run { onPrimary() } }
             }
             .padding(Spacing.s3)
         }

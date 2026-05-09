@@ -84,8 +84,7 @@ final class MailboxDrawersViewModel: ListOfRowsDataSource {
             subtitle: subtitle,
             template: .fileChevron,
             leading: .icon(icon, tint: Theme.Color.primary600),
-            trailing: .chevron,
-            onTap: { @Sendable in Task { @MainActor in self.onOpenDrawer(drawer.drawer) } }
-        )
+            trailing: .chevron
+        ) { @Sendable in Task { @MainActor in self.onOpenDrawer(drawer.drawer) } }
     }
 }

@@ -38,9 +38,8 @@ final class MailboxListViewModel: ListOfRowsDataSource {
     public var topBarAction: TopBarAction? {
         TopBarAction(
             icon: .search,
-            accessibilityLabel: "Search mail",
-            handler: { [weak self] in Task { @MainActor in self?.toast = "Search coming soon" } }
-        )
+            accessibilityLabel: "Search mail"
+        ) { [weak self] in Task { @MainActor in self?.toast = "Search coming soon" } }
     }
     public var fab: FABAction? { nil }
     public private(set) var state: ListOfRowsState = .loading
@@ -138,9 +137,8 @@ final class MailboxListViewModel: ListOfRowsDataSource {
             subtitle: mail.previewText ?? mail.senderBusinessName ?? mail.senderAddress,
             template: .statusChip,
             leading: .icon(.mailbox, tint: Theme.Color.primary600),
-            trailing: chip,
-            onTap: { @Sendable in Task { @MainActor in self.onOpenMail(mail.id) } }
-        )
+            trailing: chip
+        ) { @Sendable in Task { @MainActor in self.onOpenMail(mail.id) } }
     }
 
     private static func statusChip(for mail: MailItem) -> RowTrailing {

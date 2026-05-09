@@ -14,28 +14,32 @@ final class DeepLinkRouterTests: XCTestCase {
         _ = DeepLinkRouter.shared.consume() // clear any leftover state
     }
 
-    func testCustomSchemeFeed() {
-        DeepLinkRouter.shared.handle(url: URL(string: "pantopus://feed")!)
+    func testCustomSchemeFeed() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://feed"))
+        DeepLinkRouter.shared.handle(url: url)
         XCTAssertEqual(DeepLinkRouter.shared.pending, .feed)
     }
 
-    func testHTTPSHost() {
-        DeepLinkRouter.shared.handle(url: URL(string: "https://pantopus.app/home")!)
+    func testHTTPSHost() throws {
+        let url = try XCTUnwrap(URL(string: "https://pantopus.app/home"))
+        DeepLinkRouter.shared.handle(url: url)
         XCTAssertEqual(DeepLinkRouter.shared.pending, .home)
     }
 
-    func testPostIDExtracted() {
-        DeepLinkRouter.shared.handle(url: URL(string: "https://pantopus.app/posts/abc-123")!)
+    func testPostIDExtracted() throws {
+        let url = try XCTUnwrap(URL(string: "https://pantopus.app/posts/abc-123"))
+        DeepLinkRouter.shared.handle(url: url)
         XCTAssertEqual(DeepLinkRouter.shared.pending, .post(id: "abc-123"))
     }
 
-    func testConversationIDExtracted() {
-        DeepLinkRouter.shared.handle(url: URL(string: "pantopus://messages/conv_42")!)
+    func testConversationIDExtracted() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://messages/conv_42"))
+        DeepLinkRouter.shared.handle(url: url)
         XCTAssertEqual(DeepLinkRouter.shared.pending, .conversation(id: "conv_42"))
     }
 
-    func testUnknownPathFallsBack() {
-        let url = URL(string: "pantopus://wat")!
+    func testUnknownPathFallsBack() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://wat"))
         DeepLinkRouter.shared.handle(url: url)
         if case .unknown(let captured) = DeepLinkRouter.shared.pending {
             XCTAssertEqual(captured, url)
@@ -44,8 +48,9 @@ final class DeepLinkRouterTests: XCTestCase {
         }
     }
 
-    func testConsumeClearsPending() {
-        DeepLinkRouter.shared.handle(url: URL(string: "pantopus://feed")!)
+    func testConsumeClearsPending() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://feed"))
+        DeepLinkRouter.shared.handle(url: url)
         XCTAssertNotNil(DeepLinkRouter.shared.consume())
         XCTAssertNil(DeepLinkRouter.shared.pending)
         XCTAssertNil(DeepLinkRouter.shared.consume())

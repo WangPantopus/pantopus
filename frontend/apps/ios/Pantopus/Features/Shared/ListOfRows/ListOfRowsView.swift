@@ -67,7 +67,7 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource>: View {
                 subcopy: content.subcopy,
                 cta: content.ctaTitle.flatMap { title in
                     guard let handler = content.onCTA else { return nil }
-                    return EmptyState.CTA(title: title, action: { await MainActor.run { handler() } })
+                    return EmptyState.CTA(title: title) { await MainActor.run { handler() } }
                 }
             )
         case .error(let message):

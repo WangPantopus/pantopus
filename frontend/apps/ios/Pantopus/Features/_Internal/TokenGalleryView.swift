@@ -215,13 +215,17 @@ public struct TokenGalleryView: View {
 
     private func spacingRow(_ name: String, _ value: CGFloat) -> some View {
         HStack(spacing: Spacing.s3) {
-            Text(name).pantopusTextStyle(.body).foregroundStyle(Theme.Color.appText)
+            Text(name)
+                .pantopusTextStyle(.body)
+                .foregroundStyle(Theme.Color.appText)
                 .frame(width: 60, alignment: .leading)
             Rectangle()
                 .fill(Theme.Color.primary200)
                 .frame(width: max(value, 1), height: 12)
             Spacer()
-            Text("\(Int(value)) pt").pantopusTextStyle(.caption).foregroundStyle(Theme.Color.appTextSecondary)
+            Text("\(Int(value)) pt")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
                 .monospaced()
         }
         .frame(minHeight: 44)
@@ -229,7 +233,9 @@ public struct TokenGalleryView: View {
 
     private func radiusRow(_ name: String, _ value: CGFloat) -> some View {
         HStack(spacing: Spacing.s3) {
-            Text(name).pantopusTextStyle(.body).foregroundStyle(Theme.Color.appText)
+            Text(name)
+                .pantopusTextStyle(.body)
+                .foregroundStyle(Theme.Color.appText)
                 .frame(width: 80, alignment: .leading)
             RoundedRectangle(cornerRadius: min(value, 28))
                 .fill(Theme.Color.primary100)
@@ -239,7 +245,9 @@ public struct TokenGalleryView: View {
                 )
                 .frame(width: 56, height: 40)
             Spacer()
-            Text("\(Int(value)) pt").pantopusTextStyle(.caption).foregroundStyle(Theme.Color.appTextSecondary)
+            Text("\(Int(value)) pt")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
                 .monospaced()
         }
         .frame(minHeight: 44)
@@ -247,7 +255,9 @@ public struct TokenGalleryView: View {
 
     private func shadowRow(_ name: String, _ shadow: PantopusShadow) -> some View {
         HStack(spacing: Spacing.s3) {
-            Text(name).pantopusTextStyle(.body).foregroundStyle(Theme.Color.appText)
+            Text(name)
+                .pantopusTextStyle(.body)
+                .foregroundStyle(Theme.Color.appText)
                 .frame(width: 80, alignment: .leading)
             RoundedRectangle(cornerRadius: Radii.md)
                 .fill(Theme.Color.appSurface)

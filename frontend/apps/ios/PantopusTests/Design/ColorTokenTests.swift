@@ -19,7 +19,7 @@ final class ColorTokenTests: XCTestCase {
     // MARK: - Primary
 
     func testPrimaryScale() {
-        assertColor(Theme.Color.primary50,  hex: "#f0f9ff")
+        assertColor(Theme.Color.primary50, hex: "#f0f9ff")
         assertColor(Theme.Color.primary100, hex: "#e0f2fe")
         assertColor(Theme.Color.primary200, hex: "#bae6fd")
         assertColor(Theme.Color.primary300, hex: "#7dd3fc")
@@ -32,59 +32,59 @@ final class ColorTokenTests: XCTestCase {
     }
 
     func testSemantic() {
-        assertColor(Theme.Color.success,      hex: "#059669")
+        assertColor(Theme.Color.success, hex: "#059669")
         assertColor(Theme.Color.successLight, hex: "#D1FAE5")
-        assertColor(Theme.Color.successBg,    hex: "#F0FDF4")
-        assertColor(Theme.Color.warning,      hex: "#D97706")
+        assertColor(Theme.Color.successBg, hex: "#F0FDF4")
+        assertColor(Theme.Color.warning, hex: "#D97706")
         assertColor(Theme.Color.warningLight, hex: "#FDE68A")
-        assertColor(Theme.Color.warningBg,    hex: "#FFFBEB")
-        assertColor(Theme.Color.error,        hex: "#DC2626")
-        assertColor(Theme.Color.errorLight,   hex: "#FECACA")
-        assertColor(Theme.Color.errorBg,      hex: "#FEF2F2")
-        assertColor(Theme.Color.info,         hex: "#0284c7")
-        assertColor(Theme.Color.infoLight,    hex: "#BAE6FD")
-        assertColor(Theme.Color.infoBg,       hex: "#F0F9FF")
+        assertColor(Theme.Color.warningBg, hex: "#FFFBEB")
+        assertColor(Theme.Color.error, hex: "#DC2626")
+        assertColor(Theme.Color.errorLight, hex: "#FECACA")
+        assertColor(Theme.Color.errorBg, hex: "#FEF2F2")
+        assertColor(Theme.Color.info, hex: "#0284c7")
+        assertColor(Theme.Color.infoLight, hex: "#BAE6FD")
+        assertColor(Theme.Color.infoBg, hex: "#F0F9FF")
     }
 
     func testIdentity() {
-        assertColor(Theme.Color.personal,   hex: "#0284C7")
+        assertColor(Theme.Color.personal, hex: "#0284C7")
         assertColor(Theme.Color.personalBg, hex: "#DBEAFE")
-        assertColor(Theme.Color.home,       hex: "#16A34A")
-        assertColor(Theme.Color.homeBg,     hex: "#DCFCE7")
-        assertColor(Theme.Color.business,   hex: "#7C3AED")
+        assertColor(Theme.Color.home, hex: "#16A34A")
+        assertColor(Theme.Color.homeBg, hex: "#DCFCE7")
+        assertColor(Theme.Color.business, hex: "#7C3AED")
         assertColor(Theme.Color.businessBg, hex: "#F3E8FF")
     }
 
     func testNeutrals() {
-        assertColor(Theme.Color.appBg,             hex: "#f6f7f9")
-        assertColor(Theme.Color.appSurface,        hex: "#ffffff")
-        assertColor(Theme.Color.appSurfaceRaised,  hex: "#f9fafb")
-        assertColor(Theme.Color.appSurfaceSunken,  hex: "#f3f4f6")
-        assertColor(Theme.Color.appSurfaceMuted,   hex: "#f8fafc")
-        assertColor(Theme.Color.appBorder,         hex: "#e5e7eb")
-        assertColor(Theme.Color.appBorderStrong,   hex: "#d1d5db")
-        assertColor(Theme.Color.appBorderSubtle,   hex: "#f3f4f6")
-        assertColor(Theme.Color.appText,           hex: "#111827")
-        assertColor(Theme.Color.appTextStrong,     hex: "#374151")
-        assertColor(Theme.Color.appTextSecondary,  hex: "#6b7280")
-        assertColor(Theme.Color.appTextMuted,      hex: "#9ca3af")
-        assertColor(Theme.Color.appTextInverse,    hex: "#ffffff")
-        assertColor(Theme.Color.appHover,          hex: "#f3f4f6")
+        assertColor(Theme.Color.appBg, hex: "#f6f7f9")
+        assertColor(Theme.Color.appSurface, hex: "#ffffff")
+        assertColor(Theme.Color.appSurfaceRaised, hex: "#f9fafb")
+        assertColor(Theme.Color.appSurfaceSunken, hex: "#f3f4f6")
+        assertColor(Theme.Color.appSurfaceMuted, hex: "#f8fafc")
+        assertColor(Theme.Color.appBorder, hex: "#e5e7eb")
+        assertColor(Theme.Color.appBorderStrong, hex: "#d1d5db")
+        assertColor(Theme.Color.appBorderSubtle, hex: "#f3f4f6")
+        assertColor(Theme.Color.appText, hex: "#111827")
+        assertColor(Theme.Color.appTextStrong, hex: "#374151")
+        assertColor(Theme.Color.appTextSecondary, hex: "#6b7280")
+        assertColor(Theme.Color.appTextMuted, hex: "#9ca3af")
+        assertColor(Theme.Color.appTextInverse, hex: "#ffffff")
+        assertColor(Theme.Color.appHover, hex: "#f3f4f6")
     }
 
     func testCategories() {
-        assertColor(Theme.Color.handyman,  hex: "#f97316")
-        assertColor(Theme.Color.cleaning,  hex: "#27ae60")
-        assertColor(Theme.Color.moving,    hex: "#8e44ad")
-        assertColor(Theme.Color.petCare,   hex: "#e74c3c")
+        assertColor(Theme.Color.handyman, hex: "#f97316")
+        assertColor(Theme.Color.cleaning, hex: "#27ae60")
+        assertColor(Theme.Color.moving, hex: "#8e44ad")
+        assertColor(Theme.Color.petCare, hex: "#e74c3c")
         assertColor(Theme.Color.childCare, hex: "#f39c12")
-        assertColor(Theme.Color.tutoring,  hex: "#2980b9")
-        assertColor(Theme.Color.delivery,  hex: "#374151")
-        assertColor(Theme.Color.tech,      hex: "#3498db")
-        assertColor(Theme.Color.goods,     hex: "#7c3aed")
-        assertColor(Theme.Color.gigs,      hex: "#f97316")
-        assertColor(Theme.Color.rentals,   hex: "#16a34a")
-        assertColor(Theme.Color.vehicles,  hex: "#dc2626")
+        assertColor(Theme.Color.tutoring, hex: "#2980b9")
+        assertColor(Theme.Color.delivery, hex: "#374151")
+        assertColor(Theme.Color.tech, hex: "#3498db")
+        assertColor(Theme.Color.goods, hex: "#7c3aed")
+        assertColor(Theme.Color.gigs, hex: "#f97316")
+        assertColor(Theme.Color.rentals, hex: "#16a34a")
+        assertColor(Theme.Color.vehicles, hex: "#dc2626")
     }
 
     // MARK: - Helpers
@@ -108,7 +108,7 @@ final class ColorTokenTests: XCTestCase {
         XCTAssertEqual(Double(a), 1.0, accuracy: 0.001, "alpha mismatch for \(hex)", file: file, line: line)
     }
 
-    private static func hexToComponents(_ hex: String) -> (r: Double, g: Double, b: Double) {
+    private static func hexToComponents(_ hex: String) -> RGBComponents {
         var s = hex
         if s.hasPrefix("#") { s.removeFirst() }
         let value = UInt64(s, radix: 16) ?? 0
@@ -116,10 +116,16 @@ final class ColorTokenTests: XCTestCase {
         let g = Double((value >> 8) & 0xff) / 255.0
         let b = Double(value & 0xff) / 255.0
         // Round to 3 decimals to mirror the asset-catalog precision.
-        return (
-            (r * 1000).rounded() / 1000,
-            (g * 1000).rounded() / 1000,
-            (b * 1000).rounded() / 1000
+        return RGBComponents(
+            r: (r * 1000).rounded() / 1000,
+            g: (g * 1000).rounded() / 1000,
+            b: (b * 1000).rounded() / 1000
         )
+    }
+
+    private struct RGBComponents {
+        let r: Double
+        let g: Double
+        let b: Double
     }
 }
