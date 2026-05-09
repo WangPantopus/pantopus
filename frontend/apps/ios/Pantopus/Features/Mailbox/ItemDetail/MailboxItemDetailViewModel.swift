@@ -264,9 +264,13 @@ final class MailboxItemDetailViewModel {
         let currentIndex = order.firstIndex(of: status) ?? 1
         return zip(order, labels).enumerated().map { index, pair in
             let state: TimelineStepState
-            if index < currentIndex { state = .done }
-            else if index == currentIndex { state = .current }
-            else { state = .upcoming }
+            if index < currentIndex {
+                state = .done
+            } else if index == currentIndex {
+                state = .current
+            } else {
+                state = .upcoming
+            }
             return TimelineStep(id: pair.0, title: pair.1, state: state)
         }
     }

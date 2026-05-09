@@ -76,9 +76,8 @@ struct HubActionStrip: View {
                     ActionChip(
                         icon: chip.icon,
                         label: chip.label,
-                        isActive: chip.active,
-                        action: { onTap(chip.kind) }
-                    )
+                        isActive: chip.active
+                    ) { onTap(chip.kind) }
                 }
             }
             .padding(.horizontal, Spacing.s4)

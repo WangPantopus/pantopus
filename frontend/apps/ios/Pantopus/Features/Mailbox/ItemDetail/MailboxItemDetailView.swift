@@ -61,14 +61,15 @@ struct MailboxItemDetailView: View {
             onBack: onBack,
             onAIChip: { _ in },
             onPrimary: { Task { await viewModel.logAsReceived() } },
-            onGhost: { Task { await viewModel.markNotMine() } }
-        ) {
-            if content.category == .package, let pkg = content.packageInfo {
-                PackageBody(carrier: pkg.carrier, etaLine: pkg.etaLine)
-            } else if content.category != .package {
-                MailItemPlaceholderBody(category: content.category)
+            onGhost: { Task { await viewModel.markNotMine() } },
+            body: {
+                if content.category == .package, let pkg = content.packageInfo {
+                    PackageBody(carrier: pkg.carrier, etaLine: pkg.etaLine)
+                } else if content.category != .package {
+                    MailItemPlaceholderBody(category: content.category)
+                }
             }
-        }
+        )
     }
 
     private func ctaContent(for content: MailboxItemDetailContent) -> MailboxCTAShelfContent? {
@@ -125,5 +126,5 @@ private struct ErrorLayout: View {
 }
 
 #Preview {
-    MailboxItemDetailView(mailId: "preview", onBack: {})
+    MailboxItemDetailView(mailId: "preview") {}
 }

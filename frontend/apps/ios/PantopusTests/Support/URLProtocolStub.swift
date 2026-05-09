@@ -46,8 +46,8 @@ final class URLProtocolStub: URLProtocol {
 
     // MARK: - URLProtocol
 
-    override class func canInit(with _: URLRequest) -> Bool { true }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override static func canInit(with _: URLRequest) -> Bool { true }
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func stopLoading() {}
 
     override func startLoading() {

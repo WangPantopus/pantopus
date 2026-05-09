@@ -69,11 +69,12 @@ final class ListOfRowsViewModelTests: XCTestCase {
     // MARK: - MailboxListViewModel
 
     func testMailboxPaginationAndTabs() async {
-        let page1 = (0..<25).map {
+        let page1Items = (0..<25).map {
             "{\"id\":\"m\($0)\",\"type\":\"notice\",\"viewed\":true,\"archived\":false," +
             "\"starred\":false,\"tags\":[],\"priority\":\"normal\",\"attachments\":null," +
             "\"created_at\":\"2025-01-01T00:00:00Z\"}"
-        }.joined(separator: ",")
+        }
+        let page1 = page1Items.joined(separator: ",")
         let page2 = "{\"id\":\"m_last\",\"type\":\"notice\",\"viewed\":true,\"archived\":false," +
             "\"starred\":false,\"tags\":[],\"priority\":\"normal\",\"attachments\":null," +
             "\"created_at\":\"2025-01-01T00:00:00Z\"}"

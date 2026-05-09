@@ -34,7 +34,8 @@ final class HomeDashboardViewModelTests: XCTestCase {
               "owner":{"id":"u1","username":"alice","name":"Alice"},
               "occupants":[],"location":null,"isOwner":true,"isPendingOwner":false,
               "pendingClaimId":null,"isOccupant":false,
-              "owners":[{"id":"o1","subject_type":"user","subject_id":"u1","owner_status":"verified","is_primary_owner":true,"verification_tier":"attom"}],
+              "owners":[{"id":"o1","subject_type":"user","subject_id":"u1",
+                         "owner_status":"verified","is_primary_owner":true,"verification_tier":"attom"}],
               "can_delete_home":true
             }}
             """),

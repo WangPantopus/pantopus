@@ -79,27 +79,28 @@ public struct EditProfileView: View {
                 case .confirmDiscard: showsDiscardConfirm = true
                 }
             },
-            onSave: { Task { await viewModel.save() } }
-        ) {
-            FormFieldGroup("About") {
-                fieldView(for: .firstName, label: "First name")
-                fieldView(for: .lastName, label: "Last name")
-                bioField
+            onSave: { Task { await viewModel.save() } },
+            content: {
+                FormFieldGroup("About") {
+                    fieldView(for: .firstName, label: "First name")
+                    fieldView(for: .lastName, label: "Last name")
+                    bioField
+                }
+                FormFieldGroup("Contact") {
+                    readOnlyEmail
+                    fieldView(
+                        for: .phoneNumber,
+                        label: "Phone",
+                        placeholder: "+15555550123",
+                        keyboardType: .phonePad,
+                        contentType: .telephoneNumber
+                    )
+                }
+                FormFieldGroup("Visibility") {
+                    visibilityPicker
+                }
             }
-            FormFieldGroup("Contact") {
-                readOnlyEmail
-                fieldView(
-                    for: .phoneNumber,
-                    label: "Phone",
-                    placeholder: "+15555550123",
-                    keyboardType: .phonePad,
-                    contentType: .telephoneNumber
-                )
-            }
-            FormFieldGroup("Visibility") {
-                visibilityPicker
-            }
-        }
+        )
         .formShakeOnChange(of: viewModel.shakeTrigger)
         .accessibilityIdentifier("editProfileShell")
     }
