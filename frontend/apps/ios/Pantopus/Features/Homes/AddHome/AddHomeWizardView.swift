@@ -317,6 +317,8 @@ private struct AddressVerdictRow: View {
         .padding(Spacing.s3)
         .background(Theme.Color.appSurfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(verdictHeadline). \(verdictSubcopy)")
     }
 
     private var verdictIcon: PantopusIcon {

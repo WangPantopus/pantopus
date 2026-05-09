@@ -279,7 +279,10 @@ private fun AddressVerdictRow(check: app.pantopus.android.data.api.models.homes.
             .fillMaxWidth()
             .clip(RoundedCornerShape(Radii.md))
             .background(PantopusColors.appSurfaceMuted)
-            .padding(Spacing.s3),
+            .padding(Spacing.s3)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "$headline. $subcopy"
+            },
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
     ) {

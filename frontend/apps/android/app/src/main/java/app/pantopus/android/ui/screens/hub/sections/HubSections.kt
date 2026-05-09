@@ -247,8 +247,14 @@ fun HubFirstRunHero(
             "${content.greeting}, ${content.name}",
             style = PantopusTextStyle.h2,
             color = PantopusColors.appText,
+            modifier = Modifier.semantics { heading() },
         )
-        Text("Verify your home", style = PantopusTextStyle.h1, color = PantopusColors.appText)
+        Text(
+            "Verify your home",
+            style = PantopusTextStyle.h1,
+            color = PantopusColors.appText,
+            modifier = Modifier.semantics { heading() },
+        )
         Text(
             "Claim your address to unlock your neighborhood pulse, mailbox, and more.",
             style = PantopusTextStyle.body,
