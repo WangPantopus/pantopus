@@ -1,5 +1,8 @@
 package app.pantopus.android.ui.screens.root
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,9 +14,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import app.pantopus.android.ui.screens.hub.HUB_HEADING_TAG
+import app.pantopus.android.ui.screens.hub.HUB_SCREEN_TAG
 import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.nearby.NearbyScreen
+import app.pantopus.android.ui.theme.PantopusIcon
 import org.junit.Rule
 import org.junit.Test
 
@@ -22,7 +26,11 @@ import org.junit.Test
  * directly. Verifies that:
  * - Hub is the default selection.
  * - Each un-designed tab renders the NotYetAvailable empty state.
- * - Re-selecting Hub returns to the Hub heading.
+ * - Re-selecting Hub returns to the Hub container.
+ *
+ * The Hub destination is stubbed with a tagged Box so the test stays free
+ * of Hilt — the real HubScreen pulls a HiltViewModel which would require
+ * a Hilt-aware test runner.
  */
 class RootTabTest {
     @get:Rule
@@ -41,15 +49,15 @@ class RootTabTest {
                     )
                 },
             ) { padding ->
-                androidx.compose.foundation.layout.Box(Modifier.padding(padding)) {
+                Box(Modifier.padding(padding)) {
                     when (selected) {
-                        PantopusRoute.Hub -> app.pantopus.android.ui.screens.hub.HubScreen()
+                        PantopusRoute.Hub -> Box(Modifier.fillMaxSize().testTag(HUB_SCREEN_TAG))
                         PantopusRoute.Nearby -> NearbyScreen()
                         PantopusRoute.Inbox -> InboxScreen()
                         PantopusRoute.You ->
                             NotYetAvailableView(
                                 tabName = "You",
-                                icon = app.pantopus.android.ui.theme.PantopusIcon.User,
+                                icon = PantopusIcon.User,
                             )
                     }
                 }
@@ -57,7 +65,7 @@ class RootTabTest {
         }
 
         // Default is Hub.
-        composeRule.onNodeWithTag(HUB_HEADING_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(HUB_SCREEN_TAG).assertIsDisplayed()
 
         // Nearby tab renders the empty-state heading.
         composeRule.onNodeWithTag("tab.nearby").performClick()
@@ -69,6 +77,6 @@ class RootTabTest {
 
         // Back to Hub.
         composeRule.onNodeWithTag("tab.hub").performClick()
-        composeRule.onNodeWithTag(HUB_HEADING_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(HUB_SCREEN_TAG).assertIsDisplayed()
     }
 }
