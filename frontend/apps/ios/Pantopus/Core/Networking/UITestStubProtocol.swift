@@ -20,6 +20,12 @@ import Foundation
 /// - `UI_TESTS_PROFILE_PATCH_BODY` — JSON body for `PATCH /api/users/profile`.
 /// - `UI_TESTS_PROFILE_GET_STATUS` / `UI_TESTS_PROFILE_PATCH_STATUS` —
 ///    override status codes (default 200).
+/// - `UI_TESTS_HOMES_SUGGEST_BODY` — JSON body for
+///   `POST /api/homes/property-suggestions`.
+/// - `UI_TESTS_HOMES_CHECK_BODY` — JSON body for
+///   `POST /api/homes/check-address`.
+/// - `UI_TESTS_HOMES_CREATE_BODY` — JSON body for `POST /api/homes`.
+/// - `UI_TESTS_HOMES_*_STATUS` — override the corresponding status code.
 ///
 /// The protocol is single-process: each XCUITest spawns the app fresh,
 /// so there is no need for cross-test isolation.
@@ -51,6 +57,33 @@ final class UITestStubProtocol: URLProtocol {
             let body = env["UI_TESTS_PROFILE_PATCH_BODY"] ?? Self.defaultProfilePatchResponseJSON
             let status = Int(env["UI_TESTS_PROFILE_PATCH_STATUS"] ?? "200") ?? 200
             finishWith(status: status, body: Data(body.utf8))
+
+        case ("POST", "/api/homes/property-suggestions"):
+            let body = env["UI_TESTS_HOMES_SUGGEST_BODY"] ?? Self.defaultPropertySuggestionsJSON
+            let status = Int(env["UI_TESTS_HOMES_SUGGEST_STATUS"] ?? "200") ?? 200
+            finishWith(status: status, body: Data(body.utf8))
+
+        case ("POST", "/api/homes/check-address"):
+            let body = env["UI_TESTS_HOMES_CHECK_BODY"] ?? Self.defaultCheckAddressJSON
+            let status = Int(env["UI_TESTS_HOMES_CHECK_STATUS"] ?? "200") ?? 200
+            finishWith(status: status, body: Data(body.utf8))
+
+        case ("POST", "/api/homes"):
+            let body = env["UI_TESTS_HOMES_CREATE_BODY"] ?? Self.defaultCreateHomeJSON
+            let status = Int(env["UI_TESTS_HOMES_CREATE_STATUS"] ?? "200") ?? 200
+            finishWith(status: status, body: Data(body.utf8))
+
+        case ("GET", let path) where path.hasPrefix("/api/homes/") && path.hasSuffix("/public-profile"):
+            let body = env["UI_TESTS_HOMES_PUBLIC_BODY"] ?? Self.defaultHomePublicProfileJSON
+            finishWith(status: 200, body: Data(body.utf8))
+
+        case ("GET", let path) where path.hasPrefix("/api/homes/") && !path.contains("my-homes"):
+            let body = env["UI_TESTS_HOMES_DETAIL_BODY"] ?? Self.defaultHomeDetailJSON
+            finishWith(status: 200, body: Data(body.utf8))
+
+        case ("GET", "/api/homes/my-homes"):
+            let body = env["UI_TESTS_HOMES_MYHOMES_BODY"] ?? Self.defaultMyHomesJSON
+            finishWith(status: 200, body: Data(body.utf8))
 
         default:
             // Unknown endpoint under test — surface a recognizable 599
@@ -105,6 +138,61 @@ final class UITestStubProtocol: URLProtocol {
       "bio":"Hello world","tagline":null,"socialLinks":null,"skills":[],
       "followers_count":0,"average_rating":0,"gigs_posted":0,"gigs_completed":0,
       "profileVisibility":"public","createdAt":"2025-01-01T00:00:00Z","updatedAt":"2025-01-01T00:00:00Z"
+    }}
+    """
+
+    /// ATTOM property suggestions envelope — matches `JSONValue` with one
+    /// candidate. Tests can override via `UI_TESTS_HOMES_SUGGEST_BODY`.
+    static let defaultPropertySuggestionsJSON = """
+    {"results":[{"address":"412 Elm St","city":"Portland","state":"OR","zipCode":"97214"}]}
+    """
+
+    /// `CheckAddressResponse` — exists=false so the wizard's verdict row
+    /// renders the "looks good" path.
+    static let defaultCheckAddressJSON = """
+    {"exists":false,"homeCount":0,"hasVerifiedMembers":false,"verdictStatus":null}
+    """
+
+    /// `CreateHomeResponse` envelope. The wizard's "View home" CTA uses
+    /// the returned `home.id` to push the dashboard route.
+    static let defaultCreateHomeJSON = """
+    {"message":"ok","home":{
+      "id":"home_test","name":"412 Elm St","address":"412 Elm St",
+      "city":"Portland","state":"OR","zipcode":"97214",
+      "home_type":null,"visibility":"public","description":null,
+      "created_at":"2025-01-01T00:00:00Z","updated_at":"2025-01-01T00:00:00Z"
+    },"requires_verification":false,"verification_type":null,"role":"owner"}
+    """
+
+    /// Minimal `MyHomesResponse` for tests that need to land on the
+    /// MyHomes list before triggering the wizard.
+    static let defaultMyHomesJSON = """
+    {"homes":[],"message":"ok"}
+    """
+
+    /// Minimal `HomeDetailResponse` for the dashboard route.
+    static let defaultHomeDetailJSON = """
+    {"home":{
+      "id":"home_test","name":"412 Elm St","address":"412 Elm St",
+      "city":"Portland","state":"OR","zipcode":"97214",
+      "home_type":null,"visibility":"public","description":null,
+      "created_at":"2025-01-01T00:00:00Z","updated_at":"2025-01-01T00:00:00Z",
+      "owner":null,"occupants":[],"location":null,
+      "isOwner":true,"isPendingOwner":false,"pendingClaimId":null,
+      "isOccupant":true,"owners":[],"can_delete_home":true
+    }}
+    """
+
+    /// Minimal `HomePublicProfileResponse`.
+    static let defaultHomePublicProfileJSON = """
+    {"home":{
+      "id":"home_test","name":"412 Elm St","address":"412 Elm St",
+      "city":"Portland","state":"OR","zipcode":"97214",
+      "home_type":null,"visibility":"public","description":null,
+      "created_at":"2025-01-01T00:00:00Z",
+      "hasVerifiedOwner":false,"verifiedOwner":null,
+      "userMembershipStatus":"member","userResidencyClaim":null,
+      "memberCount":1,"nearbyGigs":0
     }}
     """
 }

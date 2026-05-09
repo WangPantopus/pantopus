@@ -105,7 +105,12 @@ public struct HubTabRoot: View {
                 viewModel: MailboxDrawersViewModel { _ in /* Drawer detail lands later. */ }
             )
         case .addHome:
-            AddHomePlaceholder()
+            AddHomeWizardView { homeId in
+                // Replace the wizard with the dashboard so Back goes to
+                // MyHomes, not the success screen.
+                path.removeAll(where: { $0 == .addHome })
+                path.append(.homeDashboard(homeId: homeId))
+            }
         #if DEBUG
         case .tokenGallery: TokenGalleryView()
         case .iconGallery: IconGalleryView()
@@ -120,19 +125,6 @@ extension HubRoute: Identifiable {
     public var id: Self { self }
 }
 #endif
-
-/// Placeholder destination for the "Add home" wizard (Prompt P7 / P9).
-private struct AddHomePlaceholder: View {
-    var body: some View {
-        EmptyState(
-            icon: .plusSquare,
-            headline: "Add home flow coming soon",
-            subcopy: "We're wiring up address verification next."
-        )
-        .navigationTitle("Claim a home")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
 
 #Preview {
     HubTabRoot()

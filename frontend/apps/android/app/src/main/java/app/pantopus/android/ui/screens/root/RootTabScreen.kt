@@ -25,11 +25,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.pantopus.android.BuildConfig
-import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.screens._internal.TokenGalleryScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
+import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.HubNavigationIntent
 import app.pantopus.android.ui.screens.hub.HubScreen
@@ -41,7 +41,6 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_M
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
 import app.pantopus.android.ui.screens.nearby.NearbyScreen
 import app.pantopus.android.ui.screens.you.YouScreen
-import app.pantopus.android.ui.theme.PantopusIcon
 
 /** Non-tab routes reachable from within the Hub stack. */
 private object ChildRoutes {
@@ -159,10 +158,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.ADD_HOME) {
-                EmptyState(
-                    icon = PantopusIcon.PlusSquare,
-                    headline = "Add home flow coming soon",
-                    subcopy = "We're wiring up address verification next.",
+                AddHomeWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenHomeDashboard = { homeId ->
+                        // Pop the wizard then push the dashboard so Back
+                        // returns to MyHomes, not the success screen.
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.homeDashboard(homeId))
+                    },
                 )
             }
             if (BuildConfig.DEBUG) {
