@@ -5,18 +5,48 @@
 //  Fetches `GET /api/users/profile` (`backend/routes/users.js:1427`) and
 //  submits `PATCH /api/users/profile` (`backend/routes/users.js:1503`).
 //  Every editable field is defined in `updateProfileSchema`
-//  (`backend/routes/users.js:324-352`).
+//  (`backend/routes/users.js:324-351`) and is mirrored 1:1 below.
+//
+//  TODO(backend): the Edit Profile design also calls for an avatar
+//  upload, an editable email when unverified, and boolean toggles
+//  `profile_visibility_public` + `show_in_neighbor_discovery`. None of
+//  those exist in `updateProfileSchema`, so per the P10 rules we omit
+//  them here and leave this comment for future backend work.
 //
 
 import Foundation
 import Observation
 
-/// Stable identifiers for the Edit Profile fields.
+/// Stable identifiers for every editable field in the Edit Profile form.
+/// Order mirrors `updateProfileSchema` declaration order so the form layout
+/// reads top-down in the same order as the backend contract.
 public enum EditProfileField: String, CaseIterable, Sendable {
+    // About
     case firstName
+    case middleName
     case lastName
     case bio
+    case tagline
+
+    // Contact
     case phoneNumber
+    case dateOfBirth
+
+    // Address
+    case address
+    case city
+    case state
+    case zipcode
+
+    // Social links — backend stores these in the `social_links` jsonb
+    // column but accepts them as flat keys on PATCH.
+    case website
+    case linkedin
+    case twitter
+    case instagram
+    case facebook
+
+    // Visibility
     case profileVisibility
 }
 
@@ -87,6 +117,12 @@ final class EditProfileViewModel {
         FormAggregate(fields: EditProfileField.allCases.compactMap { fields[$0] })
     }
 
+    /// Convenience exposes for `FormShell` so the view doesn't have to
+    /// thread `aggregate.isValid` / `aggregate.isDirty` through the call
+    /// site.
+    var isValid: Bool { aggregate.isValid }
+    var isDirty: Bool { aggregate.isDirty }
+
     /// Runs all validators and returns the first failing field id, if any.
     @discardableResult
     func validateAll() -> EditProfileField? {
@@ -105,10 +141,9 @@ final class EditProfileViewModel {
     /// Submit the PATCH. Returns true on success.
     @discardableResult
     func save() async -> Bool {
-        if let invalid = validateAll() {
+        if validateAll() != nil {
             shakeTrigger &+= 1
             toast = ToastMessage(text: "Fix the highlighted field.", kind: .error)
-            _ = invalid
             return false
         }
         guard aggregate.isDirty else { return false }
@@ -140,9 +175,21 @@ final class EditProfileViewModel {
         email = profile.email
         emailVerified = profile.verified
         seed(.firstName, profile.firstName)
+        seed(.middleName, profile.middleName ?? "")
         seed(.lastName, profile.lastName)
         seed(.bio, profile.bio ?? "")
+        seed(.tagline, profile.tagline ?? "")
         seed(.phoneNumber, profile.phoneNumber ?? "")
+        seed(.dateOfBirth, profile.dateOfBirth ?? "")
+        seed(.address, profile.address ?? "")
+        seed(.city, profile.city ?? "")
+        seed(.state, profile.state ?? "")
+        seed(.zipcode, profile.zipcode ?? "")
+        seed(.website, profile.socialLinks?.website ?? "")
+        seed(.linkedin, profile.socialLinks?.linkedin ?? "")
+        seed(.twitter, profile.socialLinks?.twitter ?? "")
+        seed(.instagram, profile.socialLinks?.instagram ?? "")
+        seed(.facebook, profile.socialLinks?.facebook ?? "")
         seed(.profileVisibility, profile.profileVisibility ?? "public")
     }
 
@@ -152,35 +199,86 @@ final class EditProfileViewModel {
         fields[field] = snapshot
     }
 
+    /// Per-field validator, looked up via `Self.validators` so this stays
+    /// well below the SwiftLint cyclomatic-complexity ceiling.
     private func validator(for field: EditProfileField) -> FormValidator {
-        switch field {
-        case .firstName:
-            return FormValidator.all([.required("First name"), .maxLength(255)])
-        case .lastName:
-            return FormValidator.all([.required("Last name"), .maxLength(255)])
-        case .bio:
-            return FormValidator.maxLength(2000)
-        case .phoneNumber:
-            return FormValidator.e164Phone()
-        case .profileVisibility:
-            return FormValidator { value in
-                ["public", "registered", "private"].contains(value)
-                    ? nil
-                    : "Pick a visibility option."
-            }
-        }
+        Self.validators[field] ?? FormValidator { _ in nil }
     }
 
+    /// Static validator table. Each entry mirrors the corresponding Joi
+    /// rule in `updateProfileSchema` (`backend/routes/users.js:324-351`).
+    private static let validators: [EditProfileField: FormValidator] = [
+        // Required name fields — Joi `.string().min(1).max(255)`.
+        .firstName: .all([.required("First name"), .maxLength(255)]),
+        .lastName: .all([.required("Last name"), .maxLength(255)]),
+        // Optional name fields with length bounds.
+        .middleName: .optionalLength("Middle name", min: 1, max: 255),
+        // `.allow('', null)` text fields — only an upper bound applies.
+        .bio: .maxLength(2000),
+        .tagline: .maxLength(255),
+        // E.164 phone (optional). Empty allowed at the validator layer
+        // but skipped from the PATCH body (see fieldAllowsEmpty).
+        .phoneNumber: .e164Phone(),
+        // ISO-8601 date or empty.
+        .dateOfBirth: .isoDateOrEmpty(),
+        // Optional address fields — Joi enforces min/max only when set.
+        .address: .optionalLength("Address", min: 5, max: 255),
+        .city: .optionalLength("City", min: 2, max: 100),
+        .state: .optionalLength("State", min: 2, max: 50),
+        .zipcode: .optionalLength("Zipcode", min: 3, max: 20),
+        // Social links — Joi `urlOrEmpty`.
+        .website: .urlOrEmpty(),
+        .linkedin: .urlOrEmpty(),
+        .twitter: .urlOrEmpty(),
+        .instagram: .urlOrEmpty(),
+        .facebook: .urlOrEmpty(),
+        // Visibility enum — restrict to the three schema values.
+        .profileVisibility: FormValidator { value in
+            ["public", "registered", "private"].contains(value)
+                ? nil
+                : "Pick a visibility option."
+        },
+    ]
+
+    /// Whether the schema explicitly allows an empty / null payload for
+    /// the given field — see the Joi declarations at
+    /// `backend/routes/users.js:324-351`.
+    private static let allowsEmpty: Set<EditProfileField> = [
+        .middleName, .bio, .tagline, .dateOfBirth,
+        .website, .linkedin, .twitter, .instagram, .facebook,
+    ]
+
+    /// Assemble a PATCH body with only the dirty fields. Empty strings are
+    /// included for fields whose schema entry has `.allow('', null)` (so
+    /// the user can clear them); fields without that allowance are
+    /// skipped when empty so we don't send a value the server will reject.
+    // The 17-case switch below mirrors the schema 1:1; cyclomatic
+    // complexity is intentionally high and adding indirection would only
+    // hide the mapping.
+    // swiftlint:disable:next cyclomatic_complexity
     private func buildRequest() -> ProfileUpdateRequest {
         var update = ProfileUpdateRequest()
         for field in EditProfileField.allCases {
             guard let snapshot = fields[field], snapshot.isDirty else { continue }
             let trimmed = snapshot.value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty && !Self.allowsEmpty.contains(field) { continue }
             switch field {
             case .firstName: update.firstName = trimmed
+            case .middleName: update.middleName = trimmed
             case .lastName: update.lastName = trimmed
             case .bio: update.bio = trimmed
-            case .phoneNumber: update.phoneNumber = trimmed.isEmpty ? nil : trimmed
+            case .tagline: update.tagline = trimmed
+            case .phoneNumber: update.phoneNumber = trimmed
+            case .dateOfBirth: update.dateOfBirth = trimmed
+            case .address: update.address = trimmed
+            case .city: update.city = trimmed
+            case .state: update.state = trimmed
+            case .zipcode: update.zipcode = trimmed
+            case .website: update.website = trimmed
+            case .linkedin: update.linkedin = trimmed
+            case .twitter: update.twitter = trimmed
+            case .instagram: update.instagram = trimmed
+            case .facebook: update.facebook = trimmed
             case .profileVisibility: update.profileVisibility = trimmed
             }
         }

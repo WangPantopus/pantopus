@@ -26,6 +26,7 @@ public struct PantopusTextField: View {
     private let isSecure: Bool
     private let keyboardType: UIKeyboardType
     private let contentType: UITextContentType?
+    private let identifier: String?
 
     @FocusState private var isFocused: Bool
 
@@ -36,7 +37,8 @@ public struct PantopusTextField: View {
         state: PantopusFieldState = .default,
         isSecure: Bool = false,
         keyboardType: UIKeyboardType = .default,
-        contentType: UITextContentType? = nil
+        contentType: UITextContentType? = nil,
+        identifier: String? = nil
     ) {
         self.label = label
         self._text = text
@@ -45,6 +47,7 @@ public struct PantopusTextField: View {
         self.isSecure = isSecure
         self.keyboardType = keyboardType
         self.contentType = contentType
+        self.identifier = identifier
     }
 
     public var body: some View {
@@ -75,6 +78,7 @@ public struct PantopusTextField: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(a11yLabel)
+        .modifier(IdentifierModifier(identifier: identifier))
     }
 
     @ViewBuilder private var input: some View {
@@ -111,6 +115,21 @@ public struct PantopusTextField: View {
         case .error(let msg): "\(label), error: \(msg)"
         case .valid: "\(label), valid"
         case .default: label
+        }
+    }
+}
+
+/// Conditional `accessibilityIdentifier` — applied to the combined
+/// outer element so XCUITests can locate the field while the inner
+/// `TextField` keeps its first-responder behavior for keyboard input.
+private struct IdentifierModifier: ViewModifier {
+    let identifier: String?
+
+    func body(content: Content) -> some View {
+        if let identifier {
+            content.accessibilityIdentifier(identifier)
+        } else {
+            content
         }
     }
 }

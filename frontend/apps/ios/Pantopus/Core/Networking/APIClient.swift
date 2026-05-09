@@ -16,8 +16,33 @@ import Logging
 /// idempotent methods.
 @Observable
 final class APIClient: @unchecked Sendable {
-    /// Singleton for the live app. Unit tests construct their own instance.
-    static let shared = APIClient()
+    /// Singleton for the live app. Unit tests construct their own
+    /// instance. Under `UI_TESTS_STUB_API=1` the lazy initializer wires
+    /// in `UITestStubProtocol` so XCUITests can drive the network surface
+    /// without a real backend.
+    static let shared: APIClient = {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["UI_TESTS_STUB_API"] == "1" {
+            return APIClient.makeUITestStubbed()
+        }
+        #endif
+        return APIClient()
+    }()
+
+    #if DEBUG
+    /// Build an `APIClient` whose `URLSession` routes every request
+    /// through `UITestStubProtocol`. Only used by UI-test launches.
+    private static func makeUITestStubbed() -> APIClient {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [UITestStubProtocol.self]
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        return APIClient(
+            session: URLSession(configuration: config),
+            retryPolicy: .none
+        )
+    }
+    #endif
 
     private let session: URLSession
     private let decoder: JSONDecoder
