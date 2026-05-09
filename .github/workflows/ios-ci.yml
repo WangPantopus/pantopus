@@ -36,6 +36,18 @@ jobs:
       - name: SwiftFormat (lint only)
         run: swiftformat --lint .
 
+      - name: No raw hex in feature code
+        # Acceptance criterion #5 from Prompt P1 — feature code must use
+        # `Theme.Color.*` tokens, never raw `#RRGGBB(AA)` literals (in code
+        # or comments). Token files under `Pantopus/Core/Design/` are
+        # exempt by design.
+        run: |
+          if grep -rnE '#[0-9a-fA-F]{6,8}' Pantopus/Features ; then
+            echo "::error::Raw hex literals found in feature code. Use Theme.Color.* tokens instead."
+            exit 1
+          fi
+          echo "✓ No raw hex literals in Pantopus/Features."
+
   test:
     name: Unit + UI tests
     runs-on: macos-14

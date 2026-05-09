@@ -52,6 +52,18 @@ jobs:
           MAPS_API_KEY=
           ENV
 
+      - name: No raw hex in feature code
+        # Acceptance criterion #5 from Prompt P1 — feature code must use
+        # `PantopusColors.*` / `LocalPantopusTokens` tokens, never raw
+        # `Color(0xRRGGBB...)` or `#RRGGBB(AA)` literals (in code or
+        # comments). Token files under `ui/theme/` are exempt by design.
+        run: |
+          if grep -rnE '#[0-9a-fA-F]{6,8}' app/src/main/java/app/pantopus/android/ui/screens ; then
+            echo "::error::Raw hex literals found in feature code. Use PantopusColors.* tokens instead."
+            exit 1
+          fi
+          echo "✓ No raw hex literals in ui/screens."
+
       - name: ktlint
         run: ./gradlew ktlintCheck --no-daemon
 

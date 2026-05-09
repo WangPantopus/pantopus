@@ -34,27 +34,45 @@ public struct HubTabRoot: View {
 
     public var body: some View {
         NavigationStack(path: $path) {
-            HubView { intent in
-                switch intent {
-                case .pillar(.mail): path.append(.mailbox)
-                case .action(.addHome), .startVerification: path.append(.addHome)
-                case .action(.scanMail): path.append(.mailboxDrawers)
-                case .pillar, .action, .openDiscovery, .jumpBackIn,
-                     .openNotifications, .openMenu:
-                    break
+            hub
+                .navigationTitle("Hub")
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(for: HubRoute.self) { route in
+                    destination(for: route) { path.append($0) }
                 }
-            }
-            .navigationTitle("Hub")
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: HubRoute.self) { route in
-                destination(for: route) { path.append($0) }
-            }
             #if DEBUG
-            .sheet(item: $debugSheet) { route in
-                destination(for: route) { _ in }
-            }
+                .sheet(item: $debugSheet) { route in
+                    destination(for: route) { _ in }
+                }
             #endif
         }
+    }
+
+    @ViewBuilder
+    private var hub: some View {
+        HubView { intent in
+            switch intent {
+            case .pillar(.mail): path.append(.mailbox)
+            case .action(.addHome), .startVerification: path.append(.addHome)
+            case .action(.scanMail): path.append(.mailboxDrawers)
+            case .pillar, .action, .openDiscovery, .jumpBackIn,
+                 .openNotifications, .openMenu:
+                break
+            }
+        }
+        #if DEBUG
+        // 44pt invisible 5-tap target in the top-leading safe area — the
+        // production hub hides its nav bar so there's no visible title to
+        // tap. Hidden from accessibility so VoiceOver users can't trip
+        // the debug menu by accident.
+        .overlay(alignment: .topLeading) {
+            Color.clear
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                .onTapGesture(count: 5) { debugSheet = .tokenGallery }
+                .accessibilityHidden(true)
+        }
+        #endif
     }
 
     @ViewBuilder
@@ -113,39 +131,6 @@ private struct AddHomePlaceholder: View {
         )
         .navigationTitle("Claim a home")
         .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-/// Placeholder body shown while the real hub UI is being designed (Prompt
-/// P7). Also exposes entry points to the three new List-of-Rows screens
-/// from P6 and a 5-tap easter egg to the token gallery.
-private struct HubPlaceholder: View {
-    let onMyHomes: () -> Void
-    let onMailboxDrawers: () -> Void
-    let onMailbox: () -> Void
-    let onDebugFiveTap: () -> Void
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.s4) {
-                Text("Hub")
-                    .pantopusTextStyle(.h1)
-                    .foregroundStyle(Theme.Color.appText)
-                    .contentShape(Rectangle())
-                    .onTapGesture(count: 5, perform: onDebugFiveTap)
-                    .accessibilityAddTraits(.isHeader)
-                Text("Your personalised Pantopus hub is coming soon. In the meantime, poke at the scaffolding:")
-                    .pantopusTextStyle(.body)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                VStack(spacing: Spacing.s3) {
-                    PrimaryButton(title: "My homes") { onMyHomes() }
-                    GhostButton(title: "Mailbox drawers") { onMailboxDrawers() }
-                    GhostButton(title: "All mail") { onMailbox() }
-                }
-            }
-            .padding(Spacing.s5)
-        }
-        .background(Theme.Color.appBg)
     }
 }
 
