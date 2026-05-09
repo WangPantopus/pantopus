@@ -1,9 +1,15 @@
 package app.pantopus.android.ui.screens.hub
 
+import androidx.compose.runtime.Immutable
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.theme.PantopusIcon
 
-/** Top-level hub lifecycle state. */
+/**
+ * Top-level hub lifecycle state. Marked `@Immutable` so Compose treats
+ * the parent `HubScreen` as skippable when neither the state nor the
+ * intent handler changed.
+ */
+@Immutable
 sealed interface HubUiState {
     /** Initial skeleton / refresh state. */
     data object Skeleton : HubUiState
@@ -19,6 +25,7 @@ sealed interface HubUiState {
 }
 
 /** First-run projection. */
+@Immutable
 data class FirstRunContent(
     val greeting: String,
     val name: String,
@@ -30,6 +37,7 @@ data class FirstRunContent(
 )
 
 /** Assembled hub bundle. */
+@Immutable
 data class PopulatedContent(
     val topBar: TopBarContent,
     val actionChips: List<ActionChipContent>,
@@ -42,9 +50,11 @@ data class PopulatedContent(
 )
 
 /** Setup-step row. */
+@Immutable
 data class SetupStep(val id: String, val title: String, val done: Boolean)
 
 /** Hub top-bar payload. */
+@Immutable
 data class TopBarContent(
     val greeting: String,
     val name: String,
@@ -54,6 +64,7 @@ data class TopBarContent(
 )
 
 /** Chip in the action strip. */
+@Immutable
 data class ActionChipContent(
     val kind: Kind,
     val label: String,
@@ -65,12 +76,14 @@ data class ActionChipContent(
 }
 
 /** Amber setup banner payload. */
+@Immutable
 data class SetupBannerContent(
     val title: String = "Verify your address",
     val ctaTitle: String = "Start",
 )
 
 /** Today card. */
+@Immutable
 data class TodaySummary(
     val temperatureFahrenheit: Int? = null,
     val conditions: String? = null,
@@ -79,6 +92,7 @@ data class TodaySummary(
 )
 
 /** One of the 4 pillar tiles. */
+@Immutable
 data class PillarTile(
     val pillar: Pillar,
     val label: String,
@@ -91,6 +105,7 @@ data class PillarTile(
 }
 
 /** Discovery rail card. */
+@Immutable
 data class DiscoveryCardContent(
     val id: String,
     val title: String,
@@ -100,9 +115,11 @@ data class DiscoveryCardContent(
 )
 
 /** Jump-back-in rail card. */
+@Immutable
 data class JumpBackItem(val id: String, val title: String, val icon: PantopusIcon)
 
 /** Recent-activity row. */
+@Immutable
 data class ActivityEntry(
     val id: String,
     val title: String,

@@ -199,6 +199,7 @@ final class APIClient: @unchecked Sendable {
             throw APIError.invalidResponse
         }
         logger.debug("API \(endpoint.method.rawValue) \(endpoint.path) -> \(http.statusCode)")
+        warnIfResponseExceedsBudget(path: endpoint.path, byteCount: data.count)
 
         switch http.statusCode {
         case 200..<300, 304:
@@ -258,6 +259,34 @@ final class APIClient: @unchecked Sendable {
         }
 
         return request
+    }
+
+    // MARK: - Response-size budgets (P13)
+
+    /// Hot read endpoints whose response should stay under the
+    /// per-request size budget. Anything larger trips a warn-level log
+    /// and (when wired in P15) a Sentry breadcrumb so we catch
+    /// regressions before they ship.
+    private static let responseSizeWatchPaths: [String] = [
+        "/api/hub",
+        "/api/mailbox",
+        "/api/homes/my-homes",
+    ]
+
+    /// Per-path size budget in bytes (500 KB).
+    private static let responseSizeBudgetBytes: Int = 500_000
+
+    /// Log a warning when a watched endpoint exceeds the size budget.
+    /// Called from `executeOnce` after a successful 2xx so retries don't
+    /// double-count.
+    private func warnIfResponseExceedsBudget(path: String, byteCount: Int) {
+        guard byteCount > Self.responseSizeBudgetBytes else { return }
+        let watched = Self.responseSizeWatchPaths.contains { path.hasPrefix($0) }
+        guard watched else { return }
+        let kib = byteCount / 1024
+        logger.warning(
+            "API response size budget exceeded for \(path): \(kib) KB > 500 KB"
+        )
     }
 }
 

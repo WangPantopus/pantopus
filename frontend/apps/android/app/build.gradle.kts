@@ -106,6 +106,18 @@ android {
         buildConfig = true
     }
 
+    // P13 perf: opt into Compose compiler stability + recomposition
+    // reports when invoked with `-PcomposeCompilerReports=true`. Off by
+    // default so day-to-day builds stay fast.
+    if (project.findProperty("composeCompilerReports") == "true") {
+        composeCompiler {
+            reportsDestination =
+                layout.buildDirectory.dir("compose_compiler_reports")
+            metricsDestination =
+                layout.buildDirectory.dir("compose_compiler_reports")
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
