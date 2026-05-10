@@ -89,29 +89,7 @@ class HubViewModel
         ) {
             val todaySummary = projectToday(today)
             if (isFirstRun(hub)) {
-                _state.value =
-                    HubUiState.FirstRun(
-                        FirstRunContent(
-                            greeting = greeting(),
-                            name = hub.user.firstName ?: hub.user.name,
-                            avatarInitials = initials(hub.user.name),
-                            ringProgress =
-                                hub.setup.profileCompleteness.score
-                                    .toFloat(),
-                            profileCompleteness =
-                                hub.setup.profileCompleteness.score
-                                    .toFloat(),
-                            steps =
-                                hub.setup.steps.map {
-                                    SetupStep(
-                                        id = it.key,
-                                        title = it.key.replace('_', ' ').replaceFirstChar { c -> c.uppercase() },
-                                        done = it.done,
-                                    )
-                                },
-                            today = todaySummary,
-                        ),
-                    )
+                _state.value = firstRunState(hub, todaySummary)
                 return
             }
 
@@ -168,6 +146,33 @@ class HubViewModel
                     ),
                 )
         }
+
+        private fun firstRunState(
+            hub: HubResponse,
+            todaySummary: TodaySummary?,
+        ): HubUiState.FirstRun =
+            HubUiState.FirstRun(
+                FirstRunContent(
+                    greeting = greeting(),
+                    name = hub.user.firstName ?: hub.user.name,
+                    avatarInitials = initials(hub.user.name),
+                    ringProgress =
+                        hub.setup.profileCompleteness.score
+                            .toFloat(),
+                    profileCompleteness =
+                        hub.setup.profileCompleteness.score
+                            .toFloat(),
+                    steps =
+                        hub.setup.steps.map {
+                            SetupStep(
+                                id = it.key,
+                                title = it.key.replace('_', ' ').replaceFirstChar { c -> c.uppercase() },
+                                done = it.done,
+                            )
+                        },
+                    today = todaySummary,
+                ),
+            )
 
         private fun isFirstRun(hub: HubResponse): Boolean =
             !hub.setup.allDone &&

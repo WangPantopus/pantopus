@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName")
+
 package app.pantopus.android.ui.screens.shared.wizard.blocks
 
 import androidx.compose.foundation.background

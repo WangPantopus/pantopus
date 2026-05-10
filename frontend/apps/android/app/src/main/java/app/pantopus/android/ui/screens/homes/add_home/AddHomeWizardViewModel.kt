@@ -57,6 +57,7 @@ data class AddHomeUiState(
  * config changes and process death (acceptance criterion #5).
  */
 @HiltViewModel
+@Suppress("TooManyFunctions")
 open class AddHomeWizardViewModel
     @Inject
     constructor(
@@ -396,6 +397,7 @@ open class AddHomeWizardViewModel
 
         companion object {
             const val SUGGESTION_DEBOUNCE_MS: Long = 300L
+            private const val MAX_SUGGESTIONS = 5
 
             private const val KEY_STEP = "addHome.step"
             private const val KEY_STREET = "addHome.street"
@@ -408,12 +410,12 @@ open class AddHomeWizardViewModel
 
             /**
              * Flatten the provider-defined ATTOM JSON into a list of human-
-             * readable display strings. Returns at most 5.
+             * readable display strings. Returns at most [MAX_SUGGESTIONS].
              */
             fun flattenSuggestions(value: JsonValue): List<String> {
                 val out = mutableListOf<String>()
                 collectAny(value as Any?, out)
-                return out.take(5)
+                return out.take(MAX_SUGGESTIONS)
             }
 
             private fun collectAny(

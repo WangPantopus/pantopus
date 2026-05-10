@@ -295,7 +295,7 @@ private fun SuggestionList(
 
 @Composable
 private fun AddressVerdictRow(check: app.pantopus.android.data.api.models.homes.CheckAddressResponse) {
-    val (icon, color, headline, subcopy) =
+    val verdict =
         if (check.exists) {
             Verdict(
                 icon = PantopusIcon.AlertCircle,
@@ -319,16 +319,16 @@ private fun AddressVerdictRow(check: app.pantopus.android.data.api.models.homes.
                 .background(PantopusColors.appSurfaceMuted)
                 .padding(Spacing.s3)
                 .semantics(mergeDescendants = true) {
-                    contentDescription = "$headline. $subcopy"
+                    contentDescription = "${verdict.headline}. ${verdict.subcopy}"
                 },
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 20.dp, tint = color)
+        PantopusIconImage(icon = verdict.icon, contentDescription = null, size = 20.dp, tint = verdict.color)
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = headline, style = PantopusTextStyle.body, color = PantopusColors.appText)
+            Text(text = verdict.headline, style = PantopusTextStyle.body, color = PantopusColors.appText)
             Text(
-                text = subcopy,
+                text = verdict.subcopy,
                 style = PantopusTextStyle.caption,
                 color = PantopusColors.appTextSecondary,
             )
