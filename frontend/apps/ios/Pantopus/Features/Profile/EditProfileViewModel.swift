@@ -260,6 +260,8 @@ final class EditProfileViewModel {
         .website, .linkedin, .twitter, .instagram, .facebook,
     ]
 
+    // swiftlint:disable cyclomatic_complexity
+
     /// Assemble a PATCH body with only the dirty fields. Empty strings are
     /// included for fields whose schema entry has `.allow('', null)` (so
     /// the user can clear them); fields without that allowance are
@@ -268,7 +270,6 @@ final class EditProfileViewModel {
     /// The 17-case switch below mirrors the schema 1:1; cyclomatic
     /// complexity is intentionally high and adding indirection would only
     /// hide the mapping.
-    // swiftlint:disable:next cyclomatic_complexity
     private func buildRequest() -> ProfileUpdateRequest {
         var update = ProfileUpdateRequest()
         for field in EditProfileField.allCases {
@@ -297,4 +298,5 @@ final class EditProfileViewModel {
         }
         return update
     }
+    // swiftlint:enable cyclomatic_complexity
 }
