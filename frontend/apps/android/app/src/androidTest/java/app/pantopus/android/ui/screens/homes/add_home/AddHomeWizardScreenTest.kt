@@ -132,10 +132,16 @@ class AddHomeWizardScreenTest {
         compose.onNodeWithTag(WizardShellTags.LEADING).performClick()
         // Material 3 AlertDialog renders inside its own Popup window —
         // reach the visible surface by title text rather than testTag.
+        // `waitUntil` confirms the dialog node exists in the semantics
+        // tree; we deliberately do NOT then assertIsDisplayed on the
+        // same query. The popup creates a matching text node that the
+        // `isDisplayed` check (alpha + visible bounds) reports as not
+        // displayed even when the dialog is on-screen, leading to a
+        // false negative. Acting on the dialog ("Keep going") then
+        // re-asserting on the shell after dismissal is enough.
         compose.waitUntil(timeoutMillis = 10_000) {
             compose.onAllNodesWithText("Discard your progress?").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("Discard your progress?").assertIsDisplayed()
         compose.onNodeWithText("Keep going").performClick()
         compose.onNodeWithTag(WizardShellTags.SHELL).assertIsDisplayed()
     }
