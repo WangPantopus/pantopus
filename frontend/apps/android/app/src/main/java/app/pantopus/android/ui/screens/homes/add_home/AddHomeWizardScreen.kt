@@ -123,33 +123,35 @@ private fun AddressStep(
             value = state.form.address.street,
             onValueChange = { vm.updateField(AddressField.Street, it) },
             placeholder = "123 Main St",
-            modifier = Modifier.testTag("addHome_street"),
+            fieldTestTag = "addHome_street",
         )
         PantopusTextField(
             label = "Unit (optional)",
             value = state.form.address.unit,
             onValueChange = { vm.updateField(AddressField.Unit, it) },
             placeholder = "Apt 4B",
-            modifier = Modifier.testTag("addHome_unit"),
+            fieldTestTag = "addHome_unit",
         )
         PantopusTextField(
             label = "City",
             value = state.form.address.city,
             onValueChange = { vm.updateField(AddressField.City, it) },
-            modifier = Modifier.testTag("addHome_city"),
+            fieldTestTag = "addHome_city",
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             PantopusTextField(
                 label = "State",
                 value = state.form.address.state,
                 onValueChange = { vm.updateField(AddressField.State, it) },
-                modifier = Modifier.weight(1f).testTag("addHome_state"),
+                modifier = Modifier.weight(1f),
+                fieldTestTag = "addHome_state",
             )
             PantopusTextField(
                 label = "ZIP",
                 value = state.form.address.zipCode,
                 onValueChange = { vm.updateField(AddressField.Zip, it) },
-                modifier = Modifier.weight(1f).testTag("addHome_zip"),
+                modifier = Modifier.weight(1f),
+                fieldTestTag = "addHome_zip",
             )
         }
     }

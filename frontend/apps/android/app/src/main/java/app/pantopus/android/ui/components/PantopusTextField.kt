@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
@@ -68,6 +69,7 @@ fun PantopusTextField(
     state: PantopusFieldState = PantopusFieldState.Default,
     isSecure: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
+    fieldTestTag: String? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -75,7 +77,7 @@ fun PantopusTextField(
 
     Column(
         modifier =
-            modifier.semantics(mergeDescendants = true) {
+            modifier.semantics {
                 contentDescription =
                     when (state) {
                         is PantopusFieldState.Error -> "$label, error: ${state.message}"
@@ -114,7 +116,13 @@ fun PantopusTextField(
                 visualTransformation =
                     if (isSecure) VisualTransformation.None else VisualTransformation.None,
                 keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                modifier = Modifier.weight(1f),
+                // Test tag must land directly on BasicTextField — that's the
+                // node that owns the editable's RequestFocus / SetText
+                // semantic actions. Putting it on the outer wrapper meant
+                // performTextInput failed with "(RequestFocus is defined)".
+                modifier = Modifier
+                    .weight(1f)
+                    .then(if (fieldTestTag != null) Modifier.testTag(fieldTestTag) else Modifier),
                 decorationBox = { inner ->
                     if (value.isEmpty()) {
                         Text(
