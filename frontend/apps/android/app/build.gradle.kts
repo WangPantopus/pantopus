@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.paparazzi)
+    alias(libs.plugins.play.publisher)
 }
 
 // Load local env from .env (not committed). Falls back to sensible defaults.
@@ -269,4 +270,60 @@ tasks.register("paparazziRecord") {
     group = "verification"
     description = "Record new Paparazzi snapshot baselines for the debug variant."
     dependsOn("recordPaparazziDebug")
+}
+
+// P16: Gradle Play Publisher.
+//
+// Reads the service-account JSON path + track from
+// `~/.gradle/gradle.properties` (never committed) so a real release
+// looks like:
+//
+//   ./gradlew publishReleaseBundle --dry-run        # smoke check
+//   ./gradlew publishReleaseBundle                  # ship
+//
+// Fall through gracefully when the credentials aren't set so day-to-day
+// builds (and CI without secrets) still succeed.
+play {
+    val keyPath = providers
+        .gradleProperty("PANTOPUS_PLAY_SERVICE_ACCOUNT_JSON")
+        .orElse(providers.environmentVariable("PANTOPUS_PLAY_SERVICE_ACCOUNT_JSON"))
+        .getOrElse("")
+    if (keyPath.isNotEmpty() && file(keyPath).exists()) {
+        serviceAccountCredentials.set(file(keyPath))
+        track.set("internal")
+        defaultToAppBundles.set(true)
+        // `draft` keeps reviews paused until a human flips status to
+        // `completed` in the Play Console — safer for first-time
+        // automation.
+        releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.DRAFT)
+        // Read changelog from `fastlane/metadata/android/<lang>/changelogs/<versionCode>.txt`.
+        // Mirror the path as a Play resolution strategy.
+        resolutionStrategy.set(com.github.triplet.gradle.androidpublisher.ResolutionStrategy.AUTO)
+    } else {
+        // No credentials → mark the publisher disabled so the plugin's
+        // tasks are no-ops. `--dry-run` still works.
+        enabled.set(false)
+    }
+}
+
+// P16: convenience task to drive `StoreScreenshotsTest` on a connected
+// device/emulator and pull the resulting PNGs into the fastlane metadata
+// folder. Runs the existing instrumented test class then `adb pull`s
+// the artifacts.
+tasks.register("captureStoreScreenshots") {
+    group = "publishing"
+    description = "Capture the 6 hero screenshots into fastlane metadata."
+    dependsOn(":app:connectedDebugAndroidTest")
+    doLast {
+        val pkg = android.namespace
+        val src = "/sdcard/Android/data/$pkg/files/Pictures/store_screenshots"
+        val dst = file("fastlane/metadata/android/en-US/images/phoneScreenshots").apply {
+            mkdirs()
+        }
+        exec {
+            commandLine("adb", "pull", src, dst.absolutePath)
+            isIgnoreExitValue = true
+        }
+        logger.lifecycle("✓ Screenshots pulled to $dst")
+    }
 }

@@ -15,10 +15,20 @@ final class AppEnvironment {
         case staging
         case production
 
-        /// Selected from scheme env variable PANTOPUS_API_ENV.
+        /// Selected from scheme env variable `PANTOPUS_API_ENV` first.
+        /// When unset (release builds installed from TestFlight / App
+        /// Store don't carry scheme env) we fall back per build
+        /// configuration: Debug → `.local`, Release → `.production`.
         static var current: Target {
-            let raw = ProcessInfo.processInfo.environment["PANTOPUS_API_ENV"] ?? "local"
-            return Target(rawValue: raw) ?? .local
+            if let raw = ProcessInfo.processInfo.environment["PANTOPUS_API_ENV"],
+               let target = Target(rawValue: raw) {
+                return target
+            }
+            #if DEBUG
+            return .local
+            #else
+            return .production
+            #endif
         }
     }
 

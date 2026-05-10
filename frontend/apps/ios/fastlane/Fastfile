@@ -18,7 +18,7 @@ platform :ios do
     )
   end
 
-  desc "Build and upload to TestFlight"
+  desc "Build and upload to TestFlight (via match for signing)"
   lane :beta do
     setup_ci if is_ci
     match(type: "appstore", readonly: is_ci)
@@ -32,7 +32,8 @@ platform :ios do
       scheme: "Pantopus",
       configuration: "Release",
       export_method: "app-store",
-      clean: true
+      clean: true,
+      xcargs: "PANTOPUS_API_ENV=production"
     )
 
     upload_to_testflight(
@@ -41,7 +42,7 @@ platform :ios do
     )
   end
 
-  desc "Build and submit to App Store review"
+  desc "Build, upload metadata + screenshots, and submit to App Store review"
   lane :release do
     setup_ci if is_ci
     match(type: "appstore", readonly: is_ci)
@@ -51,14 +52,31 @@ platform :ios do
       scheme: "Pantopus",
       configuration: "Release",
       export_method: "app-store",
-      clean: true
+      clean: true,
+      xcargs: "PANTOPUS_API_ENV=production"
     )
 
+    # Push every text file under fastlane/metadata/<locale>/ + the
+    # PNGs under fastlane/screenshots/ before submitting.
     upload_to_app_store(
       submit_for_review: true,
       automatic_release: false,
       force: true,
-      precheck_include_in_app_purchases: false
+      precheck_include_in_app_purchases: false,
+      skip_metadata: false,
+      skip_screenshots: false
+    )
+  end
+
+  desc "Capture App Store screenshots for the 6 hero screens × 3 devices"
+  lane :screenshots do
+    capture_screenshots(
+      project: "Pantopus.xcodeproj",
+      scheme: "PantopusUITests",
+      output_directory: "./fastlane/screenshots",
+      clear_previous_screenshots: true,
+      override_status_bar: true,
+      stop_after_first_error: false
     )
   end
 
