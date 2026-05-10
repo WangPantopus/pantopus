@@ -119,13 +119,16 @@ class AddHomeWizardScreenTest {
     @Test
     fun close_on_dirty_form_shows_discard_confirm() {
         val vm = makeViewModel()
+        // Mutate the form BEFORE setContent so the initial composition
+        // sees `chrome.dirty == true` on first render. Mutating after
+        // setContent has been racy on the macos-15 emulator: the
+        // StateFlow → collectAsStateWithLifecycle hop sometimes lands
+        // after WizardShell's onLeading closure has already captured a
+        // stale chrome.
+        vm.updateField(AddressField.Street, "412 Elm St")
         compose.setContent {
             AddHomeWizardScreen(onDismiss = {}, onOpenHomeDashboard = {}, viewModel = vm)
         }
-        // Make the form dirty inside runOnIdle so the WizardShell's onLeading
-        // closure observes chrome.dirty == true on the next frame.
-        compose.runOnIdle { vm.updateField(AddressField.Street, "412 Elm St") }
-        compose.waitForIdle()
         compose.onNodeWithTag(WizardShellTags.LEADING).performClick()
         // Material 3 AlertDialog renders inside its own Popup window —
         // reach the visible surface by title text rather than testTag.
