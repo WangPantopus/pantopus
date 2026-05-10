@@ -63,10 +63,22 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -switch /Applications/Xcode_16.2.app
+        # Xcode 16.4 ships with the iOS 18.5 simulator runtime
+        # preinstalled on the macos-15 runner image; older 16.x bundles
+        # may be missing their runtime, leading to "iOS X is not
+        # installed" errors when xcodebuild looks for a destination.
+        run: sudo xcode-select -switch /Applications/Xcode_16.4.app
 
       - name: Show Xcode version
         run: xcodebuild -version
+
+      - name: List available iOS simulators
+        # Surfaces the actual installed runtimes/devices so destination
+        # mismatches are visible in the log instead of as a one-line
+        # xcodebuild error.
+        run: |
+          xcrun simctl list runtimes
+          xcrun simctl list devices available iPhone
 
       - name: Install XcodeGen + xcbeautify
         run: brew install xcodegen xcbeautify
@@ -145,7 +157,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -switch /Applications/Xcode_16.2.app
+        # Xcode 16.4 ships with the iOS 18.5 simulator runtime
+        # preinstalled on the macos-15 runner image; older 16.x bundles
+        # may be missing their runtime, leading to "iOS X is not
+        # installed" errors when xcodebuild looks for a destination.
+        run: sudo xcode-select -switch /Applications/Xcode_16.4.app
 
       - name: Install XcodeGen
         run: brew install xcodegen
