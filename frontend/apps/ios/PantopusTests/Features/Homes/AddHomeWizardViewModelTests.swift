@@ -32,9 +32,8 @@ final class AddHomeWizardViewModelTests: XCTestCase {
     private func makeVM(initialState: AddHomeFormState = .empty) -> AddHomeWizardViewModel {
         AddHomeWizardViewModel(
             api: makeAPI(),
-            initialState: initialState,
-            isOnlineProvider: { true }
-        )
+            initialState: initialState
+        ) { true }
     }
 
     /// Poll-and-yield helper. Replaces the brittle `Task.sleep(150ms)`
