@@ -187,8 +187,12 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         seed.role = .owner
         let vm = makeVM(initialState: seed)
         vm.primaryTapped()
-        await waitFor("createdHomeId set") { vm.createdHomeId != nil }
-        // Now on success step.
+        // Wait for the .success step itself, not just createdHomeId — the
+        // VM sets createdHomeId BEFORE transition(to: .success), so a wait
+        // on createdHomeId alone returns while we're still on .review.
+        // primaryTapped() then re-enters submit() and consumes a second
+        // (non-existent) URL stub instead of firing openHomeDashboard.
+        await waitFor("currentStep == .success") { vm.currentStep == .success }
         vm.primaryTapped()
         await waitFor("openHomeDashboard event") {
             vm.pendingEvent == .openHomeDashboard(homeId: "home_42")
@@ -203,7 +207,9 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         seed.role = .owner
         let vm = makeVM(initialState: seed)
         vm.primaryTapped()
-        await waitFor("createdHomeId set") { vm.createdHomeId != nil }
+        // Same gating as testSuccessPrimary above — wait for the actual
+        // step transition, not just createdHomeId.
+        await waitFor("currentStep == .success") { vm.currentStep == .success }
         vm.secondaryTapped()
         XCTAssertEqual(vm.pendingEvent, .dismiss)
     }
