@@ -38,8 +38,9 @@ public enum AddHomeStep: Int, CaseIterable, Sendable {
 /// `propertySuggestions` Joi schema requires `{address, city, state,
 /// zipCode}` rather than a free-form `{query}` (`backend/routes/home.js:540`).
 /// A real typeahead will need a server-side autocomplete endpoint.
-// TODO(backend): expose a query-only autocomplete to enable the design's
-// single-input typeahead UX in step 1.
+///
+/// TODO(backend): expose a query-only autocomplete to enable the design's
+/// single-input typeahead UX in step 1.
 public struct AddHomeAddressFields: Codable, Sendable, Equatable {
     public var street: String
     public var unit: String

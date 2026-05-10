@@ -30,11 +30,11 @@ import Foundation
 /// The protocol is single-process: each XCUITest spawns the app fresh,
 /// so there is no need for cross-test isolation.
 final class UITestStubProtocol: URLProtocol {
-    override class func canInit(with request: URLRequest) -> Bool {
+    override static func canInit(with request: URLRequest) -> Bool {
         request.url?.path.hasPrefix("/api/") ?? false
     }
 
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func stopLoading() {}
 
     override func startLoading() {

@@ -264,9 +264,10 @@ final class EditProfileViewModel {
     /// included for fields whose schema entry has `.allow('', null)` (so
     /// the user can clear them); fields without that allowance are
     /// skipped when empty so we don't send a value the server will reject.
-    // The 17-case switch below mirrors the schema 1:1; cyclomatic
-    // complexity is intentionally high and adding indirection would only
-    // hide the mapping.
+    ///
+    /// The 17-case switch below mirrors the schema 1:1; cyclomatic
+    /// complexity is intentionally high and adding indirection would only
+    /// hide the mapping.
     // swiftlint:disable:next cyclomatic_complexity
     private func buildRequest() -> ProfileUpdateRequest {
         var update = ProfileUpdateRequest()

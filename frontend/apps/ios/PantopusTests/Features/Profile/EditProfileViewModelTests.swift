@@ -217,7 +217,8 @@ final class EditProfileViewModelTests: XCTestCase {
         XCTAssertNotEqual(before, vm.shakeTrigger)
         XCTAssertFalse(vm.shouldDismiss)
         XCTAssertEqual(
-            SequencedURLProtocol.capturedRequests.count, captured,
+            SequencedURLProtocol.capturedRequests.count,
+            captured,
             "Invalid form must not issue a network call."
         )
     }

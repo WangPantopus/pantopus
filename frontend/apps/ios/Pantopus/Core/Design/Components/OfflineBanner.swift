@@ -58,7 +58,7 @@ private struct OfflineBannerModifier: ViewModifier {
     func body(content: Content) -> some View {
         VStack(spacing: 0) {
             if isOffline && !dismissed {
-                OfflineBanner(onDismiss: { dismissed = true })
+                OfflineBanner { dismissed = true }
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
             content

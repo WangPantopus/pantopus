@@ -142,10 +142,9 @@ private struct AddressStep: View {
             }
         }
         if !viewModel.suggestions.isEmpty {
-            SuggestionList(
-                suggestions: viewModel.suggestions,
-                onSelect: { viewModel.selectSuggestion($0) }
-            )
+            SuggestionList(suggestions: viewModel.suggestions) {
+                viewModel.selectSuggestion($0)
+            }
         }
     }
 
@@ -205,10 +204,9 @@ private struct ConfirmStep: View {
             if let check = viewModel.addressCheck {
                 AddressVerdictRow(check: check)
             }
-            PrimaryHomeToggle(
-                isPrimary: viewModel.form.isPrimary,
-                onChange: { viewModel.setPrimaryHome($0) }
-            )
+            PrimaryHomeToggle(isPrimary: viewModel.form.isPrimary) {
+                viewModel.setPrimaryHome($0)
+            }
         }
     }
 }
@@ -223,11 +221,9 @@ private struct RoleStep: View {
         SubcopyBlock("This determines what verification we'll ask for next.")
         VStack(spacing: Spacing.s2) {
             ForEach(AddHomeRole.allCases, id: \.self) { role in
-                RoleRow(
-                    role: role,
-                    isSelected: viewModel.form.role == role,
-                    onTap: { viewModel.selectRole(role) }
-                )
+                RoleRow(role: role, isSelected: viewModel.form.role == role) {
+                    viewModel.selectRole(role)
+                }
             }
         }
     }

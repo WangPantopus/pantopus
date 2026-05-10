@@ -38,15 +38,16 @@ final class TapTargetAudit: XCTestCase {
             // can hold off-screen siblings on tab containers).
             guard button.isHittable else { continue }
             let frame = button.frame
+            let id = button.identifier.isEmpty ? button.label : button.identifier
             XCTAssertGreaterThanOrEqual(
-                frame.width, minTapSize,
-                "[\(screenName)] button \(button.identifier.isEmpty ? button.label : button.identifier) " +
-                "width \(frame.width) < \(minTapSize)"
+                frame.width,
+                minTapSize,
+                "[\(screenName)] button \(id) width \(frame.width) < \(minTapSize)"
             )
             XCTAssertGreaterThanOrEqual(
-                frame.height, minTapSize,
-                "[\(screenName)] button \(button.identifier.isEmpty ? button.label : button.identifier) " +
-                "height \(frame.height) < \(minTapSize)"
+                frame.height,
+                minTapSize,
+                "[\(screenName)] button \(id) height \(frame.height) < \(minTapSize)"
             )
         }
     }

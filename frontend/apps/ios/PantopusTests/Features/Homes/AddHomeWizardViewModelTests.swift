@@ -244,11 +244,10 @@ final class AddHomeWizardViewModelTests: XCTestCase {
 
     // MARK: - Suggestion parser
 
-    func testFlattenSuggestionsHandlesNestedPayload() {
-        let json = """
-        {"results":[{"address":"100 Main St"},{"nested":{"address":"200 Oak St"}}]}
-        """.data(using: .utf8)!
-        let value = try! JSONDecoder().decode(JSONValue.self, from: json)
+    func testFlattenSuggestionsHandlesNestedPayload() throws {
+        let raw = #"{"results":[{"address":"100 Main St"},{"nested":{"address":"200 Oak St"}}]}"#
+        let json = Data(raw.utf8)
+        let value = try JSONDecoder().decode(JSONValue.self, from: json)
         let flat = AddHomeWizardViewModel.flattenSuggestions(value)
         XCTAssertEqual(flat, ["100 Main St", "200 Oak St"])
     }

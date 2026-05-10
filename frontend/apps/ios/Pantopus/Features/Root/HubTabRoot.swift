@@ -108,7 +108,7 @@ public struct HubTabRoot: View {
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to
                 // MyHomes, not the success screen.
-                path.removeAll(where: { $0 == .addHome })
+                path.removeAll { $0 == .addHome }
                 path.append(.homeDashboard(homeId: homeId))
             }
         #if DEBUG
