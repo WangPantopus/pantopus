@@ -48,7 +48,6 @@ public struct HubTabRoot: View {
         }
     }
 
-    @ViewBuilder
     private var hub: some View {
         HubView { intent in
             switch intent {
@@ -60,18 +59,23 @@ public struct HubTabRoot: View {
                 break
             }
         }
-        // 44pt invisible 5-tap target in the top-leading safe area — the
-        // production hub hides its nav bar so there's no visible title to
-        // tap. Hidden from accessibility so VoiceOver users can't trip
-        // the debug menu by accident.
+        .overlay(alignment: .topLeading) { debugTapTarget }
+    }
+
+    /// 44pt invisible 5-tap target in the top-leading safe area — the
+    /// production hub hides its nav bar so there's no visible title to
+    /// tap. Hidden from accessibility so VoiceOver users can't trip
+    /// the debug menu by accident. No-op in release.
+    @ViewBuilder
+    private var debugTapTarget: some View {
         #if DEBUG
-            .overlay(alignment: .topLeading) {
-                Color.clear
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-                    .onTapGesture(count: 5) { debugSheet = .tokenGallery }
-                    .accessibilityHidden(true)
-            }
+        Color.clear
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+            .onTapGesture(count: 5) { debugSheet = .tokenGallery }
+            .accessibilityHidden(true)
+        #else
+        EmptyView()
         #endif
     }
 
