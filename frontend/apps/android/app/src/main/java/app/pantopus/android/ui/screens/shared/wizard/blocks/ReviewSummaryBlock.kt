@@ -35,16 +35,18 @@ fun ReviewSummaryBlock(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(PantopusColors.appSurface),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface),
     ) {
         rows.forEachIndexed { index, row ->
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(Spacing.s3),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.s3),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
             ) {
                 Text(

@@ -66,7 +66,8 @@ class StoreScreenshotsTest {
 
         val outDir =
             File(
-                InstrumentationRegistry.getInstrumentation()
+                InstrumentationRegistry
+                    .getInstrumentation()
                     .targetContext
                     .getExternalFilesDir(Environment.DIRECTORY_PICTURES),
                 "store_screenshots",

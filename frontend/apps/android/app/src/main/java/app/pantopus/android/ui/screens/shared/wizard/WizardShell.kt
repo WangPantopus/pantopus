@@ -99,8 +99,9 @@ fun WizardShell(
                     SegmentedProgressBar(
                         filled = filled,
                         total = total.coerceAtLeast(1),
-                        modifier = Modifier
-                            .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
+                        modifier =
+                            Modifier
+                                .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
                     )
                 }
             }
@@ -114,16 +115,18 @@ fun WizardShell(
         },
     ) { padding: PaddingValues ->
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(PantopusColors.appBg),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(PantopusColors.appBg),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = Spacing.s4, vertical = Spacing.s4),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s4),
                 verticalArrangement = Arrangement.spacedBy(Spacing.s5),
             ) {
                 content()
@@ -150,34 +153,36 @@ private fun WizardTopBar(
 ) {
     val interaction = remember { MutableInteractionSource() }
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 44.dp)
-            .background(PantopusColors.appSurface)
-            .padding(horizontal = Spacing.s2),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 44.dp)
+                .background(PantopusColors.appSurface)
+                .padding(horizontal = Spacing.s2),
     ) {
         Text(
             text = title,
             style = PantopusTextStyle.body,
             color = PantopusColors.appText,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .semantics { heading() },
+            modifier =
+                Modifier
+                    .align(Alignment.Center)
+                    .semantics { heading() },
         )
         Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .size(44.dp)
-                .testTag(WizardShellTags.LEADING)
-                .semantics {
-                    contentDescription = if (leading == WizardLeadingControl.Close) "Close" else "Back"
-                    role = Role.Button
-                }
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    onClick = onLeading,
-                ),
+            modifier =
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .size(44.dp)
+                    .testTag(WizardShellTags.LEADING)
+                    .semantics {
+                        contentDescription = if (leading == WizardLeadingControl.Close) "Close" else "Back"
+                        role = Role.Button
+                    }.clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        onClick = onLeading,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
@@ -191,10 +196,11 @@ private fun WizardTopBar(
                 text = "${progressLabel.current} of ${progressLabel.total}",
                 style = PantopusTextStyle.caption,
                 color = PantopusColors.appTextSecondary,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = Spacing.s3)
-                    .testTag(WizardShellTags.STEP_READOUT),
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = Spacing.s3)
+                        .testTag(WizardShellTags.STEP_READOUT),
             )
         }
     }
@@ -210,10 +216,11 @@ private fun WizardStickyCta(
     Column(modifier = Modifier.fillMaxWidth()) {
         HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorderSubtle)
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(PantopusColors.appSurface)
-                .padding(Spacing.s4),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(PantopusColors.appSurface)
+                    .padding(Spacing.s4),
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             chrome.secondaryCta?.let { secondary ->

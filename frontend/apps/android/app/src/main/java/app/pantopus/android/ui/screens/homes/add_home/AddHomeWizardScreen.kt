@@ -111,7 +111,10 @@ fun AddHomeWizardScreen(
 // MARK: - Step 1
 
 @Composable
-private fun AddressStep(state: AddHomeUiState, vm: AddHomeWizardViewModel) {
+private fun AddressStep(
+    state: AddHomeUiState,
+    vm: AddHomeWizardViewModel,
+) {
     HeadlineBlock("What's the address?")
     SubcopyBlock("Enter the street, city, state, and ZIP for the home you'd like to add.")
     FormFieldsBlock {
@@ -158,19 +161,23 @@ private fun AddressStep(state: AddHomeUiState, vm: AddHomeWizardViewModel) {
 // MARK: - Step 2
 
 @Composable
-private fun ConfirmStep(state: AddHomeUiState, vm: AddHomeWizardViewModel) {
+private fun ConfirmStep(
+    state: AddHomeUiState,
+    vm: AddHomeWizardViewModel,
+) {
     HeadlineBlock("Confirm the property")
     SubcopyBlock(
         "We checked this address against our property records. Review the details before continuing.",
     )
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
         ReviewSummaryBlock(
-            rows = listOf(
-                ReviewSummaryRow("Street", state.form.address.street),
-                ReviewSummaryRow("City", state.form.address.city),
-                ReviewSummaryRow("State", state.form.address.state),
-                ReviewSummaryRow("ZIP", state.form.address.zipCode),
-            ),
+            rows =
+                listOf(
+                    ReviewSummaryRow("Street", state.form.address.street),
+                    ReviewSummaryRow("City", state.form.address.city),
+                    ReviewSummaryRow("State", state.form.address.state),
+                    ReviewSummaryRow("ZIP", state.form.address.zipCode),
+                ),
         )
         state.addressCheck?.let { check ->
             AddressVerdictRow(check)
@@ -185,7 +192,10 @@ private fun ConfirmStep(state: AddHomeUiState, vm: AddHomeWizardViewModel) {
 // MARK: - Step 3
 
 @Composable
-private fun RoleStep(state: AddHomeUiState, vm: AddHomeWizardViewModel) {
+private fun RoleStep(
+    state: AddHomeUiState,
+    vm: AddHomeWizardViewModel,
+) {
     HeadlineBlock("What's your role?")
     SubcopyBlock("This determines what verification we'll ask for next.")
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
@@ -205,18 +215,24 @@ private fun RoleStep(state: AddHomeUiState, vm: AddHomeWizardViewModel) {
 private fun ReviewStep(state: AddHomeUiState) {
     HeadlineBlock("Review and submit")
     SubcopyBlock("Make sure everything below looks right before submitting.")
-    val composedAddress = buildString {
-        append(state.form.address.street)
-        if (state.form.address.unit.isNotEmpty()) append(", ${state.form.address.unit}")
-        append(", ${state.form.address.city}")
-        append(", ${state.form.address.state} ${state.form.address.zipCode}")
-    }
+    val composedAddress =
+        buildString {
+            append(state.form.address.street)
+            if (state.form.address.unit
+                    .isNotEmpty()
+            ) {
+                append(", ${state.form.address.unit}")
+            }
+            append(", ${state.form.address.city}")
+            append(", ${state.form.address.state} ${state.form.address.zipCode}")
+        }
     ReviewSummaryBlock(
-        rows = listOf(
-            ReviewSummaryRow("Address", composedAddress),
-            ReviewSummaryRow("Role", state.form.role?.label ?: "—"),
-            ReviewSummaryRow("Primary", if (state.form.isPrimary) "Yes" else "No"),
-        ),
+        rows =
+            listOf(
+                ReviewSummaryRow("Address", composedAddress),
+                ReviewSummaryRow("Role", state.form.role?.label ?: "—"),
+                ReviewSummaryRow("Primary", if (state.form.isPrimary) "Yes" else "No"),
+            ),
     )
 }
 
@@ -233,20 +249,25 @@ private fun SuccessStep() {
 // MARK: - Helpers
 
 @Composable
-private fun SuggestionList(suggestions: List<String>, onSelect: (String) -> Unit) {
+private fun SuggestionList(
+    suggestions: List<String>,
+    onSelect: (String) -> Unit,
+) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(PantopusColors.appSurface),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface),
     ) {
         suggestions.forEachIndexed { index, suggestion ->
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(role = Role.Button) { onSelect(suggestion) }
-                    .padding(Spacing.s3)
-                    .testTag("addHome_suggestion_$index"),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(role = Role.Button) { onSelect(suggestion) }
+                        .padding(Spacing.s3)
+                        .testTag("addHome_suggestion_$index"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -291,14 +312,15 @@ private fun AddressVerdictRow(check: app.pantopus.android.data.api.models.homes.
             )
         }
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.md))
-            .background(PantopusColors.appSurfaceMuted)
-            .padding(Spacing.s3)
-            .semantics(mergeDescendants = true) {
-                contentDescription = "$headline. $subcopy"
-            },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurfaceMuted)
+                .padding(Spacing.s3)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "$headline. $subcopy"
+                },
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -322,13 +344,17 @@ private data class Verdict(
 )
 
 @Composable
-private fun PrimaryHomeToggle(isPrimary: Boolean, onChange: (Boolean) -> Unit) {
+private fun PrimaryHomeToggle(
+    isPrimary: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(PantopusColors.appSurface)
-            .padding(Spacing.s3),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .padding(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -346,26 +372,32 @@ private fun PrimaryHomeToggle(isPrimary: Boolean, onChange: (Boolean) -> Unit) {
         Switch(
             checked = isPrimary,
             onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = PantopusColors.appTextInverse,
-                checkedTrackColor = PantopusColors.primary600,
-            ),
+            colors =
+                SwitchDefaults.colors(
+                    checkedThumbColor = PantopusColors.appTextInverse,
+                    checkedTrackColor = PantopusColors.primary600,
+                ),
             modifier = Modifier.testTag("addHome_primaryToggle"),
         )
     }
 }
 
 @Composable
-private fun RoleRow(role: AddHomeRole, isSelected: Boolean, onTap: () -> Unit) {
+private fun RoleRow(
+    role: AddHomeRole,
+    isSelected: Boolean,
+    onTap: () -> Unit,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.md))
-            .background(PantopusColors.appSurface)
-            .clickable(onClick = onTap, role = Role.RadioButton)
-            .padding(Spacing.s3)
-            .testTag("addHome_role_${role.name.lowercase()}")
-            .semantics { contentDescription = role.label },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurface)
+                .clickable(onClick = onTap, role = Role.RadioButton)
+                .padding(Spacing.s3)
+                .testTag("addHome_role_${role.name.lowercase()}")
+                .semantics { contentDescription = role.label },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
@@ -378,19 +410,21 @@ private fun RoleRow(role: AddHomeRole, isSelected: Boolean, onTap: () -> Unit) {
 private fun RadioCircle(isSelected: Boolean) {
     val borderColor = if (isSelected) PantopusColors.primary600 else PantopusColors.appBorder
     Box(
-        modifier = Modifier
-            .size(22.dp)
-            .clip(CircleShape)
-            .background(PantopusColors.appSurface)
-            .border(width = 2.dp, color = borderColor, shape = CircleShape),
+        modifier =
+            Modifier
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(PantopusColors.appSurface)
+                .border(width = 2.dp, color = borderColor, shape = CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         if (isSelected) {
             Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(PantopusColors.primary600),
+                modifier =
+                    Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.primary600),
             )
         }
     }
@@ -399,12 +433,13 @@ private fun RadioCircle(isSelected: Boolean) {
 @Composable
 private fun ErrorBanner(message: String) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.md))
-            .background(PantopusColors.errorBg)
-            .padding(Spacing.s3)
-            .testTag("addHomeErrorBanner"),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.errorBg)
+                .padding(Spacing.s3)
+                .testTag("addHomeErrorBanner"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
@@ -421,4 +456,3 @@ private fun ErrorBanner(message: String) {
         )
     }
 }
-

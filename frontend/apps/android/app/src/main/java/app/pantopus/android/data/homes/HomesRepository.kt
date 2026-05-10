@@ -31,14 +31,11 @@ open class HomesRepository
         open suspend fun publicProfile(id: String) = safeApiCall { api.publicProfile(id) }
 
         /** `POST /api/homes/property-suggestions`. */
-        open suspend fun propertySuggestions(request: PropertySuggestionsRequest) =
-            safeApiCall { api.propertySuggestions(request) }
+        open suspend fun propertySuggestions(request: PropertySuggestionsRequest) = safeApiCall { api.propertySuggestions(request) }
 
         /** `POST /api/homes/check-address`. */
-        open suspend fun checkAddress(request: CheckAddressRequest) =
-            safeApiCall { api.checkAddress(request) }
+        open suspend fun checkAddress(request: CheckAddressRequest) = safeApiCall { api.checkAddress(request) }
 
         /** `POST /api/homes`. */
-        open suspend fun create(request: CreateHomeRequest) =
-            safeApiCall { api.create(request) }
+        open suspend fun create(request: CreateHomeRequest) = safeApiCall { api.create(request) }
     }

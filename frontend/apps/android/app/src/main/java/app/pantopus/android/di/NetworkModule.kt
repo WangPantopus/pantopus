@@ -42,7 +42,8 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideMoshi(): Moshi =
-        Moshi.Builder()
+        Moshi
+            .Builder()
             .add(Instant::class.java, Rfc3339DateJsonAdapter().nullSafe())
             .addLast(KotlinJsonAdapterFactory())
             .build()
@@ -78,7 +79,8 @@ object NetworkModule {
                         HttpLoggingInterceptor.Level.NONE
                     }
             }
-        return OkHttpClient.Builder()
+        return OkHttpClient
+            .Builder()
             .cache(cache)
             .addInterceptor(authInterceptor)
             .addInterceptor(retryInterceptor)
@@ -96,7 +98,8 @@ object NetworkModule {
         client: OkHttpClient,
         moshi: Moshi,
     ): Retrofit =
-        Retrofit.Builder()
+        Retrofit
+            .Builder()
             .baseUrl(BuildConfig.PANTOPUS_API_BASE_URL.trimEnd('/') + "/")
             .client(client)
             .addConverterFactory(MoshiConverterFactory.create(moshi))

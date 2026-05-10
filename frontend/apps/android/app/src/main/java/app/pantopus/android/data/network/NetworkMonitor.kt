@@ -33,7 +33,8 @@ open class NetworkMonitor
 
         init {
             val request =
-                NetworkRequest.Builder()
+                NetworkRequest
+                    .Builder()
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                     .build()
 

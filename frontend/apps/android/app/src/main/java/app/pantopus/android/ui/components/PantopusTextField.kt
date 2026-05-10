@@ -42,7 +42,9 @@ sealed interface PantopusFieldState {
 
     data object Valid : PantopusFieldState
 
-    data class Error(val message: String) : PantopusFieldState
+    data class Error(
+        val message: String,
+    ) : PantopusFieldState
 }
 
 /**
@@ -98,8 +100,7 @@ fun PantopusTextField(
                         width = if (isFocused) 2.dp else 1.dp,
                         color = border,
                         shape = RoundedCornerShape(Radii.md),
-                    )
-                    .padding(horizontal = Spacing.s3),
+                    ).padding(horizontal = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {

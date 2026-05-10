@@ -15,7 +15,10 @@ enum class WizardLeadingControl {
 
 /** Right-hand top-bar readout. Disappears on the success step. */
 sealed interface WizardProgressLabel {
-    data class StepOf(val current: Int, val total: Int) : WizardProgressLabel
+    data class StepOf(
+        val current: Int,
+        val total: Int,
+    ) : WizardProgressLabel
 
     data object Hidden : WizardProgressLabel
 }

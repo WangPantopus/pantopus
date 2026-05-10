@@ -8,16 +8,25 @@ import timber.log.Timber
  * Closed list of analytics events. Mirrors the P15 taxonomy 1:1; do
  * not invent ad-hoc names — extend the sealed hierarchy instead.
  */
-sealed class AnalyticsEvent(val eventName: String) {
+sealed class AnalyticsEvent(
+    val eventName: String,
+) {
     open val properties: Map<String, String> get() = emptyMap()
 
     data object ScreenHubViewed : AnalyticsEvent("screen.hub.viewed")
+
     data object ScreenMailboxListViewed : AnalyticsEvent("screen.mailbox_list.viewed")
+
     data object ScreenMailboxDrawersViewed : AnalyticsEvent("screen.mailbox_drawers.viewed")
+
     data object ScreenMyHomesViewed : AnalyticsEvent("screen.my_homes.viewed")
+
     data object ScreenHomeDashboardViewed : AnalyticsEvent("screen.home_dashboard.viewed")
+
     data object ScreenEditProfileViewed : AnalyticsEvent("screen.edit_profile.viewed")
+
     data object CtaMailboxItemLogReceived : AnalyticsEvent("cta.mailbox_item.log_received")
+
     data object CtaAddHomeSubmit : AnalyticsEvent("cta.add_home.submit")
 
     data class ScreenMailboxItemDetailViewed(
@@ -35,29 +44,35 @@ sealed class AnalyticsEvent(val eventName: String) {
             mapOf("step_number" to stepNumber.toString(), "step_name" to stepName)
     }
 
-    data class CtaHubActionStripTapped(val label: String) :
-        AnalyticsEvent("cta.hub.action_strip_tapped") {
+    data class CtaHubActionStripTapped(
+        val label: String,
+    ) : AnalyticsEvent("cta.hub.action_strip_tapped") {
         override val properties = mapOf("label" to label)
     }
 
-    data class CtaHubPillarTapped(val pillar: String) :
-        AnalyticsEvent("cta.hub.pillar_tapped") {
+    data class CtaHubPillarTapped(
+        val pillar: String,
+    ) : AnalyticsEvent("cta.hub.pillar_tapped") {
         override val properties = mapOf("pillar" to pillar)
     }
 
-    data class FormEditProfileSubmit(val result: AnalyticsResult) :
-        AnalyticsEvent("form.edit_profile.submit") {
+    data class FormEditProfileSubmit(
+        val result: AnalyticsResult,
+    ) : AnalyticsEvent("form.edit_profile.submit") {
         override val properties = mapOf("result" to result.value)
     }
 
-    data class FormEditProfileValidationError(val field: String) :
-        AnalyticsEvent("form.edit_profile.validation_error") {
+    data class FormEditProfileValidationError(
+        val field: String,
+    ) : AnalyticsEvent("form.edit_profile.validation_error") {
         override val properties = mapOf("field" to field)
     }
 }
 
 /** Standard outcomes for form submissions and other yes/no telemetry. */
-enum class AnalyticsResult(val value: String) {
+enum class AnalyticsResult(
+    val value: String,
+) {
     SUCCESS("success"),
     ERROR("error"),
 }
@@ -93,11 +108,12 @@ object Analytics {
 
     fun track(event: AnalyticsEvent) {
         if (BuildConfig.DEBUG) {
-            val props = if (event.properties.isEmpty()) {
-                ""
-            } else {
-                " " + event.properties.entries.joinToString(" ") { "${it.key}=${it.value}" }
-            }
+            val props =
+                if (event.properties.isEmpty()) {
+                    ""
+                } else {
+                    " " + event.properties.entries.joinToString(" ") { "${it.key}=${it.value}" }
+                }
             Timber.tag("analytics").i("📊 ${event.eventName}$props")
         }
         observability?.track(event.eventName, event.properties)

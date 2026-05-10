@@ -95,8 +95,12 @@ class HubViewModel
                             greeting = greeting(),
                             name = hub.user.firstName ?: hub.user.name,
                             avatarInitials = initials(hub.user.name),
-                            ringProgress = hub.setup.profileCompleteness.score.toFloat(),
-                            profileCompleteness = hub.setup.profileCompleteness.score.toFloat(),
+                            ringProgress =
+                                hub.setup.profileCompleteness.score
+                                    .toFloat(),
+                            profileCompleteness =
+                                hub.setup.profileCompleteness.score
+                                    .toFloat(),
                             steps =
                                 hub.setup.steps.map {
                                     SetupStep(
@@ -122,7 +126,9 @@ class HubViewModel
                                 greeting = greeting(),
                                 name = hub.user.firstName ?: hub.user.name,
                                 avatarInitials = initials(hub.user.name),
-                                ringProgress = hub.setup.profileCompleteness.score.toFloat(),
+                                ringProgress =
+                                    hub.setup.profileCompleteness.score
+                                        .toFloat(),
                                 unreadCount = hub.statusItems.size,
                             ),
                         actionChips =
@@ -248,7 +254,12 @@ class HubViewModel
         private fun iconFromRaw(raw: String): PantopusIcon = PantopusIcon.valueOfRaw(raw) ?: PantopusIcon.ArrowLeft
 
         private fun initials(name: String): String =
-            name.trim().split(' ').take(2).mapNotNull { it.firstOrNull()?.uppercaseChar()?.toString() }.joinToString("")
+            name
+                .trim()
+                .split(' ')
+                .take(2)
+                .mapNotNull { it.firstOrNull()?.uppercaseChar()?.toString() }
+                .joinToString("")
 
         private fun greeting(): String {
             val hour = LocalDateTime.now(ZoneId.systemDefault()).hour
@@ -260,10 +271,13 @@ class HubViewModel
             }
         }
 
-        private fun relative(timestamp: String): String {
-            return runCatching {
+        private fun relative(timestamp: String): String =
+            runCatching {
                 val then = Instant.parse(timestamp)
-                val delta = java.time.Duration.between(then, Instant.now()).seconds
+                val delta =
+                    java.time.Duration
+                        .between(then, Instant.now())
+                        .seconds
                 when {
                     delta < 60 -> "just now"
                     delta < 60 * 60 -> "${delta / 60}m ago"
@@ -271,5 +285,4 @@ class HubViewModel
                     else -> "${delta / 60 / 60 / 24}d ago"
                 }
             }.getOrDefault(timestamp)
-        }
     }

@@ -72,8 +72,20 @@ class MyHomesListViewModelTest {
                 assertEquals(ListOfRowsUiState.Loading, awaitItem())
                 vm.load()
                 val loaded = awaitItem() as ListOfRowsUiState.Loaded
-                assertEquals(1, loaded.sections.first().rows.size)
-                assertEquals("Main", loaded.sections.first().rows.first().title)
+                assertEquals(
+                    1,
+                    loaded.sections
+                        .first()
+                        .rows.size,
+                )
+                assertEquals(
+                    "Main",
+                    loaded.sections
+                        .first()
+                        .rows
+                        .first()
+                        .title,
+                )
                 cancelAndConsumeRemainingEvents()
             }
         }

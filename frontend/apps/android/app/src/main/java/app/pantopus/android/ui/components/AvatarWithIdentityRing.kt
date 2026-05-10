@@ -28,7 +28,10 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Spacing
 
 /** Identity pillar tint for the progress ring. */
-enum class IdentityPillar(val color: Color, val backgroundColor: Color) {
+enum class IdentityPillar(
+    val color: Color,
+    val backgroundColor: Color,
+) {
     Personal(PantopusColors.personal, PantopusColors.personalBg),
     Home(PantopusColors.home, PantopusColors.homeBg),
     Business(PantopusColors.business, PantopusColors.businessBg),

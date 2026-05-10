@@ -34,7 +34,11 @@ import app.pantopus.android.ui.theme.Spacing
 import app.pantopus.android.ui.theme.pantopusShadow
 
 /** One stat cell inside [HomeHeroHeader]. */
-data class HomeHeroStat(val id: String, val value: String, val label: String)
+data class HomeHeroStat(
+    val id: String,
+    val value: String,
+    val label: String,
+)
 
 /**
  * Gradient primary card with VERIFIED overline, bold address, and a 3-stat row.
@@ -56,8 +60,7 @@ fun HomeHeroHeader(
                     Brush.linearGradient(
                         colors = listOf(PantopusColors.primary600, PantopusColors.primary800),
                     ),
-                )
-                .padding(Spacing.s5)
+                ).padding(Spacing.s5)
                 .semantics {
                     contentDescription = "${if (verified) "Verified home" else "Unverified home"}, $address"
                 },

@@ -58,7 +58,9 @@ import app.pantopus.android.R
  * kebab-case Lucide token names so [PantopusIcon.valueOfRaw] and snapshot
  * tests stay stable across renames.
  */
-enum class PantopusIcon(val lucideName: String) {
+enum class PantopusIcon(
+    val lucideName: String,
+) {
     Home("home"),
     Map("map"),
     Inbox("inbox"),
@@ -116,7 +118,9 @@ enum class PantopusIcon(val lucideName: String) {
  */
 internal sealed interface IconSource {
     @JvmInline
-    value class Material(val vector: ImageVector) : IconSource
+    value class Material(
+        val vector: ImageVector,
+    ) : IconSource
 
     @JvmInline
     value class Drawable(

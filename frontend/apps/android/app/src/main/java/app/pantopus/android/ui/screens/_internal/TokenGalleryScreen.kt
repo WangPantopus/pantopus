@@ -103,12 +103,17 @@ private fun IconRow(icon: PantopusIcon) {
             size = 24.dp,
             tint = PantopusColors.appText,
         )
-        androidx.compose.foundation.layout.Spacer(Modifier.width(Spacing.s3))
+        androidx.compose.foundation.layout
+            .Spacer(Modifier.width(Spacing.s3))
         Text(icon.lucideName, style = PantopusTextStyle.body, color = PantopusColors.appText)
     }
 }
 
-private data class ColorToken(val name: String, val color: Color, val hex: String)
+private data class ColorToken(
+    val name: String,
+    val color: Color,
+    val hex: String,
+)
 
 private fun Color.toHexString(): String {
     val argb = toArgb()

@@ -52,14 +52,16 @@ class Observability
                 options.isSendDefaultPii = false
 
                 // P15: scrub PII from every event + breadcrumb before send.
-                options.beforeSend = SentryOptions.BeforeSendCallback { event, _ ->
-                    scrubPII(event)
-                    event
-                }
-                options.beforeBreadcrumb = SentryOptions.BeforeBreadcrumbCallback { breadcrumb, _ ->
-                    scrubPII(breadcrumb)
-                    breadcrumb
-                }
+                options.beforeSend =
+                    SentryOptions.BeforeSendCallback { event, _ ->
+                        scrubPII(event)
+                        event
+                    }
+                options.beforeBreadcrumb =
+                    SentryOptions.BeforeBreadcrumbCallback { breadcrumb, _ ->
+                        scrubPII(breadcrumb)
+                        breadcrumb
+                    }
 
                 // Route Timber.e/w into Sentry breadcrumbs + events automatically.
                 options.addIntegration(
@@ -83,14 +85,38 @@ class Observability
 
         // MARK: - PII scrubbing
 
-        private val piiKeys = setOf(
-            "email", "emailaddress", "email_address",
-            "phone", "phonenumber", "phone_number", "telephone",
-            "address", "street", "streetaddress", "street_address",
-            "city", "state", "zip", "zipcode", "zip_code", "postalcode", "postal_code",
-            "fullname", "name", "firstname", "first_name", "lastname", "last_name",
-            "password", "token", "authorization", "auth", "secret",
-        )
+        private val piiKeys =
+            setOf(
+                "email",
+                "emailaddress",
+                "email_address",
+                "phone",
+                "phonenumber",
+                "phone_number",
+                "telephone",
+                "address",
+                "street",
+                "streetaddress",
+                "street_address",
+                "city",
+                "state",
+                "zip",
+                "zipcode",
+                "zip_code",
+                "postalcode",
+                "postal_code",
+                "fullname",
+                "name",
+                "firstname",
+                "first_name",
+                "lastname",
+                "last_name",
+                "password",
+                "token",
+                "authorization",
+                "auth",
+                "secret",
+            )
         private val redacted = "[redacted]"
         private val emailRegex = Regex("""[\w.+-]+@[\w-]+\.[\w.-]+""")
         private val phoneRegex = Regex("""\+?\d[\d\s().-]{7,}""")

@@ -63,8 +63,8 @@ open class AddHomeWizardViewModel
         private val repository: HomesRepository,
         private val savedStateHandle: SavedStateHandle,
         private val networkMonitor: NetworkMonitor,
-    ) : ViewModel(), WizardModel {
-
+    ) : ViewModel(),
+        WizardModel {
         private val _state =
             MutableStateFlow(restoreFormState().let { AddHomeUiState(form = it) })
 
@@ -106,15 +106,19 @@ open class AddHomeWizardViewModel
 
         // MARK: - Field updates
 
-        fun updateField(field: AddressField, value: String) {
+        fun updateField(
+            field: AddressField,
+            value: String,
+        ) {
             _state.update { current ->
-                val next = when (field) {
-                    AddressField.Street -> current.form.address.copy(street = value)
-                    AddressField.Unit -> current.form.address.copy(unit = value)
-                    AddressField.City -> current.form.address.copy(city = value)
-                    AddressField.State -> current.form.address.copy(state = value)
-                    AddressField.Zip -> current.form.address.copy(zipCode = value)
-                }
+                val next =
+                    when (field) {
+                        AddressField.Street -> current.form.address.copy(street = value)
+                        AddressField.Unit -> current.form.address.copy(unit = value)
+                        AddressField.City -> current.form.address.copy(city = value)
+                        AddressField.State -> current.form.address.copy(state = value)
+                        AddressField.Zip -> current.form.address.copy(zipCode = value)
+                    }
                 current.copy(form = current.form.copy(address = next))
             }
             persist()
@@ -141,7 +145,9 @@ open class AddHomeWizardViewModel
             persist()
         }
 
-        fun acknowledgeEvent() { pendingEvent.value = null }
+        fun acknowledgeEvent() {
+            pendingEvent.value = null
+        }
 
         // MARK: - State machine
 
@@ -193,21 +199,23 @@ open class AddHomeWizardViewModel
                 _state.update { it.copy(suggestions = emptyList(), isLoadingSuggestions = false) }
                 return
             }
-            debounceJob = viewModelScope.launch {
-                delay(SUGGESTION_DEBOUNCE_MS)
-                fetchSuggestions(fields)
-            }
+            debounceJob =
+                viewModelScope.launch {
+                    delay(SUGGESTION_DEBOUNCE_MS)
+                    fetchSuggestions(fields)
+                }
         }
 
         private suspend fun fetchSuggestions(fields: AddHomeAddressFields) {
             _state.update { it.copy(isLoadingSuggestions = true) }
-            val request = PropertySuggestionsRequest(
-                address = fields.street,
-                unitNumber = fields.unit.takeIf { it.isNotEmpty() },
-                city = fields.city,
-                state = fields.state,
-                zipCode = fields.zipCode,
-            )
+            val request =
+                PropertySuggestionsRequest(
+                    address = fields.street,
+                    unitNumber = fields.unit.takeIf { it.isNotEmpty() },
+                    city = fields.city,
+                    state = fields.state,
+                    zipCode = fields.zipCode,
+                )
             val result = repository.propertySuggestions(request)
             val suggestions =
                 if (result is NetworkResult.Success) flattenSuggestions(result.data) else emptyList()
@@ -219,24 +227,28 @@ open class AddHomeWizardViewModel
         private suspend fun runCheckAddress() {
             val fields = _state.value.form.address
             _state.update { it.copy(isCheckingAddress = true, addressCheck = null, errorMessage = null) }
-            val request = CheckAddressRequest(
-                address = fields.street,
-                unitNumber = fields.unit.takeIf { it.isNotEmpty() },
-                city = fields.city,
-                state = fields.state,
-                zipCode = fields.zipCode,
-            )
+            val request =
+                CheckAddressRequest(
+                    address = fields.street,
+                    unitNumber = fields.unit.takeIf { it.isNotEmpty() },
+                    city = fields.city,
+                    state = fields.state,
+                    zipCode = fields.zipCode,
+                )
             when (val result = repository.checkAddress(request)) {
-                is NetworkResult.Success -> _state.update {
-                    it.copy(addressCheck = result.data, isCheckingAddress = false)
-                }
-                is NetworkResult.Failure -> _state.update {
-                    it.copy(
-                        isCheckingAddress = false,
-                        errorMessage = result.error.message
-                            ?: "Couldn't verify that address. Try again.",
-                    )
-                }
+                is NetworkResult.Success ->
+                    _state.update {
+                        it.copy(addressCheck = result.data, isCheckingAddress = false)
+                    }
+                is NetworkResult.Failure ->
+                    _state.update {
+                        it.copy(
+                            isCheckingAddress = false,
+                            errorMessage =
+                                result.error.message
+                                    ?: "Couldn't verify that address. Try again.",
+                        )
+                    }
             }
         }
 
@@ -254,14 +266,15 @@ open class AddHomeWizardViewModel
                 return
             }
             _state.update { it.copy(isSubmitting = true, errorMessage = null) }
-            val request = CreateHomeRequest(
-                address = fields.street,
-                unitNumber = fields.unit.takeIf { it.isNotEmpty() },
-                city = fields.city,
-                state = fields.state,
-                zipCode = fields.zipCode,
-                name = role.label,
-            )
+            val request =
+                CreateHomeRequest(
+                    address = fields.street,
+                    unitNumber = fields.unit.takeIf { it.isNotEmpty() },
+                    city = fields.city,
+                    state = fields.state,
+                    zipCode = fields.zipCode,
+                    name = role.label,
+                )
             when (val result = repository.create(request)) {
                 is NetworkResult.Success -> {
                     _state.update {
@@ -273,13 +286,15 @@ open class AddHomeWizardViewModel
                     }
                     persist()
                 }
-                is NetworkResult.Failure -> _state.update {
-                    it.copy(
-                        isSubmitting = false,
-                        errorMessage = result.error.message
-                            ?: "Couldn't add your home. Please try again.",
-                    )
-                }
+                is NetworkResult.Failure ->
+                    _state.update {
+                        it.copy(
+                            isSubmitting = false,
+                            errorMessage =
+                                result.error.message
+                                    ?: "Couldn't add your home. Please try again.",
+                        )
+                    }
             }
         }
 
@@ -306,9 +321,10 @@ open class AddHomeWizardViewModel
             val zip: String = savedStateHandle[KEY_ZIP] ?: ""
             val isPrimary: Boolean = savedStateHandle[KEY_PRIMARY] ?: true
             val roleName: String? = savedStateHandle[KEY_ROLE]
-            val role = roleName?.let { name ->
-                AddHomeRole.entries.firstOrNull { it.name == name }
-            }
+            val role =
+                roleName?.let { name ->
+                    AddHomeRole.entries.firstOrNull { it.name == name }
+                }
             return AddHomeFormState(
                 step = step,
                 address = AddHomeAddressFields(street, unit, city, state, zip),
@@ -331,7 +347,10 @@ open class AddHomeWizardViewModel
                 primaryCtaEnabled = primaryEnabled(state) && !state.isSubmitting && !state.isCheckingAddress,
                 secondaryCta = secondaryCta(step),
                 isSubmitting = state.isSubmitting || state.isCheckingAddress,
-                dirty = step != AddHomeStep.Success && state.form.address.street.isNotEmpty(),
+                dirty =
+                    step != AddHomeStep.Success &&
+                        state.form.address.street
+                            .isNotEmpty(),
                 showsProgressBar = step != AddHomeStep.Success,
             )
         }
@@ -366,13 +385,14 @@ open class AddHomeWizardViewModel
             return number.toFloat() / AddHomeStep.PROGRESS_TOTAL
         }
 
-        private fun primaryEnabled(state: AddHomeUiState): Boolean = when (state.form.currentStep) {
-            AddHomeStep.Address -> state.form.address.isComplete
-            AddHomeStep.Confirm -> !state.isCheckingAddress && state.errorMessage == null
-            AddHomeStep.Role -> state.form.role != null
-            AddHomeStep.Review -> state.form.role != null
-            AddHomeStep.Success -> state.createdHomeId != null
-        }
+        private fun primaryEnabled(state: AddHomeUiState): Boolean =
+            when (state.form.currentStep) {
+                AddHomeStep.Address -> state.form.address.isComplete
+                AddHomeStep.Confirm -> !state.isCheckingAddress && state.errorMessage == null
+                AddHomeStep.Role -> state.form.role != null
+                AddHomeStep.Review -> state.form.role != null
+                AddHomeStep.Success -> state.createdHomeId != null
+            }
 
         companion object {
             const val SUGGESTION_DEBOUNCE_MS: Long = 300L
@@ -396,7 +416,10 @@ open class AddHomeWizardViewModel
                 return out.take(5)
             }
 
-            private fun collectAny(value: Any?, out: MutableList<String>) {
+            private fun collectAny(
+                value: Any?,
+                out: MutableList<String>,
+            ) {
                 when (value) {
                     is Map<*, *> -> {
                         val address = value["address"] as? String

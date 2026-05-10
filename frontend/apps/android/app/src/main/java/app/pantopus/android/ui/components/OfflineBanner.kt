@@ -45,15 +45,17 @@ fun OfflineBanner(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(PantopusColors.warningBg)
-            .testTag(OFFLINE_BANNER_TAG),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(PantopusColors.warningBg)
+                .testTag(OFFLINE_BANNER_TAG),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
@@ -70,9 +72,10 @@ fun OfflineBanner(
                 modifier = Modifier.weight(1f),
             )
             Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clickable(role = Role.Button, onClick = onDismiss),
+                modifier =
+                    Modifier
+                        .size(32.dp)
+                        .clickable(role = Role.Button, onClick = onDismiss),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(

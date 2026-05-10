@@ -23,11 +23,12 @@ fun FormFieldsBlock(
     content: @Composable () -> Unit,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(PantopusColors.appSurface)
-            .padding(Spacing.s4),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .padding(Spacing.s4),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         content()

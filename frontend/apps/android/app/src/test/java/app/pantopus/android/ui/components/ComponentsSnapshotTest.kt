@@ -43,7 +43,9 @@ class ComponentsSnapshotTest {
 private fun ComponentGallery() {
     Column(
         modifier = Modifier.background(Color.White).padding(16.dp),
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+        verticalArrangement =
+            androidx.compose.foundation.layout.Arrangement
+                .spacedBy(12.dp),
     ) {
         Text("Shimmer")
         Shimmer(width = 180.dp, height = 16.dp)
@@ -55,7 +57,9 @@ private fun ComponentGallery() {
 
         Text("ActionChip")
         androidx.compose.foundation.layout.Row(
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+            horizontalArrangement =
+                androidx.compose.foundation.layout.Arrangement
+                    .spacedBy(8.dp),
         ) {
             ActionChip(PantopusIcon.PlusCircle, "Post", onClick = {}, isActive = true)
             ActionChip(PantopusIcon.Search, "Search", onClick = {})
@@ -63,7 +67,9 @@ private fun ComponentGallery() {
 
         Text("Avatars")
         androidx.compose.foundation.layout.Row(
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+            horizontalArrangement =
+                androidx.compose.foundation.layout.Arrangement
+                    .spacedBy(16.dp),
         ) {
             AvatarWithIdentityRing("Alice Doe", IdentityPillar.Personal, 0.25f)
             AvatarWithIdentityRing("Bob Roy", IdentityPillar.Home, 0.65f)
@@ -72,7 +78,9 @@ private fun ComponentGallery() {
 
         Text("Verified")
         androidx.compose.foundation.layout.Row(
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+            horizontalArrangement =
+                androidx.compose.foundation.layout.Arrangement
+                    .spacedBy(8.dp),
         ) {
             VerifiedBadge()
             VerifiedBadge(size = 20.dp)
@@ -81,7 +89,9 @@ private fun ComponentGallery() {
 
         Text("Status chips")
         androidx.compose.foundation.layout.Row(
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+            horizontalArrangement =
+                androidx.compose.foundation.layout.Arrangement
+                    .spacedBy(8.dp),
         ) {
             StatusChip("Paid", StatusChipVariant.Success, icon = PantopusIcon.Check)
             StatusChip("Due", StatusChipVariant.Warning)

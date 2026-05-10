@@ -45,7 +45,10 @@ data class QuickActionTile(
 )
 
 /** A tab in the [GridTabsBody] strip. */
-data class GridTabsTab(val id: String, val label: String)
+data class GridTabsTab(
+    val id: String,
+    val label: String,
+)
 
 /**
  * 4-across quick-action grid + scrollable tab strip with Overview content

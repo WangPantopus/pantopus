@@ -44,7 +44,8 @@ class MailboxItemDetailViewModelTest {
 
     private fun makeVm(): MailboxItemDetailViewModel {
         val networkMonitor =
-            io.mockk.mockk<app.pantopus.android.data.network.NetworkMonitor>(relaxed = true)
+            io.mockk
+                .mockk<app.pantopus.android.data.network.NetworkMonitor>(relaxed = true)
                 .also { io.mockk.every { it.isOnline } returns kotlinx.coroutines.flow.MutableStateFlow(true) }
         return MailboxItemDetailViewModel(
             repo = repo,

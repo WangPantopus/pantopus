@@ -19,7 +19,9 @@ import javax.inject.Inject
  * Registered in AndroidManifest.xml via `android:name=".PantopusApplication"`.
  */
 @HiltAndroidApp
-class PantopusApplication : Application(), ImageLoaderFactory {
+class PantopusApplication :
+    Application(),
+    ImageLoaderFactory {
     @Inject lateinit var observability: Observability
 
     override fun onCreate() {
@@ -45,19 +47,20 @@ class PantopusApplication : Application(), ImageLoaderFactory {
      * during fast scrolls.
      */
     override fun newImageLoader(): ImageLoader =
-        ImageLoader.Builder(this)
+        ImageLoader
+            .Builder(this)
             .memoryCache {
-                MemoryCache.Builder(this)
+                MemoryCache
+                    .Builder(this)
                     .maxSizePercent(IMAGE_CACHE_MEMORY_PERCENT)
                     .build()
-            }
-            .diskCache {
-                DiskCache.Builder()
+            }.diskCache {
+                DiskCache
+                    .Builder()
                     .directory(File(cacheDir, "image_cache"))
                     .maxSizePercent(IMAGE_CACHE_DISK_PERCENT)
                     .build()
-            }
-            .crossfade(true)
+            }.crossfade(true)
             .build()
 
     private companion object {

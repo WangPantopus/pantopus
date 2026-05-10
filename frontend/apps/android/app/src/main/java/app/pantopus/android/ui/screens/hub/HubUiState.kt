@@ -15,13 +15,19 @@ sealed interface HubUiState {
     data object Skeleton : HubUiState
 
     /** First-run content for new users. */
-    data class FirstRun(val content: FirstRunContent) : HubUiState
+    data class FirstRun(
+        val content: FirstRunContent,
+    ) : HubUiState
 
     /** Fully-assembled hub. */
-    data class Populated(val content: PopulatedContent) : HubUiState
+    data class Populated(
+        val content: PopulatedContent,
+    ) : HubUiState
 
     /** Transport / server error. */
-    data class Error(val message: String) : HubUiState
+    data class Error(
+        val message: String,
+    ) : HubUiState
 }
 
 /** First-run projection. */
@@ -51,7 +57,11 @@ data class PopulatedContent(
 
 /** Setup-step row. */
 @Immutable
-data class SetupStep(val id: String, val title: String, val done: Boolean)
+data class SetupStep(
+    val id: String,
+    val title: String,
+    val done: Boolean,
+)
 
 /** Hub top-bar payload. */
 @Immutable
@@ -116,7 +126,11 @@ data class DiscoveryCardContent(
 
 /** Jump-back-in rail card. */
 @Immutable
-data class JumpBackItem(val id: String, val title: String, val icon: PantopusIcon)
+data class JumpBackItem(
+    val id: String,
+    val title: String,
+    val icon: PantopusIcon,
+)
 
 /** Recent-activity row. */
 @Immutable
@@ -136,11 +150,19 @@ sealed interface HubNavigationIntent {
 
     data object StartVerification : HubNavigationIntent
 
-    data class ActionTapped(val kind: ActionChipContent.Kind) : HubNavigationIntent
+    data class ActionTapped(
+        val kind: ActionChipContent.Kind,
+    ) : HubNavigationIntent
 
-    data class PillarTapped(val pillar: PillarTile.Pillar) : HubNavigationIntent
+    data class PillarTapped(
+        val pillar: PillarTile.Pillar,
+    ) : HubNavigationIntent
 
-    data class DiscoveryTapped(val id: String) : HubNavigationIntent
+    data class DiscoveryTapped(
+        val id: String,
+    ) : HubNavigationIntent
 
-    data class JumpBackTapped(val id: String) : HubNavigationIntent
+    data class JumpBackTapped(
+        val id: String,
+    ) : HubNavigationIntent
 }

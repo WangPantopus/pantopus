@@ -39,18 +39,20 @@ fun SuccessHeroBlock(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = Spacing.s8)
-            .testTag(WIZARD_SUCCESS_HERO_TAG),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(vertical = Spacing.s8)
+                .testTag(WIZARD_SUCCESS_HERO_TAG),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
         Box(
-            modifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
-                .background(PantopusColors.successBg),
+            modifier =
+                Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.successBg),
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(

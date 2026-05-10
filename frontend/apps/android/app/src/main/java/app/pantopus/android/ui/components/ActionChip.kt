@@ -60,8 +60,7 @@ fun ActionChip(
                 .pantopusShadow(
                     if (isActive) PantopusElevations.primary else PantopusElevations.sm,
                     shape = RoundedCornerShape(Radii.pill),
-                )
-                .clip(RoundedCornerShape(Radii.pill))
+                ).clip(RoundedCornerShape(Radii.pill))
                 .background(bg)
                 .then(
                     if (border == Color.Transparent) {
@@ -69,8 +68,7 @@ fun ActionChip(
                     } else {
                         Modifier.border(1.dp, border, RoundedCornerShape(Radii.pill))
                     },
-                )
-                .clickable(onClick = onClick)
+                ).clickable(onClick = onClick)
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s1)
                 .semantics {
                     contentDescription = label

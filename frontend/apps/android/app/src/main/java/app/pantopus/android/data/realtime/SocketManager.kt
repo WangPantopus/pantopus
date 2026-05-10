@@ -36,7 +36,8 @@ class SocketManager
             if (socket?.connected() == true) return
             _connectionState.value = ConnectionState.Connecting
             val options =
-                IO.Options.builder()
+                IO.Options
+                    .builder()
                     .setAuth(mapOf("token" to token))
                     .setReconnection(true)
                     .setReconnectionDelay(2_000)

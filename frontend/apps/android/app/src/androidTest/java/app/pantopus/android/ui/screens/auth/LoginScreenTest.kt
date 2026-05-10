@@ -32,7 +32,8 @@ class LoginScreenTest {
 
         compose.onNodeWithTag(LoginScreenTags.EMAIL_FIELD).assertIsDisplayed()
         compose.onNodeWithTag(LoginScreenTags.PASSWORD_FIELD).assertIsDisplayed()
-        compose.onNodeWithTag(LoginScreenTags.SUBMIT_BUTTON)
+        compose
+            .onNodeWithTag(LoginScreenTags.SUBMIT_BUTTON)
             .assertIsDisplayed()
             .assertHasClickAction()
             .assertIsNotEnabled()

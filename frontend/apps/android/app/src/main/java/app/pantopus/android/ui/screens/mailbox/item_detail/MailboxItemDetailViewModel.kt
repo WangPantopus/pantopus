@@ -45,9 +45,13 @@ data class MailboxItemDetailContent(
 sealed interface MailboxItemDetailUiState {
     data object Loading : MailboxItemDetailUiState
 
-    data class Loaded(val content: MailboxItemDetailContent) : MailboxItemDetailUiState
+    data class Loaded(
+        val content: MailboxItemDetailContent,
+    ) : MailboxItemDetailUiState
 
-    data class Error(val message: String) : MailboxItemDetailUiState
+    data class Error(
+        val message: String,
+    ) : MailboxItemDetailUiState
 }
 
 /** Per-CTA busy / error flags surfaced to the view for optimistic UI. */
@@ -269,7 +273,8 @@ class MailboxItemDetailViewModel
         }
 
         private fun initials(name: String): String =
-            name.trim()
+            name
+                .trim()
                 .split(" ")
                 .take(2)
                 .mapNotNull { it.firstOrNull()?.toString() }

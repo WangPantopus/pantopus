@@ -88,12 +88,22 @@ class MailboxViewModelTests {
             val vm = MailboxListViewModel(repo)
             vm.load()
             val first = vm.state.value as ListOfRowsUiState.Loaded
-            assertEquals(25, first.sections.first().rows.size)
+            assertEquals(
+                25,
+                first.sections
+                    .first()
+                    .rows.size,
+            )
             assertTrue(first.hasMore)
 
             vm.loadMoreIfNeeded()
             val second = vm.state.value as ListOfRowsUiState.Loaded
-            assertEquals(26, second.sections.first().rows.size)
+            assertEquals(
+                26,
+                second.sections
+                    .first()
+                    .rows.size,
+            )
             assertTrue(!second.hasMore)
         }
 
@@ -141,7 +151,21 @@ class MailboxViewModelTests {
             val vm = MailboxDrawersViewModel(repo)
             vm.load()
             val loaded = vm.state.value as ListOfRowsUiState.Loaded
-            assertEquals("Personal", loaded.sections.first().rows.first().title)
-            assertEquals("3 unread · 1 urgent", loaded.sections.first().rows.first().subtitle)
+            assertEquals(
+                "Personal",
+                loaded.sections
+                    .first()
+                    .rows
+                    .first()
+                    .title,
+            )
+            assertEquals(
+                "3 unread · 1 urgent",
+                loaded.sections
+                    .first()
+                    .rows
+                    .first()
+                    .subtitle,
+            )
         }
 }

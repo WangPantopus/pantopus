@@ -35,7 +35,9 @@ data class HubContext(
     val activePersona: ActivePersona,
 ) {
     @JsonClass(generateAdapter = true)
-    data class ActivePersona(val type: String)
+    data class ActivePersona(
+        val type: String,
+    )
 }
 
 @JsonClass(generateAdapter = true)
@@ -73,7 +75,10 @@ data class HubSetup(
     val profileCompleteness: ProfileCompleteness,
 ) {
     @JsonClass(generateAdapter = true)
-    data class Step(val key: String, val done: Boolean)
+    data class Step(
+        val key: String,
+        val done: Boolean,
+    )
 
     @JsonClass(generateAdapter = true)
     data class ProfileCompleteness(
@@ -106,7 +111,10 @@ data class HubStatusItem(
     val entityRef: EntityRef?,
 ) {
     @JsonClass(generateAdapter = true)
-    data class EntityRef(val kind: String, val id: String)
+    data class EntityRef(
+        val kind: String,
+        val id: String,
+    )
 }
 
 @JsonClass(generateAdapter = true)

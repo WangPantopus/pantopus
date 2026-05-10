@@ -19,8 +19,9 @@ fun HeadlineBlock(
         text = text,
         style = PantopusTextStyle.h2,
         color = PantopusColors.appText,
-        modifier = modifier
-            .fillMaxWidth()
-            .semantics { heading() },
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .semantics { heading() },
     )
 }

@@ -7,7 +7,9 @@ package app.pantopus.android.ui.screens.homes.add_home
  * success state is a sentinel terminal step used to render the success
  * hero block.
  */
-enum class AddHomeStep(val ordinal0: Int) {
+enum class AddHomeStep(
+    val ordinal0: Int,
+) {
     Address(0),
     Confirm(1),
     Role(2),
@@ -18,20 +20,20 @@ enum class AddHomeStep(val ordinal0: Int) {
     /** One-indexed position used in the "N of M" top-bar readout, or null
      *  for the success terminal. */
     val stepNumber: Int?
-        get() = when (this) {
-            Address -> 1
-            Confirm -> 2
-            Role -> 3
-            Review -> 4
-            Success -> null
-        }
+        get() =
+            when (this) {
+                Address -> 1
+                Confirm -> 2
+                Role -> 3
+                Review -> 4
+                Success -> null
+            }
 
     companion object {
         /** Total number of "step N of M" steps shown in the readout. */
         const val PROGRESS_TOTAL: Int = 4
 
-        fun fromOrdinal(value: Int): AddHomeStep =
-            entries.firstOrNull { it.ordinal0 == value } ?: Address
+        fun fromOrdinal(value: Int): AddHomeStep = entries.firstOrNull { it.ordinal0 == value } ?: Address
     }
 }
 
@@ -61,7 +63,9 @@ data class AddHomeAddressFields(
 }
 
 /** User's role on the home being added — picked in step 3. */
-enum class AddHomeRole(val label: String) {
+enum class AddHomeRole(
+    val label: String,
+) {
     Owner("Owner"),
     Tenant("Tenant"),
     HouseholdMember("Household member"),
@@ -92,5 +96,7 @@ sealed interface AddHomeOutboundEvent {
     data object Dismiss : AddHomeOutboundEvent
 
     /** Pop the wizard and navigate to the new home dashboard. */
-    data class OpenHomeDashboard(val homeId: String) : AddHomeOutboundEvent
+    data class OpenHomeDashboard(
+        val homeId: String,
+    ) : AddHomeOutboundEvent
 }

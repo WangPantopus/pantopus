@@ -8,10 +8,14 @@ package app.pantopus.android.data.api.net
  */
 sealed interface NetworkResult<out T> {
     /** Successful response with a decoded body. */
-    data class Success<T>(val data: T) : NetworkResult<T>
+    data class Success<T>(
+        val data: T,
+    ) : NetworkResult<T>
 
     /** Failure — carries the typed error for the UI to route on. */
-    data class Failure(val error: NetworkError) : NetworkResult<Nothing>
+    data class Failure(
+        val error: NetworkError,
+    ) : NetworkResult<Nothing>
 }
 
 /** Every failure mode of the Pantopus HTTP client. */
@@ -30,20 +34,26 @@ sealed class NetworkError(
     data object NotFound : NetworkError(404, "We couldn't find what you were looking for.")
 
     /** 4xx with server-supplied message. */
-    class ClientError(code: Int, val body: String?) :
-        NetworkError(code, body ?: "Request failed ($code).")
+    class ClientError(
+        code: Int,
+        val body: String?,
+    ) : NetworkError(code, body ?: "Request failed ($code).")
 
     /** 5xx after retries exhausted. */
-    class Server(code: Int, val body: String?) :
-        NetworkError(code, "Server error $code. Please try again.")
+    class Server(
+        code: Int,
+        val body: String?,
+    ) : NetworkError(code, "Server error $code. Please try again.")
 
     /** Network-layer failure (offline, timeout, DNS). */
-    class Transport(cause: Throwable) :
-        NetworkError(null, "Can't reach Pantopus. Check your connection.", cause)
+    class Transport(
+        cause: Throwable,
+    ) : NetworkError(null, "Can't reach Pantopus. Check your connection.", cause)
 
     /** Response decoded into an unexpected shape. */
-    class Decoding(cause: Throwable) :
-        NetworkError(null, "Received an unexpected response.", cause)
+    class Decoding(
+        cause: Throwable,
+    ) : NetworkError(null, "Received an unexpected response.", cause)
 
     /** Retry loop exhausted without a 2xx. */
     data object RetriesExhausted :

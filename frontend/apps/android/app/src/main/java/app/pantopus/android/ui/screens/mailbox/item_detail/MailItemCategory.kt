@@ -10,7 +10,10 @@ import app.pantopus.android.ui.theme.PantopusIcon
  * 14-category enum for mailbox items. Maps 1:1 to the backend
  * `mail.mail_type` string — unknown values fall through to [General].
  */
-enum class MailItemCategory(val raw: String, val accent: Color) {
+enum class MailItemCategory(
+    val raw: String,
+    val accent: Color,
+) {
     Package("package", PantopusColors.delivery),
     Coupon("coupon", PantopusColors.childCare),
     Notice("notice", PantopusColors.warning),

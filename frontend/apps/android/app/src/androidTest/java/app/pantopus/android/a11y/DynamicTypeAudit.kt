@@ -51,7 +51,8 @@ class DynamicTypeAudit {
             NotYetAvailableView(tabName = "Nearby", icon = PantopusIcon.Map)
         }
         // The empty-state container is the testTag-bearing Box.
-        compose.onNodeWithTag(app.pantopus.android.ui.screens.root.NOT_YET_AVAILABLE_TAG)
+        compose
+            .onNodeWithTag(app.pantopus.android.ui.screens.root.NOT_YET_AVAILABLE_TAG)
             .assertIsDisplayed()
             .assertWidthIsAtLeast(48.dp)
             .assertHeightIsAtLeast(48.dp)
@@ -62,7 +63,8 @@ class DynamicTypeAudit {
         setLargeFontScaleContent {
             NotYetAvailableView(tabName = "You", icon = PantopusIcon.User)
         }
-        compose.onNodeWithTag(app.pantopus.android.ui.screens.root.NOT_YET_AVAILABLE_TAG)
+        compose
+            .onNodeWithTag(app.pantopus.android.ui.screens.root.NOT_YET_AVAILABLE_TAG)
             .assertIsDisplayed()
     }
 }

@@ -105,8 +105,7 @@ fun Shimmer(
                         size = Size(widthPx, size.height),
                         style = Stroke(width = size.height * 2),
                     )
-                }
-                .semantics(mergeDescendants = false) { },
+                }.semantics(mergeDescendants = false) { },
     )
 }
 
@@ -134,7 +133,9 @@ private fun rememberAnimationsEnabled(): Boolean {
 private fun ShimmerPreview() {
     androidx.compose.foundation.layout.Column(
         modifier = Modifier.background(Color.White),
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+        verticalArrangement =
+            androidx.compose.foundation.layout.Arrangement
+                .spacedBy(8.dp),
     ) {
         Shimmer(width = 160.dp, height = 16.dp)
         Shimmer(width = 120.dp, height = 12.dp, cornerRadius = 4.dp)

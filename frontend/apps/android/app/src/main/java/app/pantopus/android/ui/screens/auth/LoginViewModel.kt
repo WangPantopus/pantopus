@@ -39,11 +39,11 @@ class LoginViewModel
             if (!snapshot.canSubmit) return
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             viewModelScope.launch {
-                authRepository.signIn(snapshot.email, snapshot.password)
+                authRepository
+                    .signIn(snapshot.email, snapshot.password)
                     .onFailure { e ->
                         _uiState.update { it.copy(isLoading = false, errorMessage = e.message ?: "Sign-in failed") }
-                    }
-                    .onSuccess {
+                    }.onSuccess {
                         _uiState.update { it.copy(isLoading = false) }
                     }
             }

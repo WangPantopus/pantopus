@@ -79,7 +79,8 @@ class AddHomeWizardScreenTest {
         compose.setContent {
             AddHomeWizardScreen(onDismiss = {}, onOpenHomeDashboard = {}, viewModel = makeViewModel())
         }
-        compose.onNodeWithTag(WizardShellTags.PRIMARY_CTA)
+        compose
+            .onNodeWithTag(WizardShellTags.PRIMARY_CTA)
             .assertIsDisplayed()
             .assertIsNotEnabled()
     }
