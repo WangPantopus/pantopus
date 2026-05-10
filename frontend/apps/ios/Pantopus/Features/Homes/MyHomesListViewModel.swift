@@ -14,14 +14,18 @@ import SwiftUI
 @Observable
 @MainActor
 final class MyHomesListViewModel: ListOfRowsDataSource {
-    public let title = "My homes"
-    public var topBarAction: TopBarAction? { nil }
-    public let tabs: [ListOfRowsTab] = []
-    public var selectedTab: String = ""
-    public var fab: FABAction? {
+    let title = "My homes"
+    var topBarAction: TopBarAction? {
+        nil
+    }
+
+    let tabs: [ListOfRowsTab] = []
+    var selectedTab: String = ""
+    var fab: FABAction? {
         FABAction(icon: .plusCircle, accessibilityLabel: "Claim a home", handler: onAddHome)
     }
-    public private(set) var state: ListOfRowsState = .loading
+
+    private(set) var state: ListOfRowsState = .loading
 
     private let api: APIClient
     private let onOpenHome: (String) -> Void
@@ -37,14 +41,17 @@ final class MyHomesListViewModel: ListOfRowsDataSource {
         self.onAddHome = onAddHome
     }
 
-    public func load() async {
+    func load() async {
         if case .loaded = state { return }
         state = .loading
         await fetch()
     }
 
-    public func refresh() async { await fetch() }
-    public func loadMoreIfNeeded() async {} // `my-homes` is not paginated.
+    func refresh() async {
+        await fetch()
+    }
+
+    func loadMoreIfNeeded() async {} // `my-homes` is not paginated.
 
     private func fetch() async {
         do {
@@ -98,5 +105,7 @@ final class MyHomesListViewModel: ListOfRowsDataSource {
 
 private extension String {
     /// Returns `nil` when the string is empty; otherwise the string.
-    var nilIfEmpty: String? { isEmpty ? nil : self }
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }

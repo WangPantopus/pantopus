@@ -76,8 +76,7 @@ fun PantopusButton(
                         PantopusElevations.sm
                     },
                     shape = RoundedCornerShape(Radii.lg),
-                )
-                .clip(RoundedCornerShape(Radii.lg))
+                ).clip(RoundedCornerShape(Radii.lg))
                 .background(background)
                 .then(
                     if (borderColor == Color.Transparent) {
@@ -89,8 +88,7 @@ fun PantopusButton(
                             shape = RoundedCornerShape(Radii.lg),
                         )
                     },
-                )
-                .clickable(enabled = clickable, onClick = onClick)
+                ).clickable(enabled = clickable, onClick = onClick)
                 .padding(horizontal = Spacing.s4)
                 .semantics {
                     contentDescription = title

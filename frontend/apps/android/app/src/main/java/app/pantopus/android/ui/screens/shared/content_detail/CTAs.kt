@@ -41,7 +41,11 @@ import app.pantopus.android.ui.theme.Spacing
 import app.pantopus.android.ui.theme.pantopusShadow
 
 /** Bottom-sheet action payload. */
-data class FabSheetAction(val id: String, val title: String, val icon: PantopusIcon)
+data class FabSheetAction(
+    val id: String,
+    val title: String,
+    val icon: PantopusIcon,
+)
 
 /** Test tag on the FAB. */
 const val FAB_CREATE_TAG = "homeDashboardFab"

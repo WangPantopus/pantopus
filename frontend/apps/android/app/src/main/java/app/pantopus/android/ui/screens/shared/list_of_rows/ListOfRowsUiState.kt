@@ -25,7 +25,9 @@ sealed interface ListOfRowsUiState {
     ) : ListOfRowsUiState
 
     /** Transport / server error — render banner + retry. */
-    data class Error(val message: String) : ListOfRowsUiState
+    data class Error(
+        val message: String,
+    ) : ListOfRowsUiState
 }
 
 /** Tab strip entry. */

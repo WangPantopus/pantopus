@@ -12,7 +12,6 @@ import XCTest
 
 @MainActor
 final class HomeDashboardViewModelTests: XCTestCase {
-
     override func setUp() {
         super.setUp()
         SequencedURLProtocol.reset()
@@ -38,12 +37,13 @@ final class HomeDashboardViewModelTests: XCTestCase {
                          "owner_status":"verified","is_primary_owner":true,"verification_tier":"attom"}],
               "can_delete_home":true
             }}
-            """),
+            """)
         ]
         let vm = HomeDashboardViewModel(homeId: "h1", api: makeAPI())
         await vm.load()
-        guard case .loaded(let content) = vm.state else {
-            XCTFail("Expected loaded, got \(vm.state)"); return
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected loaded, got \(vm.state)")
+            return
         }
         XCTAssertEqual(content.address, "1 Main")
         XCTAssertTrue(content.verified)
@@ -61,12 +61,13 @@ final class HomeDashboardViewModelTests: XCTestCase {
               "created_at":"2025-01-01T00:00:00Z","hasVerifiedOwner":true,"verifiedOwner":null,
               "userMembershipStatus":"none","userResidencyClaim":null,"memberCount":2,"nearbyGigs":5
             }}
-            """),
+            """)
         ]
         let vm = HomeDashboardViewModel(homeId: "h1", api: makeAPI())
         await vm.load()
-        guard case .loaded(let content) = vm.state else {
-            XCTFail("Expected loaded, got \(vm.state)"); return
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected loaded, got \(vm.state)")
+            return
         }
         XCTAssertEqual(content.address, "200 Public St")
         XCTAssertTrue(content.verified, "Public profile with a verified owner should flip verified=true")
@@ -93,16 +94,18 @@ final class HomeDashboardViewModelTests: XCTestCase {
               "occupants":[],"location":null,"isOwner":false,"isPendingOwner":false,
               "pendingClaimId":null,"isOccupant":true,"owners":[],"can_delete_home":false
             }}
-            """),
+            """)
         ]
         let vm = HomeDashboardViewModel(homeId: "h1", api: makeAPI())
         await vm.load()
         guard case .error = vm.state else {
-            XCTFail("Expected error first"); return
+            XCTFail("Expected error first")
+            return
         }
         await vm.refresh()
         guard case .loaded = vm.state else {
-            XCTFail("Expected loaded after retry"); return
+            XCTFail("Expected loaded after retry")
+            return
         }
     }
 }

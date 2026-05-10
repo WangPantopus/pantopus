@@ -55,50 +55,52 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case alertCircle = "alert-circle"
     case circle
     case info
+    case wifiOff = "wifi-off"
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
     public var sfSymbolName: String {
         switch self {
-        case .home: return "house"
-        case .map: return "map"
-        case .inbox: return "tray"
-        case .user: return "person"
-        case .bell: return "bell"
-        case .menu: return "line.3.horizontal"
-        case .shieldCheck: return "checkmark.shield"
-        case .x: return "xmark"
-        case .plusCircle: return "plus.circle"
-        case .camera: return "camera"
-        case .scanLine: return "barcode.viewfinder"
-        case .plusSquare: return "plus.square"
-        case .sun: return "sun.max"
-        case .chevronRight: return "chevron.right"
-        case .chevronLeft: return "chevron.left"
-        case .megaphone: return "megaphone"
-        case .shoppingBag: return "bag"
-        case .hammer: return "hammer"
-        case .mailbox: return "mail.stack"
-        case .search: return "magnifyingglass"
-        case .userPlus: return "person.badge.plus"
-        case .file: return "doc"
-        case .copy: return "doc.on.doc"
-        case .check: return "checkmark"
-        case .moreHorizontal: return "ellipsis"
-        case .arrowLeft: return "arrow.left"
-        case .send: return "paperplane"
-        case .chevronDown: return "chevron.down"
-        case .chevronUp: return "chevron.up"
-        case .trash2: return "trash"
-        case .edit2: return "pencil"
-        case .upload: return "square.and.arrow.up"
-        case .shield: return "shield"
-        case .lock: return "lock"
-        case .checkCircle: return "checkmark.circle"
-        case .alertCircle: return "exclamationmark.circle"
-        case .circle: return "circle"
-        case .info: return "info.circle"
+        case .home: "house"
+        case .map: "map"
+        case .inbox: "tray"
+        case .user: "person"
+        case .bell: "bell"
+        case .menu: "line.3.horizontal"
+        case .shieldCheck: "checkmark.shield"
+        case .x: "xmark"
+        case .plusCircle: "plus.circle"
+        case .camera: "camera"
+        case .scanLine: "barcode.viewfinder"
+        case .plusSquare: "plus.square"
+        case .sun: "sun.max"
+        case .chevronRight: "chevron.right"
+        case .chevronLeft: "chevron.left"
+        case .megaphone: "megaphone"
+        case .shoppingBag: "bag"
+        case .hammer: "hammer"
+        case .mailbox: "mail.stack"
+        case .search: "magnifyingglass"
+        case .userPlus: "person.badge.plus"
+        case .file: "doc"
+        case .copy: "doc.on.doc"
+        case .check: "checkmark"
+        case .moreHorizontal: "ellipsis"
+        case .arrowLeft: "arrow.left"
+        case .send: "paperplane"
+        case .chevronDown: "chevron.down"
+        case .chevronUp: "chevron.up"
+        case .trash2: "trash"
+        case .edit2: "pencil"
+        case .upload: "square.and.arrow.up"
+        case .shield: "shield"
+        case .lock: "lock"
+        case .checkCircle: "checkmark.circle"
+        case .alertCircle: "exclamationmark.circle"
+        case .circle: "circle"
+        case .info: "info.circle"
+        case .wifiOff: "wifi.slash"
         }
     }
 }
@@ -152,10 +154,10 @@ public struct Icon: View {
     /// Map the numeric Lucide stroke width onto SF Symbol font weights.
     private var weight: Font.Weight {
         switch strokeWidth {
-        case ..<1.5: return .light
-        case 1.5..<2.25: return .regular
-        case 2.25..<2.75: return .medium
-        default: return .bold
+        case ..<1.5: .light
+        case 1.5..<2.25: .regular
+        case 2.25..<2.75: .medium
+        default: .bold
         }
     }
 }

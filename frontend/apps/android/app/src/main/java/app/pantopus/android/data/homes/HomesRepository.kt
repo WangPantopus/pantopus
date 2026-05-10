@@ -1,6 +1,9 @@
 package app.pantopus.android.data.homes
 
+import app.pantopus.android.data.api.models.homes.CheckAddressRequest
+import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
+import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.HomesApi
@@ -13,17 +16,26 @@ import javax.inject.Singleton
  * they can expose a single error surface to the UI.
  */
 @Singleton
-class HomesRepository
+open class HomesRepository
     @Inject
     constructor(
         private val api: HomesApi,
     ) {
         /** `GET /api/homes/my-homes`. */
-        suspend fun myHomes(): NetworkResult<MyHomesResponse> = safeApiCall { api.myHomes() }
+        open suspend fun myHomes(): NetworkResult<MyHomesResponse> = safeApiCall { api.myHomes() }
 
         /** `GET /api/homes/:id`. */
-        suspend fun detail(id: String) = safeApiCall { api.detail(id) }
+        open suspend fun detail(id: String) = safeApiCall { api.detail(id) }
 
         /** `GET /api/homes/:id/public-profile`. */
-        suspend fun publicProfile(id: String) = safeApiCall { api.publicProfile(id) }
+        open suspend fun publicProfile(id: String) = safeApiCall { api.publicProfile(id) }
+
+        /** `POST /api/homes/property-suggestions`. */
+        open suspend fun propertySuggestions(request: PropertySuggestionsRequest) = safeApiCall { api.propertySuggestions(request) }
+
+        /** `POST /api/homes/check-address`. */
+        open suspend fun checkAddress(request: CheckAddressRequest) = safeApiCall { api.checkAddress(request) }
+
+        /** `POST /api/homes`. */
+        open suspend fun create(request: CreateHomeRequest) = safeApiCall { api.create(request) }
     }

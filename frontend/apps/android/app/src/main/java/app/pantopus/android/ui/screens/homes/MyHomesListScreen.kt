@@ -5,6 +5,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.data.analytics.Analytics
+import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -27,6 +29,7 @@ fun MyHomesListScreen(
     LaunchedEffect(Unit) {
         viewModel.configureNavigation(onOpenHome = onOpenHome, onAddHome = onAddHome)
         viewModel.load()
+        Analytics.track(AnalyticsEvent.ScreenMyHomesViewed)
     }
     ListOfRowsScreen(
         title = "My homes",

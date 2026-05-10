@@ -11,7 +11,6 @@ import XCTest
 
 @MainActor
 final class ListOfRowsViewModelTests: XCTestCase {
-
     override func setUp() {
         super.setUp()
         SequencedURLProtocol.reset()
@@ -35,12 +34,13 @@ final class ListOfRowsViewModelTests: XCTestCase {
                "ownership_status":"verified","is_primary_owner":true,
                "verification_tier":"attom","occupancy":null,"pending_claim_id":null}
             ]}
-            """),
+            """)
         ]
         let vm = MyHomesListViewModel(api: makeAPI())
         await vm.load()
-        guard case .loaded(let sections, _) = vm.state else {
-            XCTFail("Expected loaded state, got \(vm.state)"); return
+        guard case let .loaded(sections, _) = vm.state else {
+            XCTFail("Expected loaded state, got \(vm.state)")
+            return
         }
         XCTAssertEqual(sections.first?.rows.count, 1)
         XCTAssertEqual(sections.first?.rows.first?.title, "Main")
@@ -50,8 +50,9 @@ final class ListOfRowsViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [.status(200, body: "{\"homes\":[]}")]
         let vm = MyHomesListViewModel(api: makeAPI())
         await vm.load()
-        guard case .empty(let content) = vm.state else {
-            XCTFail("Expected empty state, got \(vm.state)"); return
+        guard case let .empty(content) = vm.state else {
+            XCTFail("Expected empty state, got \(vm.state)")
+            return
         }
         XCTAssertEqual(content.icon, .home)
         XCTAssertEqual(content.ctaTitle, "Claim a home")
@@ -62,7 +63,8 @@ final class ListOfRowsViewModelTests: XCTestCase {
         let vm = MyHomesListViewModel(api: makeAPI())
         await vm.load()
         guard case .error = vm.state else {
-            XCTFail("Expected error state, got \(vm.state)"); return
+            XCTFail("Expected error state, got \(vm.state)")
+            return
         }
     }
 
@@ -71,8 +73,8 @@ final class ListOfRowsViewModelTests: XCTestCase {
     func testMailboxPaginationAndTabs() async {
         let page1Items = (0..<25).map {
             "{\"id\":\"m\($0)\",\"type\":\"notice\",\"viewed\":true,\"archived\":false," +
-            "\"starred\":false,\"tags\":[],\"priority\":\"normal\",\"attachments\":null," +
-            "\"created_at\":\"2025-01-01T00:00:00Z\"}"
+                "\"starred\":false,\"tags\":[],\"priority\":\"normal\",\"attachments\":null," +
+                "\"created_at\":\"2025-01-01T00:00:00Z\"}"
         }
         let page1 = page1Items.joined(separator: ",")
         let page2 = "{\"id\":\"m_last\",\"type\":\"notice\",\"viewed\":true,\"archived\":false," +
@@ -80,12 +82,12 @@ final class ListOfRowsViewModelTests: XCTestCase {
             "\"created_at\":\"2025-01-01T00:00:00Z\"}"
         SequencedURLProtocol.sequence = [
             .status(200, body: "{\"mail\":[\(page1)],\"count\":25}"),
-            .status(200, body: "{\"mail\":[\(page2)],\"count\":1}"),
+            .status(200, body: "{\"mail\":[\(page2)],\"count\":1}")
         ]
 
         let vm = MailboxListViewModel(api: makeAPI())
         await vm.load()
-        if case .loaded(let sections, let hasMore) = vm.state {
+        if case let .loaded(sections, hasMore) = vm.state {
             XCTAssertEqual(sections.first?.rows.count, 25)
             XCTAssertTrue(hasMore, "Expected hasMore when a full page is returned")
         } else {
@@ -93,7 +95,7 @@ final class ListOfRowsViewModelTests: XCTestCase {
         }
 
         await vm.loadMoreIfNeeded()
-        if case .loaded(let sections, let hasMore) = vm.state {
+        if case let .loaded(sections, hasMore) = vm.state {
             XCTAssertEqual(sections.first?.rows.count, 26)
             XCTAssertFalse(hasMore, "Expected hasMore false after a partial page")
         } else {
@@ -105,8 +107,9 @@ final class ListOfRowsViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [.status(200, body: "{\"mail\":[],\"count\":0}")]
         let vm = MailboxListViewModel(api: makeAPI())
         await vm.load()
-        guard case .empty(let content) = vm.state else {
-            XCTFail("Expected empty state, got \(vm.state)"); return
+        guard case let .empty(content) = vm.state else {
+            XCTFail("Expected empty state, got \(vm.state)")
+            return
         }
         XCTAssertEqual(content.icon, .mailbox)
     }
@@ -120,12 +123,13 @@ final class ListOfRowsViewModelTests: XCTestCase {
               {"drawer":"personal","display_name":"Personal","icon":"inbox",
                "unread_count":3,"urgent_count":1,"last_item_at":null}
             ]}
-            """),
+            """)
         ]
         let vm = MailboxDrawersViewModel(api: makeAPI())
         await vm.load()
-        guard case .loaded(let sections, _) = vm.state else {
-            XCTFail("Expected loaded state, got \(vm.state)"); return
+        guard case let .loaded(sections, _) = vm.state else {
+            XCTFail("Expected loaded state, got \(vm.state)")
+            return
         }
         XCTAssertEqual(sections.first?.rows.first?.title, "Personal")
         XCTAssertEqual(sections.first?.rows.first?.subtitle, "3 unread · 1 urgent")

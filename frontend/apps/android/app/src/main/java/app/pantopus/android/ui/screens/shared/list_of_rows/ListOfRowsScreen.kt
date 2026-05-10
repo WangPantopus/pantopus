@@ -276,7 +276,10 @@ private fun LoadedList(
     val shouldLoadMore by remember {
         derivedStateOf {
             val total = listState.layoutInfo.totalItemsCount
-            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
+            val last =
+                listState.layoutInfo.visibleItemsInfo
+                    .lastOrNull()
+                    ?.index ?: return@derivedStateOf false
             state.hasMore && total > 0 && last >= total - 3
         }
     }

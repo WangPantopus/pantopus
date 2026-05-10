@@ -42,11 +42,17 @@ class MailboxItemDetailViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun makeVm() =
-        MailboxItemDetailViewModel(
+    private fun makeVm(): MailboxItemDetailViewModel {
+        val networkMonitor =
+            io.mockk
+                .mockk<app.pantopus.android.data.network.NetworkMonitor>(relaxed = true)
+                .also { io.mockk.every { it.isOnline } returns kotlinx.coroutines.flow.MutableStateFlow(true) }
+        return MailboxItemDetailViewModel(
             repo = repo,
+            networkMonitor = networkMonitor,
             savedStateHandle = SavedStateHandle(mapOf(MAILBOX_ITEM_DETAIL_MAIL_ID_KEY to "m1")),
         )
+    }
 
     private fun packageItem(type: String = "package"): MailboxV2ItemResponse =
         MailboxV2ItemResponse(

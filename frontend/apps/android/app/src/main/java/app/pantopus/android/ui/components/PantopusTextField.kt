@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -42,7 +43,9 @@ sealed interface PantopusFieldState {
 
     data object Valid : PantopusFieldState
 
-    data class Error(val message: String) : PantopusFieldState
+    data class Error(
+        val message: String,
+    ) : PantopusFieldState
 }
 
 /**
@@ -66,6 +69,7 @@ fun PantopusTextField(
     state: PantopusFieldState = PantopusFieldState.Default,
     isSecure: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
+    fieldTestTag: String? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -98,8 +102,7 @@ fun PantopusTextField(
                         width = if (isFocused) 2.dp else 1.dp,
                         color = border,
                         shape = RoundedCornerShape(Radii.md),
-                    )
-                    .padding(horizontal = Spacing.s3),
+                    ).padding(horizontal = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
@@ -113,7 +116,14 @@ fun PantopusTextField(
                 visualTransformation =
                     if (isSecure) VisualTransformation.None else VisualTransformation.None,
                 keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                modifier = Modifier.weight(1f),
+                // Test tag must land directly on BasicTextField — that's the
+                // node that owns the editable's RequestFocus / SetText
+                // semantic actions. Putting it on the outer wrapper meant
+                // performTextInput failed with "(RequestFocus is defined)".
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .then(if (fieldTestTag != null) Modifier.testTag(fieldTestTag) else Modifier),
                 decorationBox = { inner ->
                     if (value.isEmpty()) {
                         Text(

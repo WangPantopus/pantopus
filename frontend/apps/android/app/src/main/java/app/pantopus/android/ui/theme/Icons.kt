@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -57,7 +58,9 @@ import app.pantopus.android.R
  * kebab-case Lucide token names so [PantopusIcon.valueOfRaw] and snapshot
  * tests stay stable across renames.
  */
-enum class PantopusIcon(val lucideName: String) {
+enum class PantopusIcon(
+    val lucideName: String,
+) {
     Home("home"),
     Map("map"),
     Inbox("inbox"),
@@ -96,6 +99,7 @@ enum class PantopusIcon(val lucideName: String) {
     AlertCircle("alert-circle"),
     Circle("circle"),
     Info("info"),
+    WifiOff("wifi-off"),
     ;
 
     companion object {
@@ -114,7 +118,9 @@ enum class PantopusIcon(val lucideName: String) {
  */
 internal sealed interface IconSource {
     @JvmInline
-    value class Material(val vector: ImageVector) : IconSource
+    value class Material(
+        val vector: ImageVector,
+    ) : IconSource
 
     @JvmInline
     value class Drawable(
@@ -169,6 +175,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.AlertCircle -> IconSource.Material(Icons.Filled.Error)
         PantopusIcon.Circle -> IconSource.Material(Icons.Filled.Circle)
         PantopusIcon.Info -> IconSource.Material(Icons.Filled.Info)
+        PantopusIcon.WifiOff -> IconSource.Material(Icons.Filled.WifiOff)
     }
 
 /**

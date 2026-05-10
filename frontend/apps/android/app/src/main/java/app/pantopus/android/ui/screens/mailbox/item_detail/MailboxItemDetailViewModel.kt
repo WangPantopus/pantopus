@@ -45,9 +45,13 @@ data class MailboxItemDetailContent(
 sealed interface MailboxItemDetailUiState {
     data object Loading : MailboxItemDetailUiState
 
-    data class Loaded(val content: MailboxItemDetailContent) : MailboxItemDetailUiState
+    data class Loaded(
+        val content: MailboxItemDetailContent,
+    ) : MailboxItemDetailUiState
 
-    data class Error(val message: String) : MailboxItemDetailUiState
+    data class Error(
+        val message: String,
+    ) : MailboxItemDetailUiState
 }
 
 /** Per-CTA busy / error flags surfaced to the view for optimistic UI. */
@@ -64,6 +68,7 @@ class MailboxItemDetailViewModel
     @Inject
     constructor(
         private val repo: MailboxRepository,
+        private val networkMonitor: app.pantopus.android.data.network.NetworkMonitor,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val mailId: String =
@@ -105,6 +110,15 @@ class MailboxItemDetailViewModel
         fun logAsReceived() {
             val current = _state.value as? MailboxItemDetailUiState.Loaded ?: return
             if (_ctaFlags.value.primaryLoading) return
+            app.pantopus.android.data.analytics.Analytics.track(
+                app.pantopus.android.data.analytics.AnalyticsEvent.CtaMailboxItemLogReceived,
+            )
+            if (!networkMonitor.isOnline.value) {
+                _ctaFlags.update {
+                    it.copy(errorToast = "You're offline. Try again when you're back online.")
+                }
+                return
+            }
             val originalTimeline = current.content.timeline
             val originalCtaEnabled = current.content.ctaEnabled
             _state.value =
@@ -259,7 +273,8 @@ class MailboxItemDetailViewModel
         }
 
         private fun initials(name: String): String =
-            name.trim()
+            name
+                .trim()
                 .split(" ")
                 .take(2)
                 .mapNotNull { it.firstOrNull()?.toString() }

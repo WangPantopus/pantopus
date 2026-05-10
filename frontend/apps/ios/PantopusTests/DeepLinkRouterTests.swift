@@ -8,7 +8,6 @@ import XCTest
 
 @MainActor
 final class DeepLinkRouterTests: XCTestCase {
-
     override func setUp() {
         super.setUp()
         _ = DeepLinkRouter.shared.consume() // clear any leftover state
@@ -41,7 +40,7 @@ final class DeepLinkRouterTests: XCTestCase {
     func testUnknownPathFallsBack() throws {
         let url = try XCTUnwrap(URL(string: "pantopus://wat"))
         DeepLinkRouter.shared.handle(url: url)
-        if case .unknown(let captured) = DeepLinkRouter.shared.pending {
+        if case let .unknown(captured) = DeepLinkRouter.shared.pending {
             XCTAssertEqual(captured, url)
         } else {
             XCTFail("Expected .unknown")

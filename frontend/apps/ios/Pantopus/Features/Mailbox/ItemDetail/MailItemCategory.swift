@@ -29,20 +29,20 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
     /// 4pt accent strip color sitting at the top of the detail shell.
     public var accent: Color {
         switch self {
-        case .package: Theme.Color.delivery         // #374151
-        case .coupon: Theme.Color.childCare         // #f39c12
-        case .notice: Theme.Color.warning           // #d97706
-        case .bill: Theme.Color.error               // #dc2626
-        case .statement: Theme.Color.tutoring       // #2980b9
-        case .insurance: Theme.Color.info           // #0284c7
-        case .tax: Theme.Color.vehicles             // #dc2626
-        case .subscription: Theme.Color.goods       // #7c3aed
-        case .legal: Theme.Color.moving             // #8e44ad
-        case .healthcare: Theme.Color.petCare       // #e74c3c
-        case .membership: Theme.Color.personal      // #0284c7
-        case .delivery: Theme.Color.handyman        // #f97316
-        case .social: Theme.Color.cleaning          // #27ae60
-        case .general: Theme.Color.appTextSecondary // neutral gray
+        case .package: Theme.Color.delivery
+        case .coupon: Theme.Color.childCare
+        case .notice: Theme.Color.warning
+        case .bill: Theme.Color.error
+        case .statement: Theme.Color.tutoring
+        case .insurance: Theme.Color.info
+        case .tax: Theme.Color.vehicles
+        case .subscription: Theme.Color.goods
+        case .legal: Theme.Color.moving
+        case .healthcare: Theme.Color.petCare
+        case .membership: Theme.Color.personal
+        case .delivery: Theme.Color.handyman
+        case .social: Theme.Color.cleaning
+        case .general: Theme.Color.appTextSecondary
         }
     }
 

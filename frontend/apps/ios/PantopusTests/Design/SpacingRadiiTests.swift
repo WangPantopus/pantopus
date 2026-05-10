@@ -7,7 +7,6 @@ import XCTest
 @testable import Pantopus
 
 final class SpacingRadiiTests: XCTestCase {
-
     func testSpacingRamp() {
         XCTAssertEqual(Spacing.s0, 0)
         XCTAssertEqual(Spacing.s1, 4)

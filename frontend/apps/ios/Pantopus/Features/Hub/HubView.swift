@@ -26,20 +26,21 @@ struct HubView: View {
             case .skeleton:
                 ScrollView { HubSkeleton() }
                     .background(Theme.Color.appBg)
-            case .firstRun(let content):
+            case let .firstRun(content):
                 firstRunLayout(content)
-            case .populated(let content):
+            case let .populated(content):
                 populatedLayout(content)
-            case .error(let message):
+            case let .error(message):
                 ErrorView(message: message) { Task { await viewModel.refresh() } }
             }
         }
         .background(Theme.Color.appBg)
+        .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
         .refreshable { await viewModel.refresh() }
+        .onAppear { Analytics.track(.screenHubViewed) }
     }
 
-    @ViewBuilder
     private func populatedLayout(_ content: HubState.PopulatedContent) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Spacing.s4, pinnedViews: [.sectionHeaders]) {
@@ -74,7 +75,6 @@ struct HubView: View {
         }
     }
 
-    @ViewBuilder
     private func firstRunLayout(_ content: HubState.FirstRunContent) -> some View {
         ZStack(alignment: .bottom) {
             ScrollView {

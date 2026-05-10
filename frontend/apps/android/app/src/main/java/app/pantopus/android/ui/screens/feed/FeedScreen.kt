@@ -53,9 +53,13 @@ class FeedViewModel
         sealed interface UiState {
             data object Loading : UiState
 
-            data class Loaded(val posts: List<FeedPost>) : UiState
+            data class Loaded(
+                val posts: List<FeedPost>,
+            ) : UiState
 
-            data class Error(val message: String) : UiState
+            data class Error(
+                val message: String,
+            ) : UiState
         }
 
         private val _state = MutableStateFlow<UiState>(UiState.Loading)

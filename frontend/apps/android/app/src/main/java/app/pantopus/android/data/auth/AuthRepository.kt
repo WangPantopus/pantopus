@@ -35,7 +35,9 @@ class AuthRepository
             data object SignedOut : State
 
             /** Session restored or freshly signed in. */
-            data class SignedIn(val user: UserDto) : State
+            data class SignedIn(
+                val user: UserDto,
+            ) : State
         }
 
         private val _state = MutableStateFlow<State>(State.Unknown)

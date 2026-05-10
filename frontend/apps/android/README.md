@@ -227,3 +227,39 @@ For automated Play Store uploads, add the [Gradle Play Publisher](https://github
 | Emulator can't reach backend at `localhost:8000`   | Use `http://10.0.2.2:8000` in `.env`                                  |
 | `Cleartext HTTP ... not permitted`                 | Keep `usesCleartextTraffic="true"` for debug, hit HTTPS in release    |
 | First build is very slow                           | Expected — BOM + Kotlin + KSP first-time compile. Second build ~30s.  |
+
+## CI
+
+PRs touching `frontend/apps/android/**` trigger
+[`.github/workflows/android-ci.yml`](../../../.github/workflows/android-ci.yml):
+
+1. **Quality** (Ubuntu) — ktlint, detekt, Android Lint, the raw-hex
+   grep guard, JVM `test` (incl. Paparazzi snapshot tests via
+   `paparazziVerify`), and a Debug APK build. Uploads the test
+   reports, Paparazzi diffs (when failed), detekt report, and the
+   Debug APK as artifacts.
+2. **Instrumented** (Ubuntu + KVM emulator) — `connectedDebugAndroidTest`
+   on a Pixel 6 image (API 34). Runs only on PRs and manual dispatch.
+
+A separate
+[`.github/workflows/android-benchmark.yml`](../../../.github/workflows/android-benchmark.yml)
+runs **nightly at 09:00 UTC** and exercises the macrobenchmark suite
+once the `:benchmark` Gradle module lands (recipe in
+[`docs/perf_budgets.md`](docs/perf_budgets.md)). Until then it logs a
+"skipped" diagnostic so the schedule keeps the slot warm.
+
+Local equivalents: `./gradlew ktlintCheck detekt test paparazziVerify
+:app:assembleDebug` and `./gradlew :app:connectedDebugAndroidTest`.
+
+### Recording new Paparazzi baselines
+
+When a deliberate visual change lands, regenerate baselines:
+
+```bash
+./gradlew paparazziRecord
+git add app/src/test/snapshots
+```
+
+The CI's `paparazziVerify` step will fail any uncommitted snapshot
+divergence — so a deliberately-broken colour change in a screen
+trips the build until baselines are updated.

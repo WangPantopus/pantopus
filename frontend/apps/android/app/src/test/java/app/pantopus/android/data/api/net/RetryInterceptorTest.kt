@@ -31,8 +31,7 @@ class RetryInterceptorTest {
                         maxDelayMs = 5,
                         sleep = {},
                     ),
-                )
-                .build()
+                ).build()
     }
 
     @After
@@ -46,7 +45,15 @@ class RetryInterceptorTest {
         server.enqueue(MockResponse().setResponseCode(503))
         server.enqueue(MockResponse().setResponseCode(200).setBody("ok"))
 
-        val response = client.newCall(Request.Builder().url(server.url("/x")).get().build()).execute()
+        val response =
+            client
+                .newCall(
+                    Request
+                        .Builder()
+                        .url(server.url("/x"))
+                        .get()
+                        .build(),
+                ).execute()
 
         assertEquals(200, response.code)
         assertEquals(3, server.requestCount)
@@ -56,7 +63,15 @@ class RetryInterceptorTest {
     @Test
     fun get_exhausts_retries() {
         repeat(3) { server.enqueue(MockResponse().setResponseCode(503)) }
-        val response = client.newCall(Request.Builder().url(server.url("/x")).get().build()).execute()
+        val response =
+            client
+                .newCall(
+                    Request
+                        .Builder()
+                        .url(server.url("/x"))
+                        .get()
+                        .build(),
+                ).execute()
         assertEquals(503, response.code)
         assertEquals(3, server.requestCount)
         response.close()
@@ -66,7 +81,15 @@ class RetryInterceptorTest {
     fun post_is_not_retried() {
         server.enqueue(MockResponse().setResponseCode(503))
         val body = okhttp3.RequestBody.create(null, "")
-        val response = client.newCall(Request.Builder().url(server.url("/x")).post(body).build()).execute()
+        val response =
+            client
+                .newCall(
+                    Request
+                        .Builder()
+                        .url(server.url("/x"))
+                        .post(body)
+                        .build(),
+                ).execute()
         assertEquals(503, response.code)
         assertEquals(1, server.requestCount)
         response.close()

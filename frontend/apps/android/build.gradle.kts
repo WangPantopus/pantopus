@@ -9,6 +9,10 @@ plugins {
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
+    // P16: declare Play Publisher at the root so the :app module can
+    // apply it. Configuration lives in `app/build.gradle.kts` under
+    // the `play { … }` block.
+    alias(libs.plugins.play.publisher) apply false
 }
 
 // Apply detekt + ktlint to every subproject.

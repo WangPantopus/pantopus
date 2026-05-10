@@ -136,7 +136,7 @@ private struct TimelineMarker: View {
         .init(title: "Order placed", subtitle: "Mar 17", state: .done),
         .init(title: "In transit", subtitle: "Mar 18", state: .done),
         .init(title: "Out for delivery", subtitle: "Today", state: .current),
-        .init(title: "Delivered", state: .upcoming),
+        .init(title: "Delivered", state: .upcoming)
     ])
     .padding()
     .background(Theme.Color.appBg)

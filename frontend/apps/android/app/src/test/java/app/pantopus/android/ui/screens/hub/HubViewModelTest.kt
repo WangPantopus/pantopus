@@ -208,6 +208,11 @@ class HubViewModelTest {
             vm.load()
             val populated = vm.state.value as HubUiState.Populated
             assertEquals(1, populated.content.discovery.size)
-            assertEquals("Mow lawn", populated.content.discovery.first().title)
+            assertEquals(
+                "Mow lawn",
+                populated.content.discovery
+                    .first()
+                    .title,
+            )
         }
 }

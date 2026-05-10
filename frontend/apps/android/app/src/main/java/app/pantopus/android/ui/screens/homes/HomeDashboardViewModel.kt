@@ -38,9 +38,13 @@ data class HomeDashboardContent(
 sealed interface HomeDashboardUiState {
     data object Loading : HomeDashboardUiState
 
-    data class Loaded(val content: HomeDashboardContent) : HomeDashboardUiState
+    data class Loaded(
+        val content: HomeDashboardContent,
+    ) : HomeDashboardUiState
 
-    data class Error(val message: String) : HomeDashboardUiState
+    data class Error(
+        val message: String,
+    ) : HomeDashboardUiState
 }
 
 /**

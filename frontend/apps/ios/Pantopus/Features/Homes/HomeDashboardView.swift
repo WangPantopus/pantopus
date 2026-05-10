@@ -24,12 +24,14 @@ struct HomeDashboardView: View {
             switch viewModel.state {
             case .loading:
                 LoadingView(onBack: onBack)
-            case .loaded(let content):
+            case let .loaded(content):
                 loadedBody(for: content)
-            case .error(let message):
+            case let .error(message):
                 ErrorView(message: message, onBack: onBack) { Task { await viewModel.refresh() } }
             }
         }
+        .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+        .onAppear { Analytics.track(.screenHomeDashboardViewed) }
         .task { await viewModel.load() }
         .overlay(alignment: .bottom) {
             if let toast {
@@ -47,7 +49,6 @@ struct HomeDashboardView: View {
         .animation(.easeInOut(duration: 0.2), value: toast)
     }
 
-    @ViewBuilder
     private func loadedBody(for content: HomeDashboardContent) -> some View {
         ContentDetailShell(
             title: "Home",
@@ -78,7 +79,7 @@ struct HomeDashboardView: View {
                     actions: [
                         FABSheetAction(id: "log_package", title: "Log a package", icon: .shoppingBag),
                         FABSheetAction(id: "add_member", title: "Add member", icon: .userPlus),
-                        FABSheetAction(id: "add_mail", title: "Add mail", icon: .mailbox),
+                        FABSheetAction(id: "add_mail", title: "Add mail", icon: .mailbox)
                     ]
                 ) { showPlaceholderToast(for: $0) }
             }
@@ -119,7 +120,7 @@ private struct HomeOverviewSection: View {
                     id: "members",
                     label: "Members",
                     value: content.stats.first { $0.id == "members" }?.value ?? "—"
-                ),
+                )
             ])
         }
     }

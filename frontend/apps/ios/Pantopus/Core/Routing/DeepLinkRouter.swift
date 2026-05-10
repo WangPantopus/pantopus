@@ -33,11 +33,11 @@ final class DeepLinkRouter {
         let destination = resolve(url: url)
         logger.info("deeplink", metadata: [
             "url": .string(url.absoluteString),
-            "destination": .string("\(destination)"),
+            "destination": .string("\(destination)")
         ])
         pending = destination
         Observability.shared.track("deeplink.received", properties: [
-            "url": url.absoluteString,
+            "url": url.absoluteString
         ])
     }
 
@@ -50,8 +50,17 @@ final class DeepLinkRouter {
 
     /// Accepts both `pantopus://…` and `https://pantopus.app/…`.
     private func resolve(url: URL) -> Destination {
-        let path = url.pathComponents.filter { $0 != "/" }
-        let firstSegment = path.first ?? url.host ?? ""
+        // For custom-scheme URLs (`pantopus://messages/conv_42`) the route
+        // name lives in the host, not the path. For https URLs the host is
+        // the domain and the route is the first path component. Normalize
+        // both shapes into one `segments` array so the matcher below
+        // doesn't have to branch on scheme.
+        var segments = url.pathComponents.filter { $0 != "/" }
+        if url.scheme != "http", url.scheme != "https",
+           let host = url.host, !host.isEmpty {
+            segments.insert(host, at: 0)
+        }
+        let firstSegment = segments.first ?? ""
 
         switch firstSegment {
         case "feed":
@@ -59,10 +68,10 @@ final class DeepLinkRouter {
         case "home":
             return .home
         case "post", "posts":
-            if let id = path.dropFirst().first { return .post(id: id) }
+            if let id = segments.dropFirst().first { return .post(id: id) }
             return .unknown(url)
         case "message", "messages", "conversation":
-            if let id = path.dropFirst().first { return .conversation(id: id) }
+            if let id = segments.dropFirst().first { return .conversation(id: id) }
             return .unknown(url)
         default:
             return .unknown(url)

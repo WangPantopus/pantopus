@@ -20,10 +20,10 @@ public struct FormFieldState: Identifiable, Equatable, Sendable {
 
     public init(id: String, originalValue: String) {
         self.id = id
-        self.value = originalValue
+        value = originalValue
         self.originalValue = originalValue
-        self.touched = false
-        self.error = nil
+        touched = false
+        error = nil
     }
 
     /// True when the current value differs from `originalValue`.
@@ -45,7 +45,7 @@ public struct FormAggregate: Sendable, Equatable {
     public let isValid: Bool
 
     public init(fields: [FormFieldState]) {
-        self.isDirty = fields.contains { $0.isDirty }
-        self.isValid = fields.allSatisfy { $0.error == nil }
+        isDirty = fields.contains { $0.isDirty }
+        isValid = fields.allSatisfy { $0.error == nil }
     }
 }

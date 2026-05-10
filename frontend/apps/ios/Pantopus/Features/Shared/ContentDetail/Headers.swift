@@ -50,6 +50,7 @@ public struct HomeHeroHeader: View {
                 .pantopusTextStyle(.h2)
                 .foregroundStyle(Theme.Color.appTextInverse)
                 .lineLimit(3)
+                .accessibilityAddTraits(.isHeader)
 
             HStack(spacing: Spacing.s4) {
                 ForEach(stats) { stat in

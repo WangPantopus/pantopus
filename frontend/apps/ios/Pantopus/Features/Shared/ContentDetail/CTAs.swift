@@ -95,11 +95,15 @@ private struct FABSheet: View {
 /// Sticky bottom action row — stubbed until a screen needs it.
 public struct StickyBottomActionStub: View {
     public init() {}
-    public var body: some View { EmptyView() }
+    public var body: some View {
+        EmptyView()
+    }
 }
 
 /// Convenience empty CTA for screens that don't need one.
 public struct NoCTA: View {
     public init() {}
-    public var body: some View { EmptyView() }
+    public var body: some View {
+        EmptyView()
+    }
 }

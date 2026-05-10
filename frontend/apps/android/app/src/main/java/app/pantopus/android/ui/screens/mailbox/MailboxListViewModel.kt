@@ -25,7 +25,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Tabs surfaced by the V1 mailbox list. */
-enum class MailboxTab(val id: String, val label: String) {
+enum class MailboxTab(
+    val id: String,
+    val label: String,
+) {
     All("all", "All"),
     Unread("unread", "Unread"),
     Starred("starred", "Starred"),

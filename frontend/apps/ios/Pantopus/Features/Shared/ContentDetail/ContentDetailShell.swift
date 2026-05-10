@@ -48,9 +48,9 @@ public struct ContentDetailShell<HeaderView: View, BodyView: View, CTAView: View
         self.title = title
         self.onBack = onBack
         self.topBarAction = topBarAction
-        self.headerContent = header()
-        self.bodyContent = body()
-        self.ctaContent = cta()
+        headerContent = header()
+        bodyContent = body()
+        ctaContent = cta()
     }
 
     public var body: some View {

@@ -86,7 +86,15 @@ enum Fixtures {
 
 final class InMemorySecureStore: SecureStore {
     private var storage: [String: String] = [:]
-    func set(_ value: String, for key: String) throws { storage[key] = value }
-    func get(_ key: String) -> String? { storage[key] }
-    func delete(_ key: String) throws { storage.removeValue(forKey: key) }
+    func set(_ value: String, for key: String) throws {
+        storage[key] = value
+    }
+
+    func get(_ key: String) -> String? {
+        storage[key]
+    }
+
+    func delete(_ key: String) throws {
+        storage.removeValue(forKey: key)
+    }
 }

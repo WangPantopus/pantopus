@@ -16,6 +16,8 @@ struct MailboxListView: View {
 
     var body: some View {
         ListOfRowsView(dataSource: viewModel)
+            .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+            .onAppear { Analytics.track(.screenMailboxListViewed) }
             .overlay(alignment: .bottom) {
                 if let toast = viewModel.toast {
                     ToastBanner(message: toast)

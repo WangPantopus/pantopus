@@ -42,9 +42,17 @@ public indirect enum JSONValue: Decodable, Sendable, Hashable {
     }
 
     /// String value if this case is `.string`, otherwise nil.
-    public var stringValue: String? { if case .string(let v) = self { return v } else { return nil } }
+    public var stringValue: String? {
+        if case let .string(v) = self { v } else { nil }
+    }
+
     /// Numeric value if this case is `.number`, otherwise nil.
-    public var numberValue: Double? { if case .number(let v) = self { return v } else { return nil } }
+    public var numberValue: Double? {
+        if case let .number(v) = self { v } else { nil }
+    }
+
     /// Boolean value if this case is `.bool`, otherwise nil.
-    public var boolValue: Bool? { if case .bool(let v) = self { return v } else { return nil } }
+    public var boolValue: Bool? {
+        if case let .bool(v) = self { v } else { nil }
+    }
 }

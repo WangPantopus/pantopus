@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.data.analytics.Analytics
+import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
 import app.pantopus.android.ui.theme.PantopusColors
@@ -41,6 +43,7 @@ fun MailboxListScreen(
     LaunchedEffect(Unit) {
         viewModel.configureNavigation(onOpenMail = onOpenMail)
         viewModel.load()
+        Analytics.track(AnalyticsEvent.ScreenMailboxListViewed)
     }
 
     Box {

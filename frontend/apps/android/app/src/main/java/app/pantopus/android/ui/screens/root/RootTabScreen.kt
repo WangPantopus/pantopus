@@ -2,23 +2,34 @@
 
 package app.pantopus.android.ui.screens.root
 
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.invisibleToUser
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import app.pantopus.android.ui.components.EmptyState
+import app.pantopus.android.BuildConfig
+import app.pantopus.android.ui.screens._internal.TokenGalleryScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
+import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.HubNavigationIntent
 import app.pantopus.android.ui.screens.hub.HubScreen
@@ -30,7 +41,6 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_M
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
 import app.pantopus.android.ui.screens.nearby.NearbyScreen
 import app.pantopus.android.ui.screens.you.YouScreen
-import app.pantopus.android.ui.theme.PantopusIcon
 
 /** Non-tab routes reachable from within the Hub stack. */
 private object ChildRoutes {
@@ -40,6 +50,9 @@ private object ChildRoutes {
     const val MAILBOX_DRAWERS = "mailbox/drawers"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
     const val HOME_DASHBOARD = "homes/{$HOME_DASHBOARD_HOME_ID_KEY}"
+
+    /** Debug-only route reached via 5-tap easter egg on the Hub. */
+    const val TOKEN_GALLERY = "_debug/token-gallery"
 
     /** Build the concrete path for a home dashboard. */
     fun homeDashboard(id: String): String = "homes/$id"
@@ -86,24 +99,26 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             modifier = Modifier.padding(padding),
         ) {
             composable(PantopusRoute.Hub.path) {
-                HubScreen(onIntent = { intent ->
-                    when (intent) {
-                        is HubNavigationIntent.PillarTapped ->
-                            when (intent.pillar) {
-                                PillarTile.Pillar.Mail -> navController.navigate(ChildRoutes.MAILBOX_LIST)
-                                else -> Unit
-                            }
-                        is HubNavigationIntent.ActionTapped ->
-                            when (intent.kind) {
-                                ActionChipContent.Kind.AddHome -> navController.navigate(ChildRoutes.ADD_HOME)
-                                ActionChipContent.Kind.ScanMail -> navController.navigate(ChildRoutes.MAILBOX_DRAWERS)
-                                else -> Unit
-                            }
-                        HubNavigationIntent.StartVerification ->
-                            navController.navigate(ChildRoutes.ADD_HOME)
-                        else -> Unit
-                    }
-                })
+                HubWithDebugFiveTap(navController = navController) {
+                    HubScreen(onIntent = { intent ->
+                        when (intent) {
+                            is HubNavigationIntent.PillarTapped ->
+                                when (intent.pillar) {
+                                    PillarTile.Pillar.Mail -> navController.navigate(ChildRoutes.MAILBOX_LIST)
+                                    else -> Unit
+                                }
+                            is HubNavigationIntent.ActionTapped ->
+                                when (intent.kind) {
+                                    ActionChipContent.Kind.AddHome -> navController.navigate(ChildRoutes.ADD_HOME)
+                                    ActionChipContent.Kind.ScanMail -> navController.navigate(ChildRoutes.MAILBOX_DRAWERS)
+                                    else -> Unit
+                                }
+                            HubNavigationIntent.StartVerification ->
+                                navController.navigate(ChildRoutes.ADD_HOME)
+                            else -> Unit
+                        }
+                    })
+                }
             }
             composable(PantopusRoute.Nearby.path) { NearbyScreen() }
             composable(PantopusRoute.Inbox.path) { InboxScreen() }
@@ -143,12 +158,63 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.ADD_HOME) {
-                EmptyState(
-                    icon = PantopusIcon.PlusSquare,
-                    headline = "Add home flow coming soon",
-                    subcopy = "We're wiring up address verification next.",
+                AddHomeWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenHomeDashboard = { homeId ->
+                        // Pop the wizard then push the dashboard so Back
+                        // returns to MyHomes, not the success screen.
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.homeDashboard(homeId))
+                    },
                 )
+            }
+            if (BuildConfig.DEBUG) {
+                composable(ChildRoutes.TOKEN_GALLERY) { TokenGalleryScreen() }
             }
         }
     }
 }
+
+/**
+ * Wraps [HubScreen] with a 44dp invisible 5-tap target in the top-leading
+ * corner so debug builds can jump to the token gallery — the production
+ * hub hides its toolbar so there's no visible title to attach to. No-op in
+ * release builds; semantically hidden so TalkBack can't trip it.
+ */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+@Composable
+@Suppress("ModifierMissing")
+private fun HubWithDebugFiveTap(
+    navController: NavHostController,
+    content: @Composable () -> Unit,
+) {
+    if (!BuildConfig.DEBUG) {
+        content()
+        return
+    }
+    Box {
+        content()
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.TopStart)
+                    .size(44.dp)
+                    .semantics { invisibleToUser() }
+                    .pointerInput(Unit) {
+                        var taps = 0
+                        var lastTap = 0L
+                        detectTapGestures(onTap = {
+                            val now = System.currentTimeMillis()
+                            taps = if (now - lastTap < FIVE_TAP_WINDOW_MS) taps + 1 else 1
+                            lastTap = now
+                            if (taps >= 5) {
+                                taps = 0
+                                navController.navigate(ChildRoutes.TOKEN_GALLERY)
+                            }
+                        })
+                    },
+        )
+    }
+}
+
+private const val FIVE_TAP_WINDOW_MS: Long = 1_500L

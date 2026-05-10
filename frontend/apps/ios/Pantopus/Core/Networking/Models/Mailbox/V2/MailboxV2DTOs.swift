@@ -19,7 +19,9 @@ public struct DrawerListResponse: Decodable, Sendable, Hashable {
         public let urgentCount: Int
         public let lastItemAt: String?
 
-        public var id: String { drawer }
+        public var id: String {
+            drawer
+        }
 
         private enum CodingKeys: String, CodingKey {
             case drawer
@@ -45,15 +47,17 @@ public struct DrawerItemsResponse: Decodable, Sendable, Hashable {
         public let senderTrust: String
         public let package: JSONValue?
 
-        public var id: String { item.id }
+        public var id: String {
+            item.id
+        }
 
         public init(from decoder: Decoder) throws {
-            self.item = try MailItem(from: decoder)
+            item = try MailItem(from: decoder)
             let c = try decoder.container(keyedBy: Keys.self)
-            self.sender = try c.decodeIfPresent(SenderRef.self, forKey: .sender)
-            self.senderDisplay = try c.decode(String.self, forKey: .senderDisplay)
-            self.senderTrust = try c.decode(String.self, forKey: .senderTrust)
-            self.package = try c.decodeIfPresent(JSONValue.self, forKey: .package)
+            sender = try c.decodeIfPresent(SenderRef.self, forKey: .sender)
+            senderDisplay = try c.decode(String.self, forKey: .senderDisplay)
+            senderTrust = try c.decode(String.self, forKey: .senderTrust)
+            package = try c.decodeIfPresent(JSONValue.self, forKey: .package)
         }
 
         private enum Keys: String, CodingKey {
@@ -84,18 +88,20 @@ public struct MailboxV2ItemResponse: Decodable, Sendable, Hashable {
         public let packageTimeline: [JSONValue]
         public let objectPayload: JSONValue?
 
-        public var id: String { base.id }
+        public var id: String {
+            base.id
+        }
 
         public init(from decoder: Decoder) throws {
-            self.base = try MailItem(from: decoder)
+            base = try MailItem(from: decoder)
             let c = try decoder.container(keyedBy: Keys.self)
-            self.sender = try c.decodeIfPresent(DrawerItemsResponse.DrawerMail.SenderRef.self, forKey: .sender)
-            self.senderDisplay = try c.decode(String.self, forKey: .senderDisplay)
-            self.senderTrust = try c.decode(String.self, forKey: .senderTrust)
-            self.package = try c.decodeIfPresent(JSONValue.self, forKey: .package)
-            self.packageInfo = try c.decodeIfPresent(JSONValue.self, forKey: .packageInfo)
-            self.packageTimeline = try c.decodeIfPresent([JSONValue].self, forKey: .packageTimeline) ?? []
-            self.objectPayload = try c.decodeIfPresent(JSONValue.self, forKey: .objectPayload)
+            sender = try c.decodeIfPresent(DrawerItemsResponse.DrawerMail.SenderRef.self, forKey: .sender)
+            senderDisplay = try c.decode(String.self, forKey: .senderDisplay)
+            senderTrust = try c.decode(String.self, forKey: .senderTrust)
+            package = try c.decodeIfPresent(JSONValue.self, forKey: .package)
+            packageInfo = try c.decodeIfPresent(JSONValue.self, forKey: .packageInfo)
+            packageTimeline = try c.decodeIfPresent([JSONValue].self, forKey: .packageTimeline) ?? []
+            objectPayload = try c.decodeIfPresent(JSONValue.self, forKey: .objectPayload)
         }
 
         private enum Keys: String, CodingKey {

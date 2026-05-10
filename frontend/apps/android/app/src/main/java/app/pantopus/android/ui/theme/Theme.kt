@@ -149,7 +149,8 @@ fun PantopusTheme(
             // status-bar tinting in that case — the snapshot content is
             // what's under test.
             (view.context as? Activity)?.window?.let { window ->
-                WindowCompat.getInsetsController(window, view)
+                WindowCompat
+                    .getInsetsController(window, view)
                     .isAppearanceLightStatusBars = !darkTheme
             }
         }

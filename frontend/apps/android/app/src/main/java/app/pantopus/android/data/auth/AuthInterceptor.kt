@@ -23,13 +23,16 @@ class AuthInterceptor
     ) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val request =
-                chain.request().newBuilder().apply {
-                    val token = runBlocking { tokenStorage.accessToken() }
-                    if (!token.isNullOrBlank()) {
-                        header("Authorization", "Bearer $token")
-                    }
-                    header("X-Client-Platform", "android")
-                }.build()
+                chain
+                    .request()
+                    .newBuilder()
+                    .apply {
+                        val token = runBlocking { tokenStorage.accessToken() }
+                        if (!token.isNullOrBlank()) {
+                            header("Authorization", "Bearer $token")
+                        }
+                        header("X-Client-Platform", "android")
+                    }.build()
 
             val response = chain.proceed(request)
             if (response.code == 401) {

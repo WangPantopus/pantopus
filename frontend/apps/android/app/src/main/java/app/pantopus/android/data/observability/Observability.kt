@@ -1,10 +1,13 @@
 package app.pantopus.android.data.observability
 
 import android.content.Context
+import android.os.Build
 import app.pantopus.android.BuildConfig
 import io.sentry.Breadcrumb
 import io.sentry.Sentry
+import io.sentry.SentryEvent
 import io.sentry.SentryLevel
+import io.sentry.SentryOptions
 import io.sentry.android.core.SentryAndroid
 import io.sentry.android.timber.SentryTimberIntegration
 import io.sentry.protocol.User
@@ -47,6 +50,19 @@ class Observability
                 options.isAttachScreenshot = false
                 options.isAttachViewHierarchy = false
                 options.isSendDefaultPii = false
+
+                // P15: scrub PII from every event + breadcrumb before send.
+                options.beforeSend =
+                    SentryOptions.BeforeSendCallback { event, _ ->
+                        scrubPII(event)
+                        event
+                    }
+                options.beforeBreadcrumb =
+                    SentryOptions.BeforeBreadcrumbCallback { breadcrumb, _ ->
+                        scrubPII(breadcrumb)
+                        breadcrumb
+                    }
+
                 // Route Timber.e/w into Sentry breadcrumbs + events automatically.
                 options.addIntegration(
                     SentryTimberIntegration(
@@ -55,8 +71,95 @@ class Observability
                     ),
                 )
             }
+
+            // P15: tag every event with platform context so Sentry's
+            // search/grouping understands which build hit the failure.
+            Sentry.configureScope { scope ->
+                scope.setTag("app_version", BuildConfig.VERSION_NAME)
+                scope.setTag("os_version", "Android ${Build.VERSION.RELEASE}")
+                scope.setTag("device_model", "${Build.MANUFACTURER} ${Build.MODEL}")
+            }
+
             Timber.i("Sentry started (env=${BuildConfig.PANTOPUS_ENV})")
         }
+
+        // MARK: - PII scrubbing
+
+        private val piiKeys =
+            setOf(
+                "email",
+                "emailaddress",
+                "email_address",
+                "phone",
+                "phonenumber",
+                "phone_number",
+                "telephone",
+                "address",
+                "street",
+                "streetaddress",
+                "street_address",
+                "city",
+                "state",
+                "zip",
+                "zipcode",
+                "zip_code",
+                "postalcode",
+                "postal_code",
+                "fullname",
+                "name",
+                "firstname",
+                "first_name",
+                "lastname",
+                "last_name",
+                "password",
+                "token",
+                "authorization",
+                "auth",
+                "secret",
+            )
+        private val redacted = "[redacted]"
+        private val emailRegex = Regex("""[\w.+-]+@[\w-]+\.[\w.-]+""")
+        private val phoneRegex = Regex("""\+?\d[\d\s().-]{7,}""")
+
+        private fun scrubPII(event: SentryEvent) {
+            val extras = event.extras
+            if (extras != null) {
+                val mutable = extras.toMutableMap()
+                scrubInPlace(mutable)
+                mutable.forEach { (k, v) -> event.setExtra(k, v) }
+            }
+            event.breadcrumbs?.forEach { scrubPII(it) }
+        }
+
+        private fun scrubPII(breadcrumb: Breadcrumb) {
+            breadcrumb.data
+                .toMutableMap()
+                .also { scrubInPlace(it) }
+                .forEach { (k, v) -> breadcrumb.setData(k, v) }
+            breadcrumb.message?.let { breadcrumb.message = redact(it) }
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun scrubInPlace(dict: MutableMap<String, Any?>) {
+            for (key in dict.keys.toList()) {
+                val lower = key.lowercase()
+                val value = dict[key]
+                when {
+                    piiKeys.contains(lower) -> dict[key] = redacted
+                    value is Map<*, *> -> {
+                        val nested = (value as Map<String, Any?>).toMutableMap()
+                        scrubInPlace(nested)
+                        dict[key] = nested
+                    }
+                    value is String -> dict[key] = redact(value)
+                }
+            }
+        }
+
+        private fun redact(value: String): String =
+            value
+                .replace(emailRegex, redacted)
+                .replace(phoneRegex, redacted)
 
         fun capture(throwable: Throwable) {
             Timber.e(throwable)

@@ -16,8 +16,33 @@ import Logging
 /// idempotent methods.
 @Observable
 final class APIClient: @unchecked Sendable {
-    /// Singleton for the live app. Unit tests construct their own instance.
-    static let shared = APIClient()
+    /// Singleton for the live app. Unit tests construct their own
+    /// instance. Under `UI_TESTS_STUB_API=1` the lazy initializer wires
+    /// in `UITestStubProtocol` so XCUITests can drive the network surface
+    /// without a real backend.
+    static let shared: APIClient = {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["UI_TESTS_STUB_API"] == "1" {
+            return APIClient.makeUITestStubbed()
+        }
+        #endif
+        return APIClient()
+    }()
+
+    #if DEBUG
+    /// Build an `APIClient` whose `URLSession` routes every request
+    /// through `UITestStubProtocol`. Only used by UI-test launches.
+    private static func makeUITestStubbed() -> APIClient {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [UITestStubProtocol.self]
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        return APIClient(
+            session: URLSession(configuration: config),
+            retryPolicy: .none
+        )
+    }
+    #endif
 
     private let session: URLSession
     private let decoder: JSONDecoder
@@ -107,7 +132,7 @@ final class APIClient: @unchecked Sendable {
         as type: Response.Type = Response.self
     ) async -> APIResult<Response> {
         do {
-            return .success(try await request(endpoint, as: type))
+            return try await .success(request(endpoint, as: type))
         } catch let error as APIError {
             return .failure(error)
         } catch {
@@ -174,6 +199,7 @@ final class APIClient: @unchecked Sendable {
             throw APIError.invalidResponse
         }
         logger.debug("API \(endpoint.method.rawValue) \(endpoint.path) -> \(http.statusCode)")
+        warnIfResponseExceedsBudget(path: endpoint.path, byteCount: data.count)
 
         switch http.statusCode {
         case 200..<300, 304:
@@ -233,6 +259,34 @@ final class APIClient: @unchecked Sendable {
         }
 
         return request
+    }
+
+    // MARK: - Response-size budgets (P13)
+
+    /// Hot read endpoints whose response should stay under the
+    /// per-request size budget. Anything larger trips a warn-level log
+    /// and (when wired in P15) a Sentry breadcrumb so we catch
+    /// regressions before they ship.
+    private static let responseSizeWatchPaths: [String] = [
+        "/api/hub",
+        "/api/mailbox",
+        "/api/homes/my-homes"
+    ]
+
+    /// Per-path size budget in bytes (500 KB).
+    private static let responseSizeBudgetBytes: Int = 500_000
+
+    /// Log a warning when a watched endpoint exceeds the size budget.
+    /// Called from `executeOnce` after a successful 2xx so retries don't
+    /// double-count.
+    private func warnIfResponseExceedsBudget(path: String, byteCount: Int) {
+        guard byteCount > Self.responseSizeBudgetBytes else { return }
+        let watched = Self.responseSizeWatchPaths.contains { path.hasPrefix($0) }
+        guard watched else { return }
+        let kib = byteCount / 1024
+        logger.warning(
+            "API response size budget exceeded for \(path): \(kib) KB > 500 KB"
+        )
     }
 }
 
@@ -325,9 +379,10 @@ public struct EmptyResponse: Decodable, Sendable {
 /// only know the concrete type at the call site.
 struct AnyEncodable: Encodable, @unchecked Sendable {
     private let encodeClosure: (Encoder) throws -> Void
-    init<T: Encodable>(_ wrapped: T) {
-        self.encodeClosure = wrapped.encode
+    init(_ wrapped: some Encodable) {
+        encodeClosure = wrapped.encode
     }
+
     func encode(to encoder: Encoder) throws {
         try encodeClosure(encoder)
     }

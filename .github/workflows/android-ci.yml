@@ -52,6 +52,18 @@ jobs:
           MAPS_API_KEY=
           ENV
 
+      - name: No raw hex in feature code
+        # Acceptance criterion #5 from Prompt P1 — feature code must use
+        # `PantopusColors.*` / `LocalPantopusTokens` tokens, never raw
+        # `Color(0xRRGGBB...)` or `#RRGGBB(AA)` literals (in code or
+        # comments). Token files under `ui/theme/` are exempt by design.
+        run: |
+          if grep -rnE '#[0-9a-fA-F]{6,8}' app/src/main/java/app/pantopus/android/ui/screens ; then
+            echo "::error::Raw hex literals found in feature code. Use PantopusColors.* tokens instead."
+            exit 1
+          fi
+          echo "✓ No raw hex literals in ui/screens."
+
       - name: ktlint
         run: ./gradlew ktlintCheck --no-daemon
 
@@ -63,6 +75,12 @@ jobs:
 
       - name: Unit tests
         run: ./gradlew test --no-daemon
+
+      - name: Paparazzi snapshot verification
+        # P14 acceptance: a deliberately broken snapshot (e.g. a colour
+        # change) must fail CI. The `paparazziVerify` task is wired in
+        # `app/build.gradle.kts` and runs `verifyPaparazziDebug`.
+        run: ./gradlew paparazziVerify --no-daemon
 
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug --no-daemon
@@ -76,6 +94,7 @@ jobs:
             frontend/apps/android/app/build/reports/tests/
             frontend/apps/android/app/build/reports/detekt/
             frontend/apps/android/app/build/reports/lint-results-debug.html
+            frontend/apps/android/app/build/paparazzi/
           retention-days: 7
 
       - name: Upload debug APK

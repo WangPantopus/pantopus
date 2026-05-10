@@ -117,8 +117,7 @@ private fun KeyFactRowView(row: KeyFactRow) {
                                 delay(1_400)
                                 justCopied = false
                             }
-                        }
-                        .semantics {
+                        }.semantics {
                             contentDescription = if (justCopied) "Copied" else "Copy ${row.label}"
                         },
                 contentAlignment = Alignment.Center,

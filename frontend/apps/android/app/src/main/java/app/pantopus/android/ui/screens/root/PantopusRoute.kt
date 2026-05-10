@@ -27,8 +27,16 @@ sealed class PantopusRoute(
     data object You : PantopusRoute(path = "root/you", label = "You", icon = PantopusIcon.User)
 
     companion object {
-        /** Bottom-bar destinations in display order. */
-        val entries: List<PantopusRoute> = listOf(Hub, Nearby, Inbox, You)
+        /**
+         * Bottom-bar destinations in display order.
+         *
+         * `by lazy` is intentional: when this list is built eagerly, the
+         * companion's <clinit> runs while `PantopusRoute`'s own class init
+         * is still in flight, so `Hub.INSTANCE` etc. resolve to null and
+         * downstream callers crash with NPE. Deferring construction until
+         * first access lets every `data object` finish initialising first.
+         */
+        val entries: List<PantopusRoute> by lazy { listOf(Hub, Nearby, Inbox, You) }
 
         /** Lookup a route by its `path`. Returns null for unknown paths. */
         fun fromPath(path: String?): PantopusRoute? = entries.firstOrNull { it.path == path }

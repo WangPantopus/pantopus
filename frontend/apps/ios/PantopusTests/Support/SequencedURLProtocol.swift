@@ -35,17 +35,22 @@ final class SequencedURLProtocol: URLProtocol {
         return URLSession(configuration: config)
     }
 
-    override static func canInit(with _: URLRequest) -> Bool { true }
-    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override static func canInit(with _: URLRequest) -> Bool {
+        true
+    }
+
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
     override func stopLoading() {}
 
     override func startLoading() {
         Self.capturedRequests.append(request)
-        let response: Response
-        if Self.sequence.isEmpty {
-            response = Response.status(599, body: "{\"error\":\"no stubbed response\"}")
+        let response: Response = if Self.sequence.isEmpty {
+            Response.status(599, body: "{\"error\":\"no stubbed response\"}")
         } else {
-            response = Self.sequence.removeFirst()
+            Self.sequence.removeFirst()
         }
 
         guard let url = request.url,

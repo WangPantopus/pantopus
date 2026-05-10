@@ -10,7 +10,6 @@ import XCTest
 @testable import Pantopus
 
 final class ModelsCodingTests: XCTestCase {
-
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601

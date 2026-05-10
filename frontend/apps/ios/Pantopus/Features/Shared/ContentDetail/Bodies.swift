@@ -54,7 +54,7 @@ public struct GridTabsBody<Overview: View>: View {
     ) {
         self.quickActions = quickActions
         self.tabs = tabs
-        self._selectedTab = selectedTab
+        _selectedTab = selectedTab
         self.onQuickAction = onQuickAction
         self.overview = overview()
     }

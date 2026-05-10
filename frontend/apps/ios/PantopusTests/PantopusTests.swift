@@ -9,7 +9,6 @@ import XCTest
 @testable import Pantopus
 
 final class PantopusTests: XCTestCase {
-
     func testAppEnvironmentURLsArePopulated() {
         let env = AppEnvironment.current
         XCTAssertFalse(env.apiBaseURL.absoluteString.isEmpty)
@@ -27,7 +26,7 @@ final class PantopusTests: XCTestCase {
         switch env.target {
         case .local:
             XCTAssertTrue(env.apiBaseURL.absoluteString.contains("localhost") ||
-                          env.apiBaseURL.absoluteString.contains("127.0.0.1"))
+                env.apiBaseURL.absoluteString.contains("127.0.0.1"))
         case .staging:
             XCTAssertTrue(env.apiBaseURL.absoluteString.contains("staging"))
         case .production:

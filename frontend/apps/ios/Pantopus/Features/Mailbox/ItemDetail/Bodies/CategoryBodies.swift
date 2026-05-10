@@ -48,7 +48,9 @@ public struct PackageBody: View {
 public struct MailItemPlaceholderBody: View {
     public let category: MailItemCategory
 
-    public init(category: MailItemCategory) { self.category = category }
+    public init(category: MailItemCategory) {
+        self.category = category
+    }
 
     public var body: some View {
         NotYetAvailableView(

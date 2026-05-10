@@ -36,7 +36,10 @@ class TokenStorage
         val accessTokenFlow: Flow<String?> =
             context.tokenDataStore.data.map { it[Keys.ACCESS] }
 
-        suspend fun accessToken(): String? = context.tokenDataStore.data.map { it[Keys.ACCESS] }.first()
+        suspend fun accessToken(): String? =
+            context.tokenDataStore.data
+                .map { it[Keys.ACCESS] }
+                .first()
 
         suspend fun save(
             accessToken: String,

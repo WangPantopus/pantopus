@@ -22,7 +22,7 @@ public enum MailboxEndpoints {
             "archived": String(archived),
             "limit": String(limit),
             "offset": String(offset),
-            "scope": scope,
+            "scope": scope
         ]
         if let type { query["type"] = type }
         if let viewed { query["viewed"] = String(viewed) }

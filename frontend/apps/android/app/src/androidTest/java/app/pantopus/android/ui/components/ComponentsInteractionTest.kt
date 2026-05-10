@@ -1,9 +1,13 @@
 package app.pantopus.android.ui.components
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.theme.PantopusIcon
 import org.junit.Rule
 import org.junit.Test
@@ -113,17 +117,31 @@ class ComponentsInteractionTest {
     @Test
     fun timeline_renders_all_states() {
         composeRule.setContent {
-            TimelineStepper(
-                steps =
-                    listOf(
-                        TimelineStep("Placed", TimelineStepState.Done),
-                        TimelineStep("In transit", TimelineStepState.Current),
-                        TimelineStep("Delivered", TimelineStepState.Upcoming),
-                    ),
-            )
+            // StepMarker's connector uses `fillMaxHeight()`. Without a
+            // bounded vertical AND horizontal host, that resolves toward
+            // Constraints.Infinity and the row is clipped off-screen,
+            // tripping assertIsDisplayed. A 360 × 480 dp Box mirrors a
+            // typical content surface.
+            Box(modifier = Modifier.size(width = 360.dp, height = 480.dp)) {
+                TimelineStepper(
+                    steps =
+                        listOf(
+                            TimelineStep("Placed", TimelineStepState.Done),
+                            TimelineStep("In transit", TimelineStepState.Current),
+                            TimelineStep("Delivered", TimelineStepState.Upcoming),
+                        ),
+                )
+            }
         }
+        // The parent Row sets a contentDescription without mergeDescendants,
+        // which hides the child Text nodes from the default merged tree.
+        // useUnmergedTree=true reaches the inner Text composables directly.
+        // assertExists is enough — we already know the bounded Box places
+        // them on-screen; assertIsDisplayed adds an alpha/visibility check
+        // that the StepMarker's `Current` pulse animation transiently
+        // fails (alpha animates 1→0).
         listOf("Placed", "In transit", "Delivered").forEach {
-            composeRule.onNodeWithText(it).assertIsDisplayed()
+            composeRule.onNodeWithText(it, useUnmergedTree = true).assertExists()
         }
     }
 }

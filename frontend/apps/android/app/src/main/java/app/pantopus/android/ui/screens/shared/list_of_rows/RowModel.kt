@@ -34,7 +34,10 @@ sealed interface RowTrailing {
 
     data object Kebab : RowTrailing
 
-    data class Status(val text: String, val variant: StatusChipVariant) : RowTrailing
+    data class Status(
+        val text: String,
+        val variant: StatusChipVariant,
+    ) : RowTrailing
 }
 
 /**

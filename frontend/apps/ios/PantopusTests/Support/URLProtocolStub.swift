@@ -46,8 +46,14 @@ final class URLProtocolStub: URLProtocol {
 
     // MARK: - URLProtocol
 
-    override static func canInit(with _: URLRequest) -> Bool { true }
-    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override static func canInit(with _: URLRequest) -> Bool {
+        true
+    }
+
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
     override func stopLoading() {}
 
     override func startLoading() {
@@ -56,11 +62,10 @@ final class URLProtocolStub: URLProtocol {
         let path = request.url?.path ?? ""
         let match = Self.stubs.first { path.hasSuffix($0.pathSuffix) }
 
-        let resp: Response
-        if let match {
-            resp = match.response
+        let resp: Response = if let match {
+            match.response
         } else {
-            resp = Response(status: 404, body: Data("{\"error\":\"no stub\"}".utf8), headers: [:])
+            Response(status: 404, body: Data("{\"error\":\"no stub\"}".utf8), headers: [:])
         }
 
         guard let url = request.url,

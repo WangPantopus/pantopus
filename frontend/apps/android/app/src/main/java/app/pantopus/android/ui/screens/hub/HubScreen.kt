@@ -56,7 +56,12 @@ fun HubScreen(
     viewModel: HubViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { viewModel.load() }
+    LaunchedEffect(Unit) {
+        viewModel.load()
+        app.pantopus.android.data.analytics.Analytics.track(
+            app.pantopus.android.data.analytics.AnalyticsEvent.ScreenHubViewed,
+        )
+    }
 
     val pullState =
         rememberPullRefreshState(

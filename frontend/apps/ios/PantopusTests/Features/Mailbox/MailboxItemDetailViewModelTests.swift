@@ -12,7 +12,6 @@ import XCTest
 
 @MainActor
 final class MailboxItemDetailViewModelTests: XCTestCase {
-
     override func setUp() {
         super.setUp()
         SequencedURLProtocol.reset()
@@ -43,12 +42,13 @@ final class MailboxItemDetailViewModelTests: XCTestCase {
     func testPackageHappyPath() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.packageItemJSON),
-            .status(200, body: Self.packageDetailJSON),
+            .status(200, body: Self.packageDetailJSON)
         ]
         let vm = MailboxItemDetailViewModel(mailId: "m1", api: makeAPI())
         await vm.load()
-        guard case .loaded(let content) = vm.state else {
-            XCTFail("Expected loaded, got \(vm.state)"); return
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected loaded, got \(vm.state)")
+            return
         }
         XCTAssertEqual(content.category, .package)
         XCTAssertEqual(content.trust, .verified)
@@ -69,8 +69,9 @@ final class MailboxItemDetailViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [.status(200, body: json)]
         let vm = MailboxItemDetailViewModel(mailId: "m2", api: makeAPI())
         await vm.load()
-        guard case .loaded(let content) = vm.state else {
-            XCTFail("Expected loaded, got \(vm.state)"); return
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected loaded, got \(vm.state)")
+            return
         }
         XCTAssertEqual(content.category, .bill)
         XCTAssertNil(content.packageInfo)
@@ -82,15 +83,16 @@ final class MailboxItemDetailViewModelTests: XCTestCase {
             .status(200, body: Self.packageDetailJSON),
             .status(200, body: """
             {"message":"ok","status":"delivered","previousStatus":"in_transit"}
-            """),
+            """)
         ]
         let vm = MailboxItemDetailViewModel(mailId: "m1", api: makeAPI())
         await vm.load()
         await vm.logAsReceived()
         XCTAssertTrue(vm.ctaFlags.primaryCompleted)
         XCTAssertFalse(vm.ctaFlags.primaryLoading)
-        guard case .loaded(let content) = vm.state else {
-            XCTFail("Expected loaded"); return
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected loaded")
+            return
         }
         XCTAssertFalse(content.ctaEnabled)
     }
@@ -99,21 +101,23 @@ final class MailboxItemDetailViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.packageItemJSON),
             .status(200, body: Self.packageDetailJSON),
-            .status(500, body: "{}"),
+            .status(500, body: "{}")
         ]
         let vm = MailboxItemDetailViewModel(mailId: "m1", api: makeAPI())
         await vm.load()
-        guard case .loaded(let originalContent) = vm.state else {
-            XCTFail("Expected loaded"); return
+        guard case let .loaded(originalContent) = vm.state else {
+            XCTFail("Expected loaded")
+            return
         }
-        let originalStates = originalContent.timeline.map { $0.state }
+        let originalStates = originalContent.timeline.map(\.state)
         await vm.logAsReceived()
         XCTAssertFalse(vm.ctaFlags.primaryCompleted)
         XCTAssertNotNil(vm.ctaFlags.errorToast)
-        guard case .loaded(let rolled) = vm.state else {
-            XCTFail("Expected loaded after rollback"); return
+        guard case let .loaded(rolled) = vm.state else {
+            XCTFail("Expected loaded after rollback")
+            return
         }
-        XCTAssertEqual(rolled.timeline.map { $0.state }, originalStates)
+        XCTAssertEqual(rolled.timeline.map(\.state), originalStates)
         XCTAssertTrue(rolled.ctaEnabled)
     }
 
@@ -123,13 +127,14 @@ final class MailboxItemDetailViewModelTests: XCTestCase {
             .status(200, body: Self.packageDetailJSON),
             .status(200, body: """
             {"message":"flagged","action":"not_mine"}
-            """),
+            """)
         ]
         let vm = MailboxItemDetailViewModel(mailId: "m1", api: makeAPI())
         await vm.load()
         await vm.markNotMine()
-        guard case .loaded(let content) = vm.state else {
-            XCTFail("Expected loaded"); return
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected loaded")
+            return
         }
         XCTAssertFalse(content.ctaEnabled)
         XCTAssertNil(vm.ctaFlags.errorToast)

@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -33,7 +34,11 @@ import app.pantopus.android.ui.theme.Spacing
 import app.pantopus.android.ui.theme.pantopusShadow
 
 /** One stat cell inside [HomeHeroHeader]. */
-data class HomeHeroStat(val id: String, val value: String, val label: String)
+data class HomeHeroStat(
+    val id: String,
+    val value: String,
+    val label: String,
+)
 
 /**
  * Gradient primary card with VERIFIED overline, bold address, and a 3-stat row.
@@ -55,8 +60,7 @@ fun HomeHeroHeader(
                     Brush.linearGradient(
                         colors = listOf(PantopusColors.primary600, PantopusColors.primary800),
                     ),
-                )
-                .padding(Spacing.s5)
+                ).padding(Spacing.s5)
                 .semantics {
                     contentDescription = "${if (verified) "Verified home" else "Unverified home"}, $address"
                 },
@@ -80,6 +84,7 @@ fun HomeHeroHeader(
             style = PantopusTextStyle.h2,
             color = PantopusColors.appTextInverse,
             maxLines = 3,
+            modifier = Modifier.semantics { heading() },
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s4), modifier = Modifier.fillMaxWidth()) {
             stats.forEachIndexed { index, stat ->
