@@ -17,12 +17,10 @@
 import Foundation
 import XCTest
 
-@MainActor
 func setupSnapshot(_ app: XCUIApplication, waitForAnimations: Bool = true) {
     Snapshot.setupSnapshot(app, waitForAnimations: waitForAnimations)
 }
 
-@MainActor
 func snapshot(_ name: String, timeWaitingForIdle timeout: TimeInterval = 20) {
     Snapshot.snapshot(name, timeWaitingForIdle: timeout)
 }
@@ -30,9 +28,8 @@ func snapshot(_ name: String, timeWaitingForIdle timeout: TimeInterval = 20) {
 /// Stand-in for fastlane's Snapshot class. All entry points are no-ops
 /// outside of a fastlane snapshot run — they keep references to the
 /// app for parity with the real API but do not write any image.
-@MainActor
 enum Snapshot {
-    private static var app: XCUIApplication?
+    nonisolated(unsafe) static var app: XCUIApplication?
 
     static func setupSnapshot(_ app: XCUIApplication, waitForAnimations: Bool = true) {
         _ = waitForAnimations
