@@ -90,9 +90,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
-          key: spm-${{ runner.os }}-${{ hashFiles('frontend/apps/ios/project.yml') }}
+          # v2 — bust the previous cache; restore had been failing with
+          # `gtar: Cannot mkdir: Invalid argument` on sentry-cocoa, which
+          # poisoned every subsequent test run. Bumping the key forces a
+          # clean re-resolve.
+          key: spm-v2-${{ runner.os }}-${{ hashFiles('frontend/apps/ios/project.yml') }}
           restore-keys: |
-            spm-${{ runner.os }}-
+            spm-v2-${{ runner.os }}-
 
       # Sanitised matrix entry → safe artifact + bundle name (no spaces /
       # parentheses). Used by the result-bundle path and the upload step.
