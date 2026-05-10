@@ -71,6 +71,14 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
 
+        <!-- Sentry's auto-init ContentProvider crashes the app when no
+             DSN is set (e.g. CI emulators, dev builds without a .env).
+             Observability.start() does the init manually and gracefully
+             skips when BuildConfig.SENTRY_DSN is empty. -->
+        <meta-data
+            android:name="io.sentry.auto-init"
+            android:value="false" />
+
     </application>
 
 </manifest>
