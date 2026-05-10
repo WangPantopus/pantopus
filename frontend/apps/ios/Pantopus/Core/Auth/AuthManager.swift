@@ -44,14 +44,13 @@ final class AuthManager {
 
     func restoreSession() async {
         if let token = store.get(SecureStoreKey.accessToken) {
-            self.accessToken = token
+            accessToken = token
             // Best-effort hydration of the current user. If this fails with
             // 401, handleUnauthorized will flip us to signedOut.
             do {
-                let user: UserDTO = try await APIClient.shared.request(
-                    Endpoint(method: .get, path: "/api/users/me")
-                )
-                self.state = .signedIn(user)
+                let response: ProfileResponse = try await APIClient.shared.request(UsersEndpoints.profile())
+                let user = UserDTO(from: response.user)
+                state = .signedIn(user)
                 Observability.shared.identify(userId: user.id, email: user.email)
                 logger.info("Session restored", metadata: ["userId": .string(user.id)])
             } catch {
@@ -59,29 +58,27 @@ final class AuthManager {
                 await signOut()
             }
         } else {
-            self.state = .signedOut
+            state = .signedOut
         }
     }
 
     // MARK: - Sign in
 
     func signIn(email: String, password: String) async throws {
-        let response: AuthResponse = try await APIClient.shared.request(
-            Endpoint(
-                method: .post,
-                path: "/api/auth/login",
-                body: LoginRequest(email: email, password: password),
-                authenticated: false
-            )
+        let response: LoginResponse = try await APIClient.shared.request(
+            AuthEndpoints.login(email: email, password: password)
         )
-        try store.set(response.accessToken, for: SecureStoreKey.accessToken)
+        if let access = response.accessToken {
+            try store.set(access, for: SecureStoreKey.accessToken)
+            accessToken = access
+        }
         if let refresh = response.refreshToken {
             try store.set(refresh, for: SecureStoreKey.refreshToken)
         }
         try store.set(response.user.id, for: SecureStoreKey.userId)
 
-        self.accessToken = response.accessToken
-        self.state = .signedIn(response.user)
+        let user = UserDTO(from: response.user)
+        state = .signedIn(user)
         Observability.shared.identify(userId: response.user.id, email: response.user.email)
         Observability.shared.track("auth.signed_in")
         logger.info("Signed in", metadata: ["userId": .string(response.user.id)])
@@ -93,8 +90,8 @@ final class AuthManager {
         try? store.delete(SecureStoreKey.accessToken)
         try? store.delete(SecureStoreKey.refreshToken)
         try? store.delete(SecureStoreKey.userId)
-        self.accessToken = nil
-        self.state = .signedOut
+        accessToken = nil
+        state = .signedOut
         SocketClient.shared.disconnect()
         Observability.shared.identify(userId: nil)
         Observability.shared.track("auth.signed_out")
@@ -113,7 +110,15 @@ final class AuthManager {
 
 private final class InMemoryStore: SecureStore {
     private var storage: [String: String] = [:]
-    func set(_ value: String, for key: String) throws { storage[key] = value }
-    func get(_ key: String) -> String? { storage[key] }
-    func delete(_ key: String) throws { storage.removeValue(forKey: key) }
+    func set(_ value: String, for key: String) throws {
+        storage[key] = value
+    }
+
+    func get(_ key: String) -> String? {
+        storage[key]
+    }
+
+    func delete(_ key: String) throws {
+        storage.removeValue(forKey: key)
+    }
 }

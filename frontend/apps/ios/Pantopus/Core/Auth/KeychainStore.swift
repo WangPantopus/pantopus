@@ -19,7 +19,7 @@ struct KeychainStore: SecureStore {
     private let keychain: Keychain
 
     init(service: String = "app.pantopus.ios") {
-        self.keychain = Keychain(service: service)
+        keychain = Keychain(service: service)
             .accessibility(.afterFirstUnlockThisDeviceOnly)
             .synchronizable(false)
     }

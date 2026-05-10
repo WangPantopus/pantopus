@@ -15,10 +15,20 @@ final class AppEnvironment {
         case staging
         case production
 
-        /// Selected from scheme env variable PANTOPUS_API_ENV.
+        /// Selected from scheme env variable `PANTOPUS_API_ENV` first.
+        /// When unset (release builds installed from TestFlight / App
+        /// Store don't carry scheme env) we fall back per build
+        /// configuration: Debug → `.local`, Release → `.production`.
         static var current: Target {
-            let raw = ProcessInfo.processInfo.environment["PANTOPUS_API_ENV"] ?? "local"
-            return Target(rawValue: raw) ?? .local
+            if let raw = ProcessInfo.processInfo.environment["PANTOPUS_API_ENV"],
+               let target = Target(rawValue: raw) {
+                return target
+            }
+            #if DEBUG
+            return .local
+            #else
+            return .production
+            #endif
         }
     }
 
@@ -35,18 +45,25 @@ final class AppEnvironment {
 
         switch target {
         case .local:
-            self.apiBaseURL = URL(string: "http://localhost:8000")!
-            self.socketURL = URL(string: "http://localhost:8000")!
+            apiBaseURL = Self.mustURL("http://localhost:8000")
+            socketURL = Self.mustURL("http://localhost:8000")
         case .staging:
-            self.apiBaseURL = URL(string: "https://staging.api.pantopus.app")!
-            self.socketURL = URL(string: "https://staging.api.pantopus.app")!
+            apiBaseURL = Self.mustURL("https://staging.api.pantopus.app")
+            socketURL = Self.mustURL("https://staging.api.pantopus.app")
         case .production:
-            self.apiBaseURL = URL(string: "https://api.pantopus.app")!
-            self.socketURL = URL(string: "https://api.pantopus.app")!
+            apiBaseURL = Self.mustURL("https://api.pantopus.app")
+            socketURL = Self.mustURL("https://api.pantopus.app")
         }
 
         // Stripe publishable key — read from Info.plist so it can be injected
         // per-configuration via xcconfig. Never commit a real key here.
-        self.stripePublishableKey = Bundle.main.object(forInfoDictionaryKey: "StripePublishableKey") as? String ?? ""
+        stripePublishableKey = Bundle.main.object(forInfoDictionaryKey: "StripePublishableKey") as? String ?? ""
+    }
+
+    private static func mustURL(_ string: String) -> URL {
+        guard let url = URL(string: string) else {
+            preconditionFailure("Invalid URL literal: \(string)")
+        }
+        return url
     }
 }

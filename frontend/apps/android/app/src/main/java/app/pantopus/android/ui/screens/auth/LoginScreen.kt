@@ -18,10 +18,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -41,21 +41,22 @@ fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(24.dp),
         verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             "Pantopus",
             style = MaterialTheme.typography.displayLarge,
-            modifier = Modifier.semantics { heading() }
+            modifier = Modifier.semantics { heading() },
         )
         Text(
             "Your neighborhood, verified.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground
+            color = MaterialTheme.colorScheme.onBackground,
         )
         Spacer(Modifier.height(32.dp))
 
@@ -65,10 +66,11 @@ fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
             label = { Text("Email") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(LoginScreenTags.EMAIL_FIELD)
-                .semantics { contentDescription = "Email address" }
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .testTag(LoginScreenTags.EMAIL_FIELD)
+                    .semantics { contentDescription = "Email address" },
         )
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
@@ -78,10 +80,11 @@ fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(LoginScreenTags.PASSWORD_FIELD)
-                .semantics { contentDescription = "Password, at least six characters" }
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .testTag(LoginScreenTags.PASSWORD_FIELD)
+                    .semantics { contentDescription = "Password, at least six characters" },
         )
 
         state.errorMessage?.let {
@@ -89,9 +92,10 @@ fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
             Text(
                 it,
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier
-                    .testTag(LoginScreenTags.ERROR_MESSAGE)
-                    .semantics { liveRegion = LiveRegionMode.Polite }
+                modifier =
+                    Modifier
+                        .testTag(LoginScreenTags.ERROR_MESSAGE)
+                        .semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
 
@@ -100,11 +104,12 @@ fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
         Button(
             onClick = viewModel::signIn,
             enabled = state.canSubmit,
-            modifier = Modifier
-                .testTag(LoginScreenTags.SUBMIT_BUTTON)
-                .semantics {
-                    contentDescription = if (state.isLoading) "Signing in" else "Sign in"
-                }
+            modifier =
+                Modifier
+                    .testTag(LoginScreenTags.SUBMIT_BUTTON)
+                    .semantics {
+                        contentDescription = if (state.isLoading) "Signing in" else "Sign in"
+                    },
         ) {
             if (state.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.height(20.dp))

@@ -12,7 +12,6 @@ import XCTest
 
 @MainActor
 final class APIClientTests: XCTestCase {
-
     private var client: APIClient!
 
     override func setUp() {
@@ -76,7 +75,7 @@ final class APIClientTests: XCTestCase {
                 Endpoint(method: .get, path: "/api/posts", authenticated: false)
             )
             XCTFail("Expected server error")
-        } catch APIError.server(let status, _) {
+        } catch let APIError.server(status, _) {
             XCTAssertEqual(status, 503)
         } catch {
             XCTFail("Expected APIError.server, got \(error)")

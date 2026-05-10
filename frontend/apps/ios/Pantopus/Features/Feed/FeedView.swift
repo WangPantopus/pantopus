@@ -15,7 +15,7 @@ struct FeedView: View {
                 case .idle, .loading:
                     ProgressView("Loading feed…")
                         .accessibilityIdentifier("feedLoadingIndicator")
-                case .loaded(let posts):
+                case let .loaded(posts):
                     List(posts) { post in
                         VStack(alignment: .leading, spacing: 6) {
                             Text(post.authorName ?? "Anonymous")
@@ -32,7 +32,7 @@ struct FeedView: View {
                     }
                     .accessibilityIdentifier("feedList")
                     .refreshable { await viewModel.load() }
-                case .error(let message):
+                case let .error(message):
                     ContentUnavailableView(
                         "Couldn't load feed",
                         systemImage: "exclamationmark.triangle",

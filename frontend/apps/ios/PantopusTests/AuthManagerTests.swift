@@ -11,7 +11,6 @@ import XCTest
 
 @MainActor
 final class AuthManagerTests: XCTestCase {
-
     func testInitialStateIsUnknown() {
         let manager = AuthManager(store: InMemorySecureStore())
         if case .unknown = manager.state { /* pass */ } else {

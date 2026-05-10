@@ -13,7 +13,7 @@ struct PantopusApp: App {
 
     // App-wide singletons — injected via environment.
     @State private var environment = AppEnvironment.current
-    @State private var authManager = AuthManager.shared
+    @State private var authManager = Self.bootAuthManager()
     @State private var apiClient = APIClient.shared
     @State private var socketClient = SocketClient.shared
 
@@ -25,9 +25,29 @@ struct PantopusApp: App {
                 .environment(apiClient)
                 .environment(socketClient)
                 .task {
-                    await authManager.restoreSession()
+                    if !ProcessInfo.processInfo.isUITestSignedInSession {
+                        await authManager.restoreSession()
+                    }
                 }
         }
+    }
+
+    /// Pick the AuthManager for this launch. Under `UI_TESTS_SIGNED_IN=1`
+    /// we boot into an in-memory signed-in session so UI tests can exercise
+    /// the root tab view without a real backend.
+    private static func bootAuthManager() -> AuthManager {
+        if ProcessInfo.processInfo.isUITestSignedInSession {
+            return AuthManager.previewSignedIn
+        }
+        return AuthManager.shared
+    }
+}
+
+private extension ProcessInfo {
+    /// True when the process was launched by a UI test that wants a
+    /// seeded signed-in session.
+    var isUITestSignedInSession: Bool {
+        environment["UI_TESTS_SIGNED_IN"] == "1"
     }
 }
 
@@ -39,41 +59,33 @@ struct RootView: View {
         Group {
             switch auth.state {
             case .unknown:
-                ProgressView()
-                    .progressViewStyle(.circular)
+                SplashView()
             case .signedOut:
                 LoginView()
             case .signedIn:
-                MainTabView()
+                RootTabView()
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: auth.state)
+        .animation(.easeInOut(duration: 0.25), value: auth.state)
+        .transition(.opacity)
     }
 }
 
-/// Main tab scaffold — Feed / Home / Profile.
-struct MainTabView: View {
+/// Launch-time splash while we hydrate the session from the keychain.
+private struct SplashView: View {
     var body: some View {
-        TabView {
-            FeedView()
-                .tabItem {
-                    Label("Feed", systemImage: "square.grid.2x2")
-                }
-
-            HomeView()
-                .tabItem {
-                    Label("Home", systemImage: "house")
-                }
-
-            Text("Profile — coming soon")
-                .tabItem {
-                    Label("Profile", systemImage: "person.crop.circle")
-                }
+        ZStack {
+            Theme.Color.appBg.ignoresSafeArea()
+            VStack(spacing: Spacing.s4) {
+                Icon(.home, size: 64, color: Theme.Color.primary600)
+                ProgressView()
+            }
         }
+        .accessibilityLabel("Loading Pantopus")
     }
 }
 
-#Preview {
+#Preview("Signed in") {
     RootView()
         .environment(AppEnvironment.current)
         .environment(AuthManager.previewSignedIn)

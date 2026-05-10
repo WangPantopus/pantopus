@@ -9,6 +9,10 @@ plugins {
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
+    // P16: declare Play Publisher at the root so the :app module can
+    // apply it. Configuration lives in `app/build.gradle.kts` under
+    // the `play { … }` block.
+    alias(libs.plugins.play.publisher) apply false
 }
 
 // Apply detekt + ktlint to every subproject.
@@ -21,6 +25,13 @@ subprojects {
         buildUponDefaultConfig = true
         allRules = false
         autoCorrect = false
+        // Per-module baseline for pre-existing issues. Added when P1 (design
+        // tokens) landed — snapshots issues that predate the design-system
+        // work so those files can be cleaned up separately.
+        val baselineFile = file("$projectDir/detekt-baseline.xml")
+        if (baselineFile.exists()) {
+            baseline = baselineFile
+        }
     }
 
     configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {

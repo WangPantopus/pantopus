@@ -9,13 +9,14 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class RootViewModel @Inject constructor(
-    private val authRepository: AuthRepository
-) : ViewModel() {
+class RootViewModel
+    @Inject
+    constructor(
+        private val authRepository: AuthRepository,
+    ) : ViewModel() {
+        val authState: StateFlow<AuthRepository.State> = authRepository.state
 
-    val authState: StateFlow<AuthRepository.State> = authRepository.state
-
-    init {
-        viewModelScope.launch { authRepository.restore() }
+        init {
+            viewModelScope.launch { authRepository.restore() }
+        }
     }
-}

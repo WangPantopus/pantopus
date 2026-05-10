@@ -8,7 +8,7 @@ DESTINATION_SIM := platform=iOS Simulator,name=iPhone 15,OS=latest
 ENV_FILE        := .env
 SECRETS_XCCONFIG := Config/Secrets.xcconfig
 
-.PHONY: help bootstrap open build test lint format clean beta release validate-env env-to-xcconfig
+.PHONY: help bootstrap open build test lint format clean beta release validate-env env-to-xcconfig verify-icons
 
 help:
 	@echo "Pantopus iOS — available targets:"
@@ -77,9 +77,14 @@ test: bootstrap
 		-configuration Debug \
 		test
 
-lint:
+lint: verify-icons
 	@command -v swiftlint >/dev/null 2>&1 || { echo >&2 "Install SwiftLint: brew install swiftlint"; exit 1; }
 	swiftlint lint
+
+# Fails the build if feature code reaches for raw SF Symbols or calls out a
+# Lucide icon name outside the PantopusIcon enum. Wired into `make lint`.
+verify-icons:
+	@bash Pantopus/scripts/verify-icons.sh
 
 format:
 	@command -v swiftformat >/dev/null 2>&1 || { echo >&2 "Install SwiftFormat: brew install swiftformat"; exit 1; }
