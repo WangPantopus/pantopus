@@ -284,10 +284,11 @@ tasks.register("paparazziRecord") {
 // Fall through gracefully when the credentials aren't set so day-to-day
 // builds (and CI without secrets) still succeed.
 play {
-    val keyPath = providers
-        .gradleProperty("PANTOPUS_PLAY_SERVICE_ACCOUNT_JSON")
-        .orElse(providers.environmentVariable("PANTOPUS_PLAY_SERVICE_ACCOUNT_JSON"))
-        .getOrElse("")
+    val keyPath =
+        providers
+            .gradleProperty("PANTOPUS_PLAY_SERVICE_ACCOUNT_JSON")
+            .orElse(providers.environmentVariable("PANTOPUS_PLAY_SERVICE_ACCOUNT_JSON"))
+            .getOrElse("")
     if (keyPath.isNotEmpty() && file(keyPath).exists()) {
         serviceAccountCredentials.set(file(keyPath))
         track.set("internal")
@@ -317,9 +318,10 @@ tasks.register("captureStoreScreenshots") {
     doLast {
         val pkg = android.namespace
         val src = "/sdcard/Android/data/$pkg/files/Pictures/store_screenshots"
-        val dst = file("fastlane/metadata/android/en-US/images/phoneScreenshots").apply {
-            mkdirs()
-        }
+        val dst =
+            file("fastlane/metadata/android/en-US/images/phoneScreenshots").apply {
+                mkdirs()
+            }
         exec {
             commandLine("adb", "pull", src, dst.absolutePath)
             isIgnoreExitValue = true
