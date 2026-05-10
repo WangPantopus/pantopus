@@ -39,12 +39,13 @@ final class AddHomeWizardViewModelTests: XCTestCase {
 
     /// Poll-and-yield helper. Replaces the brittle `Task.sleep(150ms)`
     /// pattern: waits up to `timeout` seconds, returning as soon as the
-    /// predicate becomes true. CI runners are slow enough that fixed
-    /// 150ms sleeps consistently race against the URL stub roundtrip
-    /// + main-actor hop + recompose.
+    /// predicate becomes true. The 15s default reflects what we
+    /// actually see on the macos-15 / Xcode 16.4 CI runners — sister
+    /// tests on the same suite have logged 9–10s for a single URL stub
+    /// roundtrip when the runner is loaded.
     private func waitFor(
         _ description: String = "predicate",
-        timeout: TimeInterval = 3.0,
+        timeout: TimeInterval = 15.0,
         _ predicate: @MainActor () -> Bool
     ) async {
         let deadline = Date().addingTimeInterval(timeout)
@@ -241,9 +242,9 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         vm.update(.zip, to: "97214")
         // Right away, no fetch yet.
         XCTAssertEqual(vm.suggestions.count, 0)
-        // Poll for up to 5s — debounce is 300ms, plus the URL stub round
-        // trip and main-actor hop. Tight 450ms sleeps raced on CI runners.
-        await waitFor("suggestions populated", timeout: 5.0) { !vm.suggestions.isEmpty }
+        // Default 15s timeout — debounce is 300ms, plus the URL stub
+        // round trip and main-actor hop. Tight 450ms sleeps raced on CI.
+        await waitFor("suggestions populated") { !vm.suggestions.isEmpty }
         XCTAssertGreaterThan(vm.suggestions.count, 0)
     }
 
