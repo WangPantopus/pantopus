@@ -3,7 +3,6 @@ package app.pantopus.android.screenshots
 import android.os.Environment
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.test.platform.app.InstrumentationRegistry
@@ -56,20 +55,22 @@ class StoreScreenshotsTest {
         compose.waitForIdle()
 
         val view = compose.activity.window.decorView
-        val bitmap = android.graphics.Bitmap.createBitmap(
-            view.width,
-            view.height,
-            android.graphics.Bitmap.Config.ARGB_8888,
-        )
+        val bitmap =
+            android.graphics.Bitmap.createBitmap(
+                view.width,
+                view.height,
+                android.graphics.Bitmap.Config.ARGB_8888,
+            )
         val canvas = android.graphics.Canvas(bitmap)
         view.draw(canvas)
 
-        val outDir = File(
-            InstrumentationRegistry.getInstrumentation()
-                .targetContext
-                .getExternalFilesDir(Environment.DIRECTORY_PICTURES),
-            "store_screenshots",
-        ).apply { mkdirs() }
+        val outDir =
+            File(
+                InstrumentationRegistry.getInstrumentation()
+                    .targetContext
+                    .getExternalFilesDir(Environment.DIRECTORY_PICTURES),
+                "store_screenshots",
+            ).apply { mkdirs() }
         File(outDir, "$name.png").outputStream().use {
             bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
         }
@@ -81,8 +82,6 @@ class StoreScreenshotsTest {
         // Stub composable. Replaced with the live screen + preview data
         // in a follow-up — the test scaffolding is wired so the pipeline
         // is shippable today.
-        @Suppress("UnusedParameter")
-        val _view = LocalView.current
         androidx.compose.material3.Text(label)
     }
 }

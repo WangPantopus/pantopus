@@ -36,7 +36,6 @@ import org.junit.Test
  * Hilt-aware runner.
  */
 class TapTargetAudit {
-
     @get:Rule
     val compose = createComposeRule()
 
@@ -49,9 +48,9 @@ class TapTargetAudit {
 
     private fun assertAllClickableTouchTargetsClear(screenName: String) {
         val minPx = with(compose.density) { minDp.toPx() }
-        val nodes = compose.onAllNodes(SemanticsMatcher("hasClickAction") {
-            hasClickAction().matches(it)
-        }).fetchSemanticsNodes()
+        val matcher =
+            SemanticsMatcher("hasClickAction") { hasClickAction().matches(it) }
+        val nodes = compose.onAllNodes(matcher).fetchSemanticsNodes()
         for (node in nodes) {
             val bounds = node.boundsInRoot
             assertTrue(

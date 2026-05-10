@@ -38,14 +38,13 @@ import org.junit.Test
  * invisible to TalkBack.
  */
 class A11yLabelAudit {
-
     @get:Rule
     val compose = createComposeRule()
 
     private fun assertEveryClickableHasALabel(screenName: String) {
-        val nodes = compose.onAllNodes(SemanticsMatcher("hasClickAction") {
-            hasClickAction().matches(it)
-        }).fetchSemanticsNodes()
+        val matcher =
+            SemanticsMatcher("hasClickAction") { hasClickAction().matches(it) }
+        val nodes = compose.onAllNodes(matcher).fetchSemanticsNodes()
         for (node in nodes) {
             val cfg = node.config
             val text = cfg.getOrNull(SemanticsProperties.Text)?.joinToString(" ") { it.text }

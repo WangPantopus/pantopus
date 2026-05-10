@@ -26,7 +26,6 @@ import org.junit.Test
  * elements still meet their minimum size and remain displayed.
  */
 class DynamicTypeAudit {
-
     @get:Rule
     val compose = createComposeRule()
 
@@ -38,12 +37,9 @@ class DynamicTypeAudit {
     private fun setLargeFontScaleContent(content: @androidx.compose.runtime.Composable () -> Unit) {
         compose.setContent {
             val original = LocalDensity.current
-            CompositionLocalProvider(
-                LocalDensity provides Density(
-                    density = original.density,
-                    fontScale = 1.3f,
-                ),
-            ) {
+            val scaledDensity =
+                Density(density = original.density, fontScale = 1.3f)
+            CompositionLocalProvider(LocalDensity provides scaledDensity) {
                 Box(Modifier.fillMaxSize()) { content() }
             }
         }

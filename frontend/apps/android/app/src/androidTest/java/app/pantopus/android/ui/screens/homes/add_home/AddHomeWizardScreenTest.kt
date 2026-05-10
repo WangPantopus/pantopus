@@ -45,19 +45,20 @@ class AddHomeWizardScreenTest {
     private val createHomeResponse =
         CreateHomeResponse(
             message = "ok",
-            home = HomeDto(
-                id = "home_42",
-                name = "412 Elm St",
-                address = "412 Elm St",
-                city = "Portland",
-                state = "OR",
-                zipcode = "97214",
-                homeType = null,
-                visibility = "public",
-                description = null,
-                createdAt = "2025-01-01T00:00:00Z",
-                updatedAt = "2025-01-01T00:00:00Z",
-            ),
+            home =
+                HomeDto(
+                    id = "home_42",
+                    name = "412 Elm St",
+                    address = "412 Elm St",
+                    city = "Portland",
+                    state = "OR",
+                    zipcode = "97214",
+                    homeType = null,
+                    visibility = "public",
+                    description = null,
+                    createdAt = "2025-01-01T00:00:00Z",
+                    updatedAt = "2025-01-01T00:00:00Z",
+                ),
             requiresVerification = false,
             verificationType = null,
             role = "owner",
@@ -66,9 +67,10 @@ class AddHomeWizardScreenTest {
     private fun makeViewModel(): AddHomeWizardViewModel {
         coEvery { repo.checkAddress(any<CheckAddressRequest>()) } returns NetworkResult.Success(checkAddressOk)
         coEvery { repo.create(any<CreateHomeRequest>()) } returns NetworkResult.Success(createHomeResponse)
-        val networkMonitor = mockk<NetworkMonitor>(relaxed = true).also {
-            every { it.isOnline } returns MutableStateFlow(true)
-        }
+        val networkMonitor =
+            mockk<NetworkMonitor>(relaxed = true).also {
+                every { it.isOnline } returns MutableStateFlow(true)
+            }
         return AddHomeWizardViewModel(repo, SavedStateHandle(), networkMonitor)
     }
 

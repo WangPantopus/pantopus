@@ -38,7 +38,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AddHomeWizardViewModelTest {
-
     private val repo: HomesRepository = mockk(relaxed = true)
     private val networkMonitor: NetworkMonitor =
         mockk<NetworkMonitor>(relaxed = true).also {
