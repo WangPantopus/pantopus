@@ -10,11 +10,7 @@ options:
   bundleIdPrefix: app.pantopus
   deploymentTarget:
     iOS: "17.0"
-  xcodeVersion: "15.4"
-  # Pin to Xcode 14/15-compatible pbxproj format. Newer XcodeGen
-  # defaults to 77 (Xcode 16+), which the macos-14 / Xcode 15.4 CI
-  # runners can't read.
-  objectVersion: 56
+  xcodeVersion: "16.2"
   createIntermediateGroups: true
   groupSortPosition: top
   generateEmptyDirectories: true
