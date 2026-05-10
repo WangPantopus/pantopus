@@ -25,6 +25,36 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         )
     }
 
+    /// Centralised constructor so every test injects an "always online"
+    /// stub. NetworkMonitor.shared can transiently report `.unsatisfied`
+    /// on CI simulators, which would gate `submit()` and hide the real
+    /// behaviour we're testing.
+    private func makeVM(initialState: AddHomeFormState = .empty) -> AddHomeWizardViewModel {
+        AddHomeWizardViewModel(
+            api: makeAPI(),
+            initialState: initialState,
+            isOnlineProvider: { true }
+        )
+    }
+
+    /// Poll-and-yield helper. Replaces the brittle `Task.sleep(150ms)`
+    /// pattern: waits up to `timeout` seconds, returning as soon as the
+    /// predicate becomes true. CI runners are slow enough that fixed
+    /// 150ms sleeps consistently race against the URL stub roundtrip
+    /// + main-actor hop + recompose.
+    private func waitFor(
+        _ description: String = "predicate",
+        timeout: TimeInterval = 3.0,
+        _ predicate: @MainActor () -> Bool
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if predicate() { return }
+            try? await Task.sleep(nanoseconds: 25_000_000)
+        }
+        XCTFail("Timed out waiting for \(description)")
+    }
+
     private func filled() -> AddHomeFormState {
         AddHomeFormState(
             step: AddHomeStep.address.rawValue,
@@ -78,10 +108,9 @@ final class AddHomeWizardViewModelTests: XCTestCase {
 
     func testPrimaryAdvancesAndFiresCheckAddress() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.checkAddressJSON)]
-        let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: filled())
+        let vm = makeVM(initialState: filled())
         vm.primaryTapped()
-        // Wait for the async advance + check-address to flush.
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        await waitFor("addressCheck populated") { vm.addressCheck != nil }
         XCTAssertEqual(vm.currentStep, .confirm)
         XCTAssertNotNil(vm.addressCheck)
         XCTAssertEqual(vm.chrome.leading, .back, "Back chevron replaces X on step 2.")
@@ -89,9 +118,9 @@ final class AddHomeWizardViewModelTests: XCTestCase {
 
     func testCheckAddressErrorSurfacesMessage() async {
         SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"down\"}")]
-        let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: filled())
+        let vm = makeVM(initialState: filled())
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        await waitFor("errorMessage set") { vm.errorMessage != nil }
         XCTAssertEqual(vm.currentStep, .confirm)
         XCTAssertNil(vm.addressCheck)
         XCTAssertNotNil(vm.errorMessage)
@@ -101,9 +130,9 @@ final class AddHomeWizardViewModelTests: XCTestCase {
 
     func testBackOnConfirmGoesToAddress() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.checkAddressJSON)]
-        let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: filled())
+        let vm = makeVM(initialState: filled())
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        await waitFor("step is confirm") { vm.currentStep == .confirm && !vm.isCheckingAddress }
         vm.leadingTapped()
         XCTAssertEqual(vm.currentStep, .address)
     }
@@ -126,9 +155,9 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         var seed = filled()
         seed.step = AddHomeStep.review.rawValue
         seed.role = .owner
-        let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: seed)
+        let vm = makeVM(initialState: seed)
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        await waitFor("currentStep == .success") { vm.currentStep == .success }
         XCTAssertEqual(vm.currentStep, .success)
         XCTAssertEqual(vm.createdHomeId, "home_42")
         XCTAssertEqual(vm.chrome.primaryCTALabel, "View home")
@@ -141,9 +170,9 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         var seed = filled()
         seed.step = AddHomeStep.review.rawValue
         seed.role = .owner
-        let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: seed)
+        let vm = makeVM(initialState: seed)
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        await waitFor("errorMessage set") { vm.errorMessage != nil }
         XCTAssertEqual(vm.currentStep, .review)
         XCTAssertNotNil(vm.errorMessage)
     }
@@ -155,11 +184,14 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         var seed = filled()
         seed.step = AddHomeStep.review.rawValue
         seed.role = .owner
-        let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: seed)
+        let vm = makeVM(initialState: seed)
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        await waitFor("createdHomeId set") { vm.createdHomeId != nil }
         // Now on success step.
         vm.primaryTapped()
+        await waitFor("openHomeDashboard event") {
+            vm.pendingEvent == .openHomeDashboard(homeId: "home_42")
+        }
         XCTAssertEqual(vm.pendingEvent, .openHomeDashboard(homeId: "home_42"))
     }
 
@@ -168,9 +200,9 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         var seed = filled()
         seed.step = AddHomeStep.review.rawValue
         seed.role = .owner
-        let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: seed)
+        let vm = makeVM(initialState: seed)
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        await waitFor("createdHomeId set") { vm.createdHomeId != nil }
         vm.secondaryTapped()
         XCTAssertEqual(vm.pendingEvent, .dismiss)
     }
@@ -192,9 +224,9 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         var seed = filled()
         seed.step = AddHomeStep.review.rawValue
         seed.role = .owner
-        let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: seed)
+        let vm = makeVM(initialState: seed)
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        await waitFor("currentStep == .success") { vm.currentStep == .success }
         XCTAssertFalse(vm.chrome.dirty)
     }
 
@@ -202,20 +234,21 @@ final class AddHomeWizardViewModelTests: XCTestCase {
 
     func testSuggestionsDebounce() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.suggestionsJSON)]
-        let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: .empty)
+        let vm = makeVM(initialState: .empty)
         vm.update(.street, to: "412 Elm St")
         vm.update(.city, to: "Portland")
         vm.update(.state, to: "OR")
         vm.update(.zip, to: "97214")
         // Right away, no fetch yet.
         XCTAssertEqual(vm.suggestions.count, 0)
-        // Wait through the 300 ms debounce.
-        try? await Task.sleep(nanoseconds: 450_000_000)
+        // Poll for up to 5s — debounce is 300ms, plus the URL stub round
+        // trip and main-actor hop. Tight 450ms sleeps raced on CI runners.
+        await waitFor("suggestions populated", timeout: 5.0) { !vm.suggestions.isEmpty }
         XCTAssertGreaterThan(vm.suggestions.count, 0)
     }
 
     func testSelectSuggestionPopulatesStreet() {
-        let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: .empty)
+        let vm = makeVM(initialState: .empty)
         vm.selectSuggestion("100 Test Ave")
         XCTAssertEqual(vm.form.address.street, "100 Test Ave")
     }

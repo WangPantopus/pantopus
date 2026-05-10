@@ -70,6 +70,7 @@ final class AddHomeWizardViewModel: WizardModel {
     // MARK: - Private dependencies
 
     private let api: APIClient
+    private let isOnlineProvider: @MainActor () -> Bool
     private var debounceTask: Task<Void, Never>?
 
     /// Visible-for-testing default that fires `propertySuggestions` after
@@ -80,9 +81,15 @@ final class AddHomeWizardViewModel: WizardModel {
 
     init(
         api: APIClient = .shared,
-        initialState: AddHomeFormState = .empty
+        initialState: AddHomeFormState = .empty,
+        // Defaults to the live NetworkMonitor in production. Tests inject
+        // a closure returning a fixed value so the simulator's
+        // NWPathMonitor (which can transiently report `.unsatisfied` on
+        // CI runners with limited network) doesn't gate `submit()`.
+        isOnlineProvider: @escaping @MainActor () -> Bool = { NetworkMonitor.shared.isOnline }
     ) {
         self.api = api
+        self.isOnlineProvider = isOnlineProvider
         form = initialState
     }
 
@@ -276,7 +283,7 @@ final class AddHomeWizardViewModel: WizardModel {
     private func submit() async {
         guard let role = form.role else { return }
         Analytics.track(.ctaAddHomeSubmit)
-        if !NetworkMonitor.shared.isOnline {
+        if !isOnlineProvider() {
             // P15: surface offline state inline; never silent-queue.
             errorMessage = "You're offline. Try again when you're back online."
             return
