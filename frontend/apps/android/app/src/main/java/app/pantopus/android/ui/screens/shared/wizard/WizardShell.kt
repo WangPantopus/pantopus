@@ -97,8 +97,8 @@ fun WizardShell(
                             ?.let { (it * total).toInt() }
                             ?: 0
                     SegmentedProgressBar(
-                        filled = filled,
-                        total = total.coerceAtLeast(1),
+                        currentStep = filled,
+                        totalSteps = total.coerceAtLeast(1),
                         modifier =
                             Modifier
                                 .padding(horizontal = Spacing.s4, vertical = Spacing.s2),

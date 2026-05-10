@@ -65,13 +65,13 @@ public struct HubTabRoot: View {
         // tap. Hidden from accessibility so VoiceOver users can't trip
         // the debug menu by accident.
         #if DEBUG
-        .overlay(alignment: .topLeading) {
-            Color.clear
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-                .onTapGesture(count: 5) { debugSheet = .tokenGallery }
-                .accessibilityHidden(true)
-        }
+            .overlay(alignment: .topLeading) {
+                Color.clear
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 5) { debugSheet = .tokenGallery }
+                    .accessibilityHidden(true)
+            }
         #endif
     }
 
