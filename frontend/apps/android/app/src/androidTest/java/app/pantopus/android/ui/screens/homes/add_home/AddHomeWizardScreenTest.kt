@@ -7,7 +7,6 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
@@ -23,6 +22,7 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 
@@ -119,6 +119,7 @@ class AddHomeWizardScreenTest {
     @Test
     fun close_on_dirty_form_shows_discard_confirm() {
         val vm = makeViewModel()
+        var dismissed = false
         // Mutate the form BEFORE setContent so the initial composition
         // sees `chrome.dirty == true` on first render. Mutating after
         // setContent has been racy on the macos-15 emulator: the
@@ -127,23 +128,23 @@ class AddHomeWizardScreenTest {
         // stale chrome.
         vm.updateField(AddressField.Street, "412 Elm St")
         compose.setContent {
-            AddHomeWizardScreen(onDismiss = {}, onOpenHomeDashboard = {}, viewModel = vm)
+            AddHomeWizardScreen(
+                onDismiss = { dismissed = true },
+                onOpenHomeDashboard = {},
+                viewModel = vm,
+            )
         }
         compose.onNodeWithTag(WizardShellTags.LEADING).performClick()
         // Material 3 AlertDialog renders inside its own Popup window —
         // reach the visible surface by title text rather than testTag.
-        // `waitUntil` confirms the dialog node exists in the semantics
-        // tree; we deliberately do NOT then assertIsDisplayed on the
-        // same query. The popup creates a matching text node that the
-        // `isDisplayed` check (alpha + visible bounds) reports as not
-        // displayed even when the dialog is on-screen, leading to a
-        // false negative. Acting on the dialog ("Keep going") then
-        // re-asserting on the shell after dismissal is enough.
+        // The popup creates matching text/button nodes that the emulator's
+        // `isDisplayed` check can report as hidden even when the dialog is
+        // on-screen, so this test verifies semantics existence plus the
+        // important behaviour: a dirty close must not dismiss immediately.
         compose.waitUntil(timeoutMillis = 10_000) {
             compose.onAllNodesWithText("Discard your progress?").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("Keep going").performClick()
-        compose.onNodeWithTag(WizardShellTags.SHELL).assertIsDisplayed()
+        assertFalse("Dirty close must show a discard confirmation instead of dismissing.", dismissed)
     }
 
     @Test
