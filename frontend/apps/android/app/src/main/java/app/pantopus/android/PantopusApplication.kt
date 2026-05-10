@@ -1,6 +1,7 @@
 package app.pantopus.android
 
 import android.app.Application
+import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.observability.Observability
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -31,6 +32,7 @@ class PantopusApplication : Application(), ImageLoaderFactory {
         // Sentry's Timber integration handles error forwarding in release builds —
         // see Observability.start(). No extra tree needed.
         observability.start(this)
+        Analytics.bind(observability)
     }
 
     /**

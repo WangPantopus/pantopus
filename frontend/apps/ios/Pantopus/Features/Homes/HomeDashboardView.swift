@@ -30,6 +30,8 @@ struct HomeDashboardView: View {
                 ErrorView(message: message, onBack: onBack) { Task { await viewModel.refresh() } }
             }
         }
+        .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+        .onAppear { Analytics.track(.screenHomeDashboardViewed) }
         .task { await viewModel.load() }
         .overlay(alignment: .bottom) {
             if let toast {

@@ -31,6 +31,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.data.analytics.Analytics
+import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.screens.shared.wizard.WizardShell
 import app.pantopus.android.ui.screens.shared.wizard.blocks.FormFieldsBlock
@@ -74,6 +76,20 @@ fun AddHomeWizardScreen(
                 onOpenHomeDashboard(event.homeId)
             }
             null -> Unit
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        // Fire the initial step view; subsequent transitions emit
+        // their own ScreenAddHomeWizardStepViewed events from the VM.
+        val current = state.form.currentStep
+        current.stepNumber?.let { number ->
+            Analytics.track(
+                AnalyticsEvent.ScreenAddHomeWizardStepViewed(
+                    stepNumber = number,
+                    stepName = current.name,
+                ),
+            )
         }
     }
 

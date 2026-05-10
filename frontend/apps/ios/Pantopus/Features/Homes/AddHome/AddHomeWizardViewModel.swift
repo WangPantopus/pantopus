@@ -201,6 +201,14 @@ final class AddHomeWizardViewModel: WizardModel {
     private func transition(to step: AddHomeStep) {
         form.step = step.rawValue
         errorMessage = nil
+        if let stepNumber = step.stepNumber {
+            Analytics.track(
+                .screenAddHomeWizardStepViewed(
+                    stepNumber: stepNumber,
+                    stepName: String(describing: step)
+                )
+            )
+        }
     }
 
     // MARK: - API calls
@@ -265,6 +273,12 @@ final class AddHomeWizardViewModel: WizardModel {
 
     private func submit() async {
         guard let role = form.role else { return }
+        Analytics.track(.ctaAddHomeSubmit)
+        if !NetworkMonitor.shared.isOnline {
+            // P15: surface offline state inline; never silent-queue.
+            errorMessage = "You're offline. Try again when you're back online."
+            return
+        }
         isSubmitting = true
         defer { isSubmitting = false }
         let request = CreateHomeRequest(

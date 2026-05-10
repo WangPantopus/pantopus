@@ -15,6 +15,8 @@ struct MailboxDrawersView: View {
 
     var body: some View {
         ListOfRowsView(dataSource: viewModel)
+            .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+            .onAppear { Analytics.track(.screenMailboxDrawersViewed) }
     }
 }
 

@@ -35,8 +35,10 @@ struct HubView: View {
             }
         }
         .background(Theme.Color.appBg)
+        .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
         .refreshable { await viewModel.refresh() }
+        .onAppear { Analytics.track(.screenHubViewed) }
     }
 
     @ViewBuilder

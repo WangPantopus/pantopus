@@ -29,6 +29,7 @@ struct MailboxItemDetailView: View {
                 }
             }
         }
+        .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
         .overlay(alignment: .bottom) {
             if let toast = viewModel.ctaFlags.errorToast {

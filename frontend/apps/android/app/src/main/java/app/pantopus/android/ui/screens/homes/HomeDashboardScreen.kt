@@ -60,7 +60,12 @@ fun HomeDashboardScreen(
     var toast by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) { viewModel.load() }
+    LaunchedEffect(Unit) {
+        viewModel.load()
+        app.pantopus.android.data.analytics.Analytics.track(
+            app.pantopus.android.data.analytics.AnalyticsEvent.ScreenHomeDashboardViewed,
+        )
+    }
 
     fun showToast(actionId: String) {
         toast =

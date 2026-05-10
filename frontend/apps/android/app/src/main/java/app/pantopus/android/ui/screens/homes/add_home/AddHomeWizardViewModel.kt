@@ -5,6 +5,8 @@ package app.pantopus.android.ui.screens.homes.add_home
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.analytics.Analytics
+import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.data.api.models.common.JsonValue
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CheckAddressResponse
@@ -12,6 +14,7 @@ import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
 import app.pantopus.android.ui.screens.shared.wizard.WizardModel
@@ -59,6 +62,7 @@ open class AddHomeWizardViewModel
     constructor(
         private val repository: HomesRepository,
         private val savedStateHandle: SavedStateHandle,
+        private val networkMonitor: NetworkMonitor,
     ) : ViewModel(), WizardModel {
 
         private val _state =
@@ -170,6 +174,14 @@ open class AddHomeWizardViewModel
                 it.copy(form = it.form.copy(step = step.ordinal0), errorMessage = null)
             }
             persist()
+            step.stepNumber?.let { number ->
+                Analytics.track(
+                    AnalyticsEvent.ScreenAddHomeWizardStepViewed(
+                        stepNumber = number,
+                        stepName = step.name,
+                    ),
+                )
+            }
         }
 
         // MARK: - API calls
@@ -231,6 +243,16 @@ open class AddHomeWizardViewModel
         private suspend fun submit() {
             val role = _state.value.form.role ?: return
             val fields = _state.value.form.address
+            Analytics.track(AnalyticsEvent.CtaAddHomeSubmit)
+            if (!networkMonitor.isOnline.value) {
+                // P15: surface offline state inline; never silent-queue.
+                _state.update {
+                    it.copy(
+                        errorMessage = "You're offline. Try again when you're back online.",
+                    )
+                }
+                return
+            }
             _state.update { it.copy(isSubmitting = true, errorMessage = null) }
             val request = CreateHomeRequest(
                 address = fields.street,

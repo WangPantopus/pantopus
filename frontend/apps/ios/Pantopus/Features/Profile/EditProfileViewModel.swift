@@ -141,12 +141,22 @@ final class EditProfileViewModel {
     /// Submit the PATCH. Returns true on success.
     @discardableResult
     func save() async -> Bool {
-        if validateAll() != nil {
+        if let invalidField = validateAll() {
             shakeTrigger &+= 1
             toast = ToastMessage(text: "Fix the highlighted field.", kind: .error)
+            Analytics.track(.formEditProfileValidationError(field: invalidField.rawValue))
             return false
         }
         guard aggregate.isDirty else { return false }
+        if !NetworkMonitor.shared.isOnline {
+            // P15: don't silently queue. Surface the error inline.
+            toast = ToastMessage(
+                text: "You're offline. Try again when you're back online.",
+                kind: .error
+            )
+            Analytics.track(.formEditProfileSubmit(result: .error))
+            return false
+        }
         isSaving = true
         defer { isSaving = false }
         do {
@@ -156,12 +166,14 @@ final class EditProfileViewModel {
             hydrate(from: response.user)
             toast = ToastMessage(text: "Profile updated.", kind: .success)
             shouldDismiss = true
+            Analytics.track(.formEditProfileSubmit(result: .success))
             return true
         } catch {
             toast = ToastMessage(
                 text: (error as? APIError)?.errorDescription ?? "Couldn't save profile.",
                 kind: .error
             )
+            Analytics.track(.formEditProfileSubmit(result: .error))
             return false
         }
     }

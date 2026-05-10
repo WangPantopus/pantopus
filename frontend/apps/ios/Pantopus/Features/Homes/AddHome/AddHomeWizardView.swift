@@ -33,7 +33,19 @@ public struct AddHomeWizardView: View {
                 ErrorBanner(message: error)
             }
         }
-        .onAppear { restoreIfNeeded() }
+        .onAppear {
+            restoreIfNeeded()
+            // Fire the initial step view event since transitions only
+            // fire on user-driven step changes after this point.
+            if let stepNumber = viewModel.currentStep.stepNumber {
+                Analytics.track(
+                    .screenAddHomeWizardStepViewed(
+                        stepNumber: stepNumber,
+                        stepName: String(describing: viewModel.currentStep)
+                    )
+                )
+            }
+        }
         .onChange(of: viewModel.form) { _, _ in persist() }
         .onChange(of: viewModel.pendingEvent) { _, event in
             handle(event)

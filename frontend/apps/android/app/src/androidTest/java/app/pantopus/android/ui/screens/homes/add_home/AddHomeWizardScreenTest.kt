@@ -18,11 +18,14 @@ import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.HomeDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WIZARD_DISCARD_DIALOG_TAG
 import app.pantopus.android.ui.screens.shared.wizard.WizardShellTags
 import app.pantopus.android.ui.screens.shared.wizard.blocks.WIZARD_SUCCESS_HERO_TAG
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
 
@@ -63,7 +66,10 @@ class AddHomeWizardScreenTest {
     private fun makeViewModel(): AddHomeWizardViewModel {
         coEvery { repo.checkAddress(any<CheckAddressRequest>()) } returns NetworkResult.Success(checkAddressOk)
         coEvery { repo.create(any<CreateHomeRequest>()) } returns NetworkResult.Success(createHomeResponse)
-        return AddHomeWizardViewModel(repo, SavedStateHandle())
+        val networkMonitor = mockk<NetworkMonitor>(relaxed = true).also {
+            every { it.isOnline } returns MutableStateFlow(true)
+        }
+        return AddHomeWizardViewModel(repo, SavedStateHandle(), networkMonitor)
     }
 
     @Test

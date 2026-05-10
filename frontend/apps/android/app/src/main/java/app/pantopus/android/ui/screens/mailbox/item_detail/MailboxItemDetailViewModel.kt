@@ -64,6 +64,7 @@ class MailboxItemDetailViewModel
     @Inject
     constructor(
         private val repo: MailboxRepository,
+        private val networkMonitor: app.pantopus.android.data.network.NetworkMonitor,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val mailId: String =
@@ -105,6 +106,15 @@ class MailboxItemDetailViewModel
         fun logAsReceived() {
             val current = _state.value as? MailboxItemDetailUiState.Loaded ?: return
             if (_ctaFlags.value.primaryLoading) return
+            app.pantopus.android.data.analytics.Analytics.track(
+                app.pantopus.android.data.analytics.AnalyticsEvent.CtaMailboxItemLogReceived,
+            )
+            if (!networkMonitor.isOnline.value) {
+                _ctaFlags.update {
+                    it.copy(errorToast = "You're offline. Try again when you're back online.")
+                }
+                return
+            }
             val originalTimeline = current.content.timeline
             val originalCtaEnabled = current.content.ctaEnabled
             _state.value =

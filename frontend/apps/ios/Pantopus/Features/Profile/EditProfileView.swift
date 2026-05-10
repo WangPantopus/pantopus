@@ -38,6 +38,7 @@ public struct EditProfileView: View {
         }
         .background(Theme.Color.appBg)
         .task { await viewModel.load() }
+        .onAppear { Analytics.track(.screenEditProfileViewed) }
         .overlay(alignment: .bottom) {
             if let toast = viewModel.toast {
                 ToastView(message: toast)

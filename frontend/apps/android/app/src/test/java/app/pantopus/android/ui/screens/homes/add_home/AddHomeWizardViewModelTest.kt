@@ -13,10 +13,13 @@ import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
 import app.pantopus.android.ui.screens.shared.wizard.WizardProgressLabel
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -37,6 +40,10 @@ import org.junit.Test
 class AddHomeWizardViewModelTest {
 
     private val repo: HomesRepository = mockk(relaxed = true)
+    private val networkMonitor: NetworkMonitor =
+        mockk<NetworkMonitor>(relaxed = true).also {
+            every { it.isOnline } returns MutableStateFlow(true)
+        }
 
     @Before
     fun setUp() {
@@ -49,7 +56,7 @@ class AddHomeWizardViewModelTest {
     }
 
     private fun makeVm(savedStateHandle: SavedStateHandle = SavedStateHandle()) =
-        AddHomeWizardViewModel(repo, savedStateHandle)
+        AddHomeWizardViewModel(repo, savedStateHandle, networkMonitor)
 
     private fun fillAddress(vm: AddHomeWizardViewModel) {
         vm.updateField(AddressField.Street, "412 Elm St")

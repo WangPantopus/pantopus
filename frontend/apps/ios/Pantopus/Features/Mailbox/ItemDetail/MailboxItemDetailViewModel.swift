@@ -77,6 +77,11 @@ final class MailboxItemDetailViewModel {
     /// Marks the step as optimistically-done; rolls back on failure.
     func logAsReceived() async {
         guard case .loaded(var content) = state, !ctaFlags.primaryLoading else { return }
+        Analytics.track(.ctaMailboxItemLogReceived)
+        if !NetworkMonitor.shared.isOnline {
+            ctaFlags.errorToast = "You're offline. Try again when you're back online."
+            return
+        }
         let originalTimeline = content.timeline
         let originalCtaEnabled = content.ctaEnabled
 
@@ -184,10 +189,17 @@ final class MailboxItemDetailViewModel {
     }
 
     private func applyItem(_ item: MailboxV2ItemResponse.Item, category: MailItemCategory) {
+        let trust = MailTrust.fromRaw(item.senderTrust)
+        Analytics.track(
+            .screenMailboxItemDetailViewed(
+                category: category.rawValue,
+                trustLevel: trust.rawValue
+            )
+        )
         state = .loaded(
             MailboxItemDetailContent(
                 category: category,
-                trust: MailTrust.fromRaw(item.senderTrust),
+                trust: trust,
                 sender: SenderBlockContent(
                     displayName: item.senderDisplay,
                     meta: item.base.createdAt,
@@ -232,11 +244,18 @@ final class MailboxItemDetailViewModel {
         facts.append(KeyFactRow(label: "Received at", value: item.base.createdAt))
 
         let steps = Self.timeline(for: currentStatus)
+        let trust = MailTrust.fromRaw(item.senderTrust)
+        Analytics.track(
+            .screenMailboxItemDetailViewed(
+                category: MailItemCategory.package.rawValue,
+                trustLevel: trust.rawValue
+            )
+        )
 
         state = .loaded(
             MailboxItemDetailContent(
                 category: .package,
-                trust: MailTrust.fromRaw(item.senderTrust),
+                trust: trust,
                 sender: SenderBlockContent(
                     displayName: item.senderDisplay,
                     meta: pkg.sender?.display ?? carrier,
