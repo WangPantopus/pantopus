@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -73,9 +73,8 @@ private fun StepRow(
     Row(
         modifier =
             Modifier
-                .semantics(mergeDescendants = true) {
-                    contentDescription = "${step.state.a11y()}: ${step.title}"
-                }.padding(bottom = if (isLast) 0.dp else Spacing.s4),
+                .semantics { contentDescription = "${step.state.a11y()}: ${step.title}" }
+                .padding(bottom = if (isLast) 0.dp else Spacing.s4),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
@@ -186,13 +185,7 @@ private fun StepMarker(
                 modifier =
                     Modifier
                         .width(2.dp)
-                        // Bridge from current marker bottom to the next
-                        // marker (Box(28.dp) + the row's bottom padding s4
-                        // + a small buffer). `fillMaxHeight()` here
-                        // exploded under unbounded vertical constraints
-                        // (test setContent without a Scaffold) and
-                        // pushed the row off-screen.
-                        .height(Spacing.s5)
+                        .fillMaxHeight()
                         .background(
                             if (state == TimelineStepState.Done) {
                                 PantopusColors.success

@@ -1,9 +1,13 @@
 package app.pantopus.android.ui.components
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.theme.PantopusIcon
 import org.junit.Rule
 import org.junit.Test
@@ -113,14 +117,23 @@ class ComponentsInteractionTest {
     @Test
     fun timeline_renders_all_states() {
         composeRule.setContent {
-            TimelineStepper(
-                steps =
-                    listOf(
-                        TimelineStep("Placed", TimelineStepState.Done),
-                        TimelineStep("In transit", TimelineStepState.Current),
-                        TimelineStep("Delivered", TimelineStepState.Upcoming),
-                    ),
-            )
+            // Wrap in a fixed-height Box because StepMarker's connector uses
+            // `fillMaxHeight()`. Under the unbounded vertical constraints
+            // setContent creates by default, that resolves toward
+            // Constraints.Infinity and pushes the rows off-screen, so
+            // assertIsDisplayed reports "not displayed". A bounded host
+            // mirrors how the component is used in production (inside a
+            // Scaffold / sized parent).
+            Box(modifier = Modifier.height(240.dp)) {
+                TimelineStepper(
+                    steps =
+                        listOf(
+                            TimelineStep("Placed", TimelineStepState.Done),
+                            TimelineStep("In transit", TimelineStepState.Current),
+                            TimelineStep("Delivered", TimelineStepState.Upcoming),
+                        ),
+                )
+            }
         }
         listOf("Placed", "In transit", "Delivered").forEach {
             composeRule.onNodeWithText(it).assertIsDisplayed()
