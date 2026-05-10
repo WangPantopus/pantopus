@@ -120,10 +120,7 @@ class ComponentsInteractionTest {
             // Wrap in a fixed-height Box because StepMarker's connector uses
             // `fillMaxHeight()`. Under the unbounded vertical constraints
             // setContent creates by default, that resolves toward
-            // Constraints.Infinity and pushes the rows off-screen, so
-            // assertIsDisplayed reports "not displayed". A bounded host
-            // mirrors how the component is used in production (inside a
-            // Scaffold / sized parent).
+            // Constraints.Infinity and pushes the rows off-screen.
             Box(modifier = Modifier.height(240.dp)) {
                 TimelineStepper(
                     steps =
@@ -135,8 +132,12 @@ class ComponentsInteractionTest {
                 )
             }
         }
+        // useUnmergedTree = true reaches the inner Text composables directly.
+        // The parent Row sets a contentDescription with `mergeDescendants = false`,
+        // which makes the merged tree treat the row as a leaf and hides the
+        // child Text nodes from `onNodeWithText`.
         listOf("Placed", "In transit", "Delivered").forEach {
-            composeRule.onNodeWithText(it).assertIsDisplayed()
+            composeRule.onNodeWithText(it, useUnmergedTree = true).assertIsDisplayed()
         }
     }
 }
