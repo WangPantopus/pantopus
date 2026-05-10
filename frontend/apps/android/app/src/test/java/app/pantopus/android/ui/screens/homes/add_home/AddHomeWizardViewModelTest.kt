@@ -357,7 +357,7 @@ class AddHomeWizardViewModelTest {
                     "addHome.role" to "Tenant",
                 ),
             )
-        val vm = AddHomeWizardViewModel(repo, handle)
+        val vm = AddHomeWizardViewModel(repo, handle, networkMonitor)
         assertEquals(AddHomeStep.Role, vm.state.value.form.currentStep)
         assertEquals("412 Elm St", vm.state.value.form.address.street)
         assertEquals(AddHomeRole.Tenant, vm.state.value.form.role)
