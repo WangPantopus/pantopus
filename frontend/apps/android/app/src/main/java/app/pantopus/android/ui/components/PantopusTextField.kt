@@ -75,7 +75,7 @@ fun PantopusTextField(
 
     Column(
         modifier =
-            modifier.semantics {
+            modifier.semantics(mergeDescendants = true) {
                 contentDescription =
                     when (state) {
                         is PantopusFieldState.Error -> "$label, error: ${state.message}"

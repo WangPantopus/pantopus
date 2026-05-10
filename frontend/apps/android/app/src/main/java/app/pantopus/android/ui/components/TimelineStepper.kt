@@ -73,8 +73,9 @@ private fun StepRow(
     Row(
         modifier =
             Modifier
-                .semantics { contentDescription = "${step.state.a11y()}: ${step.title}" }
-                .padding(bottom = if (isLast) 0.dp else Spacing.s4),
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "${step.state.a11y()}: ${step.title}"
+                }.padding(bottom = if (isLast) 0.dp else Spacing.s4),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {

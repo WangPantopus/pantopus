@@ -36,15 +36,21 @@ import java.io.File
 class StoreScreenshotsTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test
-    fun captureSixHeroScreens() {
-        captureScreen("01_Hub_populated") { Placeholder("Hub populated") }
-        captureScreen("02_MyHomes") { Placeholder("My homes") }
-        captureScreen("03_HomeDashboard") { Placeholder("Home dashboard") }
-        captureScreen("04_MailboxList") { Placeholder("Mailbox") }
-        captureScreen("05_MailboxItemDetail_package") { Placeholder("Package") }
-        captureScreen("06_EditProfile") { Placeholder("Edit profile") }
-    }
+    // Compose's ComposeTestRule allows only one `setContent` per test, so
+    // each hero screen lives in its own @Test method — JUnit gives every
+    // test a fresh rule.
+
+    @Test fun capture01HubPopulated() = captureScreen("01_Hub_populated") { Placeholder("Hub populated") }
+
+    @Test fun capture02MyHomes() = captureScreen("02_MyHomes") { Placeholder("My homes") }
+
+    @Test fun capture03HomeDashboard() = captureScreen("03_HomeDashboard") { Placeholder("Home dashboard") }
+
+    @Test fun capture04MailboxList() = captureScreen("04_MailboxList") { Placeholder("Mailbox") }
+
+    @Test fun capture05MailboxItemDetail() = captureScreen("05_MailboxItemDetail_package") { Placeholder("Package") }
+
+    @Test fun capture06EditProfile() = captureScreen("06_EditProfile") { Placeholder("Edit profile") }
 
     private fun captureScreen(
         name: String,
