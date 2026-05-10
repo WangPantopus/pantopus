@@ -2,8 +2,11 @@ package app.pantopus.android.screenshots
 
 import android.os.Environment
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Rule
@@ -54,15 +57,7 @@ class StoreScreenshotsTest {
         }
         compose.waitForIdle()
 
-        val view = compose.activity.window.decorView
-        val bitmap =
-            android.graphics.Bitmap.createBitmap(
-                view.width,
-                view.height,
-                android.graphics.Bitmap.Config.ARGB_8888,
-            )
-        val canvas = android.graphics.Canvas(bitmap)
-        view.draw(canvas)
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
 
         val outDir =
             File(

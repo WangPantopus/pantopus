@@ -49,6 +49,7 @@ class IconTest {
             "alert-circle",
             "circle",
             "info",
+            "wifi-off",
         )
 
     @Test

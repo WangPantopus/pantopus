@@ -18,7 +18,6 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodes
 import app.pantopus.android.ui.screens.hub.HUB_SCREEN_TAG
 import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.nearby.NearbyScreen
