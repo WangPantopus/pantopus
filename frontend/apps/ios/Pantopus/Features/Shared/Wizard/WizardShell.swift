@@ -63,7 +63,7 @@ public struct WizardShell<Content: View>: View {
             1
         }
         let filled = Int((Double(segmentCount) * fraction).rounded())
-        SegmentedProgressBar(filled: filled, total: segmentCount)
+        SegmentedProgressBar(currentStep: filled, totalSteps: segmentCount)
             .padding(.horizontal, Spacing.s4)
             .padding(.vertical, Spacing.s2)
             .background(Theme.Color.appSurface)

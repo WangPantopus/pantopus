@@ -243,7 +243,7 @@ public struct EditProfileView: View {
                 Spacer()
                 if !snapshot.value.isEmpty {
                     Button("Clear") { viewModel.update(.dateOfBirth, to: "") }
-                        .pantopusTextStyle(.caption)
+                        .font(Theme.Font.role(.caption))
                         .foregroundStyle(Theme.Color.primary600)
                         .accessibilityIdentifier("field_dateOfBirth_clear")
                 }

@@ -79,7 +79,7 @@ final class Observability {
 
     private static let redacted = "[redacted]"
 
-    private static func scrubPII(from event: Event) {
+    private nonisolated static func scrubPII(from event: Event) {
         if var extra = event.extra {
             scrubInPlace(&extra)
             event.extra = extra
@@ -89,7 +89,7 @@ final class Observability {
         event.breadcrumbs?.forEach { Self.scrubPII(from: $0) }
     }
 
-    private static func scrubPII(from breadcrumb: Breadcrumb) {
+    private nonisolated static func scrubPII(from breadcrumb: Breadcrumb) {
         if var data = breadcrumb.data {
             scrubInPlace(&data)
             breadcrumb.data = data
@@ -99,7 +99,7 @@ final class Observability {
         }
     }
 
-    private static func scrubInPlace(_ dict: inout [String: Any]) {
+    private nonisolated static func scrubInPlace(_ dict: inout [String: Any]) {
         for key in dict.keys {
             if piiKeys.contains(key.lowercased()) {
                 dict[key] = redacted
@@ -115,7 +115,7 @@ final class Observability {
 
     /// Replace anything that looks like an email or phone with `[redacted]`.
     /// Catches PII that slipped into free-form messages.
-    private static func redact(emailLikePattern value: String) -> String {
+    private nonisolated static func redact(emailLikePattern value: String) -> String {
         var result = value
         let patterns = [
             #"[\w.+-]+@[\w-]+\.[\w.-]+"#,
