@@ -76,6 +76,12 @@ jobs:
       - name: Unit tests
         run: ./gradlew test --no-daemon
 
+      - name: Paparazzi snapshot verification
+        # P14 acceptance: a deliberately broken snapshot (e.g. a colour
+        # change) must fail CI. The `paparazziVerify` task is wired in
+        # `app/build.gradle.kts` and runs `verifyPaparazziDebug`.
+        run: ./gradlew paparazziVerify --no-daemon
+
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug --no-daemon
 
@@ -88,6 +94,7 @@ jobs:
             frontend/apps/android/app/build/reports/tests/
             frontend/apps/android/app/build/reports/detekt/
             frontend/apps/android/app/build/reports/lint-results-debug.html
+            frontend/apps/android/app/build/paparazzi/
           retention-days: 7
 
       - name: Upload debug APK

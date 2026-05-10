@@ -49,9 +49,16 @@ jobs:
           echo "✓ No raw hex literals in Pantopus/Features."
 
   test:
-    name: Unit + UI tests
+    name: Tests on ${{ matrix.simulator }}
     runs-on: macos-14
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        simulator:
+          - "iPhone 15"
+          - "iPhone 13"
+          - "iPhone SE (3rd generation)"
     steps:
       - uses: actions/checkout@v4
 
@@ -61,8 +68,8 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Install XcodeGen + xcbeautify
+        run: brew install xcodegen xcbeautify
 
       - name: Generate project
         run: xcodegen generate
@@ -75,24 +82,51 @@ jobs:
           restore-keys: |
             spm-${{ runner.os }}-
 
+      # Sanitised matrix entry → safe artifact + bundle name (no spaces /
+      # parentheses). Used by the result-bundle path and the upload step.
+      - name: Compute simulator slug
+        id: sim
+        run: |
+          slug=$(echo "${{ matrix.simulator }}" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9]+/-/g; s/-+$//')
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
+
       - name: Run tests
         run: |
           set -o pipefail
           xcodebuild \
             -project Pantopus.xcodeproj \
             -scheme Pantopus \
-            -destination "platform=iOS Simulator,name=iPhone 15,OS=latest" \
+            -destination "platform=iOS Simulator,name=${{ matrix.simulator }},OS=latest" \
             -configuration Debug \
             -enableCodeCoverage YES \
-            -resultBundlePath TestResults.xcresult \
+            -resultBundlePath "TestResults-${{ steps.sim.outputs.slug }}.xcresult" \
             clean test | xcbeautify
+
+      - name: Extract coverage summary
+        if: always()
+        run: |
+          set -e
+          bundle="TestResults-${{ steps.sim.outputs.slug }}.xcresult"
+          if [[ -d "$bundle" ]]; then
+            echo "## iOS coverage — ${{ matrix.simulator }}" >> "$GITHUB_STEP_SUMMARY"
+            xcrun xccov view --report --only-targets "$bundle" \
+              | tee coverage-${{ steps.sim.outputs.slug }}.txt \
+              | head -40 >> "$GITHUB_STEP_SUMMARY" || true
+            xcrun xccov view --report --json "$bundle" \
+              > coverage-${{ steps.sim.outputs.slug }}.json || true
+          fi
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-test-results
-          path: frontend/apps/ios/TestResults.xcresult
+          name: ios-test-results-${{ steps.sim.outputs.slug }}
+          path: |
+            frontend/apps/ios/TestResults-${{ steps.sim.outputs.slug }}.xcresult
+            frontend/apps/ios/coverage-${{ steps.sim.outputs.slug }}.txt
+            frontend/apps/ios/coverage-${{ steps.sim.outputs.slug }}.json
           retention-days: 7
 
   build:

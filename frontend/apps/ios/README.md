@@ -118,3 +118,20 @@ See `fastlane/Fastfile`. At minimum, before `make beta`:
 - [ ] `.env` has the production Stripe key.
 - [ ] `CURRENT_PROJECT_VERSION` and `MARKETING_VERSION` in `project.yml` are bumped.
 - [ ] `make test` passes locally.
+
+## CI
+
+PRs touching `frontend/apps/ios/**` trigger
+[`.github/workflows/ios-ci.yml`](../../../.github/workflows/ios-ci.yml).
+Three jobs run in parallel:
+
+1. **Lint** — SwiftLint `--strict`, SwiftFormat `--lint`, and the
+   raw-hex grep guard from P1.
+2. **Tests** — matrix over **iPhone 15 / iPhone 13 / iPhone SE (3rd gen)**.
+   Each leg runs `make test` with code coverage on. The leg uploads
+   the `.xcresult` bundle plus a JSON coverage report; the per-target
+   coverage summary is also written to the workflow's step summary so
+   PR reviewers see it inline.
+3. **Build** — clean Debug build for the simulator. Gated on Lint.
+
+Local equivalents: `make lint`, `make test`, `make build`.
