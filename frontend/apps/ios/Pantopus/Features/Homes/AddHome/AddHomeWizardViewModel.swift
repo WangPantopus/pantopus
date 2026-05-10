@@ -74,7 +74,7 @@ final class AddHomeWizardViewModel: WizardModel {
 
     /// Visible-for-testing default that fires `propertySuggestions` after
     /// the user pauses typing.
-    public static let suggestionDebounceNanoseconds: UInt64 = 300_000_000
+    static let suggestionDebounceNanoseconds: UInt64 = 300_000_000
 
     // MARK: - Init
 
@@ -83,7 +83,7 @@ final class AddHomeWizardViewModel: WizardModel {
         initialState: AddHomeFormState = .empty
     ) {
         self.api = api
-        self.form = initialState
+        form = initialState
     }
 
     /// Replace the in-memory form state from scene storage on first
@@ -118,7 +118,9 @@ final class AddHomeWizardViewModel: WizardModel {
         }
     }
 
-    func discardConfirmed() { pendingEvent = .dismiss }
+    func discardConfirmed() {
+        pendingEvent = .dismiss
+    }
 
     func primaryTapped() {
         Task { await advance() }
@@ -224,7 +226,7 @@ final class AddHomeWizardViewModel: WizardModel {
         debounceTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: Self.suggestionDebounceNanoseconds)
             guard let self, !Task.isCancelled else { return }
-            await self.fetchSuggestions(for: snapshot)
+            await fetchSuggestions(for: snapshot)
         }
     }
 
@@ -317,8 +319,8 @@ final class AddHomeWizardViewModel: WizardModel {
 
     private func leadingControl(for step: AddHomeStep) -> WizardLeadingControl {
         switch step {
-        case .address, .success: return .close
-        case .confirm, .role, .review: return .back
+        case .address, .success: .close
+        case .confirm, .role, .review: .back
         }
     }
 
@@ -337,11 +339,11 @@ final class AddHomeWizardViewModel: WizardModel {
 
     private func primaryEnabled(for step: AddHomeStep) -> Bool {
         switch step {
-        case .address: return form.address.isComplete
-        case .confirm: return !isCheckingAddress && errorMessage == nil
-        case .role: return form.role != nil
-        case .review: return form.role != nil
-        case .success: return createdHomeId != nil
+        case .address: form.address.isComplete
+        case .confirm: !isCheckingAddress && errorMessage == nil
+        case .role: form.role != nil
+        case .review: form.role != nil
+        case .success: createdHomeId != nil
         }
     }
 
@@ -363,14 +365,18 @@ final class AddHomeWizardViewModel: WizardModel {
 
     private static func collect(_ value: JSONValue, into out: inout [String]) {
         switch value {
-        case .object(let dict):
+        case let .object(dict):
             if let address = dict["address"]?.stringValue,
                !address.isEmpty {
                 out.append(address)
             }
-            for (_, child) in dict { Self.collect(child, into: &out) }
-        case .array(let array):
-            for item in array { Self.collect(item, into: &out) }
+            for (_, child) in dict {
+                Self.collect(child, into: &out)
+            }
+        case let .array(array):
+            for item in array {
+                Self.collect(item, into: &out)
+            }
         default: break
         }
     }

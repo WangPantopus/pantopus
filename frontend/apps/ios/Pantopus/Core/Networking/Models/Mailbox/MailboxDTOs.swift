@@ -79,40 +79,40 @@ public struct MailItem: Decodable, Sendable, Hashable, Identifiable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = try c.decode(String.self, forKey: .id)
-        self.recipientUserId = try c.decodeIfPresent(String.self, forKey: .recipientUserId)
-        self.recipientHomeId = try c.decodeIfPresent(String.self, forKey: .recipientHomeId)
-        self.deliveryTargetType = try c.decodeIfPresent(String.self, forKey: .deliveryTargetType)
-        self.deliveryTargetId = try c.decodeIfPresent(String.self, forKey: .deliveryTargetId)
-        self.addressHomeId = try c.decodeIfPresent(String.self, forKey: .addressHomeId)
-        self.attnUserId = try c.decodeIfPresent(String.self, forKey: .attnUserId)
-        self.attnLabel = try c.decodeIfPresent(String.self, forKey: .attnLabel)
-        self.deliveryVisibility = try c.decodeIfPresent(String.self, forKey: .deliveryVisibility)
-        self.mailType = try c.decodeIfPresent(String.self, forKey: .mailType)
-        self.displayTitle = try c.decodeIfPresent(String.self, forKey: .displayTitle)
-        self.previewText = try c.decodeIfPresent(String.self, forKey: .previewText)
-        self.primaryAction = try c.decodeIfPresent(String.self, forKey: .primaryAction)
-        self.actionRequired = try c.decodeIfPresent(Bool.self, forKey: .actionRequired)
-        self.ackRequired = try c.decodeIfPresent(Bool.self, forKey: .ackRequired)
-        self.ackStatus = try c.decodeIfPresent(String.self, forKey: .ackStatus)
-        self.type = try c.decode(String.self, forKey: .type)
-        self.subject = try c.decodeIfPresent(String.self, forKey: .subject)
-        self.content = try c.decodeIfPresent(String.self, forKey: .content)
-        self.senderUserId = try c.decodeIfPresent(String.self, forKey: .senderUserId)
-        self.senderBusinessName = try c.decodeIfPresent(String.self, forKey: .senderBusinessName)
-        self.senderAddress = try c.decodeIfPresent(String.self, forKey: .senderAddress)
-        self.viewed = try c.decodeIfPresent(Bool.self, forKey: .viewed) ?? false
-        self.viewedAt = try c.decodeIfPresent(String.self, forKey: .viewedAt)
-        self.archived = try c.decodeIfPresent(Bool.self, forKey: .archived) ?? false
-        self.starred = try c.decodeIfPresent(Bool.self, forKey: .starred) ?? false
-        self.payoutAmount = try c.decodeIfPresent(Double.self, forKey: .payoutAmount)
-        self.payoutStatus = try c.decodeIfPresent(String.self, forKey: .payoutStatus)
-        self.category = try c.decodeIfPresent(String.self, forKey: .category)
-        self.tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
-        self.priority = try c.decodeIfPresent(String.self, forKey: .priority) ?? "normal"
-        self.attachments = try c.decodeIfPresent([String].self, forKey: .attachments)
-        self.expiresAt = try c.decodeIfPresent(String.self, forKey: .expiresAt)
-        self.createdAt = try c.decode(String.self, forKey: .createdAt)
+        id = try c.decode(String.self, forKey: .id)
+        recipientUserId = try c.decodeIfPresent(String.self, forKey: .recipientUserId)
+        recipientHomeId = try c.decodeIfPresent(String.self, forKey: .recipientHomeId)
+        deliveryTargetType = try c.decodeIfPresent(String.self, forKey: .deliveryTargetType)
+        deliveryTargetId = try c.decodeIfPresent(String.self, forKey: .deliveryTargetId)
+        addressHomeId = try c.decodeIfPresent(String.self, forKey: .addressHomeId)
+        attnUserId = try c.decodeIfPresent(String.self, forKey: .attnUserId)
+        attnLabel = try c.decodeIfPresent(String.self, forKey: .attnLabel)
+        deliveryVisibility = try c.decodeIfPresent(String.self, forKey: .deliveryVisibility)
+        mailType = try c.decodeIfPresent(String.self, forKey: .mailType)
+        displayTitle = try c.decodeIfPresent(String.self, forKey: .displayTitle)
+        previewText = try c.decodeIfPresent(String.self, forKey: .previewText)
+        primaryAction = try c.decodeIfPresent(String.self, forKey: .primaryAction)
+        actionRequired = try c.decodeIfPresent(Bool.self, forKey: .actionRequired)
+        ackRequired = try c.decodeIfPresent(Bool.self, forKey: .ackRequired)
+        ackStatus = try c.decodeIfPresent(String.self, forKey: .ackStatus)
+        type = try c.decode(String.self, forKey: .type)
+        subject = try c.decodeIfPresent(String.self, forKey: .subject)
+        content = try c.decodeIfPresent(String.self, forKey: .content)
+        senderUserId = try c.decodeIfPresent(String.self, forKey: .senderUserId)
+        senderBusinessName = try c.decodeIfPresent(String.self, forKey: .senderBusinessName)
+        senderAddress = try c.decodeIfPresent(String.self, forKey: .senderAddress)
+        viewed = try c.decodeIfPresent(Bool.self, forKey: .viewed) ?? false
+        viewedAt = try c.decodeIfPresent(String.self, forKey: .viewedAt)
+        archived = try c.decodeIfPresent(Bool.self, forKey: .archived) ?? false
+        starred = try c.decodeIfPresent(Bool.self, forKey: .starred) ?? false
+        payoutAmount = try c.decodeIfPresent(Double.self, forKey: .payoutAmount)
+        payoutStatus = try c.decodeIfPresent(String.self, forKey: .payoutStatus)
+        category = try c.decodeIfPresent(String.self, forKey: .category)
+        tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
+        priority = try c.decodeIfPresent(String.self, forKey: .priority) ?? "normal"
+        attachments = try c.decodeIfPresent([String].self, forKey: .attachments)
+        expiresAt = try c.decodeIfPresent(String.self, forKey: .expiresAt)
+        createdAt = try c.decode(String.self, forKey: .createdAt)
     }
 }
 
@@ -133,15 +133,17 @@ public struct MailDetailResponse: Decodable, Sendable, Hashable {
         public let contentFormat: String?
         public let links: [JSONValue]
 
-        public var id: String { item.id }
+        public var id: String {
+            item.id
+        }
 
         public init(from decoder: Decoder) throws {
-            self.item = try MailItem(from: decoder)
+            item = try MailItem(from: decoder)
             let c = try decoder.container(keyedBy: Keys.self)
-            self.sender = try c.decodeIfPresent(Sender.self, forKey: .sender)
-            self.object = try c.decodeIfPresent(JSONValue.self, forKey: .object)
-            self.contentFormat = try c.decodeIfPresent(String.self, forKey: .contentFormat)
-            self.links = try c.decodeIfPresent([JSONValue].self, forKey: .links) ?? []
+            sender = try c.decodeIfPresent(Sender.self, forKey: .sender)
+            object = try c.decodeIfPresent(JSONValue.self, forKey: .object)
+            contentFormat = try c.decodeIfPresent(String.self, forKey: .contentFormat)
+            links = try c.decodeIfPresent([JSONValue].self, forKey: .links) ?? []
         }
 
         public struct Sender: Decodable, Sendable, Hashable, Identifiable {

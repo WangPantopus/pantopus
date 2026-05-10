@@ -29,7 +29,7 @@ public final class NetworkMonitor {
     private let queue = DispatchQueue(label: "app.pantopus.NetworkMonitor")
 
     public init() {
-        self.monitor = NWPathMonitor()
+        monitor = NWPathMonitor()
         monitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
             Task { @MainActor [weak self] in

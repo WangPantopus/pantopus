@@ -14,7 +14,7 @@ import Observation
 @MainActor
 final class MailboxListViewModel: ListOfRowsDataSource {
     /// Tabs exposed on the list.
-    public enum Tab: String, CaseIterable, Sendable {
+    enum Tab: String, CaseIterable {
         case all
         case unread
         case starred
@@ -28,23 +28,29 @@ final class MailboxListViewModel: ListOfRowsDataSource {
         }
     }
 
-    public let title = "Mailbox"
-    public let tabs: [ListOfRowsTab] = Tab.allCases.map {
+    let title = "Mailbox"
+    let tabs: [ListOfRowsTab] = Tab.allCases.map {
         ListOfRowsTab(id: $0.rawValue, label: $0.label, count: nil)
     }
-    public var selectedTab: String = Tab.all.rawValue {
+
+    var selectedTab: String = Tab.all.rawValue {
         didSet { if oldValue != selectedTab { Task { await reloadForTab() } } }
     }
-    public var topBarAction: TopBarAction? {
+
+    var topBarAction: TopBarAction? {
         TopBarAction(
             icon: .search,
             accessibilityLabel: "Search mail"
         ) { [weak self] in Task { @MainActor in self?.toast = "Search coming soon" } }
     }
-    public var fab: FABAction? { nil }
-    public private(set) var state: ListOfRowsState = .loading
+
+    var fab: FABAction? {
+        nil
+    }
+
+    private(set) var state: ListOfRowsState = .loading
     /// Transient toast message. The view clears it after display.
-    public var toast: String?
+    var toast: String?
 
     private let api: APIClient
     private let pageSize = 25
@@ -62,7 +68,7 @@ final class MailboxListViewModel: ListOfRowsDataSource {
         self.onOpenMail = onOpenMail
     }
 
-    public func load() async {
+    func load() async {
         if case .loaded = state, !loadedItems.isEmpty { return }
         state = .loading
         offset = 0
@@ -70,13 +76,13 @@ final class MailboxListViewModel: ListOfRowsDataSource {
         await fetchPage()
     }
 
-    public func refresh() async {
+    func refresh() async {
         offset = 0
         loadedItems = []
         await fetchPage()
     }
 
-    public func loadMoreIfNeeded() async {
+    func loadMoreIfNeeded() async {
         guard hasMore, !isLoadingPage else { return }
         await fetchPage()
     }

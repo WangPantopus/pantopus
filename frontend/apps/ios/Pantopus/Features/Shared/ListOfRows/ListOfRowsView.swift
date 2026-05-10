@@ -53,14 +53,14 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource>: View {
         switch dataSource.state {
         case .loading:
             LoadingRows()
-        case .loaded(let sections, let hasMore):
+        case let .loaded(sections, hasMore):
             LoadedList(
                 sections: sections,
                 hasMore: hasMore,
                 onEndReached: { Task { await dataSource.loadMoreIfNeeded() } },
                 onRefresh: { await dataSource.refresh() }
             )
-        case .empty(let content):
+        case let .empty(content):
             EmptyState(
                 icon: content.icon,
                 headline: content.headline,
@@ -70,7 +70,7 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource>: View {
                     return EmptyState.CTA(title: title) { await MainActor.run { handler() } }
                 }
             )
-        case .error(let message):
+        case let .error(message):
             ErrorBanner(message: message) { Task { await dataSource.load() } }
         }
     }
@@ -245,12 +245,12 @@ private struct RowView: View {
 
     @ViewBuilder private var leadingView: some View {
         switch row.leading {
-        case .icon(let icon, let tint):
+        case let .icon(icon, tint):
             Icon(icon, size: 20, color: tint)
                 .frame(width: 40, height: 40)
                 .background(Theme.Color.appSurfaceSunken)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.md))
-        case .avatar(let name, let imageURL, let identity, let progress):
+        case let .avatar(name, imageURL, identity, progress):
             AvatarWithIdentityRing(name: name, imageURL: imageURL, identity: identity, ringProgress: progress)
         case .none:
             EmptyView()
@@ -259,7 +259,7 @@ private struct RowView: View {
 
     @ViewBuilder private var trailingView: some View {
         switch row.trailing {
-        case .statusChip(let text, let variant):
+        case let .statusChip(text, variant):
             StatusChip(text, variant: variant)
         case .chevron:
             Icon(.chevronRight, size: 18, color: Theme.Color.appTextSecondary)
@@ -280,7 +280,7 @@ private struct RowView: View {
     private var a11yLabel: String {
         var parts = [row.title]
         if let subtitle = row.subtitle { parts.append(subtitle) }
-        if case .statusChip(let text, _) = row.trailing { parts.append(text) }
+        if case let .statusChip(text, _) = row.trailing { parts.append(text) }
         return parts.joined(separator: ", ")
     }
 }

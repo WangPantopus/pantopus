@@ -6,20 +6,39 @@
 //  point size and weight.
 //
 
-import XCTest
 import SwiftUI
 import UIKit
+import XCTest
 @testable import Pantopus
 
 final class TypographyTests: XCTestCase {
+    func testH1() {
+        assertRole(.h1, size: 30, weight: .bold)
+    }
 
-    func testH1() { assertRole(.h1, size: 30, weight: .bold) }
-    func testH2() { assertRole(.h2, size: 24, weight: .semibold) }
-    func testH3() { assertRole(.h3, size: 20, weight: .semibold) }
-    func testBody() { assertRole(.body, size: 16, weight: .regular) }
-    func testSmall() { assertRole(.small, size: 14, weight: .regular) }
-    func testCaption() { assertRole(.caption, size: 12, weight: .regular) }
-    func testOverline() { assertRole(.overline, size: 11, weight: .semibold) }
+    func testH2() {
+        assertRole(.h2, size: 24, weight: .semibold)
+    }
+
+    func testH3() {
+        assertRole(.h3, size: 20, weight: .semibold)
+    }
+
+    func testBody() {
+        assertRole(.body, size: 16, weight: .regular)
+    }
+
+    func testSmall() {
+        assertRole(.small, size: 14, weight: .regular)
+    }
+
+    func testCaption() {
+        assertRole(.caption, size: 12, weight: .regular)
+    }
+
+    func testOverline() {
+        assertRole(.overline, size: 11, weight: .semibold)
+    }
 
     func testLineHeights() {
         XCTAssertEqual(PantopusTextStyle.h1.lineHeight, 36)
@@ -64,16 +83,16 @@ final class TypographyTests: XCTestCase {
 
     private func swiftUIWeight(_ w: UIFont.Weight) -> Font.Weight {
         switch w {
-        case .bold: return .bold
-        case .semibold: return .semibold
-        case .medium: return .medium
-        case .regular: return .regular
-        case .light: return .light
-        case .thin: return .thin
-        case .ultraLight: return .ultraLight
-        case .heavy: return .heavy
-        case .black: return .black
-        default: return .regular
+        case .bold: .bold
+        case .semibold: .semibold
+        case .medium: .medium
+        case .regular: .regular
+        case .light: .light
+        case .thin: .thin
+        case .ultraLight: .ultraLight
+        case .heavy: .heavy
+        case .black: .black
+        default: .regular
         }
     }
 }

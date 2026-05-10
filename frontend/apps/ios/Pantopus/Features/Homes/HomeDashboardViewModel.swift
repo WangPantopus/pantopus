@@ -51,7 +51,9 @@ final class HomeDashboardViewModel {
     }
 
     /// Pull-to-refresh / retry.
-    func refresh() async { await fetch() }
+    func refresh() async {
+        await fetch()
+    }
 
     private func fetch() async {
         do {
@@ -89,7 +91,7 @@ final class HomeDashboardViewModel {
                 id: "verified",
                 value: detail.isOwner ? "Owner" : "Member",
                 label: "Your role"
-            ),
+            )
         ]
         state = .loaded(content(address: address, verified: detail.isOwner, stats: stats))
     }
@@ -102,7 +104,7 @@ final class HomeDashboardViewModel {
                 id: "visibility",
                 value: public_.visibility.capitalized,
                 label: "Visibility"
-            ),
+            )
         ]
         state = .loaded(content(address: public_.address, verified: public_.hasVerifiedOwner, stats: stats))
     }
@@ -116,13 +118,13 @@ final class HomeDashboardViewModel {
                 QuickActionTile(id: "add_mail", label: "Add mail", icon: .mailbox, tint: .home),
                 QuickActionTile(id: "log_package", label: "Log package", icon: .shoppingBag, tint: .business),
                 QuickActionTile(id: "add_member", label: "Add member", icon: .userPlus, tint: .personal),
-                QuickActionTile(id: "verify", label: "Verify", icon: .shieldCheck, tint: .home),
+                QuickActionTile(id: "verify", label: "Verify", icon: .shieldCheck, tint: .home)
             ],
             tabs: [
                 GridTabsTab(id: "overview", label: "Overview"),
                 GridTabsTab(id: "members", label: "Members"),
                 GridTabsTab(id: "mail", label: "Mail"),
-                GridTabsTab(id: "access", label: "Access"),
+                GridTabsTab(id: "access", label: "Access")
             ]
         )
     }

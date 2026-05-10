@@ -5,13 +5,12 @@
 //  Inventory + renderability checks for `PantopusIcon`.
 //
 
-import XCTest
 import SwiftUI
 import UIKit
+import XCTest
 @testable import Pantopus
 
 final class IconTests: XCTestCase {
-
     /// Expected Lucide icon inventory, derived from the design JSX. Keep in
     /// lock-step with the enum — the test catches additions/removals.
     private let expectedInventory: [String] = [
@@ -21,7 +20,7 @@ final class IconTests: XCTestCase {
         "mailbox", "search", "user-plus", "file", "copy", "check",
         "more-horizontal", "arrow-left", "send", "chevron-down", "chevron-up",
         "trash-2", "edit-2", "upload", "shield", "lock", "check-circle",
-        "alert-circle", "circle", "info",
+        "alert-circle", "circle", "info"
     ]
 
     func testInventoryMatches() {

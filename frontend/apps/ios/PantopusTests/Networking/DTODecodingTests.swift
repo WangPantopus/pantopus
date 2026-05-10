@@ -10,14 +10,13 @@ import XCTest
 @testable import Pantopus
 
 final class DTODecodingTests: XCTestCase {
-
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
         return d
     }()
 
-    private func decode<T: Decodable>(_ type: T.Type, from string: String) throws -> T {
+    private func decode<T: Decodable>(_: T.Type, from string: String) throws -> T {
         try decoder.decode(T.self, from: Data(string.utf8))
     }
 

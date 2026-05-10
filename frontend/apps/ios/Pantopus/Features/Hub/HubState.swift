@@ -89,7 +89,7 @@ public struct ActionChipContent: Identifiable, Sendable {
     public let active: Bool
 
     public init(kind: Kind, label: String, icon: PantopusIcon, active: Bool) {
-        self.id = kind.rawValue
+        id = kind.rawValue
         self.kind = kind
         self.label = label
         self.icon = icon
@@ -151,7 +151,7 @@ public struct PillarTile: Identifiable, Sendable {
         chip: String?,
         chipSetupState: Bool
     ) {
-        self.id = pillar.rawValue
+        id = pillar.rawValue
         self.pillar = pillar
         self.label = label
         self.icon = icon

@@ -12,7 +12,6 @@ import XCTest
 
 @MainActor
 final class EditProfileViewModelTests: XCTestCase {
-
     override func setUp() {
         super.setUp()
         SequencedURLProtocol.reset()
@@ -185,7 +184,7 @@ final class EditProfileViewModelTests: XCTestCase {
     func testSaveHappyPathPatchesAndSignalsDismiss() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.profileJSON),
-            .status(200, body: Self.patchEnvelope),
+            .status(200, body: Self.patchEnvelope)
         ]
         let vm = EditProfileViewModel(api: makeAPI())
         await vm.load()
@@ -198,7 +197,7 @@ final class EditProfileViewModelTests: XCTestCase {
     func testSaveServerErrorSurfacesToast() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.profileJSON),
-            .status(500, body: "{\"error\":\"down\"}"),
+            .status(500, body: "{\"error\":\"down\"}")
         ]
         let vm = EditProfileViewModel(api: makeAPI())
         await vm.load()
@@ -250,13 +249,12 @@ final class EditProfileViewModelTests: XCTestCase {
         // URLProtocol-stubbed sessions strip the body and expose it as
         // `httpBodyStream`. Read the stream end-to-end so the assertion
         // stays robust across iOS versions.
-        let data: Data
-        if let body = request.httpBody {
-            data = body
+        let data: Data = if let body = request.httpBody {
+            body
         } else if let stream = request.httpBodyStream {
-            data = Data(reading: stream)
+            Data(reading: stream)
         } else {
-            data = Data()
+            Data()
         }
         return try JSONDecoder().decode(PatchBody.self, from: data)
     }
@@ -264,7 +262,7 @@ final class EditProfileViewModelTests: XCTestCase {
     func testPatchBodyIncludesOnlyDirtyFields() async throws {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.profileJSON),
-            .status(200, body: Self.patchEnvelope),
+            .status(200, body: Self.patchEnvelope)
         ]
         let vm = EditProfileViewModel(api: makeAPI())
         await vm.load()
@@ -293,7 +291,7 @@ final class EditProfileViewModelTests: XCTestCase {
         // Bio allows '', so clearing it should send `bio: ""`.
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.profileJSON),
-            .status(200, body: Self.patchEnvelope),
+            .status(200, body: Self.patchEnvelope)
         ]
         let vm = EditProfileViewModel(api: makeAPI())
         await vm.load()
@@ -309,7 +307,7 @@ final class EditProfileViewModelTests: XCTestCase {
         // form — see EditProfileViewModel.fieldAllowsEmpty).
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.profileJSON),
-            .status(200, body: Self.patchEnvelope),
+            .status(200, body: Self.patchEnvelope)
         ]
         let vm = EditProfileViewModel(api: makeAPI())
         await vm.load()

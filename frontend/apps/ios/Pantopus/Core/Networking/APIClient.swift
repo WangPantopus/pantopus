@@ -132,7 +132,7 @@ final class APIClient: @unchecked Sendable {
         as type: Response.Type = Response.self
     ) async -> APIResult<Response> {
         do {
-            return .success(try await request(endpoint, as: type))
+            return try await .success(request(endpoint, as: type))
         } catch let error as APIError {
             return .failure(error)
         } catch {
@@ -270,7 +270,7 @@ final class APIClient: @unchecked Sendable {
     private static let responseSizeWatchPaths: [String] = [
         "/api/hub",
         "/api/mailbox",
-        "/api/homes/my-homes",
+        "/api/homes/my-homes"
     ]
 
     /// Per-path size budget in bytes (500 KB).
@@ -379,9 +379,10 @@ public struct EmptyResponse: Decodable, Sendable {
 /// only know the concrete type at the call site.
 struct AnyEncodable: Encodable, @unchecked Sendable {
     private let encodeClosure: (Encoder) throws -> Void
-    init<T: Encodable>(_ wrapped: T) {
-        self.encodeClosure = wrapped.encode
+    init(_ wrapped: some Encodable) {
+        encodeClosure = wrapped.encode
     }
+
     func encode(to encoder: Encoder) throws {
         try encodeClosure(encoder)
     }

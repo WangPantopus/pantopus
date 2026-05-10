@@ -11,7 +11,6 @@
 import XCTest
 
 final class DynamicTypeAudit: XCTestCase {
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }

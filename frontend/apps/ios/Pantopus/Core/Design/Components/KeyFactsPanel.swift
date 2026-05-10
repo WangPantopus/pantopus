@@ -94,7 +94,7 @@ private struct KeyFactRowView: View {
         KeyFactRow(label: "Order ID", value: "PAN-48291", isCode: true),
         KeyFactRow(label: "Placed", value: "Mar 18, 2026"),
         KeyFactRow(label: "Tracking", value: "1Z999AA10123456784", isCode: true),
-        KeyFactRow(label: "Status", value: "Out for delivery"),
+        KeyFactRow(label: "Status", value: "Out for delivery")
     ])
     .padding()
     .background(Theme.Color.appBg)

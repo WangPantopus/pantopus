@@ -34,7 +34,10 @@ final class UITestStubProtocol: URLProtocol {
         request.url?.path.hasPrefix("/api/") ?? false
     }
 
-    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
     override func stopLoading() {}
 
     override func startLoading() {
@@ -73,11 +76,11 @@ final class UITestStubProtocol: URLProtocol {
             let status = Int(env["UI_TESTS_HOMES_CREATE_STATUS"] ?? "200") ?? 200
             finishWith(status: status, body: Data(body.utf8))
 
-        case ("GET", let path) where path.hasPrefix("/api/homes/") && path.hasSuffix("/public-profile"):
+        case let ("GET", path) where path.hasPrefix("/api/homes/") && path.hasSuffix("/public-profile"):
             let body = env["UI_TESTS_HOMES_PUBLIC_BODY"] ?? Self.defaultHomePublicProfileJSON
             finishWith(status: 200, body: Data(body.utf8))
 
-        case ("GET", let path) where path.hasPrefix("/api/homes/") && !path.contains("my-homes"):
+        case let ("GET", path) where path.hasPrefix("/api/homes/") && !path.contains("my-homes"):
             let body = env["UI_TESTS_HOMES_DETAIL_BODY"] ?? Self.defaultHomeDetailJSON
             finishWith(status: 200, body: Data(body.utf8))
 

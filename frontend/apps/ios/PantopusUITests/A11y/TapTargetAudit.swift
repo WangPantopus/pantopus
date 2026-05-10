@@ -10,7 +10,6 @@
 import XCTest
 
 final class TapTargetAudit: XCTestCase {
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }

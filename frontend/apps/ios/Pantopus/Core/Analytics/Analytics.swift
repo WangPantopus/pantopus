@@ -36,20 +36,20 @@ public enum AnalyticsEvent: Sendable, Equatable {
     /// owners depend on these strings.
     public var name: String {
         switch self {
-        case .screenHubViewed: return "screen.hub.viewed"
-        case .screenMailboxListViewed: return "screen.mailbox_list.viewed"
-        case .screenMailboxDrawersViewed: return "screen.mailbox_drawers.viewed"
-        case .screenMyHomesViewed: return "screen.my_homes.viewed"
-        case .screenHomeDashboardViewed: return "screen.home_dashboard.viewed"
-        case .screenMailboxItemDetailViewed: return "screen.mailbox_item_detail.viewed"
-        case .screenEditProfileViewed: return "screen.edit_profile.viewed"
-        case .screenAddHomeWizardStepViewed: return "screen.add_home_wizard.step_viewed"
-        case .ctaHubActionStripTapped: return "cta.hub.action_strip_tapped"
-        case .ctaHubPillarTapped: return "cta.hub.pillar_tapped"
-        case .ctaMailboxItemLogReceived: return "cta.mailbox_item.log_received"
-        case .ctaAddHomeSubmit: return "cta.add_home.submit"
-        case .formEditProfileSubmit: return "form.edit_profile.submit"
-        case .formEditProfileValidationError: return "form.edit_profile.validation_error"
+        case .screenHubViewed: "screen.hub.viewed"
+        case .screenMailboxListViewed: "screen.mailbox_list.viewed"
+        case .screenMailboxDrawersViewed: "screen.mailbox_drawers.viewed"
+        case .screenMyHomesViewed: "screen.my_homes.viewed"
+        case .screenHomeDashboardViewed: "screen.home_dashboard.viewed"
+        case .screenMailboxItemDetailViewed: "screen.mailbox_item_detail.viewed"
+        case .screenEditProfileViewed: "screen.edit_profile.viewed"
+        case .screenAddHomeWizardStepViewed: "screen.add_home_wizard.step_viewed"
+        case .ctaHubActionStripTapped: "cta.hub.action_strip_tapped"
+        case .ctaHubPillarTapped: "cta.hub.pillar_tapped"
+        case .ctaMailboxItemLogReceived: "cta.mailbox_item.log_received"
+        case .ctaAddHomeSubmit: "cta.add_home.submit"
+        case .formEditProfileSubmit: "form.edit_profile.submit"
+        case .formEditProfileValidationError: "form.edit_profile.validation_error"
         }
     }
 
@@ -57,18 +57,18 @@ public enum AnalyticsEvent: Sendable, Equatable {
     /// vendor schema doesn't need nested types.
     public var properties: [String: String] {
         switch self {
-        case .screenMailboxItemDetailViewed(let category, let trustLevel):
-            return ["category": category, "trust_level": trustLevel]
-        case .screenAddHomeWizardStepViewed(let stepNumber, let stepName):
-            return ["step_number": "\(stepNumber)", "step_name": stepName]
-        case .ctaHubActionStripTapped(let label):
-            return ["label": label]
-        case .ctaHubPillarTapped(let pillar):
-            return ["pillar": pillar]
-        case .formEditProfileSubmit(let result):
-            return ["result": result.rawValue]
-        case .formEditProfileValidationError(let field):
-            return ["field": field]
+        case let .screenMailboxItemDetailViewed(category, trustLevel):
+            ["category": category, "trust_level": trustLevel]
+        case let .screenAddHomeWizardStepViewed(stepNumber, stepName):
+            ["step_number": "\(stepNumber)", "step_name": stepName]
+        case let .ctaHubActionStripTapped(label):
+            ["label": label]
+        case let .ctaHubPillarTapped(pillar):
+            ["pillar": pillar]
+        case let .formEditProfileSubmit(result):
+            ["result": result.rawValue]
+        case let .formEditProfileValidationError(field):
+            ["field": field]
         case .screenHubViewed,
              .screenMailboxListViewed,
              .screenMailboxDrawersViewed,
@@ -77,7 +77,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenEditProfileViewed,
              .ctaMailboxItemLogReceived,
              .ctaAddHomeSubmit:
-            return [:]
+            [:]
         }
     }
 }

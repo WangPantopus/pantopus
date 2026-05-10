@@ -32,21 +32,21 @@ public struct UserDTO: Decodable, Sendable, Hashable, Identifiable {
 
     /// Project a rich [`AuthenticatedUser`](x-source-tag://AuthenticatedUser) down to the session shape.
     public init(from authUser: AuthenticatedUser) {
-        self.id = authUser.id
-        self.email = authUser.email
-        self.displayName = authUser.name.isEmpty ? nil : authUser.name
-        self.avatarURL = nil
+        id = authUser.id
+        email = authUser.email
+        displayName = authUser.name.isEmpty ? nil : authUser.name
+        avatarURL = nil
     }
 
     /// Project a full [`UserProfile`](x-source-tag://UserProfile) down to the session shape.
     public init(from profile: UserProfile) {
-        self.id = profile.id
-        self.email = profile.email
-        self.displayName = profile.name
+        id = profile.id
+        email = profile.email
+        displayName = profile.name
         if let raw = profile.avatarURL ?? profile.profilePictureURL, let url = URL(string: raw) {
-            self.avatarURL = url
+            avatarURL = url
         } else {
-            self.avatarURL = nil
+            avatarURL = nil
         }
     }
 }

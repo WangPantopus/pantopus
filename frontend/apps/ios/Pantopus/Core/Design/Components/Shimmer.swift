@@ -62,7 +62,7 @@ public struct Shimmer: View {
             stops: [
                 .init(color: base.opacity(0), location: 0),
                 .init(color: highlight, location: 0.5),
-                .init(color: base.opacity(0), location: 1),
+                .init(color: base.opacity(0), location: 1)
             ],
             startPoint: UnitPoint(x: phase - 1, y: 0.5),
             endPoint: UnitPoint(x: phase, y: 0.5)

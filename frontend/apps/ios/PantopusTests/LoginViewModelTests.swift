@@ -8,7 +8,6 @@ import XCTest
 
 @MainActor
 final class LoginViewModelTests: XCTestCase {
-
     func testCanSubmitRequiresValidEmailAndLongPassword() {
         let vm = LoginViewModel()
 
@@ -36,7 +35,7 @@ final class LoginViewModelTests: XCTestCase {
         XCTAssertFalse(vm.canSubmit)
     }
 
-    func testErrorMessageRenderedOnFailure() async {
+    func testErrorMessageRenderedOnFailure() {
         let vm = LoginViewModel()
         vm.email = "alice@example.com"
         vm.password = "hunter22"

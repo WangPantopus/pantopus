@@ -24,7 +24,7 @@ public struct YouTabRoot: View {
         NavigationStack {
             List {
                 Section("Account") {
-                    if case .signedIn(let user) = auth.state {
+                    if case let .signedIn(user) = auth.state {
                         LabeledContent("Email", value: user.email)
                             .accessibilityLabel("Email: \(user.email)")
                         LabeledContent("User ID", value: user.id)

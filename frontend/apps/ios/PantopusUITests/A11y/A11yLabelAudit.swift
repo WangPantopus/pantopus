@@ -11,7 +11,6 @@
 import XCTest
 
 final class A11yLabelAudit: XCTestCase {
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
@@ -34,7 +33,7 @@ final class A11yLabelAudit: XCTestCase {
             XCTAssertFalse(
                 label.isEmpty,
                 "[\(screenName)] button " +
-                "\(button.identifier.isEmpty ? "<no id>" : button.identifier) has empty accessibility label"
+                    "\(button.identifier.isEmpty ? "<no id>" : button.identifier) has empty accessibility label"
             )
         }
     }

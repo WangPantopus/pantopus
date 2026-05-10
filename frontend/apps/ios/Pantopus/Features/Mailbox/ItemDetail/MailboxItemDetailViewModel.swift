@@ -69,14 +69,16 @@ final class MailboxItemDetailViewModel {
     }
 
     /// Pull-to-refresh / retry.
-    func refresh() async { await fetch() }
+    func refresh() async {
+        await fetch()
+    }
 
     // MARK: - Actions
 
     /// Primary CTA for Package: `PATCH .../status { status: "received" }`
     /// Marks the step as optimistically-done; rolls back on failure.
     func logAsReceived() async {
-        guard case .loaded(var content) = state, !ctaFlags.primaryLoading else { return }
+        guard case var .loaded(content) = state, !ctaFlags.primaryLoading else { return }
         Analytics.track(.ctaMailboxItemLogReceived)
         if !NetworkMonitor.shared.isOnline {
             ctaFlags.errorToast = "You're offline. Try again when you're back online."
@@ -109,7 +111,7 @@ final class MailboxItemDetailViewModel {
             ) as PackageStatusUpdateResponse
             ctaFlags.primaryCompleted = true
         } catch {
-            if case .loaded(var rollback) = state {
+            if case var .loaded(rollback) = state {
                 rollback = MailboxItemDetailContent(
                     category: rollback.category,
                     trust: rollback.trust,
@@ -129,7 +131,7 @@ final class MailboxItemDetailViewModel {
 
     /// Ghost CTA: `POST .../action { action: "not_mine" }`.
     func markNotMine() async {
-        guard case .loaded(let snapshot) = state, !ctaFlags.ghostLoading else { return }
+        guard case let .loaded(snapshot) = state, !ctaFlags.ghostLoading else { return }
         ctaFlags.ghostLoading = true
         do {
             _ = try await api.request(
@@ -208,7 +210,7 @@ final class MailboxItemDetailViewModel {
                 aiElf: nil,
                 keyFacts: [
                     KeyFactRow(label: "Subject", value: item.base.displayTitle ?? item.base.subject ?? "—"),
-                    KeyFactRow(label: "Received", value: item.base.createdAt),
+                    KeyFactRow(label: "Received", value: item.base.createdAt)
                 ],
                 timeline: [],
                 packageInfo: nil,
@@ -282,13 +284,12 @@ final class MailboxItemDetailViewModel {
         let labels = ["Shipped", "In transit", "Out for delivery", "Delivered"]
         let currentIndex = order.firstIndex(of: status) ?? 1
         return zip(order, labels).enumerated().map { index, pair in
-            let state: TimelineStepState
-            if index < currentIndex {
-                state = .done
+            let state: TimelineStepState = if index < currentIndex {
+                .done
             } else if index == currentIndex {
-                state = .current
+                .current
             } else {
-                state = .upcoming
+                .upcoming
             }
             return TimelineStep(id: pair.0, title: pair.1, state: state)
         }
@@ -312,6 +313,6 @@ final class MailboxItemDetailViewModel {
 private extension JSONValue {
     /// Dictionary projection if this case is `.object`.
     var dictValue: [String: JSONValue]? {
-        if case .object(let dict) = self { return dict } else { return nil }
+        if case let .object(dict) = self { dict } else { nil }
     }
 }

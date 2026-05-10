@@ -83,7 +83,6 @@ public struct RootTabView: View {
         )
     }
 
-    @ViewBuilder
     private func tabLabel(_ tab: RootTab) -> some View {
         Label {
             Text(tab.label)

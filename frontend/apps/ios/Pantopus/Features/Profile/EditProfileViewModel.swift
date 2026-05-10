@@ -46,7 +46,7 @@ public enum EditProfileField: String, CaseIterable, Sendable {
     case instagram
     case facebook
 
-    // Visibility
+    /// Visibility
     case profileVisibility
 }
 
@@ -101,7 +101,9 @@ final class EditProfileViewModel {
     }
 
     /// Retry after an error.
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     /// Update a field's value and re-run its validator.
     func update(_ field: EditProfileField, to value: String) {
@@ -120,8 +122,13 @@ final class EditProfileViewModel {
     /// Convenience exposes for `FormShell` so the view doesn't have to
     /// thread `aggregate.isValid` / `aggregate.isDirty` through the call
     /// site.
-    var isValid: Bool { aggregate.isValid }
-    var isDirty: Bool { aggregate.isDirty }
+    var isValid: Bool {
+        aggregate.isValid
+    }
+
+    var isDirty: Bool {
+        aggregate.isDirty
+    }
 
     /// Runs all validators and returns the first failing field id, if any.
     @discardableResult
@@ -179,7 +186,9 @@ final class EditProfileViewModel {
     }
 
     /// Invoked by the view when the dismiss should take effect.
-    func acknowledgeDismiss() { shouldDismiss = false }
+    func acknowledgeDismiss() {
+        shouldDismiss = false
+    }
 
     // MARK: - Private
 
@@ -249,7 +258,7 @@ final class EditProfileViewModel {
             ["public", "registered", "private"].contains(value)
                 ? nil
                 : "Pick a visibility option."
-        },
+        }
     ]
 
     /// Whether the schema explicitly allows an empty / null payload for
@@ -257,7 +266,7 @@ final class EditProfileViewModel {
     /// `backend/routes/users.js:324-351`.
     private static let allowsEmpty: Set<EditProfileField> = [
         .middleName, .bio, .tagline, .dateOfBirth,
-        .website, .linkedin, .twitter, .instagram, .facebook,
+        .website, .linkedin, .twitter, .instagram, .facebook
     ]
 
     // swiftlint:disable cyclomatic_complexity

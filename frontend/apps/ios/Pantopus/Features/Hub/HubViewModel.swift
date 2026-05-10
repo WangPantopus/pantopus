@@ -35,12 +35,14 @@ final class HubViewModel {
     }
 
     /// Pull-to-refresh / retry.
-    func refresh() async { await fetch() }
+    func refresh() async {
+        await fetch()
+    }
 
     /// Dismiss the amber setup banner; persists across launches.
     func dismissSetupBanner() {
         bannerDismissed = true
-        if case .populated(var content) = state {
+        if case var .populated(content) = state {
             content = HubState.PopulatedContent(
                 topBar: content.topBar,
                 actionChips: content.actionChips,
@@ -217,7 +219,7 @@ final class HubViewModel {
                 tint: .home,
                 chip: home.map { $0.newMail > 0 ? "\($0.newMail)" : nil } ?? "Set up",
                 chipSetupState: home == nil
-            ),
+            )
         ]
     }
 
@@ -226,16 +228,16 @@ final class HubViewModel {
             ActionChipContent(kind: .postTask, label: "Post task", icon: .plusCircle, active: true),
             ActionChipContent(kind: .snapAndSell, label: "Snap & sell", icon: .camera, active: false),
             ActionChipContent(kind: .scanMail, label: "Scan mail", icon: .scanLine, active: false),
-            ActionChipContent(kind: .addHome, label: "Add home", icon: .home, active: false),
+            ActionChipContent(kind: .addHome, label: "Add home", icon: .home, active: false)
         ]
     }
 
     private static func pillarTint(for value: String) -> IdentityPillar {
         switch value {
-        case "personal": return .personal
-        case "home": return .home
-        case "business": return .business
-        default: return .personal
+        case "personal": .personal
+        case "home": .home
+        case "business": .business
+        default: .personal
         }
     }
 
@@ -275,6 +277,6 @@ final class HubViewModel {
 private extension JSONValue {
     /// Dictionary projection if this case is `.object`.
     var dictValue: [String: JSONValue]? {
-        if case .object(let dict) = self { return dict } else { return nil }
+        if case let .object(dict) = self { dict } else { nil }
     }
 }

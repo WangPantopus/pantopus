@@ -11,7 +11,6 @@ import XCTest
 
 @MainActor
 final class RetryAndErrorTests: XCTestCase {
-
     override func setUp() {
         super.setUp()
         SequencedURLProtocol.reset()
@@ -34,7 +33,7 @@ final class RetryAndErrorTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(503, body: "{}"),
             .status(503, body: "{}"),
-            .status(200, body: Fixtures.feedJSON),
+            .status(200, body: Fixtures.feedJSON)
         ]
         let client = makeClient(retries: 2)
         let _: FeedResponse = try await client.request(
@@ -47,7 +46,7 @@ final class RetryAndErrorTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(503, body: "{}"),
             .status(503, body: "{}"),
-            .status(503, body: "{}"),
+            .status(503, body: "{}")
         ]
         let client = makeClient(retries: 2)
         do {
@@ -55,7 +54,7 @@ final class RetryAndErrorTests: XCTestCase {
                 Endpoint(method: .get, path: "/api/posts", authenticated: false)
             )
             XCTFail("Expected server error after retries exhausted")
-        } catch APIError.server(let status, _) {
+        } catch let APIError.server(status, _) {
             XCTAssertEqual(status, 503)
             XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 3)
         } catch {
@@ -65,7 +64,7 @@ final class RetryAndErrorTests: XCTestCase {
 
     func testNonIdempotentPOSTDoesNotRetry() async {
         SequencedURLProtocol.sequence = [
-            .status(503, body: "{}"),
+            .status(503, body: "{}")
         ]
         let client = makeClient(retries: 2)
         do {
@@ -123,7 +122,7 @@ final class RetryAndErrorTests: XCTestCase {
                 Endpoint(method: .get, path: "/api/posts", authenticated: false)
             )
             XCTFail("Expected clientError")
-        } catch APIError.clientError(let status, _) {
+        } catch let APIError.clientError(status, _) {
             XCTAssertEqual(status, 422)
         } catch {
             XCTFail("Expected APIError.clientError, got \(error)")

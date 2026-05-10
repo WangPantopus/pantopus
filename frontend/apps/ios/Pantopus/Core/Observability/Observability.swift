@@ -74,7 +74,7 @@ final class Observability {
         "address", "street", "streetaddress", "street_address",
         "city", "state", "zip", "zipcode", "zip_code", "postalcode", "postal_code",
         "fullname", "name", "firstname", "first_name", "lastname", "last_name",
-        "password", "token", "authorization", "auth", "secret",
+        "password", "token", "authorization", "auth", "secret"
     ]
 
     private static let redacted = "[redacted]"
@@ -119,7 +119,7 @@ final class Observability {
         var result = value
         let patterns = [
             #"[\w.+-]+@[\w-]+\.[\w.-]+"#,
-            #"\+?\d[\d\s().-]{7,}"#,
+            #"\+?\d[\d\s().-]{7,}"#
         ]
         for pattern in patterns {
             if let regex = try? NSRegularExpression(pattern: pattern) {
@@ -170,7 +170,7 @@ final class Observability {
     func track(_ name: String, properties: [String: String] = [:]) {
         logger.info("analytics", metadata: [
             "event": .string(name),
-            "props": .string(properties.description),
+            "props": .string(properties.description)
         ])
         guard isStarted else { return }
         let crumb = Breadcrumb(level: .info, category: "analytics")

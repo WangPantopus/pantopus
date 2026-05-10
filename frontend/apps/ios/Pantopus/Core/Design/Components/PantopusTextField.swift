@@ -41,7 +41,7 @@ public struct PantopusTextField: View {
         identifier: String? = nil
     ) {
         self.label = label
-        self._text = text
+        _text = text
         self.placeholder = placeholder
         self.state = state
         self.isSecure = isSecure
@@ -69,7 +69,7 @@ public struct PantopusTextField: View {
                     .stroke(borderColor, lineWidth: isFocused ? 2 : 1)
             )
 
-            if case .error(let message) = state {
+            if case let .error(message) = state {
                 Text(message)
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.error)
@@ -112,7 +112,7 @@ public struct PantopusTextField: View {
 
     private var a11yLabel: String {
         switch state {
-        case .error(let msg): "\(label), error: \(msg)"
+        case let .error(msg): "\(label), error: \(msg)"
         case .valid: "\(label), valid"
         case .default: label
         }

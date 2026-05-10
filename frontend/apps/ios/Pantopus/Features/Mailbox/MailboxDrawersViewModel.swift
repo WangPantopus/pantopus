@@ -13,12 +13,18 @@ import Observation
 @Observable
 @MainActor
 final class MailboxDrawersViewModel: ListOfRowsDataSource {
-    public let title = "Mailbox"
-    public var topBarAction: TopBarAction? { nil }
-    public let tabs: [ListOfRowsTab] = []
-    public var selectedTab: String = ""
-    public var fab: FABAction? { nil }
-    public private(set) var state: ListOfRowsState = .loading
+    let title = "Mailbox"
+    var topBarAction: TopBarAction? {
+        nil
+    }
+
+    let tabs: [ListOfRowsTab] = []
+    var selectedTab: String = ""
+    var fab: FABAction? {
+        nil
+    }
+
+    private(set) var state: ListOfRowsState = .loading
 
     private let api: APIClient
     private let onOpenDrawer: (String) -> Void
@@ -28,13 +34,17 @@ final class MailboxDrawersViewModel: ListOfRowsDataSource {
         self.onOpenDrawer = onOpenDrawer
     }
 
-    public func load() async {
+    func load() async {
         if case .loaded = state { return }
         state = .loading
         await fetch()
     }
-    public func refresh() async { await fetch() }
-    public func loadMoreIfNeeded() async {} // drawers are a fixed set.
+
+    func refresh() async {
+        await fetch()
+    }
+
+    func loadMoreIfNeeded() async {} // drawers are a fixed set.
 
     private func fetch() async {
         do {
@@ -59,24 +69,20 @@ final class MailboxDrawersViewModel: ListOfRowsDataSource {
     }
 
     private func row(for drawer: DrawerListResponse.Drawer) -> RowModel {
-        let subtitle: String? = {
-            switch (drawer.unreadCount, drawer.urgentCount) {
-            case (0, 0): return nil
-            case (let unread, 0): return "\(unread) unread"
-            case (0, let urgent): return "\(urgent) urgent"
-            case (let unread, let urgent): return "\(unread) unread · \(urgent) urgent"
-            }
-        }()
+        let subtitle: String? = switch (drawer.unreadCount, drawer.urgentCount) {
+        case (0, 0): nil
+        case let (unread, 0): "\(unread) unread"
+        case let (0, urgent): "\(urgent) urgent"
+        case let (unread, urgent): "\(unread) unread · \(urgent) urgent"
+        }
 
-        let icon: PantopusIcon = {
-            switch drawer.drawer {
-            case "personal": .user
-            case "home": .home
-            case "business": .shoppingBag
-            case "earn": .megaphone
-            default: .inbox
-            }
-        }()
+        let icon: PantopusIcon = switch drawer.drawer {
+        case "personal": .user
+        case "home": .home
+        case "business": .shoppingBag
+        case "earn": .megaphone
+        default: .inbox
+        }
 
         return RowModel(
             id: drawer.id,

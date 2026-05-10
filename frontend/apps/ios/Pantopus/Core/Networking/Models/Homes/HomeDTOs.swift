@@ -65,19 +65,21 @@ public struct MyHome: Decodable, Sendable, Hashable, Identifiable {
     public let isPrimaryOwner: Bool?
     public let pendingClaimId: String?
 
-    public var id: String { home.id }
+    public var id: String {
+        home.id
+    }
 
-    // Backend returns these as siblings on the home row, not a nested
-    // object; we decode the Home fields via a custom init so the outer
-    // response shape stays flat.
+    /// Backend returns these as siblings on the home row, not a nested
+    /// object; we decode the Home fields via a custom init so the outer
+    /// response shape stays flat.
     public init(from decoder: Decoder) throws {
-        self.home = try HomeDTO(from: decoder)
+        home = try HomeDTO(from: decoder)
         let container = try decoder.container(keyedBy: FlatKeys.self)
-        self.occupancy = try container.decodeIfPresent(HomeOccupancy.self, forKey: .occupancy)
-        self.ownershipStatus = try container.decodeIfPresent(String.self, forKey: .ownershipStatus)
-        self.verificationTier = try container.decodeIfPresent(String.self, forKey: .verificationTier)
-        self.isPrimaryOwner = try container.decodeIfPresent(Bool.self, forKey: .isPrimaryOwner)
-        self.pendingClaimId = try container.decodeIfPresent(String.self, forKey: .pendingClaimId)
+        occupancy = try container.decodeIfPresent(HomeOccupancy.self, forKey: .occupancy)
+        ownershipStatus = try container.decodeIfPresent(String.self, forKey: .ownershipStatus)
+        verificationTier = try container.decodeIfPresent(String.self, forKey: .verificationTier)
+        isPrimaryOwner = try container.decodeIfPresent(Bool.self, forKey: .isPrimaryOwner)
+        pendingClaimId = try container.decodeIfPresent(String.self, forKey: .pendingClaimId)
     }
 
     private enum FlatKeys: String, CodingKey {
@@ -114,17 +116,17 @@ public struct HomeDetail: Decodable, Sendable, Hashable {
     public let canDeleteHome: Bool
 
     public init(from decoder: Decoder) throws {
-        self.base = try HomeDTO(from: decoder)
+        base = try HomeDTO(from: decoder)
         let c = try decoder.container(keyedBy: FlatKeys.self)
-        self.owner = try c.decodeIfPresent(HomeUserRef.self, forKey: .owner)
-        self.occupants = try c.decodeIfPresent([HomeOccupant].self, forKey: .occupants) ?? []
-        self.location = try c.decodeIfPresent(HomeLocation.self, forKey: .location)
-        self.isOwner = try c.decodeIfPresent(Bool.self, forKey: .isOwner) ?? false
-        self.isPendingOwner = try c.decodeIfPresent(Bool.self, forKey: .isPendingOwner) ?? false
-        self.pendingClaimId = try c.decodeIfPresent(String.self, forKey: .pendingClaimId)
-        self.isOccupant = try c.decodeIfPresent(Bool.self, forKey: .isOccupant) ?? false
-        self.owners = try c.decodeIfPresent([HomeOwnershipRef].self, forKey: .owners) ?? []
-        self.canDeleteHome = try c.decodeIfPresent(Bool.self, forKey: .canDeleteHome) ?? false
+        owner = try c.decodeIfPresent(HomeUserRef.self, forKey: .owner)
+        occupants = try c.decodeIfPresent([HomeOccupant].self, forKey: .occupants) ?? []
+        location = try c.decodeIfPresent(HomeLocation.self, forKey: .location)
+        isOwner = try c.decodeIfPresent(Bool.self, forKey: .isOwner) ?? false
+        isPendingOwner = try c.decodeIfPresent(Bool.self, forKey: .isPendingOwner) ?? false
+        pendingClaimId = try c.decodeIfPresent(String.self, forKey: .pendingClaimId)
+        isOccupant = try c.decodeIfPresent(Bool.self, forKey: .isOccupant) ?? false
+        owners = try c.decodeIfPresent([HomeOwnershipRef].self, forKey: .owners) ?? []
+        canDeleteHome = try c.decodeIfPresent(Bool.self, forKey: .canDeleteHome) ?? false
     }
 
     private enum FlatKeys: String, CodingKey {
@@ -414,9 +416,10 @@ public struct CheckAddressResponse: Decodable, Sendable, Hashable {
 /// defined server-side (e.g. ATTOM property details).
 public struct JSONEncodable: Encodable, Sendable {
     private let encodeClosure: @Sendable (Encoder) throws -> Void
-    public init<T: Encodable & Sendable>(_ wrapped: T) {
-        self.encodeClosure = wrapped.encode
+    public init(_ wrapped: some Encodable & Sendable) {
+        encodeClosure = wrapped.encode
     }
+
     public func encode(to encoder: Encoder) throws {
         try encodeClosure(encoder)
     }

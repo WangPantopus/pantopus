@@ -11,7 +11,6 @@ import XCTest
 
 @MainActor
 final class HubViewModelTests: XCTestCase {
-
     override func setUp() {
         super.setUp()
         SequencedURLProtocol.reset()
@@ -66,13 +65,14 @@ final class HubViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: populatedHubJSON()),
             .status(200, body: "{\"today\":null}"),
-            .status(200, body: "{\"items\":[]}"),
+            .status(200, body: "{\"items\":[]}")
         ]
         let vm = makeVM()
         XCTAssertEqual(isSkeleton(vm.state), true)
         await vm.load()
-        guard case .populated(let content) = vm.state else {
-            XCTFail("Expected populated, got \(vm.state)"); return
+        guard case let .populated(content) = vm.state else {
+            XCTFail("Expected populated, got \(vm.state)")
+            return
         }
         XCTAssertEqual(content.topBar.name, "Alice")
         XCTAssertEqual(content.pillars.count, 4)
@@ -82,12 +82,13 @@ final class HubViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: populatedHubJSON(allDone: false, score: 0.2, homeCount: 0)),
             .status(200, body: "{\"today\":null}"),
-            .status(200, body: "{\"items\":[]}"),
+            .status(200, body: "{\"items\":[]}")
         ]
         let vm = makeVM()
         await vm.load()
-        guard case .firstRun(let content) = vm.state else {
-            XCTFail("Expected firstRun, got \(vm.state)"); return
+        guard case let .firstRun(content) = vm.state else {
+            XCTFail("Expected firstRun, got \(vm.state)")
+            return
         }
         XCTAssertEqual(content.profileCompleteness, 0.2, accuracy: 0.001)
     }
@@ -97,16 +98,18 @@ final class HubViewModelTests: XCTestCase {
             .status(500, body: "{}"),
             .status(200, body: populatedHubJSON()),
             .status(200, body: "{\"today\":null}"),
-            .status(200, body: "{\"items\":[]}"),
+            .status(200, body: "{\"items\":[]}")
         ]
         let vm = makeVM()
         await vm.load()
         guard case .error = vm.state else {
-            XCTFail("Expected error, got \(vm.state)"); return
+            XCTFail("Expected error, got \(vm.state)")
+            return
         }
         await vm.refresh()
         guard case .populated = vm.state else {
-            XCTFail("Expected populated after retry, got \(vm.state)"); return
+            XCTFail("Expected populated after retry, got \(vm.state)")
+            return
         }
     }
 
@@ -114,18 +117,20 @@ final class HubViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: populatedHubJSON(allDone: false, score: 0.9, homeCount: 1)),
             .status(200, body: "{\"today\":null}"),
-            .status(200, body: "{\"items\":[]}"),
+            .status(200, body: "{\"items\":[]}")
         ]
         let vm = makeVM()
         await vm.load()
-        guard case .populated(let content) = vm.state else {
-            XCTFail("Expected populated, got \(vm.state)"); return
+        guard case let .populated(content) = vm.state else {
+            XCTFail("Expected populated, got \(vm.state)")
+            return
         }
         XCTAssertNotNil(content.setupBanner, "Banner should show when setup not done")
 
         vm.dismissSetupBanner()
-        guard case .populated(let updated) = vm.state else {
-            XCTFail("Expected populated after dismiss, got \(vm.state)"); return
+        guard case let .populated(updated) = vm.state else {
+            XCTFail("Expected populated after dismiss, got \(vm.state)")
+            return
         }
         XCTAssertNil(updated.setupBanner, "Banner should be hidden after dismiss")
     }
@@ -133,6 +138,6 @@ final class HubViewModelTests: XCTestCase {
     // MARK: - Helpers
 
     private func isSkeleton(_ state: HubState) -> Bool {
-        if case .skeleton = state { return true } else { return false }
+        if case .skeleton = state { true } else { false }
     }
 }

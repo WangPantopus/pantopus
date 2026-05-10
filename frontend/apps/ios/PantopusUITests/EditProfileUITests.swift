@@ -12,7 +12,6 @@
 import XCTest
 
 final class EditProfileUITests: XCTestCase {
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
@@ -93,7 +92,7 @@ final class EditProfileUITests: XCTestCase {
         let firstName = field("field_firstName", in: app)
         XCTAssertTrue(firstName.waitForExistence(timeout: 3))
         firstName.tap()
-        firstName.typeText("ander")  // "Alice" → "Aliceander"
+        firstName.typeText("ander") // "Alice" → "Aliceander"
 
         let save = app.buttons["formCommitButton"]
         XCTAssertTrue(save.waitForExistence(timeout: 1))

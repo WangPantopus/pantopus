@@ -22,53 +22,55 @@ public enum PantopusTextStyle: Sendable {
     /// Font point size.
     public var size: CGFloat {
         switch self {
-        case .h1: return 30
-        case .h2: return 24
-        case .h3: return 20
-        case .body: return 16
-        case .small: return 14
-        case .caption: return 12
-        case .overline: return 11
+        case .h1: 30
+        case .h2: 24
+        case .h3: 20
+        case .body: 16
+        case .small: 14
+        case .caption: 12
+        case .overline: 11
         }
     }
 
     /// Target line height, in points.
     public var lineHeight: CGFloat {
         switch self {
-        case .h1: return 36
-        case .h2: return 32
-        case .h3: return 28
-        case .body: return 24
-        case .small: return 20
-        case .caption: return 16
-        case .overline: return 16
+        case .h1: 36
+        case .h2: 32
+        case .h3: 28
+        case .body: 24
+        case .small: 20
+        case .caption: 16
+        case .overline: 16
         }
     }
 
     /// Font weight.
     public var weight: Font.Weight {
         switch self {
-        case .h1: return .bold
-        case .h2, .h3, .overline: return .semibold
-        case .body, .small, .caption: return .regular
+        case .h1: .bold
+        case .h2, .h3, .overline: .semibold
+        case .body, .small, .caption: .regular
         }
     }
 
     /// Letter-spacing in points (CSS `em` × size).
     public var tracking: CGFloat {
         switch self {
-        case .h1: return -0.020 * 30
-        case .h2: return -0.015 * 24
-        case .h3: return 0
-        case .body: return 0
-        case .small: return 0
-        case .caption: return 0
-        case .overline: return 0.06 * 11
+        case .h1: -0.020 * 30
+        case .h2: -0.015 * 24
+        case .h3: 0
+        case .body: 0
+        case .small: 0
+        case .caption: 0
+        case .overline: 0.06 * 11
         }
     }
 
     /// Whether the role enforces upper-casing.
-    public var uppercased: Bool { self == .overline }
+    public var uppercased: Bool {
+        self == .overline
+    }
 }
 
 public extension Theme.Font {
@@ -90,13 +92,13 @@ public extension Theme.Font {
     /// Resolve the system `Font` for a given role.
     static func role(_ role: PantopusTextStyle) -> Font {
         switch role {
-        case .h1: return h1
-        case .h2: return h2
-        case .h3: return h3
-        case .body: return body
-        case .small: return small
-        case .caption: return caption
-        case .overline: return overline
+        case .h1: h1
+        case .h2: h2
+        case .h3: h3
+        case .body: body
+        case .small: small
+        case .caption: caption
+        case .overline: overline
         }
     }
 }
@@ -110,7 +112,7 @@ public extension Text {
     func pantopusTextStyle(_ style: PantopusTextStyle) -> Text {
         var text = self
         if style.uppercased {
-            text = Text(verbatim: self.stringValue.uppercased())
+            text = Text(verbatim: stringValue.uppercased())
         }
         return text
             .font(Theme.Font.role(style))
@@ -119,7 +121,7 @@ public extension Text {
 
     /// Best-effort extraction of a `Text`'s string value. Falls back to empty
     /// when the `Text` is built from a formatter or attributed source.
-    fileprivate var stringValue: String {
+    private var stringValue: String {
         // Mirror is the only reliable way; `Text` has no public accessor.
         for child in Mirror(reflecting: self).children {
             if let s = child.value as? String { return s }
@@ -132,6 +134,6 @@ public extension View {
     /// Apply line spacing that approximates the role's CSS line-height
     /// (`lineHeight - size`). Apply on the `View` wrapping the `Text`.
     func pantopusLineHeight(_ style: PantopusTextStyle) -> some View {
-        self.lineSpacing(style.lineHeight - style.size)
+        lineSpacing(style.lineHeight - style.size)
     }
 }

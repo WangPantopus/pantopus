@@ -57,11 +57,10 @@ public struct WizardShell<Content: View>: View {
 
     @ViewBuilder
     private func progressBar(fraction: Double) -> some View {
-        let segmentCount: Int
-        if case .stepOf(_, let total) = model.chrome.progressLabel {
-            segmentCount = max(1, total)
+        let segmentCount: Int = if case let .stepOf(_, total) = model.chrome.progressLabel {
+            max(1, total)
         } else {
-            segmentCount = 1
+            1
         }
         let filled = Int((Double(segmentCount) * fraction).rounded())
         SegmentedProgressBar(filled: filled, total: segmentCount)
@@ -70,7 +69,6 @@ public struct WizardShell<Content: View>: View {
             .background(Theme.Color.appSurface)
     }
 
-    @ViewBuilder
     private func stickyCTA(chrome: WizardChrome) -> some View {
         VStack(spacing: 0) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
@@ -131,7 +129,7 @@ private struct WizardTopBar: View {
                 .accessibilityIdentifier("wizardLeadingButton")
                 Spacer()
                 Group {
-                    if case .stepOf(let current, let total) = progressLabel {
+                    if case let .stepOf(current, total) = progressLabel {
                         Text("\(current) of \(total)")
                             .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
@@ -153,15 +151,15 @@ private struct WizardTopBar: View {
 
     private var leadingIcon: PantopusIcon {
         switch leading {
-        case .close: return .x
-        case .back: return .chevronLeft
+        case .close: .x
+        case .back: .chevronLeft
         }
     }
 
     private var leadingA11y: String {
         switch leading {
-        case .close: return "Close"
-        case .back: return "Back"
+        case .close: "Close"
+        case .back: "Back"
         }
     }
 }

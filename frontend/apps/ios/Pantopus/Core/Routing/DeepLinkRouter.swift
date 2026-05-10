@@ -33,11 +33,11 @@ final class DeepLinkRouter {
         let destination = resolve(url: url)
         logger.info("deeplink", metadata: [
             "url": .string(url.absoluteString),
-            "destination": .string("\(destination)"),
+            "destination": .string("\(destination)")
         ])
         pending = destination
         Observability.shared.track("deeplink.received", properties: [
-            "url": url.absoluteString,
+            "url": url.absoluteString
         ])
     }
 

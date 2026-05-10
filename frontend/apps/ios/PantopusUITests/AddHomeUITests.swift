@@ -12,7 +12,6 @@
 import XCTest
 
 final class AddHomeUITests: XCTestCase {
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
@@ -82,7 +81,7 @@ final class AddHomeUITests: XCTestCase {
             ("addHome_street", "412 Elm St"),
             ("addHome_city", "Portland"),
             ("addHome_state", "OR"),
-            ("addHome_zip", "97214"),
+            ("addHome_zip", "97214")
         ] {
             let field = app.descendants(matching: .any).matching(identifier: id).firstMatch
             XCTAssertTrue(field.waitForExistence(timeout: 3), "Missing \(id)")
@@ -93,21 +92,21 @@ final class AddHomeUITests: XCTestCase {
         let primary = app.buttons["wizardPrimaryCTA"]
         XCTAssertTrue(primary.waitForExistence(timeout: 1))
         XCTAssertTrue(primary.isEnabled)
-        primary.tap()  // → step 2
+        primary.tap() // → step 2
 
         // Step 2 — confirm. Tap continue without changing the toggle.
         XCTAssertTrue(primary.waitForExistence(timeout: 5))
-        primary.tap()  // → step 3
+        primary.tap() // → step 3
 
         // Step 3 — pick "Owner".
         let ownerOption = app.descendants(matching: .any)
             .matching(identifier: "addHome_role_owner").firstMatch
         XCTAssertTrue(ownerOption.waitForExistence(timeout: 3))
         ownerOption.tap()
-        primary.tap()  // → step 4
+        primary.tap() // → step 4
 
         // Step 4 — submit.
-        primary.tap()  // → success
+        primary.tap() // → success
 
         // Success hero is visible.
         let hero = app.descendants(matching: .any)

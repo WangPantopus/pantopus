@@ -173,7 +173,7 @@ private struct Shaker: GeometryEffect {
         set { animatable = newValue }
     }
 
-    func effectValue(size: CGSize) -> ProjectionTransform {
+    func effectValue(size _: CGSize) -> ProjectionTransform {
         guard enabled else { return ProjectionTransform(.identity) }
         let phase = sin(animatable * .pi * 3) * 1
         return ProjectionTransform(CGAffineTransform(translationX: phase, y: 0))

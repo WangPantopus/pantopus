@@ -12,16 +12,16 @@
 //  twelve near-identical file headers.
 //
 
-import XCTest
 import SwiftUI
 import UIKit
+import XCTest
 @testable import Pantopus
 
 @MainActor
 final class ComponentRenderTests: XCTestCase {
-    private func assertRenders<Content: View>(
+    private func assertRenders(
         _ label: String,
-        @ViewBuilder _ view: () -> Content,
+        @ViewBuilder _ view: () -> some View,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
@@ -32,7 +32,9 @@ final class ComponentRenderTests: XCTestCase {
         XCTAssertNotNil(host.view, "\(label) failed to build", file: file, line: line)
     }
 
-    func testShimmerRenders() { assertRenders("Shimmer") { Shimmer(width: 120, height: 12) } }
+    func testShimmerRenders() {
+        assertRenders("Shimmer") { Shimmer(width: 120, height: 12) }
+    }
 
     func testEmptyStateRenders() {
         assertRenders("EmptyState") {
@@ -80,7 +82,7 @@ final class ComponentRenderTests: XCTestCase {
 
     func testStatusChipRenders() {
         let variants: [StatusChipVariant] = [
-            .success, .warning, .error, .info, .personal, .home, .business, .neutral,
+            .success, .warning, .error, .info, .personal, .home, .business, .neutral
         ]
         for variant in variants {
             assertRenders("StatusChip \(variant)") {
@@ -93,7 +95,7 @@ final class ComponentRenderTests: XCTestCase {
         assertRenders("KeyFactsPanel") {
             KeyFactsPanel(rows: [
                 KeyFactRow(label: "Code", value: "PAN-1", isCode: true),
-                KeyFactRow(label: "Status", value: "Delivered"),
+                KeyFactRow(label: "Status", value: "Delivered")
             ])
         }
     }
@@ -103,7 +105,7 @@ final class ComponentRenderTests: XCTestCase {
             TimelineStepper(steps: [
                 .init(title: "Step 1", state: .done),
                 .init(title: "Step 2", state: .current),
-                .init(title: "Step 3", state: .upcoming),
+                .init(title: "Step 3", state: .upcoming)
             ])
         }
     }
@@ -129,9 +131,9 @@ final class ComponentRenderTests: XCTestCase {
         }
     }
 
-    // Reduced-motion contract — when the trait is on, Shimmer & timeline
-    // pulse collapse to static. We verify by rendering with a trait override
-    // and asserting no crash; visual verification lives in previews.
+    /// Reduced-motion contract — when the trait is on, Shimmer & timeline
+    /// pulse collapse to static. We verify by rendering with a trait override
+    /// and asserting no crash; visual verification lives in previews.
     func testShimmerRespectsReduceMotion() {
         let host = UIHostingController(rootView: Shimmer(width: 100, height: 10))
         host.setOverrideTraitCollection(

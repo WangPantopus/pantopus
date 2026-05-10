@@ -25,7 +25,7 @@ public struct EditProfileView: View {
                     .background(Theme.Color.appBg)
             case .loaded:
                 loaded
-            case .error(let message):
+            case let .error(message):
                 EmptyState(
                     icon: .alertCircle,
                     headline: "Couldn't load profile",
@@ -64,7 +64,7 @@ public struct EditProfileView: View {
         }
     }
 
-    @ViewBuilder private var loaded: some View {
+    private var loaded: some View {
         FormShell(
             title: "Edit profile",
             isValid: viewModel.isValid,
@@ -86,7 +86,7 @@ public struct EditProfileView: View {
 
     // MARK: - Sections
 
-    @ViewBuilder private var aboutSection: some View {
+    private var aboutSection: some View {
         // TODO(backend): Edit Profile design also calls for an avatar
         // upload (tap to replace). `updateProfileSchema` has no avatar
         // field, so omit per P10 rules.
@@ -99,7 +99,7 @@ public struct EditProfileView: View {
         }
     }
 
-    @ViewBuilder private var contactSection: some View {
+    private var contactSection: some View {
         FormFieldGroup("Contact") {
             // TODO(backend): the Edit Profile design says email should be
             // editable when `verified == false`. `updateProfileSchema`
@@ -116,7 +116,7 @@ public struct EditProfileView: View {
         }
     }
 
-    @ViewBuilder private var addressSection: some View {
+    private var addressSection: some View {
         FormFieldGroup("Address") {
             textField(
                 .address,
@@ -136,7 +136,7 @@ public struct EditProfileView: View {
         }
     }
 
-    @ViewBuilder private var socialSection: some View {
+    private var socialSection: some View {
         FormFieldGroup("Social") {
             textField(
                 .website,
@@ -152,7 +152,7 @@ public struct EditProfileView: View {
         }
     }
 
-    @ViewBuilder private var visibilitySection: some View {
+    private var visibilitySection: some View {
         // TODO(backend): the Edit Profile design specifies boolean
         // toggles `profile_visibility_public` and
         // `show_in_neighbor_discovery`. The schema only has the 3-way
@@ -190,7 +190,7 @@ public struct EditProfileView: View {
         )
     }
 
-    @ViewBuilder private var taglineField: some View {
+    private var taglineField: some View {
         textField(
             .tagline,
             label: "Tagline (optional)",
@@ -276,7 +276,7 @@ public struct EditProfileView: View {
         }
     }
 
-    @ViewBuilder private var readOnlyEmail: some View {
+    private var readOnlyEmail: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
             Text("Email")
                 .pantopusTextStyle(.caption)

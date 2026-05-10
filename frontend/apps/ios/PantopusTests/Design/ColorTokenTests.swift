@@ -7,13 +7,12 @@
 //  assert that they match the expected hex to 3 decimals of precision.
 //
 
-import XCTest
 import SwiftUI
 import UIKit
+import XCTest
 @testable import Pantopus
 
 final class ColorTokenTests: XCTestCase {
-
     private let lightTraits = UITraitCollection(userInterfaceStyle: .light)
 
     // MARK: - Primary
@@ -112,9 +111,9 @@ final class ColorTokenTests: XCTestCase {
         var s = hex
         if s.hasPrefix("#") { s.removeFirst() }
         let value = UInt64(s, radix: 16) ?? 0
-        let r = Double((value >> 16) & 0xff) / 255.0
-        let g = Double((value >> 8) & 0xff) / 255.0
-        let b = Double(value & 0xff) / 255.0
+        let r = Double((value >> 16) & 0xFF) / 255.0
+        let g = Double((value >> 8) & 0xFF) / 255.0
+        let b = Double(value & 0xFF) / 255.0
         // Round to 3 decimals to mirror the asset-catalog precision.
         return RGBComponents(
             r: (r * 1000).rounded() / 1000,

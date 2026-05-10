@@ -45,19 +45,19 @@ final class AppEnvironment {
 
         switch target {
         case .local:
-            self.apiBaseURL = Self.mustURL("http://localhost:8000")
-            self.socketURL = Self.mustURL("http://localhost:8000")
+            apiBaseURL = Self.mustURL("http://localhost:8000")
+            socketURL = Self.mustURL("http://localhost:8000")
         case .staging:
-            self.apiBaseURL = Self.mustURL("https://staging.api.pantopus.app")
-            self.socketURL = Self.mustURL("https://staging.api.pantopus.app")
+            apiBaseURL = Self.mustURL("https://staging.api.pantopus.app")
+            socketURL = Self.mustURL("https://staging.api.pantopus.app")
         case .production:
-            self.apiBaseURL = Self.mustURL("https://api.pantopus.app")
-            self.socketURL = Self.mustURL("https://api.pantopus.app")
+            apiBaseURL = Self.mustURL("https://api.pantopus.app")
+            socketURL = Self.mustURL("https://api.pantopus.app")
         }
 
         // Stripe publishable key — read from Info.plist so it can be injected
         // per-configuration via xcconfig. Never commit a real key here.
-        self.stripePublishableKey = Bundle.main.object(forInfoDictionaryKey: "StripePublishableKey") as? String ?? ""
+        stripePublishableKey = Bundle.main.object(forInfoDictionaryKey: "StripePublishableKey") as? String ?? ""
     }
 
     private static func mustURL(_ string: String) -> URL {

@@ -42,9 +42,9 @@ public enum APIError: Error, LocalizedError, Sendable {
         case .unauthorized: "Your session has expired. Please sign in again."
         case .forbidden: "You don't have permission to do that."
         case .notFound: "We couldn't find what you were looking for."
-        case .clientError(let status, let message):
+        case let .clientError(status, message):
             message ?? "Request failed (\(status))."
-        case .server(let status, _): "Server error \(status). Please try again."
+        case let .server(status, _): "Server error \(status). Please try again."
         case .transport: "Can't reach Pantopus. Check your connection."
         case .decoding: "Received an unexpected response."
         case .retriesExhausted: "The server is having trouble. Please try again."
@@ -54,15 +54,15 @@ public enum APIError: Error, LocalizedError, Sendable {
     /// Whether this error is worth retrying on an idempotent request.
     public var isTransient: Bool {
         switch self {
-        case .server(let status, _): (500...599).contains(status) && status != 501
-        case .transport(let err): Self.transientURLErrors.contains(err.code)
+        case let .server(status, _): (500...599).contains(status) && status != 501
+        case let .transport(err): Self.transientURLErrors.contains(err.code)
         default: false
         }
     }
 
     private static let transientURLErrors: Set<URLError.Code> = [
         .timedOut, .cannotFindHost, .cannotConnectToHost,
-        .networkConnectionLost, .dnsLookupFailed, .notConnectedToInternet,
+        .networkConnectionLost, .dnsLookupFailed, .notConnectedToInternet
     ]
 }
 

@@ -80,7 +80,7 @@ public struct ComponentGalleryView: View {
                     KeyFactsPanel(rows: [
                         KeyFactRow(label: "Order ID", value: "PAN-48291", isCode: true),
                         KeyFactRow(label: "Placed", value: "Mar 18"),
-                        KeyFactRow(label: "Status", value: "Out for delivery"),
+                        KeyFactRow(label: "Status", value: "Out for delivery")
                     ])
                 }
                 section("Timeline stepper") {
@@ -88,7 +88,7 @@ public struct ComponentGalleryView: View {
                         .init(title: "Order placed", subtitle: "Mar 17", state: .done),
                         .init(title: "In transit", subtitle: "Mar 18", state: .done),
                         .init(title: "Out for delivery", subtitle: "Today", state: .current),
-                        .init(title: "Delivered", state: .upcoming),
+                        .init(title: "Delivered", state: .upcoming)
                     ])
                 }
                 section("Text field") {
@@ -109,7 +109,6 @@ public struct ComponentGalleryView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    @ViewBuilder
     private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             SectionHeader(title)

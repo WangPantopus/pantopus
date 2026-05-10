@@ -14,7 +14,7 @@ final class PantopusUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testLaunchLandsOnLogin() throws {
+    func testLaunchLandsOnLogin() {
         let app = XCUIApplication()
         app.launch()
         XCTAssertTrue(app.waitForExistence(timeout: 10))
@@ -25,7 +25,7 @@ final class PantopusUITests: XCTestCase {
         XCTAssertTrue(app.secureTextFields["loginPasswordField"].exists)
     }
 
-    func testSignInButtonDisabledWithEmptyFields() throws {
+    func testSignInButtonDisabledWithEmptyFields() {
         let app = XCUIApplication()
         app.launch()
         let button = app.buttons["loginSubmitButton"]
@@ -33,7 +33,7 @@ final class PantopusUITests: XCTestCase {
         XCTAssertFalse(button.isEnabled)
     }
 
-    func testSignInButtonEnablesOnceFormIsValid() throws {
+    func testSignInButtonEnablesOnceFormIsValid() {
         let app = XCUIApplication()
         app.launch()
 

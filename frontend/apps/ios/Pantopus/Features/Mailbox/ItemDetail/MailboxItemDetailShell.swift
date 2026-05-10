@@ -104,7 +104,7 @@ public struct MailboxItemDetailShell<CategoryBodyView: View>: View {
         self.onAIChip = onAIChip
         self.onPrimary = onPrimary
         self.onGhost = onGhost
-        self.bodyContent = body()
+        bodyContent = body()
     }
 
     public var body: some View {
@@ -131,7 +131,7 @@ public struct MailboxItemDetailShell<CategoryBodyView: View>: View {
                         TimelineStepper(steps: timeline)
                             .padding(.horizontal, Spacing.s4)
                     }
-                    self.bodyContent
+                    bodyContent
                     Spacer(minLength: 120)
                 }
                 .padding(.vertical, Spacing.s4)
@@ -150,7 +150,10 @@ public struct MailboxItemDetailShell<CategoryBodyView: View>: View {
 /// 4pt horizontal accent strip at the top of every mailbox detail.
 public struct AccentStrip: View {
     public let category: MailItemCategory
-    public init(category: MailItemCategory) { self.category = category }
+    public init(category: MailItemCategory) {
+        self.category = category
+    }
+
     public var body: some View {
         Rectangle().fill(category.accent).frame(height: 4).accessibilityHidden(true)
     }
@@ -159,7 +162,10 @@ public struct AccentStrip: View {
 /// Pill showing the sender's trust level.
 public struct TrustPill: View {
     public let trust: MailTrust
-    public init(trust: MailTrust) { self.trust = trust }
+    public init(trust: MailTrust) {
+        self.trust = trust
+    }
+
     public var body: some View {
         HStack(spacing: Spacing.s1) {
             Icon(trust.icon, size: 14, color: trust.foreground)
@@ -178,7 +184,10 @@ public struct TrustPill: View {
 /// 36pt avatar + sender name + meta row.
 public struct SenderBlock: View {
     public let content: SenderBlockContent
-    public init(content: SenderBlockContent) { self.content = content }
+    public init(content: SenderBlockContent) {
+        self.content = content
+    }
+
     public var body: some View {
         HStack(spacing: Spacing.s3) {
             AvatarWithIdentityRing(

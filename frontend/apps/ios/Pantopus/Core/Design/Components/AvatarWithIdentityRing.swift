@@ -81,7 +81,7 @@ public struct AvatarWithIdentityRing: View {
         if let imageURL {
             AsyncImage(url: imageURL) { phase in
                 switch phase {
-                case .success(let image): image.resizable().scaledToFill()
+                case let .success(image): image.resizable().scaledToFill()
                 default: initialsView
                 }
             }

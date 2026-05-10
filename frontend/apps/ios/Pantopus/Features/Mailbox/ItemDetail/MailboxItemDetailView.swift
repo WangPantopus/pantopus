@@ -21,9 +21,9 @@ struct MailboxItemDetailView: View {
             switch viewModel.state {
             case .loading:
                 LoadingLayout(onBack: onBack)
-            case .loaded(let content):
+            case let .loaded(content):
                 loadedLayout(content)
-            case .error(let message):
+            case let .error(message):
                 ErrorLayout(message: message, onBack: onBack) {
                     Task { await viewModel.refresh() }
                 }
@@ -49,7 +49,6 @@ struct MailboxItemDetailView: View {
         }
     }
 
-    @ViewBuilder
     private func loadedLayout(_ content: MailboxItemDetailContent) -> some View {
         MailboxItemDetailShell(
             category: content.category,

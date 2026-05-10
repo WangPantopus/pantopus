@@ -12,7 +12,6 @@ import XCTest
 
 @MainActor
 final class AddHomeWizardViewModelTests: XCTestCase {
-
     override func setUp() {
         super.setUp()
         SequencedURLProtocol.reset()

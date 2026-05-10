@@ -86,7 +86,7 @@ public struct AddHomeWizardView: View {
         case .dismiss:
             storedForm = ""
             dismiss()
-        case .openHomeDashboard(let homeId):
+        case let .openHomeDashboard(homeId):
             storedForm = ""
             onOpenHomeDashboard(homeId)
         }
@@ -199,7 +199,7 @@ private struct ConfirmStep: View {
                 ReviewSummaryRow(label: "Street", value: viewModel.form.address.street),
                 ReviewSummaryRow(label: "City", value: viewModel.form.address.city),
                 ReviewSummaryRow(label: "State", value: viewModel.form.address.state),
-                ReviewSummaryRow(label: "ZIP", value: viewModel.form.address.zipCode),
+                ReviewSummaryRow(label: "ZIP", value: viewModel.form.address.zipCode)
             ])
             if let check = viewModel.addressCheck {
                 AddressVerdictRow(check: check)
@@ -249,7 +249,7 @@ private struct ReviewStep: View {
             ReviewSummaryRow(
                 label: "Primary",
                 value: viewModel.form.isPrimary ? "Yes" : "No"
-            ),
+            )
         ])
     }
 
