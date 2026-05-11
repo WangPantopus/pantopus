@@ -37,8 +37,8 @@ struct DisambiguateMailFormView: View {
             FormShell(
                 title: "Who is this for?",
                 rightActionLabel: "",
-                isValid: false, // top-bar action is intentionally disabled
-                isDirty: false, // sticky CTA below owns submit
+                isValid: false, // top-bar action is intentionally disabled — sticky CTA owns submit
+                isDirty: viewModel.isDirty, // drives discard-confirm on close
                 isSaving: false,
                 onClose: onClose,
                 onCommit: {}

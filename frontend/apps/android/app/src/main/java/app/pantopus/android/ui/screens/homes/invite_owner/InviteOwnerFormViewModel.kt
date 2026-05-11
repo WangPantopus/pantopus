@@ -127,14 +127,18 @@ class InviteOwnerFormViewModel
             val request = buildRequest()
             viewModelScope.launch {
                 when (val result = repo.inviteOwner(homeId, request)) {
-                    is NetworkResult.Success ->
+                    is NetworkResult.Success -> {
                         _state.update {
                             it.copy(
                                 isSaving = false,
                                 toast = ToastPayload("Invite sent.", isError = false),
-                                shouldDismiss = true,
                             )
                         }
+                        // Hold the success toast on screen briefly before
+                        // dismissing the form so the overlay actually renders.
+                        kotlinx.coroutines.delay(1_500)
+                        _state.update { it.copy(shouldDismiss = true) }
+                    }
                     is NetworkResult.Failure ->
                         _state.update { current ->
                             val (fieldError, toast) = mapInviteError(result.error)

@@ -71,6 +71,13 @@ data class DisambiguateUiState(
         }
 
     val canSubmit: Boolean get() = selected != null && aliasError == null && !isSubmitting
+
+    /**
+     * True once the user has touched the form (picked a recipient or
+     * typed alias notes). Drives the FormShell's discard-confirm on
+     * close.
+     */
+    val isDirty: Boolean get() = selected != null || aliasNotes.trim().isNotEmpty()
 }
 
 /**
@@ -143,7 +150,7 @@ class DisambiguateMailFormViewModel
                 )
             viewModelScope.launch {
                 when (val result = repo.resolve(request)) {
-                    is NetworkResult.Success ->
+                    is NetworkResult.Success -> {
                         _state.update {
                             it.copy(
                                 isSubmitting = false,
@@ -152,9 +159,13 @@ class DisambiguateMailFormViewModel
                                         "Mail routed to ${choice.title.lowercase()}.",
                                         isError = false,
                                     ),
-                                shouldDismiss = true,
                             )
                         }
+                        // Hold the success toast on screen briefly so it
+                        // renders before the form pops.
+                        kotlinx.coroutines.delay(1_500)
+                        _state.update { it.copy(shouldDismiss = true) }
+                    }
                     is NetworkResult.Failure ->
                         _state.update {
                             it.copy(

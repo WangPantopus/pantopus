@@ -84,7 +84,7 @@ fun DisambiguateMailFormScreen(
                     title = "Who is this for?",
                     rightActionLabel = "",
                     isValid = false, // top-bar action intentionally disabled — sticky CTA owns submit
-                    isDirty = false,
+                    isDirty = state.isDirty, // drives discard-confirm on close
                     isSaving = false,
                     onClose = onClose,
                     onCommit = {},

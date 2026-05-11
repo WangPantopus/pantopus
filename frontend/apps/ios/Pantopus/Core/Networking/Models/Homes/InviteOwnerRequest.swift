@@ -32,6 +32,18 @@ public struct InviteOwnerRequest: Encodable, Sendable, Hashable {
         self.fastTrack = fastTrack
     }
 
+    /// Custom encoder so nil optionals are OMITTED from the wire body
+    /// instead of emitted as `null`. Backend's `inviteOwnerSchema`
+    /// accepts both, but absent keys keep the request small and
+    /// surface intent more cleanly to log readers.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(email, forKey: .email)
+        try c.encodeIfPresent(phone, forKey: .phone)
+        try c.encodeIfPresent(userId, forKey: .userId)
+        try c.encode(fastTrack, forKey: .fastTrack)
+    }
+
     private enum CodingKeys: String, CodingKey {
         case email, phone
         case userId = "user_id"

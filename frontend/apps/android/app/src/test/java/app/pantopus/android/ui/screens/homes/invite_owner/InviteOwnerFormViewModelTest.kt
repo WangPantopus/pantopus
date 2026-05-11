@@ -14,7 +14,9 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -95,9 +97,13 @@ class InviteOwnerFormViewModelTest {
             val vm = makeVm()
             vm.update(InviteOwnerField.Email, "alex@pantopus.app")
             vm.submit()
-            val state = vm.state.value
-            assertEquals("Invite sent.", state.toast?.text)
-            assertTrue(state.shouldDismiss)
+            // The VM holds the toast for 1.5s before flipping the dismiss
+            // flag so the success overlay renders. Skip past that delay
+            // in virtual time before asserting the dismiss latch.
+            assertEquals("Invite sent.", vm.state.value.toast?.text)
+            advanceTimeBy(1_600)
+            runCurrent()
+            assertTrue(vm.state.value.shouldDismiss)
             coVerify(exactly = 1) { repo.inviteOwner("home-1", any()) }
         }
 

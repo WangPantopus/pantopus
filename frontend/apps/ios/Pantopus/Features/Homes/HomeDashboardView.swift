@@ -203,4 +203,5 @@ private struct ErrorView: View {
 
 #Preview {
     HomeDashboardView(homeId: "preview")
+        .environment(AuthManager.previewSignedIn)
 }

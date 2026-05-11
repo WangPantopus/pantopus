@@ -15,7 +15,9 @@ import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -88,6 +90,9 @@ class DisambiguateMailFormViewModelTest {
             assertEquals("mail-1", captured.captured.mailId)
             assertEquals(true, captured.captured.addAlias)
             assertEquals("Mom", captured.captured.aliasString)
+            // The VM holds the success toast for 1.5s before dismissing.
+            advanceTimeBy(1_600)
+            runCurrent()
             assertTrue(vm.state.value.shouldDismiss)
         }
 

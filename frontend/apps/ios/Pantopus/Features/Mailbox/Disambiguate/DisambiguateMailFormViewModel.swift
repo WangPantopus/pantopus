@@ -102,6 +102,12 @@ final class DisambiguateMailFormViewModel {
         selectedChoice != nil && aliasError == nil && !isSubmitting
     }
 
+    /// True once the user has touched the form (selection or alias).
+    /// Drives the FormShell's discard-confirm on close.
+    var isDirty: Bool {
+        selectedChoice != nil || !aliasNotes.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
     private let mailId: String
     private let api: APIClient
 
@@ -160,6 +166,10 @@ final class DisambiguateMailFormViewModel {
             // Use the backend-confirmed drawer in case the response
             // diverges from what we sent.
             _ = response.drawer
+            // Hold the success toast on screen briefly before
+            // dismissing the form — otherwise the overlay never
+            // renders.
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
             shouldDismiss = true
             return true
         } catch {

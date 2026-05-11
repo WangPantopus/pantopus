@@ -105,6 +105,10 @@ final class InviteOwnerFormViewModel {
                 HomesEndpoints.inviteOwner(homeId: homeId, request: request)
             ) as InviteOwnerResponse
             toast = ToastMessage(text: "Invite sent.", kind: .success)
+            // Hold the success toast on screen briefly before tearing
+            // the form down — otherwise SwiftUI dismisses the view
+            // before the overlay has a chance to render.
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
             shouldDismiss = true
             return true
         } catch let APIError.clientError(status, message) where status == 400 || status == 409 {
