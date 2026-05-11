@@ -36,4 +36,14 @@ public enum HomesEndpoints {
     public static func checkAddress(_ request: CheckAddressRequest) -> Endpoint {
         Endpoint(method: .post, path: "/api/homes/check-address", body: request)
     }
+
+    /// `POST /api/homes/:id/owners/invite` — route
+    /// `backend/routes/homeOwnership.js:1376`.
+    public static func inviteOwner(homeId: String, request: InviteOwnerRequest) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/owners/invite",
+            body: request
+        )
+    }
 }

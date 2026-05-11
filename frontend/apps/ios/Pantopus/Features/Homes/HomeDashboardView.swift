@@ -10,13 +10,24 @@ import SwiftUI
 
 /// Home Dashboard screen wired to `GET /api/homes/:id` (with public-profile fallback).
 struct HomeDashboardView: View {
+    @Environment(AuthManager.self) private var auth
     @State private var viewModel: HomeDashboardViewModel
     @State private var toast: String?
+    @State private var showsInviteOwner = false
+    private let homeId: String
     private let onBack: (() -> Void)?
 
     init(homeId: String, onBack: (() -> Void)? = nil) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
+        self.homeId = homeId
         self.onBack = onBack
+    }
+
+    /// Current signed-in user's email — used by the Invite Owner form
+    /// to reject self-invites. Returns empty when in preview mode.
+    private var currentUserEmail: String {
+        if case let .signedIn(user) = auth.state { return user.email }
+        return ""
     }
 
     var body: some View {
@@ -78,12 +89,28 @@ struct HomeDashboardView: View {
                 FABCreateCTA(
                     actions: [
                         FABSheetAction(id: "log_package", title: "Log a package", icon: .shoppingBag),
-                        FABSheetAction(id: "add_member", title: "Add member", icon: .userPlus),
+                        FABSheetAction(id: "add_member", title: "Invite owner", icon: .userPlus),
                         FABSheetAction(id: "add_mail", title: "Add mail", icon: .mailbox)
                     ]
-                ) { showPlaceholderToast(for: $0) }
+                ) { handleFabAction($0) }
             }
         )
+        .sheet(isPresented: $showsInviteOwner) {
+            InviteOwnerFormView(
+                homeId: homeId,
+                currentUserEmail: currentUserEmail,
+                onClose: { showsInviteOwner = false }
+            )
+        }
+    }
+
+    private func handleFabAction(_ action: String) {
+        switch action {
+        case "add_member":
+            showsInviteOwner = true
+        default:
+            showPlaceholderToast(for: action)
+        }
     }
 
     private func showPlaceholderToast(for action: String) {

@@ -79,14 +79,20 @@ fun YouScreen(
     viewModel: YouViewModel = hiltViewModel(),
     onOpenPublicProfile: (String) -> Unit = {},
     onOpenPulsePost: (String) -> Unit = {},
+    onInviteOwner: (String, String) -> Unit = { _, _ -> },
+    onDisambiguateMail: (String) -> Unit = {},
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
     val signedIn = state as? AuthRepository.State.SignedIn
     var confirmVisible by remember { mutableStateOf(false) }
     var debugProfileDialog by remember { mutableStateOf(false) }
     var debugPostDialog by remember { mutableStateOf(false) }
+    var debugInviteDialog by remember { mutableStateOf(false) }
+    var debugDisambiguateDialog by remember { mutableStateOf(false) }
     var debugProfileId by remember { mutableStateOf("") }
     var debugPostId by remember { mutableStateOf("") }
+    var debugInviteHomeId by remember { mutableStateOf("") }
+    var debugDisambiguateMailId by remember { mutableStateOf("") }
 
     Column(
         modifier =
@@ -157,6 +163,18 @@ fun YouScreen(
                 modifier = Modifier.testTag("youDebugOpenPost"),
             ) {
                 Text("Open Pulse post by ID", color = PantopusColors.primary600)
+            }
+            TextButton(
+                onClick = { debugInviteDialog = true },
+                modifier = Modifier.testTag("youDebugInviteOwner"),
+            ) {
+                Text("Invite owner to home by ID", color = PantopusColors.primary600)
+            }
+            TextButton(
+                onClick = { debugDisambiguateDialog = true },
+                modifier = Modifier.testTag("youDebugDisambiguate"),
+            ) {
+                Text("Disambiguate mail by ID", color = PantopusColors.primary600)
             }
         }
     }
@@ -235,6 +253,63 @@ fun YouScreen(
             },
             dismissButton = {
                 TextButton(onClick = { debugPostDialog = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (BuildConfig.DEBUG && debugInviteDialog) {
+        val currentEmail = signedIn?.user?.email.orEmpty()
+        AlertDialog(
+            onDismissRequest = { debugInviteDialog = false },
+            title = { Text("Invite owner") },
+            text = {
+                OutlinedTextField(
+                    value = debugInviteHomeId,
+                    onValueChange = { debugInviteHomeId = it },
+                    label = { Text("Home ID") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val id = debugInviteHomeId.trim()
+                    debugInviteDialog = false
+                    if (id.isNotEmpty()) {
+                        debugInviteHomeId = ""
+                        onInviteOwner(id, currentEmail)
+                    }
+                }) { Text("Open") }
+            },
+            dismissButton = {
+                TextButton(onClick = { debugInviteDialog = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (BuildConfig.DEBUG && debugDisambiguateDialog) {
+        AlertDialog(
+            onDismissRequest = { debugDisambiguateDialog = false },
+            title = { Text("Disambiguate mail") },
+            text = {
+                OutlinedTextField(
+                    value = debugDisambiguateMailId,
+                    onValueChange = { debugDisambiguateMailId = it },
+                    label = { Text("Mail ID") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val id = debugDisambiguateMailId.trim()
+                    debugDisambiguateDialog = false
+                    if (id.isNotEmpty()) {
+                        debugDisambiguateMailId = ""
+                        onDisambiguateMail(id)
+                    }
+                }) { Text("Open") }
+            },
+            dismissButton = {
+                TextButton(onClick = { debugDisambiguateDialog = false }) { Text("Cancel") }
             },
         )
     }

@@ -16,6 +16,16 @@ public enum YouRoute: Hashable {
     #endif
 }
 
+#if DEBUG
+private struct DebugInviteHomeItem: Identifiable, Hashable {
+    let id: String
+}
+
+private struct DebugDisambiguateItem: Identifiable, Hashable {
+    let id: String
+}
+#endif
+
 /// NavigationStack wrapper for the You tab.
 public struct YouTabRoot: View {
     @Environment(AuthManager.self) private var auth
@@ -25,8 +35,14 @@ public struct YouTabRoot: View {
     #if DEBUG
     @State private var debugProfileSheet = false
     @State private var debugPostSheet = false
+    @State private var debugInviteHomeSheet = false
+    @State private var debugDisambiguateSheet = false
     @State private var debugProfileId = ""
     @State private var debugPostId = ""
+    @State private var debugInviteHomeId = ""
+    @State private var debugDisambiguateMailId = ""
+    @State private var debugInviteFormHomeId: String?
+    @State private var debugDisambiguateFormMailId: String?
     #endif
 
     public init() {}
@@ -67,6 +83,18 @@ public struct YouTabRoot: View {
                         debugRow(label: "Open Pulse post by ID")
                     }
                     .accessibilityIdentifier("youDebugOpenPost")
+                    Button {
+                        debugInviteHomeSheet = true
+                    } label: {
+                        debugRow(label: "Invite owner to home by ID")
+                    }
+                    .accessibilityIdentifier("youDebugInviteOwner")
+                    Button {
+                        debugDisambiguateSheet = true
+                    } label: {
+                        debugRow(label: "Disambiguate mail by ID")
+                    }
+                    .accessibilityIdentifier("youDebugDisambiguate")
                 }
                 #endif
                 Section {
@@ -124,6 +152,55 @@ public struct YouTabRoot: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Paste a Pulse post UUID")
+            }
+            .alert("Invite owner", isPresented: $debugInviteHomeSheet) {
+                TextField("Home ID", text: $debugInviteHomeId)
+                Button("Open") {
+                    let id = debugInviteHomeId.trimmingCharacters(in: .whitespaces)
+                    if !id.isEmpty {
+                        debugInviteFormHomeId = id
+                        debugInviteHomeId = ""
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Paste a home UUID")
+            }
+            .alert("Disambiguate mail", isPresented: $debugDisambiguateSheet) {
+                TextField("Mail ID", text: $debugDisambiguateMailId)
+                Button("Open") {
+                    let id = debugDisambiguateMailId.trimmingCharacters(in: .whitespaces)
+                    if !id.isEmpty {
+                        debugDisambiguateFormMailId = id
+                        debugDisambiguateMailId = ""
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Paste a Mail UUID to route")
+            }
+            .sheet(item: Binding<DebugInviteHomeItem?>(
+                get: { debugInviteFormHomeId.map { DebugInviteHomeItem(id: $0) } },
+                set: { debugInviteFormHomeId = $0?.id }
+            )) { item in
+                let email: String = {
+                    if case let .signedIn(user) = auth.state { return user.email }
+                    return ""
+                }()
+                InviteOwnerFormView(
+                    homeId: item.id,
+                    currentUserEmail: email,
+                    onClose: { debugInviteFormHomeId = nil }
+                )
+            }
+            .sheet(item: Binding<DebugDisambiguateItem?>(
+                get: { debugDisambiguateFormMailId.map { DebugDisambiguateItem(id: $0) } },
+                set: { debugDisambiguateFormMailId = $0?.id }
+            )) { item in
+                DisambiguateMailFormView(
+                    mailId: item.id,
+                    onClose: { debugDisambiguateFormMailId = nil }
+                )
             }
             #endif
         }

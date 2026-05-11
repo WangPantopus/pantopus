@@ -44,6 +44,33 @@ public extension FormValidator {
         }
     }
 
+    /// RFC-5322-ish email check. Mirrors the `Joi.string().email()` rule
+    /// used by `inviteOwnerSchema.email`
+    /// (`backend/routes/homeOwnership.js:67`). The Joi check is stricter
+    /// server-side; this is the same shape Apple's `NSDataDetector` uses
+    /// and is good enough to gate the submit button.
+    static func email() -> FormValidator {
+        FormValidator { value in
+            let trimmed = value.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { return "Email is required." }
+            let pattern = #"^[A-Z0-9a-z._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$"#
+            let matches = trimmed.range(of: pattern, options: .regularExpression) != nil
+            return matches ? nil : "Enter a valid email address."
+        }
+    }
+
+    /// Reject the supplied email (case-insensitive). Used by the Invite
+    /// Owner form to stop a user from inviting themselves.
+    static func emailNotMatching(_ otherEmail: String) -> FormValidator {
+        let normalised = otherEmail.lowercased()
+        return FormValidator { value in
+            let trimmed = value.trimmingCharacters(in: .whitespaces).lowercased()
+            return trimmed == normalised && !trimmed.isEmpty
+                ? "You can't invite yourself."
+                : nil
+        }
+    }
+
     /// Min/max length, but only when the value is non-empty. Mirrors the
     /// optional address-component fields in `updateProfileSchema`
     /// (`backend/routes/users.js:332-335`) where empty means "leave alone".

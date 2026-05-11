@@ -2,6 +2,7 @@ package app.pantopus.android.data.homes
 
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
+import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.net.NetworkResult
@@ -38,4 +39,10 @@ open class HomesRepository
 
         /** `POST /api/homes`. */
         open suspend fun create(request: CreateHomeRequest) = safeApiCall { api.create(request) }
+
+        /** `POST /api/homes/:id/owners/invite`. */
+        open suspend fun inviteOwner(
+            homeId: String,
+            request: InviteOwnerRequest,
+        ) = safeApiCall { api.inviteOwner(homeId, request) }
     }

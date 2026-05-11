@@ -78,6 +78,9 @@ class HomeDashboardViewModel
             _selectedTab.value = id
         }
 
+        /** Expose the home id so the screen can build outbound nav routes. */
+        fun currentHomeId(): String? = homeId
+
         /** Initial load; no-op when already loaded. */
         fun load() {
             if (_state.value is HomeDashboardUiState.Loaded) return

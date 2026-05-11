@@ -53,6 +53,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeDashboardScreen(
     onBack: () -> Unit,
+    onInviteOwner: ((String) -> Unit)? = null,
     viewModel: HomeDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -71,7 +72,6 @@ fun HomeDashboardScreen(
         toast =
             when (actionId) {
                 "log_package" -> "Log a package isn't available yet"
-                "add_member" -> "Add member isn't available yet"
                 "add_mail" -> "Add mail isn't available yet"
                 "verify" -> "Verify home isn't available yet"
                 else -> "That isn't available yet"
@@ -79,6 +79,17 @@ fun HomeDashboardScreen(
         scope.launch {
             delay(1_800)
             toast = null
+        }
+    }
+
+    fun handleFab(actionId: String) {
+        when (actionId) {
+            "add_member" -> {
+                viewModel.currentHomeId()?.let { homeId ->
+                    onInviteOwner?.invoke(homeId) ?: showToast(actionId)
+                }
+            }
+            else -> showToast(actionId)
         }
     }
 
@@ -92,7 +103,7 @@ fun HomeDashboardScreen(
                     onSelectTab = viewModel::selectTab,
                     onBack = onBack,
                     onQuickAction = ::showToast,
-                    onFabAction = ::showToast,
+                    onFabAction = ::handleFab,
                 )
             is HomeDashboardUiState.Error ->
                 ErrorLayout(message = current.message, onBack = onBack, onRetry = viewModel::refresh)
@@ -136,7 +147,7 @@ private fun LoadedLayout(
                 actions =
                     listOf(
                         FabSheetAction("log_package", "Log a package", PantopusIcon.ShoppingBag),
-                        FabSheetAction("add_member", "Add member", PantopusIcon.UserPlus),
+                        FabSheetAction("add_member", "Invite owner", PantopusIcon.UserPlus),
                         FabSheetAction("add_mail", "Add mail", PantopusIcon.Mailbox),
                     ),
                 onSelect = onFabAction,

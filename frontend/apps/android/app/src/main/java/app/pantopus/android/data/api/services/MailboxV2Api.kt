@@ -8,6 +8,8 @@ import app.pantopus.android.data.api.models.mailbox.v2.MailboxV2ItemResponse
 import app.pantopus.android.data.api.models.mailbox.v2.PackageDetailResponse
 import app.pantopus.android.data.api.models.mailbox.v2.PackageStatusUpdateRequest
 import app.pantopus.android.data.api.models.mailbox.v2.PackageStatusUpdateResponse
+import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingRequest
+import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
@@ -56,4 +58,10 @@ interface MailboxV2Api {
         @Path("mailId") mailId: String,
         @Body body: PackageStatusUpdateRequest,
     ): PackageStatusUpdateResponse
+
+    /** `POST /api/mailbox/v2/resolve` — route `backend/routes/mailboxV2.js:555`. */
+    @POST("api/mailbox/v2/resolve")
+    suspend fun resolve(
+        @Body body: ResolveRoutingRequest,
+    ): ResolveRoutingResponse
 }

@@ -39,6 +39,11 @@ import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
+import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
+import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
+import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.nearby.NearbyScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
@@ -56,6 +61,9 @@ private object ChildRoutes {
     const val HOME_DASHBOARD = "homes/{$HOME_DASHBOARD_HOME_ID_KEY}"
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
+    const val INVITE_OWNER =
+        "homes/{$INVITE_OWNER_HOME_ID_KEY}/invite?email={$INVITE_OWNER_CURRENT_EMAIL_KEY}"
+    const val DISAMBIGUATE_MAIL = "mailbox/disambiguate/{$DISAMBIGUATE_MAIL_ID_KEY}"
 
     /** Debug-only route reached via 5-tap easter egg on the Hub. */
     const val TOKEN_GALLERY = "_debug/token-gallery"
@@ -71,6 +79,18 @@ private object ChildRoutes {
 
     /** Build the concrete path for a Pulse post detail. */
     fun pulsePost(id: String): String = "posts/$id"
+
+    /**
+     * Build the invite-owner path. `email` is forwarded so the form
+     * can reject self-invites; pass `""` when unknown.
+     */
+    fun inviteOwner(
+        homeId: String,
+        currentEmail: String,
+    ): String = "homes/$homeId/invite?email=${java.net.URLEncoder.encode(currentEmail, "UTF-8")}"
+
+    /** Build the disambiguate-mail path. */
+    fun disambiguateMail(mailId: String): String = "mailbox/disambiguate/$mailId"
 }
 
 /**
@@ -147,6 +167,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenPulsePost = { postId ->
                         navController.navigate(ChildRoutes.pulsePost(postId))
                     },
+                    onInviteOwner = { homeId, email ->
+                        navController.navigate(ChildRoutes.inviteOwner(homeId, email))
+                    },
+                    onDisambiguateMail = { mailId ->
+                        navController.navigate(ChildRoutes.disambiguateMail(mailId))
+                    },
                 )
             }
 
@@ -161,7 +187,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.HOME_DASHBOARD,
                 arguments = listOf(navArgument(HOME_DASHBOARD_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
-                HomeDashboardScreen(onBack = { navController.popBackStack() })
+                HomeDashboardScreen(
+                    onBack = { navController.popBackStack() },
+                    onInviteOwner = { homeId ->
+                        navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
+                    },
+                )
             }
             composable(ChildRoutes.MAILBOX_LIST) {
                 MailboxListScreen(
@@ -198,6 +229,25 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.publicProfile(userId))
                     },
                 )
+            }
+            composable(
+                route = ChildRoutes.INVITE_OWNER,
+                arguments =
+                    listOf(
+                        navArgument(INVITE_OWNER_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(INVITE_OWNER_CURRENT_EMAIL_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                    ),
+            ) {
+                InviteOwnerFormScreen(onClose = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.DISAMBIGUATE_MAIL,
+                arguments = listOf(navArgument(DISAMBIGUATE_MAIL_ID_KEY) { type = NavType.StringType }),
+            ) {
+                DisambiguateMailFormScreen(onClose = { navController.popBackStack() })
             }
             composable(ChildRoutes.MAILBOX_DRAWERS) {
                 MailboxDrawersScreen(

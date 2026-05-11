@@ -7,6 +7,8 @@ import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.HomeDetailResponse
 import app.pantopus.android.data.api.models.homes.HomePublicProfileResponse
+import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
+import app.pantopus.android.data.api.models.homes.InviteOwnerResponse
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import retrofit2.http.Body
@@ -52,4 +54,14 @@ interface HomesApi {
     suspend fun checkAddress(
         @Body body: CheckAddressRequest,
     ): CheckAddressResponse
+
+    /**
+     * `POST /api/homes/:id/owners/invite` — route
+     * `backend/routes/homeOwnership.js:1376`.
+     */
+    @POST("api/homes/{id}/owners/invite")
+    suspend fun inviteOwner(
+        @Path("id") homeId: String,
+        @Body body: InviteOwnerRequest,
+    ): InviteOwnerResponse
 }
