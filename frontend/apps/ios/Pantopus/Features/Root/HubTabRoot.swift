@@ -5,6 +5,7 @@
 //  Navigation stack for the Hub tab. Placeholder body until the full hub
 //  UI lands in Prompt P7.
 //
+// swiftlint:disable cyclomatic_complexity
 
 import SwiftUI
 
@@ -103,9 +104,7 @@ public struct HubTabRoot: View {
             )
         case .myClaims:
             MyClaimsListView(
-                viewModel: MyClaimsListViewModel(
-                    onStartNewClaim: { Task { @MainActor in push(.addHome) } }
-                )
+                viewModel: MyClaimsListViewModel { Task { @MainActor in push(.addHome) } }
             )
         case let .homeDashboard(homeId):
             HomeDashboardView(

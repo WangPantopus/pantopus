@@ -6,6 +6,7 @@
 //  overlapping the header → action button row → About/Reviews/Gigs tab
 //  strip → tab content panel.
 //
+// swiftlint:disable multiple_closures_with_trailing_closure
 
 import SwiftUI
 
@@ -26,7 +27,9 @@ public struct ProfileStatCell: Sendable, Hashable, Identifiable {
 public enum ProfileTab: String, Sendable, CaseIterable, Identifiable {
     case about, reviews, gigs
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -129,7 +132,7 @@ public struct StatsTabsBody: View {
         }
     }
 
-    @ViewBuilder private var statsStrip: some View {
+    private var statsStrip: some View {
         HStack(alignment: .center, spacing: Spacing.s2) {
             ForEach(content.stats) { stat in
                 VStack(spacing: 2) {
@@ -152,7 +155,7 @@ public struct StatsTabsBody: View {
         .accessibilityElement(children: .combine)
     }
 
-    @ViewBuilder private var actionRow: some View {
+    private var actionRow: some View {
         HStack(spacing: Spacing.s2) {
             Button(action: { onMessage() }) {
                 Text("Message")
@@ -192,7 +195,7 @@ public struct StatsTabsBody: View {
         }
     }
 
-    @ViewBuilder private var tabStrip: some View {
+    private var tabStrip: some View {
         HStack(spacing: 0) {
             ForEach(ProfileTab.allCases) { tab in
                 Button {
@@ -221,7 +224,7 @@ public struct StatsTabsBody: View {
         }
     }
 
-    @ViewBuilder private var aboutTabContent: some View {
+    private var aboutTabContent: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             if let bio = content.bio, !bio.isEmpty {
                 Text(bio)
@@ -261,7 +264,7 @@ public struct StatsTabsBody: View {
         }
     }
 
-    @ViewBuilder private var gigsTabContent: some View {
+    private var gigsTabContent: some View {
         // TODO: gigs feature not yet integrated in mobile
         EmptyState(
             icon: .hammer,
@@ -298,7 +301,7 @@ private struct FlowingChips: View {
 private struct FlowLayout: Layout {
     let spacing: CGFloat
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
         let width = proposal.width ?? 0
         var rowWidth: CGFloat = 0
         var rowHeight: CGFloat = 0
@@ -320,9 +323,9 @@ private struct FlowLayout: Layout {
 
     func placeSubviews(
         in bounds: CGRect,
-        proposal: ProposedViewSize,
+        proposal _: ProposedViewSize,
         subviews: Subviews,
-        cache: inout ()
+        cache _: inout ()
     ) {
         var x: CGFloat = bounds.minX
         var y: CGFloat = bounds.minY
@@ -398,7 +401,7 @@ private struct ReviewCardView: View {
             stats: [
                 ProfileStatCell(id: "reviews", value: "12", label: "Reviews"),
                 ProfileStatCell(id: "rating", value: "4.9", label: "Rating"),
-                ProfileStatCell(id: "gigs", value: "8", label: "Gigs"),
+                ProfileStatCell(id: "gigs", value: "8", label: "Gigs")
             ],
             bio: "Cambridge transplant. I post about local food, ask for handy help, share neighborhood updates.",
             skills: ["Carpentry", "Spanish", "Coffee snob", "JS / TS"],
@@ -410,7 +413,7 @@ private struct ReviewCardView: View {
                     rating: 5,
                     body: "Great help with my move. Would book again.",
                     timestamp: "2 days ago"
-                ),
+                )
             ]
         ),
         selectedTab: $selected

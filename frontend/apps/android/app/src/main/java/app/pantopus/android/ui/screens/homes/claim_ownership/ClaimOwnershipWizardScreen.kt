@@ -108,7 +108,8 @@ fun ClaimOwnershipWizardScreen(
 private fun StartStep() {
     HeadlineBlock("Let's verify you own this home")
     SubcopyBlock(
-        "We need a couple of documents to confirm ownership. The verification team reviews each claim manually — most take 4–5 minutes to file.",
+        "We need a couple of documents to confirm ownership. " +
+            "The verification team reviews each claim manually - most take 4-5 minutes to file.",
     )
     RequirementsCardBlock(
         rows =
@@ -293,4 +294,3 @@ private fun ErrorBanner(message: String) {
         Text(text = message, style = PantopusTextStyle.caption, color = PantopusColors.error)
     }
 }
-

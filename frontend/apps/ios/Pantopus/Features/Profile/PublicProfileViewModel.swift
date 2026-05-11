@@ -75,7 +75,7 @@ public final class PublicProfileViewModel {
     private let client: APIClient
     private let logger = Logger(label: "app.pantopus.ios.PublicProfile")
 
-    public init(userId: String, client: APIClient = .shared) {
+    init(userId: String, client: APIClient = .shared) {
         self.userId = userId
         self.client = client
     }
@@ -183,7 +183,7 @@ public final class PublicProfileViewModel {
             IdentityPillarBadge(
                 pillar: .business,
                 state: profile.accountType == "business" ? .verified : .unverified
-            ),
+            )
         ]
     }
 
@@ -201,9 +201,9 @@ public final class PublicProfileViewModel {
         let elapsed = Date().timeIntervalSince(date)
         switch elapsed {
         case ..<60: return "Just now"
-        case ..<3_600: return "\(Int(elapsed / 60))m ago"
-        case ..<86_400: return "\(Int(elapsed / 3_600))h ago"
-        case ..<604_800: return "\(Int(elapsed / 86_400))d ago"
+        case ..<3600: return "\(Int(elapsed / 60))m ago"
+        case ..<86400: return "\(Int(elapsed / 3600))h ago"
+        case ..<604_800: return "\(Int(elapsed / 86400))d ago"
         default:
             let display = DateFormatter()
             display.dateStyle = .medium

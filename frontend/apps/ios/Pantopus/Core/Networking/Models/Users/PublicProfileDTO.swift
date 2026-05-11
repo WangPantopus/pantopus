@@ -99,9 +99,9 @@ public struct PublicProfile: Decodable, Sendable, Hashable, Identifiable {
         averageRating = try c.decodeIfPresent(Double.self, forKey: .averageRating)
         reviewCount = try c.decodeIfPresent(Int.self, forKey: .reviewCount)
         followersCount = try c.decodeIfPresent(Int.self, forKey: .followersCount)
-        reviews = (try c.decodeIfPresent([PublicProfileReview].self, forKey: .reviews)) ?? []
+        reviews = try (c.decodeIfPresent([PublicProfileReview].self, forKey: .reviews)) ?? []
         socialLinks = try c.decodeIfPresent(JSONValue.self, forKey: .socialLinks)
-        skills = (try c.decodeIfPresent([String].self, forKey: .skills)) ?? []
+        skills = try (c.decodeIfPresent([String].self, forKey: .skills)) ?? []
     }
 
     /// Best-effort display name.

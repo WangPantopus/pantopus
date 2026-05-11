@@ -9,6 +9,7 @@
 //  in-line markdown if backend returns markdown" but no fetch endpoint
 //  exists today.
 //
+// swiftlint:disable force_unwrapping multiple_closures_with_trailing_closure
 
 import SwiftUI
 
@@ -80,7 +81,6 @@ public struct CertifiedTermsSheet: View {
 
 #Preview {
     CertifiedTermsSheet(
-        termsURL: URL(string: "https://example.com/certified-terms.pdf")!,
-        onDismiss: {}
-    )
+        termsURL: URL(string: "https://example.com/certified-terms.pdf")!
+    ) {}
 }

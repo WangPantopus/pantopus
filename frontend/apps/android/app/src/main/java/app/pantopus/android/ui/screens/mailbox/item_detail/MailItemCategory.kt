@@ -16,7 +16,7 @@ enum class MailItemCategory(
 ) {
     Package("package", PantopusColors.delivery),
     Coupon("coupon", PantopusColors.childCare),
-    Booklet("booklet", PantopusColors.moving), // violet (#8e44ad) per P18
+    Booklet("booklet", PantopusColors.moving), // violet token per P18
     Certified("certified", PantopusColors.primary600), // primary per P18
     Notice("notice", PantopusColors.warning),
     Bill("bill", PantopusColors.error),

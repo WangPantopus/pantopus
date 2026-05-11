@@ -125,8 +125,11 @@ final class PublicProfileViewModelTests: XCTestCase {
         let initialRequestCount = SequencedURLProtocol.capturedRequests.count
         vm.selectedTab = .reviews
         vm.selectedTab = .gigs
-        XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, initialRequestCount,
-                       "Switching tabs must not trigger a network fetch.")
+        XCTAssertEqual(
+            SequencedURLProtocol.capturedRequests.count,
+            initialRequestCount,
+            "Switching tabs must not trigger a network fetch."
+        )
     }
 
     // MARK: - Empty Reviews

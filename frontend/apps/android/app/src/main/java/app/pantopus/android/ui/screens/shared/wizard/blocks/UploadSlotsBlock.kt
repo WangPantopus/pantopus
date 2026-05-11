@@ -196,7 +196,10 @@ private fun FilledContent(
 }
 
 @Composable
-private fun UploadingContent(name: String, fraction: Float) {
+private fun UploadingContent(
+    name: String,
+    fraction: Float,
+) {
     Column(
         modifier =
             Modifier
@@ -217,7 +220,10 @@ private fun UploadingContent(name: String, fraction: Float) {
 }
 
 @Composable
-private fun FailedContent(name: String, message: String) {
+private fun FailedContent(
+    name: String,
+    message: String,
+) {
     Column(
         modifier =
             Modifier

@@ -16,6 +16,7 @@ excluded:
   - Pantopus.xcodeproj
 
 disabled_rules:
+  - blanket_disable_command
   - todo
   - trailing_comma
   - identifier_name

@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.mailbox.item_detail.bodies
 

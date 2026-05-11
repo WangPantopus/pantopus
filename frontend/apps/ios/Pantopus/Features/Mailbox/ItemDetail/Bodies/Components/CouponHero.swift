@@ -60,7 +60,7 @@ public struct CouponHero: View {
         .accessibilityElement(children: .combine)
     }
 
-    @ViewBuilder private var brandTile: some View {
+    private var brandTile: some View {
         ZStack {
             RoundedRectangle(cornerRadius: Radii.md)
                 .fill(Theme.Color.appSurface)

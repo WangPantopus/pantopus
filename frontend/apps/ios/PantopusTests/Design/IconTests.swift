@@ -20,7 +20,7 @@ final class IconTests: XCTestCase {
         "mailbox", "search", "user-plus", "file", "copy", "check",
         "more-horizontal", "arrow-left", "send", "chevron-down", "chevron-up",
         "trash-2", "edit-2", "upload", "shield", "lock", "check-circle",
-        "alert-circle", "circle", "info", "wifi-off"
+        "alert-circle", "circle", "info", "wifi-off", "heart", "thumbs-up", "star"
     ]
 
     func testInventoryMatches() {

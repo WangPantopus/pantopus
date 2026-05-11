@@ -64,9 +64,10 @@ data class PublicProfileDto(
 
     /** "City, ST" if both present. */
     val locality: String?
-        get() = when {
-            !city.isNullOrEmpty() && !state.isNullOrEmpty() -> "$city, $state"
-            !city.isNullOrEmpty() -> city
-            else -> state
-        }
+        get() =
+            when {
+                !city.isNullOrEmpty() && !state.isNullOrEmpty() -> "$city, $state"
+                !city.isNullOrEmpty() -> city
+                else -> state
+            }
 }

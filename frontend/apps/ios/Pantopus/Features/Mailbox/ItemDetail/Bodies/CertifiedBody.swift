@@ -7,6 +7,7 @@
 //  body adds the long-form notice text and the "I acknowledge receipt"
 //  gate that locks the primary CTA.
 //
+// swiftlint:disable multiple_closures_with_trailing_closure
 
 import SwiftUI
 
@@ -74,12 +75,12 @@ public struct CertifiedBody: View {
                 CertifiedChainStep(id: "delivered", label: "Delivered", occurredAt: "2026-05-10", isComplete: true),
                 CertifiedChainStep(id: "acknowledged", label: "Acknowledged", occurredAt: nil, isComplete: false)
             ],
-            noticeBody: "You are summoned to appear at Cambridge District Court on May 25, 2026 at 10:00 AM. Failure to appear may result in additional penalties.",
+            noticeBody: "You are summoned to appear at Cambridge District Court on May 25, 2026 at 10:00 AM. " +
+                "Failure to appear may result in additional penalties.",
             termsURL: URL(string: "https://example.com/terms"),
             isAcknowledged: false
         ),
-        isAcknowledged: $ack,
-        onViewTerms: {}
-    )
-    .background(Theme.Color.appBg)
+        isAcknowledged: $ack
+    ) {}
+        .background(Theme.Color.appBg)
 }

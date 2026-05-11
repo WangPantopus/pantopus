@@ -5,6 +5,7 @@
 //  `post_author` slot for the Pulse post detail. 44pt avatar + verified
 //  badge, two-line identity stack, right-aligned intent chip.
 //
+// swiftlint:disable multiple_closures_with_trailing_closure
 
 import SwiftUI
 
@@ -19,7 +20,9 @@ public enum PostIntent: String, Sendable, CaseIterable, Identifiable {
     case share
     case alert
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Display label.
     public var label: String {
@@ -123,7 +126,7 @@ public struct PostAuthorHeader: View {
         }
     }
 
-    @ViewBuilder private var avatarStack: some View {
+    private var avatarStack: some View {
         ZStack(alignment: .bottomTrailing) {
             AvatarWithIdentityRing(
                 name: displayName,

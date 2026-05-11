@@ -11,7 +11,8 @@ struct ClaimStartStep: View {
     var body: some View {
         HeadlineBlock("Let's verify you own this home")
         SubcopyBlock(
-            "We need a couple of documents to confirm ownership. The verification team reviews each claim manually — most take 4–5 minutes to file."
+            "We need a couple of documents to confirm ownership. " +
+                "The verification team reviews each claim manually - most take 4-5 minutes to file."
         )
         RequirementsCardBlock(rows: [
             RequirementsRow(

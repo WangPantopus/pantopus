@@ -23,10 +23,15 @@ import SwiftUI
 @MainActor
 final class MyClaimsListViewModel: ListOfRowsDataSource {
     let title = "My claims"
-    var topBarAction: TopBarAction? { nil }
+    var topBarAction: TopBarAction? {
+        nil
+    }
+
     let tabs: [ListOfRowsTab] = []
     var selectedTab: String = ""
-    var fab: FABAction? { nil }
+    var fab: FABAction? {
+        nil
+    }
 
     private(set) var state: ListOfRowsState = .loading
 
@@ -102,13 +107,12 @@ final class MyClaimsListViewModel: ListOfRowsDataSource {
             trailing: .statusChip(
                 text: statusText(for: claim.status),
                 variant: statusVariant(for: claim.status)
-            ),
-            onTap: { @Sendable [logger] in
-                Task { @MainActor in
-                    logger.info("Claim row tapped: \(claim.id) — detail view not yet designed.")
-                }
+            )
+        ) { @Sendable [logger] in
+            Task { @MainActor in
+                logger.info("Claim row tapped: \(claim.id) — detail view not yet designed.")
             }
-        )
+        }
     }
 
     private func subtitle(for claim: OwnershipClaimDTO) -> String? {
@@ -120,10 +124,10 @@ final class MyClaimsListViewModel: ListOfRowsDataSource {
 
     private func friendlyMethod(_ method: String) -> String? {
         switch method {
-        case "doc_upload": return "Document upload"
-        case "fast_track": return "Fast-track invite"
-        case "id_verification": return "ID verification"
-        default: return method.isEmpty ? nil : method
+        case "doc_upload": "Document upload"
+        case "fast_track": "Fast-track invite"
+        case "id_verification": "ID verification"
+        default: method.isEmpty ? nil : method
         }
     }
 
@@ -140,19 +144,19 @@ final class MyClaimsListViewModel: ListOfRowsDataSource {
 
     private func statusText(for status: String) -> String {
         switch status {
-        case "verified", "approved", "complete": return "Verified"
-        case "rejected", "denied": return "Not approved"
-        case "under_review", "pending", "submitted": return "Under review"
-        default: return status.replacingOccurrences(of: "_", with: " ").capitalized
+        case "verified", "approved", "complete": "Verified"
+        case "rejected", "denied": "Not approved"
+        case "under_review", "pending", "submitted": "Under review"
+        default: status.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
 
     private func statusVariant(for status: String) -> StatusChipVariant {
         switch status {
-        case "verified", "approved", "complete": return .success
-        case "rejected", "denied": return .error
-        case "under_review", "pending", "submitted": return .info
-        default: return .neutral
+        case "verified", "approved", "complete": .success
+        case "rejected", "denied": .error
+        case "under_review", "pending", "submitted": .info
+        default: .neutral
         }
     }
 }

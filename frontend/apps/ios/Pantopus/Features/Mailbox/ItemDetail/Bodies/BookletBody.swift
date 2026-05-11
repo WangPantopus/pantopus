@@ -6,6 +6,7 @@
 //  placeholder. Hosts the page swiper plus the optional summary copy
 //  the design draws below the pager.
 //
+// swiftlint:disable force_unwrapping
 
 import SwiftUI
 

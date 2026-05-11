@@ -116,9 +116,8 @@ struct HomeDashboardView: View {
         .sheet(isPresented: $showsInviteOwner) {
             InviteOwnerFormView(
                 homeId: homeId,
-                currentUserEmail: currentUserEmail,
-                onClose: { showsInviteOwner = false }
-            )
+                currentUserEmail: currentUserEmail
+            ) { showsInviteOwner = false }
         }
     }
 

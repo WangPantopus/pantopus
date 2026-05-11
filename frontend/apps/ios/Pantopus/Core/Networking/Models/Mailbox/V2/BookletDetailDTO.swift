@@ -26,7 +26,7 @@ public struct BookletDetailDTO: Sendable, Hashable {
     public static func decode(from value: JSONValue?) -> BookletDetailDTO? {
         guard let dict = value?.dictValue else { return nil }
         let pageURLs: [URL] = (dict["pages"]?.arrayValue ?? [])
-            .compactMap { $0.stringValue }
+            .compactMap(\.stringValue)
             .compactMap(URL.init(string:))
         guard !pageURLs.isEmpty else { return nil }
         return BookletDetailDTO(

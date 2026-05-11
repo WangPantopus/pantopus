@@ -22,10 +22,12 @@ private extension ISO8601DateFormatter {
         // stable regardless of the test's wall-clock time-of-day.
         let calendar = Calendar(identifier: .gregorian)
         var calUTC = calendar
-        calUTC.timeZone = TimeZone(identifier: "UTC")!
+        if let utc = TimeZone(identifier: "UTC") {
+            calUTC.timeZone = utc
+        }
         let now = Date()
         let startOfTodayUTC = calUTC.startOfDay(for: now)
-        let target = startOfTodayUTC.addingTimeInterval(Double(days) * 86_400)
+        let target = startOfTodayUTC.addingTimeInterval(Double(days) * 86400)
         return formatter.string(from: target)
     }
 }
@@ -184,7 +186,7 @@ final class MailboxItemDetailCategoryDispatchTests: XCTestCase {
     func testDaysUntilParsesFullTimestamp() {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let date = Date(timeIntervalSinceNow: 3 * 86_400 + 1) // +1s → guarantees >= 3 days
+        let date = Date(timeIntervalSinceNow: 3 * 86400 + 1) // +1s → guarantees >= 3 days
         let iso = formatter.string(from: date)
         XCTAssertEqual(MailboxItemDetailViewModel.daysUntil(iso), 3)
     }

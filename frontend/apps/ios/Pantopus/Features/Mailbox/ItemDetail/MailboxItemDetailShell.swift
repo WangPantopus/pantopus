@@ -6,6 +6,7 @@
 //  trust pill + sender block + (optional) AI elf + KeyFactsPanel +
 //  (optional) TimelineStepper + body + sticky CTA shelf.
 //
+// swiftlint:disable multiple_closures_with_trailing_closure
 
 import SwiftUI
 
@@ -243,7 +244,7 @@ public struct SenderBlock: View {
         }
     }
 
-    @ViewBuilder private var avatarRing: some View {
+    private var avatarRing: some View {
         AvatarWithIdentityRing(
             name: content.initials,
             identity: .business,

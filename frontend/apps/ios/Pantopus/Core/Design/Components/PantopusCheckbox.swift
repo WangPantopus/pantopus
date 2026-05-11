@@ -63,7 +63,7 @@ public struct PantopusCheckbox: View {
         .accessibilityIdentifier(accessibilityIdentifier ?? "")
     }
 
-    @ViewBuilder private var box: some View {
+    private var box: some View {
         ZStack {
             RoundedRectangle(cornerRadius: Radii.sm)
                 .fill(isChecked ? Theme.Color.primary600 : Theme.Color.appSurface)

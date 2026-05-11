@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName")
+
 package app.pantopus.android.ui.screens.shared.wizard.blocks
 
 import androidx.compose.foundation.background
@@ -20,8 +22,8 @@ import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
-import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.PantopusTextStyle
+import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /**

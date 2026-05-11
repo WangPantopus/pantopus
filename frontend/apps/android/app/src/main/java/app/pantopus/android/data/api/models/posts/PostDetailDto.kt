@@ -31,12 +31,13 @@ data class PostCreatorDto(
 
     /** "City, ST" if both, else city, else state, else null. */
     val locality: String?
-        get() = when {
-            !city.isNullOrEmpty() && !state.isNullOrEmpty() -> "$city, $state"
-            !city.isNullOrEmpty() -> city
-            !state.isNullOrEmpty() -> state
-            else -> null
-        }
+        get() =
+            when {
+                !city.isNullOrEmpty() && !state.isNullOrEmpty() -> "$city, $state"
+                !city.isNullOrEmpty() -> city
+                !state.isNullOrEmpty() -> state
+                else -> null
+            }
 }
 
 /** Home reference attached to a post. */

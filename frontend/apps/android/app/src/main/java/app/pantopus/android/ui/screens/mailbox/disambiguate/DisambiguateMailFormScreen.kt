@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.mailbox.disambiguate
 
@@ -80,11 +80,13 @@ fun DisambiguateMailFormScreen(
     Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                // Top-bar action is intentionally disabled; sticky CTA owns submit.
                 FormShell(
                     title = "Who is this for?",
                     rightActionLabel = "",
-                    isValid = false, // top-bar action intentionally disabled — sticky CTA owns submit
-                    isDirty = state.isDirty, // drives discard-confirm on close
+                    isValid = false,
+                    // Drives discard-confirm on close.
+                    isDirty = state.isDirty,
                     isSaving = false,
                     onClose = onClose,
                     onCommit = {},

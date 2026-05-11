@@ -86,7 +86,7 @@ public final class PulsePostDetailViewModel {
     private let logger = Logger(label: "app.pantopus.ios.PulsePostDetail")
     private let maxInitialReplies = 3
 
-    public init(postId: String, client: APIClient = .shared) {
+    init(postId: String, client: APIClient = .shared) {
         self.postId = postId
         self.client = client
     }
@@ -284,9 +284,8 @@ public final class PulsePostDetailViewModel {
         // Group by parent → flatten with indentLevel capped at 1.
         let topLevel = comments.filter { $0.parentCommentId == nil && !$0.isDeleted }
         let repliesByParent = Dictionary(
-            grouping: comments.filter { $0.parentCommentId != nil && !$0.isDeleted },
-            by: { $0.parentCommentId ?? "" }
-        )
+            grouping: comments.filter { $0.parentCommentId != nil && !$0.isDeleted }
+        ) { $0.parentCommentId ?? "" }
 
         var rows: [PostCommentRow] = []
         var visibleReplyCount = 0
@@ -337,9 +336,9 @@ public final class PulsePostDetailViewModel {
         let elapsed = Date().timeIntervalSince(date)
         switch elapsed {
         case ..<60: return "Just now"
-        case ..<3_600: return "\(Int(elapsed / 60))m ago"
-        case ..<86_400: return "\(Int(elapsed / 3_600))h ago"
-        case ..<604_800: return "\(Int(elapsed / 86_400))d ago"
+        case ..<3600: return "\(Int(elapsed / 60))m ago"
+        case ..<86400: return "\(Int(elapsed / 3600))h ago"
+        case ..<604_800: return "\(Int(elapsed / 86400))d ago"
         default:
             let display = DateFormatter()
             display.dateStyle = .medium
@@ -357,4 +356,3 @@ public final class PulsePostDetailViewModel {
         }
     }
 }
-

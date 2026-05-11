@@ -79,7 +79,7 @@ class PulsePostDetailViewModel
         private val _toastMessage = MutableStateFlow<String?>(null)
         val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
 
-        private val _showingAllReplies = MutableStateFlow(false)
+        private val showingAllReplies = MutableStateFlow(false)
 
         private val maxInitialReplies = 3
 
@@ -105,7 +105,7 @@ class PulsePostDetailViewModel
 
         fun showMoreReplies() {
             val loaded = _state.value as? PulsePostDetailUiState.Loaded ?: return
-            _showingAllReplies.value = true
+            showingAllReplies.value = true
             _state.value = PulsePostDetailUiState.Loaded(rebuildContent(loaded.content.post))
         }
 
@@ -202,10 +202,11 @@ class PulsePostDetailViewModel
                 // header can never show a verified badge. Wire this up
                 // once feedService.js#CREATOR_SELECT joins `verified`.
                 authorVerified = false,
-                timeAndLocality = formatTimeAndLocality(
-                    createdAt = post.createdAt,
-                    locality = post.creator?.locality ?: post.home?.city,
-                ),
+                timeAndLocality =
+                    formatTimeAndLocality(
+                        createdAt = post.createdAt,
+                        locality = post.creator?.locality ?: post.home?.city,
+                    ),
                 intent = PostIntent.from(post.purpose, post.postType),
                 mediaUrls = post.mediaUrls,
                 reactions =
@@ -230,9 +231,10 @@ class PulsePostDetailViewModel
         private fun buildCommentRows(comments: List<PostCommentDto>): Pair<List<PostCommentRow>, Int> {
             val visible = comments.filter { !it.isDeleted }
             val topLevel = visible.filter { it.parentCommentId == null }
-            val repliesByParent = visible.filter { it.parentCommentId != null }
-                .groupBy { it.parentCommentId ?: "" }
-                .mapValues { (_, list) -> list.sortedBy { it.createdAt } }
+            val repliesByParent =
+                visible.filter { it.parentCommentId != null }
+                    .groupBy { it.parentCommentId ?: "" }
+                    .mapValues { (_, list) -> list.sortedBy { it.createdAt } }
 
             val rows = mutableListOf<PostCommentRow>()
             var visibleReplyCount = 0
@@ -243,7 +245,7 @@ class PulsePostDetailViewModel
                 val replies = repliesByParent[parent.id].orEmpty()
                 totalReplyCount += replies.size
                 val cap =
-                    if (_showingAllReplies.value) {
+                    if (showingAllReplies.value) {
                         replies.size
                     } else {
                         minOf(maxInitialReplies, replies.size)
@@ -254,7 +256,7 @@ class PulsePostDetailViewModel
                 }
             }
             val hidden =
-                if (_showingAllReplies.value) {
+                if (showingAllReplies.value) {
                     0
                 } else {
                     (totalReplyCount - visibleReplyCount).coerceAtLeast(0)
@@ -300,9 +302,10 @@ class PulsePostDetailViewModel
                 seconds < 3_600 -> "${seconds / 60}m ago"
                 seconds < 86_400 -> "${seconds / 3_600}h ago"
                 seconds < 604_800 -> "${seconds / 86_400}d ago"
-                else -> DateTimeFormatter.ISO_LOCAL_DATE.format(
-                    instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
-                )
+                else ->
+                    DateTimeFormatter.ISO_LOCAL_DATE.format(
+                        instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
+                    )
             }
         }
 

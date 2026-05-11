@@ -144,9 +144,11 @@ private struct UploadTile: View {
     private func filledState(name: String, size: Int, isUploaded: Bool) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(spacing: Spacing.s2) {
-                Icon(isUploaded ? .checkCircle : .file,
-                     size: 22,
-                     color: isUploaded ? Theme.Color.success : Theme.Color.primary600)
+                Icon(
+                    isUploaded ? .checkCircle : .file,
+                    size: 22,
+                    color: isUploaded ? Theme.Color.success : Theme.Color.primary600
+                )
                 VStack(alignment: .leading, spacing: 2) {
                     Text(slot.title)
                         .pantopusTextStyle(.caption)
@@ -259,7 +261,7 @@ private struct UploadTile: View {
     private func formatSize(_ bytes: Int) -> String {
         let mb = Double(bytes) / 1_048_576.0
         if mb >= 1 { return String(format: "%.1f MB", mb) }
-        let kb = Double(bytes) / 1_024.0
+        let kb = Double(bytes) / 1024.0
         return String(format: "%.0f KB", kb)
     }
 }
@@ -268,7 +270,12 @@ private struct UploadTile: View {
     UploadSlotsBlock(
         slots: [
             UploadSlot(id: "id", title: "Government ID", acceptHint: "JPG, PNG, or PDF up to 10 MB", state: .empty),
-            UploadSlot(id: "doc", title: "Proof of ownership", acceptHint: "JPG, PNG, or PDF up to 10 MB", state: .uploaded(name: "Deed.pdf", sizeBytes: 256_000))
+            UploadSlot(
+                id: "doc",
+                title: "Proof of ownership",
+                acceptHint: "JPG, PNG, or PDF up to 10 MB",
+                state: .uploaded(name: "Deed.pdf", sizeBytes: 256_000)
+            )
         ],
         onPick: { _ in },
         onRemove: { _ in }

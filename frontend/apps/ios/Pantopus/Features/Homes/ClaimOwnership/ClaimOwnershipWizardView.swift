@@ -17,7 +17,7 @@ public struct ClaimOwnershipWizardView: View {
     private let onClose: @MainActor () -> Void
     private let onOpenClaimsList: @MainActor () -> Void
 
-    public init(
+    init(
         homeId: String,
         api: APIClient = .shared,
         uploader: MultipartUploader = .shared,

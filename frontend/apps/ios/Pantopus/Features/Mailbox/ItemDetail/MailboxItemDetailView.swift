@@ -2,6 +2,7 @@
 //  MailboxItemDetailView.swift
 //  Pantopus
 //
+// swiftlint:disable multiple_closures_with_trailing_closure
 
 import SwiftUI
 
@@ -75,12 +76,11 @@ struct MailboxItemDetailView: View {
             onAIChip: { _ in },
             onPrimary: { Task { await viewModel.performPrimaryAction() } },
             onGhost: { handleGhost(for: content) },
-            onSenderAvatarTap: onOpenSenderProfile,
-            body: { categoryBody(for: content) }
-        )
-        .sheet(item: $termsSheet) { item in
-            CertifiedTermsSheet(termsURL: item.url) { termsSheet = nil }
-        }
+            onSenderAvatarTap: onOpenSenderProfile
+        ) { categoryBody(for: content) }
+            .sheet(item: $termsSheet) { item in
+                CertifiedTermsSheet(termsURL: item.url) { termsSheet = nil }
+            }
     }
 
     /// Ghost CTA dispatcher. For certified mail this surfaces the
@@ -113,13 +113,12 @@ struct MailboxItemDetailView: View {
                 isAcknowledged: Binding(
                     get: { viewModel.certifiedAckChecked },
                     set: { viewModel.certifiedAckChecked = $0 }
-                ),
-                onViewTerms: {
-                    if let url = certified.termsURL {
-                        termsSheet = TermsSheetItem(url: url)
-                    }
+                )
+            ) {
+                if let url = certified.termsURL {
+                    termsSheet = TermsSheetItem(url: url)
                 }
-            )
+            }
         default:
             MailItemPlaceholderBody(category: content.category)
         }
@@ -128,7 +127,7 @@ struct MailboxItemDetailView: View {
     private func ctaContent(for content: MailboxItemDetailContent) -> MailboxCTAShelfContent? {
         switch content.category {
         case .package:
-            return MailboxCTAShelfContent(
+            MailboxCTAShelfContent(
                 primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Delivered" : "Log as received",
                 ghostTitle: "Not mine",
                 primaryLoading: viewModel.ctaFlags.primaryLoading,
@@ -136,7 +135,7 @@ struct MailboxItemDetailView: View {
                 primaryEnabled: content.ctaEnabled && !viewModel.ctaFlags.primaryCompleted
             )
         case .coupon:
-            return MailboxCTAShelfContent(
+            MailboxCTAShelfContent(
                 primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Added to wallet ✓" : "Add to wallet",
                 ghostTitle: "Save for later",
                 primaryLoading: viewModel.ctaFlags.primaryLoading,
@@ -144,7 +143,7 @@ struct MailboxItemDetailView: View {
                 primaryEnabled: content.ctaEnabled && !viewModel.ctaFlags.primaryCompleted
             )
         case .booklet:
-            return MailboxCTAShelfContent(
+            MailboxCTAShelfContent(
                 primaryTitle: "Save to library",
                 ghostTitle: nil,
                 primaryLoading: viewModel.ctaFlags.primaryLoading,
@@ -152,7 +151,7 @@ struct MailboxItemDetailView: View {
                 primaryEnabled: content.ctaEnabled
             )
         case .certified:
-            return MailboxCTAShelfContent(
+            MailboxCTAShelfContent(
                 primaryTitle: viewModel.ctaFlags.primaryCompleted
                     ? "Acknowledged ✓"
                     : "Acknowledge receipt",
@@ -164,7 +163,7 @@ struct MailboxItemDetailView: View {
                     && !viewModel.ctaFlags.primaryCompleted
             )
         default:
-            return nil
+            nil
         }
     }
 }

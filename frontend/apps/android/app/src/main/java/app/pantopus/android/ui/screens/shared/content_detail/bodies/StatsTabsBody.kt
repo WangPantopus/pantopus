@@ -1,4 +1,11 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongParameterList", "LongMethod", "TooManyFunctions")
+@file:Suppress(
+    "MagicNumber",
+    "PackageNaming",
+    "LongParameterList",
+    "LongMethod",
+    "TooManyFunctions",
+    "UnusedPrivateMember",
+)
 
 package app.pantopus.android.ui.screens.shared.content_detail.bodies
 
@@ -115,7 +122,7 @@ fun StatsTabsBody(
             when (selectedTab) {
                 ProfileTab.About -> AboutTabContent(bio = content.bio, skills = content.skills)
                 ProfileTab.Reviews -> ReviewsTabContent(reviews = content.reviews)
-                // TODO: gigs feature not yet integrated in mobile
+                // Gigs feature is not yet integrated in mobile.
                 ProfileTab.Gigs -> GigsTabContent()
             }
         }

@@ -66,10 +66,10 @@ public struct PostCreatorDTO: Decodable, Sendable, Hashable, Identifiable {
     /// Locality summary — "City, ST" if both, else city, else state, else nil.
     public var locality: String? {
         switch (city?.isEmpty, state?.isEmpty) {
-        case (false, false) where city != nil && state != nil: return "\(city ?? ""), \(state ?? "")"
-        case (false, _) where city != nil: return city
-        case (_, false) where state != nil: return state
-        default: return nil
+        case (false, false) where city != nil && state != nil: "\(city ?? ""), \(state ?? "")"
+        case (false, _) where city != nil: city
+        case (_, false) where state != nil: state
+        default: nil
         }
     }
 }
@@ -174,9 +174,9 @@ public struct PostDetailDTO: Decodable, Sendable, Hashable, Identifiable {
         postType = try c.decodeIfPresent(String.self, forKey: .postType)
         postFormat = try c.decodeIfPresent(String.self, forKey: .postFormat)
         purpose = try c.decodeIfPresent(String.self, forKey: .purpose)
-        mediaURLs = (try c.decodeIfPresent([String].self, forKey: .mediaURLs)) ?? []
+        mediaURLs = try (c.decodeIfPresent([String].self, forKey: .mediaURLs)) ?? []
         mediaTypes = try c.decodeIfPresent([String].self, forKey: .mediaTypes)
-        mediaLiveURLs = (try c.decodeIfPresent([String].self, forKey: .mediaLiveURLs)) ?? []
+        mediaLiveURLs = try (c.decodeIfPresent([String].self, forKey: .mediaLiveURLs)) ?? []
         createdAt = try c.decode(String.self, forKey: .createdAt)
         updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
         isEdited = try c.decodeIfPresent(Bool.self, forKey: .isEdited)
@@ -189,6 +189,6 @@ public struct PostDetailDTO: Decodable, Sendable, Hashable, Identifiable {
         userHasLiked = try c.decodeIfPresent(Bool.self, forKey: .userHasLiked) ?? false
         userHasSaved = try c.decodeIfPresent(Bool.self, forKey: .userHasSaved) ?? false
         userHasReposted = try c.decodeIfPresent(Bool.self, forKey: .userHasReposted) ?? false
-        comments = (try c.decodeIfPresent([PostCommentDTO].self, forKey: .comments)) ?? []
+        comments = try (c.decodeIfPresent([PostCommentDTO].self, forKey: .comments)) ?? []
     }
 }

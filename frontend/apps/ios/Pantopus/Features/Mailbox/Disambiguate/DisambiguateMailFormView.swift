@@ -6,6 +6,7 @@
 //  three drawer-recipient radio rows, optional notes, sticky bottom
 //  Confirm CTA.
 //
+// swiftlint:disable multiple_closures_with_trailing_closure
 
 import SwiftUI
 
@@ -50,19 +51,20 @@ struct DisambiguateMailFormView: View {
                     ForEach(MailRecipientChoice.allCases) { choice in
                         RecipientRow(
                             choice: choice,
-                            isSelected: viewModel.selectedChoice == choice,
-                            onTap: { viewModel.select(choice) }
-                        )
-                        .accessibilityIdentifier("disambiguateRow_\(choice.rawValue)")
+                            isSelected: viewModel.selectedChoice == choice
+                        ) { viewModel.select(choice) }
+                            .accessibilityIdentifier("disambiguateRow_\(choice.rawValue)")
                     }
                 }
 
                 FormFieldGroup("Anything else?") {
-                    AliasNotesField(text: Binding(
-                        get: { viewModel.aliasNotes },
-                        set: { viewModel.aliasNotes = $0 }
-                    ),
-                    error: viewModel.aliasError)
+                    AliasNotesField(
+                        text: Binding(
+                            get: { viewModel.aliasNotes },
+                            set: { viewModel.aliasNotes = $0 }
+                        ),
+                        error: viewModel.aliasError
+                    )
                 }
 
                 Color.clear.frame(height: 96) // pad for sticky CTA
@@ -79,7 +81,7 @@ struct DisambiguateMailFormView: View {
         }
     }
 
-    @ViewBuilder private var envelopeCard: some View {
+    private var envelopeCard: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             envelopeImage
             HStack(alignment: .top, spacing: Spacing.s2) {
@@ -93,7 +95,7 @@ struct DisambiguateMailFormView: View {
         }
     }
 
-    @ViewBuilder private var envelopeImage: some View {
+    private var envelopeImage: some View {
         Group {
             if let url = viewModel.envelopeImageURL {
                 AsyncImage(url: url) { phase in
@@ -134,16 +136,15 @@ struct DisambiguateMailFormView: View {
         }
     }
 
-    @ViewBuilder private var stickyCTA: some View {
+    private var stickyCTA: some View {
         VStack(spacing: 0) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
             PrimaryButton(
                 title: "Confirm recipient",
                 isLoading: viewModel.isSubmitting,
-                isEnabled: viewModel.canSubmit,
-                action: { await viewModel.submit() }
-            )
-            .padding(Spacing.s4)
+                isEnabled: viewModel.canSubmit
+            ) { await viewModel.submit() }
+                .padding(Spacing.s4)
         }
         .background(Theme.Color.appSurface)
     }
@@ -196,10 +197,10 @@ private struct RecipientRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(choice.title), \(choice.subtitle)")
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
-        .accessibilityAddTraits([.isButton] + (isSelected ? [.isSelected] : []))
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
-    @ViewBuilder private var radioMark: some View {
+    private var radioMark: some View {
         ZStack {
             Circle()
                 .stroke(
@@ -217,7 +218,9 @@ private struct RecipientRow: View {
 private struct ConfidencePill: View {
     let confidence: Double
 
-    private var percent: Int { Int((confidence * 100).rounded()) }
+    private var percent: Int {
+        Int((confidence * 100).rounded())
+    }
 
     private var palette: (background: Color, foreground: Color) {
         switch confidence {
@@ -253,7 +256,7 @@ private struct AliasNotesField: View {
                 .foregroundStyle(Theme.Color.appTextSecondary)
             TextField("Add a name to remember this routing", text: $text, axis: .vertical)
                 .lineLimit(3...6)
-                .pantopusTextStyle(.body)
+                .font(Theme.Font.body)
                 .padding(Spacing.s3)
                 .frame(minHeight: 80, alignment: .topLeading)
                 .background(Theme.Color.appSurfaceSunken)
@@ -283,7 +286,6 @@ private struct AliasNotesField: View {
         mailId: "m-preview",
         ocrRecipient: "MS. ALEX RIVERA\n140 MAIN ST APT 4\nCAMBRIDGE MA 02139",
         confidence: 0.85,
-        envelopeImageURL: nil,
-        onClose: {}
-    )
+        envelopeImageURL: nil
+    ) {}
 }

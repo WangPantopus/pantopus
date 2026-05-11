@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "UnusedParameter")
 
 package app.pantopus.android.data.api.models.homes
 
@@ -19,7 +19,10 @@ import com.squareup.moshi.ToJson
  */
 class UploadEvidenceRequestJsonAdapter {
     @ToJson
-    fun toJson(writer: JsonWriter, value: UploadEvidenceRequest) {
+    fun toJson(
+        writer: JsonWriter,
+        value: UploadEvidenceRequest,
+    ) {
         writer.beginObject()
         writer.name("evidence_type").value(value.evidenceType)
         writer.name("provider").value(value.provider)

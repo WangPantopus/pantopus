@@ -123,5 +123,5 @@ private struct ErrorLayout: View {
 }
 
 #Preview {
-    PublicProfileView(userId: "preview", onBack: {})
+    PublicProfileView(userId: "preview") {}
 }

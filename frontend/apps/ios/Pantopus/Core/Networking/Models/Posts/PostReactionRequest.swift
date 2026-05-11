@@ -23,7 +23,9 @@ public enum PostReactionKind: String, Sendable, CaseIterable, Identifiable {
     case heart
     case going
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Spoken label for VoiceOver / TalkBack.
     public var accessibilityLabel: String {
@@ -35,5 +37,7 @@ public enum PostReactionKind: String, Sendable, CaseIterable, Identifiable {
     }
 
     /// Whether the reaction is wired to a real backend route.
-    public var isBackendWired: Bool { self == .helpful }
+    public var isBackendWired: Bool {
+        self == .helpful
+    }
 }

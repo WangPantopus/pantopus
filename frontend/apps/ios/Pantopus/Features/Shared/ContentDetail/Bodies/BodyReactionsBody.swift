@@ -5,6 +5,7 @@
 //  `body_reactions` slot for the Pulse post detail. Body copy → media
 //  grid → reactions bar → inline composer → flattened comment thread.
 //
+// swiftlint:disable multiple_closures_with_trailing_closure
 
 import SwiftUI
 
@@ -61,7 +62,7 @@ public struct PostReactionCounts: Sendable, Hashable {
 /// surface; all state lives in the host view-model.
 @MainActor
 public struct BodyReactionsBody: View {
-    private let body: String
+    private let bodyText: String
     private let mediaURLs: [URL]
     private let reactions: PostReactionCounts
     private let onReactionTap: @MainActor (PostReactionKind) -> Void
@@ -90,7 +91,7 @@ public struct BodyReactionsBody: View {
         onShowMoreReplies: (@MainActor () -> Void)? = nil,
         onCommentAvatarTap: @escaping @MainActor (String) -> Void = { _ in }
     ) {
-        self.body = body
+        bodyText = body
         self.mediaURLs = mediaURLs
         self.reactions = reactions
         self.onReactionTap = onReactionTap
@@ -107,13 +108,13 @@ public struct BodyReactionsBody: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            if !body.isEmpty {
-                Text(body)
+            if !bodyText.isEmpty {
+                Text(bodyText)
                     .font(.system(size: 15, weight: .regular))
                     .foregroundStyle(Theme.Color.appText)
                     .lineSpacing(7) // 15 + 7 ≈ 22pt line height
                     .padding(.horizontal, Spacing.s4)
-                    .accessibilityLabel(body)
+                    .accessibilityLabel(bodyText)
             }
 
             if !mediaURLs.isEmpty {
@@ -202,7 +203,7 @@ private struct PostMediaGrid: View {
         }
     }
 
-    @ViewBuilder private func mediaTile(_ url: URL) -> some View {
+    private func mediaTile(_ url: URL) -> some View {
         AsyncImage(url: url) { phase in
             switch phase {
             case let .success(image):
@@ -231,23 +232,20 @@ private struct ReactionsBar: View {
                 kind: .helpful,
                 icon: .thumbsUp,
                 count: counts.helpful,
-                isSelected: counts.userReaction == .helpful,
-                onTap: { onTap(.helpful) }
-            )
+                isSelected: counts.userReaction == .helpful
+            ) { onTap(.helpful) }
             ReactionPill(
                 kind: .heart,
                 icon: .heart,
                 count: counts.heart,
-                isSelected: counts.userReaction == .heart,
-                onTap: { onTap(.heart) }
-            )
+                isSelected: counts.userReaction == .heart
+            ) { onTap(.heart) }
             ReactionPill(
                 kind: .going,
                 icon: .check,
                 count: counts.going,
-                isSelected: counts.userReaction == .going,
-                onTap: { onTap(.going) }
-            )
+                isSelected: counts.userReaction == .going
+            ) { onTap(.going) }
             Spacer()
         }
     }
@@ -426,10 +424,9 @@ private struct CommentRow: View {
                 timestamp: "2m ago",
                 indentLevel: 1,
                 authorUserId: "u2"
-            ),
+            )
         ],
-        hiddenReplyCount: 4,
-        onShowMoreReplies: {}
-    )
-    .background(Theme.Color.appBg)
+        hiddenReplyCount: 4
+    ) {}
+        .background(Theme.Color.appBg)
 }

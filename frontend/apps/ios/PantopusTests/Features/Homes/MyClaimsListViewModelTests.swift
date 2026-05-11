@@ -35,7 +35,7 @@ final class MyClaimsListViewModelTests: XCTestCase {
             return
         }
         XCTAssertEqual(content.headline, "No claims yet")
-        XCTAssertEqual(content.ctaTitle, "Claim a home")
+        XCTAssertEqual(content.ctaTitle, "Add a home")
     }
 
     func testLoadedResponseMapsToRows() async {

@@ -39,7 +39,7 @@ public final class MultipartUploader: @unchecked Sendable {
     private let environment: AppEnvironment
     private let logger = Logger(label: "app.pantopus.ios.MultipartUploader")
 
-    public init(
+    init(
         environment: AppEnvironment = .current,
         session: URLSession? = nil
     ) {
@@ -113,18 +113,17 @@ public final class MultipartUploader: @unchecked Sendable {
     ) -> Data {
         var body = Data()
         for (name, value) in fields.sorted(by: { $0.key < $1.key }) {
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
-            body.append("\(value)\r\n".data(using: .utf8)!)
+            body.append(Data("--\(boundary)\r\n".utf8))
+            body.append(Data("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".utf8))
+            body.append(Data("\(value)\r\n".utf8))
         }
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append(Data("--\(boundary)\r\n".utf8))
         body.append(
-            "Content-Disposition: form-data; name=\"\(file.fieldName)\"; filename=\"\(file.filename)\"\r\n"
-                .data(using: .utf8)!
+            Data("Content-Disposition: form-data; name=\"\(file.fieldName)\"; filename=\"\(file.filename)\"\r\n".utf8)
         )
-        body.append("Content-Type: \(file.mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(Data("Content-Type: \(file.mimeType)\r\n\r\n".utf8))
         body.append(file.data)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
         return body
     }
 }

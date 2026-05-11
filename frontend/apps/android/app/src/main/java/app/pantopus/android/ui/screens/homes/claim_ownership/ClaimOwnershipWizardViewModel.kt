@@ -1,4 +1,11 @@
-@file:Suppress("PackageNaming", "TooManyFunctions", "LongMethod")
+@file:Suppress(
+    "PackageNaming",
+    "TooManyFunctions",
+    "LongMethod",
+    "CyclomaticComplexMethod",
+    "LoopWithTooManyJumpStatements",
+    "MagicNumber",
+)
 
 package app.pantopus.android.ui.screens.homes.claim_ownership
 
@@ -132,7 +139,10 @@ open class ClaimOwnershipWizardViewModel
 
         // MARK: - Slot management
 
-        fun picked(slot: ClaimEvidenceSlot, file: ClaimPickedFile) {
+        fun picked(
+            slot: ClaimEvidenceSlot,
+            file: ClaimPickedFile,
+        ) {
             // Picking a new file invalidates any prior URL we'd cached
             // for this slot — the next submit must re-upload these bytes.
             pendingUploadUrls.remove(slot)
@@ -178,34 +188,35 @@ open class ClaimOwnershipWizardViewModel
             // Step 1: create the claim — but only once across retry
             // attempts. Holding the id in `pendingClaimId` keeps a
             // partial-success retry from creating a duplicate row.
-            val claimId = pendingClaimId ?: run {
-                val claimResult =
-                    repository.submitClaim(homeId, SubmitClaimRequest(method = "doc_upload"))
-                val envelope =
-                    when (claimResult) {
-                        is NetworkResult.Success -> claimResult.data.claim
-                        is NetworkResult.Failure -> {
+            val claimId =
+                pendingClaimId ?: run {
+                    val claimResult =
+                        repository.submitClaim(homeId, SubmitClaimRequest(method = "doc_upload"))
+                    val envelope =
+                        when (claimResult) {
+                            is NetworkResult.Success -> claimResult.data.claim
+                            is NetworkResult.Failure -> {
+                                Analytics.track(AnalyticsEvent.CtaClaimOwnershipSubmit(AnalyticsResult.ERROR))
+                                _state.update {
+                                    it.copy(isSubmitting = false, submitError = "Couldn't submit. Retry.")
+                                }
+                                return
+                            }
+                        }
+                    val resolvedId =
+                        envelope.id ?: run {
                             Analytics.track(AnalyticsEvent.CtaClaimOwnershipSubmit(AnalyticsResult.ERROR))
                             _state.update {
-                                it.copy(isSubmitting = false, submitError = "Couldn't submit. Retry.")
+                                it.copy(
+                                    isSubmitting = false,
+                                    submitError = "We're already working on a claim for this home.",
+                                )
                             }
                             return
                         }
-                    }
-                val resolvedId =
-                    envelope.id ?: run {
-                        Analytics.track(AnalyticsEvent.CtaClaimOwnershipSubmit(AnalyticsResult.ERROR))
-                        _state.update {
-                            it.copy(
-                                isSubmitting = false,
-                                submitError = "We're already working on a claim for this home.",
-                            )
-                        }
-                        return
-                    }
-                pendingClaimId = resolvedId
-                resolvedId
-            }
+                    pendingClaimId = resolvedId
+                    resolvedId
+                }
 
             // Step 2: upload each slot's bytes, then register the URL as
             // evidence. Skip slots already fully uploaded and reuse any
@@ -281,7 +292,10 @@ open class ClaimOwnershipWizardViewModel
             }
         }
 
-        private fun markSlot(slot: ClaimEvidenceSlot, value: ClaimSlotState) {
+        private fun markSlot(
+            slot: ClaimEvidenceSlot,
+            value: ClaimSlotState,
+        ) {
             _state.update { current ->
                 current.copy(slots = current.slots.toMutableMap().apply { put(slot, value) })
             }

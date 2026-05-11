@@ -115,7 +115,7 @@ private struct ReviewerNoteField: View {
                 axis: .vertical
             )
             .lineLimit(4...8)
-            .pantopusTextStyle(.body)
+            .font(Theme.Font.body)
             .padding(Spacing.s3)
             .frame(minHeight: 96, alignment: .topLeading)
             .background(Theme.Color.appSurface)

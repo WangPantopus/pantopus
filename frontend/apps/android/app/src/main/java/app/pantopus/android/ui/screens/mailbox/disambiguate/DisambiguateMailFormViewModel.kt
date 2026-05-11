@@ -64,11 +64,12 @@ data class DisambiguateUiState(
 ) {
     /** Char-count error when the alias would exceed the schema limit. */
     val aliasError: String?
-        get() = if (aliasNotes.trim().length > 255) {
-            "Notes must be 255 characters or fewer."
-        } else {
-            null
-        }
+        get() =
+            if (aliasNotes.trim().length > 255) {
+                "Notes must be 255 characters or fewer."
+            } else {
+                null
+            }
 
     val canSubmit: Boolean get() = selected != null && aliasError == null && !isSubmitting
 
@@ -129,12 +130,13 @@ class DisambiguateMailFormViewModel
 
         fun submit() {
             val current = _state.value
-            val choice = current.selected ?: run {
-                _state.update {
-                    it.copy(toast = ToastPayload("Pick a destination first.", isError = true))
+            val choice =
+                current.selected ?: run {
+                    _state.update {
+                        it.copy(toast = ToastPayload("Pick a destination first.", isError = true))
+                    }
+                    return
                 }
-                return
-            }
             current.aliasError?.let { msg ->
                 _state.update { it.copy(toast = ToastPayload(msg, isError = true)) }
                 return

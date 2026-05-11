@@ -48,7 +48,10 @@ class PulsePostDetailViewModelTest {
             savedStateHandle = SavedStateHandle(mapOf(PULSE_POST_DETAIL_ID_KEY to "p1")),
         )
 
-    private fun creator(id: String = "u1", name: String = "Alex Rivera"): PostCreatorDto =
+    private fun creator(
+        id: String = "u1",
+        name: String = "Alex Rivera",
+    ): PostCreatorDto =
         PostCreatorDto(
             id = id,
             username = name.lowercase().split(" ").first(),
@@ -144,16 +147,17 @@ class PulsePostDetailViewModelTest {
 
     @Test fun send_comment_refetches_and_clears_composer() =
         runTest {
-            val reply = PostCommentDto(
-                id = "c-new",
-                postId = "p1",
-                userId = "u1",
-                parentCommentId = null,
-                comment = "hi",
-                createdAt = "2026-04-30T12:07:00.000Z",
-                isDeleted = false,
-                author = creator(),
-            )
+            val reply =
+                PostCommentDto(
+                    id = "c-new",
+                    postId = "p1",
+                    userId = "u1",
+                    parentCommentId = null,
+                    comment = "hi",
+                    createdAt = "2026-04-30T12:07:00.000Z",
+                    isDeleted = false,
+                    author = creator(),
+                )
             coEvery { repo.detail("p1") } returns NetworkResult.Success(sampleResponse())
             coEvery { repo.createComment("p1", any()) } returns
                 NetworkResult.Success(PostCommentCreateResponse(comment = reply))
@@ -176,24 +180,26 @@ class PulsePostDetailViewModelTest {
 
     @Test fun comments_flatten_to_depth_one() =
         runTest {
-            val top = PostCommentDto(
-                id = "c1",
-                postId = "p1",
-                userId = "u2",
-                parentCommentId = null,
-                comment = "Top",
-                createdAt = "2026-04-30T12:05:00.000Z",
-                isDeleted = false,
-                author = creator("u2", "Maria Chen"),
-            )
-            val reply = top.copy(
-                id = "c2",
-                userId = "u3",
-                parentCommentId = "c1",
-                comment = "Reply",
-                createdAt = "2026-04-30T12:06:00.000Z",
-                author = creator("u3", "Sam Lee"),
-            )
+            val top =
+                PostCommentDto(
+                    id = "c1",
+                    postId = "p1",
+                    userId = "u2",
+                    parentCommentId = null,
+                    comment = "Top",
+                    createdAt = "2026-04-30T12:05:00.000Z",
+                    isDeleted = false,
+                    author = creator("u2", "Maria Chen"),
+                )
+            val reply =
+                top.copy(
+                    id = "c2",
+                    userId = "u3",
+                    parentCommentId = "c1",
+                    comment = "Reply",
+                    createdAt = "2026-04-30T12:06:00.000Z",
+                    author = creator("u3", "Sam Lee"),
+                )
             coEvery { repo.detail("p1") } returns
                 NetworkResult.Success(PostDetailResponse(samplePost(comments = listOf(top, reply))))
             val vm = makeVm()

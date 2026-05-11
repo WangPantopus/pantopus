@@ -49,7 +49,7 @@ public enum ClaimEvidenceSlot: String, CaseIterable, Sendable {
 /// Maximum file size accepted by the wizard's client-side picker.
 /// Mirrors the backend's `/api/files/upload` cap so the user sees an
 /// inline error instead of a 413 round-trip.
-public let CLAIM_FILE_MAX_BYTES: Int = 10 * 1_024 * 1_024
+public let CLAIM_FILE_MAX_BYTES: Int = 10 * 1024 * 1024
 
 /// One picked file held in the VM until submit time.
 public struct ClaimPickedFile: Sendable, Equatable {
@@ -63,7 +63,9 @@ public struct ClaimPickedFile: Sendable, Equatable {
         self.data = data
     }
 
-    public var sizeBytes: Int { data.count }
+    public var sizeBytes: Int {
+        data.count
+    }
 }
 
 /// Per-slot upload state surfaced to the UI.

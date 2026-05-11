@@ -158,7 +158,7 @@ public struct ProfileHeader: View {
         identityBadges: [
             IdentityPillarBadge(pillar: .personal, state: .verified),
             IdentityPillarBadge(pillar: .home, state: .verified),
-            IdentityPillarBadge(pillar: .business, state: .unverified),
+            IdentityPillarBadge(pillar: .business, state: .unverified)
         ]
     )
     .padding(.vertical, Spacing.s4)

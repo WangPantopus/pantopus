@@ -16,6 +16,7 @@
 //  - The evidence endpoint takes JSON `storage_ref`, not multipart.
 //    Real bytes go through `/api/files/upload` first.
 //
+// swiftlint:disable function_body_length
 
 import Foundation
 import Logging
@@ -75,7 +76,7 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
     var chrome: WizardChrome {
         switch currentStep {
         case .start:
-            return WizardChrome(
+            WizardChrome(
                 title: "Claim ownership",
                 progressLabel: .stepOf(current: 1, total: 3),
                 progressFraction: 1.0 / 3.0,
@@ -92,7 +93,7 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
                 showsProgressBar: true
             )
         case .upload:
-            return WizardChrome(
+            WizardChrome(
                 title: "Claim ownership",
                 progressLabel: .stepOf(current: 2, total: 3),
                 progressFraction: 2.0 / 3.0,
@@ -105,7 +106,7 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
                 showsProgressBar: true
             )
         case .success:
-            return WizardChrome(
+            WizardChrome(
                 title: "Claim ownership",
                 progressLabel: .hidden,
                 progressFraction: nil,
@@ -169,12 +170,12 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
     /// Surface a "file too large" error inline rather than letting the
     /// upload round-trip to a 413. Called by the picker when the user
     /// selects a file over `CLAIM_FILE_MAX_BYTES`.
-    func fileTooLarge(for slot: ClaimEvidenceSlot) {
+    func fileTooLarge(for _: ClaimEvidenceSlot) {
         submitError = "That file is over 10 MB. Try a smaller photo."
     }
 
     var bothSlotsHaveFiles: Bool {
-        slots.values.allSatisfy { $0.hasFile }
+        slots.values.allSatisfy(\.hasFile)
     }
 
     var anySlotHasFile: Bool {

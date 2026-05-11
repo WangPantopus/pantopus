@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongParameterList")
+@file:Suppress("MagicNumber", "PackageNaming", "LongParameterList", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components
 
@@ -24,7 +24,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.theme.PantopusColors
-import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import coil.compose.SubcomposeAsyncImage

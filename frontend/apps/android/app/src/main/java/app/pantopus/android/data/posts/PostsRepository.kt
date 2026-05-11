@@ -19,12 +19,10 @@ class PostsRepository
         private val api: PostsApi,
     ) {
         /** `GET /api/posts/:id`. */
-        suspend fun detail(id: String): NetworkResult<PostDetailResponse> =
-            safeApiCall { api.detail(id) }
+        suspend fun detail(id: String): NetworkResult<PostDetailResponse> = safeApiCall { api.detail(id) }
 
         /** `POST /api/posts/:id/like`. */
-        suspend fun toggleLike(id: String): NetworkResult<PostLikeResponse> =
-            safeApiCall { api.toggleLike(id) }
+        suspend fun toggleLike(id: String): NetworkResult<PostLikeResponse> = safeApiCall { api.toggleLike(id) }
 
         /** `GET /api/posts/:id/comments`. */
         suspend fun comments(

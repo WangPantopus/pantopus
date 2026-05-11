@@ -66,9 +66,8 @@ public struct PulsePostDetailView: View {
                     isVerified: detail.authorVerified,
                     identity: detail.authorIdentity,
                     timeAndLocality: detail.timeAndLocality,
-                    intent: detail.intent,
-                    onAvatarTap: { onOpenProfile(detail.post.userId) }
-                )
+                    intent: detail.intent
+                ) { onOpenProfile(detail.post.userId) }
             },
             body: {
                 BodyReactionsBody(
@@ -140,5 +139,5 @@ private struct ErrorLayout: View {
 }
 
 #Preview {
-    PulsePostDetailView(postId: "preview", onBack: {})
+    PulsePostDetailView(postId: "preview") {}
 }

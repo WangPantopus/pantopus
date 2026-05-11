@@ -33,8 +33,8 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         switch self {
         case .package: Theme.Color.delivery
         case .coupon: Theme.Color.childCare
-        case .booklet: Theme.Color.moving // violet (#8e44ad) per P18 FrameBooklet
-        case .certified: Theme.Color.primary600 // primary (#0284c7) per P18 FrameCertified
+        case .booklet: Theme.Color.moving // violet token per P18 FrameBooklet
+        case .certified: Theme.Color.primary600 // primary token per P18 FrameCertified
         case .notice: Theme.Color.warning
         case .bill: Theme.Color.error
         case .statement: Theme.Color.tutoring

@@ -6,6 +6,7 @@
 //  Backend doesn't accept the Role / Personal Note fields the design
 //  draws, so they're omitted (see PR description).
 //
+// swiftlint:disable multiple_closures_with_trailing_closure
 
 import SwiftUI
 
@@ -99,7 +100,6 @@ struct InviteOwnerFormView: View {
 #Preview {
     InviteOwnerFormView(
         homeId: "home-preview",
-        currentUserEmail: "me@example.com",
-        onClose: {}
-    )
+        currentUserEmail: "me@example.com"
+    ) {}
 }

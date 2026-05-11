@@ -70,6 +70,5 @@ class MailboxRepository
             safeApiCall { v2Api.packageStatusUpdate(mailId, PackageStatusUpdateRequest(status = status)) }
 
         /** `POST /api/mailbox/v2/resolve`. */
-        suspend fun resolve(request: ResolveRoutingRequest): NetworkResult<ResolveRoutingResponse> =
-            safeApiCall { v2Api.resolve(request) }
+        suspend fun resolve(request: ResolveRoutingRequest): NetworkResult<ResolveRoutingResponse> = safeApiCall { v2Api.resolve(request) }
     }

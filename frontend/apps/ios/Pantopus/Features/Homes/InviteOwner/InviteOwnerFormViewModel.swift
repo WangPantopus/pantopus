@@ -64,8 +64,14 @@ final class InviteOwnerFormViewModel {
         FormAggregate(fields: InviteOwnerField.allCases.compactMap { fields[$0] })
     }
 
-    var isValid: Bool { aggregate.isValid }
-    var isDirty: Bool { aggregate.isDirty }
+    var isValid: Bool {
+        let email = fields[.email]?.value.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return aggregate.isValid && !email.isEmpty
+    }
+
+    var isDirty: Bool {
+        aggregate.isDirty
+    }
 
     /// Run all validators. Returns the first invalid field id.
     @discardableResult

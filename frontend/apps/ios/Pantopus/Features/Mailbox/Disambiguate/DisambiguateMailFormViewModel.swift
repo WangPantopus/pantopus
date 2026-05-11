@@ -23,7 +23,9 @@ public enum MailRecipientChoice: String, CaseIterable, Identifiable, Sendable {
     case home
     case business
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Human-readable row label.
     public var title: String {

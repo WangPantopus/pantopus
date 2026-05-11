@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming")
+@file:Suppress("MagicNumber", "PackageNaming", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components
 
@@ -89,9 +89,10 @@ fun BookletPageSwiper(
             text = "Page ${pagerState.currentPage + 1} of ${pages.size}",
             style = PantopusTextStyle.caption,
             color = PantopusColors.appTextSecondary,
-            modifier = Modifier.semantics {
-                contentDescription = "Page ${pagerState.currentPage + 1} of ${pages.size}"
-            },
+            modifier =
+                Modifier.semantics {
+                    contentDescription = "Page ${pagerState.currentPage + 1} of ${pages.size}"
+                },
         )
     }
 }
@@ -125,10 +126,11 @@ private fun BookletPage(
         SubcomposeAsyncImage(
             model = url,
             contentDescription = null,
-            modifier = Modifier.fillMaxWidth().graphicsLayer(
-                scaleX = scale.value,
-                scaleY = scale.value,
-            ),
+            modifier =
+                Modifier.fillMaxWidth().graphicsLayer(
+                    scaleX = scale.value,
+                    scaleY = scale.value,
+                ),
             loading = {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))

@@ -86,6 +86,7 @@ public struct HomeHeroHeader: View {
 }
 
 // MARK: - Stubs (implemented in later prompts)
+
 //
 // `PostAuthorHeaderStub` and `ProfileHeaderStub` were removed in P17 —
 // their concrete implementations now live in

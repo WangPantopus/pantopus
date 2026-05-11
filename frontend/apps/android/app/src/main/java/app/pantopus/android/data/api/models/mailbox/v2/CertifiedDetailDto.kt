@@ -62,8 +62,9 @@ data class CertifiedDetailDto(
                 documentType = payload["document_type"] as? String,
                 acknowledgeBy = payload["acknowledge_by"] as? String,
                 chain = chain,
-                noticeBody = (payload["notice_body"] as? String)
-                    ?: (payload["body"] as? String),
+                noticeBody =
+                    (payload["notice_body"] as? String)
+                        ?: (payload["body"] as? String),
                 termsUrl = payload["terms_url"] as? String,
                 isAcknowledged = (payload["is_acknowledged"] as? Boolean) ?: false,
             )

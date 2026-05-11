@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongParameterList")
+@file:Suppress("MagicNumber", "PackageNaming", "LongParameterList", "MatchingDeclarationName", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.shared.content_detail.headers
 

@@ -130,7 +130,7 @@ final class PulsePostDetailViewModelTests: XCTestCase {
     func testHelpfulOptimisticToggleAndReconcile() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.postJSON),
-            .status(200, body: "{\"liked\":true,\"likeCount\":4}"),
+            .status(200, body: "{\"liked\":true,\"likeCount\":4}")
         ]
         let vm = PulsePostDetailViewModel(postId: "p1", client: makeAPI())
         await vm.load()
@@ -146,7 +146,7 @@ final class PulsePostDetailViewModelTests: XCTestCase {
     func testHelpfulRollbackOnFailure() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.postJSON),
-            .status(500, body: "{\"error\":\"boom\"}"),
+            .status(500, body: "{\"error\":\"boom\"}")
         ]
         let vm = PulsePostDetailViewModel(postId: "p1", client: makeAPI())
         await vm.load()
@@ -173,8 +173,14 @@ final class PulsePostDetailViewModelTests: XCTestCase {
     func testSendCommentRefetchesAndClearsComposer() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.postJSON),
-            .status(201, body: "{\"comment\":{\"id\":\"c3\",\"post_id\":\"p1\",\"user_id\":\"u1\",\"parent_comment_id\":null,\"comment\":\"hi\",\"created_at\":\"2026-04-30T12:07:00.000Z\",\"is_deleted\":false}}"),
-            .status(200, body: Self.postJSON),
+            .status(
+                201,
+                body: """
+                {"comment":{"id":"c3","post_id":"p1","user_id":"u1","parent_comment_id":null,
+                "comment":"hi","created_at":"2026-04-30T12:07:00.000Z","is_deleted":false}}
+                """
+            ),
+            .status(200, body: Self.postJSON)
         ]
         let vm = PulsePostDetailViewModel(postId: "p1", client: makeAPI())
         await vm.load()

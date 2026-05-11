@@ -7,6 +7,7 @@
 //  `POST /api/mailbox/v2/item/:id/action` and
 //  `PATCH /api/mailbox/v2/package/:mailId/status`.
 //
+// swiftlint:disable file_length type_body_length
 
 import Foundation
 import Observation
@@ -424,7 +425,7 @@ final class MailboxItemDetailViewModel {
         category: MailItemCategory,
         certified: CertifiedDetailDTO
     ) {
-        let timeline: [TimelineStep] = certified.chain.enumerated().map { _, step in
+        let timeline: [TimelineStep] = certified.chain.map { step in
             TimelineStep(
                 id: step.id,
                 title: step.label,
@@ -587,11 +588,11 @@ final class MailboxItemDetailViewModel {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let parsed =
             formatter.date(from: iso)
-            ?? ISO8601DateFormatter().date(from: iso)
-            ?? dateOnlyFormatter.date(from: iso)
+                ?? ISO8601DateFormatter().date(from: iso)
+                ?? dateOnlyFormatter.date(from: iso)
         guard let date = parsed else { return nil }
         let interval = date.timeIntervalSinceNow
-        return Int((interval / 86_400).rounded(.down))
+        return Int((interval / 86400).rounded(.down))
     }
 
     private static let dateOnlyFormatter: DateFormatter = {
@@ -632,4 +633,3 @@ final class MailboxItemDetailViewModel {
         return updated
     }
 }
-

@@ -131,19 +131,21 @@ class PublicProfileViewModel
             val stats = mutableListOf<ProfileStatCell>()
             val reviewCount = profile.reviewCount ?: 0
             if (reviewCount > 0 || profile.reviews.isNotEmpty()) {
-                stats += ProfileStatCell(
-                    id = "reviews",
-                    value = "${profile.reviewCount ?: profile.reviews.size}",
-                    label = "Reviews",
-                )
+                stats +=
+                    ProfileStatCell(
+                        id = "reviews",
+                        value = "${profile.reviewCount ?: profile.reviews.size}",
+                        label = "Reviews",
+                    )
             }
             val rating = profile.averageRating ?: 0.0
             if (rating > 0) {
-                stats += ProfileStatCell(
-                    id = "rating",
-                    value = "%.1f".format(rating),
-                    label = "Rating",
-                )
+                stats +=
+                    ProfileStatCell(
+                        id = "rating",
+                        value = "%.1f".format(rating),
+                        label = "Rating",
+                    )
             }
             val gigsCompleted = profile.gigsCompleted ?: 0
             val gigsPosted = profile.gigsPosted ?: 0
@@ -184,6 +186,18 @@ class PublicProfileViewModel
 
         private fun buildBadges(profile: PublicProfileDto): List<IdentityPillarBadge> {
             val verified = profile.verified == true
+            val homeState =
+                if (hasHomeResidency(profile)) {
+                    IdentityPillarVerificationState.Verified
+                } else {
+                    IdentityPillarVerificationState.Unverified
+                }
+            val businessState =
+                if (profile.accountType == "business") {
+                    IdentityPillarVerificationState.Verified
+                } else {
+                    IdentityPillarVerificationState.Unverified
+                }
             return listOf(
                 IdentityPillarBadge(
                     pillar = IdentityPillar.Personal,
@@ -191,11 +205,11 @@ class PublicProfileViewModel
                 ),
                 IdentityPillarBadge(
                     pillar = IdentityPillar.Home,
-                    state = if (hasHomeResidency(profile)) IdentityPillarVerificationState.Verified else IdentityPillarVerificationState.Unverified,
+                    state = homeState,
                 ),
                 IdentityPillarBadge(
                     pillar = IdentityPillar.Business,
-                    state = if (profile.accountType == "business") IdentityPillarVerificationState.Verified else IdentityPillarVerificationState.Unverified,
+                    state = businessState,
                 ),
             )
         }
@@ -233,4 +247,3 @@ class PublicProfileViewModel
                 else -> "Something went wrong. Try again."
             }
     }
-

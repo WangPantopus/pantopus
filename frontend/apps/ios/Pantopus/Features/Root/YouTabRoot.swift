@@ -4,6 +4,7 @@
 //
 //  Placeholder "You" tab with account summary and sign-out.
 //
+// swiftlint:disable closure_end_indentation
 
 import SwiftUI
 
@@ -128,80 +129,78 @@ public struct YouTabRoot: View {
             }
             #if DEBUG
             .alert("Open profile", isPresented: $debugProfileSheet) {
-                TextField("User ID", text: $debugProfileId)
-                Button("Open") {
-                    let id = debugProfileId.trimmingCharacters(in: .whitespaces)
-                    if !id.isEmpty {
-                        path.append(.publicProfile(userId: id))
-                        debugProfileId = ""
+                    TextField("User ID", text: $debugProfileId)
+                    Button("Open") {
+                        let id = debugProfileId.trimmingCharacters(in: .whitespaces)
+                        if !id.isEmpty {
+                            path.append(.publicProfile(userId: id))
+                            debugProfileId = ""
+                        }
                     }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Paste a Pantopus user UUID")
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Paste a Pantopus user UUID")
-            }
-            .alert("Open post", isPresented: $debugPostSheet) {
-                TextField("Post ID", text: $debugPostId)
-                Button("Open") {
-                    let id = debugPostId.trimmingCharacters(in: .whitespaces)
-                    if !id.isEmpty {
-                        path.append(.pulsePost(postId: id))
-                        debugPostId = ""
+                .alert("Open post", isPresented: $debugPostSheet) {
+                    TextField("Post ID", text: $debugPostId)
+                    Button("Open") {
+                        let id = debugPostId.trimmingCharacters(in: .whitespaces)
+                        if !id.isEmpty {
+                            path.append(.pulsePost(postId: id))
+                            debugPostId = ""
+                        }
                     }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Paste a Pulse post UUID")
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Paste a Pulse post UUID")
-            }
-            .alert("Invite owner", isPresented: $debugInviteHomeSheet) {
-                TextField("Home ID", text: $debugInviteHomeId)
-                Button("Open") {
-                    let id = debugInviteHomeId.trimmingCharacters(in: .whitespaces)
-                    if !id.isEmpty {
-                        debugInviteFormHomeId = id
-                        debugInviteHomeId = ""
+                .alert("Invite owner", isPresented: $debugInviteHomeSheet) {
+                    TextField("Home ID", text: $debugInviteHomeId)
+                    Button("Open") {
+                        let id = debugInviteHomeId.trimmingCharacters(in: .whitespaces)
+                        if !id.isEmpty {
+                            debugInviteFormHomeId = id
+                            debugInviteHomeId = ""
+                        }
                     }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Paste a home UUID")
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Paste a home UUID")
-            }
-            .alert("Disambiguate mail", isPresented: $debugDisambiguateSheet) {
-                TextField("Mail ID", text: $debugDisambiguateMailId)
-                Button("Open") {
-                    let id = debugDisambiguateMailId.trimmingCharacters(in: .whitespaces)
-                    if !id.isEmpty {
-                        debugDisambiguateFormMailId = id
-                        debugDisambiguateMailId = ""
+                .alert("Disambiguate mail", isPresented: $debugDisambiguateSheet) {
+                    TextField("Mail ID", text: $debugDisambiguateMailId)
+                    Button("Open") {
+                        let id = debugDisambiguateMailId.trimmingCharacters(in: .whitespaces)
+                        if !id.isEmpty {
+                            debugDisambiguateFormMailId = id
+                            debugDisambiguateMailId = ""
+                        }
                     }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Paste a Mail UUID to route")
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Paste a Mail UUID to route")
-            }
-            .sheet(item: Binding<DebugInviteHomeItem?>(
-                get: { debugInviteFormHomeId.map { DebugInviteHomeItem(id: $0) } },
-                set: { debugInviteFormHomeId = $0?.id }
-            )) { item in
-                let email: String = {
-                    if case let .signedIn(user) = auth.state { return user.email }
-                    return ""
-                }()
-                InviteOwnerFormView(
-                    homeId: item.id,
-                    currentUserEmail: email,
-                    onClose: { debugInviteFormHomeId = nil }
-                )
-            }
-            .sheet(item: Binding<DebugDisambiguateItem?>(
-                get: { debugDisambiguateFormMailId.map { DebugDisambiguateItem(id: $0) } },
-                set: { debugDisambiguateFormMailId = $0?.id }
-            )) { item in
-                DisambiguateMailFormView(
-                    mailId: item.id,
-                    onClose: { debugDisambiguateFormMailId = nil }
-                )
-            }
+                .sheet(item: Binding<DebugInviteHomeItem?>(
+                    get: { debugInviteFormHomeId.map { DebugInviteHomeItem(id: $0) } },
+                    set: { debugInviteFormHomeId = $0?.id }
+                )) { item in
+                    let email: String = {
+                        if case let .signedIn(user) = auth.state { return user.email }
+                        return ""
+                    }()
+                    InviteOwnerFormView(
+                        homeId: item.id,
+                        currentUserEmail: email
+                    ) { debugInviteFormHomeId = nil }
+                }
+                .sheet(item: Binding<DebugDisambiguateItem?>(
+                    get: { debugDisambiguateFormMailId.map { DebugDisambiguateItem(id: $0) } },
+                    set: { debugDisambiguateFormMailId = $0?.id }
+                )) { item in
+                    DisambiguateMailFormView(
+                        mailId: item.id
+                    ) { debugDisambiguateFormMailId = nil }
+                }
             #endif
         }
     }
@@ -228,7 +227,7 @@ public struct YouTabRoot: View {
         }
     }
 
-    @ViewBuilder private func debugRow(label: String) -> some View {
+    private func debugRow(label: String) -> some View {
         HStack {
             Text(label)
                 .foregroundStyle(Theme.Color.appText)

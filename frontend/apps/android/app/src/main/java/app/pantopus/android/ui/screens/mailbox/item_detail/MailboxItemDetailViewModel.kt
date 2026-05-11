@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming")
+@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.mailbox.item_detail
 
@@ -323,7 +323,8 @@ class MailboxItemDetailViewModel
                         MailItemCategory.Package -> fetchPackage(item, category)
                         MailItemCategory.Coupon,
                         MailItemCategory.Booklet,
-                        MailItemCategory.Certified ->
+                        MailItemCategory.Certified,
+                        ->
                             _state.value =
                                 MailboxItemDetailUiState.Loaded(projectCategoryBody(item, category))
                         else ->

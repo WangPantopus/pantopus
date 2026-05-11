@@ -33,6 +33,9 @@ import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
 import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
+import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
+import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.HubNavigationIntent
 import app.pantopus.android.ui.screens.hub.HubScreen
@@ -40,13 +43,10 @@ import app.pantopus.android.ui.screens.hub.PillarTile
 import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
-import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
-import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
-import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
-import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
-import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
+import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
+import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
 import app.pantopus.android.ui.screens.nearby.NearbyScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen

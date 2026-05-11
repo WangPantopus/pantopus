@@ -38,11 +38,13 @@ data class CouponDetailDto(
                 subcopy = payload["subcopy"] as? String,
                 code = payload["code"] as? String,
                 expiresAt = payload["expires_at"] as? String,
-                merchant = (payload["merchant"] as? String)
-                    ?: (payload["brand_name"] as? String),
+                merchant =
+                    (payload["merchant"] as? String)
+                        ?: (payload["brand_name"] as? String),
                 terms = payload["terms"] as? String,
-                minimumSpend = (payload["minimum_spend"] as? String)
-                    ?: (payload["min_spend"] as? String),
+                minimumSpend =
+                    (payload["minimum_spend"] as? String)
+                        ?: (payload["min_spend"] as? String),
                 finePrint = payload["fine_print"] as? String,
             )
         }

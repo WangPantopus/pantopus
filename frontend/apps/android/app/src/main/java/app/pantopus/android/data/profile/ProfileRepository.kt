@@ -15,6 +15,5 @@ class ProfileRepository
         private val api: UsersApi,
     ) {
         /** `GET /api/users/id/:id` — route `backend/routes/users.js:2041`. */
-        suspend fun publicProfile(id: String): NetworkResult<PublicProfileDto> =
-            safeApiCall { api.publicProfile(id) }
+        suspend fun publicProfile(id: String): NetworkResult<PublicProfileDto> = safeApiCall { api.publicProfile(id) }
     }
