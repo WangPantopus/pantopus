@@ -200,6 +200,81 @@ class ClaimOwnershipWizardViewModelTest {
         assertEquals(ClaimOwnershipStep.Start, vm.state.value.currentStep)
     }
 
+    @Test fun start_chrome_stays_dirty_after_files_picked_then_back() {
+        // Regression: when the user picks files on Upload then backs to
+        // Start, tapping X must still trigger the discard-confirm —
+        // otherwise the in-memory bytes are dumped silently.
+        val vm = makeVm()
+        vm.onPrimary() // → upload
+        vm.picked(ClaimEvidenceSlot.Identity, pickedFile("id.jpg"))
+        assertTrue("Upload chrome should be dirty after picking a file", vm.chrome.dirty)
+        vm.onLeading() // back to Start
+        assertEquals(ClaimOwnershipStep.Start, vm.state.value.currentStep)
+        assertTrue(
+            "Start chrome should stay dirty so X tap triggers discard-confirm",
+            vm.chrome.dirty,
+        )
+    }
+
+    @Test fun retry_after_partial_success_skips_claim_and_uploaded_slots() =
+        runTest {
+            // First attempt:  claim → slot1 upload → slot1 evidence OK
+            // → slot2 upload OK → slot2 evidence fails.
+            // Retry:  no claim call, no re-upload, just slot2 evidence.
+            val claimResponses =
+                ArrayDeque(
+                    listOf(
+                        NetworkResult.Success(
+                            SubmitClaimResponse(
+                                message = "ok",
+                                claim = SubmitClaimEnvelope("claim-r", "under_review"),
+                            ),
+                        ),
+                    ),
+                )
+            coEvery { repo.submitClaim(any(), any()) } answers { claimResponses.removeFirst() }
+
+            val uploadResponses =
+                ArrayDeque(
+                    listOf(
+                        NetworkResult.Success(
+                            FileUploadResponse("ok", FileUploadResponse.FileRef("f1", "https://files/r1")),
+                        ),
+                        NetworkResult.Success(
+                            FileUploadResponse("ok", FileUploadResponse.FileRef("f2", "https://files/r2")),
+                        ),
+                    ),
+                )
+            coEvery { repo.uploadFile(any(), any(), any()) } answers { uploadResponses.removeFirst() }
+
+            val evidenceResponses =
+                ArrayDeque(
+                    listOf<NetworkResult<UploadEvidenceResponse>>(
+                        NetworkResult.Success(UploadEvidenceResponse(emptyMap<String, Any?>(), null)),
+                        NetworkResult.Failure(NetworkError.Server(500, null)),
+                        NetworkResult.Success(UploadEvidenceResponse(emptyMap<String, Any?>(), null)),
+                    ),
+                )
+            coEvery { repo.uploadEvidence(any(), any(), any()) } answers {
+                evidenceResponses.removeFirst()
+            }
+
+            val vm = makeVm()
+            vm.onPrimary() // → upload
+            vm.picked(ClaimEvidenceSlot.Identity, pickedFile("id.jpg"))
+            vm.picked(ClaimEvidenceSlot.Ownership, pickedFile("deed.pdf"))
+            vm.onPrimary() // attempt 1 — fails on slot2 evidence
+            assertEquals(ClaimOwnershipStep.Upload, vm.state.value.currentStep)
+            assertNotNull(vm.state.value.submitError)
+
+            vm.onPrimary() // retry — should succeed
+            assertEquals(ClaimOwnershipStep.Success, vm.state.value.currentStep)
+
+            coVerify(exactly = 1) { repo.submitClaim(any(), any()) }
+            coVerify(exactly = 2) { repo.uploadFile(any(), any(), any()) }
+            coVerify(exactly = 3) { repo.uploadEvidence(any(), any(), any()) }
+        }
+
     @Test fun success_primary_emits_open_claims_list() =
         runTest {
             coEvery { repo.submitClaim(any(), any()) } returns

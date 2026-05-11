@@ -3,20 +3,18 @@
 //  Pantopus
 //
 //  P20 FrameUpload — two upload tiles + optional reviewer note +
-//  inline error banner above the sticky submit shelf.
+//  inline error banner above the sticky submit shelf. PDF support is
+//  TODO(picker); for now only the system Photos picker is wired and
+//  the accept hint advertises JPG/PNG only.
 //
 
 import PhotosUI
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct ClaimUploadStep: View {
     @Bindable var viewModel: ClaimOwnershipWizardViewModel
     @State private var photosPickerSlot: ClaimEvidenceSlot?
     @State private var photosPickerSelection: PhotosPickerItem?
-    @State private var fileImporterPresented = false
-    @State private var fileImporterSlot: ClaimEvidenceSlot?
-    @State private var pickerSheetSlot: ClaimEvidenceSlot?
 
     var body: some View {
         HeadlineBlock("Upload your evidence")
@@ -27,7 +25,7 @@ struct ClaimUploadStep: View {
             slots: ClaimEvidenceSlot.allCases.map { slotDescriptor(for: $0) },
             onPick: { id in
                 if let slot = ClaimEvidenceSlot(rawValue: id) {
-                    pickerSheetSlot = slot
+                    photosPickerSlot = slot
                 }
             },
             onRemove: { id in
@@ -43,17 +41,15 @@ struct ClaimUploadStep: View {
         if let error = viewModel.submitError {
             ErrorBanner(message: error)
         }
-        // Picker sheet — choose Photo Library or Files.
-        if let pickerSheetSlot {
-            Color.clear.frame(height: 0).onAppear {
-                self.photosPickerSlot = pickerSheetSlot
-            }
-        }
+        // Hidden anchor to host the PhotosPicker. Driving the sheet
+        // directly off `photosPickerSlot` (rather than an intermediate
+        // onAppear hop) keeps the picker reachable after a remove +
+        // re-tap of the same slot.
         Color.clear.frame(width: 0, height: 0)
             .photosPicker(
                 isPresented: Binding(
                     get: { photosPickerSlot != nil },
-                    set: { if !$0 { photosPickerSlot = nil; pickerSheetSlot = nil } }
+                    set: { if !$0 { photosPickerSlot = nil } }
                 ),
                 selection: $photosPickerSelection,
                 matching: .images
@@ -62,16 +58,21 @@ struct ClaimUploadStep: View {
                 guard let newItem, let slot = photosPickerSlot else { return }
                 Task {
                     if let data = try? await newItem.loadTransferable(type: Data.self) {
-                        let filename = "\(slot.rawValue)-\(UUID().uuidString.prefix(6)).jpg"
-                        viewModel.picked(slot, file: ClaimPickedFile(
-                            filename: filename,
-                            mimeType: "image/jpeg",
-                            data: data
-                        ))
+                        if data.count > CLAIM_FILE_MAX_BYTES {
+                            // Client-side guard so the user sees an
+                            // inline error instead of a 413 round-trip.
+                            viewModel.fileTooLarge(for: slot)
+                        } else {
+                            let filename = "\(slot.rawValue)-\(UUID().uuidString.prefix(6)).jpg"
+                            viewModel.picked(slot, file: ClaimPickedFile(
+                                filename: filename,
+                                mimeType: "image/jpeg",
+                                data: data
+                            ))
+                        }
                     }
                     photosPickerSelection = nil
                     photosPickerSlot = nil
-                    pickerSheetSlot = nil
                 }
             }
     }

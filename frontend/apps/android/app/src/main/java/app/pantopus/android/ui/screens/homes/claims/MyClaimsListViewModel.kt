@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.time.Instant
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
@@ -52,7 +51,10 @@ class MyClaimsListViewModel
         }
 
         fun load() {
-            if (_state.value is ListOfRowsUiState.Loaded) return
+            // Unlike MyHomes, always refetch — claim status changes
+            // server-side within hours (per the success-step copy) and
+            // the user expects to see flips on return-nav, not only
+            // via pull-to-refresh.
             refresh()
         }
 
@@ -73,8 +75,14 @@ class MyClaimsListViewModel
                     ListOfRowsUiState.Empty(
                         icon = PantopusIcon.ShieldCheck,
                         headline = "No claims yet",
-                        subcopy = "Once you submit a claim, you'll see its status here.",
-                        ctaTitle = "Claim a home",
+                        // CTA opens the AddHome wizard (which kicks off
+                        // verification when the user picks "Owner" on
+                        // the role step). Copy matches the wizard the
+                        // CTA actually routes to so the user doesn't
+                        // expect a claim-existing-home picker that
+                        // doesn't exist.
+                        subcopy = "Submit a claim from a home dashboard. New here? Add a home and pick the Owner role to start.",
+                        ctaTitle = "Add a home",
                         onCta = onStartNewClaim,
                     )
                 return
@@ -121,10 +129,16 @@ class MyClaimsListViewModel
 
         private fun relativeSubmitted(iso: String): String? =
             runCatching {
-                val instant = DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(iso, Instant::from)
-                val days = ChronoUnit.DAYS.between(instant, Instant.now())
-                val hours = ChronoUnit.HOURS.between(instant, Instant.now())
-                val minutes = ChronoUnit.MINUTES.between(instant, Instant.now())
+                // Use `Instant.parse` rather than `ISO_OFFSET_DATE_TIME` —
+                // the latter rejects the bare `Z` zone abbreviation that
+                // backend `created_at` columns use. Capture `now` once
+                // so the three threshold comparisons can't drift between
+                // clock reads.
+                val instant = Instant.parse(iso)
+                val now = Instant.now()
+                val days = ChronoUnit.DAYS.between(instant, now)
+                val hours = ChronoUnit.HOURS.between(instant, now)
+                val minutes = ChronoUnit.MINUTES.between(instant, now)
                 "Submitted " +
                     when {
                         days >= 7L -> "${days / 7L}w ago"

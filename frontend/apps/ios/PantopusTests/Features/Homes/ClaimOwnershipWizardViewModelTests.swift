@@ -228,6 +228,77 @@ final class ClaimOwnershipWizardViewModelTests: XCTestCase {
         XCTAssertEqual(vm.currentStep, .start)
     }
 
+    func testStartChromeDirtyAfterFilesPickedThenBack() {
+        // Regression: when the user picks files on Upload then backs to
+        // Start, tapping X must still trigger the discard-confirm
+        // sheet — otherwise the in-memory bytes are dumped silently.
+        let vm = makeVM()
+        vm.primaryTapped() // → upload
+        vm.picked(.identity, file: ClaimPickedFile(filename: "id.jpg", mimeType: "image/jpeg", data: Data([1])))
+        XCTAssertTrue(vm.chrome.dirty, "Upload chrome should be dirty after picking a file")
+        vm.leadingTapped() // back to start
+        XCTAssertEqual(vm.currentStep, .start)
+        XCTAssertTrue(
+            vm.chrome.dirty,
+            "Start chrome should stay dirty so X tap triggers discard-confirm"
+        )
+    }
+
+    func testRetrySkipsClaimCreationAndCachedSlot() async {
+        // First attempt: claim + slot1 round-trip succeed; slot2 upload
+        // succeeds; slot2 evidence registration fails. The wizard
+        // remains on Upload with .failed slot2.
+        SequencedURLProtocol.sequence = [
+            // 1. Create claim
+            .status(201, body: """
+            {"message":"ok","claim":{"id":"claim-r","status":"under_review"}}
+            """),
+            // 2. Upload slot 1
+            .status(200, body: """
+            {"message":"ok","file":{"id":"f-1","url":"https://files/pantopus/r1"}}
+            """),
+            // 3. Evidence slot 1
+            .status(201, body: """
+            {"evidence":{"id":"e-1"},"verification_tier":null}
+            """),
+            // 4. Upload slot 2
+            .status(200, body: """
+            {"message":"ok","file":{"id":"f-2","url":"https://files/pantopus/r2"}}
+            """),
+            // 5. Evidence slot 2 — fails
+            .status(500, body: "{\"error\":\"server\"}")
+        ]
+        let vm = makeVM()
+        vm.primaryTapped()
+        vm.picked(.identity, file: ClaimPickedFile(filename: "id.jpg", mimeType: "image/jpeg", data: Data([1])))
+        vm.picked(.ownership, file: ClaimPickedFile(filename: "deed.pdf", mimeType: "application/pdf", data: Data([2])))
+        await vm.submit()
+        XCTAssertEqual(vm.currentStep, .upload)
+        XCTAssertNotNil(vm.submitError)
+        let firstAttemptCount = SequencedURLProtocol.capturedRequests.count
+        XCTAssertEqual(firstAttemptCount, 5)
+
+        // Retry: only the evidence call for slot 2 should fly. No new
+        // claim, no new uploads (slot 1 is .uploaded, slot 2 has a
+        // cached URL).
+        SequencedURLProtocol.capturedRequests = []
+        SequencedURLProtocol.sequence = [
+            .status(201, body: """
+            {"evidence":{"id":"e-2"},"verification_tier":null}
+            """)
+        ]
+        await vm.submit()
+        XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 1)
+        XCTAssertEqual(vm.currentStep, .success)
+    }
+
+    func testFileTooLargeSetsInlineError() {
+        let vm = makeVM()
+        vm.primaryTapped()
+        vm.fileTooLarge(for: .identity)
+        XCTAssertEqual(vm.submitError, "That file is over 10 MB. Try a smaller photo.")
+    }
+
     func testSuccessPrimaryDispatchesOpenClaimsList() async {
         SequencedURLProtocol.sequence = [
             .status(201, body: """

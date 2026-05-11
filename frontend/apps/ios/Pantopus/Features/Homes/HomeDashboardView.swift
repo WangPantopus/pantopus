@@ -82,7 +82,7 @@ struct HomeDashboardView: View {
             },
             body: {
                 VStack(spacing: Spacing.s4) {
-                    if !content.verified {
+                    if !content.isVerifiedOwner {
                         ClaimOwnershipBanner(
                             onClaim: { onClaimOwnership?() },
                             onViewClaims: { onOpenClaimsList?() }

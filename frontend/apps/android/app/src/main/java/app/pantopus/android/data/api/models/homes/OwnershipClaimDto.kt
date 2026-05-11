@@ -61,12 +61,17 @@ data class SubmitClaimResponse(
  * — `backend/routes/homeOwnership.js:886`. Mirrors
  * `uploadEvidenceSchema` (`backend/routes/homeOwnership.js:43`).
  * `storageRef` carries the URL produced by `/api/files/upload`.
+ *
+ * Note: deliberately NOT annotated with `@JsonClass(generateAdapter)` —
+ * the wire format omits `storage_ref` and `metadata` when they are
+ * null instead of emitting JSON `null`. See
+ * [UploadEvidenceRequestJsonAdapter] for the custom serializer that
+ * enforces that.
  */
-@JsonClass(generateAdapter = true)
 data class UploadEvidenceRequest(
-    @Json(name = "evidence_type") val evidenceType: String,
+    val evidenceType: String,
     val provider: String = "manual",
-    @Json(name = "storage_ref") val storageRef: String? = null,
+    val storageRef: String? = null,
     val metadata: Map<String, String>? = null,
 )
 

@@ -7,6 +7,10 @@
 
 import SwiftUI
 
+/// Concrete claim-ownership wizard view. Mirrors `AddHomeWizardView` —
+/// owns a `ClaimOwnershipWizardViewModel` instance, renders the active
+/// step inside the shared `WizardShell`, and dispatches outbound events
+/// (`dismiss` / `openClaimsList`) to the host nav stack.
 @MainActor
 public struct ClaimOwnershipWizardView: View {
     @State private var viewModel: ClaimOwnershipWizardViewModel
@@ -35,6 +39,12 @@ public struct ClaimOwnershipWizardView: View {
         }
         .onChange(of: viewModel.pendingEvent) { _, event in
             handle(event)
+        }
+        .onChange(of: viewModel.currentStep) { _, step in
+            Analytics.track(.screenClaimOwnershipStepViewed(stepName: step.rawValue))
+        }
+        .onAppear {
+            Analytics.track(.screenClaimOwnershipStepViewed(stepName: viewModel.currentStep.rawValue))
         }
         .accessibilityIdentifier("claimOwnershipWizard")
     }

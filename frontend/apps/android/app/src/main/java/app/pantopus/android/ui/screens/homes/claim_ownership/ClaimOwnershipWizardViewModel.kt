@@ -83,6 +83,21 @@ open class ClaimOwnershipWizardViewModel
         /** One-shot navigation events the screen reacts to. */
         val pendingEvent = MutableStateFlow<ClaimOwnershipOutboundEvent?>(null)
 
+        /**
+         * Server-side claim id once `POST /ownership-claims` succeeds.
+         * Held across retry attempts so a partial-success → retry doesn't
+         * create a duplicate claim row server-side.
+         */
+        private var pendingClaimId: String? = null
+
+        /**
+         * File URLs successfully pushed through `/api/files/upload` whose
+         * evidence registration later failed. Held so retry can POST the
+         * evidence call directly with the existing `storage_ref` instead
+         * of re-uploading the bytes (which would orphan the prior file).
+         */
+        private val pendingUploadUrls: MutableMap<ClaimEvidenceSlot, String> = mutableMapOf()
+
         // MARK: - WizardModel
 
         override val chrome: WizardChrome
@@ -118,6 +133,9 @@ open class ClaimOwnershipWizardViewModel
         // MARK: - Slot management
 
         fun picked(slot: ClaimEvidenceSlot, file: ClaimPickedFile) {
+            // Picking a new file invalidates any prior URL we'd cached
+            // for this slot — the next submit must re-upload these bytes.
+            pendingUploadUrls.remove(slot)
             _state.update { current ->
                 current.copy(
                     slots = current.slots.toMutableMap().apply { put(slot, ClaimSlotState.Picked(file)) },
@@ -127,6 +145,7 @@ open class ClaimOwnershipWizardViewModel
         }
 
         fun remove(slot: ClaimEvidenceSlot) {
+            pendingUploadUrls.remove(slot)
             _state.update { current ->
                 current.copy(slots = current.slots.toMutableMap().apply { put(slot, ClaimSlotState.Empty) })
             }
@@ -142,6 +161,7 @@ open class ClaimOwnershipWizardViewModel
 
         // MARK: - Submit
 
+        @Suppress("ReturnCount")
         private suspend fun submit() {
             val current = _state.value
             if (!current.bothSlotsHaveFiles || current.isSubmitting) return
@@ -155,42 +175,65 @@ open class ClaimOwnershipWizardViewModel
             }
             _state.update { it.copy(isSubmitting = true, submitError = null) }
 
-            val claimResult = repository.submitClaim(homeId, SubmitClaimRequest(method = "doc_upload"))
-            val claim =
-                when (claimResult) {
-                    is NetworkResult.Success -> claimResult.data.claim
-                    is NetworkResult.Failure -> {
+            // Step 1: create the claim — but only once across retry
+            // attempts. Holding the id in `pendingClaimId` keeps a
+            // partial-success retry from creating a duplicate row.
+            val claimId = pendingClaimId ?: run {
+                val claimResult =
+                    repository.submitClaim(homeId, SubmitClaimRequest(method = "doc_upload"))
+                val envelope =
+                    when (claimResult) {
+                        is NetworkResult.Success -> claimResult.data.claim
+                        is NetworkResult.Failure -> {
+                            Analytics.track(AnalyticsEvent.CtaClaimOwnershipSubmit(AnalyticsResult.ERROR))
+                            _state.update {
+                                it.copy(isSubmitting = false, submitError = "Couldn't submit. Retry.")
+                            }
+                            return
+                        }
+                    }
+                val resolvedId =
+                    envelope.id ?: run {
                         Analytics.track(AnalyticsEvent.CtaClaimOwnershipSubmit(AnalyticsResult.ERROR))
                         _state.update {
-                            it.copy(isSubmitting = false, submitError = "Couldn't submit. Retry.")
+                            it.copy(
+                                isSubmitting = false,
+                                submitError = "We're already working on a claim for this home.",
+                            )
                         }
                         return
                     }
-                }
-            val claimId =
-                claim.id ?: run {
-                    Analytics.track(AnalyticsEvent.CtaClaimOwnershipSubmit(AnalyticsResult.ERROR))
-                    _state.update {
-                        it.copy(
-                            isSubmitting = false,
-                            submitError = "We're already working on a claim for this home.",
-                        )
-                    }
-                    return
-                }
+                pendingClaimId = resolvedId
+                resolvedId
+            }
 
-            // Upload each slot's bytes, then register the URL as evidence.
+            // Step 2: upload each slot's bytes, then register the URL as
+            // evidence. Skip slots already fully uploaded and reuse any
+            // cached `storage_ref` from a prior partial-success run so a
+            // retry doesn't re-upload bytes (which would orphan the
+            // earlier file server-side).
             for ((index, slot) in ClaimEvidenceSlot.entries.withIndex()) {
+                if (current.slots[slot] is ClaimSlotState.Uploaded) continue
                 val file = current.slots[slot]?.pickedFile ?: continue
-                markSlot(slot, ClaimSlotState.Uploading(file, 0.4f))
-                val uploadResult = repository.uploadFile(file.filename, file.mimeType, file.bytes)
+                val cachedUrl = pendingUploadUrls[slot]
                 val fileUrl =
-                    when (uploadResult) {
-                        is NetworkResult.Success -> uploadResult.data.file.url
-                        is NetworkResult.Failure -> {
-                            markSlot(slot, ClaimSlotState.Failed(file, "Upload failed"))
-                            failSubmit()
-                            return
+                    if (cachedUrl != null) {
+                        cachedUrl
+                    } else {
+                        markSlot(slot, ClaimSlotState.Uploading(file, 0.4f))
+                        val uploadResult =
+                            repository.uploadFile(file.filename, file.mimeType, file.bytes)
+                        when (uploadResult) {
+                            is NetworkResult.Success -> {
+                                val url = uploadResult.data.file.url
+                                pendingUploadUrls[slot] = url
+                                url
+                            }
+                            is NetworkResult.Failure -> {
+                                markSlot(slot, ClaimSlotState.Failed(file, "Upload failed"))
+                                failSubmit()
+                                return
+                            }
                         }
                     }
                 markSlot(slot, ClaimSlotState.Uploading(file, 0.8f))
@@ -212,9 +255,12 @@ open class ClaimOwnershipWizardViewModel
                             ),
                     )
                 when (evidenceResult) {
-                    is NetworkResult.Success -> markSlot(slot, ClaimSlotState.Uploaded(file, fileUrl))
+                    is NetworkResult.Success -> {
+                        markSlot(slot, ClaimSlotState.Uploaded(file, fileUrl))
+                        pendingUploadUrls.remove(slot)
+                    }
                     is NetworkResult.Failure -> {
-                        markSlot(slot, ClaimSlotState.Failed(file, "Upload failed"))
+                        markSlot(slot, ClaimSlotState.Failed(file, "Couldn't register evidence"))
                         failSubmit()
                         return
                     }
@@ -262,7 +308,11 @@ open class ClaimOwnershipWizardViewModel
                         primaryCtaEnabled = true,
                         secondaryCta = null,
                         isSubmitting = false,
-                        dirty = false,
+                        // Once the user has touched Upload (picked a file or
+                        // typed a note), Back→Start must still surface the
+                        // discard-confirm so an X tap doesn't dump the
+                        // in-memory bytes silently.
+                        dirty = state.anySlotHasFile || state.note.isNotEmpty(),
                         showsProgressBar = true,
                     )
                 ClaimOwnershipStep.Upload ->

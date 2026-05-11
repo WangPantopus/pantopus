@@ -10,19 +10,14 @@ import Foundation
 /// Steps the claim-ownership wizard can be on. Order is meaningful —
 /// the wizard advances `start → upload → success` and back-navigates
 /// `upload → start`. Success has no back chevron and ends the flow.
+///
+/// Chrome (top-bar readout + progress fraction) is computed in the VM's
+/// `chrome` accessor; per-step numeric metadata isn't needed because the
+/// wizard doesn't survive process death (no save/restore key).
 public enum ClaimOwnershipStep: String, CaseIterable, Sendable {
     case start
     case upload
     case success
-
-    /// 1-based step number, nil for terminal step.
-    public var stepNumber: Int? {
-        switch self {
-        case .start: 1
-        case .upload: 2
-        case .success: nil
-        }
-    }
 }
 
 /// Identifier for one of the two upload tiles.
@@ -47,9 +42,14 @@ public enum ClaimEvidenceSlot: String, CaseIterable, Sendable {
     }
 
     public var acceptHint: String {
-        "JPG, PNG, or PDF up to 10 MB"
+        "JPG or PNG up to 10 MB"
     }
 }
+
+/// Maximum file size accepted by the wizard's client-side picker.
+/// Mirrors the backend's `/api/files/upload` cap so the user sees an
+/// inline error instead of a 413 round-trip.
+public let CLAIM_FILE_MAX_BYTES: Int = 10 * 1_024 * 1_024
 
 /// One picked file held in the VM until submit time.
 public struct ClaimPickedFile: Sendable, Equatable {

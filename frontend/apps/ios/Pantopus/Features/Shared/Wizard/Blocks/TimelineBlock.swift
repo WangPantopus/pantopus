@@ -35,7 +35,7 @@ public struct TimelineBlock: View {
         let currentIndex = stages.firstIndex { $0.id == currentStageId } ?? 0
         VStack(spacing: Spacing.s2) {
             HStack(spacing: 0) {
-                ForEach(Array(stages.enumerated()), id: \.element.id) { index, stage in
+                ForEach(Array(stages.enumerated()), id: \.element.id) { index, _ in
                     StageDot(state: stateFor(index: index, currentIndex: currentIndex))
                     if index != stages.count - 1 {
                         Rectangle()

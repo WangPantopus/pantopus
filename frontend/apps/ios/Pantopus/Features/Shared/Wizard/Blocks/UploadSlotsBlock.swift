@@ -135,7 +135,7 @@ private struct UploadTile: View {
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             Text(slot.acceptHint)
-                .font(.system(size: 11))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextMuted)
         }
         .padding(Spacing.s4)

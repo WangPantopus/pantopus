@@ -3,6 +3,7 @@ package app.pantopus.android.di
 import android.content.Context
 import app.pantopus.android.BuildConfig
 import app.pantopus.android.data.api.ApiService
+import app.pantopus.android.data.api.models.homes.UploadEvidenceRequestJsonAdapter
 import app.pantopus.android.data.api.net.RetryInterceptor
 import app.pantopus.android.data.api.services.AuthApi
 import app.pantopus.android.data.api.services.FilesApi
@@ -46,6 +47,11 @@ object NetworkModule {
     fun provideMoshi(): Moshi =
         Moshi
             .Builder()
+            // Custom serializers must be registered ahead of the
+            // generic Kotlin factory so they win the lookup. The
+            // UploadEvidenceRequest one omits optional fields when
+            // null instead of writing JSON `null`.
+            .add(UploadEvidenceRequestJsonAdapter())
             .add(Instant::class.java, Rfc3339DateJsonAdapter().nullSafe())
             .addLast(KotlinJsonAdapterFactory())
             .build()

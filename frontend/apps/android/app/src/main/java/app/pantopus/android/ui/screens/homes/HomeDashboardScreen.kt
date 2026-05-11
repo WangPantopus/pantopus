@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -186,7 +187,7 @@ private fun LoadedLayout(
         },
         body = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
-                if (!content.verified) {
+                if (!content.isVerifiedOwner) {
                     ClaimOwnershipBanner(onClaim = onClaim, onViewClaims = onViewClaims)
                 }
                 GridTabsBody(
@@ -242,27 +243,39 @@ private fun ClaimOwnershipBanner(
             color = PantopusColors.appTextSecondary,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "Claim ownership",
-                style = PantopusTextStyle.small,
-                color = PantopusColors.appTextInverse,
+            Box(
                 modifier =
                     Modifier
+                        .heightIn(min = 48.dp)
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.primary600)
                         .clickable(onClick = onClaim)
-                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
-            )
-            Text(
-                text = "View claims",
-                style = PantopusTextStyle.small,
-                color = PantopusColors.primary600,
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                        .testTag("homeDashboard_claimCTA"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Claim ownership",
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.appTextInverse,
+                )
+            }
+            Box(
                 modifier =
                     Modifier
+                        .heightIn(min = 48.dp)
                         .clip(RoundedCornerShape(Radii.pill))
                         .clickable(onClick = onViewClaims)
-                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
-            )
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                        .testTag("homeDashboard_viewClaimsCTA"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "View claims",
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.primary600,
+                )
+            }
         }
     }
 }

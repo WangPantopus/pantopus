@@ -56,7 +56,7 @@ public struct RequirementsCardBlock: View {
                                 .pantopusTextStyle(.body)
                                 .foregroundStyle(Theme.Color.appText)
                             Text(row.subcopy)
-                                .font(.system(size: 12))
+                                .pantopusTextStyle(.caption)
                                 .foregroundStyle(Theme.Color.appTextSecondary)
                         }
                         Spacer()

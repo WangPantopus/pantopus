@@ -43,8 +43,13 @@ final class MyClaimsListViewModel: ListOfRowsDataSource {
     }
 
     func load() async {
-        if case .loaded = state { return }
-        state = .loading
+        // Unlike MyHomes, we always refetch — claim status changes
+        // server-side within hours (per the success-step copy) and the
+        // user expects to see status flips on return-nav, not only via
+        // pull-to-refresh.
+        if case .loading = state {} else {
+            state = .loading
+        }
         await fetch()
     }
 
@@ -64,8 +69,14 @@ final class MyClaimsListViewModel: ListOfRowsDataSource {
                     ListOfRowsState.EmptyContent(
                         icon: .shieldCheck,
                         headline: "No claims yet",
-                        subcopy: "Once you submit a claim, you'll see its status here.",
-                        ctaTitle: "Claim a home",
+                        // Empty-state CTA opens the AddHome wizard
+                        // (which kicks off verification when the user
+                        // selects "Owner" on the role step). The "Add a
+                        // home" copy matches the wizard the CTA actually
+                        // routes to, so the user doesn't expect a
+                        // claim-existing-home picker that doesn't exist.
+                        subcopy: "Submit a claim from a home dashboard. New here? Add a home and pick the Owner role to start.",
+                        ctaTitle: "Add a home",
                         onCTA: onStartNewClaim
                     )
                 )

@@ -6,32 +6,12 @@ package app.pantopus.android.ui.screens.homes.claim_ownership
  * Steps the claim-ownership wizard can be on. Order is meaningful — the
  * wizard advances `Start → Upload → Success` and back-navigates
  * `Upload → Start`. Success has no back chevron and ends the flow.
+ *
+ * Chrome (top-bar readout + progress fraction) is computed in the VM's
+ * `computeChrome` rather than via per-step metadata on this enum; the
+ * wizard doesn't survive process-death so there's nothing to (de)serialise.
  */
-enum class ClaimOwnershipStep(
-    val ordinal0: Int,
-) {
-    Start(0),
-    Upload(1),
-    Success(2),
-    ;
-
-    /** One-indexed position used in the "N of M" top-bar readout, or null
-     *  for the success terminal. */
-    val stepNumber: Int?
-        get() =
-            when (this) {
-                Start -> 1
-                Upload -> 2
-                Success -> null
-            }
-
-    companion object {
-        const val PROGRESS_TOTAL: Int = 2
-
-        fun fromOrdinal(value: Int): ClaimOwnershipStep =
-            entries.firstOrNull { it.ordinal0 == value } ?: Start
-    }
-}
+enum class ClaimOwnershipStep { Start, Upload, Success }
 
 /**
  * Identifier for one of the two upload tiles. The `backendType` matches

@@ -40,6 +40,16 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
     private(set) var submitError: String?
     var pendingEvent: ClaimOwnershipOutboundEvent?
 
+    /// Server-side claim id once `POST /ownership-claims` succeeds. Held
+    /// across retry attempts so a partial-success → retry doesn't create
+    /// a duplicate claim row server-side.
+    private var pendingClaimId: String?
+    /// File URLs successfully pushed through `/api/files/upload` whose
+    /// evidence registration later failed. Held so retry can POST the
+    /// evidence call directly with the existing `storage_ref` instead
+    /// of re-uploading the bytes (which would orphan the prior file).
+    private var pendingUploadURLs: [ClaimEvidenceSlot: String] = [:]
+
     // MARK: - Init
 
     private let homeId: String
@@ -74,7 +84,11 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
                 primaryCTAEnabled: true,
                 secondaryCTA: nil,
                 isSubmitting: false,
-                dirty: false,
+                // Once the user has filled any slot or typed a note on the
+                // upload step, going back to Start must still surface the
+                // discard-confirm so an X tap doesn't dump the in-memory
+                // bytes silently.
+                dirty: anySlotHasFile || !note.isEmpty,
                 showsProgressBar: true
             )
         case .upload:
@@ -141,11 +155,22 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
 
     func picked(_ slot: ClaimEvidenceSlot, file: ClaimPickedFile) {
         slots[slot] = .picked(file: file)
+        // Picking a new file invalidates any prior URL we'd cached for
+        // this slot — the next submit must re-upload these bytes.
+        pendingUploadURLs[slot] = nil
         submitError = nil
     }
 
     func remove(_ slot: ClaimEvidenceSlot) {
         slots[slot] = .empty
+        pendingUploadURLs[slot] = nil
+    }
+
+    /// Surface a "file too large" error inline rather than letting the
+    /// upload round-trip to a 413. Called by the picker when the user
+    /// selects a file over `CLAIM_FILE_MAX_BYTES`.
+    func fileTooLarge(for slot: ClaimEvidenceSlot) {
+        submitError = "That file is over 10 MB. Try a smaller photo."
     }
 
     var bothSlotsHaveFiles: Bool {
@@ -168,46 +193,67 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
         submitError = nil
         defer { isSubmitting = false }
 
-        // Step 1: create the claim.
-        let claimResponse: SubmitClaimResponse
-        do {
-            claimResponse = try await api.request(
-                HomesEndpoints.submitClaim(
-                    homeId: homeId,
-                    request: SubmitClaimRequest(method: "doc_upload")
+        // Step 1: create the claim — but only once across retry attempts.
+        // Holding the id in `pendingClaimId` keeps a partial-success retry
+        // from creating a duplicate claim row server-side.
+        let claimId: String
+        if let existing = pendingClaimId {
+            claimId = existing
+        } else {
+            let claimResponse: SubmitClaimResponse
+            do {
+                claimResponse = try await api.request(
+                    HomesEndpoints.submitClaim(
+                        homeId: homeId,
+                        request: SubmitClaimRequest(method: "doc_upload")
+                    )
                 )
-            )
-        } catch {
-            submitError = "Couldn't submit. Retry."
-            logger.warning("Claim submit failed: \(error)")
-            return
-        }
-        guard let claimId = claimResponse.claim.id else {
-            // Opaque-handshake path can return nil claim id when a
-            // duplicate exists. Surface a friendly message rather than
-            // failing silently.
-            submitError = "We're already working on a claim for this home."
-            return
+            } catch {
+                submitError = "Couldn't submit. Retry."
+                logger.warning("Claim submit failed: \(error)")
+                Analytics.track(.ctaClaimOwnershipSubmit(result: .error))
+                return
+            }
+            guard let id = claimResponse.claim.id else {
+                // Opaque-handshake path can return nil claim id when a
+                // duplicate exists. Surface a friendly message rather
+                // than failing silently.
+                submitError = "We're already working on a claim for this home."
+                Analytics.track(.ctaClaimOwnershipSubmit(result: .error))
+                return
+            }
+            claimId = id
+            pendingClaimId = id
         }
 
-        // Step 2: upload each slot's file then register evidence.
+        // Step 2: upload each slot's file then register evidence. Skip
+        // any slot we already finished on a prior attempt, and skip the
+        // upload step for slots whose bytes are already in storage —
+        // both retry-paths exist so partial failures don't repeat work.
         for (index, slot) in ClaimEvidenceSlot.allCases.enumerated() {
+            if case .uploaded = slots[slot] { continue }
             guard let file = slots[slot]?.pickedFile else { continue }
-            slots[slot] = .uploading(file: file, fraction: 0.1)
             let metadata: [String: String]? =
                 index == 0 && !note.trimmingCharacters(in: .whitespaces).isEmpty
                     ? ["note": note] : nil
             do {
-                slots[slot] = .uploading(file: file, fraction: 0.4)
-                let upload = try await uploader.uploadFile(
-                    MultipartFile(
-                        fieldName: "file",
-                        filename: file.filename,
-                        mimeType: file.mimeType,
-                        data: file.data
-                    ),
-                    formFields: ["file_type": "claim_evidence", "visibility": "private"]
-                )
+                let fileURL: String
+                if let cached = pendingUploadURLs[slot] {
+                    fileURL = cached
+                } else {
+                    slots[slot] = .uploading(file: file, fraction: 0.4)
+                    let upload = try await uploader.uploadFile(
+                        MultipartFile(
+                            fieldName: "file",
+                            filename: file.filename,
+                            mimeType: file.mimeType,
+                            data: file.data
+                        ),
+                        formFields: ["file_type": "claim_evidence", "visibility": "private"]
+                    )
+                    fileURL = upload.file.url
+                    pendingUploadURLs[slot] = fileURL
+                }
                 slots[slot] = .uploading(file: file, fraction: 0.8)
                 _ = try await api.request(
                     HomesEndpoints.uploadEvidence(
@@ -215,21 +261,25 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
                         claimId: claimId,
                         request: UploadEvidenceRequest(
                             evidenceType: slot.backendType,
-                            storageRef: upload.file.url,
+                            storageRef: fileURL,
                             metadata: metadata
                         )
                     )
                 ) as UploadEvidenceResponse
-                slots[slot] = .uploaded(file: file, fileURL: upload.file.url)
+                slots[slot] = .uploaded(file: file, fileURL: fileURL)
+                // Evidence row exists — no need to keep the URL cache.
+                pendingUploadURLs[slot] = nil
             } catch {
                 logger.warning("Evidence upload failed for slot \(slot.rawValue): \(error)")
                 slots[slot] = .failed(file: file, message: "Upload failed")
                 submitError = "Couldn't submit. Retry."
+                Analytics.track(.ctaClaimOwnershipSubmit(result: .error))
                 return
             }
         }
 
         // All uploads succeeded — advance to success.
+        Analytics.track(.ctaClaimOwnershipSubmit(result: .success))
         currentStep = .success
     }
 

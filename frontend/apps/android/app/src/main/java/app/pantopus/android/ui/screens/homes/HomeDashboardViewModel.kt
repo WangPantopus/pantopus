@@ -28,7 +28,19 @@ const val HOME_DASHBOARD_HOME_ID_KEY = "homeId"
 /** Projection shown by [HomeDashboardScreen]. */
 data class HomeDashboardContent(
     val address: String,
+    /**
+     * True when the home has any verified owner — drives the header
+     * "Verified" badge and the summary status row. Distinct from
+     * [isVerifiedOwner] because the home can have a verified owner who
+     * isn't the signed-in user.
+     */
     val verified: Boolean,
+    /**
+     * True when the signed-in user is the verified owner of this home.
+     * Drives the claim-ownership banner gate: shown when this is false
+     * regardless of whether anyone else is a verified owner.
+     */
+    val isVerifiedOwner: Boolean,
     val stats: List<HomeHeroStat>,
     val quickActions: List<QuickActionTile>,
     val tabs: List<GridTabsTab>,
@@ -128,7 +140,15 @@ class HomeDashboardViewModel
                         label = "Your role",
                     ),
                 )
-            _state.value = HomeDashboardUiState.Loaded(content(address, detail.isOwner, stats))
+            // Header / summary: home has any verified owner. Banner gate:
+            // I'm the verified owner only when isOwner is true and there
+            // is no pending claim still in flight.
+            val homeVerified = detail.isOwner || detail.owners.any { it.ownerStatus == "verified" }
+            val iAmVerified = detail.isOwner && !detail.isPendingOwner
+            _state.value =
+                HomeDashboardUiState.Loaded(
+                    content(address, verified = homeVerified, isVerifiedOwner = iAmVerified, stats = stats),
+                )
         }
 
         private fun applyPublic(publicProfile: HomePublicProfile) {
@@ -142,17 +162,29 @@ class HomeDashboardViewModel
                         label = "Visibility",
                     ),
                 )
-            _state.value = HomeDashboardUiState.Loaded(content(publicProfile.address, publicProfile.hasVerifiedOwner, stats))
+            // Public-profile path is hit when the user is NOT a verified
+            // owner — the private detail call returned 403/404 first.
+            _state.value =
+                HomeDashboardUiState.Loaded(
+                    content(
+                        address = publicProfile.address,
+                        verified = publicProfile.hasVerifiedOwner,
+                        isVerifiedOwner = false,
+                        stats = stats,
+                    ),
+                )
         }
 
         private fun content(
             address: String,
             verified: Boolean,
+            isVerifiedOwner: Boolean,
             stats: List<HomeHeroStat>,
         ): HomeDashboardContent =
             HomeDashboardContent(
                 address = address,
                 verified = verified,
+                isVerifiedOwner = isVerifiedOwner,
                 stats = stats,
                 quickActions =
                     listOf(
