@@ -2,12 +2,22 @@ package app.pantopus.android.data.homes
 
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
+import app.pantopus.android.data.api.models.homes.FileUploadResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
+import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
+import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
+import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
+import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
+import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
+import app.pantopus.android.data.api.services.FilesApi
 import app.pantopus.android.data.api.services.HomesApi
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,6 +31,7 @@ open class HomesRepository
     @Inject
     constructor(
         private val api: HomesApi,
+        private val filesApi: FilesApi,
     ) {
         /** `GET /api/homes/my-homes`. */
         open suspend fun myHomes(): NetworkResult<MyHomesResponse> = safeApiCall { api.myHomes() }
@@ -45,4 +56,47 @@ open class HomesRepository
             homeId: String,
             request: InviteOwnerRequest,
         ) = safeApiCall { api.inviteOwner(homeId, request) }
+
+        /** `POST /api/homes/:id/ownership-claims`. */
+        open suspend fun submitClaim(
+            homeId: String,
+            request: SubmitClaimRequest,
+        ): NetworkResult<SubmitClaimResponse> = safeApiCall { api.submitClaim(homeId, request) }
+
+        /** `POST /api/homes/:id/ownership-claims/:claimId/evidence`. */
+        open suspend fun uploadEvidence(
+            homeId: String,
+            claimId: String,
+            request: UploadEvidenceRequest,
+        ): NetworkResult<UploadEvidenceResponse> = safeApiCall { api.uploadEvidence(homeId, claimId, request) }
+
+        /** `GET /api/homes/my-ownership-claims`. */
+        open suspend fun myOwnershipClaims(): NetworkResult<MyOwnershipClaimsResponse> = safeApiCall { api.myOwnershipClaims() }
+
+        /**
+         * Upload one binary file to `POST /api/files/upload` and return
+         * the resulting URL. ViewModels pass that URL as `storage_ref`
+         * on the subsequent evidence call. `fileType="claim_evidence"`
+         * / `visibility="private"` keeps the artefact off public
+         * surfaces.
+         */
+        open suspend fun uploadFile(
+            filename: String,
+            mimeType: String,
+            bytes: ByteArray,
+        ): NetworkResult<FileUploadResponse> =
+            safeApiCall {
+                val filePart =
+                    MultipartBody.Part.createFormData(
+                        name = "file",
+                        filename = filename,
+                        body = bytes.toRequestBody(mimeType.toMediaTypeOrNull()),
+                    )
+                val plain = "text/plain".toMediaTypeOrNull()
+                filesApi.upload(
+                    file = filePart,
+                    fileType = "claim_evidence".toRequestBody(plain),
+                    visibility = "private".toRequestBody(plain),
+                )
+            }
     }

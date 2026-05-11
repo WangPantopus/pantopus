@@ -3,15 +3,18 @@
 package app.pantopus.android.ui.screens.homes
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +41,7 @@ import app.pantopus.android.ui.screens.shared.content_detail.GridTabsBody
 import app.pantopus.android.ui.screens.shared.content_detail.HomeHeroHeader
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
@@ -54,6 +58,8 @@ import kotlinx.coroutines.launch
 fun HomeDashboardScreen(
     onBack: () -> Unit,
     onInviteOwner: ((String) -> Unit)? = null,
+    onClaimOwnership: ((String) -> Unit)? = null,
+    onOpenClaimsList: (() -> Unit)? = null,
     viewModel: HomeDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -93,6 +99,20 @@ fun HomeDashboardScreen(
         }
     }
 
+    fun handleQuickAction(actionId: String) {
+        when (actionId) {
+            "verify" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onClaimOwnership?.invoke(homeId) ?: showToast(actionId)
+                }
+            "add_member" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onInviteOwner?.invoke(homeId) ?: showToast(actionId)
+                }
+            else -> showToast(actionId)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         when (val current = state) {
             HomeDashboardUiState.Loading -> LoadingLayout(onBack = onBack)
@@ -102,8 +122,14 @@ fun HomeDashboardScreen(
                     selectedTab = selectedTab,
                     onSelectTab = viewModel::selectTab,
                     onBack = onBack,
-                    onQuickAction = ::showToast,
+                    onQuickAction = ::handleQuickAction,
                     onFabAction = ::handleFab,
+                    onClaim = {
+                        viewModel.currentHomeId()?.let { homeId ->
+                            onClaimOwnership?.invoke(homeId) ?: showToast("verify")
+                        }
+                    },
+                    onViewClaims = { onOpenClaimsList?.invoke() ?: showToast("verify") },
                 )
             is HomeDashboardUiState.Error ->
                 ErrorLayout(message = current.message, onBack = onBack, onRetry = viewModel::refresh)
@@ -138,6 +164,8 @@ private fun LoadedLayout(
     onBack: () -> Unit,
     onQuickAction: (String) -> Unit,
     onFabAction: (String) -> Unit,
+    onClaim: () -> Unit,
+    onViewClaims: () -> Unit,
 ) {
     ContentDetailShell(
         title = "Home",
@@ -157,17 +185,86 @@ private fun LoadedLayout(
             HomeHeroHeader(address = content.address, verified = content.verified, stats = content.stats)
         },
         body = {
-            GridTabsBody(
-                quickActions = content.quickActions,
-                tabs = content.tabs,
-                selectedTab = selectedTab,
-                onSelectTab = onSelectTab,
-                onQuickAction = onQuickAction,
-            ) {
-                OverviewSection(content = content)
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
+                if (!content.verified) {
+                    ClaimOwnershipBanner(onClaim = onClaim, onViewClaims = onViewClaims)
+                }
+                GridTabsBody(
+                    quickActions = content.quickActions,
+                    tabs = content.tabs,
+                    selectedTab = selectedTab,
+                    onSelectTab = onSelectTab,
+                    onQuickAction = onQuickAction,
+                ) {
+                    OverviewSection(content = content)
+                }
             }
         },
     )
+}
+
+@Composable
+private fun ClaimOwnershipBanner(
+    onClaim: () -> Unit,
+    onViewClaims: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(
+                    1.dp,
+                    PantopusColors.primary600.copy(alpha = 0.4f),
+                    RoundedCornerShape(Radii.lg),
+                )
+                .padding(Spacing.s4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            PantopusIconImage(
+                icon = PantopusIcon.ShieldCheck,
+                contentDescription = null,
+                size = 20.dp,
+                tint = PantopusColors.primary600,
+            )
+            Text(
+                text = "Are you the owner?",
+                style = PantopusTextStyle.body,
+                color = PantopusColors.appText,
+            )
+        }
+        Text(
+            text = "Claim this home to unlock private features for owners.",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Claim ownership",
+                style = PantopusTextStyle.small,
+                color = PantopusColors.appTextInverse,
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(PantopusColors.primary600)
+                        .clickable(onClick = onClaim)
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
+            )
+            Text(
+                text = "View claims",
+                style = PantopusTextStyle.small,
+                color = PantopusColors.primary600,
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .clickable(onClick = onViewClaims)
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
+            )
+        }
+    }
 }
 
 @Composable

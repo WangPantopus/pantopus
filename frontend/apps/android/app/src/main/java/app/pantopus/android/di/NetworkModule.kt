@@ -5,6 +5,7 @@ import app.pantopus.android.BuildConfig
 import app.pantopus.android.data.api.ApiService
 import app.pantopus.android.data.api.net.RetryInterceptor
 import app.pantopus.android.data.api.services.AuthApi
+import app.pantopus.android.data.api.services.FilesApi
 import app.pantopus.android.data.api.services.HomesApi
 import app.pantopus.android.data.api.services.HubApi
 import app.pantopus.android.data.api.services.MailboxApi
@@ -119,6 +120,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideHomesApi(retrofit: Retrofit): HomesApi = retrofit.create(HomesApi::class.java)
+
+    @Provides @Singleton
+    fun provideFilesApi(retrofit: Retrofit): FilesApi = retrofit.create(FilesApi::class.java)
 
     @Provides @Singleton
     fun provideMailboxApi(retrofit: Retrofit): MailboxApi = retrofit.create(MailboxApi::class.java)

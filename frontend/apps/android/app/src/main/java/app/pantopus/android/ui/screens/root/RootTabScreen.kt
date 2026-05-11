@@ -30,6 +30,9 @@ import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
+import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
+import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.HubNavigationIntent
 import app.pantopus.android.ui.screens.hub.HubScreen
@@ -54,7 +57,9 @@ import app.pantopus.android.ui.screens.you.YouScreen
 /** Non-tab routes reachable from within the Hub stack. */
 private object ChildRoutes {
     const val MY_HOMES = "homes/my-homes"
+    const val MY_CLAIMS = "homes/my-claims"
     const val ADD_HOME = "homes/add"
+    const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
     const val MAILBOX_LIST = "mailbox/list"
     const val MAILBOX_DRAWERS = "mailbox/drawers"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
@@ -91,6 +96,9 @@ private object ChildRoutes {
 
     /** Build the disambiguate-mail path. */
     fun disambiguateMail(mailId: String): String = "mailbox/disambiguate/$mailId"
+
+    /** Build the claim-ownership wizard path. */
+    fun claimOwnership(homeId: String): String = "homes/$homeId/claim"
 }
 
 /**
@@ -192,6 +200,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onInviteOwner = { homeId ->
                         navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
                     },
+                    onClaimOwnership = { homeId ->
+                        navController.navigate(ChildRoutes.claimOwnership(homeId))
+                    },
+                    onOpenClaimsList = { navController.navigate(ChildRoutes.MY_CLAIMS) },
                 )
             }
             composable(ChildRoutes.MAILBOX_LIST) {
@@ -264,6 +276,24 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.popBackStack()
                         navController.navigate(ChildRoutes.homeDashboard(homeId))
                     },
+                )
+            }
+            composable(
+                route = ChildRoutes.CLAIM_OWNERSHIP,
+                arguments = listOf(navArgument(CLAIM_OWNERSHIP_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                ClaimOwnershipWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenClaimsList = {
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.MY_CLAIMS)
+                    },
+                )
+            }
+            composable(ChildRoutes.MY_CLAIMS) {
+                MyClaimsListScreen(
+                    onStartNewClaim = { navController.navigate(ChildRoutes.ADD_HOME) },
+                    onBack = { navController.popBackStack() },
                 )
             }
             if (BuildConfig.DEBUG) {

@@ -11,10 +11,12 @@ import SwiftUI
 /// Typed routes within the Hub tab's NavigationStack.
 public enum HubRoute: Hashable {
     case myHomes
+    case myClaims
     case mailboxDrawers
     case mailbox
     case mailItemDetail(mailId: String)
     case addHome
+    case claimOwnership(homeId: String)
     case homeDashboard(homeId: String)
     case publicProfile(userId: String)
     case pulsePost(postId: String)
@@ -99,8 +101,32 @@ public struct HubTabRoot: View {
                     onAddHome: { Task { @MainActor in push(.addHome) } }
                 )
             )
+        case .myClaims:
+            MyClaimsListView(
+                viewModel: MyClaimsListViewModel(
+                    onStartNewClaim: { Task { @MainActor in push(.addHome) } }
+                )
+            )
         case let .homeDashboard(homeId):
-            HomeDashboardView(homeId: homeId)
+            HomeDashboardView(
+                homeId: homeId,
+                onClaimOwnership: { Task { @MainActor in push(.claimOwnership(homeId: homeId)) } },
+                onOpenClaimsList: { Task { @MainActor in push(.myClaims) } }
+            )
+        case let .claimOwnership(homeId):
+            ClaimOwnershipWizardView(
+                homeId: homeId,
+                onClose: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenClaimsList: {
+                    path.removeAll { route in
+                        if case .claimOwnership = route { return true }
+                        return false
+                    }
+                    path.append(.myClaims)
+                }
+            )
         case .mailbox:
             MailboxListView(
                 viewModel: MailboxListViewModel { mailId in

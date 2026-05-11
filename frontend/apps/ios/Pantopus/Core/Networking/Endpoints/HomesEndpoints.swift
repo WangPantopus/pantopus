@@ -46,4 +46,34 @@ public enum HomesEndpoints {
             body: request
         )
     }
+
+    /// `POST /api/homes/:id/ownership-claims` — route
+    /// `backend/routes/homeOwnership.js:251`.
+    public static func submitClaim(homeId: String, request: SubmitClaimRequest) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/ownership-claims",
+            body: request
+        )
+    }
+
+    /// `POST /api/homes/:id/ownership-claims/:claimId/evidence` — route
+    /// `backend/routes/homeOwnership.js:886`.
+    public static func uploadEvidence(
+        homeId: String,
+        claimId: String,
+        request: UploadEvidenceRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/ownership-claims/\(claimId)/evidence",
+            body: request
+        )
+    }
+
+    /// `GET /api/homes/my-ownership-claims` — route
+    /// `backend/routes/homeOwnership.js:217`.
+    public static func myOwnershipClaims() -> Endpoint {
+        Endpoint(method: .get, path: "/api/homes/my-ownership-claims")
+    }
 }
