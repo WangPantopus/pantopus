@@ -52,6 +52,12 @@ data class SenderBlockContent(
     val displayName: String,
     val meta: String,
     val initials: String,
+    /**
+     * Optional Pantopus user-id behind the sender. When populated and an
+     * `onAvatarTap` callback is passed to [MailboxItemDetailShell],
+     * tapping the avatar opens the public profile (P17).
+     */
+    val senderUserId: String? = null,
 )
 
 /** AI elf suggestion card payload. */
@@ -94,6 +100,7 @@ fun MailboxItemDetailShell(
     onAIChip: (MailboxItemDetailAIChipKind) -> Unit = {},
     onPrimary: () -> Unit = {},
     onGhost: () -> Unit = {},
+    onSenderAvatarTap: ((String) -> Unit)? = null,
     body: @Composable () -> Unit,
 ) {
     Box(
@@ -121,6 +128,7 @@ fun MailboxItemDetailShell(
                 )
                 SenderBlock(
                     content = sender,
+                    onAvatarTap = onSenderAvatarTap,
                     modifier = Modifier.padding(horizontal = Spacing.s4),
                 )
                 if (aiElf != null) {
@@ -218,23 +226,43 @@ fun TrustPill(
     }
 }
 
-/** Avatar + display name + meta row. */
+/**
+ * Avatar + display name + meta row. When both [onAvatarTap] is non-null
+ * and [SenderBlockContent.senderUserId] is set, the avatar becomes a
+ * clickable button that opens the sender's public profile.
+ */
 @Composable
 fun SenderBlock(
     content: SenderBlockContent,
     modifier: Modifier = Modifier,
+    onAvatarTap: ((String) -> Unit)? = null,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        AvatarWithIdentityRing(
-            name = content.initials,
-            identity = IdentityPillar.Business,
-            ringProgress = 1f,
-            size = 36.dp,
-        )
+        val userId = content.senderUserId
+        val avatar: @Composable () -> Unit = {
+            AvatarWithIdentityRing(
+                name = content.initials,
+                identity = IdentityPillar.Business,
+                ringProgress = 1f,
+                size = 36.dp,
+            )
+        }
+        if (onAvatarTap != null && userId != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .sizeIn(minWidth = 44.dp, minHeight = 44.dp)
+                        .clickable { onAvatarTap(userId) }
+                        .semantics { contentDescription = "Open ${content.displayName}'s profile" },
+                contentAlignment = Alignment.Center,
+            ) { avatar() }
+        } else {
+            avatar()
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(content.displayName, style = PantopusTextStyle.body, color = PantopusColors.appText)
             Text(

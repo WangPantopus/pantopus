@@ -39,6 +39,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun MailboxItemDetailScreen(
     onBack: () -> Unit,
+    onOpenSenderProfile: ((String) -> Unit)? = null,
     viewModel: MailboxItemDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -71,6 +72,7 @@ fun MailboxItemDetailScreen(
                     onBack = onBack,
                     onPrimary = { viewModel.logAsReceived() },
                     onGhost = { viewModel.markNotMine() },
+                    onSenderAvatarTap = onOpenSenderProfile,
                 ) {
                     val pkg = content.packageInfo
                     if (content.category == MailItemCategory.Package && pkg != null) {

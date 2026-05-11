@@ -107,16 +107,11 @@ fun HomeHeroHeader(
 }
 
 // MARK: - Stubs
-
-@Composable
-fun ProfileHeaderStub() {
-    StubContainer(icon = PantopusIcon.User, label = "Profile header")
-}
-
-@Composable
-fun PostAuthorHeaderStub() {
-    StubContainer(icon = PantopusIcon.Megaphone, label = "Post header")
-}
+//
+// `PostAuthorHeaderStub` and `ProfileHeaderStub` were removed in P17 —
+// their concrete implementations now live in
+// `content_detail/headers/PostAuthorHeader.kt` and
+// `content_detail/headers/ProfileHeader.kt`.
 
 @Composable
 fun BusinessHeaderStub() {

@@ -10,10 +10,16 @@ import SwiftUI
 struct MailboxItemDetailView: View {
     @State private var viewModel: MailboxItemDetailViewModel
     private let onBack: () -> Void
+    private let onOpenSenderProfile: (@MainActor (String) -> Void)?
 
-    init(mailId: String, onBack: @escaping () -> Void) {
+    init(
+        mailId: String,
+        onBack: @escaping () -> Void,
+        onOpenSenderProfile: (@MainActor (String) -> Void)? = nil
+    ) {
         _viewModel = State(initialValue: MailboxItemDetailViewModel(mailId: mailId))
         self.onBack = onBack
+        self.onOpenSenderProfile = onOpenSenderProfile
     }
 
     var body: some View {
@@ -62,6 +68,7 @@ struct MailboxItemDetailView: View {
             onAIChip: { _ in },
             onPrimary: { Task { await viewModel.logAsReceived() } },
             onGhost: { Task { await viewModel.markNotMine() } },
+            onSenderAvatarTap: onOpenSenderProfile,
             body: {
                 if content.category == .package, let pkg = content.packageInfo {
                     PackageBody(carrier: pkg.carrier, etaLine: pkg.etaLine)

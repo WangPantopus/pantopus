@@ -205,7 +205,8 @@ final class MailboxItemDetailViewModel {
                 sender: SenderBlockContent(
                     displayName: item.senderDisplay,
                     meta: item.base.createdAt,
-                    initials: Self.initials(from: item.senderDisplay)
+                    initials: Self.initials(from: item.senderDisplay),
+                    senderUserId: item.base.senderUserId
                 ),
                 aiElf: nil,
                 keyFacts: [
@@ -261,7 +262,8 @@ final class MailboxItemDetailViewModel {
                 sender: SenderBlockContent(
                     displayName: item.senderDisplay,
                     meta: pkg.sender?.display ?? carrier,
-                    initials: Self.initials(from: item.senderDisplay)
+                    initials: Self.initials(from: item.senderDisplay),
+                    senderUserId: item.base.senderUserId
                 ),
                 aiElf: aiElf,
                 keyFacts: facts,

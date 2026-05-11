@@ -9,6 +9,7 @@ import app.pantopus.android.data.api.services.HomesApi
 import app.pantopus.android.data.api.services.HubApi
 import app.pantopus.android.data.api.services.MailboxApi
 import app.pantopus.android.data.api.services.MailboxV2Api
+import app.pantopus.android.data.api.services.PostsApi
 import app.pantopus.android.data.api.services.UsersApi
 import app.pantopus.android.data.auth.AuthInterceptor
 import com.squareup.moshi.Moshi
@@ -124,6 +125,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideMailboxV2Api(retrofit: Retrofit): MailboxV2Api = retrofit.create(MailboxV2Api::class.java)
+
+    @Provides @Singleton
+    fun providePostsApi(retrofit: Retrofit): PostsApi = retrofit.create(PostsApi::class.java)
 
     // Legacy aggregate — retained for existing AuthRepository / FeedScreen.
     @Provides @Singleton

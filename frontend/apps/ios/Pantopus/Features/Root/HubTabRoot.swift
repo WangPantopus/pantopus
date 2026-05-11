@@ -16,6 +16,8 @@ public enum HubRoute: Hashable {
     case mailItemDetail(mailId: String)
     case addHome
     case homeDashboard(homeId: String)
+    case publicProfile(userId: String)
+    case pulsePost(postId: String)
     #if DEBUG
     case tokenGallery
     case iconGallery
@@ -54,8 +56,11 @@ public struct HubTabRoot: View {
             case .pillar(.mail): path.append(.mailbox)
             case .action(.addHome), .startVerification: path.append(.addHome)
             case .action(.scanMail): path.append(.mailboxDrawers)
-            case .pillar, .action, .openDiscovery, .jumpBackIn,
-                 .openNotifications, .openMenu:
+            case let .openDiscovery(id):
+                // Discovery cards surface people today — treat the id as a
+                // userId and open their public profile (P17).
+                path.append(.publicProfile(userId: id))
+            case .pillar, .action, .jumpBackIn, .openNotifications, .openMenu:
                 break
             }
         }
@@ -101,9 +106,29 @@ public struct HubTabRoot: View {
                 }
             )
         case let .mailItemDetail(mailId):
-            MailboxItemDetailView(mailId: mailId) {
+            MailboxItemDetailView(
+                mailId: mailId,
+                onBack: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenSenderProfile: { userId in
+                    Task { @MainActor in push(.publicProfile(userId: userId)) }
+                }
+            )
+        case let .publicProfile(userId):
+            PublicProfileView(userId: userId) {
                 if !path.isEmpty { path.removeLast() }
             }
+        case let .pulsePost(postId):
+            PulsePostDetailView(
+                postId: postId,
+                onBack: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenProfile: { userId in
+                    Task { @MainActor in push(.publicProfile(userId: userId)) }
+                }
+            )
         case .mailboxDrawers:
             MailboxDrawersView(
                 viewModel: MailboxDrawersViewModel { _ in /* Drawer detail lands later. */ }

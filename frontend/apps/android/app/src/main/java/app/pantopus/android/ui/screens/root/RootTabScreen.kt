@@ -40,6 +40,10 @@ import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
 import app.pantopus.android.ui.screens.nearby.NearbyScreen
+import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
+import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
+import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
+import app.pantopus.android.ui.screens.profile.PublicProfileScreen
 import app.pantopus.android.ui.screens.you.YouScreen
 
 /** Non-tab routes reachable from within the Hub stack. */
@@ -50,6 +54,8 @@ private object ChildRoutes {
     const val MAILBOX_DRAWERS = "mailbox/drawers"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
     const val HOME_DASHBOARD = "homes/{$HOME_DASHBOARD_HOME_ID_KEY}"
+    const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
+    const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
 
     /** Debug-only route reached via 5-tap easter egg on the Hub. */
     const val TOKEN_GALLERY = "_debug/token-gallery"
@@ -59,6 +65,12 @@ private object ChildRoutes {
 
     /** Build the concrete path for a mailbox item detail. */
     fun mailboxItemDetail(id: String): String = "mailbox/item/$id"
+
+    /** Build the concrete path for a public profile. */
+    fun publicProfile(id: String): String = "users/$id"
+
+    /** Build the concrete path for a Pulse post detail. */
+    fun pulsePost(id: String): String = "posts/$id"
 }
 
 /**
@@ -115,6 +127,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 }
                             HubNavigationIntent.StartVerification ->
                                 navController.navigate(ChildRoutes.ADD_HOME)
+                            is HubNavigationIntent.DiscoveryTapped ->
+                                // Discovery cards surface people today — treat the id as
+                                // a userId and open their public profile (P17).
+                                navController.navigate(ChildRoutes.publicProfile(intent.id))
                             else -> Unit
                         }
                     })
@@ -122,7 +138,16 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(PantopusRoute.Nearby.path) { NearbyScreen() }
             composable(PantopusRoute.Inbox.path) { InboxScreen() }
-            composable(PantopusRoute.You.path) { YouScreen() }
+            composable(PantopusRoute.You.path) {
+                YouScreen(
+                    onOpenPublicProfile = { userId ->
+                        navController.navigate(ChildRoutes.publicProfile(userId))
+                    },
+                    onOpenPulsePost = { postId ->
+                        navController.navigate(ChildRoutes.pulsePost(postId))
+                    },
+                )
+            }
 
             composable(ChildRoutes.MY_HOMES) {
                 MyHomesListScreen(
@@ -149,7 +174,29 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.MAILBOX_ITEM_DETAIL,
                 arguments = listOf(navArgument(MAILBOX_ITEM_DETAIL_MAIL_ID_KEY) { type = NavType.StringType }),
             ) {
-                MailboxItemDetailScreen(onBack = { navController.popBackStack() })
+                MailboxItemDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenSenderProfile = { userId ->
+                        navController.navigate(ChildRoutes.publicProfile(userId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.PUBLIC_PROFILE,
+                arguments = listOf(navArgument(PUBLIC_PROFILE_USER_ID_KEY) { type = NavType.StringType }),
+            ) {
+                PublicProfileScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.PULSE_POST,
+                arguments = listOf(navArgument(PULSE_POST_DETAIL_ID_KEY) { type = NavType.StringType }),
+            ) {
+                PulsePostDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenProfile = { userId ->
+                        navController.navigate(ChildRoutes.publicProfile(userId))
+                    },
+                )
             }
             composable(ChildRoutes.MAILBOX_DRAWERS) {
                 MailboxDrawersScreen(
