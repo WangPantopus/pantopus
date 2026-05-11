@@ -157,7 +157,7 @@ class ClaimOwnershipWizardViewModelTest {
                     ),
                 )
             val captured = mutableListOf<UploadEvidenceRequest>()
-            coEvery { repo.uploadEvidence(any(), any(), io.mockk.capture(captured)) } returns
+            coEvery { repo.uploadEvidence(any(), any(), capture(captured)) } returns
                 NetworkResult.Success(
                     UploadEvidenceResponse(evidence = emptyMap<String, Any?>(), verificationTier = null),
                 )
@@ -324,7 +324,7 @@ class ClaimOwnershipWizardViewModelTest {
     @Test fun submit_builds_doc_upload_request() =
         runTest {
             val captured = slot<SubmitClaimRequest>()
-            coEvery { repo.submitClaim("home-1", io.mockk.capture(captured)) } returns
+            coEvery { repo.submitClaim("home-1", capture(captured)) } returns
                 NetworkResult.Success(
                     SubmitClaimResponse(
                         message = "ok",

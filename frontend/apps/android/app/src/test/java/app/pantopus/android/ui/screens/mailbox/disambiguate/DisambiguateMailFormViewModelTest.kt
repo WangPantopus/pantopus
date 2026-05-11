@@ -80,7 +80,7 @@ class DisambiguateMailFormViewModelTest {
     @Test fun submit_happy_path_sends_drawer_and_alias() =
         runTest {
             val captured = slot<ResolveRoutingRequest>()
-            coEvery { repo.resolve(io.mockk.capture(captured)) } returns
+            coEvery { repo.resolve(capture(captured)) } returns
                 NetworkResult.Success(ResolveRoutingResponse(message = "ok", drawer = "home"))
             val vm = makeVm()
             vm.select(MailRecipientChoice.Home)
@@ -99,7 +99,7 @@ class DisambiguateMailFormViewModelTest {
     @Test fun submit_with_empty_alias_omits_alias_fields() =
         runTest {
             val captured = slot<ResolveRoutingRequest>()
-            coEvery { repo.resolve(io.mockk.capture(captured)) } returns
+            coEvery { repo.resolve(capture(captured)) } returns
                 NetworkResult.Success(ResolveRoutingResponse(message = "ok", drawer = "personal"))
             val vm = makeVm()
             vm.select(MailRecipientChoice.Personal)

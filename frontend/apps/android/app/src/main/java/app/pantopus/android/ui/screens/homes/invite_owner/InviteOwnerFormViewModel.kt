@@ -45,7 +45,8 @@ data class InviteOwnerUiState(
     val aggregate: FormAggregate
         get() = FormAggregate.from(InviteOwnerField.entries.mapNotNull { fields[it] })
 
-    val isValid: Boolean get() = aggregate.isValid
+    val isValid: Boolean
+        get() = aggregate.isValid && fields[InviteOwnerField.Email]?.value?.trim()?.isNotEmpty() == true
     val isDirty: Boolean get() = aggregate.isDirty
 }
 

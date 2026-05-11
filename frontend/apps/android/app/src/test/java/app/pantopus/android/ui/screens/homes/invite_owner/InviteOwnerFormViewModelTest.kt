@@ -11,6 +11,7 @@ import app.pantopus.android.data.homes.HomesRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -134,7 +135,7 @@ class InviteOwnerFormViewModelTest {
     @Test fun build_request_omits_empty_phone() =
         runTest {
             val captured = slot<InviteOwnerRequest>()
-            coEvery { repo.inviteOwner("home-1", io.mockk.capture(captured)) } returns
+            coEvery { repo.inviteOwner("home-1", capture(captured)) } returns
                 NetworkResult.Success(InviteOwnerResponse(message = "ok", claimId = "c-1"))
             val vm = makeVm()
             vm.update(InviteOwnerField.Email, "alex@pantopus.app")
@@ -143,6 +144,4 @@ class InviteOwnerFormViewModelTest {
             assertNull(captured.captured.phone)
             assertEquals(false, captured.captured.fastTrack)
         }
-
-    private fun <T> slot() = io.mockk.slot<T>()
 }
