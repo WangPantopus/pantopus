@@ -56,6 +56,9 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case circle
     case info
     case wifiOff = "wifi-off"
+    case heart
+    case thumbsUp = "thumbs-up"
+    case star
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
@@ -101,6 +104,9 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .circle: "circle"
         case .info: "info.circle"
         case .wifiOff: "wifi.slash"
+        case .heart: "heart"
+        case .thumbsUp: "hand.thumbsup"
+        case .star: "star"
         }
     }
 }

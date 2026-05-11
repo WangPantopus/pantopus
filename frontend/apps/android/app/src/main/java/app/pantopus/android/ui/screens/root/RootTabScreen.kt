@@ -30,6 +30,12 @@ import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
+import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
+import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
+import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
+import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.HubNavigationIntent
 import app.pantopus.android.ui.screens.hub.HubScreen
@@ -37,19 +43,32 @@ import app.pantopus.android.ui.screens.hub.PillarTile
 import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
+import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
+import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
 import app.pantopus.android.ui.screens.nearby.NearbyScreen
+import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
+import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
+import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
+import app.pantopus.android.ui.screens.profile.PublicProfileScreen
 import app.pantopus.android.ui.screens.you.YouScreen
 
 /** Non-tab routes reachable from within the Hub stack. */
 private object ChildRoutes {
     const val MY_HOMES = "homes/my-homes"
+    const val MY_CLAIMS = "homes/my-claims"
     const val ADD_HOME = "homes/add"
+    const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
     const val MAILBOX_LIST = "mailbox/list"
     const val MAILBOX_DRAWERS = "mailbox/drawers"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
     const val HOME_DASHBOARD = "homes/{$HOME_DASHBOARD_HOME_ID_KEY}"
+    const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
+    const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
+    const val INVITE_OWNER =
+        "homes/{$INVITE_OWNER_HOME_ID_KEY}/invite?email={$INVITE_OWNER_CURRENT_EMAIL_KEY}"
+    const val DISAMBIGUATE_MAIL = "mailbox/disambiguate/{$DISAMBIGUATE_MAIL_ID_KEY}"
 
     /** Debug-only route reached via 5-tap easter egg on the Hub. */
     const val TOKEN_GALLERY = "_debug/token-gallery"
@@ -59,6 +78,27 @@ private object ChildRoutes {
 
     /** Build the concrete path for a mailbox item detail. */
     fun mailboxItemDetail(id: String): String = "mailbox/item/$id"
+
+    /** Build the concrete path for a public profile. */
+    fun publicProfile(id: String): String = "users/$id"
+
+    /** Build the concrete path for a Pulse post detail. */
+    fun pulsePost(id: String): String = "posts/$id"
+
+    /**
+     * Build the invite-owner path. `email` is forwarded so the form
+     * can reject self-invites; pass `""` when unknown.
+     */
+    fun inviteOwner(
+        homeId: String,
+        currentEmail: String,
+    ): String = "homes/$homeId/invite?email=${java.net.URLEncoder.encode(currentEmail, "UTF-8")}"
+
+    /** Build the disambiguate-mail path. */
+    fun disambiguateMail(mailId: String): String = "mailbox/disambiguate/$mailId"
+
+    /** Build the claim-ownership wizard path. */
+    fun claimOwnership(homeId: String): String = "homes/$homeId/claim"
 }
 
 /**
@@ -115,6 +155,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 }
                             HubNavigationIntent.StartVerification ->
                                 navController.navigate(ChildRoutes.ADD_HOME)
+                            // TODO(routing): re-enable DiscoveryTapped → publicProfile
+                            // once HubViewModel surfaces the discovery item type.
+                            // P17 routed unconditionally, but discovery currently
+                            // fetches `filter=gigs` and the gig UUIDs do not resolve
+                            // as user IDs.
                             else -> Unit
                         }
                     })
@@ -122,7 +167,22 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(PantopusRoute.Nearby.path) { NearbyScreen() }
             composable(PantopusRoute.Inbox.path) { InboxScreen() }
-            composable(PantopusRoute.You.path) { YouScreen() }
+            composable(PantopusRoute.You.path) {
+                YouScreen(
+                    onOpenPublicProfile = { userId ->
+                        navController.navigate(ChildRoutes.publicProfile(userId))
+                    },
+                    onOpenPulsePost = { postId ->
+                        navController.navigate(ChildRoutes.pulsePost(postId))
+                    },
+                    onInviteOwner = { homeId, email ->
+                        navController.navigate(ChildRoutes.inviteOwner(homeId, email))
+                    },
+                    onDisambiguateMail = { mailId ->
+                        navController.navigate(ChildRoutes.disambiguateMail(mailId))
+                    },
+                )
+            }
 
             composable(ChildRoutes.MY_HOMES) {
                 MyHomesListScreen(
@@ -135,7 +195,16 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.HOME_DASHBOARD,
                 arguments = listOf(navArgument(HOME_DASHBOARD_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
-                HomeDashboardScreen(onBack = { navController.popBackStack() })
+                HomeDashboardScreen(
+                    onBack = { navController.popBackStack() },
+                    onInviteOwner = { homeId ->
+                        navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
+                    },
+                    onClaimOwnership = { homeId ->
+                        navController.navigate(ChildRoutes.claimOwnership(homeId))
+                    },
+                    onOpenClaimsList = { navController.navigate(ChildRoutes.MY_CLAIMS) },
+                )
             }
             composable(ChildRoutes.MAILBOX_LIST) {
                 MailboxListScreen(
@@ -149,7 +218,48 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.MAILBOX_ITEM_DETAIL,
                 arguments = listOf(navArgument(MAILBOX_ITEM_DETAIL_MAIL_ID_KEY) { type = NavType.StringType }),
             ) {
-                MailboxItemDetailScreen(onBack = { navController.popBackStack() })
+                MailboxItemDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenSenderProfile = { userId ->
+                        navController.navigate(ChildRoutes.publicProfile(userId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.PUBLIC_PROFILE,
+                arguments = listOf(navArgument(PUBLIC_PROFILE_USER_ID_KEY) { type = NavType.StringType }),
+            ) {
+                PublicProfileScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.PULSE_POST,
+                arguments = listOf(navArgument(PULSE_POST_DETAIL_ID_KEY) { type = NavType.StringType }),
+            ) {
+                PulsePostDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenProfile = { userId ->
+                        navController.navigate(ChildRoutes.publicProfile(userId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.INVITE_OWNER,
+                arguments =
+                    listOf(
+                        navArgument(INVITE_OWNER_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(INVITE_OWNER_CURRENT_EMAIL_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                    ),
+            ) {
+                InviteOwnerFormScreen(onClose = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.DISAMBIGUATE_MAIL,
+                arguments = listOf(navArgument(DISAMBIGUATE_MAIL_ID_KEY) { type = NavType.StringType }),
+            ) {
+                DisambiguateMailFormScreen(onClose = { navController.popBackStack() })
             }
             composable(ChildRoutes.MAILBOX_DRAWERS) {
                 MailboxDrawersScreen(
@@ -166,6 +276,24 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.popBackStack()
                         navController.navigate(ChildRoutes.homeDashboard(homeId))
                     },
+                )
+            }
+            composable(
+                route = ChildRoutes.CLAIM_OWNERSHIP,
+                arguments = listOf(navArgument(CLAIM_OWNERSHIP_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                ClaimOwnershipWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenClaimsList = {
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.MY_CLAIMS)
+                    },
+                )
+            }
+            composable(ChildRoutes.MY_CLAIMS) {
+                MyClaimsListScreen(
+                    onStartNewClaim = { navController.navigate(ChildRoutes.ADD_HOME) },
+                    onBack = { navController.popBackStack() },
                 )
             }
             if (BuildConfig.DEBUG) {

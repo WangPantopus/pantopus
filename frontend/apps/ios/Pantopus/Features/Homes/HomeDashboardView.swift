@@ -10,13 +10,33 @@ import SwiftUI
 
 /// Home Dashboard screen wired to `GET /api/homes/:id` (with public-profile fallback).
 struct HomeDashboardView: View {
+    @Environment(AuthManager.self) private var auth
     @State private var viewModel: HomeDashboardViewModel
     @State private var toast: String?
+    @State private var showsInviteOwner = false
+    private let homeId: String
     private let onBack: (() -> Void)?
+    private let onClaimOwnership: (() -> Void)?
+    private let onOpenClaimsList: (() -> Void)?
 
-    init(homeId: String, onBack: (() -> Void)? = nil) {
+    init(
+        homeId: String,
+        onBack: (() -> Void)? = nil,
+        onClaimOwnership: (() -> Void)? = nil,
+        onOpenClaimsList: (() -> Void)? = nil
+    ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
+        self.homeId = homeId
         self.onBack = onBack
+        self.onClaimOwnership = onClaimOwnership
+        self.onOpenClaimsList = onOpenClaimsList
+    }
+
+    /// Current signed-in user's email — used by the Invite Owner form
+    /// to reject self-invites. Returns empty when in preview mode.
+    private var currentUserEmail: String {
+        if case let .signedIn(user) = auth.state { return user.email }
+        return ""
     }
 
     var body: some View {
@@ -61,29 +81,64 @@ struct HomeDashboardView: View {
                 )
             },
             body: {
-                GridTabsBody(
-                    quickActions: content.quickActions,
-                    tabs: content.tabs,
-                    selectedTab: Binding(
-                        get: { viewModel.selectedTab },
-                        set: { viewModel.selectedTab = $0 }
-                    ),
-                    onQuickAction: { showPlaceholderToast(for: $0) },
-                    overview: {
-                        HomeOverviewSection(content: content)
+                VStack(spacing: Spacing.s4) {
+                    if !content.isVerifiedOwner {
+                        ClaimOwnershipBanner(
+                            onClaim: { onClaimOwnership?() },
+                            onViewClaims: { onOpenClaimsList?() }
+                        )
+                        .padding(.horizontal, Spacing.s4)
                     }
-                )
+                    GridTabsBody(
+                        quickActions: content.quickActions,
+                        tabs: content.tabs,
+                        selectedTab: Binding(
+                            get: { viewModel.selectedTab },
+                            set: { viewModel.selectedTab = $0 }
+                        ),
+                        onQuickAction: { handleQuickAction($0) },
+                        overview: {
+                            HomeOverviewSection(content: content)
+                        }
+                    )
+                }
             },
             cta: {
                 FABCreateCTA(
                     actions: [
                         FABSheetAction(id: "log_package", title: "Log a package", icon: .shoppingBag),
-                        FABSheetAction(id: "add_member", title: "Add member", icon: .userPlus),
+                        FABSheetAction(id: "add_member", title: "Invite owner", icon: .userPlus),
                         FABSheetAction(id: "add_mail", title: "Add mail", icon: .mailbox)
                     ]
-                ) { showPlaceholderToast(for: $0) }
+                ) { handleFabAction($0) }
             }
         )
+        .sheet(isPresented: $showsInviteOwner) {
+            InviteOwnerFormView(
+                homeId: homeId,
+                currentUserEmail: currentUserEmail
+            ) { showsInviteOwner = false }
+        }
+    }
+
+    private func handleFabAction(_ action: String) {
+        switch action {
+        case "add_member":
+            showsInviteOwner = true
+        default:
+            showPlaceholderToast(for: action)
+        }
+    }
+
+    private func handleQuickAction(_ action: String) {
+        switch action {
+        case "verify":
+            onClaimOwnership?()
+        case "add_member":
+            showsInviteOwner = true
+        default:
+            showPlaceholderToast(for: action)
+        }
     }
 
     private func showPlaceholderToast(for action: String) {
@@ -106,6 +161,64 @@ struct HomeDashboardView: View {
 }
 
 // MARK: - Subviews
+
+/// Inline banner shown above the grid-tabs body when the signed-in user
+/// is not yet a verified owner of this home. Two CTAs: "Claim" (opens
+/// the wizard) and "View status" (opens MyClaimsList).
+private struct ClaimOwnershipBanner: View {
+    let onClaim: () -> Void
+    let onViewClaims: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s2) {
+                Icon(.shieldCheck, size: 20, color: Theme.Color.primary600)
+                Text("Are you the owner?")
+                    .pantopusTextStyle(.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appText)
+            }
+            Text("Claim this home to unlock private features for owners.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: Spacing.s3) {
+                Button(action: onClaim) {
+                    Text("Claim ownership")
+                        .pantopusTextStyle(.small)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .padding(.horizontal, Spacing.s4)
+                        .padding(.vertical, Spacing.s2)
+                        .background(Theme.Color.primary600)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("homeDashboard_claimCTA")
+
+                Button(action: onViewClaims) {
+                    Text("View claims")
+                        .pantopusTextStyle(.small)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.primary600)
+                        .padding(.horizontal, Spacing.s4)
+                        .padding(.vertical, Spacing.s2)
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("homeDashboard_viewClaimsCTA")
+            }
+        }
+        .padding(Spacing.s4)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg)
+                .stroke(Theme.Color.primary600.opacity(0.4), lineWidth: 1)
+        )
+    }
+}
 
 private struct HomeOverviewSection: View {
     let content: HomeDashboardContent
@@ -176,4 +289,5 @@ private struct ErrorView: View {
 
 #Preview {
     HomeDashboardView(homeId: "preview")
+        .environment(AuthManager.previewSignedIn)
 }

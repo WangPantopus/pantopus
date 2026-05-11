@@ -184,8 +184,8 @@ class MailboxItemDetailViewModelTest {
             assertEquals(TimelineStepState.Current, steps[2].state)
         }
 
-    @Test fun accent_colors_cover_all_14_categories() {
-        assertEquals(14, MailItemCategory.entries.size)
+    @Test fun accent_colors_cover_all_categories() {
+        assertEquals(16, MailItemCategory.entries.size)
         MailItemCategory.entries.forEach {
             @Suppress("UNUSED_VARIABLE")
             val c = it.accent

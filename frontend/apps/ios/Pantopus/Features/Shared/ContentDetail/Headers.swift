@@ -87,25 +87,11 @@ public struct HomeHeroHeader: View {
 
 // MARK: - Stubs (implemented in later prompts)
 
-/// Placeholder for a future profile-header pattern.
-public struct ProfileHeaderStub: View {
-    public init() {}
-    public var body: some View {
-        NotYetAvailableView(tabName: "Profile header", icon: .user)
-            .frame(height: 240)
-            .padding(.horizontal, Spacing.s4)
-    }
-}
-
-/// Placeholder for a future post-author header.
-public struct PostAuthorHeaderStub: View {
-    public init() {}
-    public var body: some View {
-        NotYetAvailableView(tabName: "Post header", icon: .megaphone)
-            .frame(height: 240)
-            .padding(.horizontal, Spacing.s4)
-    }
-}
+//
+// `PostAuthorHeaderStub` and `ProfileHeaderStub` were removed in P17 —
+// their concrete implementations now live in
+// `ContentDetail/Headers/PostAuthorHeader.swift` and
+// `ContentDetail/Headers/ProfileHeader.swift`.
 
 /// Placeholder for a future business header.
 public struct BusinessHeaderStub: View {

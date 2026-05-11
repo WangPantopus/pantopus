@@ -50,6 +50,9 @@ class IconTest {
             "circle",
             "info",
             "wifi-off",
+            "heart",
+            "thumbs-up",
+            "star",
         )
 
     @Test

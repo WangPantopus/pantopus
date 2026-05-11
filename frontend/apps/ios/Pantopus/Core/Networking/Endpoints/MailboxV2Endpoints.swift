@@ -59,4 +59,15 @@ public enum MailboxV2Endpoints {
             body: request
         )
     }
+
+    /// `POST /api/mailbox/v2/resolve` — route
+    /// `backend/routes/mailboxV2.js:555`. Records the user's chosen
+    /// drawer for an item the auto-router couldn't classify.
+    public static func resolve(_ request: ResolveRoutingRequest) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/mailbox/v2/resolve",
+            body: request
+        )
+    }
 }

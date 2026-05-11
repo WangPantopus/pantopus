@@ -2,18 +2,32 @@
 //  MailboxItemDetailView.swift
 //  Pantopus
 //
+// swiftlint:disable multiple_closures_with_trailing_closure
 
 import SwiftUI
 
 /// Mailbox Item Detail screen. Category-aware; Package renders the
 /// concrete body, other categories fall back to `NotYetAvailable`.
+/// Identifiable wrapper around `URL` so we can drive a `.sheet(item:)`.
+private struct TermsSheetItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 struct MailboxItemDetailView: View {
     @State private var viewModel: MailboxItemDetailViewModel
+    @State private var termsSheet: TermsSheetItem?
     private let onBack: () -> Void
+    private let onOpenSenderProfile: (@MainActor (String) -> Void)?
 
-    init(mailId: String, onBack: @escaping () -> Void) {
+    init(
+        mailId: String,
+        onBack: @escaping () -> Void,
+        onOpenSenderProfile: (@MainActor (String) -> Void)? = nil
+    ) {
         _viewModel = State(initialValue: MailboxItemDetailViewModel(mailId: mailId))
         self.onBack = onBack
+        self.onOpenSenderProfile = onOpenSenderProfile
     }
 
     var body: some View {
@@ -60,27 +74,97 @@ struct MailboxItemDetailView: View {
             cta: ctaContent(for: content),
             onBack: onBack,
             onAIChip: { _ in },
-            onPrimary: { Task { await viewModel.logAsReceived() } },
-            onGhost: { Task { await viewModel.markNotMine() } },
-            body: {
-                if content.category == .package, let pkg = content.packageInfo {
-                    PackageBody(carrier: pkg.carrier, etaLine: pkg.etaLine)
-                } else if content.category != .package {
-                    MailItemPlaceholderBody(category: content.category)
+            onPrimary: { Task { await viewModel.performPrimaryAction() } },
+            onGhost: { handleGhost(for: content) },
+            onSenderAvatarTap: onOpenSenderProfile
+        ) { categoryBody(for: content) }
+            .sheet(item: $termsSheet) { item in
+                CertifiedTermsSheet(termsURL: item.url) { termsSheet = nil }
+            }
+    }
+
+    /// Ghost CTA dispatcher. For certified mail this surfaces the
+    /// View-terms sheet directly; for other categories the VM handles
+    /// the action via `performGhostAction`.
+    private func handleGhost(for content: MailboxItemDetailContent) {
+        if content.category == .certified,
+           case let .certified(detail) = content.payload,
+           let url = detail.termsURL {
+            termsSheet = TermsSheetItem(url: url)
+            return
+        }
+        Task { await viewModel.performGhostAction() }
+    }
+
+    @ViewBuilder
+    private func categoryBody(for content: MailboxItemDetailContent) -> some View {
+        switch (content.category, content.payload) {
+        case (.package, _):
+            if let pkg = content.packageInfo {
+                PackageBody(carrier: pkg.carrier, etaLine: pkg.etaLine)
+            }
+        case let (.coupon, .coupon(coupon)):
+            CouponBody(coupon: coupon)
+        case let (.booklet, .booklet(booklet)):
+            BookletBody(booklet: booklet)
+        case let (.certified, .certified(certified)):
+            CertifiedBody(
+                certified: certified,
+                isAcknowledged: Binding(
+                    get: { viewModel.certifiedAckChecked },
+                    set: { viewModel.certifiedAckChecked = $0 }
+                )
+            ) {
+                if let url = certified.termsURL {
+                    termsSheet = TermsSheetItem(url: url)
                 }
             }
-        )
+        default:
+            MailItemPlaceholderBody(category: content.category)
+        }
     }
 
     private func ctaContent(for content: MailboxItemDetailContent) -> MailboxCTAShelfContent? {
-        guard content.category == .package else { return nil }
-        return MailboxCTAShelfContent(
-            primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Delivered" : "Log as received",
-            ghostTitle: "Not mine",
-            primaryLoading: viewModel.ctaFlags.primaryLoading,
-            ghostLoading: viewModel.ctaFlags.ghostLoading,
-            primaryEnabled: content.ctaEnabled && !viewModel.ctaFlags.primaryCompleted
-        )
+        switch content.category {
+        case .package:
+            MailboxCTAShelfContent(
+                primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Delivered" : "Log as received",
+                ghostTitle: "Not mine",
+                primaryLoading: viewModel.ctaFlags.primaryLoading,
+                ghostLoading: viewModel.ctaFlags.ghostLoading,
+                primaryEnabled: content.ctaEnabled && !viewModel.ctaFlags.primaryCompleted
+            )
+        case .coupon:
+            MailboxCTAShelfContent(
+                primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Added to wallet ✓" : "Add to wallet",
+                ghostTitle: "Save for later",
+                primaryLoading: viewModel.ctaFlags.primaryLoading,
+                ghostLoading: viewModel.ctaFlags.ghostLoading,
+                primaryEnabled: content.ctaEnabled && !viewModel.ctaFlags.primaryCompleted
+            )
+        case .booklet:
+            MailboxCTAShelfContent(
+                primaryTitle: "Save to library",
+                ghostTitle: nil,
+                primaryLoading: viewModel.ctaFlags.primaryLoading,
+                ghostLoading: false,
+                primaryEnabled: content.ctaEnabled
+            )
+        case .certified:
+            MailboxCTAShelfContent(
+                primaryTitle: viewModel.ctaFlags.primaryCompleted
+                    ? "Acknowledged ✓"
+                    : "Acknowledge receipt",
+                ghostTitle: "View terms",
+                primaryLoading: viewModel.ctaFlags.primaryLoading,
+                ghostLoading: viewModel.ctaFlags.ghostLoading,
+                primaryEnabled: content.ctaEnabled
+                    && viewModel.certifiedAckChecked
+                    && !viewModel.ctaFlags.primaryCompleted
+            )
+        default:
+            nil
+        }
     }
 }
 

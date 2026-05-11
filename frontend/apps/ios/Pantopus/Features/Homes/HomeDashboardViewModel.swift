@@ -13,7 +13,15 @@ import Observation
 /// Projection of the home header + stats + tab strip.
 public struct HomeDashboardContent: Sendable {
     public let address: String
+    /// True when the home has any verified owner — drives the header
+    /// "Verified" badge and the summary status row. Distinct from
+    /// `isVerifiedOwner` because the home can have a verified owner
+    /// who isn't the signed-in user.
     public let verified: Bool
+    /// True when the signed-in user is the verified owner of this home.
+    /// Drives the claim-ownership banner gate: shown when this is false
+    /// regardless of whether anyone else is a verified owner.
+    public let isVerifiedOwner: Bool
     public let stats: [HomeHeroStat]
     public let quickActions: [QuickActionTile]
     public let tabs: [GridTabsTab]
@@ -93,7 +101,15 @@ final class HomeDashboardViewModel {
                 label: "Your role"
             )
         ]
-        state = .loaded(content(address: address, verified: detail.isOwner, stats: stats))
+        state = .loaded(content(
+            address: address,
+            // Header badge / summary row: home has any verified owner.
+            verified: detail.isOwner || detail.owners.contains { $0.ownerStatus == "verified" },
+            // Banner gate: I'm the verified owner only when isOwner is
+            // true and there's no pending claim still in flight.
+            isVerifiedOwner: detail.isOwner && !detail.isPendingOwner,
+            stats: stats
+        ))
     }
 
     private func applyPublic(_ public_: HomePublicProfileResponse.HomePublicProfile) {
@@ -106,13 +122,26 @@ final class HomeDashboardViewModel {
                 label: "Visibility"
             )
         ]
-        state = .loaded(content(address: public_.address, verified: public_.hasVerifiedOwner, stats: stats))
+        state = .loaded(content(
+            address: public_.address,
+            verified: public_.hasVerifiedOwner,
+            // Public-profile path is hit when the user is NOT a verified
+            // owner — the private detail call returned 403/404 first.
+            isVerifiedOwner: false,
+            stats: stats
+        ))
     }
 
-    private func content(address: String, verified: Bool, stats: [HomeHeroStat]) -> HomeDashboardContent {
+    private func content(
+        address: String,
+        verified: Bool,
+        isVerifiedOwner: Bool,
+        stats: [HomeHeroStat]
+    ) -> HomeDashboardContent {
         HomeDashboardContent(
             address: address,
             verified: verified,
+            isVerifiedOwner: isVerifiedOwner,
             stats: stats,
             quickActions: [
                 QuickActionTile(id: "add_mail", label: "Add mail", icon: .mailbox, tint: .home),

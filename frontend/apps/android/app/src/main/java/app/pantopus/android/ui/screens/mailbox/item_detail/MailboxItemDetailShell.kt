@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.mailbox.item_detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -52,6 +54,17 @@ data class SenderBlockContent(
     val displayName: String,
     val meta: String,
     val initials: String,
+    /**
+     * Optional Pantopus user-id behind the sender. When populated and an
+     * `onAvatarTap` callback is passed to [MailboxItemDetailShell],
+     * tapping the avatar opens the public profile (P17).
+     */
+    val senderUserId: String? = null,
+    /**
+     * When true the sender block renders a small "CERTIFIED" stamp on
+     * the trailing edge — used by the certified body (P18).
+     */
+    val showStamp: Boolean = false,
 )
 
 /** AI elf suggestion card payload. */
@@ -94,6 +107,7 @@ fun MailboxItemDetailShell(
     onAIChip: (MailboxItemDetailAIChipKind) -> Unit = {},
     onPrimary: () -> Unit = {},
     onGhost: () -> Unit = {},
+    onSenderAvatarTap: ((String) -> Unit)? = null,
     body: @Composable () -> Unit,
 ) {
     Box(
@@ -121,6 +135,7 @@ fun MailboxItemDetailShell(
                 )
                 SenderBlock(
                     content = sender,
+                    onAvatarTap = onSenderAvatarTap,
                     modifier = Modifier.padding(horizontal = Spacing.s4),
                 )
                 if (aiElf != null) {
@@ -218,23 +233,43 @@ fun TrustPill(
     }
 }
 
-/** Avatar + display name + meta row. */
+/**
+ * Avatar + display name + meta row. When both [onAvatarTap] is non-null
+ * and [SenderBlockContent.senderUserId] is set, the avatar becomes a
+ * clickable button that opens the sender's public profile.
+ */
 @Composable
 fun SenderBlock(
     content: SenderBlockContent,
     modifier: Modifier = Modifier,
+    onAvatarTap: ((String) -> Unit)? = null,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        AvatarWithIdentityRing(
-            name = content.initials,
-            identity = IdentityPillar.Business,
-            ringProgress = 1f,
-            size = 36.dp,
-        )
+        val userId = content.senderUserId
+        val avatar: @Composable () -> Unit = {
+            AvatarWithIdentityRing(
+                name = content.initials,
+                identity = IdentityPillar.Business,
+                ringProgress = 1f,
+                size = 36.dp,
+            )
+        }
+        if (onAvatarTap != null && userId != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .sizeIn(minWidth = 44.dp, minHeight = 44.dp)
+                        .clickable { onAvatarTap(userId) }
+                        .semantics { contentDescription = "Open ${content.displayName}'s profile" },
+                contentAlignment = Alignment.Center,
+            ) { avatar() }
+        } else {
+            avatar()
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(content.displayName, style = PantopusTextStyle.body, color = PantopusColors.appText)
             Text(
@@ -243,6 +278,35 @@ fun SenderBlock(
                 color = PantopusColors.appTextSecondary,
             )
         }
+        if (content.showStamp) {
+            CertifiedStamp()
+        }
+    }
+}
+
+/**
+ * Tilted "CERTIFIED" stamp rendered on the trailing edge of the sender
+ * block when [SenderBlockContent.showStamp] is true.
+ */
+@Composable
+fun CertifiedStamp(modifier: Modifier = Modifier) {
+    Box(
+        modifier =
+            modifier
+                .rotate(-12f)
+                .border(
+                    1.5.dp,
+                    PantopusColors.primary600,
+                    RoundedCornerShape(Radii.sm),
+                )
+                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .semantics { contentDescription = "Certified" },
+    ) {
+        Text(
+            text = "CERTIFIED",
+            style = PantopusTextStyle.overline,
+            color = PantopusColors.primary600,
+        )
     }
 }
 

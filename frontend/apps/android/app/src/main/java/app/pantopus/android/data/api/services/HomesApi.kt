@@ -7,8 +7,15 @@ import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.HomeDetailResponse
 import app.pantopus.android.data.api.models.homes.HomePublicProfileResponse
+import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
+import app.pantopus.android.data.api.models.homes.InviteOwnerResponse
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
+import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
+import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
+import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
+import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
+import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -52,4 +59,44 @@ interface HomesApi {
     suspend fun checkAddress(
         @Body body: CheckAddressRequest,
     ): CheckAddressResponse
+
+    /**
+     * `POST /api/homes/:id/owners/invite` — route
+     * `backend/routes/homeOwnership.js:1376`.
+     */
+    @POST("api/homes/{id}/owners/invite")
+    suspend fun inviteOwner(
+        @Path("id") homeId: String,
+        @Body body: InviteOwnerRequest,
+    ): InviteOwnerResponse
+
+    /**
+     * `POST /api/homes/:id/ownership-claims` — route
+     * `backend/routes/homeOwnership.js:251`.
+     */
+    @POST("api/homes/{id}/ownership-claims")
+    suspend fun submitClaim(
+        @Path("id") homeId: String,
+        @Body body: SubmitClaimRequest,
+    ): SubmitClaimResponse
+
+    /**
+     * `POST /api/homes/:id/ownership-claims/:claimId/evidence` — route
+     * `backend/routes/homeOwnership.js:886`. Body is JSON; real bytes
+     * are pushed through `/api/files/upload` first and the resulting
+     * URL is sent here as `storage_ref`.
+     */
+    @POST("api/homes/{id}/ownership-claims/{claimId}/evidence")
+    suspend fun uploadEvidence(
+        @Path("id") homeId: String,
+        @Path("claimId") claimId: String,
+        @Body body: UploadEvidenceRequest,
+    ): UploadEvidenceResponse
+
+    /**
+     * `GET /api/homes/my-ownership-claims` — route
+     * `backend/routes/homeOwnership.js:217`.
+     */
+    @GET("api/homes/my-ownership-claims")
+    suspend fun myOwnershipClaims(): MyOwnershipClaimsResponse
 }

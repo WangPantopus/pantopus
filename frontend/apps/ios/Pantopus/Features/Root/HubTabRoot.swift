@@ -5,17 +5,22 @@
 //  Navigation stack for the Hub tab. Placeholder body until the full hub
 //  UI lands in Prompt P7.
 //
+// swiftlint:disable cyclomatic_complexity
 
 import SwiftUI
 
 /// Typed routes within the Hub tab's NavigationStack.
 public enum HubRoute: Hashable {
     case myHomes
+    case myClaims
     case mailboxDrawers
     case mailbox
     case mailItemDetail(mailId: String)
     case addHome
+    case claimOwnership(homeId: String)
     case homeDashboard(homeId: String)
+    case publicProfile(userId: String)
+    case pulsePost(postId: String)
     #if DEBUG
     case tokenGallery
     case iconGallery
@@ -56,6 +61,11 @@ public struct HubTabRoot: View {
             case .action(.scanMail): path.append(.mailboxDrawers)
             case .pillar, .action, .openDiscovery, .jumpBackIn,
                  .openNotifications, .openMenu:
+                // TODO(routing): re-enable openDiscovery → publicProfile
+                // once HubViewModel surfaces the discovery item type.
+                // P17 routed unconditionally to publicProfile, but
+                // discovery currently fetches `filter=gigs` and the
+                // gig UUIDs do not resolve as user IDs.
                 break
             }
         }
@@ -92,8 +102,30 @@ public struct HubTabRoot: View {
                     onAddHome: { Task { @MainActor in push(.addHome) } }
                 )
             )
+        case .myClaims:
+            MyClaimsListView(
+                viewModel: MyClaimsListViewModel { Task { @MainActor in push(.addHome) } }
+            )
         case let .homeDashboard(homeId):
-            HomeDashboardView(homeId: homeId)
+            HomeDashboardView(
+                homeId: homeId,
+                onClaimOwnership: { Task { @MainActor in push(.claimOwnership(homeId: homeId)) } },
+                onOpenClaimsList: { Task { @MainActor in push(.myClaims) } }
+            )
+        case let .claimOwnership(homeId):
+            ClaimOwnershipWizardView(
+                homeId: homeId,
+                onClose: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenClaimsList: {
+                    path.removeAll { route in
+                        if case .claimOwnership = route { return true }
+                        return false
+                    }
+                    path.append(.myClaims)
+                }
+            )
         case .mailbox:
             MailboxListView(
                 viewModel: MailboxListViewModel { mailId in
@@ -101,9 +133,29 @@ public struct HubTabRoot: View {
                 }
             )
         case let .mailItemDetail(mailId):
-            MailboxItemDetailView(mailId: mailId) {
+            MailboxItemDetailView(
+                mailId: mailId,
+                onBack: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenSenderProfile: { userId in
+                    Task { @MainActor in push(.publicProfile(userId: userId)) }
+                }
+            )
+        case let .publicProfile(userId):
+            PublicProfileView(userId: userId) {
                 if !path.isEmpty { path.removeLast() }
             }
+        case let .pulsePost(postId):
+            PulsePostDetailView(
+                postId: postId,
+                onBack: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenProfile: { userId in
+                    Task { @MainActor in push(.publicProfile(userId: userId)) }
+                }
+            )
         case .mailboxDrawers:
             MailboxDrawersView(
                 viewModel: MailboxDrawersViewModel { _ in /* Drawer detail lands later. */ }

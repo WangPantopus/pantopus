@@ -8,6 +8,8 @@ import app.pantopus.android.data.api.models.mailbox.v2.MailboxV2ItemResponse
 import app.pantopus.android.data.api.models.mailbox.v2.PackageDetailResponse
 import app.pantopus.android.data.api.models.mailbox.v2.PackageStatusUpdateRequest
 import app.pantopus.android.data.api.models.mailbox.v2.PackageStatusUpdateResponse
+import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingRequest
+import app.pantopus.android.data.api.models.mailbox.v2.ResolveRoutingResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.MailboxApi
@@ -66,4 +68,7 @@ class MailboxRepository
             status: String,
         ): NetworkResult<PackageStatusUpdateResponse> =
             safeApiCall { v2Api.packageStatusUpdate(mailId, PackageStatusUpdateRequest(status = status)) }
+
+        /** `POST /api/mailbox/v2/resolve`. */
+        suspend fun resolve(request: ResolveRoutingRequest): NetworkResult<ResolveRoutingResponse> = safeApiCall { v2Api.resolve(request) }
     }

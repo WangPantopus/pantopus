@@ -3,12 +3,15 @@ package app.pantopus.android.di
 import android.content.Context
 import app.pantopus.android.BuildConfig
 import app.pantopus.android.data.api.ApiService
+import app.pantopus.android.data.api.models.homes.UploadEvidenceRequestJsonAdapter
 import app.pantopus.android.data.api.net.RetryInterceptor
 import app.pantopus.android.data.api.services.AuthApi
+import app.pantopus.android.data.api.services.FilesApi
 import app.pantopus.android.data.api.services.HomesApi
 import app.pantopus.android.data.api.services.HubApi
 import app.pantopus.android.data.api.services.MailboxApi
 import app.pantopus.android.data.api.services.MailboxV2Api
+import app.pantopus.android.data.api.services.PostsApi
 import app.pantopus.android.data.api.services.UsersApi
 import app.pantopus.android.data.auth.AuthInterceptor
 import com.squareup.moshi.Moshi
@@ -44,6 +47,11 @@ object NetworkModule {
     fun provideMoshi(): Moshi =
         Moshi
             .Builder()
+            // Custom serializers must be registered ahead of the
+            // generic Kotlin factory so they win the lookup. The
+            // UploadEvidenceRequest one omits optional fields when
+            // null instead of writing JSON `null`.
+            .add(UploadEvidenceRequestJsonAdapter())
             .add(Instant::class.java, Rfc3339DateJsonAdapter().nullSafe())
             .addLast(KotlinJsonAdapterFactory())
             .build()
@@ -120,10 +128,16 @@ object NetworkModule {
     fun provideHomesApi(retrofit: Retrofit): HomesApi = retrofit.create(HomesApi::class.java)
 
     @Provides @Singleton
+    fun provideFilesApi(retrofit: Retrofit): FilesApi = retrofit.create(FilesApi::class.java)
+
+    @Provides @Singleton
     fun provideMailboxApi(retrofit: Retrofit): MailboxApi = retrofit.create(MailboxApi::class.java)
 
     @Provides @Singleton
     fun provideMailboxV2Api(retrofit: Retrofit): MailboxV2Api = retrofit.create(MailboxV2Api::class.java)
+
+    @Provides @Singleton
+    fun providePostsApi(retrofit: Retrofit): PostsApi = retrofit.create(PostsApi::class.java)
 
     // Legacy aggregate — retained for existing AuthRepository / FeedScreen.
     @Provides @Singleton

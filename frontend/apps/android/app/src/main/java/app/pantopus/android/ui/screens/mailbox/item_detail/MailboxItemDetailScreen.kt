@@ -14,17 +14,25 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.data.api.models.mailbox.v2.MailboxCategoryPayload
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.BookletBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CertifiedBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CouponBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.MailItemPlaceholderBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.PackageBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedTermsSheet
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusTextStyle
@@ -39,10 +47,13 @@ import kotlinx.coroutines.delay
 @Composable
 fun MailboxItemDetailScreen(
     onBack: () -> Unit,
+    onOpenSenderProfile: ((String) -> Unit)? = null,
     viewModel: MailboxItemDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val ctaFlags by viewModel.ctaFlags.collectAsStateWithLifecycle()
+    val ackChecked by viewModel.certifiedAckChecked.collectAsStateWithLifecycle()
+    var termsSheetUrl by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -60,6 +71,14 @@ fun MailboxItemDetailScreen(
                 ErrorLayout(message = s.message, onRetry = { viewModel.refresh() })
             is MailboxItemDetailUiState.Loaded -> {
                 val content = s.content
+                val showTerms = {
+                    val payload = content.payload
+                    if (payload is MailboxCategoryPayload.Certified && !payload.detail.termsUrl.isNullOrEmpty()) {
+                        termsSheetUrl = payload.detail.termsUrl
+                    } else {
+                        viewModel.performGhostAction()
+                    }
+                }
                 MailboxItemDetailShell(
                     category = content.category,
                     trust = content.trust,
@@ -67,17 +86,24 @@ fun MailboxItemDetailScreen(
                     aiElf = content.aiElf,
                     keyFacts = content.keyFacts,
                     timeline = content.timeline,
-                    cta = ctaContent(content, ctaFlags),
+                    cta = ctaContent(content, ctaFlags, ackChecked),
                     onBack = onBack,
-                    onPrimary = { viewModel.logAsReceived() },
-                    onGhost = { viewModel.markNotMine() },
+                    onPrimary = { viewModel.performPrimaryAction() },
+                    onGhost = {
+                        if (content.category == MailItemCategory.Certified) {
+                            showTerms()
+                        } else {
+                            viewModel.performGhostAction()
+                        }
+                    },
+                    onSenderAvatarTap = onOpenSenderProfile,
                 ) {
-                    val pkg = content.packageInfo
-                    if (content.category == MailItemCategory.Package && pkg != null) {
-                        PackageBody(carrier = pkg.carrier, etaLine = pkg.etaLine)
-                    } else if (content.category != MailItemCategory.Package) {
-                        MailItemPlaceholderBody(category = content.category)
-                    }
+                    CategoryBody(
+                        content = content,
+                        ackChecked = ackChecked,
+                        onAckChange = { viewModel.setCertifiedAckChecked(it) },
+                        onViewTerms = showTerms,
+                    )
                 }
             }
         }
@@ -95,20 +121,87 @@ fun MailboxItemDetailScreen(
             }
         }
     }
+
+    termsSheetUrl?.let { url ->
+        CertifiedTermsSheet(
+            termsUrl = url,
+            onDismiss = { termsSheetUrl = null },
+        )
+    }
 }
 
 private fun ctaContent(
     content: MailboxItemDetailContent,
     flags: MailboxCTAFlags,
-): MailboxCTAShelfContent? {
-    if (content.category != MailItemCategory.Package) return null
-    return MailboxCTAShelfContent(
-        primaryTitle = if (flags.primaryCompleted) "Delivered" else "Log as received",
-        ghostTitle = "Not mine",
-        primaryLoading = flags.primaryLoading,
-        ghostLoading = flags.ghostLoading,
-        primaryEnabled = content.ctaEnabled && !flags.primaryCompleted,
-    )
+    ackChecked: Boolean,
+): MailboxCTAShelfContent? =
+    when (content.category) {
+        MailItemCategory.Package ->
+            MailboxCTAShelfContent(
+                primaryTitle = if (flags.primaryCompleted) "Delivered" else "Log as received",
+                ghostTitle = "Not mine",
+                primaryLoading = flags.primaryLoading,
+                ghostLoading = flags.ghostLoading,
+                primaryEnabled = content.ctaEnabled && !flags.primaryCompleted,
+            )
+        MailItemCategory.Coupon ->
+            MailboxCTAShelfContent(
+                primaryTitle =
+                    if (flags.primaryCompleted) "Added to wallet ✓" else "Add to wallet",
+                ghostTitle = "Save for later",
+                primaryLoading = flags.primaryLoading,
+                ghostLoading = flags.ghostLoading,
+                primaryEnabled = content.ctaEnabled && !flags.primaryCompleted,
+            )
+        MailItemCategory.Booklet ->
+            MailboxCTAShelfContent(
+                primaryTitle = "Save to library",
+                ghostTitle = null,
+                primaryLoading = flags.primaryLoading,
+                ghostLoading = false,
+                primaryEnabled = content.ctaEnabled,
+            )
+        MailItemCategory.Certified ->
+            MailboxCTAShelfContent(
+                primaryTitle =
+                    if (flags.primaryCompleted) "Acknowledged ✓" else "Acknowledge receipt",
+                ghostTitle = "View terms",
+                primaryLoading = flags.primaryLoading,
+                ghostLoading = flags.ghostLoading,
+                primaryEnabled =
+                    content.ctaEnabled && ackChecked && !flags.primaryCompleted,
+            )
+        else -> null
+    }
+
+@Composable
+private fun CategoryBody(
+    content: MailboxItemDetailContent,
+    ackChecked: Boolean,
+    onAckChange: (Boolean) -> Unit,
+    onViewTerms: () -> Unit,
+) {
+    when {
+        content.category == MailItemCategory.Package && content.packageInfo != null ->
+            PackageBody(
+                carrier = content.packageInfo.carrier,
+                etaLine = content.packageInfo.etaLine,
+            )
+        content.payload is MailboxCategoryPayload.Coupon ->
+            CouponBody(coupon = content.payload.detail)
+        content.payload is MailboxCategoryPayload.Booklet ->
+            BookletBody(booklet = content.payload.detail)
+        content.payload is MailboxCategoryPayload.Certified ->
+            CertifiedBody(
+                certified = content.payload.detail,
+                isAcknowledged = ackChecked,
+                onAcknowledgedChange = onAckChange,
+                onViewTerms = onViewTerms,
+            )
+        content.category != MailItemCategory.Package ->
+            MailItemPlaceholderBody(category = content.category)
+        else -> Unit
+    }
 }
 
 @Composable

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -39,6 +40,8 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.WifiOff
@@ -100,6 +103,9 @@ enum class PantopusIcon(
     Circle("circle"),
     Info("info"),
     WifiOff("wifi-off"),
+    Heart("heart"),
+    ThumbsUp("thumbs-up"),
+    Star("star"),
     ;
 
     companion object {
@@ -176,6 +182,9 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Circle -> IconSource.Material(Icons.Filled.Circle)
         PantopusIcon.Info -> IconSource.Material(Icons.Filled.Info)
         PantopusIcon.WifiOff -> IconSource.Material(Icons.Filled.WifiOff)
+        PantopusIcon.Heart -> IconSource.Material(Icons.Filled.Favorite)
+        PantopusIcon.ThumbsUp -> IconSource.Material(Icons.Filled.ThumbUp)
+        PantopusIcon.Star -> IconSource.Material(Icons.Filled.Star)
     }
 
 /**

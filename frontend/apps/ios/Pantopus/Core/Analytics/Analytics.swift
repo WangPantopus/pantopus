@@ -25,10 +25,13 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenMailboxItemDetailViewed(category: String, trustLevel: String)
     case screenEditProfileViewed
     case screenAddHomeWizardStepViewed(stepNumber: Int, stepName: String)
+    case screenClaimOwnershipStepViewed(stepName: String)
+    case screenMyClaimsViewed
     case ctaHubActionStripTapped(label: String)
     case ctaHubPillarTapped(pillar: String)
     case ctaMailboxItemLogReceived
     case ctaAddHomeSubmit
+    case ctaClaimOwnershipSubmit(result: AnalyticsResult)
     case formEditProfileSubmit(result: AnalyticsResult)
     case formEditProfileValidationError(field: String)
 
@@ -44,10 +47,13 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenMailboxItemDetailViewed: "screen.mailbox_item_detail.viewed"
         case .screenEditProfileViewed: "screen.edit_profile.viewed"
         case .screenAddHomeWizardStepViewed: "screen.add_home_wizard.step_viewed"
+        case .screenClaimOwnershipStepViewed: "screen.claim_ownership_wizard.step_viewed"
+        case .screenMyClaimsViewed: "screen.my_claims.viewed"
         case .ctaHubActionStripTapped: "cta.hub.action_strip_tapped"
         case .ctaHubPillarTapped: "cta.hub.pillar_tapped"
         case .ctaMailboxItemLogReceived: "cta.mailbox_item.log_received"
         case .ctaAddHomeSubmit: "cta.add_home.submit"
+        case .ctaClaimOwnershipSubmit: "cta.claim_ownership.submit"
         case .formEditProfileSubmit: "form.edit_profile.submit"
         case .formEditProfileValidationError: "form.edit_profile.validation_error"
         }
@@ -61,10 +67,14 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["category": category, "trust_level": trustLevel]
         case let .screenAddHomeWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
+        case let .screenClaimOwnershipStepViewed(stepName):
+            ["step_name": stepName]
         case let .ctaHubActionStripTapped(label):
             ["label": label]
         case let .ctaHubPillarTapped(pillar):
             ["pillar": pillar]
+        case let .ctaClaimOwnershipSubmit(result):
+            ["result": result.rawValue]
         case let .formEditProfileSubmit(result):
             ["result": result.rawValue]
         case let .formEditProfileValidationError(field):
@@ -74,6 +84,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenMailboxDrawersViewed,
              .screenMyHomesViewed,
              .screenHomeDashboardViewed,
+             .screenMyClaimsViewed,
              .screenEditProfileViewed,
              .ctaMailboxItemLogReceived,
              .ctaAddHomeSubmit:
