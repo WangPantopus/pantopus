@@ -13,6 +13,8 @@ import SwiftUI
 public enum MailItemCategory: String, Sendable, CaseIterable {
     case package
     case coupon
+    case booklet
+    case certified
     case notice
     case bill
     case statement
@@ -31,6 +33,8 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         switch self {
         case .package: Theme.Color.delivery
         case .coupon: Theme.Color.childCare
+        case .booklet: Theme.Color.moving // violet (#8e44ad) per P18 FrameBooklet
+        case .certified: Theme.Color.primary600 // primary (#0284c7) per P18 FrameCertified
         case .notice: Theme.Color.warning
         case .bill: Theme.Color.error
         case .statement: Theme.Color.tutoring
@@ -59,7 +63,12 @@ public enum MailTrust: String, Sendable, CaseIterable {
     case verified
     case partial
     case unverified
+    /// Sender is a known Pantopus user.
     case chain
+    /// Certified mail / chain-of-custody — primary tint, longer label.
+    /// Set by the VM when category is `.certified`; not derived from the
+    /// wire `sender_trust` field today.
+    case certifiedChain
 
     /// Icon rendered in the pill.
     public var icon: PantopusIcon {
@@ -68,6 +77,7 @@ public enum MailTrust: String, Sendable, CaseIterable {
         case .partial: .shield
         case .unverified: .shield
         case .chain: .shieldCheck
+        case .certifiedChain: .shieldCheck
         }
     }
 
@@ -78,6 +88,7 @@ public enum MailTrust: String, Sendable, CaseIterable {
         case .partial: Theme.Color.warningBg
         case .unverified: Theme.Color.appSurfaceSunken
         case .chain: Theme.Color.infoBg
+        case .certifiedChain: Theme.Color.infoBg
         }
     }
 
@@ -88,6 +99,7 @@ public enum MailTrust: String, Sendable, CaseIterable {
         case .partial: Theme.Color.warning
         case .unverified: Theme.Color.appTextSecondary
         case .chain: Theme.Color.primary600
+        case .certifiedChain: Theme.Color.primary600
         }
     }
 
@@ -98,6 +110,7 @@ public enum MailTrust: String, Sendable, CaseIterable {
         case .partial: "Partial"
         case .unverified: "Unverified"
         case .chain: "Pantopus user"
+        case .certifiedChain: "Certified · Chain of custody"
         }
     }
 

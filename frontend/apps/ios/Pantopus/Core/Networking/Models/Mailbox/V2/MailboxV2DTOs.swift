@@ -108,7 +108,10 @@ public struct MailboxV2ItemResponse: Decodable, Sendable, Hashable {
             case sender
             case senderDisplay = "sender_display"
             case senderTrust = "sender_trust"
-            case package, packageInfo, packageTimeline, objectPayload
+            case package
+            case packageInfo // backend: column on Mail (rare); currently no override
+            case packageTimeline = "timeline" // backend response key
+            case objectPayload = "object_payload" // backend response key (P18 fix)
         }
     }
 }

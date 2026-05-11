@@ -55,4 +55,14 @@ public indirect enum JSONValue: Decodable, Sendable, Hashable {
     public var boolValue: Bool? {
         if case let .bool(v) = self { v } else { nil }
     }
+
+    /// Dictionary projection if this case is `.object`, otherwise nil.
+    public var dictValue: [String: JSONValue]? {
+        if case let .object(dict) = self { dict } else { nil }
+    }
+
+    /// Array projection if this case is `.array`, otherwise nil.
+    public var arrayValue: [JSONValue]? {
+        if case let .array(arr) = self { arr } else { nil }
+    }
 }

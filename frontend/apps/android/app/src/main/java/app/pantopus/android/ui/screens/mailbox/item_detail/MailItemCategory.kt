@@ -16,6 +16,8 @@ enum class MailItemCategory(
 ) {
     Package("package", PantopusColors.delivery),
     Coupon("coupon", PantopusColors.childCare),
+    Booklet("booklet", PantopusColors.moving), // violet (#8e44ad) per P18
+    Certified("certified", PantopusColors.primary600), // primary per P18
     Notice("notice", PantopusColors.warning),
     Bill("bill", PantopusColors.error),
     Statement("statement", PantopusColors.tutoring),
@@ -50,6 +52,18 @@ enum class MailTrust(
     Partial("Partial", PantopusIcon.Shield, PantopusColors.warningBg, PantopusColors.warning),
     Unverified("Unverified", PantopusIcon.Shield, PantopusColors.appSurfaceSunken, PantopusColors.appTextSecondary),
     Chain("Pantopus user", PantopusIcon.ShieldCheck, PantopusColors.infoBg, PantopusColors.primary600),
+
+    /**
+     * Certified mail / chain-of-custody. Set by the VM when category is
+     * [MailItemCategory.Certified]; not derived from the wire
+     * `sender_trust` field today.
+     */
+    CertifiedChain(
+        "Certified · Chain of custody",
+        PantopusIcon.ShieldCheck,
+        PantopusColors.infoBg,
+        PantopusColors.primary600,
+    ),
     ;
 
     companion object {

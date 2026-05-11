@@ -18,12 +18,22 @@ public struct SenderBlockContent: Sendable {
     /// the avatar opens the public profile (wired in P17). `nil` for mail
     /// whose sender doesn't map to a Pantopus user.
     public let senderUserId: String?
+    /// When true the sender block renders a small "CERTIFIED" stamp on
+    /// the trailing edge — used by the certified body (P18).
+    public let showStamp: Bool
 
-    public init(displayName: String, meta: String, initials: String, senderUserId: String? = nil) {
+    public init(
+        displayName: String,
+        meta: String,
+        initials: String,
+        senderUserId: String? = nil,
+        showStamp: Bool = false
+    ) {
         self.displayName = displayName
         self.meta = meta
         self.initials = initials
         self.senderUserId = senderUserId
+        self.showStamp = showStamp
     }
 }
 
@@ -213,6 +223,9 @@ public struct SenderBlock: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
             Spacer()
+            if content.showStamp {
+                CertifiedStamp()
+            }
         }
         .accessibilityElement(children: .contain)
     }
@@ -237,6 +250,26 @@ public struct SenderBlock: View {
             ringProgress: 1,
             size: 36
         )
+    }
+}
+
+/// Tilted "CERTIFIED" stamp rendered on the trailing edge of the
+/// sender block when [`SenderBlockContent.showStamp`] is true.
+public struct CertifiedStamp: View {
+    public init() {}
+
+    public var body: some View {
+        Text("CERTIFIED")
+            .pantopusTextStyle(.overline)
+            .foregroundStyle(Theme.Color.primary600)
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, 4)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.sm)
+                    .stroke(Theme.Color.primary600, lineWidth: 1.5)
+            )
+            .rotationEffect(.degrees(-12))
+            .accessibilityLabel("Certified")
     }
 }
 

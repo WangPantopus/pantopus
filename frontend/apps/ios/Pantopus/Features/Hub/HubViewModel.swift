@@ -272,11 +272,4 @@ final class HubViewModel {
     }
 }
 
-// MARK: - JSON convenience
-
-private extension JSONValue {
-    /// Dictionary projection if this case is `.object`.
-    var dictValue: [String: JSONValue]? {
-        if case let .object(dict) = self { dict } else { nil }
-    }
-}
+// `JSONValue.dictValue` lives in `Core/Networking/Models/Common/JSONValue.swift`.

@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.mailbox.item_detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -58,6 +60,11 @@ data class SenderBlockContent(
      * tapping the avatar opens the public profile (P17).
      */
     val senderUserId: String? = null,
+    /**
+     * When true the sender block renders a small "CERTIFIED" stamp on
+     * the trailing edge — used by the certified body (P18).
+     */
+    val showStamp: Boolean = false,
 )
 
 /** AI elf suggestion card payload. */
@@ -271,6 +278,35 @@ fun SenderBlock(
                 color = PantopusColors.appTextSecondary,
             )
         }
+        if (content.showStamp) {
+            CertifiedStamp()
+        }
+    }
+}
+
+/**
+ * Tilted "CERTIFIED" stamp rendered on the trailing edge of the sender
+ * block when [SenderBlockContent.showStamp] is true.
+ */
+@Composable
+fun CertifiedStamp(modifier: Modifier = Modifier) {
+    Box(
+        modifier =
+            modifier
+                .rotate(-12f)
+                .border(
+                    1.5.dp,
+                    PantopusColors.primary600,
+                    RoundedCornerShape(Radii.sm),
+                )
+                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .semantics { contentDescription = "Certified" },
+    ) {
+        Text(
+            text = "CERTIFIED",
+            style = PantopusTextStyle.overline,
+            color = PantopusColors.primary600,
+        )
     }
 }
 

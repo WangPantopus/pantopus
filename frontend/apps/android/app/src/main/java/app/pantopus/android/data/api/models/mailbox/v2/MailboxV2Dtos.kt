@@ -76,9 +76,9 @@ data class MailboxV2Item(
      */
     @Json(name = "sender_user_id") val senderUserId: String? = null,
     val `package`: JsonValue?,
-    val packageInfo: JsonValue?,
-    val packageTimeline: JsonArrayValue = emptyList(),
-    val objectPayload: JsonValue?,
+    val packageInfo: JsonValue? = null,
+    @Json(name = "timeline") val packageTimeline: JsonArrayValue = emptyList(),
+    @Json(name = "object_payload") val objectPayload: JsonValue? = null,
 )
 
 /** `POST /api/mailbox/v2/item/:id/action` — route `backend/routes/mailboxV2.js:459`. */

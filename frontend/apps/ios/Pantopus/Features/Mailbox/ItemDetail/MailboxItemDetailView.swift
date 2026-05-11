@@ -66,28 +66,79 @@ struct MailboxItemDetailView: View {
             cta: ctaContent(for: content),
             onBack: onBack,
             onAIChip: { _ in },
-            onPrimary: { Task { await viewModel.logAsReceived() } },
-            onGhost: { Task { await viewModel.markNotMine() } },
+            onPrimary: { Task { await viewModel.performPrimaryAction() } },
+            onGhost: { Task { await viewModel.performGhostAction() } },
             onSenderAvatarTap: onOpenSenderProfile,
-            body: {
-                if content.category == .package, let pkg = content.packageInfo {
-                    PackageBody(carrier: pkg.carrier, etaLine: pkg.etaLine)
-                } else if content.category != .package {
-                    MailItemPlaceholderBody(category: content.category)
-                }
-            }
+            body: { categoryBody(for: content) }
         )
     }
 
+    @ViewBuilder
+    private func categoryBody(for content: MailboxItemDetailContent) -> some View {
+        switch (content.category, content.payload) {
+        case (.package, _):
+            if let pkg = content.packageInfo {
+                PackageBody(carrier: pkg.carrier, etaLine: pkg.etaLine)
+            }
+        case let (.coupon, .coupon(coupon)):
+            CouponBody(coupon: coupon)
+        case let (.booklet, .booklet(booklet)):
+            BookletBody(booklet: booklet)
+        case let (.certified, .certified(certified)):
+            CertifiedBody(
+                certified: certified,
+                isAcknowledged: Binding(
+                    get: { viewModel.certifiedAckChecked },
+                    set: { viewModel.certifiedAckChecked = $0 }
+                ),
+                onViewTerms: { Task { await viewModel.performGhostAction() } }
+            )
+        default:
+            MailItemPlaceholderBody(category: content.category)
+        }
+    }
+
     private func ctaContent(for content: MailboxItemDetailContent) -> MailboxCTAShelfContent? {
-        guard content.category == .package else { return nil }
-        return MailboxCTAShelfContent(
-            primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Delivered" : "Log as received",
-            ghostTitle: "Not mine",
-            primaryLoading: viewModel.ctaFlags.primaryLoading,
-            ghostLoading: viewModel.ctaFlags.ghostLoading,
-            primaryEnabled: content.ctaEnabled && !viewModel.ctaFlags.primaryCompleted
-        )
+        switch content.category {
+        case .package:
+            return MailboxCTAShelfContent(
+                primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Delivered" : "Log as received",
+                ghostTitle: "Not mine",
+                primaryLoading: viewModel.ctaFlags.primaryLoading,
+                ghostLoading: viewModel.ctaFlags.ghostLoading,
+                primaryEnabled: content.ctaEnabled && !viewModel.ctaFlags.primaryCompleted
+            )
+        case .coupon:
+            return MailboxCTAShelfContent(
+                primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Added to wallet ✓" : "Add to wallet",
+                ghostTitle: "Save for later",
+                primaryLoading: viewModel.ctaFlags.primaryLoading,
+                ghostLoading: viewModel.ctaFlags.ghostLoading,
+                primaryEnabled: content.ctaEnabled && !viewModel.ctaFlags.primaryCompleted
+            )
+        case .booklet:
+            return MailboxCTAShelfContent(
+                primaryTitle: "Save to library",
+                ghostTitle: nil,
+                primaryLoading: viewModel.ctaFlags.primaryLoading,
+                ghostLoading: false,
+                primaryEnabled: content.ctaEnabled
+            )
+        case .certified:
+            return MailboxCTAShelfContent(
+                primaryTitle: viewModel.ctaFlags.primaryCompleted
+                    ? "Acknowledged ✓"
+                    : "Acknowledge receipt",
+                ghostTitle: "View terms",
+                primaryLoading: viewModel.ctaFlags.primaryLoading,
+                ghostLoading: viewModel.ctaFlags.ghostLoading,
+                primaryEnabled: content.ctaEnabled
+                    && viewModel.certifiedAckChecked
+                    && !viewModel.ctaFlags.primaryCompleted
+            )
+        default:
+            return nil
+        }
     }
 }
 
