@@ -14,6 +14,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +32,7 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CertifiedBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CouponBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.MailItemPlaceholderBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.PackageBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedTermsSheet
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusTextStyle
@@ -49,6 +53,7 @@ fun MailboxItemDetailScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val ctaFlags by viewModel.ctaFlags.collectAsStateWithLifecycle()
     val ackChecked by viewModel.certifiedAckChecked.collectAsStateWithLifecycle()
+    var termsSheetUrl by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -66,6 +71,14 @@ fun MailboxItemDetailScreen(
                 ErrorLayout(message = s.message, onRetry = { viewModel.refresh() })
             is MailboxItemDetailUiState.Loaded -> {
                 val content = s.content
+                val showTerms = {
+                    val payload = content.payload
+                    if (payload is MailboxCategoryPayload.Certified && !payload.detail.termsUrl.isNullOrEmpty()) {
+                        termsSheetUrl = payload.detail.termsUrl
+                    } else {
+                        viewModel.performGhostAction()
+                    }
+                }
                 MailboxItemDetailShell(
                     category = content.category,
                     trust = content.trust,
@@ -76,14 +89,20 @@ fun MailboxItemDetailScreen(
                     cta = ctaContent(content, ctaFlags, ackChecked),
                     onBack = onBack,
                     onPrimary = { viewModel.performPrimaryAction() },
-                    onGhost = { viewModel.performGhostAction() },
+                    onGhost = {
+                        if (content.category == MailItemCategory.Certified) {
+                            showTerms()
+                        } else {
+                            viewModel.performGhostAction()
+                        }
+                    },
                     onSenderAvatarTap = onOpenSenderProfile,
                 ) {
                     CategoryBody(
                         content = content,
                         ackChecked = ackChecked,
                         onAckChange = { viewModel.setCertifiedAckChecked(it) },
-                        onViewTerms = { viewModel.performGhostAction() },
+                        onViewTerms = showTerms,
                     )
                 }
             }
@@ -101,6 +120,13 @@ fun MailboxItemDetailScreen(
                 Text(toast, style = PantopusTextStyle.small, color = PantopusColors.appTextInverse)
             }
         }
+    }
+
+    termsSheetUrl?.let { url ->
+        CertifiedTermsSheet(
+            termsUrl = url,
+            onDismiss = { termsSheetUrl = null },
+        )
     }
 }
 

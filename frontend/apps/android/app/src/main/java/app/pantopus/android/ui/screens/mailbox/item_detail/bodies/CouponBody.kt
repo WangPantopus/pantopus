@@ -172,12 +172,17 @@ private fun ExpiryChip(
 }
 
 private fun isExpiringSoon(iso: String): Boolean {
-    return try {
-        val instant = Instant.parse(iso)
-        Duration.between(Instant.now(), instant).toDays() < 7L
-    } catch (_: Throwable) {
-        false
-    }
+    val instant =
+        runCatching { Instant.parse(iso) }
+            .getOrNull()
+            ?: runCatching {
+                java.time.LocalDate
+                    .parse(iso)
+                    .atStartOfDay(java.time.ZoneOffset.UTC)
+                    .toInstant()
+            }.getOrNull()
+            ?: return false
+    return Duration.between(Instant.now(), instant).toDays() < 7L
 }
 
 private fun copyToClipboard(

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -40,7 +39,7 @@ fun CertifiedConfirmGate(
                 Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(Color(0x660284C7)), // primary600 @ 40%
+                    .background(PantopusColors.primary600.copy(alpha = 0.4f)),
         )
         PantopusCheckbox(
             isChecked = isAcknowledged,

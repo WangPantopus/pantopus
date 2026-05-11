@@ -10,6 +10,26 @@
 import XCTest
 @testable import Pantopus
 
+private extension ISO8601DateFormatter {
+    /// Build a `yyyy-MM-dd` string a fixed number of days from now,
+    /// at UTC midnight, so `daysUntil` returns the exact integer.
+    static func dateOnly(daysFromNow days: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        // Round "now" up to the next UTC midnight so the day-count is
+        // stable regardless of the test's wall-clock time-of-day.
+        let calendar = Calendar(identifier: .gregorian)
+        var calUTC = calendar
+        calUTC.timeZone = TimeZone(identifier: "UTC")!
+        let now = Date()
+        let startOfTodayUTC = calUTC.startOfDay(for: now)
+        let target = startOfTodayUTC.addingTimeInterval(Double(days) * 86_400)
+        return formatter.string(from: target)
+    }
+}
+
 @MainActor
 final class MailboxItemDetailCategoryDispatchTests: XCTestCase {
     override func setUp() {
@@ -142,6 +162,35 @@ final class MailboxItemDetailCategoryDispatchTests: XCTestCase {
             XCTFail("Expected .certified payload")
             return
         }
+    }
+
+    // MARK: - daysUntil regression
+
+    /// Regression: backend payloads commonly carry date-only strings
+    /// (`2026-05-31`). Previously `daysUntil` only accepted full ISO
+    /// timestamps, so coupon AI elf and certified countdown silently
+    /// returned nil / 0. We assert a non-nil result for a date-only
+    /// string and a tolerant range — the absolute integer drifts by
+    /// ±1 depending on UTC time-of-day at test runtime.
+    func testDaysUntilParsesDateOnlyString() {
+        let dateOnly = ISO8601DateFormatter.dateOnly(daysFromNow: 5)
+        let result = MailboxItemDetailViewModel.daysUntil(dateOnly)
+        XCTAssertNotNil(result, "Date-only string failed to parse")
+        if let result {
+            XCTAssertTrue((4...5).contains(result), "Got \(result), expected 4 or 5")
+        }
+    }
+
+    func testDaysUntilParsesFullTimestamp() {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = Date(timeIntervalSinceNow: 3 * 86_400 + 1) // +1s → guarantees >= 3 days
+        let iso = formatter.string(from: date)
+        XCTAssertEqual(MailboxItemDetailViewModel.daysUntil(iso), 3)
+    }
+
+    func testDaysUntilReturnsNilForGarbage() {
+        XCTAssertNil(MailboxItemDetailViewModel.daysUntil("not-a-date"))
     }
 
     func testCertifiedPrimaryActionGatedOnAckCheckbox() async {

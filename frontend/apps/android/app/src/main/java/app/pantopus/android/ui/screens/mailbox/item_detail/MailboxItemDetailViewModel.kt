@@ -573,16 +573,23 @@ class MailboxItemDetailViewModel
 
         /**
          * Number of whole days from now until the supplied ISO-8601
-         * string, rounded down. Negative if the date is in the past;
-         * null if it can't be parsed.
+         * string, rounded down. Accepts both full timestamps
+         * (`2026-05-31T12:00:00Z`) and date-only strings
+         * (`2026-05-31`). Negative when in the past; null when the
+         * string can't be parsed.
          */
         private fun daysUntil(iso: String): Int? {
-            return try {
-                val instant = Instant.parse(iso)
-                Duration.between(Instant.now(), instant).toDays().toInt()
-            } catch (_: Throwable) {
-                null
-            }
+            val instant =
+                runCatching { Instant.parse(iso) }
+                    .getOrNull()
+                    ?: runCatching {
+                        java.time.LocalDate
+                            .parse(iso)
+                            .atStartOfDay(java.time.ZoneOffset.UTC)
+                            .toInstant()
+                    }.getOrNull()
+                    ?: return null
+            return Duration.between(Instant.now(), instant).toDays().toInt()
         }
 
         private fun timeline(status: String): List<TimelineStep> {

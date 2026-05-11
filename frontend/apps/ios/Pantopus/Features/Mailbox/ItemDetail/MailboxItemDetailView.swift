@@ -7,8 +7,15 @@ import SwiftUI
 
 /// Mailbox Item Detail screen. Category-aware; Package renders the
 /// concrete body, other categories fall back to `NotYetAvailable`.
+/// Identifiable wrapper around `URL` so we can drive a `.sheet(item:)`.
+private struct TermsSheetItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 struct MailboxItemDetailView: View {
     @State private var viewModel: MailboxItemDetailViewModel
+    @State private var termsSheet: TermsSheetItem?
     private let onBack: () -> Void
     private let onOpenSenderProfile: (@MainActor (String) -> Void)?
 
@@ -67,10 +74,26 @@ struct MailboxItemDetailView: View {
             onBack: onBack,
             onAIChip: { _ in },
             onPrimary: { Task { await viewModel.performPrimaryAction() } },
-            onGhost: { Task { await viewModel.performGhostAction() } },
+            onGhost: { handleGhost(for: content) },
             onSenderAvatarTap: onOpenSenderProfile,
             body: { categoryBody(for: content) }
         )
+        .sheet(item: $termsSheet) { item in
+            CertifiedTermsSheet(termsURL: item.url) { termsSheet = nil }
+        }
+    }
+
+    /// Ghost CTA dispatcher. For certified mail this surfaces the
+    /// View-terms sheet directly; for other categories the VM handles
+    /// the action via `performGhostAction`.
+    private func handleGhost(for content: MailboxItemDetailContent) {
+        if content.category == .certified,
+           case let .certified(detail) = content.payload,
+           let url = detail.termsURL {
+            termsSheet = TermsSheetItem(url: url)
+            return
+        }
+        Task { await viewModel.performGhostAction() }
     }
 
     @ViewBuilder
@@ -91,7 +114,11 @@ struct MailboxItemDetailView: View {
                     get: { viewModel.certifiedAckChecked },
                     set: { viewModel.certifiedAckChecked = $0 }
                 ),
-                onViewTerms: { Task { await viewModel.performGhostAction() } }
+                onViewTerms: {
+                    if let url = certified.termsURL {
+                        termsSheet = TermsSheetItem(url: url)
+                    }
+                }
             )
         default:
             MailItemPlaceholderBody(category: content.category)

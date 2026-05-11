@@ -394,12 +394,11 @@ final class MailboxItemDetailViewModel {
         booklet: BookletDetailDTO,
         baseTrust: MailTrust
     ) {
-        var facts: [KeyFactRow] = [
+        let facts: [KeyFactRow] = [
             KeyFactRow(label: "Sender", value: item.senderDisplay),
             KeyFactRow(label: "Pages", value: "\(booklet.pageCount)"),
             KeyFactRow(label: "Received at", value: item.base.createdAt)
         ]
-        if facts.isEmpty { facts = [] } // keep linter happy for future edits
         state = .loaded(
             MailboxItemDetailContent(
                 category: category,
@@ -579,16 +578,29 @@ final class MailboxItemDetailViewModel {
     }
 
     /// Number of whole days from now until the supplied ISO-8601 string,
-    /// rounded down. Negative if the date is in the past, nil if it
-    /// can't be parsed.
+    /// rounded down. Accepts both full timestamps
+    /// (`2026-05-31T12:00:00Z`) and date-only strings (`2026-05-31`).
+    /// Returns nil if the string can't be parsed; negative when the
+    /// date is in the past.
     static func daysUntil(_ iso: String) -> Int? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let parsed = formatter.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+        let parsed =
+            formatter.date(from: iso)
+            ?? ISO8601DateFormatter().date(from: iso)
+            ?? dateOnlyFormatter.date(from: iso)
         guard let date = parsed else { return nil }
         let interval = date.timeIntervalSinceNow
         return Int((interval / 86_400).rounded(.down))
     }
+
+    private static let dateOnlyFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
 
     private static func timeline(for status: String) -> [TimelineStep] {
         let order = ["pre_receipt", "in_transit", "out_for_delivery", "delivered"]

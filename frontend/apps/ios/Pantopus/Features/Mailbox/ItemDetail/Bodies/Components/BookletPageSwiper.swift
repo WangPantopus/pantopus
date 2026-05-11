@@ -51,6 +51,7 @@ public struct BookletPageSwiper: View {
 private struct BookletPage: View {
     let url: URL
     @State private var scale: CGFloat = 1.0
+    @State private var baseScale: CGFloat = 1.0
 
     var body: some View {
         AsyncImage(url: url) { phase in
@@ -61,14 +62,26 @@ private struct BookletPage: View {
                     .aspectRatio(16.0 / 9.0, contentMode: .fit)
                     .scaleEffect(scale)
                     .gesture(
+                        // Sustain pinch-to-zoom in [1.0, 3.0]. Double-tap
+                        // to reset back to 1.0 (handled below).
                         MagnificationGesture()
                             .onChanged { value in
-                                scale = min(max(1.0, value), 3.0)
+                                scale = min(max(1.0, baseScale * value), 3.0)
                             }
                             .onEnded { _ in
-                                withAnimation(.spring()) { scale = 1.0 }
+                                baseScale = scale
                             }
                     )
+                    .onTapGesture(count: 2) {
+                        withAnimation(.spring()) {
+                            scale = 1.0
+                            baseScale = 1.0
+                        }
+                    }
+                    .onChange(of: url) { _, _ in
+                        scale = 1.0
+                        baseScale = 1.0
+                    }
             case .failure:
                 fallback(icon: .alertCircle, label: "Couldn't load page")
             case .empty:
