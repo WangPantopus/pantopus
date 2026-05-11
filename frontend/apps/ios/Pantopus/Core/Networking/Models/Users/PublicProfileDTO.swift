@@ -67,7 +67,8 @@ public struct PublicProfile: Decodable, Sendable, Hashable, Identifiable {
         case avatarURL = "avatar_url"
         case profilePictureURL = "profile_picture_url"
         case city, state, accountType
-        case verified, residency, createdAt
+        case verified, residency
+        case createdAt = "created_at"
         case gigsPosted = "gigs_posted"
         case gigsCompleted = "gigs_completed"
         case averageRating = "average_rating"

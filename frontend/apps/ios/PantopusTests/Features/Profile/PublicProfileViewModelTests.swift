@@ -111,6 +111,9 @@ final class PublicProfileViewModelTests: XCTestCase {
         XCTAssertEqual(content.stats.stats.map(\.label), ["Reviews", "Rating", "Gigs"])
         XCTAssertEqual(content.stats.reviews.count, 1)
         XCTAssertEqual(content.stats.skills, ["Carpentry", "Spanish"])
+        // Regression guard: backend sends `created_at` snake-case but the
+        // CodingKey was missing originally and silently nil'd this field.
+        XCTAssertEqual(content.profile.createdAt, "2025-01-01T00:00:00.000Z")
     }
 
     // MARK: - Tabs

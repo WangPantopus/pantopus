@@ -69,6 +69,12 @@ data class MailboxV2Item(
     val sender: DrawerMail.SenderRef?,
     @Json(name = "sender_display") val senderDisplay: String,
     @Json(name = "sender_trust") val senderTrust: String,
+    /**
+     * Pantopus user id behind the sender. Sourced from the `*`
+     * projection on Mail in `backend/routes/mailboxV2.js`. Drives the
+     * avatar-tap → public profile navigation in P17.
+     */
+    @Json(name = "sender_user_id") val senderUserId: String? = null,
     val `package`: JsonValue?,
     val packageInfo: JsonValue?,
     val packageTimeline: JsonArrayValue = emptyList(),

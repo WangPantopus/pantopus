@@ -258,7 +258,11 @@ public final class PulsePostDetailViewModel {
             authorDisplayName: displayName,
             authorAvatarURL: avatarURL,
             authorIdentity: identity,
-            authorVerified: post.creator?.accountType == "verified",
+            // TODO(backend): backend `CREATOR_SELECT` for posts does not
+            // include the `verified` column today, so the post header
+            // can never show a verified badge. Wire this up once
+            // feedService.js#CREATOR_SELECT joins `verified`.
+            authorVerified: false,
             timeAndLocality: timeAndLocality,
             intent: intent,
             mediaURLs: mediaURLs,

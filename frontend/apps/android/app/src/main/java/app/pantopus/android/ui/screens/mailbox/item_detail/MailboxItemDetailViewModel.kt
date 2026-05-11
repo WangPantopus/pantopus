@@ -217,6 +217,7 @@ class MailboxItemDetailViewModel
                         displayName = item.senderDisplay,
                         meta = item.createdAt,
                         initials = initials(item.senderDisplay),
+                        senderUserId = item.senderUserId,
                     ),
                 aiElf = null,
                 keyFacts =
@@ -263,6 +264,7 @@ class MailboxItemDetailViewModel
                         displayName = item.senderDisplay,
                         meta = pkg.sender?.display ?: carrier,
                         initials = initials(item.senderDisplay),
+                        senderUserId = item.senderUserId,
                     ),
                 aiElf = elf,
                 keyFacts = facts,

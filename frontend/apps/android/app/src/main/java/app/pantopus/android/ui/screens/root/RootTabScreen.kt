@@ -127,10 +127,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 }
                             HubNavigationIntent.StartVerification ->
                                 navController.navigate(ChildRoutes.ADD_HOME)
-                            is HubNavigationIntent.DiscoveryTapped ->
-                                // Discovery cards surface people today — treat the id as
-                                // a userId and open their public profile (P17).
-                                navController.navigate(ChildRoutes.publicProfile(intent.id))
+                            // TODO(routing): re-enable DiscoveryTapped → publicProfile
+                            // once HubViewModel surfaces the discovery item type.
+                            // P17 routed unconditionally, but discovery currently
+                            // fetches `filter=gigs` and the gig UUIDs do not resolve
+                            // as user IDs.
                             else -> Unit
                         }
                     })

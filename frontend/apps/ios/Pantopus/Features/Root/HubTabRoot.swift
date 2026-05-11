@@ -56,11 +56,13 @@ public struct HubTabRoot: View {
             case .pillar(.mail): path.append(.mailbox)
             case .action(.addHome), .startVerification: path.append(.addHome)
             case .action(.scanMail): path.append(.mailboxDrawers)
-            case let .openDiscovery(id):
-                // Discovery cards surface people today — treat the id as a
-                // userId and open their public profile (P17).
-                path.append(.publicProfile(userId: id))
-            case .pillar, .action, .jumpBackIn, .openNotifications, .openMenu:
+            case .pillar, .action, .openDiscovery, .jumpBackIn,
+                 .openNotifications, .openMenu:
+                // TODO(routing): re-enable openDiscovery → publicProfile
+                // once HubViewModel surfaces the discovery item type.
+                // P17 routed unconditionally to publicProfile, but
+                // discovery currently fetches `filter=gigs` and the
+                // gig UUIDs do not resolve as user IDs.
                 break
             }
         }
