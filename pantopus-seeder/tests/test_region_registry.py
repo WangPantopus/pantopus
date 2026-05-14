@@ -39,7 +39,7 @@ class TestLoadActiveRegions:
                 "lng": -122.6615,
                 "radius_meters": 25000,
                 "timezone": "America/Los_Angeles",
-                "display_name": "Clark County",
+                "display_name": "Clark County, WA",
                 "curator_user_id": "curator-uuid",
             },
             {
@@ -112,7 +112,7 @@ class TestLoadSourcesForRegion:
                 "source_type": "google_news",
                 "url": "Clark County WA news",
                 "category": "local_news",
-                "display_name": "Google News (Clark County)",
+                "display_name": "Google News (Clark County, WA)",
                 "region": "clark_county",
             },
         ]

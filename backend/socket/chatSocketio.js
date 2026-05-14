@@ -657,7 +657,7 @@ module.exports = (io) => {
   // ============ PERIODIC CLEANUP ============
   
   // Clean up expired typing indicators every 30 seconds
-  setInterval(async () => {
+  const typingCleanupInterval = setInterval(async () => {
     try {
       const { data: deletedCount } = await supabaseAdmin.rpc('cleanup_expired_typing');
       if (deletedCount > 0) {
@@ -667,6 +667,9 @@ module.exports = (io) => {
       logger.error('Typing cleanup error', { error: err.message });
     }
   }, 30000);
+  if (typeof typingCleanupInterval.unref === 'function') {
+    typingCleanupInterval.unref();
+  }
   
   logger.info('Socket.IO chat server initialized');
 };

@@ -101,6 +101,15 @@ function decodeGeohash(hash) {
 // ─── Section keys ────────────────────────────────────────────────────────────
 
 const SECTION_KEYS = ['free_nearby', 'just_listed', 'nearby_deals', 'wanted_nearby', 'by_category'];
+const METERS_PER_MILE = 1609.34;
+const DEFAULT_DISCOVERY_RADIUS_METERS = Math.round(100 * METERS_PER_MILE);
+
+function normalizeRadiusMeters(radius) {
+  const parsed = Number(radius);
+  return Number.isFinite(parsed) && parsed > 0
+    ? Math.round(parsed)
+    : DEFAULT_DISCOVERY_RADIUS_METERS;
+}
 
 // ─── Cache helpers ───────────────────────────────────────────────────────────
 
@@ -173,7 +182,13 @@ function applySectionFilters(sections, filters) {
 /**
  * Get cached discovery sections for a location, falling back to live query.
  */
-async function getCachedDiscovery({ lat, lng, userId }) {
+async function getCachedDiscovery({ lat, lng, userId, radius }) {
+  const radiusMeters = normalizeRadiusMeters(radius);
+
+  if (radiusMeters !== DEFAULT_DISCOVERY_RADIUS_METERS) {
+    return discoverListings({ lat, lng, userId, radius: radiusMeters });
+  }
+
   const geohash = encodeGeohash(lat, lng);
 
   // Try cache first
@@ -211,7 +226,7 @@ async function getCachedDiscovery({ lat, lng, userId }) {
   }
 
   // Cache miss — live query
-  const result = await discoverListings({ lat, lng, userId });
+  const result = await discoverListings({ lat, lng, userId, radius: radiusMeters });
 
   // Fire-and-forget: cache sections
   upsertSections(geohash, result.sections).catch((err) => {

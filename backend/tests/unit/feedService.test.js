@@ -27,7 +27,9 @@ const { getListFeed, getMapFeed, invalidateFilterCache } = require('../../servic
 
 const USER_ID = 'aaaaaaaa-aaaa-1aaa-8aaa-aaaaaaaaaaaa';
 const OTHER_USER = 'bbbbbbbb-bbbb-2bbb-8bbb-bbbbbbbbbbbb';
-const UNFOLLOWED_USER = 'cccccccc-cccc-3ccc-8ccc-cccccccccccc';
+const UNCONNECTED_USER = 'cccccccc-cccc-3ccc-8ccc-cccccccccccc';
+const PERSONA_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const PERSONA_TIER_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 
 // San Francisco center
 const SF_LAT = 37.7749;
@@ -135,8 +137,8 @@ describe('Feed Service', () => {
   // ────────────────────────────────────────────────────────────
   it('place surface excludes posts without place distribution target', async () => {
     seedTable('Post', [
-      makePost({ distribution_targets: ['followers'], effective_latitude: SF_LAT, effective_longitude: SF_LNG }),
       makePost({ distribution_targets: ['connections'], effective_latitude: SF_LAT, effective_longitude: SF_LNG }),
+      makePost({ distribution_targets: ['persona_followers'], effective_latitude: SF_LAT, effective_longitude: SF_LNG }),
     ]);
 
     const result = await getListFeed({
@@ -211,57 +213,37 @@ describe('Feed Service', () => {
   });
 
   // ────────────────────────────────────────────────────────────
-  // 4. following_excludes_unfollowed
+  // 4. connections_includes_connected_authors
   // ────────────────────────────────────────────────────────────
-  it('following surface excludes posts from unfollowed users', async () => {
-    // User follows OTHER_USER but not UNFOLLOWED_USER
-    seedTable('UserFollow', [
-      { follower_id: USER_ID, following_id: OTHER_USER },
+  it('connections surface includes posts from connected users', async () => {
+    seedTable('Relationship', [
+      { id: 'r-1', requester_id: USER_ID, addressee_id: OTHER_USER, status: 'accepted' },
     ]);
     seedTable('Post', [
-      makePost({
-        user_id: UNFOLLOWED_USER,
-        distribution_targets: ['followers'],
-        creator: { id: UNFOLLOWED_USER, username: 'unfollowed', name: 'Unfollowed', first_name: 'Un', last_name: 'Followed', profile_picture_url: null, city: 'SF', state: 'CA' },
-      }),
+      makePost({ user_id: OTHER_USER, distribution_targets: ['connections'] }),
+      makePost({ user_id: OTHER_USER, distribution_targets: ['connections'] }),
     ]);
 
     const result = await getListFeed({
       userId: USER_ID,
-      surface: 'following',
-    });
-
-    expect(result.posts).toHaveLength(0);
-  });
-
-  // ────────────────────────────────────────────────────────────
-  // 5. following_includes_followed_authors
-  // ────────────────────────────────────────────────────────────
-  it('following surface includes posts from followed users', async () => {
-    seedTable('UserFollow', [
-      { follower_id: USER_ID, following_id: OTHER_USER },
-    ]);
-    seedTable('Post', [
-      makePost({ user_id: OTHER_USER, distribution_targets: ['followers'] }),
-      makePost({ user_id: OTHER_USER, distribution_targets: ['followers'] }),
-    ]);
-
-    const result = await getListFeed({
-      userId: USER_ID,
-      surface: 'following',
+      surface: 'connections',
     });
 
     expect(result.posts).toHaveLength(2);
   });
 
   // ────────────────────────────────────────────────────────────
-  // 6. connections_excludes_non_connected
+  // 5. connections_excludes_unconnected
   // ────────────────────────────────────────────────────────────
   it('connections surface excludes posts from unconnected users', async () => {
     // No accepted connections for USER_ID
     seedTable('Relationship', []);
     seedTable('Post', [
-      makePost({ user_id: OTHER_USER, distribution_targets: ['connections'] }),
+      makePost({
+        user_id: UNCONNECTED_USER,
+        distribution_targets: ['connections'],
+        creator: { id: UNCONNECTED_USER, username: 'stranger', name: 'Stranger', first_name: 'Str', last_name: 'Anger', profile_picture_url: null, city: 'SF', state: 'CA' },
+      }),
     ]);
 
     const result = await getListFeed({
@@ -273,18 +255,154 @@ describe('Feed Service', () => {
     expect(result.posts).toHaveLength(0);
   });
 
+  it('personas surface includes Beacon updates from followed persona Posts', async () => {
+    seedTable('PersonaTier', [
+      { id: PERSONA_TIER_ID, persona_id: PERSONA_ID, rank: 1, name: 'Follower' },
+    ]);
+    seedTable('PersonaMembership', [
+      {
+        id: 'membership-1',
+        persona_id: PERSONA_ID,
+        user_id: USER_ID,
+        tier_id: PERSONA_TIER_ID,
+        relationship_type: 'follower',
+        status: 'active',
+      },
+    ]);
+    seedTable('PublicPersona', [
+      {
+        id: PERSONA_ID,
+        user_id: OTHER_USER,
+        handle: 'maya',
+        display_name: 'Maya Builds',
+        avatar_url: null,
+        status: 'active',
+      },
+    ]);
+    seedTable('Post', [
+      makePost({
+        id: 'broadcast-1',
+        user_id: OTHER_USER,
+        author_user_id: OTHER_USER,
+        identity_context_type: 'persona',
+        identity_context_id: PERSONA_ID,
+        content: 'Follower update',
+        post_type: 'personal_update',
+        visibility: 'followers',
+        visibility_scope: 'global',
+        location_precision: 'none',
+        latitude: null,
+        longitude: null,
+        effective_latitude: null,
+        effective_longitude: null,
+        location_name: null,
+        post_as: 'persona',
+        audience: 'followers',
+        distribution_targets: ['persona_followers'],
+        profile_visibility_scope: 'followers',
+        broadcast_channel_id: 'channel-1',
+        target_tier_rank: null,
+        created_at: '2026-05-10T10:00:00.000Z',
+        updated_at: '2026-05-10T10:00:00.000Z',
+        creator: { id: OTHER_USER, username: 'other', name: 'Other User' },
+      }),
+    ]);
+    seedTable('BroadcastMessage', []);
+
+    const result = await getListFeed({
+      userId: USER_ID,
+      surface: 'personas',
+    });
+
+    expect(result.posts).toHaveLength(1);
+    expect(result.posts[0]).toMatchObject({
+      id: 'broadcast-1',
+      content: 'Follower update',
+      post_type: 'personal_update',
+      identity_context_type: 'persona',
+      identity_context_id: PERSONA_ID,
+    });
+    expect(result.posts[0].author).toMatchObject({
+      type: 'persona',
+      id: PERSONA_ID,
+      handle: 'maya',
+      displayName: 'Maya Builds',
+    });
+  });
+
+  it('personas surface includes the viewer-owned Beacon posts', async () => {
+    seedTable('PersonaMembership', []);
+    seedTable('PublicPersona', [
+      {
+        id: PERSONA_ID,
+        user_id: USER_ID,
+        handle: 'ownerbeacon',
+        display_name: 'Owner Beacon',
+        avatar_url: null,
+        status: 'active',
+      },
+    ]);
+    seedTable('Post', [
+      makePost({
+        id: 'owner-beacon-feed-post',
+        user_id: USER_ID,
+        author_user_id: USER_ID,
+        identity_context_type: 'persona',
+        identity_context_id: PERSONA_ID,
+        content: 'My own Beacon update',
+        post_type: 'personal_update',
+        visibility: 'followers',
+        visibility_scope: 'global',
+        location_precision: 'none',
+        latitude: null,
+        longitude: null,
+        effective_latitude: null,
+        effective_longitude: null,
+        location_name: null,
+        post_as: 'persona',
+        audience: 'followers',
+        distribution_targets: ['persona_followers'],
+        profile_visibility_scope: 'followers',
+        target_tier_rank: null,
+        created_at: '2026-05-10T11:00:00.000Z',
+        updated_at: '2026-05-10T11:00:00.000Z',
+        creator: { id: USER_ID, username: 'owner' },
+      }),
+    ]);
+
+    const result = await getListFeed({
+      userId: USER_ID,
+      surface: 'personas',
+    });
+
+    expect(result.posts).toHaveLength(1);
+    expect(result.posts[0]).toMatchObject({
+      id: 'owner-beacon-feed-post',
+      content: 'My own Beacon update',
+      identity_context_type: 'persona',
+      identity_context_id: PERSONA_ID,
+    });
+    expect(result.posts[0].author).toMatchObject({
+      type: 'persona',
+      id: PERSONA_ID,
+      handle: 'ownerbeacon',
+      displayName: 'Owner Beacon',
+      viewer: expect.objectContaining({ isOwner: true }),
+    });
+  });
+
   // ────────────────────────────────────────────────────────────
   // 7. pagination_no_duplicates
   // ────────────────────────────────────────────────────────────
   it('pagination returns no duplicate post IDs', async () => {
-    seedTable('UserFollow', [
-      { follower_id: USER_ID, following_id: OTHER_USER },
+    seedTable('Relationship', [
+      { id: 'r-1', requester_id: USER_ID, addressee_id: OTHER_USER, status: 'accepted' },
     ]);
     const posts = [];
     for (let i = 0; i < 50; i++) {
       posts.push(makePost({
         user_id: OTHER_USER,
-        distribution_targets: ['followers'],
+        distribution_targets: ['connections'],
         created_at: new Date(Date.now() - i * 60000).toISOString(),
       }));
     }
@@ -297,7 +415,7 @@ describe('Feed Service', () => {
     for (let page = 0; page < 5; page++) {
       const result = await getListFeed({
         userId: USER_ID,
-        surface: 'following',
+        surface: 'connections',
         limit: 10,
         cursorCreatedAt,
         cursorId,
@@ -317,14 +435,14 @@ describe('Feed Service', () => {
   // 8. pagination_no_skips
   // ────────────────────────────────────────────────────────────
   it('pagination returns all 50 posts with no skips', async () => {
-    seedTable('UserFollow', [
-      { follower_id: USER_ID, following_id: OTHER_USER },
+    seedTable('Relationship', [
+      { id: 'r-1', requester_id: USER_ID, addressee_id: OTHER_USER, status: 'accepted' },
     ]);
     const posts = [];
     for (let i = 0; i < 50; i++) {
       posts.push(makePost({
         user_id: OTHER_USER,
-        distribution_targets: ['followers'],
+        distribution_targets: ['connections'],
         created_at: new Date(Date.now() - i * 60000).toISOString(),
       }));
     }
@@ -337,7 +455,7 @@ describe('Feed Service', () => {
     for (let page = 0; page < 10; page++) {
       const result = await getListFeed({
         userId: USER_ID,
-        surface: 'following',
+        surface: 'connections',
         limit: 10,
         cursorCreatedAt,
         cursorId,
@@ -354,43 +472,43 @@ describe('Feed Service', () => {
   });
 
   it('pagination does not skip newer unpinned posts after older pinned posts', async () => {
-    seedTable('UserFollow', [
-      { follower_id: USER_ID, following_id: OTHER_USER },
+    seedTable('Relationship', [
+      { id: 'r-1', requester_id: USER_ID, addressee_id: OTHER_USER, status: 'accepted' },
     ]);
 
     seedTable('Post', [
       makePost({
         id: 'pinned-newer',
         user_id: OTHER_USER,
-        distribution_targets: ['followers'],
+        distribution_targets: ['connections'],
         is_pinned: true,
         created_at: '2026-03-01T10:00:00.000Z',
       }),
       makePost({
         id: 'pinned-older',
         user_id: OTHER_USER,
-        distribution_targets: ['followers'],
+        distribution_targets: ['connections'],
         is_pinned: true,
         created_at: '2026-03-01T09:00:00.000Z',
       }),
       makePost({
         id: 'unpinned-newest',
         user_id: OTHER_USER,
-        distribution_targets: ['followers'],
+        distribution_targets: ['connections'],
         is_pinned: false,
         created_at: '2026-03-01T12:00:00.000Z',
       }),
       makePost({
         id: 'unpinned-middle',
         user_id: OTHER_USER,
-        distribution_targets: ['followers'],
+        distribution_targets: ['connections'],
         is_pinned: false,
         created_at: '2026-03-01T11:00:00.000Z',
       }),
       makePost({
         id: 'unpinned-older',
         user_id: OTHER_USER,
-        distribution_targets: ['followers'],
+        distribution_targets: ['connections'],
         is_pinned: false,
         created_at: '2026-03-01T08:00:00.000Z',
       }),
@@ -403,7 +521,7 @@ describe('Feed Service', () => {
     for (let page = 0; page < 3; page++) {
       const result = await getListFeed({
         userId: USER_ID,
-        surface: 'following',
+        surface: 'connections',
         limit: 2,
         cursorCreatedAt,
         cursorId,
@@ -449,30 +567,30 @@ describe('Feed Service', () => {
   it('muted user posts are excluded from the feed', async () => {
     const MUTED_USER = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 
-    seedTable('UserFollow', [
-      { follower_id: USER_ID, following_id: OTHER_USER },
-      { follower_id: USER_ID, following_id: MUTED_USER },
+    seedTable('Relationship', [
+      { id: 'r-1', requester_id: USER_ID, addressee_id: OTHER_USER, status: 'accepted' },
+      { id: 'r-2', requester_id: USER_ID, addressee_id: MUTED_USER, status: 'accepted' },
     ]);
     seedTable('PostMute', [
       { id: 'mute-1', user_id: USER_ID, muted_entity_type: 'user', muted_entity_id: MUTED_USER },
     ]);
     seedTable('Post', [
-      makePost({ user_id: OTHER_USER, distribution_targets: ['followers'] }),
+      makePost({ user_id: OTHER_USER, distribution_targets: ['connections'] }),
       makePost({
         user_id: MUTED_USER,
-        distribution_targets: ['followers'],
+        distribution_targets: ['connections'],
         creator: { id: MUTED_USER, username: 'muted', name: 'Muted', first_name: 'M', last_name: 'U', profile_picture_url: null, city: 'SF', state: 'CA' },
       }),
       makePost({
         user_id: MUTED_USER,
-        distribution_targets: ['followers'],
+        distribution_targets: ['connections'],
         creator: { id: MUTED_USER, username: 'muted', name: 'Muted', first_name: 'M', last_name: 'U', profile_picture_url: null, city: 'SF', state: 'CA' },
       }),
     ]);
 
     const result = await getListFeed({
       userId: USER_ID,
-      surface: 'following',
+      surface: 'connections',
     });
 
     // Only OTHER_USER's post should remain
@@ -484,20 +602,20 @@ describe('Feed Service', () => {
   // 11. topic_mute_filtering
   // ────────────────────────────────────────────────────────────
   it('muted topic posts are excluded from the feed', async () => {
-    seedTable('UserFollow', [
-      { follower_id: USER_ID, following_id: OTHER_USER },
+    seedTable('Relationship', [
+      { id: 'r-1', requester_id: USER_ID, addressee_id: OTHER_USER, status: 'accepted' },
     ]);
     seedTable('PostMute', [
       { id: 'topic-mute-1', user_id: USER_ID, muted_entity_type: 'topic', muted_entity_id: 'deal', surface: null },
     ]);
     seedTable('Post', [
-      makePost({ user_id: OTHER_USER, post_type: 'deal', distribution_targets: ['followers'] }),
-      makePost({ user_id: OTHER_USER, post_type: 'ask_local', distribution_targets: ['followers'] }),
+      makePost({ user_id: OTHER_USER, post_type: 'deal', distribution_targets: ['connections'] }),
+      makePost({ user_id: OTHER_USER, post_type: 'ask_local', distribution_targets: ['connections'] }),
     ]);
 
     const result = await getListFeed({
       userId: USER_ID,
-      surface: 'following',
+      surface: 'connections',
     });
 
     expect(result.posts).toHaveLength(1);
@@ -508,20 +626,20 @@ describe('Feed Service', () => {
   // 12. surface_scoped_topic_mute
   // ────────────────────────────────────────────────────────────
   it('surface-scoped topic mute only applies to that surface', async () => {
-    seedTable('UserFollow', [
-      { follower_id: USER_ID, following_id: OTHER_USER },
+    seedTable('Relationship', [
+      { id: 'r-1', requester_id: USER_ID, addressee_id: OTHER_USER, status: 'accepted' },
     ]);
     seedTable('PostMute', [
       { id: 'topic-mute-2', user_id: USER_ID, muted_entity_type: 'topic', muted_entity_id: 'deal', surface: 'place' },
     ]);
     seedTable('Post', [
-      makePost({ user_id: OTHER_USER, post_type: 'deal', distribution_targets: ['followers'] }),
+      makePost({ user_id: OTHER_USER, post_type: 'deal', distribution_targets: ['connections'] }),
     ]);
 
-    // On following surface, the deal should NOT be muted (mute is scoped to place)
+    // On connections surface, the deal should NOT be muted (mute is scoped to place)
     const result = await getListFeed({
       userId: USER_ID,
-      surface: 'following',
+      surface: 'connections',
     });
 
     expect(result.posts).toHaveLength(1);
@@ -614,5 +732,36 @@ describe('Feed Service', () => {
     }
     // Both should have found posts
     expect(mapResult.length).toBeGreaterThan(0);
+  });
+
+  it('map feed strips exact home address for non-author viewers', async () => {
+    seedTable('Post', [
+      makePost({
+        id: 'home-map-post',
+        user_id: OTHER_USER,
+        home_id: 'home-1',
+        home: { id: 'home-1', address: '123 Private Way', city: 'San Francisco' },
+        location_precision: 'exact_place',
+        distribution_targets: ['place'],
+        latitude: SF_LAT,
+        longitude: SF_LNG,
+        effective_latitude: SF_LAT,
+        effective_longitude: SF_LNG,
+      }),
+    ]);
+
+    const result = await getMapFeed({
+      userId: USER_ID,
+      surface: 'place',
+      south: SF_LAT - 0.2,
+      north: SF_LAT + 0.2,
+      west: SF_LNG - 0.2,
+      east: SF_LNG + 0.2,
+      limit: 10,
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].home.address).toBeNull();
+    expect(result[0].locationUnlocked).toBe(false);
   });
 });

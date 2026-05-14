@@ -26,6 +26,12 @@ const {
 } = require('../services/notificationService');
 const { submitDisputeEvidence } = require('./disputeService');
 const stripeService = require('./stripeService');
+const { writeIdentityAuditLog } = require('../utils/identityAudit');
+const {
+  getAudienceIdentityById,
+  getOrCreateAudienceIdentityForUser,
+  audienceIdentityMembershipPayload,
+} = require('../utils/identityProfiles');
 
 // IMPORTANT: This route needs express.raw() middleware, NOT express.json()
 // Configure in app.js:
@@ -154,12 +160,17 @@ router.post('/', async (req, res) => {
 
       case 'charge.refunded':
         await handleChargeRefunded(event.data.object);
+        // P1.9 — persona-membership refund handling runs alongside
+        // gig/marketplace refund handling. The persona handler is a
+        // no-op when the charge isn't tied to a persona subscription.
+        await handlePersonaChargeRefunded(event.data.object, event.account);
         break;
 
       // ============ DISPUTE EVENTS ============
 
       case 'charge.dispute.created':
         await handleDisputeCreated(event.data.object);
+        await handlePersonaChargeDisputeCreated(event.data.object, event.account);
         break;
 
       case 'charge.dispute.updated':
@@ -228,6 +239,35 @@ router.post('/', async (req, res) => {
 
       case 'capability.updated':
         await handleCapabilityUpdated(event.data.object);
+        break;
+
+      // ============ PERSONA SUBSCRIPTION EVENTS (P1.9) ============
+      // Audience-profile design v2 §8.3. PersonaMembership lifecycle
+      // is driven by these Stripe events; the routes never write a
+      // membership row directly for paid tiers.
+
+      case 'checkout.session.completed':
+        await handlePersonaCheckoutCompleted(event.data.object);
+        break;
+
+      case 'customer.subscription.created':
+        await handlePersonaSubscriptionCreated(event.data.object);
+        break;
+
+      case 'customer.subscription.updated':
+        await handlePersonaSubscriptionUpdated(event.data.object);
+        break;
+
+      case 'customer.subscription.deleted':
+        await handlePersonaSubscriptionDeleted(event.data.object);
+        break;
+
+      case 'invoice.paid':
+        await handlePersonaInvoicePaid(event.data.object);
+        break;
+
+      case 'invoice.payment_failed':
+        await handlePersonaInvoicePaymentFailed(event.data.object);
         break;
 
       default:
@@ -315,6 +355,17 @@ async function getGigInfo(gigId) {
 async function handleAccountUpdated(account) {
   logger.info('Account updated', { accountId: account.id });
 
+  // Read the prior charges_enabled value so we can detect a false→true
+  // flip below and backfill persona Stripe Prices once onboarding
+  // actually clears. P1.7: when a connected account first becomes
+  // ready, every paid tier on the owner's persona gets a Stripe Price
+  // created on the connected account.
+  const { data: prior } = await supabaseAdmin
+    .from('StripeAccount')
+    .select('user_id, charges_enabled')
+    .eq('stripe_account_id', account.id)
+    .maybeSingle();
+
   await supabaseAdmin
     .from('StripeAccount')
     .update({
@@ -328,6 +379,29 @@ async function handleAccountUpdated(account) {
       updated_at: new Date().toISOString(),
     })
     .eq('stripe_account_id', account.id);
+
+  const becameReady = !prior?.charges_enabled && !!account.charges_enabled
+                      && !!account.details_submitted;
+  if (becameReady && prior?.user_id) {
+    try {
+      const { data: persona } = await supabaseAdmin
+        .from('PublicPersona')
+        .select('id')
+        .eq('user_id', prior.user_id)
+        .maybeSingle();
+      if (persona?.id) {
+        const personaPayments = require('../services/personaPaymentsService');
+        const synced = await personaPayments.syncAllPaidTiers(persona.id);
+        logger.info('persona_payments.backfill_after_onboard', {
+          personaId: persona.id, count: synced.length,
+        });
+      }
+    } catch (err) {
+      logger.warn('persona_payments.backfill_after_onboard_failed', {
+        accountId: account.id, error: err.message,
+      });
+    }
+  }
 }
 
 async function handleAccountAuthorized(application) {
@@ -1616,4 +1690,592 @@ async function handleCapabilityUpdated(capability) {
   }
 }
 
+// ============================================================
+// P1.9 — PERSONA SUBSCRIPTION HANDLERS
+// Audience Profile design v2 §7.3 + §8.3. PersonaMembership lifecycle
+// is driven entirely by Stripe events: the route layer never inserts
+// a paid-tier membership directly. Each handler is idempotent — safe
+// to re-process the same event without creating duplicates or
+// regressing state.
+// ============================================================
+
+// Translate Stripe's subscription.status to PersonaMembership.status.
+// Audience-profile §7.3: incomplete / unpaid → past_due, trialing
+// counts as active, paused stays paused, incomplete_expired → expired.
+function mapSubscriptionStatus(stripeStatus) {
+  const map = {
+    active: 'active',
+    trialing: 'active',
+    past_due: 'past_due',
+    unpaid: 'past_due',
+    incomplete: 'past_due',
+    incomplete_expired: 'expired',
+    canceled: 'canceled',
+    paused: 'paused',
+  };
+  return map[stripeStatus] || 'past_due';
+}
+
+// Convert a Stripe Unix timestamp (seconds) to ISO string. Returns
+// null for missing values so callers can keep nullable columns null.
+function tsToIso(ts) {
+  if (ts == null) return null;
+  return new Date(ts * 1000).toISOString();
+}
+
+function stripeAccountOpts(stripeAccountId) {
+  return stripeAccountId ? { stripeAccount: stripeAccountId } : {};
+}
+
+function assertSupabaseOk(result, operation, metadata = {}) {
+  if (!result?.error) return result;
+  logger.error(operation, { ...metadata, error: result.error.message });
+  throw new Error(`${operation}: ${result.error.message}`);
+}
+
+function assertSupabaseRows(result, operation, metadata = {}) {
+  assertSupabaseOk(result, operation, metadata);
+  const rows = Array.isArray(result?.data)
+    ? result.data
+    : result?.data
+      ? [result.data]
+      : [];
+  if (rows.length > 0) return result;
+  logger.error(operation, { ...metadata, error: 'no rows affected' });
+  throw new Error(`${operation}: no rows affected`);
+}
+
+// checkout.session.completed — informational. The membership row is
+// created by customer.subscription.created which fires alongside.
+async function handlePersonaCheckoutCompleted(session) {
+  if (session?.mode !== 'subscription') return;
+  logger.info('persona.checkout.completed', {
+    sessionId: session.id,
+    subscriptionId: session.subscription,
+    personaId: session.metadata?.persona_id,
+  });
+}
+
+// customer.subscription.created — the canonical write path for a paid
+// PersonaMembership. The handshake metadata (fan_handle, etc.) is
+// pulled from subscription.metadata, NOT from anywhere on the customer
+// record (Stripe customer.email could be a real email address that
+// must never enter the creator-facing graph).
+//
+// Idempotent: if a membership already exists for (persona_id,
+// fan_user_id) we update it; otherwise insert.
+// P2.10 / audience-profile §6.3 — audience-zone subscription emails.
+// Loaded lazily so the webhook stays testable without forcing every
+// stripe-mock-driven test to also stub nodemailer.
+function getEmailService() {
+  // eslint-disable-next-line global-require
+  return require('../services/emailService');
+}
+
+// Best-effort send. Email delivery failures must NEVER bubble out of
+// a Stripe webhook handler; the webhook contract is to ack the event
+// even when downstream side-effects fail. We log and continue.
+async function safeSendPersonaEmail(method, args, logCtx) {
+  try {
+    const email = getEmailService();
+    if (typeof email[method] !== 'function') return;
+    await email[method](args);
+  } catch (err) {
+    logger.warn('persona.email_send_failed', { method, error: err.message, ...logCtx });
+  }
+}
+
+// Look up the (fan email, persona display name + handle, tier name)
+// triple needed for any audience-zone subscription email. Returns
+// null if any piece is missing — the email skips silently in that
+// case (the DB update still succeeds; an email is best-effort UX).
+async function resolvePersonaEmailContext({ subscriptionId, personaId, fanUserId, tierId, fanHandle }) {
+  if (!fanUserId || !personaId) return null;
+  const [userRes, personaRes] = await Promise.all([
+    supabaseAdmin.from('User').select('email').eq('id', fanUserId).maybeSingle(),
+    supabaseAdmin.from('PublicPersona').select('handle, display_name').eq('id', personaId).maybeSingle(),
+  ]);
+  const toEmail = userRes?.data?.email;
+  const persona = personaRes?.data;
+  if (!toEmail || !persona) return null;
+
+  let tierName = null;
+  if (tierId) {
+    const tierRes = await supabaseAdmin.from('PersonaTier').select('name').eq('id', tierId).maybeSingle();
+    tierName = tierRes?.data?.name || null;
+  }
+
+  return {
+    toEmail,
+    fanHandle: fanHandle || null,
+    personaHandle: persona.handle,
+    personaDisplayName: persona.display_name || persona.handle,
+    tierName,
+    subscriptionId,
+  };
+}
+
+async function resolveAudienceIdentityForSubscriptionMetadata(meta) {
+  let identity = null;
+  if (meta.audience_identity_id) {
+    identity = await getAudienceIdentityById(meta.audience_identity_id);
+    if (identity && identity.user_id !== meta.fan_user_id) {
+      logger.warn('persona.subscription.audience_identity_user_mismatch', {
+        audienceIdentityId: meta.audience_identity_id,
+        fanUserId: meta.fan_user_id,
+      });
+      identity = null;
+    }
+  }
+
+  if (!identity) {
+    try {
+      identity = await getOrCreateAudienceIdentityForUser(meta.fan_user_id, {
+        preferredHandle: meta.fan_handle || null,
+        displayName: meta.fan_display_name || meta.fan_handle || null,
+        avatarUrl: meta.fan_avatar_url || null,
+      });
+    } catch (err) {
+      if (err.code !== 'fan_handle_taken' || meta.audience_identity_id) throw err;
+      logger.warn('persona.subscription.legacy_fan_handle_collision', {
+        fanUserId: meta.fan_user_id,
+        personaId: meta.persona_id,
+      });
+      identity = await getOrCreateAudienceIdentityForUser(meta.fan_user_id);
+    }
+  }
+
+  return {
+    identity,
+    fanSnapshot: audienceIdentityMembershipPayload(identity),
+  };
+}
+
+async function handlePersonaSubscriptionCreated(subscription) {
+  const meta = subscription?.metadata || {};
+  if (!meta.persona_id || !meta.persona_tier_id || !meta.fan_user_id) return;
+
+  const existingResult = await supabaseAdmin
+    .from('PersonaMembership')
+    .select('id, joined_at, stripe_subscription_id')
+    .eq('persona_id', meta.persona_id)
+    .eq('user_id', meta.fan_user_id)
+    .maybeSingle();
+  assertSupabaseOk(existingResult, 'persona.subscription.created.lookup_error', {
+    subscriptionId: subscription.id,
+    personaId: meta.persona_id,
+  });
+  const { data: existing } = existingResult;
+
+  const { identity: audienceIdentity, fanSnapshot } =
+    await resolveAudienceIdentityForSubscriptionMetadata(meta);
+  const fanHandle = String(fanSnapshot.fan_handle || meta.fan_handle || '');
+  const payload = {
+    persona_id: meta.persona_id,
+    user_id: meta.fan_user_id,
+    tier_id: meta.persona_tier_id,
+    audience_identity_id: audienceIdentity?.id || null,
+    fan_handle: fanSnapshot.fan_handle || fanHandle,
+    fan_handle_normalized: fanSnapshot.fan_handle_normalized || fanHandle.toLowerCase(),
+    fan_display_name: fanSnapshot.fan_display_name || meta.fan_display_name || null,
+    fan_avatar_url: fanSnapshot.fan_avatar_url || meta.fan_avatar_url || null,
+    relationship_type: 'subscriber',
+    status: mapSubscriptionStatus(subscription.status),
+    stripe_customer_id: subscription.customer || null,
+    stripe_subscription_id: subscription.id,
+    current_period_start: tsToIso(subscription.current_period_start),
+    current_period_end: tsToIso(subscription.current_period_end),
+    cancel_at_period_end: !!subscription.cancel_at_period_end,
+    trial_end: tsToIso(subscription.trial_end),
+    updated_at: new Date().toISOString(),
+  };
+  // New subscriptions opt into Beacon updates; Stripe retries for the same
+  // subscription must not undo a later user mute.
+  const shouldDefaultNotificationsOn = !existing || existing.stripe_subscription_id !== subscription.id;
+  if (shouldDefaultNotificationsOn) {
+    payload.notification_level = 'all';
+  }
+
+  let isFirstTime = false;
+  if (existing) {
+    assertSupabaseRows(await supabaseAdmin
+      .from('PersonaMembership')
+      .update(payload)
+      .eq('id', existing.id)
+      .select('id'), 'persona.subscription.created.update_error', {
+        subscriptionId: subscription.id,
+        membershipId: existing.id,
+      });
+  } else {
+    assertSupabaseRows(await supabaseAdmin
+      .from('PersonaMembership')
+      .insert({ ...payload, joined_at: new Date().toISOString() })
+      .select('id'),
+    'persona.subscription.created.insert_error', {
+      subscriptionId: subscription.id,
+      personaId: meta.persona_id,
+    });
+    isFirstTime = true;
+  }
+
+  logger.info('persona.subscription.created', {
+    subscriptionId: subscription.id,
+    personaId: meta.persona_id,
+  });
+
+  // P2.10 — send welcome email ONLY on the insert path. An update path
+  // means we're replaying an event Stripe already sent us; firing the
+  // welcome email twice for the same membership would be a UX bug.
+  if (isFirstTime) {
+    const ctx = await resolvePersonaEmailContext({
+      subscriptionId: subscription.id,
+      personaId: meta.persona_id,
+      fanUserId: meta.fan_user_id,
+      tierId: meta.persona_tier_id,
+      fanHandle: fanHandle,
+    });
+    if (ctx) {
+      await safeSendPersonaEmail('sendPersonaSubscriptionWelcomeEmail', {
+        toEmail: ctx.toEmail,
+        fanHandle: ctx.fanHandle,
+        personaDisplayName: ctx.personaDisplayName,
+        personaHandle: ctx.personaHandle,
+        tierName: ctx.tierName || 'paid',
+        periodEndDate: payload.current_period_end
+          ? new Date(payload.current_period_end).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+          : '',
+      }, { subscriptionId: subscription.id, personaId: meta.persona_id });
+    }
+  }
+}
+
+// customer.subscription.updated — keeps period dates, status, and
+// cancel_at_period_end in sync. Audience-profile §7.3: cancel and
+// downgrade both surface here when the Stripe state changes.
+async function handlePersonaSubscriptionUpdated(subscription) {
+  const meta = subscription?.metadata || {};
+  if (!meta.persona_id) return;
+
+  const updates = {
+    status: mapSubscriptionStatus(subscription.status),
+    cancel_at_period_end: !!subscription.cancel_at_period_end,
+    current_period_start: tsToIso(subscription.current_period_start),
+    current_period_end: tsToIso(subscription.current_period_end),
+    updated_at: new Date().toISOString(),
+  };
+  if (subscription.canceled_at) {
+    updates.canceled_at = tsToIso(subscription.canceled_at);
+  }
+
+  assertSupabaseRows(await supabaseAdmin
+    .from('PersonaMembership')
+    .update(updates)
+    .eq('stripe_subscription_id', subscription.id)
+    .select('id'),
+  'persona.subscription.updated.update_error', {
+    subscriptionId: subscription.id,
+  });
+
+  logger.info('persona.subscription.updated', {
+    subscriptionId: subscription.id, status: updates.status,
+  });
+}
+
+// customer.subscription.deleted — terminal transition. If the user
+// canceled at period end (cancel_at_period_end was set), Stripe fires
+// this when the period actually elapses; we mark canceled. Otherwise
+// the subscription was hard-deleted (refund, dunning exhaustion) and
+// we mark expired.
+async function handlePersonaSubscriptionDeleted(subscription) {
+  const meta = subscription?.metadata || {};
+  if (!meta.persona_id) return;
+
+  const status = subscription.cancel_at_period_end ? 'canceled' : 'expired';
+  const periodEndIso = subscription.current_period_end
+    ? tsToIso(subscription.current_period_end)
+    : null;
+  assertSupabaseRows(await supabaseAdmin
+    .from('PersonaMembership')
+    .update({
+      status,
+      canceled_at: subscription.canceled_at
+        ? tsToIso(subscription.canceled_at)
+        : new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('stripe_subscription_id', subscription.id)
+    .select('id'),
+  'persona.subscription.deleted.update_error', {
+    subscriptionId: subscription.id,
+  });
+
+  logger.info('persona.subscription.deleted', {
+    subscriptionId: subscription.id, status,
+  });
+
+  // P2.10 — cancellation email. Audience-zone; the body never names
+  // the underlying creator.
+  const ctx = await resolvePersonaEmailContext({
+    subscriptionId: subscription.id,
+    personaId: meta.persona_id,
+    fanUserId: meta.fan_user_id,
+    tierId: meta.persona_tier_id,
+    fanHandle: meta.fan_handle,
+  });
+  if (ctx) {
+    await safeSendPersonaEmail('sendPersonaSubscriptionCanceledEmail', {
+      toEmail: ctx.toEmail,
+      fanHandle: ctx.fanHandle,
+      personaDisplayName: ctx.personaDisplayName,
+      periodEndDate: periodEndIso
+        ? new Date(periodEndIso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '',
+    }, { subscriptionId: subscription.id, personaId: meta.persona_id });
+  }
+}
+
+// invoice.paid — rolls the period window forward. PersonaQuotaUsage
+// entries live in the previous period's window; rolling means the
+// usage-counting query (P1.5 / P1.11 / P1.12) returns 0 used in the
+// new period without deleting any rows. Audience-profile §7.3 step 1.
+async function handlePersonaInvoicePaid(invoice) {
+  if (!invoice?.subscription) return;
+  const membershipResult = await supabaseAdmin
+    .from('PersonaMembership')
+    .select('id, persona_id, tier_id')
+    .eq('stripe_subscription_id', invoice.subscription)
+    .maybeSingle();
+  assertSupabaseOk(membershipResult, 'persona.invoice_paid.lookup_error', {
+    invoiceId: invoice.id,
+    subscriptionId: invoice.subscription,
+  });
+  const { data: membership } = membershipResult;
+  if (!membership) return;
+
+  assertSupabaseRows(await supabaseAdmin
+    .from('PersonaMembership')
+    .update({
+      current_period_start: tsToIso(invoice.period_start),
+      current_period_end: tsToIso(invoice.period_end),
+      status: 'active',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', membership.id)
+    .select('id'),
+  'persona.invoice_paid.update_error', {
+    invoiceId: invoice.id,
+    membershipId: membership.id,
+  });
+}
+
+// invoice.payment_failed — initial dunning state. Audience-profile
+// §7.3: capabilities still work for a few days while Stripe retries;
+// after retry exhaustion subscription.deleted fires.
+async function handlePersonaInvoicePaymentFailed(invoice) {
+  if (!invoice?.subscription) return;
+  const membershipResult = await supabaseAdmin
+    .from('PersonaMembership')
+    .select('id, persona_id, user_id, tier_id, fan_handle')
+    .eq('stripe_subscription_id', invoice.subscription)
+    .maybeSingle();
+  assertSupabaseOk(membershipResult, 'persona.invoice_payment_failed.lookup_error', {
+    invoiceId: invoice.id,
+    subscriptionId: invoice.subscription,
+  });
+  const { data: membership } = membershipResult;
+  if (!membership) return;
+
+  assertSupabaseRows(await supabaseAdmin
+    .from('PersonaMembership')
+    .update({
+      status: 'past_due',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', membership.id)
+    .select('id'),
+  'persona.invoice_payment_failed.update_error', {
+    invoiceId: invoice.id,
+    membershipId: membership.id,
+  });
+
+  // P2.10 — payment-failed email. NO dedupe yet; Stripe Smart Retries
+  // can fire this multiple times. Flagged as a follow-up in
+  // docs/email-firewall-audit-2026-05-08.md §6.
+  const ctx = await resolvePersonaEmailContext({
+    subscriptionId: invoice.subscription,
+    personaId: membership.persona_id,
+    fanUserId: membership.user_id,
+    tierId: membership.tier_id,
+    fanHandle: membership.fan_handle,
+  });
+  if (ctx) {
+    await safeSendPersonaEmail('sendPersonaPaymentFailedEmail', {
+      toEmail: ctx.toEmail,
+      fanHandle: ctx.fanHandle,
+      personaDisplayName: ctx.personaDisplayName,
+    }, { subscriptionId: invoice.subscription, personaId: membership.persona_id });
+  }
+}
+
+// charge.refunded — co-called from the existing case branch. The
+// branch chases charge → invoice → subscription to find a persona
+// membership; if none, this is a gig/marketplace refund and we leave
+// it to the existing handler.
+async function handlePersonaChargeRefunded(charge, stripeAccountId = null) {
+  if (!charge?.refunds?.data?.length) return;
+  if (!charge.invoice) return;
+  let invoice = null;
+  let subscription = null;
+  try {
+    invoice = await stripe.invoices.retrieve(charge.invoice, stripeAccountOpts(stripeAccountId));
+  } catch (err) {
+    logger.warn('persona.charge_refunded.invoice_lookup_failed', {
+      chargeId: charge.id, error: err.message,
+    });
+    return;
+  }
+  if (!invoice?.subscription) return;
+  try {
+    subscription = await stripe.subscriptions.retrieve(invoice.subscription, stripeAccountOpts(stripeAccountId));
+  } catch (err) {
+    logger.warn('persona.charge_refunded.subscription_lookup_failed', {
+      chargeId: charge.id, error: err.message,
+    });
+    return;
+  }
+  if (!subscription?.metadata?.persona_id) return;
+
+  assertSupabaseRows(await supabaseAdmin
+    .from('PersonaMembership')
+    .update({
+      status: 'expired',
+      canceled_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('stripe_subscription_id', subscription.id)
+    .select('id'),
+  'persona.charge_refunded.update_error', {
+    chargeId: charge.id,
+    subscriptionId: subscription.id,
+  });
+
+  logger.info('persona.charge_refunded', {
+    chargeId: charge.id, subscriptionId: subscription.id,
+  });
+}
+
+// charge.dispute.created — chargeback handling. Audience-profile
+// §7.3 + §9: we expire the membership AND auto-block re-subscription
+// via PersonaBlock(source='chargeback'). Same chase pattern as
+// refunds: charge → invoice → subscription.
+async function handlePersonaChargeDisputeCreated(dispute, stripeAccountId = null) {
+  if (!dispute?.charge) return;
+  let charge = null;
+  let invoice = null;
+  let subscription = null;
+  try {
+    charge = await stripe.charges.retrieve(dispute.charge, stripeAccountOpts(stripeAccountId));
+  } catch (err) {
+    logger.warn('persona.dispute.charge_lookup_failed', {
+      disputeId: dispute.id, error: err.message,
+    });
+    return;
+  }
+  if (!charge?.invoice) return;
+  try {
+    invoice = await stripe.invoices.retrieve(charge.invoice, stripeAccountOpts(stripeAccountId));
+  } catch (err) {
+    logger.warn('persona.dispute.invoice_lookup_failed', {
+      disputeId: dispute.id, error: err.message,
+    });
+    return;
+  }
+  if (!invoice?.subscription) return;
+  try {
+    subscription = await stripe.subscriptions.retrieve(invoice.subscription, stripeAccountOpts(stripeAccountId));
+  } catch (err) {
+    logger.warn('persona.dispute.subscription_lookup_failed', {
+      disputeId: dispute.id, error: err.message,
+    });
+    return;
+  }
+  const personaId = subscription?.metadata?.persona_id;
+  const fanUserId = subscription?.metadata?.fan_user_id;
+  if (!personaId || !fanUserId) return;
+
+  const membershipUpdate = assertSupabaseRows(await supabaseAdmin
+    .from('PersonaMembership')
+    .update({
+      status: 'expired',
+      canceled_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('stripe_subscription_id', subscription.id)
+    .select('id'),
+  'persona.dispute.membership_update_error', {
+    disputeId: dispute.id,
+    subscriptionId: subscription.id,
+  });
+
+  const blockUpsert = assertSupabaseRows(await supabaseAdmin
+    .from('PersonaBlock')
+    .upsert({
+      persona_id: personaId,
+      blocked_user_id: fanUserId,
+      source: 'chargeback',
+      reason: `Stripe dispute ${dispute.id}`,
+    }, { onConflict: 'persona_id,blocked_user_id' })
+    .select('id'),
+  'persona.dispute.block_upsert_error', {
+    disputeId: dispute.id,
+    personaId,
+    fanUserId,
+  });
+
+  const blockRows = Array.isArray(blockUpsert?.data)
+    ? blockUpsert.data
+    : blockUpsert?.data ? [blockUpsert.data] : [];
+  const membershipRows = Array.isArray(membershipUpdate?.data)
+    ? membershipUpdate.data
+    : membershipUpdate?.data ? [membershipUpdate.data] : [];
+  await writeIdentityAuditLog({
+    actorUserId: null,
+    personaId,
+    targetUserId: fanUserId,
+    action: 'persona_block.created',
+    targetType: 'PersonaBlock',
+    targetId: blockRows[0]?.id || null,
+    metadata: {
+      source: 'chargeback',
+      dispute_id: dispute.id,
+      subscription_id: subscription.id,
+      membership_ids: membershipRows.map((row) => row.id).filter(Boolean),
+    },
+  });
+
+  logger.info('persona.dispute.created', {
+    disputeId: dispute.id,
+    subscriptionId: subscription.id,
+    personaId,
+  });
+}
+
 module.exports = router;
+
+// P1.9 test-surface export. The persona handlers run under the Stripe
+// webhook signature-verification flow in production (router middleware
+// at the top of this file), but unit tests need to call them directly
+// against fixture event payloads. Express routers are functions, so
+// attaching named exports here is a no-op in production and a clean
+// import path in tests.
+module.exports.personaWebhookHandlers = {
+  handlePersonaCheckoutCompleted,
+  handlePersonaSubscriptionCreated,
+  handlePersonaSubscriptionUpdated,
+  handlePersonaSubscriptionDeleted,
+  handlePersonaInvoicePaid,
+  handlePersonaInvoicePaymentFailed,
+  handlePersonaChargeRefunded,
+  handlePersonaChargeDisputeCreated,
+  mapSubscriptionStatus,
+};

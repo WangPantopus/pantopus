@@ -19,6 +19,7 @@ const supabaseAdmin = require('../config/supabaseAdmin');
 const verifyToken = require('../middleware/verifyToken');
 const validate = require('../middleware/validate');
 const logger = require('../utils/logger');
+const { writeIdentityAuditLog } = require('../utils/identityAudit');
 
 // ============================================================
 // Validation schemas
@@ -26,6 +27,7 @@ const logger = require('../utils/logger');
 
 const updateSettingsSchema = Joi.object({
   search_visibility: Joi.string().valid('everyone', 'mutuals', 'nobody'),
+  findable_by_name: Joi.boolean(),
   findable_by_email: Joi.boolean(),
   findable_by_phone: Joi.boolean(),
   profile_default_visibility: Joi.string().valid('public', 'followers', 'private'),
@@ -106,6 +108,36 @@ router.patch('/settings', verifyToken, validate(updateSettingsSchema), async (re
       logger.error('Error updating privacy settings', { error: error.message, userId });
       return res.status(500).json({ error: 'Failed to update privacy settings' });
     }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'search_visibility')) {
+      const { error: localProfileError } = await supabaseAdmin
+        .from('LocalProfile')
+        .update({
+          search_visibility: req.body.search_visibility,
+          updated_at: updates.updated_at,
+        })
+        .eq('user_id', userId);
+
+      if (localProfileError) {
+        logger.error('Error syncing local profile search visibility', {
+          error: localProfileError.message,
+          userId,
+        });
+        return res.status(500).json({ error: 'Failed to update profile search visibility' });
+      }
+    }
+
+    await writeIdentityAuditLog({
+      req,
+      actorUserId: userId,
+      targetUserId: userId,
+      action: 'privacy.settings_updated',
+      targetType: 'UserPrivacySettings',
+      targetId: userId,
+      metadata: {
+        changed_fields: Object.keys(req.body).sort(),
+      },
+    });
 
     res.json({ message: 'Privacy settings updated', settings });
   } catch (err) {
@@ -191,6 +223,19 @@ router.post('/blocks', verifyToken, validate(createBlockSchema), async (req, res
       return res.status(500).json({ error: 'Failed to create block' });
     }
 
+    await writeIdentityAuditLog({
+      req,
+      actorUserId: userId,
+      targetUserId: blocked_user_id,
+      action: 'privacy.block_created',
+      targetType: 'UserProfileBlock',
+      targetId: block.id,
+      metadata: {
+        block_scope: block.block_scope,
+        has_reason: !!block.reason,
+      },
+    });
+
     res.status(201).json({ message: 'Block created', block });
   } catch (err) {
     logger.error('POST /privacy/blocks error', { error: err.message });
@@ -211,7 +256,7 @@ router.delete('/blocks/:blockId', verifyToken, async (req, res) => {
     // Ensure the block belongs to the current user
     const { data: existing } = await supabaseAdmin
       .from('UserProfileBlock')
-      .select('id')
+      .select('id, blocked_user_id, block_scope')
       .eq('id', blockId)
       .eq('user_id', userId)
       .maybeSingle();
@@ -230,6 +275,18 @@ router.delete('/blocks/:blockId', verifyToken, async (req, res) => {
       logger.error('Error removing block', { error: error.message, blockId });
       return res.status(500).json({ error: 'Failed to remove block' });
     }
+
+    await writeIdentityAuditLog({
+      req,
+      actorUserId: userId,
+      targetUserId: existing.blocked_user_id,
+      action: 'privacy.block_removed',
+      targetType: 'UserProfileBlock',
+      targetId: existing.id,
+      metadata: {
+        block_scope: existing.block_scope,
+      },
+    });
 
     res.json({ message: 'Block removed' });
   } catch (err) {

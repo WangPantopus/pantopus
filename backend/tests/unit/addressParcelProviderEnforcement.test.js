@@ -38,6 +38,8 @@ const smartyProvider = require('../../services/addressValidation/smartyProvider'
 const parcelIntelProvider = require('../../services/addressValidation/parcelIntelProvider');
 const pipelineService = require('../../services/addressValidation/pipelineService');
 
+const freshValidatedAt = () => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
 function makeGoogle(overrides = {}) {
   const normalizedOverrides = overrides.normalized || {};
   const line1 = normalizedOverrides.line1 || '123 Main St';
@@ -101,7 +103,7 @@ function makeParcelIntel(overrides = {}) {
     confidence: 0.93,
     lookup_mode: 'property_detail',
     from_cache: false,
-    validated_at: '2026-04-02T18:00:00.000Z',
+    validated_at: freshValidatedAt(),
     ...overrides,
   };
 }

@@ -239,7 +239,12 @@ router.post('/send', verifyInternalApiKey, async (req, res) => {
     await pushService.sendToUser(userId, {
       title: briefingConfig.title,
       body: result.text,
-      data: { type: briefingConfig.notificationType, route: '/hub', briefingKind },
+      data: {
+        type: briefingConfig.notificationType,
+        route: '/hub/today',
+        briefingKind,
+        briefingDeliveryId: deliveryId,
+      },
     });
 
     // 10. Update delivery row

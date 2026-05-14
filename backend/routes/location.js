@@ -20,7 +20,7 @@ const setLocationSchema = Joi.object({
   type: Joi.string().valid('gps', 'home', 'business', 'searched', 'recent').required(),
   latitude: Joi.number().min(-90).max(90).required(),
   longitude: Joi.number().min(-180).max(180).required(),
-  radiusMiles: Joi.number().valid(1, 3, 10, 25).default(10),
+  radiusMiles: Joi.number().valid(1, 3, 10, 25, 100, 1000, 25000).default(100),
   isPinned: Joi.boolean().default(false),
   sourceId: Joi.string().uuid().allow(null).optional(),
   city: Joi.string().max(100).allow(null, '').optional(),
@@ -33,7 +33,7 @@ const pinSchema = Joi.object({
 });
 
 const radiusSchema = Joi.object({
-  radiusMiles: Joi.number().valid(1, 3, 10, 25).required(),
+  radiusMiles: Joi.number().valid(1, 3, 10, 25, 100, 1000, 25000).required(),
 });
 
 // ============ HELPERS ============
@@ -387,7 +387,7 @@ router.get('/resolve', verifyToken, async (req, res) => {
             type: 'home',
             latitude: home.latitude,
             longitude: home.longitude,
-            radiusMiles: 10,
+            radiusMiles: 100,
             isPinned: false,
             sourceId: home.home_id,
             city: home.city || null,
@@ -415,7 +415,7 @@ router.get('/resolve', verifyToken, async (req, res) => {
           type: 'searched',
           latitude: null,
           longitude: null,
-          radiusMiles: 10,
+          radiusMiles: 100,
           isPinned: false,
           sourceId: null,
           city: user.city,

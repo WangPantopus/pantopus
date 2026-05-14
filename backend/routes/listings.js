@@ -15,6 +15,7 @@ const { createNotification, notifyAddressRevealed } = require('../services/notif
 const savedSearchService = require('../services/marketplace/savedSearchService');
 const { LISTING_LIST } = require('../utils/columns');
 const { applyLocationPrecision } = require('../utils/locationPrivacy');
+const { hydrateListingCreatorIdentities } = require('../utils/listingCreatorIdentity');
 const {
   browseListings,
   discoverListings,
@@ -24,6 +25,12 @@ const {
 const { applyLocationPrivacy, applyLocationPrivacyBatch } = require('../services/marketplace/locationPrivacy');
 const { getReputation } = require('../services/marketplace/reputationService');
 const discoveryCacheService = require('../services/marketplace/discoveryCacheService');
+const {
+  SAFE_CREATOR_SELECT,
+  serializeListingAuthorForViewer,
+  serializeUserAsLocalIdentity,
+  serializeUserIdentityForViewer,
+} = require('../serializers/identitySerializers');
 
 // ============ CONSTANTS ============
 // Imported from shared backend constants (canonical source).
@@ -40,8 +47,33 @@ const {
   LISTING_TYPES,
 } = require('../constants/marketplace');
 
-const CREATOR_SELECT = 'id, username, name, first_name, profile_picture_url, city, state';
+// P0.3: legacy creator-select constant replaced by SAFE_CREATOR_SELECT
+// (imported above). Routes still need a Supabase nested select on the User
+// table, but only audience-safe columns are pulled now; consumers project
+// through serializeUserIdentityForViewer / serializeUserAsLocalIdentity
+// before any row reaches the API response. See Audience Profile design
+// v2 §16 item 2.
 const LISTING_SEARCH_RPC_TIMEOUT_MS = 8000;
+const METERS_PER_MILE = 1609.34;
+const DEFAULT_LISTING_RADIUS_METERS = Math.round(100 * METERS_PER_MILE);
+const MAX_LISTING_RADIUS_METERS = Math.round(25000 * METERS_PER_MILE);
+
+function resolveListingRadiusMeters(rawRadius) {
+  const parsed = parseInt(rawRadius, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_LISTING_RADIUS_METERS;
+  return Math.min(parsed, MAX_LISTING_RADIUS_METERS);
+}
+
+function resolveListingRadiusMilesToMeters(rawRadiusMiles) {
+  const parsed = parseFloat(rawRadiusMiles);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_LISTING_RADIUS_METERS;
+  return Math.round(Math.min(parsed, 25000) * METERS_PER_MILE);
+}
+
+function resolveListingQueryRadiusMeters({ radius, radiusMiles }) {
+  if (radius != null) return resolveListingRadiusMeters(radius);
+  return resolveListingRadiusMilesToMeters(radiusMiles);
+}
 
 // Category → layer mapping (everything not listed defaults to 'goods')
 const CATEGORY_LAYER_MAP = { vehicles: 'vehicles' };
@@ -98,7 +130,7 @@ const createListingSchema = Joi.object({
   revealPolicy: Joi.string().valid(...REVEAL_POLICIES).default('after_interest'),
   // Visibility
   visibilityScope: Joi.string().valid(...VISIBILITY_SCOPES).default('city'),
-  radiusMiles: Joi.number().min(1).max(100).default(10),
+  radiusMiles: Joi.number().min(1).max(25000).default(100),
   // Pickup / delivery
   meetupPreference: Joi.string().valid('porch_pickup', 'public_meetup', 'flexible').default('public_meetup'),
   deliveryAvailable: Joi.boolean().default(false),
@@ -190,7 +222,7 @@ const updateListingSchema = Joi.object({
   locationPrecision: Joi.string().valid(...LOCATION_PRECISIONS),
   revealPolicy: Joi.string().valid(...REVEAL_POLICIES),
   visibilityScope: Joi.string().valid(...VISIBILITY_SCOPES),
-  radiusMiles: Joi.number().min(1).max(100),
+  radiusMiles: Joi.number().min(1).max(25000),
   meetupPreference: Joi.string().valid('porch_pickup', 'public_meetup', 'flexible'),
   deliveryAvailable: Joi.boolean(),
   availableFrom: Joi.date().iso().allow(null),
@@ -263,6 +295,18 @@ const FIELD_MAP = {
 };
 
 function normalizeListing(row) {
+  const creator = row.creator
+    ? serializeUserIdentityForViewer(row.creator)
+    : serializeListingAuthorForViewer({
+        identity_context_type: 'local',
+        creator: {
+          id: row.user_id,
+          username: row.username,
+          name: row.user_name,
+          profile_picture_url: row.user_profile_picture,
+        },
+      });
+
   return {
     id: row.id,
     user_id: row.user_id,
@@ -294,12 +338,7 @@ function normalizeListing(row) {
     updated_at: row.updated_at,
     sold_at: row.sold_at,
     distance_meters: row.distance_meters || null,
-    creator: row.creator || {
-      id: row.user_id,
-      username: row.username,
-      name: row.user_name,
-      profile_picture_url: row.user_profile_picture,
-    },
+    creator,
     // Marketplace redesign fields
     layer: row.layer || 'goods',
     listing_type: row.listing_type || 'sell_item',
@@ -312,6 +351,37 @@ function normalizeListing(row) {
     budget_max: row.budget_max || null,
     expires_at: row.expires_at || null,
     carousel_score: row.carousel_score || null,
+  };
+}
+
+async function normalizeListingWithHydratedCreator(row) {
+  await hydrateListingCreatorIdentities(row);
+  return normalizeListing(row);
+}
+
+async function normalizeListingsWithHydratedCreators(rows) {
+  await hydrateListingCreatorIdentities(rows || []);
+  return (rows || []).map(normalizeListing);
+}
+
+function serializeListingQuestionForViewer(question) {
+  if (!question) return null;
+  const { asker, answerer, ...safe } = question;
+  return {
+    ...safe,
+    asker: serializeUserAsLocalIdentity(asker),
+    answerer: serializeUserIdentityForViewer(answerer),
+  };
+}
+
+function serializeListingMessageForViewer(message) {
+  if (!message) return null;
+  const { buyer, ...safe } = message;
+  const buyerIdentity = serializeUserAsLocalIdentity(buyer);
+  return {
+    ...safe,
+    buyer: buyerIdentity,
+    buyer_identity: buyerIdentity,
   };
 }
 
@@ -423,7 +493,7 @@ router.post('/', verifyToken, validate(createListingSchema), async (req, res) =>
       location_precision: locationPrecision || 'approx_area',
       reveal_policy: revealPolicy || 'after_interest',
       visibility_scope: visibilityScope || 'city',
-      radius_miles: radiusMiles || 10,
+      radius_miles: radiusMiles || 100,
       meetup_preference: meetupPreference || 'public_meetup',
       delivery_available: deliveryAvailable || false,
       available_from: availableFrom || null,
@@ -477,7 +547,7 @@ router.post('/', verifyToken, validate(createListingSchema), async (req, res) =>
       const { data, error } = await supabaseAdmin
         .from('Listing')
         .insert(listingData)
-        .select(`*, creator:user_id (${CREATOR_SELECT})`)
+        .select(`*, creator:user_id (${SAFE_CREATOR_SELECT})`)
         .single();
 
       if (error) throw error;
@@ -542,7 +612,8 @@ router.post('/', verifyToken, validate(createListingSchema), async (req, res) =>
       layer: resolvedLayer, listingType: resolvedType,
       hasCoordinates: !!(latitude && longitude),
     });
-    res.status(201).json({ message: 'Listing created successfully', listing });
+    const responseListing = applyLocationPrivacy(await normalizeListingWithHydratedCreator(listing), userId);
+    res.status(201).json({ message: 'Listing created successfully', listing: responseListing });
   } catch (err) {
     logger.error('marketplace.create.error', { error: err.message, userId: req.user?.id });
     res.status(500).json({ error: 'Failed to create listing' });
@@ -667,6 +738,7 @@ router.get('/discover', optionalAuth, async (req, res) => {
       lat: parseFloat(lat),
       lng: parseFloat(lng),
       userId,
+      radius: resolveListingRadiusMeters(radius),
     });
 
     logger.info('marketplace.discover', {
@@ -724,7 +796,7 @@ router.get('/autocomplete', optionalAuth, async (req, res) => {
 router.get('/nearby', optionalAuth, async (req, res) => {
   try {
     const {
-      latitude, longitude, radius, limit = 20, offset = 0,
+      latitude, longitude, radius, radiusMiles, limit = 20, offset = 0,
       category, minPrice, maxPrice, isFree, condition, search, sort = 'newest',
       // Marketplace redesign filters
       layer, listingType, trustOnly, isWanted,
@@ -734,7 +806,7 @@ router.get('/nearby', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'latitude and longitude are required' });
     }
 
-    const radiusMeters = radius ? parseInt(radius) : 16000;
+    const radiusMeters = resolveListingQueryRadiusMeters({ radius, radiusMiles });
 
     const { data: listings, error } = await supabaseAdmin.rpc('find_listings_nearby_v2', {
       p_latitude: parseFloat(latitude),
@@ -766,7 +838,7 @@ router.get('/nearby', optionalAuth, async (req, res) => {
 
     // Apply location privacy with viewer context
     const viewerUserId = req.user?.id || null;
-    const normalized = enriched.map(normalizeListing);
+    const normalized = await normalizeListingsWithHydratedCreators(enriched);
 
     res.json({
       listings: await applyLocationPrivacyBatch(normalized, viewerUserId),
@@ -879,7 +951,10 @@ router.get('/in-bounds', optionalAuth, async (req, res) => {
 router.get('/search', optionalAuth, async (req, res) => {
   const start = Date.now();
   try {
-    const { q, latitude, longitude, limit = 20, offset = 0, category, sort = 'newest', layer, trustOnly, isWanted } = req.query;
+    const {
+      q, latitude, longitude, radius, radiusMiles, limit = 20, offset = 0,
+      category, sort = 'newest', layer, trustOnly, isWanted,
+    } = req.query;
 
     if (!q || q.trim().length < 2) {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
@@ -892,7 +967,7 @@ router.get('/search', optionalAuth, async (req, res) => {
           supabaseAdmin.rpc('find_listings_nearby_v2', {
             p_latitude: parseFloat(latitude),
             p_longitude: parseFloat(longitude),
-            p_radius_meters: 80000, // 50 mile radius for search
+            p_radius_meters: resolveListingQueryRadiusMeters({ radius, radiusMiles }),
             p_limit: parseInt(limit),
             p_offset: parseInt(offset),
             p_category: category || null,
@@ -910,7 +985,7 @@ router.get('/search', optionalAuth, async (req, res) => {
         if (!error) {
           // Enrich RPC results with lat/lng (RPC doesn't return these columns)
           const enriched = await enrichWithCoordinates(listings || []);
-          const normalized = enriched.map(normalizeListing);
+          const normalized = await normalizeListingsWithHydratedCreators(enriched);
           logger.info('marketplace.search', {
             query: q.trim(), category: category || null, source: 'rpc',
             resultCount: normalized.length, latencyMs: Date.now() - start,
@@ -942,7 +1017,7 @@ router.get('/search', optionalAuth, async (req, res) => {
     // Fallback: no location OR location RPC failed/timed out
     let query = supabaseAdmin
       .from('Listing')
-      .select(`*, creator:user_id (${CREATOR_SELECT})`)
+      .select(`*, creator:user_id (${SAFE_CREATOR_SELECT})`)
       .eq('status', 'active')
       .textSearch('search_vector', q.trim(), { type: 'websearch' })
       .order('created_at', { ascending: false })
@@ -963,7 +1038,10 @@ router.get('/search', optionalAuth, async (req, res) => {
     });
 
     res.json({
-      listings: await applyLocationPrivacyBatch(listings || [], req.user?.id || null),
+      listings: await applyLocationPrivacyBatch(
+        await normalizeListingsWithHydratedCreators(listings || []),
+        req.user?.id || null
+      ),
       pagination: { limit: parseInt(limit), offset: parseInt(offset), hasMore: listings && listings.length === parseInt(limit) },
     });
   } catch (err) {
@@ -984,21 +1062,31 @@ router.get('/me', verifyToken, async (req, res) => {
 
     let query = supabaseAdmin
       .from('Listing')
-      .select(LISTING_LIST)
+      // Include an exact count so clients can show accurate totals without
+      // fetching all records (e.g. sidebar badges).
+      .select(LISTING_LIST, { count: 'exact' })
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
 
     if (status) query = query.eq('status', status);
 
-    const { data: listings, error } = await query;
+    const { data: listings, error, count } = await query;
 
     if (error) {
       logger.error('Error fetching user listings', { error: error.message, userId });
       return res.status(500).json({ error: 'Failed to fetch your listings' });
     }
 
-    res.json({ listings: await applyLocationPrivacyBatch(listings || [], userId) });
+    const limitNum = parseInt(limit);
+    const offsetNum = parseInt(offset);
+    const total = typeof count === 'number' ? count : null;
+    const hasMore = typeof total === 'number' ? offsetNum + limitNum < total : false;
+
+    res.json({
+      listings: await applyLocationPrivacyBatch(listings || [], userId),
+      pagination: { limit: limitNum, offset: offsetNum, total, hasMore },
+    });
   } catch (err) {
     logger.error('User listings fetch error', { error: err.message });
     res.status(500).json({ error: 'Failed to fetch your listings' });
@@ -1023,7 +1111,7 @@ router.get('/saved', verifyToken, async (req, res) => {
           id, title, price, is_free, category, condition, status,
           media_urls, media_types, location_name, location_precision,
           created_at,
-          creator:user_id (${CREATOR_SELECT})
+          creator:user_id (${SAFE_CREATOR_SELECT})
         )
       `)
       .eq('user_id', userId)
@@ -1038,7 +1126,8 @@ router.get('/saved', verifyToken, async (req, res) => {
     // Filter out saves where listing was deleted
     const validSaves = (saves || []).filter(s => s.listing);
 
-    const savedListings = validSaves.map(s => ({ ...s.listing, savedAt: s.created_at }));
+    await hydrateListingCreatorIdentities(validSaves.map(s => s.listing));
+    const savedListings = validSaves.map(s => ({ ...normalizeListing(s.listing), savedAt: s.created_at }));
     res.json({
       listings: await applyLocationPrivacyBatch(savedListings, userId),
       pagination: { limit: parseInt(limit), offset: parseInt(offset) },
@@ -1104,7 +1193,7 @@ router.get('/carousel', optionalAuth, async (req, res) => {
     const { data, error } = await supabaseAdmin.rpc('get_listing_carousel', {
       p_latitude: parseFloat(latitude),
       p_longitude: parseFloat(longitude),
-      p_radius_meters: radius ? parseInt(radius) : 8047,
+      p_radius_meters: resolveListingRadiusMeters(radius),
       p_layer: layer || null,
       p_limit: 10,
     });
@@ -1115,7 +1204,7 @@ router.get('/carousel', optionalAuth, async (req, res) => {
     }
 
     const enriched = await enrichWithCoordinates(data || []);
-    const normalized = enriched.map(normalizeListing);
+    const normalized = await normalizeListingsWithHydratedCreators(enriched);
     res.json({ listings: await applyLocationPrivacyBatch(normalized, req.user?.id || null) });
   } catch (err) {
     logger.error('Carousel error', { error: err.message });
@@ -1178,7 +1267,7 @@ router.post('/:id/refresh', verifyToken, async (req, res) => {
         updated_at: new Date().toISOString(),
       })
       .eq('id', listingId)
-      .select(`*, creator:user_id (${CREATOR_SELECT})`)
+      .select(`*, creator:user_id (${SAFE_CREATOR_SELECT})`)
       .single();
 
     if (updateErr) {
@@ -1187,7 +1276,10 @@ router.post('/:id/refresh', verifyToken, async (req, res) => {
     }
 
     logger.info('Listing refreshed', { listingId, userId, refreshCount: updated.refresh_count });
-    res.json({ message: 'Listing refreshed successfully', listing: normalizeListing(updated) });
+    res.json({
+      message: 'Listing refreshed successfully',
+      listing: applyLocationPrivacy(await normalizeListingWithHydratedCreator(updated), userId),
+    });
   } catch (err) {
     logger.error('Listing refresh error', { error: err.message });
     res.status(500).json({ error: 'Failed to refresh listing' });
@@ -1219,7 +1311,7 @@ router.get('/:id/similar', optionalAuth, async (req, res) => {
     // Build query: same category, active, not this listing, not archived
     let query = supabaseAdmin
       .from('Listing')
-      .select(`*, creator:user_id (${CREATOR_SELECT})`)
+      .select(`*, creator:user_id (${SAFE_CREATOR_SELECT})`)
       .eq('category', listing.category)
       .eq('status', 'active')
       .neq('id', id)
@@ -1256,6 +1348,7 @@ router.get('/:id/similar', optionalAuth, async (req, res) => {
     }
 
     // Normalize and apply location privacy
+    await hydrateListingCreatorIdentities(results || []);
     const normalized = (results || []).map(row => {
       const n = normalizeListing(row);
       n.userHasSaved = savedIds.has(row.id);
@@ -1286,7 +1379,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
     const { data: listing, error } = await supabaseAdmin
       .from('Listing')
-      .select(`*, creator:user_id (${CREATOR_SELECT})`)
+      .select(`*, creator:user_id (${SAFE_CREATOR_SELECT})`)
       .eq('id', id)
       .single();
 
@@ -1310,7 +1403,11 @@ router.get('/:id', optionalAuth, async (req, res) => {
       }
     }
 
-    const visibleListing = applyLocationPrivacy(listing, viewerUserId, { grantedUserIds });
+    const visibleListing = applyLocationPrivacy(
+      await normalizeListingWithHydratedCreator(listing),
+      viewerUserId,
+      { grantedUserIds }
+    );
 
     // Check if current user has saved this listing
     let userHasSaved = false;
@@ -1366,7 +1463,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
       listing: {
         ...visibleListing,
         userHasSaved,
-        creator: { ...visibleListing.creator, reputation },
+        creator: visibleListing.creator ? { ...visibleListing.creator, reputation } : null,
       },
     });
   } catch (err) {
@@ -1408,7 +1505,7 @@ router.patch('/:id', verifyToken, validate(updateListingSchema), async (req, res
       .from('Listing')
       .update(updates)
       .eq('id', id)
-      .select(`*, creator:user_id (${CREATOR_SELECT})`)
+      .select(`*, creator:user_id (${SAFE_CREATOR_SELECT})`)
       .single();
 
     if (error) {
@@ -1419,7 +1516,10 @@ router.patch('/:id', verifyToken, validate(updateListingSchema), async (req, res
     const fieldsUpdated = Object.keys(updates).filter(k => k !== 'updated_at');
     logger.info('marketplace.edit', { listingId: id, userId, fieldsUpdated });
 
-    res.json({ message: 'Listing updated successfully', listing });
+    res.json({
+      message: 'Listing updated successfully',
+      listing: applyLocationPrivacy(await normalizeListingWithHydratedCreator(listing), userId),
+    });
   } catch (err) {
     logger.error('marketplace.edit.error', { error: err.message, listingId: req.params.id });
     res.status(500).json({ error: 'Failed to update listing' });
@@ -1670,7 +1770,7 @@ router.get('/:id/messages', verifyToken, async (req, res) => {
 
     const { data: messages, error } = await supabaseAdmin
       .from('ListingMessage')
-      .select(`*, buyer:buyer_id (${CREATOR_SELECT})`)
+      .select(`*, buyer:buyer_id (${SAFE_CREATOR_SELECT})`)
       .eq('listing_id', listingId)
       .order('created_at', { ascending: false });
 
@@ -1679,7 +1779,7 @@ router.get('/:id/messages', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch messages' });
     }
 
-    res.json({ messages: messages || [] });
+    res.json({ messages: (messages || []).map(serializeListingMessageForViewer) });
   } catch (err) {
     logger.error('Listing messages fetch error', { error: err.message });
     res.status(500).json({ error: 'Failed to fetch messages' });
@@ -1804,7 +1904,7 @@ router.get('/:listingId/questions', async (req, res) => {
       'Seller';
 
     const normalized = (questions || []).map((q) => ({
-      ...q,
+      ...serializeListingQuestionForViewer(q),
       question_attachments: q.question_attachments || [],
       answer_attachments: q.answer_attachments || [],
       answerer_display_name: ownerIsBusiness && q.answer ? ownerDisplayName : null,
@@ -1899,7 +1999,7 @@ router.post('/:listingId/questions', verifyToken, async (req, res) => {
       });
     }
 
-    res.status(201).json({ question: q });
+    res.status(201).json({ question: serializeListingQuestionForViewer(q) });
   } catch (err) {
     logger.error('Listing question create error', { error: err.message });
     res.status(500).json({ error: 'Failed to post question' });
@@ -1987,7 +2087,7 @@ router.post('/:listingId/questions/:questionId/answer', verifyToken, async (req,
 
     res.json({
       question: {
-        ...updated,
+        ...serializeListingQuestionForViewer(updated),
         answerer_display_name: ownerIsBusiness ? ownerDisplayName : null,
         answerer_display_id: ownerIsBusiness ? owner?.id : null,
         answerer_display_username: ownerIsBusiness ? owner?.username || null : null,

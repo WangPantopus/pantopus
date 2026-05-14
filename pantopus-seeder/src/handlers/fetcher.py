@@ -7,7 +7,11 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from src.config.constants import QUEUE_PURGE_DAYS, QUEUE_STALE_HOURS
+from src.config.constants import (
+    QUEUE_PURGE_DAYS,
+    QUEUE_STALE_HOURS,
+    QUEUE_STALE_HOURS_BY_CATEGORY,
+)
 from src.config.region_registry import load_active_regions, load_sources_for_region
 from src.config.secrets import get_secrets
 from src.pipeline.dedup import compute_dedup_hash, is_duplicate
@@ -208,21 +212,57 @@ def _run_queue_hygiene(supabase) -> None:
         except Exception:
             log.warning("Failed to purge status=%s rows", status, exc_info=True)
 
-    # Mark stale queued items
-    stale_cutoff = (now - timedelta(hours=QUEUE_STALE_HOURS)).isoformat()
+    # Mark stale queued items. Windows are per-category so time-sensitive
+    # categories (weather, AQI, earthquake, history) are never kept past
+    # their useful life while evergreen enrichment (sports, community_resource,
+    # seasonal) can survive busy news cycles.
+    #
+    # Group categories that share a window so we emit one UPDATE per bucket.
+    buckets: dict[int, list[str]] = {}
+    for category, hours in QUEUE_STALE_HOURS_BY_CATEGORY.items():
+        buckets.setdefault(hours, []).append(category)
+
+    for hours in sorted(buckets):
+        cats = sorted(buckets[hours])
+        cutoff = (now - timedelta(hours=hours)).isoformat()
+        cats_filter = f"({','.join(cats)})"
+        try:
+            result = (
+                supabase.table("seeder_content_queue")
+                .update({"status": "skipped", "failure_reason": "stale"})
+                .eq("status", "queued")
+                .lt("fetched_at", cutoff)
+                .filter("category", "in", cats_filter)
+                .execute()
+            )
+            count = len(result.data) if result.data else 0
+            if count:
+                log.info(
+                    "Marked %d items as stale (>%dh, categories=%s)",
+                    count, hours, ",".join(cats),
+                )
+        except Exception:
+            log.warning(
+                "Failed to mark stale items (categories=%s)", cats, exc_info=True
+            )
+
+    # Safety net: any row missing a category (very rare) is swept by the default
+    # window so nothing can sit in the queue indefinitely.
+    default_cutoff = (now - timedelta(hours=QUEUE_STALE_HOURS)).isoformat()
     try:
         result = (
             supabase.table("seeder_content_queue")
             .update({"status": "skipped", "failure_reason": "stale"})
             .eq("status", "queued")
-            .lt("fetched_at", stale_cutoff)
+            .lt("fetched_at", default_cutoff)
+            .is_("category", "null")
             .execute()
         )
         count = len(result.data) if result.data else 0
         if count:
-            log.info("Marked %d queued items as stale", count)
+            log.info("Marked %d null-category items as stale", count)
     except Exception:
-        log.warning("Failed to mark stale items", exc_info=True)
+        log.warning("Failed to mark null-category items as stale", exc_info=True)
 
 
 def _get_queue_depth(supabase) -> int:

@@ -9,6 +9,7 @@
 const logger = require('../../utils/logger');
 const { geoCache } = require('../../utils/geoCache');
 const { GEO_SERVER_TOKEN } = require('../../config/geo');
+const crypto = require('crypto');
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -22,6 +23,47 @@ function requireToken() {
  */
 function findCtx(context, prefix) {
   return (context || []).find((c) => (c.id || '').startsWith(prefix));
+}
+
+/**
+ * Mapbox v5 address features often split the house number into `address`
+ * and the street name into `text`. Use both so the UI does not show
+ * "Tacoma Court" when the actual selectable feature is "4014 Tacoma Court".
+ */
+function featureAddressLine(f) {
+  const text = (f.text || '').trim();
+  const houseNumber = (f.address || '').trim();
+
+  if (houseNumber && text) {
+    const lowerText = text.toLowerCase();
+    const lowerHouseNumber = houseNumber.toLowerCase();
+    if (!lowerText.startsWith(lowerHouseNumber)) {
+      return `${houseNumber} ${text}`.trim();
+    }
+  }
+
+  if (text) return text;
+  return (f.place_name || '').split(',')[0].trim();
+}
+
+function makeSuggestionId(f) {
+  const providerId = f.id || '';
+  const fingerprint = crypto
+    .createHash('sha1')
+    .update(JSON.stringify([
+      featureAddressLine(f),
+      f.place_name || '',
+      f.center || [],
+      secondaryText(f),
+    ]))
+    .digest('hex')
+    .slice(0, 12);
+
+  return providerId ? `${providerId}::${fingerprint}` : fingerprint;
+}
+
+function providerIdFromSuggestionId(suggestionId) {
+  return String(suggestionId || '').split('::')[0];
 }
 
 /**
@@ -39,7 +81,7 @@ function featureToNormalized(f, source, mode) {
     : '';
 
   return {
-    address: f.place_name || '',
+    address: featureAddressLine(f) || f.place_name || '',
     city: place,
     state: stateCode || region,
     zipcode: postcode,
@@ -116,7 +158,7 @@ const mapboxProvider = {
     const features = data.features || [];
 
     const suggestions = features.map((f) => {
-      const suggestionId = f.id;
+      const suggestionId = makeSuggestionId(f);
 
       // Pre-parse and cache the normalized address so resolve() is free.
       const normalized = featureToNormalized(f, 'mapbox_geocode', 'temporary');
@@ -124,7 +166,7 @@ const mapboxProvider = {
 
       return {
         suggestion_id: suggestionId,
-        primary_text: f.text || '',
+        primary_text: featureAddressLine(f),
         secondary_text: secondaryText(f),
         label: f.place_name || '',
         center: f.center
@@ -152,8 +194,9 @@ const mapboxProvider = {
     logger.info('geo_resolve_cache_miss', { suggestion_id: suggestionId });
 
     const token = requireToken();
+    const providerId = providerIdFromSuggestionId(suggestionId);
     const url =
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(suggestionId)}.json` +
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(providerId)}.json` +
       `?access_token=${encodeURIComponent(token)}` +
       `&limit=1&country=us&types=address,place,locality,postcode`;
 

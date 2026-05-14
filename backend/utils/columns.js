@@ -111,7 +111,7 @@ const HOME_EVENT_LIST = `
 const NOTIFICATION_LIST = `
   id, user_id, type, title, body, icon, link,
   is_read, metadata, created_at,
-  context_type, context_id
+  context, context_type, context_id
 `.replace(/\s+/g, ' ').trim();
 
 // ─── Business Seat ──────────────────────────────────────────────────────────

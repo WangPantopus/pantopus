@@ -222,6 +222,34 @@ const supportTrainDraftLimiter = rateLimit({
   message: { error: 'AI_RATE_LIMITED', message: 'Too many draft requests. Please try again shortly.' },
 });
 
+/**
+ * Limiter for Beacon follow/unfollow writes.
+ * 15 requests per 5 minutes per user — allows normal correction while
+ * slowing audience graph probing and follow-spam.
+ */
+const personaFollowLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 15,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { error: 'Too many Beacon follow requests. Please try again shortly.' },
+});
+
+/**
+ * Limiter for persona broadcast publishing.
+ * 20 messages per 15 minutes per user — generous for real posting, tight
+ * enough to prevent accidental loops or broadcast spam.
+ */
+const broadcastPublishLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { error: 'Too many broadcast messages. Please try again shortly.' },
+});
+
 module.exports = {
   globalWriteLimiter,
   financialWriteLimiter,
@@ -239,4 +267,6 @@ module.exports = {
   previewLimiter,
   supportTrainWriteLimiter,
   supportTrainDraftLimiter,
+  personaFollowLimiter,
+  broadcastPublishLimiter,
 };

@@ -1,25 +1,23 @@
 /**
  * Visibility Policy Module
  *
- * Central source of truth for who can see what across all three graphs:
+ * Central source of truth for who can see what across two graphs:
  *   - Residency Graph (Home membership)
  *   - Trust Graph (Connections / Relationships)
- *   - Distribution Graph (Follows)
  *
  * Every route handler should call these helpers instead of inline ad-hoc checks.
  *
  * Visibility Matrix:
- * ┌──────────────────────────────┬────────┬───────────┬─────────────┬──────────────┐
- * │ Scope                        │ Public │ Followers │ Connections │ Home Members │
- * ├──────────────────────────────┼────────┼───────────┼─────────────┼──────────────┤
- * │ Public pro/business posts    │  yes   │    yes    │     yes     │     yes      │
- * │ Personal follower-only posts │  no    │    yes    │     yes     │     yes      │
- * │ Personal connection-only     │  no    │    no     │     yes     │     yes      │
- * │ Home private content         │  no    │    no     │     no      │     yes      │
- * │ Mailbox items                │  no    │    no     │     no      │ home perm    │
- * │ Exact residential address    │  no    │    no     │  optional   │     yes      │
- * │ Professional service area    │  yes*  │    yes    │     yes     │     yes      │
- * └──────────────────────────────┴────────┴───────────┴─────────────┴──────────────┘
+ * ┌──────────────────────────────┬────────┬─────────────┬──────────────┐
+ * │ Scope                        │ Public │ Connections │ Home Members │
+ * ├──────────────────────────────┼────────┼─────────────┼──────────────┤
+ * │ Public pro/business posts    │  yes   │     yes     │     yes      │
+ * │ Personal connection-only     │  no    │     yes     │     yes      │
+ * │ Home private content         │  no    │     no      │     yes      │
+ * │ Mailbox items                │  no    │     no      │ home perm    │
+ * │ Exact residential address    │  no    │  optional   │     yes      │
+ * │ Professional service area    │  yes*  │     yes     │     yes      │
+ * └──────────────────────────────┴────────┴─────────────┴──────────────┘
  *  * if profile is_public = true
  */
 
@@ -29,27 +27,6 @@ const logger = require('./logger');
 // ============================================================
 // GRAPH QUERY HELPERS
 // ============================================================
-
-/**
- * Check if viewer follows the target user.
- * @param {string} followerId
- * @param {string} followingId
- * @returns {Promise<boolean>}
- */
-async function isFollowing(followerId, followingId) {
-  if (!followerId || !followingId || followerId === followingId) return false;
-  try {
-    const { data } = await supabaseAdmin
-      .from('UserFollow')
-      .select('id')
-      .eq('follower_id', followerId)
-      .eq('following_id', followingId)
-      .single();
-    return !!data;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Get the relationship status between two users.
@@ -188,9 +165,10 @@ async function canViewContent(viewerId, post) {
       return true;
 
     case 'followers':
+      // Legacy 'followers' visibility on personal posts is treated as
+      // 'connections' after the peer-follow removal. Persona-context posts
+      // are routed via PersonaMembership before reaching this switch.
       if (await isBlocked(viewerId, post.user_id)) return false;
-      // Followers, connections, and home-mates can see
-      if (await isFollowing(viewerId, post.user_id)) return true;
       if (await isConnected(viewerId, post.user_id)) return true;
       if (await shareHome(viewerId, post.user_id)) return true;
       return false;
@@ -221,7 +199,7 @@ async function canViewContent(viewerId, post) {
  *
  * @param {string} viewerId
  * @param {string} profileUserId
- * @returns {Promise<'full'|'connected'|'follower'|'public'>}
+ * @returns {Promise<'full'|'connected'|'public'|'blocked'>}
  */
 async function getProfileVisibility(viewerId, profileUserId) {
   if (viewerId === profileUserId) return 'full';
@@ -230,7 +208,6 @@ async function getProfileVisibility(viewerId, profileUserId) {
 
   if (await shareHome(viewerId, profileUserId)) return 'full';
   if (await isConnected(viewerId, profileUserId)) return 'connected';
-  if (await isFollowing(viewerId, profileUserId)) return 'follower';
   return 'public';
 }
 
@@ -385,7 +362,12 @@ async function canViewProfileField(viewerId, targetUserId, field) {
     case 'public':
       return true;
     case 'followers':
-      if (await isFollowing(viewerId, targetUserId)) return true;
+      // Legacy stored value — peer-follow has been removed, so this now
+      // collapses to the connections/home-mate scope.
+      if (await isConnected(viewerId, targetUserId)) return true;
+      if (await shareHome(viewerId, targetUserId)) return true;
+      return false;
+    case 'connections':
       if (await isConnected(viewerId, targetUserId)) return true;
       if (await shareHome(viewerId, targetUserId)) return true;
       return false;
@@ -437,7 +419,6 @@ async function isScopedBlocked(viewerId, targetUserId, scope = 'full') {
 
 module.exports = {
   // Graph queries
-  isFollowing,
   getRelationshipStatus,
   isConnected,
   isBlocked,

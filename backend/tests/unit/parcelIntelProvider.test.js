@@ -191,6 +191,11 @@ describe('parcelIntelProvider', () => {
   });
 
   test('selects the freshest cached parcel row when multiple unit-level rows share the same normalized address', async () => {
+    jest.useFakeTimers();
+    // Real wall clock made this test flaky: cache uses now−30d, so fixed April dates could fall
+    // outside the window and only one row matched → logger.info (multi-row) never ran.
+    jest.setSystemTime(new Date('2026-05-20T12:00:00.000Z'));
+    try {
     const { provider, supabaseMock, logger } = loadProvider({
       ENABLE_ADDRESS_PARCEL_PROVIDER: 'true',
       ADDRESS_PARCEL_PROVIDER: 'attom',
@@ -210,7 +215,7 @@ describe('parcelIntelProvider', () => {
         parcel_id: 'OLD-ROW',
         usage_class: 'commercial',
         parcel_confidence: 0.7,
-        last_parcel_validated_at: '2026-04-01T12:00:00.000Z',
+        last_parcel_validated_at: '2026-05-15T12:00:00.000Z',
         validation_raw_response: {
           parcel_provider: {
             parcel_id: 'OLD-ROW',
@@ -229,7 +234,7 @@ describe('parcelIntelProvider', () => {
         parcel_id: 'NEW-ROW',
         usage_class: 'institutional',
         parcel_confidence: 0.93,
-        last_parcel_validated_at: '2026-04-02T12:00:00.000Z',
+        last_parcel_validated_at: '2026-05-18T12:00:00.000Z',
         validation_raw_response: {
           parcel_provider: {
             parcel_id: 'NEW-ROW',
@@ -254,6 +259,9 @@ describe('parcelIntelProvider', () => {
         selected_address_id: 'addr-newer',
       }),
     );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test('normalizes ATTOM detail payloads into parcel intel', async () => {

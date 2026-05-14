@@ -203,7 +203,7 @@ function composeTemplate(rankedOutput, options = {}) {
 
 // ── AI polish ───────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are a concise morning briefing writer for a neighborhood app.
+const SYSTEM_PROMPT = `You are a concise morning briefing writer for Pantopus, a real-world network.
 Compose a short morning summary from the provided facts.
 Rules:
 - Stay under {maxWords} words

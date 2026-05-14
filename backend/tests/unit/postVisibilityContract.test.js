@@ -72,7 +72,6 @@ function seedRestrictedFollowersPost() {
       is_edited: false,
     },
   ]);
-  seedTable('UserFollow', []);
   seedTable('Relationship', []);
   seedTable('User', []);
   seedTable('PostLike', [
@@ -178,7 +177,7 @@ describe('Post visibility contract', () => {
     const res = await request(app)
       .post(`/api/posts/${POST_ID}/not-helpful`)
       .set('x-test-user-id', VIEWER_ID)
-      .send({ surface: 'following' });
+      .send({ surface: 'connections' });
 
     expect(res.status).toBe(403);
     expect(res.body.error).toMatch(/do not have access/i);
@@ -201,15 +200,15 @@ describe('Post visibility contract', () => {
     expect(getTable('PostSave')).toHaveLength(0);
   });
 
-  it('still allows followers to interact with followers-only posts', async () => {
+  it('still allows connections to interact with connections-only posts', async () => {
     const app = createApp();
     const rpcMock = jest.fn().mockResolvedValue({
       data: { liked: true, likeCount: 2 },
       error: null,
     });
     setRpcMock(rpcMock);
-    seedTable('UserFollow', [
-      { follower_id: VIEWER_ID, following_id: AUTHOR_ID },
+    seedTable('Relationship', [
+      { id: 'r-vc', requester_id: VIEWER_ID, addressee_id: AUTHOR_ID, status: 'accepted' },
     ]);
 
     const res = await request(app)
@@ -324,16 +323,16 @@ describe('Post visibility contract', () => {
     expect(res.body.posts).toEqual([]);
   });
 
-  it('shows followers-only post previews to followers on the public profile', async () => {
+  it('shows connections-only post previews to connections on the public profile', async () => {
     const app = createApp();
     seedTable('Post', [
       {
         id: POST_ID,
         user_id: AUTHOR_ID,
-        content: 'Followers only profile preview',
-        visibility: 'followers',
-        audience: 'followers',
-        distribution_targets: ['followers'],
+        content: 'Connections only profile preview',
+        visibility: 'connections',
+        audience: 'connections',
+        distribution_targets: ['connections'],
         show_on_profile: true,
         profile_visibility_scope: 'public',
         archived_at: null,
@@ -347,8 +346,8 @@ describe('Post visibility contract', () => {
         is_edited: false,
       },
     ]);
-    seedTable('UserFollow', [
-      { follower_id: VIEWER_ID, following_id: AUTHOR_ID },
+    seedTable('Relationship', [
+      { id: 'r-vc', requester_id: VIEWER_ID, addressee_id: AUTHOR_ID, status: 'accepted' },
     ]);
     seedTable('PostLike', []);
     seedTable('PostSave', []);
@@ -368,10 +367,10 @@ describe('Post visibility contract', () => {
       {
         id: POST_ID,
         user_id: AUTHOR_ID,
-        content: 'Nearby post that was also shared to followers',
+        content: 'Nearby post that was also shared to connections',
         visibility: 'neighborhood',
         audience: 'nearby',
-        distribution_targets: ['place', 'followers'],
+        distribution_targets: ['place', 'connections'],
         show_on_profile: true,
         profile_visibility_scope: 'public',
         latitude: 41.8781,

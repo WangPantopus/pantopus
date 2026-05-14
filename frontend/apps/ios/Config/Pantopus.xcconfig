@@ -6,8 +6,10 @@
 // If you need a new variable to flow into Info.plist, declare a default here
 // and the Makefile's `env-to-xcconfig` target will overlay the value from .env.
 
-#include? "Secrets.xcconfig"
-
 // Defaults — individual keys can be overridden by Secrets.xcconfig.
+PANTOPUS_API_BASE_URL = http:/$()/localhost:8000
+PANTOPUS_SOCKET_URL = http:/$()/localhost:8000
 STRIPE_PUBLISHABLE_KEY = pk_test_REPLACE_ME
 SENTRY_DSN =
+
+#include? "Secrets.xcconfig"

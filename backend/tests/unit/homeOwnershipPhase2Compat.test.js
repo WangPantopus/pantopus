@@ -48,6 +48,7 @@ const propertyDataService = require('../../services/propertyDataService');
 const householdClaimConfig = require('../../config/householdClaims');
 const occupancyAttachService = require('../../services/occupancyAttachService');
 const notificationService = require('../../services/notificationService');
+const homeClaimCompatService = require('../../services/homeClaimCompatService');
 
 const router = require('../../routes/homeOwnership');
 
@@ -591,7 +592,7 @@ describe('homeOwnership Phase 2 compatibility writes', () => {
       .set('x-test-user-id', 'owner-1')
       .send({
         action: 'invite_to_household',
-        note: 'Join as a household member instead',
+        note: 'Join as a co-owner',
       });
 
     expect(res.status).toBe(200);
@@ -600,7 +601,105 @@ describe('homeOwnership Phase 2 compatibility writes', () => {
     expect(getTable('HomeInvite')).toHaveLength(1);
     expect(getTable('HomeInvite')[0].invitee_user_id).toBe('user-2');
     expect(getTable('HomeInvite')[0].proposed_preset_key).toBe('claim_merge:claim-2');
+    expect(getTable('HomeInvite')[0].proposed_role).toBe('owner');
+    expect(getTable('HomeInvite')[0].proposed_role_base).toBe('owner');
     expect(notificationService.notifyHomeInvite).toHaveBeenCalledTimes(1);
+  });
+
+  test('resident relationship invite preserves lease-resident identity', async () => {
+    householdClaimConfig.flags.inviteMerge = true;
+
+    seedBaseHome({
+      household_resolution_state: 'verified_household',
+      owner_id: 'owner-1',
+    });
+    seedTable('User', [
+      { id: 'owner-1', name: 'Verified Owner', first_name: 'Verified', username: 'owner' },
+      { id: 'user-2', name: 'Pending Resident', first_name: 'Pending', username: 'resident' },
+    ]);
+    seedTable('HomeOwner', [{
+      id: 'home-owner-1',
+      home_id: 'home-1',
+      subject_id: 'owner-1',
+      owner_status: 'verified',
+      verification_tier: 'strong',
+      is_primary_owner: true,
+    }]);
+    seedTable('HomeOwnershipClaim', [{
+      id: 'claim-resident',
+      home_id: 'home-1',
+      claimant_user_id: 'user-2',
+      claim_type: 'resident',
+      state: 'submitted',
+      method: 'doc_upload',
+      claim_phase_v2: 'under_review',
+      terminal_reason: 'none',
+      challenge_state: 'none',
+      identity_status: 'not_started',
+      routing_classification: 'parallel_claim',
+      merged_into_claim_id: null,
+    }]);
+
+    const res = await request(app)
+      .post('/api/homes/home-1/ownership-claims/claim-resident/resolve-relationship')
+      .set('x-test-user-id', 'owner-1')
+      .send({ action: 'invite_to_household' });
+
+    expect(res.status).toBe(200);
+    expect(getTable('HomeInvite')).toHaveLength(1);
+    expect(getTable('HomeInvite')[0].proposed_role).toBe('renter');
+    expect(getTable('HomeInvite')[0].proposed_role_base).toBe('lease_resident');
+  });
+
+  test('owner relationship invite requires verified owner authority at creation time', async () => {
+    householdClaimConfig.flags.inviteMerge = true;
+
+    seedBaseHome({
+      household_resolution_state: 'verified_household',
+      owner_id: 'owner-1',
+    });
+    seedTable('HomeOwner', [{
+      id: 'home-owner-1',
+      home_id: 'home-1',
+      subject_id: 'owner-1',
+      owner_status: 'verified',
+      verification_tier: 'strong',
+      is_primary_owner: true,
+    }]);
+    seedTable('HomeOccupancy', [{
+      id: 'occ-manager-1',
+      home_id: 'home-1',
+      user_id: 'manager-1',
+      role: 'manager',
+      role_base: 'manager',
+      is_active: true,
+      verification_status: 'verified',
+    }]);
+    seedTable('HomeOwnershipClaim', [{
+      id: 'claim-2',
+      home_id: 'home-1',
+      claimant_user_id: 'user-2',
+      claim_type: 'owner',
+      state: 'submitted',
+      method: 'doc_upload',
+      claim_phase_v2: 'under_review',
+      terminal_reason: 'none',
+      challenge_state: 'none',
+      identity_status: 'not_started',
+      routing_classification: 'parallel_claim',
+      merged_into_claim_id: null,
+    }]);
+
+    const res = await request(app)
+      .post('/api/homes/home-1/ownership-claims/claim-2/resolve-relationship')
+      .set('x-test-user-id', 'manager-1')
+      .send({ action: 'invite_to_household' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('OWNER_INVITE_AUTHORITY_REQUIRED');
+    expect(getTable('HomeInvite')).toHaveLength(0);
+    expect(getTable('HomeOwnershipClaim')[0].routing_classification).toBe('parallel_claim');
+    expect(notificationService.notifyHomeInvite).not.toHaveBeenCalled();
   });
 
   test('flagging an unknown claimant opens dispute review on the home', async () => {
@@ -722,8 +821,8 @@ describe('homeOwnership Phase 2 compatibility writes', () => {
       home_id: 'home-1',
       invited_by: 'owner-1',
       invitee_user_id: 'user-2',
-      proposed_role: 'member',
-      proposed_role_base: 'member',
+      proposed_role: 'owner',
+      proposed_role_base: 'owner',
       proposed_preset_key: 'claim_merge:claim-2',
       token: 'invite-token',
       token_hash: 'invite-hash',
@@ -739,22 +838,401 @@ describe('homeOwnership Phase 2 compatibility writes', () => {
       });
 
     expect(res.status).toBe(200);
-    expect(res.body.claim.claim_phase_v2).toBe('merged_into_household');
+    expect(res.body.claim.claim_phase_v2).toBe('verified');
+    expect(res.body.claim.terminal_reason).toBe('none');
+    expect(res.body.accepted_as_owner).toBe(true);
 
     const mergedClaim = getTable('HomeOwnershipClaim').find((claim) => claim.id === 'claim-2');
     expect(mergedClaim.state).toBe('approved');
-    expect(mergedClaim.claim_phase_v2).toBe('merged_into_household');
-    expect(mergedClaim.terminal_reason).toBe('merged_via_invite');
-    expect(mergedClaim.merged_into_claim_id).toBe('claim-owner');
+    expect(mergedClaim.claim_phase_v2).toBe('verified');
+    expect(mergedClaim.terminal_reason).toBe('none');
+    expect(mergedClaim.merged_into_claim_id).toBe(null);
     expect(getTable('HomeInvite')[0].status).toBe('accepted');
     expect(getTable('HomeVerificationEvidence')).toHaveLength(1);
+    const ownerRows = getTable('HomeOwner');
+    const invitedOwner = ownerRows.find((owner) => owner.subject_id === 'user-2');
+    expect(invitedOwner).toEqual(expect.objectContaining({
+      owner_status: 'verified',
+      is_primary_owner: false,
+      verification_tier: 'weak',
+      added_via: 'claim',
+    }));
+    expect(getTable('Home')[0].owner_id).toBe('owner-1');
     expect(occupancyAttachService.attach).toHaveBeenCalledWith(expect.objectContaining({
       homeId: 'home-1',
       userId: 'user-2',
-      method: 'owner_bootstrap',
-      claimType: 'member',
+      method: 'owner_invite',
+      claimType: 'owner',
+      roleOverride: 'owner',
     }));
     expect(notificationService.notifyHomeInviteAccepted).toHaveBeenCalledTimes(1);
+  });
+
+  test('owner claim merge treats stale member-role claim invites as owner accepts', async () => {
+    householdClaimConfig.flags.inviteMerge = true;
+
+    seedBaseHome({
+      household_resolution_state: 'verified_household',
+      owner_id: 'owner-1',
+    });
+    seedTable('User', [
+      { id: 'owner-1', name: 'Verified Owner', first_name: 'Verified', username: 'owner' },
+      { id: 'user-2', name: 'Pending Claimant', first_name: 'Pending', username: 'claimant' },
+    ]);
+    seedTable('HomeOwner', [{
+      id: 'home-owner-1',
+      home_id: 'home-1',
+      subject_id: 'owner-1',
+      owner_status: 'verified',
+      verification_tier: 'strong',
+      is_primary_owner: true,
+    }]);
+    seedTable('HomeOwnershipClaim', [{
+      id: 'claim-2',
+      home_id: 'home-1',
+      claimant_user_id: 'user-2',
+      claim_type: 'owner',
+      state: 'submitted',
+      method: 'doc_upload',
+      claim_phase_v2: 'under_review',
+      terminal_reason: 'none',
+      challenge_state: 'none',
+      identity_status: 'verified',
+      routing_classification: 'merge_candidate',
+      merged_into_claim_id: null,
+    }]);
+    seedTable('HomeInvite', [{
+      id: '00000000-0000-4000-8000-000000000005',
+      home_id: 'home-1',
+      invited_by: 'owner-1',
+      invitee_user_id: 'user-2',
+      proposed_role: 'member',
+      proposed_role_base: 'member',
+      proposed_preset_key: 'claim_merge:claim-2',
+      token: 'invite-token',
+      token_hash: 'invite-hash',
+      status: 'pending',
+      expires_at: futureIso(2),
+    }]);
+
+    const res = await request(app)
+      .post('/api/homes/home-1/ownership-claims/claim-2/accept-merge')
+      .set('x-test-user-id', 'user-2')
+      .send({
+        invitation_id: '00000000-0000-4000-8000-000000000005',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.accepted_as_owner).toBe(true);
+    expect(res.body.accepted_role_base).toBe('owner');
+    expect(res.body.claim.claim_phase_v2).toBe('verified');
+
+    const invitedOwner = getTable('HomeOwner').find((owner) => owner.subject_id === 'user-2');
+    expect(invitedOwner).toEqual(expect.objectContaining({
+      owner_status: 'verified',
+      verification_tier: 'weak',
+    }));
+    expect(getTable('HomeInvite')[0]).toEqual(expect.objectContaining({
+      status: 'accepted',
+      proposed_role: 'owner',
+      proposed_role_base: 'owner',
+    }));
+    expect(occupancyAttachService.attach).toHaveBeenCalledWith(expect.objectContaining({
+      method: 'owner_invite',
+      claimType: 'owner',
+      roleOverride: 'owner',
+    }));
+  });
+
+  test('resident claim merge clamps malformed owner-role invites to lease-resident', async () => {
+    householdClaimConfig.flags.inviteMerge = true;
+
+    seedBaseHome({
+      household_resolution_state: 'verified_household',
+      owner_id: 'owner-1',
+    });
+    seedTable('User', [
+      { id: 'owner-1', name: 'Verified Owner', first_name: 'Verified', username: 'owner' },
+      { id: 'user-2', name: 'Pending Resident', first_name: 'Pending', username: 'resident' },
+    ]);
+    seedTable('HomeOwner', [{
+      id: 'home-owner-1',
+      home_id: 'home-1',
+      subject_id: 'owner-1',
+      owner_status: 'verified',
+      verification_tier: 'strong',
+      is_primary_owner: true,
+    }]);
+    seedTable('HomeOwnershipClaim', [{
+      id: 'claim-resident',
+      home_id: 'home-1',
+      claimant_user_id: 'user-2',
+      claim_type: 'resident',
+      state: 'submitted',
+      method: 'doc_upload',
+      claim_phase_v2: 'under_review',
+      terminal_reason: 'none',
+      challenge_state: 'none',
+      identity_status: 'verified',
+      routing_classification: 'merge_candidate',
+      merged_into_claim_id: null,
+    }]);
+    seedTable('HomeInvite', [{
+      id: '00000000-0000-4000-8000-000000000006',
+      home_id: 'home-1',
+      invited_by: 'owner-1',
+      invitee_user_id: 'user-2',
+      proposed_role: 'owner',
+      proposed_role_base: 'owner',
+      proposed_preset_key: 'claim_merge:claim-resident',
+      token: 'invite-token',
+      token_hash: 'invite-hash',
+      status: 'pending',
+      expires_at: futureIso(2),
+    }]);
+
+    const res = await request(app)
+      .post('/api/homes/home-1/ownership-claims/claim-resident/accept-merge')
+      .set('x-test-user-id', 'user-2')
+      .send({
+        invitation_id: '00000000-0000-4000-8000-000000000006',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.accepted_as_owner).toBe(false);
+    expect(res.body.accepted_role_base).toBe('lease_resident');
+    expect(res.body.claim.claim_phase_v2).toBe('merged_into_household');
+    expect(getTable('HomeOwner').find((owner) => owner.subject_id === 'user-2')).toBeUndefined();
+    expect(getTable('HomeInvite')[0]).toEqual(expect.objectContaining({
+      status: 'accepted',
+      proposed_role: 'renter',
+      proposed_role_base: 'lease_resident',
+    }));
+    expect(occupancyAttachService.attach).toHaveBeenCalledWith(expect.objectContaining({
+      method: 'owner_bootstrap',
+      claimType: 'resident',
+      roleOverride: 'lease_resident',
+    }));
+  });
+
+  test('owner claim merge rejects invites not issued by a verified owner', async () => {
+    householdClaimConfig.flags.inviteMerge = true;
+
+    seedBaseHome({
+      household_resolution_state: 'verified_household',
+      owner_id: 'owner-1',
+    });
+    seedTable('User', [
+      { id: 'owner-1', name: 'Verified Owner', first_name: 'Verified', username: 'owner' },
+      { id: 'manager-1', name: 'Manager User', first_name: 'Manager', username: 'manager' },
+      { id: 'user-2', name: 'Pending Claimant', first_name: 'Pending', username: 'claimant' },
+    ]);
+    seedTable('HomeOwner', [{
+      id: 'home-owner-1',
+      home_id: 'home-1',
+      subject_id: 'owner-1',
+      owner_status: 'verified',
+      verification_tier: 'strong',
+      is_primary_owner: true,
+    }]);
+    seedTable('HomeOwnershipClaim', [{
+      id: 'claim-2',
+      home_id: 'home-1',
+      claimant_user_id: 'user-2',
+      claim_type: 'owner',
+      state: 'submitted',
+      method: 'doc_upload',
+      claim_phase_v2: 'under_review',
+      terminal_reason: 'none',
+      challenge_state: 'none',
+      identity_status: 'verified',
+      routing_classification: 'merge_candidate',
+      merged_into_claim_id: null,
+    }]);
+    seedTable('HomeInvite', [{
+      id: '00000000-0000-4000-8000-000000000003',
+      home_id: 'home-1',
+      invited_by: 'manager-1',
+      invitee_user_id: 'user-2',
+      proposed_role: 'owner',
+      proposed_role_base: 'owner',
+      proposed_preset_key: 'claim_merge:claim-2',
+      token: 'invite-token',
+      token_hash: 'invite-hash',
+      status: 'pending',
+      expires_at: futureIso(2),
+    }]);
+
+    const res = await request(app)
+      .post('/api/homes/home-1/ownership-claims/claim-2/accept-merge')
+      .set('x-test-user-id', 'user-2')
+      .send({
+        invitation_id: '00000000-0000-4000-8000-000000000003',
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('OWNER_INVITE_AUTHORITY_REQUIRED');
+    expect(getTable('HomeOwner').find((owner) => owner.subject_id === 'user-2')).toBeUndefined();
+    expect(getTable('HomeOwnershipClaim')[0].claim_phase_v2).toBe('under_review');
+    expect(getTable('HomeInvite')[0].status).toBe('pending');
+    expect(occupancyAttachService.attach).not.toHaveBeenCalled();
+  });
+
+  test('owner claim merge rolls back owner promotion when occupancy attach fails', async () => {
+    householdClaimConfig.flags.inviteMerge = true;
+    occupancyAttachService.attach.mockResolvedValueOnce({ success: false, error: 'attach failed' });
+
+    seedBaseHome({
+      household_resolution_state: 'verified_household',
+      owner_id: 'owner-1',
+    });
+    seedTable('User', [
+      { id: 'owner-1', name: 'Verified Owner', first_name: 'Verified', username: 'owner' },
+      { id: 'user-2', name: 'Pending Claimant', first_name: 'Pending', username: 'claimant' },
+    ]);
+    seedTable('HomeOwner', [{
+      id: 'home-owner-1',
+      home_id: 'home-1',
+      subject_id: 'owner-1',
+      owner_status: 'verified',
+      verification_tier: 'strong',
+      is_primary_owner: true,
+    }]);
+    seedTable('HomeOwnershipClaim', [{
+      id: 'claim-2',
+      home_id: 'home-1',
+      claimant_user_id: 'user-2',
+      claim_type: 'owner',
+      state: 'submitted',
+      method: 'doc_upload',
+      claim_phase_v2: 'under_review',
+      terminal_reason: 'none',
+      challenge_state: 'none',
+      identity_status: 'verified',
+      routing_classification: 'merge_candidate',
+      merged_into_claim_id: null,
+    }]);
+    seedTable('HomeInvite', [{
+      id: '00000000-0000-4000-8000-000000000004',
+      home_id: 'home-1',
+      invited_by: 'owner-1',
+      invitee_user_id: 'user-2',
+      proposed_role: 'owner',
+      proposed_role_base: 'owner',
+      proposed_preset_key: 'claim_merge:claim-2',
+      token: 'invite-token',
+      token_hash: 'invite-hash',
+      status: 'pending',
+      expires_at: futureIso(2),
+    }]);
+
+    const res = await request(app)
+      .post('/api/homes/home-1/ownership-claims/claim-2/accept-merge')
+      .set('x-test-user-id', 'user-2')
+      .send({
+        invitation_id: '00000000-0000-4000-8000-000000000004',
+      });
+
+    expect(res.status).toBe(500);
+    expect(getTable('HomeOwner').find((owner) => owner.subject_id === 'user-2')).toBeUndefined();
+    expect(getTable('HomeOwnershipClaim')[0].claim_phase_v2).toBe('under_review');
+    expect(getTable('HomeInvite')[0].status).toBe('pending');
+    expect(getTable('Home')[0].owner_id).toBe('owner-1');
+    expect(notificationService.notifyHomeInviteAccepted).not.toHaveBeenCalled();
+  });
+
+  test('owner claim merge rolls back owner and occupancy side effects after late failure', async () => {
+    householdClaimConfig.flags.inviteMerge = true;
+    const recalcSpy = jest
+      .spyOn(homeClaimCompatService, 'recalculateHouseholdResolutionState')
+      .mockRejectedValueOnce(new Error('recalculate failed'));
+    occupancyAttachService.attach.mockImplementationOnce(async () => {
+      seedTable('HomeOccupancy', [
+        ...getTable('HomeOccupancy'),
+        {
+          id: 'occ-created',
+          home_id: 'home-1',
+          user_id: 'user-2',
+          role: 'owner',
+          role_base: 'owner',
+          is_active: true,
+          verification_status: 'verified',
+          can_manage_home: false,
+          can_manage_finance: false,
+          can_manage_access: false,
+          can_manage_tasks: true,
+          can_view_sensitive: true,
+        },
+      ]);
+      return { success: true, status: 'attached', occupancy: { id: 'occ-created' } };
+    });
+
+    seedBaseHome({
+      household_resolution_state: 'verified_household',
+      owner_id: 'owner-1',
+    });
+    seedTable('User', [
+      { id: 'owner-1', name: 'Verified Owner', first_name: 'Verified', username: 'owner' },
+      { id: 'user-2', name: 'Pending Claimant', first_name: 'Pending', username: 'claimant' },
+    ]);
+    seedTable('HomeOwner', [{
+      id: 'home-owner-1',
+      home_id: 'home-1',
+      subject_id: 'owner-1',
+      owner_status: 'verified',
+      verification_tier: 'strong',
+      is_primary_owner: true,
+    }]);
+    seedTable('HomeOwnershipClaim', [{
+      id: 'claim-2',
+      home_id: 'home-1',
+      claimant_user_id: 'user-2',
+      claim_type: 'owner',
+      state: 'submitted',
+      method: 'doc_upload',
+      claim_phase_v2: 'under_review',
+      terminal_reason: 'none',
+      challenge_state: 'none',
+      identity_status: 'verified',
+      routing_classification: 'merge_candidate',
+      merged_into_claim_id: null,
+    }]);
+    seedTable('HomeInvite', [{
+      id: '00000000-0000-4000-8000-000000000007',
+      home_id: 'home-1',
+      invited_by: 'owner-1',
+      invitee_user_id: 'user-2',
+      proposed_role: 'owner',
+      proposed_role_base: 'owner',
+      proposed_preset_key: 'claim_merge:claim-2',
+      token: 'invite-token',
+      token_hash: 'invite-hash',
+      status: 'pending',
+      expires_at: futureIso(2),
+    }]);
+
+    let res;
+    try {
+      res = await request(app)
+        .post('/api/homes/home-1/ownership-claims/claim-2/accept-merge')
+        .set('x-test-user-id', 'user-2')
+        .send({
+          invitation_id: '00000000-0000-4000-8000-000000000007',
+        });
+    } finally {
+      recalcSpy.mockRestore();
+    }
+
+    expect(res.status).toBe(500);
+    expect(getTable('HomeOwner').find((owner) => owner.subject_id === 'user-2')).toBeUndefined();
+    expect(getTable('HomeOccupancy').find((occupancy) => occupancy.user_id === 'user-2')).toBeUndefined();
+    expect(getTable('HomeOwnershipClaim')[0].claim_phase_v2).toBe('under_review');
+    expect(getTable('HomeInvite')[0]).toEqual(expect.objectContaining({
+      status: 'pending',
+      proposed_role: 'owner',
+      proposed_role_base: 'owner',
+    }));
+    expect(notificationService.notifyHomeInviteAccepted).not.toHaveBeenCalled();
   });
 
   test('accept-merge requires identity confirmation before closing the claim', async () => {
@@ -791,8 +1269,8 @@ describe('homeOwnership Phase 2 compatibility writes', () => {
       home_id: 'home-1',
       invited_by: 'owner-1',
       invitee_user_id: 'user-2',
-      proposed_role: 'member',
-      proposed_role_base: 'member',
+      proposed_role: 'owner',
+      proposed_role_base: 'owner',
       proposed_preset_key: 'claim_merge:claim-2',
       token: 'invite-token',
       token_hash: 'invite-hash',

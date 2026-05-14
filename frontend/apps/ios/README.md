@@ -107,7 +107,7 @@ The app follows an MVVM structure with strict concurrency and the new `@Observab
 
 Running the app on a physical device but the backend on your Mac? The simulator's `localhost` won't work. Options:
 
-1. Add your Mac's LAN IP to `AppEnvironment.swift` as a new target or edit the `.local` base URL.
+1. Set `PANTOPUS_API_BASE_URL` and `PANTOPUS_SOCKET_URL` in `.env` to your Mac's LAN IP, then run `make bootstrap`.
 2. Use [ngrok](https://ngrok.com/) or [Cloudflare Tunnel](https://www.cloudflare.com/products/tunnel/) to expose the backend.
 
 ## Release checklist

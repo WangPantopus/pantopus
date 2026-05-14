@@ -17,6 +17,51 @@ const logger = require('../utils/logger');
 const { NOTIFICATION_LIST } = require('../utils/columns');
 const pushService = require('../services/pushService');
 
+const FIREWALL_VALUES = ['personal', 'audience', 'platform'];
+const CONTEXT_INPUT = ['all', ...FIREWALL_VALUES];
+const LEGACY_CONTEXT_TYPES = ['personal', 'business'];
+
+function parseFirewallFilter(req, { allowMultiple = false } = {}) {
+  const contextRaw = req.query.context ?? req.body?.context;
+  const firewallRaw = req.query.firewall ?? req.body?.firewall;
+  const contextsRaw = req.query.contexts ?? req.body?.contexts;
+  const raw = contextsRaw ?? contextRaw ?? firewallRaw;
+
+  if (raw === undefined || raw === null || raw === '') return { contexts: null };
+
+  const values = Array.isArray(raw)
+    ? raw
+    : String(raw).split(',').map((value) => value.trim()).filter(Boolean);
+
+  if (values.length === 0 || values.includes('all')) return { contexts: null };
+  if (!allowMultiple && values.length > 1) return { error: 'invalid context' };
+
+  for (const value of values) {
+    if (!FIREWALL_VALUES.includes(value)) return { error: 'invalid context' };
+  }
+  return { contexts: values };
+}
+
+function applyNotificationFilters(query, {
+  contextType,
+  contextId,
+  contexts,
+}) {
+  let next = query;
+  if (contextType === 'personal') {
+    next = next.eq('context_type', 'personal');
+  } else if (contextType === 'business') {
+    next = next.eq('context_type', 'business');
+    if (contextId) next = next.eq('context_id', contextId);
+  }
+  if (contexts?.length === 1) {
+    next = next.eq('context', contexts[0]);
+  } else if (contexts?.length > 1) {
+    next = next.in('context', contexts);
+  }
+  return next;
+}
+
 /**
  * GET /api/notifications
  * Returns notifications for the current user + unread count.
@@ -24,8 +69,17 @@ const pushService = require('../services/pushService');
  *   limit  — max results (default 20, max 50)
  *   offset — pagination offset (default 0)
  *   unread — if "true", only return unread
- *   context — 'personal' | 'business' | 'all' (default: all)
+ *   context — 'all' | 'personal' | 'audience' | 'platform' (default 'all')
+ *     P2.3 / unified-IA §6: filters Notification.context (the firewall
+ *     column from P0.6). Personal-zone bell scopes to personal+platform;
+ *     Audience-zone megaphone scopes to audience only.
+ *   context_type — 'personal' | 'business' (legacy Identity Firewall axis)
+ *     Filters the older context_type column. Independent of `context`;
+ *     both compose. Renamed in P2.3 to avoid colliding with the firewall
+ *     param above; previously this was also called `context`.
  *   context_id — business_user_id to filter business notifications
+ *   firewall — alias for `context` kept for P0.6 internal callers.
+ *     New code should pass `context` instead.
  */
 router.get('/', verifyToken, async (req, res) => {
   try {
@@ -33,8 +87,20 @@ router.get('/', verifyToken, async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
     const offset = parseInt(req.query.offset) || 0;
     const unreadOnly = req.query.unread === 'true';
-    const context = req.query.context; // 'personal' | 'business' | undefined
+    const contextType = req.query.context_type; // legacy 'personal' | 'business'
     const contextId = req.query.context_id;
+
+    // Firewall filter accepts either ?context= (new, preferred) or
+    // ?firewall= (P0.6-era internal callers). Validate strictly so
+    // typos surface as 400 instead of returning the unfiltered list.
+    const contextRaw = req.query.context ?? req.query.firewall;
+    if (contextRaw !== undefined && contextRaw !== null && contextRaw !== '' && !CONTEXT_INPUT.includes(contextRaw)) {
+      return res.status(400).json({ error: 'invalid context' });
+    }
+    if (contextType && !LEGACY_CONTEXT_TYPES.includes(contextType)) {
+      return res.status(400).json({ error: 'invalid context_type' });
+    }
+    const contexts = contextRaw && contextRaw !== 'all' ? [contextRaw] : null;
 
     // Get notifications
     let query = supabaseAdmin
@@ -48,16 +114,7 @@ router.get('/', verifyToken, async (req, res) => {
       query = query.eq('is_read', false);
     }
 
-    // Context filtering for Identity Firewall
-    if (context === 'personal') {
-      query = query.eq('context_type', 'personal');
-    } else if (context === 'business') {
-      query = query.eq('context_type', 'business');
-      if (contextId) {
-        query = query.eq('context_id', contextId);
-      }
-    }
-    // 'all' or undefined: no filter
+    query = applyNotificationFilters(query, { contextType, contextId, contexts });
 
     const { data: notifications, error } = await query;
 
@@ -73,15 +130,7 @@ router.get('/', verifyToken, async (req, res) => {
       .eq('user_id', userId)
       .eq('is_read', false);
 
-    // If filtering by context, count should match
-    if (context === 'personal') {
-      countQuery = countQuery.eq('context_type', 'personal');
-    } else if (context === 'business') {
-      countQuery = countQuery.eq('context_type', 'business');
-      if (contextId) {
-        countQuery = countQuery.eq('context_id', contextId);
-      }
-    }
+    countQuery = applyNotificationFilters(countQuery, { contextType, contextId, contexts });
 
     const { count: unreadCount, error: countErr } = await countQuery;
 
@@ -102,24 +151,45 @@ router.get('/', verifyToken, async (req, res) => {
 
 /**
  * GET /api/notifications/unread-count
- * Quick endpoint for the bell badge — returns just the count.
+ * Quick endpoint for the bell badge — returns the total + a per-firewall
+ * breakdown (P2.3 / unified-IA §6.1: separate streams for personal vs
+ * audience, never combined). Existing callers reading `count` keep working.
+ *
+ *   { count: 12, byContext: { personal: 9, audience: 3, platform: 0 } }
  */
 router.get('/unread-count', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const { count, error } = await supabaseAdmin
+    const baseFilter = (q) => q
       .from('Notification')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('is_read', false);
 
-    if (error) {
-      logger.error('Error counting unread', { error: error.message });
+    const [totalRes, personalRes, audienceRes, platformRes] = await Promise.all([
+      baseFilter(supabaseAdmin),
+      baseFilter(supabaseAdmin).eq('context', 'personal'),
+      baseFilter(supabaseAdmin).eq('context', 'audience'),
+      baseFilter(supabaseAdmin).eq('context', 'platform'),
+    ]);
+
+    const firstError = [totalRes, personalRes, audienceRes, platformRes]
+      .map((r) => r && r.error)
+      .find(Boolean);
+    if (firstError) {
+      logger.error('Error counting unread', { error: firstError.message });
       return res.status(500).json({ error: 'Failed to count notifications' });
     }
 
-    res.json({ count: count || 0 });
+    const total = totalRes.count || 0;
+    const byContext = {
+      personal: personalRes.count || 0,
+      audience: audienceRes.count || 0,
+      platform: platformRes.count || 0,
+    };
+
+    res.json({ count: total, total, byContext });
   } catch (err) {
     logger.error('Unread count error', { error: err.message });
     res.status(500).json({ error: 'Failed to count notifications' });
@@ -284,17 +354,33 @@ router.patch('/:id/read', verifyToken, async (req, res) => {
 
 /**
  * POST /api/notifications/read-all
- * Mark all notifications as read for the current user.
+ * Mark all notifications as read for the current user. Optional body/query:
+ *   context | contexts | firewall — personal/audience/platform/all
+ *   context_type/context_id       — legacy personal/business sub-filter
  */
 router.post('/read-all', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
+    const contextType = req.query.context_type ?? req.body?.context_type;
+    const contextId = req.query.context_id ?? req.body?.context_id;
+    if (contextType && !LEGACY_CONTEXT_TYPES.includes(contextType)) {
+      return res.status(400).json({ error: 'invalid context_type' });
+    }
+    const parsed = parseFirewallFilter(req, { allowMultiple: true });
+    if (parsed.error) return res.status(400).json({ error: parsed.error });
 
-    const { error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('Notification')
       .update({ is_read: true })
       .eq('user_id', userId)
       .eq('is_read', false);
+    query = applyNotificationFilters(query, {
+      contextType,
+      contextId,
+      contexts: parsed.contexts,
+    });
+
+    const { error } = await query;
 
     if (error) {
       logger.error('Error marking all read', { error: error.message, userId });

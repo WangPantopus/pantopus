@@ -16,6 +16,7 @@
 const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('./logger');
 const { getActiveOccupancy, mapLegacyRole } = require('./homePermissions');
+const { isPersonaEnabled } = require('./featureFlags');
 
 // Radius in meters for "nearby" determination
 const NEARBY_RADIUS_METERS = 16000; // ~10 miles
@@ -270,9 +271,29 @@ async function getPostingIdentities(userId) {
       identities.push({
         type: 'personal',
         id: userId,
-        name: user.name || user.first_name || user.username || 'You',
+        name: user.name || user.first_name || user.username || 'Local Profile',
         imageUrl: user.profile_picture_url || null,
       });
+    }
+
+    // 1b) Beacon / Public Persona identity
+    if (isPersonaEnabled()) {
+      const { data: persona } = await supabaseAdmin
+        .from('PublicPersona')
+        .select('id, handle, display_name, avatar_url, status, audience_label')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (persona) {
+        identities.push({
+          type: 'persona',
+          id: persona.id,
+          name: persona.display_name || persona.handle || 'Beacon',
+          role: persona.audience_label || 'followers',
+          imageUrl: persona.avatar_url || null,
+        });
+      }
     }
 
     // 2) Business identities
@@ -385,6 +406,14 @@ async function getPostingIdentities(userId) {
  * @returns {{ allowed: boolean, reason?: string }}
  */
 function canPostToAudience({ postAs, audience, postType, trustLevel, homeId, roleBase }) {
+  if (postAs === 'persona') {
+    if (audience === 'followers' || audience === 'public') return { allowed: true };
+    return {
+      allowed: false,
+      reason: 'Beacon posts cannot be shared to local, household, nearby, or connection audiences.',
+    };
+  }
+
   // Rule A: General is banned from all local-public audiences
   const localPublicAudiences = ['nearby', 'neighborhood', 'saved_place', 'target_area'];
   if (localPublicAudiences.includes(audience) && postType === 'general') {

@@ -17,11 +17,19 @@ const {
   requireSupportTrainViewer,
 } = require('../middleware/supportTrainPermissions');
 const { emitSupportTrainEvent } = require('../services/supportTrainNotifications');
-const { sendGuestReservationConfirmationEmail } = require('../services/emailService');
+const {
+  sendGuestReservationAddressEmail,
+  sendGuestReservationConfirmationEmail,
+} = require('../services/emailService');
 const stripeService = require('../stripe/stripeService');
 const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('../utils/logger');
 const { applyLocationPrecision } = require('../utils/locationPrivacy');
+const {
+  countActiveReservationsForSlot,
+  listEffectivelyOpenSlots,
+  normalizeSlotsWithActiveReservations,
+} = require('../services/supportTrainSlotAvailability');
 
 /** PostGIS GEOGRAPHY Point WKT */
 function formatLocationForDB(latitude, longitude) {
@@ -110,6 +118,87 @@ async function hasSupportTrainAddressGrant(supportTrainId, granteeUserId) {
     .eq('grantee_user_id', granteeUserId);
 
   return (count || 0) > 0;
+}
+
+function normalizeEmail(email) {
+  return typeof email === 'string' ? email.trim().toLowerCase() : '';
+}
+
+function formatSupportTrainSlotDate(raw) {
+  if (!raw) return 'an upcoming date';
+  return new Date(`${raw}T00:00:00Z`).toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function formatSupportTrainSlotTime(slot) {
+  if (!slot) return null;
+  if (slot.start_time && slot.end_time) return `${slot.start_time} - ${slot.end_time}`;
+  if (slot.start_time) return `${slot.start_time}+`;
+  if (slot.end_time) return `Until ${slot.end_time}`;
+  return null;
+}
+
+function formatAddressLabel(address) {
+  if (!address) return '';
+  const firstLine = [address.address, address.unit_number].filter(Boolean).join(' ');
+  const secondLine = [address.city, address.state, address.zip_code].filter(Boolean).join(', ');
+  return [firstLine, secondLine].filter(Boolean).join('\n');
+}
+
+async function getSupportTrainExactDeliveryDetails(st, supportTrainId) {
+  const [{ data: profile }, homeResult] = await Promise.all([
+    supabaseAdmin
+      .from('SupportTrainRecipientProfile')
+      .select('delivery_instructions, special_instructions')
+      .eq('support_train_id', supportTrainId)
+      .single(),
+    (async () => {
+      const locationHomeId = st.recipient_home_id || st.Activity?.home_id || null;
+      if (!locationHomeId) return { data: null, error: null };
+      return supabaseAdmin
+        .from('Home')
+        .select('address, address2, city, state, zipcode')
+        .eq('id', locationHomeId)
+        .single();
+    })(),
+  ]);
+
+  if (homeResult.error) {
+    logger.warn('Failed to resolve Support Train exact address for guest email', {
+      supportTrainId,
+      error: homeResult.error.message,
+    });
+  }
+
+  let address = null;
+  if (homeResult.data) {
+    address = {
+      address: homeResult.data.address,
+      unit_number: homeResult.data.address2 || null,
+      city: homeResult.data.city,
+      state: homeResult.data.state,
+      zip_code: homeResult.data.zipcode || null,
+    };
+  } else if (st.delivery_address) {
+    address = {
+      address: st.delivery_address,
+      unit_number: null,
+      city: st.delivery_city,
+      state: st.delivery_state,
+      zip_code: st.delivery_zip || null,
+    };
+  }
+
+  return {
+    address,
+    addressLabel: formatAddressLabel(address),
+    deliveryInstructions: profile?.delivery_instructions || null,
+    specialInstructions: profile?.special_instructions || null,
+  };
 }
 
 // ─── Delivery location resolution ────────────────────────────────────────
@@ -2056,16 +2145,25 @@ router.post(
   asyncHandler(async (req, res) => {
     const st = req.supportTrain;
 
-    // Build open slots context
-    const { data: openSlots } = await supabaseAdmin
-      .from('SupportTrainSlot')
-      .select('slot_date, slot_label, support_mode')
-      .eq('support_train_id', st.id)
-      .eq('status', 'open')
-      .order('slot_date', { ascending: true })
-      .limit(20);
+    let slots;
+    try {
+      slots = (
+        await listEffectivelyOpenSlots({
+          supportTrainId: st.id,
+          columns:
+            'id, support_train_id, slot_date, slot_label, support_mode, status, capacity, filled_count',
+        })
+      ).slice(0, 20);
+    } catch (error) {
+      logger.error('Draft open slots nudge availability lookup failed', {
+        supportTrainId: st.id,
+        error: error.message,
+      });
+      return res
+        .status(500)
+        .json({ error: 'INTERNAL', message: 'Failed to load open slots.' });
+    }
 
-    const slots = openSlots || [];
     if (slots.length === 0) {
       return res.json({ message: 'All slots are filled — no nudge needed!' });
     }
@@ -2202,13 +2300,21 @@ router.post(
       return res.status(404).json({ error: 'NOT_FOUND', message: 'Slot not found.' });
     }
 
-    if (slot.status !== 'open') {
+    if (!['open', 'full'].includes(slot.status)) {
       return res
         .status(409)
         .json({ error: 'SLOT_NOT_OPEN', message: 'This slot is no longer open.' });
     }
 
-    if (slot.filled_count >= slot.capacity) {
+    let activeReservationCount;
+    try {
+      activeReservationCount = await countActiveReservationsForSlot(slotId);
+    } catch (error) {
+      logger.error('Reserve slot availability check failed', { slotId, error: error.message });
+      return res.status(500).json({ error: 'INTERNAL', message: 'Failed to verify slot availability.' });
+    }
+
+    if (activeReservationCount >= slot.capacity) {
       return res.status(409).json({ error: 'SLOT_FULL', message: 'This slot is already full.' });
     }
 
@@ -2259,7 +2365,7 @@ router.post(
     }
 
     // Increment filled_count and update slot status if full
-    const newFilledCount = slot.filled_count + 1;
+    const newFilledCount = activeReservationCount + 1;
     const slotPatch = { filled_count: newFilledCount };
     if (newFilledCount >= slot.capacity) {
       slotPatch.status = 'full';
@@ -2321,6 +2427,7 @@ router.post(
 const guestReserveSchema = Joi.object({
   guest_name: Joi.string().trim().min(1).max(100).required(),
   guest_email: Joi.string().email().max(320).required(),
+  allow_guest_for_existing_account: Joi.boolean().optional(),
   contribution_mode: Joi.string().valid('cook', 'takeout', 'groceries').required(),
   dish_title: Joi.string().max(200).allow(null, '').optional(),
   restaurant_name: Joi.string().max(200).allow(null, '').optional(),
@@ -2332,12 +2439,16 @@ const guestReserveSchema = Joi.object({
 router.post(
   '/:id/slots/:slotId/guest-reserve',
   supportTrainWriteLimiter,
+  optionalAuth,
   loadSupportTrain,
   validate(guestReserveSchema),
   asyncHandler(async (req, res) => {
     const st = req.supportTrain;
     const { slotId } = req.params;
     const body = req.body;
+    const guestEmail = normalizeEmail(body.guest_email);
+    const authenticatedUserId =
+      req.user?.id && normalizeEmail(req.user?.email) === guestEmail ? req.user.id : null;
 
     // Must be published or active
     if (st.status !== 'published' && st.status !== 'active') {
@@ -2380,14 +2491,133 @@ router.post(
       return res.status(404).json({ error: 'NOT_FOUND', message: 'Slot not found.' });
     }
 
-    if (slot.status !== 'open') {
+    if (!['open', 'full'].includes(slot.status)) {
       return res
         .status(409)
         .json({ error: 'SLOT_NOT_OPEN', message: 'This slot is no longer open.' });
     }
 
-    if (slot.filled_count >= slot.capacity) {
+    let activeReservationCount;
+    try {
+      activeReservationCount = await countActiveReservationsForSlot(slotId);
+    } catch (error) {
+      logger.error('Public reserve slot availability check failed', { slotId, error: error.message });
+      return res.status(500).json({ error: 'INTERNAL', message: 'Failed to verify slot availability.' });
+    }
+
+    if (activeReservationCount >= slot.capacity) {
       return res.status(409).json({ error: 'SLOT_FULL', message: 'This slot is already full.' });
+    }
+
+    if (authenticatedUserId) {
+      const { count: existingUserReservationCount } = await supabaseAdmin
+        .from('SupportTrainReservation')
+        .select('id', { count: 'exact', head: true })
+        .eq('slot_id', slotId)
+        .eq('user_id', authenticatedUserId)
+        .eq('status', 'reserved');
+
+      if ((existingUserReservationCount || 0) > 0) {
+        return res.status(409).json({
+          error: 'ALREADY_RESERVED',
+          message: 'You already have a reservation on this slot.',
+        });
+      }
+
+      const { data: userRow } = await supabaseAdmin
+        .from('User')
+        .select('name, username')
+        .eq('id', authenticatedUserId)
+        .maybeSingle();
+
+      const { data: reservation, error: resErr } = await supabaseAdmin
+        .from('SupportTrainReservation')
+        .insert({
+          slot_id: slotId,
+          support_train_id: st.id,
+          user_id: authenticatedUserId,
+          status: 'reserved',
+          contribution_mode: body.contribution_mode,
+          dish_title: body.dish_title || null,
+          restaurant_name: body.restaurant_name || null,
+          estimated_arrival_at: body.estimated_arrival_at || null,
+          note_to_recipient: body.note_to_recipient || null,
+          private_note_to_organizer: body.private_note_to_organizer || null,
+        })
+        .select('*')
+        .single();
+
+      if (resErr) {
+        if (resErr.code === '23505') {
+          return res
+            .status(409)
+            .json({ error: 'SLOT_FULL', message: 'This slot was just filled by another helper.' });
+        }
+        logger.error('Authenticated public reserve slot failed', {
+          slotId,
+          userId: authenticatedUserId,
+          error: resErr.message,
+        });
+        return res.status(500).json({ error: 'INTERNAL', message: 'Failed to reserve slot.' });
+      }
+
+      const newFilledCount = activeReservationCount + 1;
+      const slotPatch = { filled_count: newFilledCount };
+      if (newFilledCount >= slot.capacity) {
+        slotPatch.status = 'full';
+      }
+      await supabaseAdmin.from('SupportTrainSlot').update(slotPatch).eq('id', slotId);
+
+      if (st.status === 'published') {
+        const { count: totalRes } = await supabaseAdmin
+          .from('SupportTrainReservation')
+          .select('id', { count: 'exact', head: true })
+          .eq('support_train_id', st.id)
+          .eq('status', 'reserved');
+
+        if ((totalRes || 0) === 1) {
+          await supabaseAdmin.from('SupportTrain').update({ status: 'active' }).eq('id', st.id);
+          await supabaseAdmin
+            .from('Activity')
+            .update({ status: 'active' })
+            .eq('id', st.activity_id);
+        }
+      }
+
+      emitSupportTrainEvent({
+        event: 'support_train.slot_filled',
+        supportTrainId: st.id,
+        actorUserId: authenticatedUserId,
+        payload: {
+          slot_id: slotId,
+          slot_label: slot.slot_label,
+          slot_date: slot.slot_date,
+          helper_name: userRow?.name || userRow?.username || body.guest_name,
+        },
+      });
+
+      try {
+        const chatThreadId = req.activity?.chat_thread_id;
+        if (chatThreadId) {
+          await supabaseAdmin.from('ChatParticipant').upsert(
+            {
+              room_id: chatThreadId,
+              user_id: authenticatedUserId,
+              role: 'member',
+              is_active: true,
+            },
+            { onConflict: 'room_id,user_id' }
+          );
+        }
+      } catch (chatErr) {
+        logger.error('Add helper to chat failed (non-fatal)', {
+          supportTrainId: st.id,
+          userId: authenticatedUserId,
+          error: chatErr.message,
+        });
+      }
+
+      return res.status(201).json(reservation);
     }
 
     // Check if this guest email already has a reserved reservation on this slot
@@ -2395,13 +2625,38 @@ router.post(
       .from('SupportTrainReservation')
       .select('id', { count: 'exact', head: true })
       .eq('slot_id', slotId)
-      .eq('guest_email', body.guest_email.toLowerCase())
+      .eq('guest_email', guestEmail)
       .eq('status', 'reserved');
 
     if ((existingCount || 0) > 0) {
       return res.status(409).json({
         error: 'ALREADY_RESERVED',
         message: 'This email already has a reservation on this slot.',
+      });
+    }
+
+    const { data: existingUsers, error: existingUserErr } = await supabaseAdmin
+      .from('User')
+      .select('id, email')
+      .ilike('email', guestEmail)
+      .limit(10);
+
+    if (existingUserErr) {
+      logger.warn('Guest reserve existing-user lookup failed', {
+        guestEmail,
+        error: existingUserErr.message,
+      });
+    }
+
+    const existingUser = (existingUsers || []).find(
+      (user) => normalizeEmail(user.email) === guestEmail
+    );
+
+    if (existingUser && !body.allow_guest_for_existing_account) {
+      return res.status(409).json({
+        error: 'ACCOUNT_EXISTS',
+        message:
+          'This email has a Pantopus account. Sign in for chat and in-app location sharing, or continue with email.',
       });
     }
 
@@ -2413,7 +2668,7 @@ router.post(
         support_train_id: st.id,
         user_id: null,
         guest_name: body.guest_name,
-        guest_email: body.guest_email.toLowerCase(),
+        guest_email: guestEmail,
         status: 'reserved',
         contribution_mode: body.contribution_mode,
         dish_title: body.dish_title || null,
@@ -2433,14 +2688,14 @@ router.post(
       }
       logger.error('Guest reserve slot failed', {
         slotId,
-        guestEmail: body.guest_email,
+        guestEmail,
         error: resErr.message,
       });
       return res.status(500).json({ error: 'INTERNAL', message: 'Failed to reserve slot.' });
     }
 
     // Increment filled_count and update slot status if full
-    const newFilledCount = slot.filled_count + 1;
+    const newFilledCount = activeReservationCount + 1;
     const slotPatch = { filled_count: newFilledCount };
     if (newFilledCount >= slot.capacity) {
       slotPatch.status = 'full';
@@ -2476,28 +2731,20 @@ router.post(
 
     // Send confirmation email to the guest
     const trainTitle = st.Activity?.title || 'Support Train';
-    const slotDateLabel = slot.slot_date
-      ? new Date(`${slot.slot_date}T00:00:00Z`).toLocaleDateString('en-US', {
-          weekday: 'long',
-          month: 'long',
-          day: 'numeric',
-          timeZone: 'UTC',
-        })
-      : 'an upcoming date';
+    const slotDateLabel = formatSupportTrainSlotDate(slot.slot_date);
 
     sendGuestReservationConfirmationEmail({
-      toEmail: body.guest_email.toLowerCase(),
+      toEmail: guestEmail,
       guestName: body.guest_name,
       trainTitle,
       slotLabel: slot.slot_label || 'Support',
       slotDate: slotDateLabel,
-      slotTime:
-        slot.start_time && slot.end_time ? `${slot.start_time} - ${slot.end_time}` : null,
+      slotTime: formatSupportTrainSlotTime(slot),
       contributionMode: body.contribution_mode,
       supportTrainId: st.id,
     }).catch((err) => {
       logger.error('Guest confirmation email failed (non-fatal)', {
-        guestEmail: body.guest_email,
+        guestEmail,
         error: err.message,
       });
     });
@@ -2539,7 +2786,9 @@ router.post(
 
     const { data: reservation, error: resErr } = await supabaseAdmin
       .from('SupportTrainReservation')
-      .select('id, user_id, status, slot_id')
+      .select(
+        'id, user_id, guest_name, guest_email, guest_address_shared_at, guest_address_share_count, status, slot_id'
+      )
       .eq('id', reservationId)
       .eq('support_train_id', st.id)
       .single();
@@ -2548,17 +2797,105 @@ router.post(
       return res.status(404).json({ error: 'NOT_FOUND', message: 'Reservation not found.' });
     }
 
-    if (!reservation.user_id) {
-      return res.status(409).json({
-        error: 'NO_HELPER',
-        message: 'This reservation is not linked to a helper account.',
-      });
-    }
-
     if (reservation.status === 'canceled') {
       return res.status(409).json({
         error: 'INVALID_STATE',
         message: 'Cannot share the exact address for a canceled reservation.',
+      });
+    }
+
+    if (!reservation.user_id && !reservation.guest_email) {
+      return res.status(409).json({
+        error: 'NO_HELPER',
+        message: 'This reservation is not linked to a helper account or guest email.',
+      });
+    }
+
+    if (!reservation.user_id) {
+      const { data: slot } = await supabaseAdmin
+        .from('SupportTrainSlot')
+        .select('slot_date, slot_label, start_time, end_time')
+        .eq('id', reservation.slot_id)
+        .single();
+      const delivery = await getSupportTrainExactDeliveryDetails(st, st.id);
+
+      if (!delivery.addressLabel) {
+        return res.status(409).json({
+          error: 'ADDRESS_UNAVAILABLE',
+          message: 'This Support Train does not have an exact delivery address to share.',
+        });
+      }
+
+      const alreadyShared = !!reservation.guest_address_shared_at;
+      const emailResult = await sendGuestReservationAddressEmail({
+        toEmail: reservation.guest_email,
+        guestName: reservation.guest_name || 'there',
+        trainTitle: st.Activity?.title || 'Support Train',
+        slotLabel: slot?.slot_label || 'Support',
+        slotDate: formatSupportTrainSlotDate(slot?.slot_date),
+        slotTime: formatSupportTrainSlotTime(slot),
+        addressLabel: delivery.addressLabel,
+        deliveryInstructions: delivery.deliveryInstructions,
+        specialInstructions: delivery.specialInstructions,
+        supportTrainId: st.id,
+      });
+
+      if (!emailResult?.success) {
+        logger.error('Guest address email failed', {
+          supportTrainId: st.id,
+          reservationId: reservation.id,
+          guestEmail: reservation.guest_email,
+          error: emailResult?.error,
+        });
+        return res
+          .status(500)
+          .json({ error: 'INTERNAL', message: 'Failed to email the exact address.' });
+      }
+
+      const nextShareCount = (reservation.guest_address_share_count || 0) + 1;
+      const sharedAt = new Date().toISOString();
+      const { error: updateErr } = await supabaseAdmin
+        .from('SupportTrainReservation')
+        .update({
+          guest_address_shared_at: sharedAt,
+          guest_address_shared_by: userId,
+          guest_address_share_count: nextShareCount,
+        })
+        .eq('id', reservation.id);
+
+      if (updateErr) {
+        logger.error('Guest address share tracking update failed', {
+          supportTrainId: st.id,
+          reservationId: reservation.id,
+          guestEmail: reservation.guest_email,
+          error: updateErr.message,
+        });
+        return res.status(500).json({
+          error: 'INTERNAL',
+          message: 'The address email was sent, but sharing status could not be saved.',
+        });
+      }
+
+      emitSupportTrainEvent({
+        event: 'support_train.address_shared',
+        supportTrainId: st.id,
+        actorUserId: userId,
+        payload: {
+          guest_email: reservation.guest_email,
+          guest_name: reservation.guest_name || null,
+          reservation_id: reservation.id,
+          slot_id: reservation.slot_id,
+          slot_label: slot?.slot_label || null,
+          slot_date: slot?.slot_date || null,
+        },
+      });
+
+      return res.json({
+        shared: true,
+        already_shared: alreadyShared,
+        guest_email: reservation.guest_email,
+        guest_address_shared_at: sharedAt,
+        reservation_id: reservation.id,
       });
     }
 
@@ -2693,7 +3030,8 @@ router.post(
       return res.status(500).json({ error: 'INTERNAL', message: 'Failed to cancel reservation.' });
     }
 
-    // Decrement filled_count and reopen slot if it was full
+    // Recalculate filled_count from active reservations after cancellation. This
+    // avoids carrying forward stale denormalized slot counters.
     const { data: slot } = await supabaseAdmin
       .from('SupportTrainSlot')
       .select('id, slot_date, slot_label, filled_count, status, capacity')
@@ -2701,12 +3039,19 @@ router.post(
       .single();
 
     if (slot) {
-      const newCount = Math.max(0, slot.filled_count - 1);
-      const slotPatch = { filled_count: newCount };
-      if (slot.status === 'full' && newCount < slot.capacity) {
-        slotPatch.status = 'open';
+      try {
+        const newCount = await countActiveReservationsForSlot(slot.id);
+        const slotPatch = { filled_count: newCount };
+        if (['open', 'full'].includes(slot.status)) {
+          slotPatch.status = newCount >= slot.capacity ? 'full' : 'open';
+        }
+        await supabaseAdmin.from('SupportTrainSlot').update(slotPatch).eq('id', slot.id);
+      } catch (error) {
+        logger.error('Cancel reservation slot availability sync failed', {
+          slotId: slot.id,
+          error: error.message,
+        });
       }
-      await supabaseAdmin.from('SupportTrainSlot').update(slotPatch).eq('id', slot.id);
     }
 
     if (isOwner && !isOrganizer) {
@@ -3009,6 +3354,7 @@ router.get(
       id, slot_id, user_id, guest_name, guest_email, status, contribution_mode,
       dish_title, restaurant_name, estimated_arrival_at,
       note_to_recipient, private_note_to_organizer,
+      guest_address_shared_at, guest_address_shared_by, guest_address_share_count,
       created_at, updated_at, canceled_at,
       User:user_id ( id, username, name, profile_picture_url )
     `
@@ -3063,7 +3409,12 @@ router.get(
         canceled_at: r.canceled_at,
         guest_name: r.guest_name,
         guest_email: r.guest_email || null,
-        exact_address_shared: !!(r.user_id && sharedUserIds.has(r.user_id)),
+        guest_address_shared_at: r.guest_address_shared_at || null,
+        guest_address_shared_by: r.guest_address_shared_by || null,
+        guest_address_share_count: r.guest_address_share_count || 0,
+        exact_address_shared: r.user_id
+          ? sharedUserIds.has(r.user_id)
+          : !!r.guest_address_shared_at,
         user: r.User
           ? {
               id: r.User.id,
@@ -3233,6 +3584,15 @@ router.get(
     ]);
 
     const profile = profileRes.data;
+    let slots = slotsRes.data || [];
+    try {
+      slots = await normalizeSlotsWithActiveReservations(slots);
+    } catch (error) {
+      logger.error('Support Train slot availability normalization failed', {
+        supportTrainId,
+        error: error.message,
+      });
+    }
     const helperHasExactAddress =
       viewerLevel === 'signed_up_helper'
         ? await hasSupportTrainAddressGrant(supportTrainId, userId)
@@ -3245,6 +3605,47 @@ router.get(
     const activity = st.Activity;
     const chips = st.ai_draft_payload?.summary_chips || [];
     const locationHomeId = st.recipient_home_id || activity?.home_id || null;
+    const organizers = (organizersRes.data || []).map((o) => ({
+      id: o.id,
+      role: o.User?.id === st.organizer_user_id ? 'primary' : o.role,
+      user: o.User
+        ? {
+            id: o.User.id,
+            username: o.User.username,
+            name: o.User.name,
+            profile_picture_url: o.User.profile_picture_url,
+          }
+        : null,
+    }));
+    const primaryOrganizerIndex = organizers.findIndex(
+      (organizer) => organizer.user?.id === st.organizer_user_id
+    );
+
+    if (primaryOrganizerIndex > 0) {
+      const [primaryOrganizer] = organizers.splice(primaryOrganizerIndex, 1);
+      organizers.unshift(primaryOrganizer);
+    }
+
+    if (primaryOrganizerIndex === -1 && st.organizer_user_id) {
+      const { data: organizerUser } = await supabaseAdmin
+        .from('User')
+        .select('id, username, name, profile_picture_url')
+        .eq('id', st.organizer_user_id)
+        .maybeSingle();
+
+      if (organizerUser) {
+        organizers.unshift({
+          id: `primary-${organizerUser.id}`,
+          role: 'primary',
+          user: {
+            id: organizerUser.id,
+            username: organizerUser.username,
+            name: organizerUser.name,
+            profile_picture_url: organizerUser.profile_picture_url,
+          },
+        });
+      }
+    }
 
     const response = {
       id: st.id,
@@ -3278,7 +3679,7 @@ router.get(
       summary_chips: chips,
 
       // Slots
-      slots: slotsRes.data || [],
+      slots,
 
       // My reservations (used to render \"You're signed up\" on slots)
       my_reservations: myResRes.data || [],
@@ -3287,18 +3688,7 @@ router.get(
       updates: updatesRes.data || [],
 
       // Organizers (display info only)
-      organizers: (organizersRes.data || []).map((o) => ({
-        id: o.id,
-        role: o.role,
-        user: o.User
-          ? {
-              id: o.User.id,
-              username: o.User.username,
-              name: o.User.name,
-              profile_picture_url: o.User.profile_picture_url,
-            }
-          : null,
-      })),
+      organizers,
 
       viewer_level: viewerLevel,
       viewer_support_train_role: viewerSupportTrainRole,

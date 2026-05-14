@@ -23,7 +23,8 @@ const MAPBOX_AUTOCOMPLETE_RESPONSE = {
       id: 'address.12345',
       type: 'Feature',
       place_type: ['address'],
-      text: '123 Main St',
+      address: '123',
+      text: 'Main St',
       place_name: '123 Main St, Portland, Oregon 97201, United States',
       center: [-122.6784, 45.5152],
       context: [
@@ -57,7 +58,8 @@ const MAPBOX_REVERSE_RESPONSE = {
       id: 'address.99999',
       type: 'Feature',
       place_type: ['address'],
-      text: '456 Oak Ave',
+      address: '456',
+      text: 'Oak Ave',
       place_name: '456 Oak Ave, Seattle, Washington 98101, United States',
       center: [-122.3321, 47.6062],
       context: [
@@ -168,7 +170,7 @@ describe('MapboxProvider', () => {
       const { suggestions } = await mapboxProvider.autocomplete('123 Main');
       const first = suggestions[0];
 
-      expect(first.suggestion_id).toBe('address.12345');
+      expect(first.suggestion_id).toMatch(/^address\.12345::[a-f0-9]{12}$/);
       expect(first.primary_text).toBe('123 Main St');
       expect(first.label).toBe('123 Main St, Portland, Oregon 97201, United States');
       expect(first.center.lat).toBeCloseTo(45.5152);
@@ -217,10 +219,10 @@ describe('MapboxProvider', () => {
       mockFetchOk(MAPBOX_AUTOCOMPLETE_RESPONSE);
 
       // Autocomplete pre-populates the resolve cache
-      await mapboxProvider.autocomplete('123 Main St');
+      const { suggestions } = await mapboxProvider.autocomplete('123 Main St');
 
       // Resolve should return from cache — no additional fetch
-      const normalized = await mapboxProvider.resolve('address.12345');
+      const normalized = await mapboxProvider.resolve(suggestions[0].suggestion_id);
 
       expectNormalizedAddress(normalized);
       // Only one fetch call (the autocomplete), no second call for resolve
@@ -229,11 +231,11 @@ describe('MapboxProvider', () => {
 
     it('returns correct address fields from cached resolve', async () => {
       mockFetchOk(MAPBOX_AUTOCOMPLETE_RESPONSE);
-      await mapboxProvider.autocomplete('123 Main St');
+      const { suggestions } = await mapboxProvider.autocomplete('123 Main St');
 
-      const n = await mapboxProvider.resolve('address.12345');
+      const n = await mapboxProvider.resolve(suggestions[0].suggestion_id);
 
-      expect(n.address).toBe('123 Main St, Portland, Oregon 97201, United States');
+      expect(n.address).toBe('123 Main St');
       expect(n.city).toBe('Portland');
       expect(n.state).toBe('OR');
       expect(n.zipcode).toBe('97201');
@@ -248,7 +250,7 @@ describe('MapboxProvider', () => {
         features: [MAPBOX_AUTOCOMPLETE_RESPONSE.features[0]],
       });
 
-      const normalized = await mapboxProvider.resolve('address.12345');
+      const normalized = await mapboxProvider.resolve('address.12345::stalehash');
 
       expectNormalizedAddress(normalized);
       expect(global.fetch).toHaveBeenCalledTimes(1);

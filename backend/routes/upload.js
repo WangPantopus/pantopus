@@ -15,6 +15,8 @@ const logger = require('../utils/logger');
 const s3 = require('../services/s3Service');
 const imageResizeService = require('../services/marketplace/imageResizeService');
 const { calculateAndStoreCompleteness } = require('../utils/businessCompleteness');
+const { requirePersonaEnabled } = require('../utils/featureFlags');
+const { writeIdentityAuditLog } = require('../utils/identityAudit');
 
 // Rate limit: 30 uploads per 15 minutes per IP
 const uploadLimiter = rateLimit({
@@ -297,6 +299,106 @@ router.post('/profile-picture', uploadLimiter, verifyToken, upload.single('file'
   } catch (err) {
     logger.error('Profile picture upload error', { error: err.message });
     res.status(500).json({ error: err.message || 'Failed to upload profile picture' });
+  }
+});
+
+// ============ PERSONA MEDIA (avatar / banner) ============
+
+/**
+ * POST /api/upload/persona-media/:personaId
+ * Upload avatar or banner for a Beacon.
+ * Query param: type = "avatar" | "banner"
+ */
+router.post('/persona-media/:personaId', requirePersonaEnabled, uploadLimiter, verifyToken, upload.single('file'), enforceFileSizeLimits, validateAndStripUploads, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { personaId } = req.params;
+    const mediaType = req.query.type || req.body.type;
+
+    if (!['avatar', 'banner'].includes(mediaType)) {
+      return res.status(400).json({ error: 'type must be "avatar" or "banner"' });
+    }
+
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No file provided' });
+
+    if (!file.mimetype.startsWith('image/')) {
+      return res.status(400).json({ error: 'Beacon media must be an image' });
+    }
+
+    const { data: persona, error: personaErr } = await supabaseAdmin
+      .from('PublicPersona')
+      .select('id, user_id, handle, avatar_url, banner_url, status')
+      .eq('id', personaId)
+      .single();
+
+    if (personaErr || !persona) {
+      return res.status(404).json({ error: 'Beacon not found' });
+    }
+
+    if (persona.user_id !== userId) {
+      return res.status(403).json({ error: 'You do not have permission to edit this Beacon' });
+    }
+
+    let processedBuffer = file.buffer;
+    let finalMimeType = file.mimetype;
+    if (sharp) {
+      try {
+        const resize =
+          mediaType === 'avatar'
+            ? sharp(file.buffer).resize(800, 800, { fit: 'cover' })
+            : sharp(file.buffer).resize(1600, 600, { fit: 'cover' });
+        processedBuffer = await resize.webp({ quality: 85 }).toBuffer();
+        finalMimeType = 'image/webp';
+      } catch {
+        processedBuffer = file.buffer;
+      }
+    }
+
+    const ext = finalMimeType === 'image/webp'
+      ? 'webp'
+      : (path.extname(file.originalname || '').replace('.', '') || 'jpg').toLowerCase();
+    const key = `persona-media/${persona.id}/${mediaType}-${Date.now()}-${require('crypto').randomBytes(4).toString('hex')}.${ext}`;
+    const { url } = await s3.uploadToS3(processedBuffer, key, finalMimeType);
+
+    const updateField = mediaType === 'avatar' ? 'avatar_url' : 'banner_url';
+    const { data: updatedPersona, error: updateErr } = await supabaseAdmin
+      .from('PublicPersona')
+      .update({
+        [updateField]: url,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', persona.id)
+      .select('id, handle, avatar_url, banner_url')
+      .single();
+
+    if (updateErr) {
+      await s3.deleteFromS3(key);
+      return res.status(500).json({ error: `Failed to update ${mediaType}` });
+    }
+
+    await writeIdentityAuditLog({
+      actorUserId: userId,
+      targetUserId: userId,
+      personaId: persona.id,
+      action: `persona.${mediaType}_uploaded`,
+      targetType: 'PublicPersona',
+      targetId: persona.id,
+      metadata: { media_type: mediaType },
+      req,
+    });
+
+    logger.info('Persona media uploaded', { personaId: persona.id, mediaType, key });
+
+    return res.json({
+      message: `${mediaType} uploaded successfully`,
+      url,
+      key,
+      persona: updatedPersona,
+    });
+  } catch (err) {
+    logger.error('Persona media upload error', { error: err.message });
+    return res.status(500).json({ error: err.message || 'Failed to upload Beacon media' });
   }
 });
 
@@ -884,16 +986,18 @@ router.post('/post-media/:postId', uploadLimiter, verifyToken, upload.array('fil
       uploadedTypes.push(category === 'video' ? 'video' : 'image');
 
       // Generate resized variants (non-blocking on failure)
+      let thumbnailUrl = '';
       if (category === 'image') {
         try {
           const variants = await imageResizeService.processListingImage(file.buffer, key);
           if (variants && variants.thumb) {
-            thumbnailUrls.push(variants.thumb);
+            thumbnailUrl = variants.thumb;
           }
         } catch (resizeErr) {
           logger.warn('Post image resize failed, continuing', { postId, error: resizeErr.message });
         }
       }
+      thumbnailUrls.push(thumbnailUrl);
     }
 
     const newMediaUrls = [...(postRecord.media_urls || []), ...uploadedUrls];
@@ -909,9 +1013,8 @@ router.post('/post-media/:postId', uploadLimiter, verifyToken, upload.array('fil
       updated_at: new Date().toISOString(),
     };
 
-    if (thumbnailUrls.length > 0) {
-      updatePayload.media_thumbnails = [...(postRecord.media_thumbnails || []), ...thumbnailUrls];
-    }
+    const newMediaThumbnails = [...(postRecord.media_thumbnails || []), ...thumbnailUrls];
+    updatePayload.media_thumbnails = newMediaThumbnails;
 
     const { error: updateErr } = await supabaseAdmin
       .from('Post')
@@ -927,6 +1030,8 @@ router.post('/post-media/:postId', uploadLimiter, verifyToken, upload.array('fil
       message: `${uploadedUrls.length} file(s) uploaded successfully`,
       media_urls: newMediaUrls,
       media_types: newMediaTypes,
+      media_thumbnails: newMediaThumbnails,
+      media_live_urls: newMediaLiveUrls,
     });
   } catch (err) {
     logger.error('Post media upload error', { error: err.message });
@@ -1873,3 +1978,7 @@ router.post(
 );
 
 module.exports = router;
+// P2.12 — exported for direct unit testing of the EXIF strip pipeline.
+// The middleware (validateAndStripUploads) wraps stripImageMetadata
+// for every multipart upload so the same code path runs in production.
+module.exports.stripImageMetadata = stripImageMetadata;

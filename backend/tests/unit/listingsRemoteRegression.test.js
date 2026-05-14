@@ -136,4 +136,78 @@ describe('Listings Remote Regression', () => {
     expect(capturedParams.p_latitude).toBe(37.7749);
     expect(capturedParams.p_longitude).toBe(-122.4194);
   });
+
+  it('honors radiusMiles for nearby listing search when radius meters is absent', async () => {
+    let capturedParams = null;
+
+    setRpcMock((rpcName, params) => {
+      if (rpcName === 'find_listings_nearby_v2') {
+        capturedParams = params;
+        return { data: [], error: null };
+      }
+      return { data: null, error: null };
+    });
+
+    await request(app)
+      .get('/api/listings/nearby')
+      .query({
+        latitude: '37.7749',
+        longitude: '-122.4194',
+        radiusMiles: '1000',
+      })
+      .expect(200);
+
+    expect(capturedParams).toBeTruthy();
+    expect(capturedParams.p_radius_meters).toBe(1609340);
+  });
+
+  it('keeps radius meters precedence over radiusMiles for nearby listing search', async () => {
+    let capturedParams = null;
+
+    setRpcMock((rpcName, params) => {
+      if (rpcName === 'find_listings_nearby_v2') {
+        capturedParams = params;
+        return { data: [], error: null };
+      }
+      return { data: null, error: null };
+    });
+
+    await request(app)
+      .get('/api/listings/nearby')
+      .query({
+        latitude: '37.7749',
+        longitude: '-122.4194',
+        radius: '16000',
+        radiusMiles: '1000',
+      })
+      .expect(200);
+
+    expect(capturedParams).toBeTruthy();
+    expect(capturedParams.p_radius_meters).toBe(16000);
+  });
+
+  it('honors radiusMiles for location-aware listing search', async () => {
+    let capturedParams = null;
+
+    setRpcMock((rpcName, params) => {
+      if (rpcName === 'find_listings_nearby_v2') {
+        capturedParams = params;
+        return { data: [], error: null };
+      }
+      return { data: null, error: null };
+    });
+
+    await request(app)
+      .get('/api/listings/search')
+      .query({
+        q: 'lamp',
+        latitude: '37.7749',
+        longitude: '-122.4194',
+        radiusMiles: '25',
+      })
+      .expect(200);
+
+    expect(capturedParams).toBeTruthy();
+    expect(capturedParams.p_radius_meters).toBe(40234);
+  });
 });

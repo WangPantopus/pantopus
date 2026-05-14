@@ -142,6 +142,17 @@ The briefing scheduler publishes metrics to `Pantopus/Briefing/{environment}`:
      }'
    ```
 
+4. **Seed the Sports event registry** after applying the Sports topic migration:
+
+   ```bash
+   python scripts/seed_sports_events.py --dry-run   # verify rows first
+   python scripts/seed_sports_events.py
+   ```
+
+   The national Sports poster only runs while rows are active in
+   `sports_events` / `active_sports_events`. Re-run this script when major
+   event windows change or new events are added.
+
 ### Updating
 
 ```bash

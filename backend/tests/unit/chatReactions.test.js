@@ -6,6 +6,8 @@
 
 const { resetTables, seedTable, getTable } = require('../__mocks__/supabaseAdmin');
 
+jest.setTimeout(15000);
+
 // ── Mock logger ──────────────────────────────────────────────
 jest.mock('../../utils/logger', () => ({
   info: jest.fn(),

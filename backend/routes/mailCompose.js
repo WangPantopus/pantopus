@@ -17,6 +17,9 @@ const notificationService = require('../services/notificationService');
 // ─── Helpers ───────────────────────────────────────────────
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const HOME_ADDRESS_VERIFICATION_REQUIRED_CODE = 'HOME_ADDRESS_VERIFICATION_REQUIRED';
+const HOME_ADDRESS_VERIFICATION_REQUIRED_MESSAGE =
+  'Verify your home address before sending mail. Open Homes and finish address verification, then try sending again.';
 
 /**
  * Escape special characters for PostgREST ILIKE patterns.
@@ -63,6 +66,31 @@ async function getSenderHomeIds(userId) {
   }
 
   return Array.from(homeIdSet);
+}
+
+async function hasVerifiedSenderHome(userId) {
+  const [occupancyRes, ownerRes] = await Promise.allSettled([
+    supabaseAdmin
+      .from('HomeOccupancy')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .eq('verification_status', 'verified')
+      .limit(1),
+    supabaseAdmin
+      .from('HomeOwner')
+      .select('home_id')
+      .eq('subject_id', userId)
+      .eq('owner_status', 'verified')
+      .limit(1),
+  ]);
+
+  const verifiedOccupancies =
+    occupancyRes.status === 'fulfilled' ? occupancyRes.value?.data || [] : [];
+  const verifiedOwnerRows =
+    ownerRes.status === 'fulfilled' ? ownerRes.value?.data || [] : [];
+
+  return verifiedOccupancies.length > 0 || verifiedOwnerRows.length > 0;
 }
 
 /**
@@ -338,6 +366,15 @@ router.get('/home-context/:homeId', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'Home not found' });
     }
 
+    const senderHasVerifiedHome = await hasVerifiedSenderHome(senderId);
+    if (!senderHasVerifiedHome) {
+      return res.status(403).json({
+        error: HOME_ADDRESS_VERIFICATION_REQUIRED_MESSAGE,
+        message: HOME_ADDRESS_VERIFICATION_REQUIRED_MESSAGE,
+        code: HOME_ADDRESS_VERIFICATION_REQUIRED_CODE,
+      });
+    }
+
     // Verify sender has access: occupant, owner, or connected to a resident
     const senderHomeIds = await getSenderHomeIds(senderId);
     const isOccupantOrOwner = senderHomeIds.includes(homeId);
@@ -365,7 +402,10 @@ router.get('/home-context/:homeId', verifyToken, async (req, res) => {
     }
 
     if (!hasAccess) {
-      return res.status(403).json({ error: 'You do not have access to this home.' });
+      return res.status(403).json({
+        error: 'You do not have access to this home.',
+        code: 'MAILBOX_HOME_CONTEXT_FORBIDDEN',
+      });
     }
 
     // Get active occupants with user details

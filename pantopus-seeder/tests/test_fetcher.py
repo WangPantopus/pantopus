@@ -42,6 +42,7 @@ def _mock_supabase():
         chain.eq.return_value = chain
         chain.lt.return_value = chain
         chain.filter.return_value = chain
+        chain.is_.return_value = chain
         chain.limit.return_value = chain
 
         result = MagicMock()
@@ -81,7 +82,7 @@ def _make_region_config(region="test_region", **overrides):
 
 # Two default region configs matching the original REGIONS
 _TWO_REGIONS = [
-    _make_region_config("clark_county", lat=45.6387, lng=-122.6615, display_name="Clark County"),
+    _make_region_config("clark_county", lat=45.6387, lng=-122.6615, display_name="Clark County, WA"),
     _make_region_config("portland_metro", lat=45.5152, lng=-122.6784, display_name="Portland Metro"),
 ]
 
@@ -316,10 +317,16 @@ class TestFetcherHandler:
 
             handler({}, None)
 
-            # Hygiene calls: 3 deletes (filtered_out, skipped, posted) + 1 update (stale)
+            # Hygiene calls: 3 deletes (purge by status) + 5 stale updates:
+            # four per-category buckets (24h / 48h / 72h / 168h) + null-category.
             table_mock = sb.table.return_value
             assert table_mock.delete.called
             assert table_mock.update.called
+            stale_calls = [
+                c for c in table_mock.update.call_args_list
+                if c.args and c.args[0].get("failure_reason") == "stale"
+            ]
+            assert len(stale_calls) == 5
 
     def test_returns_correct_summary(self):
         one_region = [_make_region_config("test_region")]

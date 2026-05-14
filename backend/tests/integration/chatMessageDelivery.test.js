@@ -60,6 +60,9 @@ function seedBaseData() {
     { id: U1, username: 'alice', name: 'Alice', first_name: 'Alice', last_name: 'A', profile_picture_url: null, account_type: 'personal' },
     { id: U2, username: 'bob', name: 'Bob', first_name: 'Bob', last_name: 'B', profile_picture_url: null, account_type: 'personal' },
   ]);
+  seedTable('LocalProfile', [
+    { id: 'lp-u2', user_id: U2, handle: 'bob', display_name: 'Bobby Local', avatar_url: null },
+  ]);
   seedTable('ChatRoom', [ROOM_DIRECT_OBJ, ROOM_GROUP_OBJ]);
   seedTable('ChatParticipant', [
     { id: 'cp-1', room_id: ROOM_D, user_id: U1, role: 'member', is_active: true, unread_count: 0, last_read_at: '2026-01-01T00:00:00Z', joined_at: '2026-01-01T00:00:00Z', left_at: null, room: ROOM_DIRECT_OBJ, user: { id: U1, username: 'alice', name: 'Alice', profile_picture_url: null } },
@@ -572,7 +575,8 @@ describe('Unified conversations', () => {
     const personConv = res.body.conversations.find(c => c._type === 'conversation' && c.other_participant_id === U2);
     expect(personConv).toBeDefined();
     expect(personConv.room_ids).toContain(ROOM_D);
-    expect(personConv.other_participant_name).toBeTruthy();
+    expect(personConv.other_participant_name).toBe('Bobby Local');
+    expect(personConv.other_participant_name).not.toBe('Bob');
 
     // Should have a room entry for the group room
     const groupConv = res.body.conversations.find(c => c._type === 'room' && c.id === ROOM_GROUP);

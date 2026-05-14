@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createClient } = require('@supabase/supabase-js');
+const { createServerSupabaseClient } = require('../config/supabaseClient');
 const crypto = require('crypto');
 const { randomBytes } = crypto;
 const supabase = require('../config/supabase');
@@ -8,21 +8,386 @@ const supabaseAdmin = require('../config/supabaseAdmin');
 const { signUp, signIn } = require('../config/auth');
 const rateLimit = require('express-rate-limit');
 const verifyToken = require('../middleware/verifyToken');
+const optionalAuth = require('../middleware/optionalAuth');
 const validate = require('../middleware/validate');
 const Joi = require('joi');
 const logger = require('../utils/logger');
 const { getPublicResidencySummary } = require('../utils/publicResidencyProfile');
 const { generateCsrfToken } = require('../utils/csrf');
+const { isConnected, isSearchable, isScopedBlocked } = require('../utils/visibilityPolicy');
 const affinityService = require('../services/gig/affinityService');
 const inviteRewardService = require('../services/inviteRewardService');
+const emailService = require('../services/emailService');
+
+async function getOrCreateMailPreferences(userId) {
+  let { data: prefs, error } = await supabaseAdmin
+    .from('MailPreferences')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!prefs) {
+    const { data: created, error: createError } = await supabaseAdmin
+      .from('MailPreferences')
+      .insert({ user_id: userId })
+      .select('*')
+      .single();
+
+    if (createError) {
+      throw createError;
+    }
+    prefs = created;
+  }
+
+  return prefs;
+}
+
+function canViewProfile(viewerId, targetUserId, visibility = 'public') {
+  if (viewerId && viewerId === targetUserId) return true;
+  if (visibility === 'public') return true;
+  if (visibility === 'registered') return Boolean(viewerId);
+  return false;
+}
+
+const LOCAL_SEARCH_FIELDS = [
+  'handle',
+  'handle_normalized',
+  'display_name',
+  'tagline',
+  'public_city',
+  'public_state',
+  'public_neighborhood',
+];
+const LOCAL_PROFILE_SEARCH_SELECT = 'id, user_id, handle, handle_normalized, display_name, avatar_url, bio, tagline, public_city, public_state, public_neighborhood, show_neighborhood, profile_visibility, search_visibility';
+const USER_NAME_SEARCH_FIELDS = [
+  'name',
+  'first_name',
+  'middle_name',
+  'last_name',
+];
+const USER_NAME_SEARCH_SELECT = 'id, account_type, name, first_name, middle_name, last_name';
+
+function localSearchFieldsForProfile(profile) {
+  const fields = ['handle', 'handle_normalized', 'display_name', 'tagline'];
+  if (profile?.show_neighborhood === true) {
+    fields.push('public_city', 'public_state', 'public_neighborhood');
+  }
+  return fields;
+}
+
+function searchableProfileText(profile, fields) {
+  return fields
+    .map((field) => profile?.[field])
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+function searchableUserNameText(user) {
+  return USER_NAME_SEARCH_FIELDS
+    .map((field) => user?.[field])
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+function ilikePattern(value) {
+  const escaped = String(value || '').trim().replace(/[\\%_]/g, (match) => `\\${match}`);
+  return `%${escaped}%`;
+}
+
+function normalizeLocalProfileHandle(value) {
+  return String(value || '').trim().replace(/^@+/, '').toLowerCase();
+}
+
+async function getLocalProfileByLegacyRouteHandle(value) {
+  const raw = String(value || '').trim().replace(/^@+/, '');
+  const normalized = normalizeLocalProfileHandle(raw);
+  if (!normalized) return null;
+
+  const normalizedResult = await supabaseAdmin
+    .from('LocalProfile')
+    .select(LOCAL_PROFILE_SEARCH_SELECT)
+    .eq('handle_normalized', normalized)
+    .maybeSingle();
+
+  if (normalizedResult.error) {
+    logger.warn('Legacy profile local handle lookup error', { error: normalizedResult.error.message });
+  }
+  if (normalizedResult.data) return normalizedResult.data;
+
+  const exactResult = await supabaseAdmin
+    .from('LocalProfile')
+    .select(LOCAL_PROFILE_SEARCH_SELECT)
+    .eq('handle', raw)
+    .maybeSingle();
+
+  if (exactResult.error) {
+    logger.warn('Legacy profile local handle exact lookup error', { error: exactResult.error.message });
+  }
+  return exactResult.data || null;
+}
+
+async function getLocalProfileByLegacyRouteId(value) {
+  const id = String(value || '').trim();
+  if (!id) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from('LocalProfile')
+    .select(LOCAL_PROFILE_SEARCH_SELECT)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    logger.warn('Legacy profile local id lookup error', { error: error.message });
+  }
+  return data || null;
+}
+
+function matchesSearchTokens(profile, fields, tokens) {
+  const text = searchableProfileText(profile, fields);
+  return tokens.every((token) => text.includes(token));
+}
+
+function profileWithNameSearchText(profile, nameSearchText) {
+  if (!nameSearchText) return { profile, fields: localSearchFieldsForProfile(profile) };
+  return {
+    profile: {
+      ...profile,
+      __name_search_text: nameSearchText,
+    },
+    fields: [...localSearchFieldsForProfile(profile), '__name_search_text'],
+  };
+}
+
+function scoreLocalProfile(profile, fields, normalizedQuery, tokens) {
+  const handle = String(profile.handle_normalized || profile.handle || '').toLowerCase();
+  const displayName = String(profile.display_name || '').trim().toLowerCase();
+  const searchable = searchableProfileText(profile, fields);
+  let score = 4;
+  if (handle === normalizedQuery || displayName === normalizedQuery) {
+    score = 0;
+  } else if (handle.startsWith(normalizedQuery) || displayName.startsWith(normalizedQuery)) {
+    score = 1;
+  } else if (searchable.includes(normalizedQuery)) {
+    score = 2;
+  } else if (tokens.every((token) => searchable.includes(token))) {
+    score = 3;
+  }
+  return score;
+}
+
+async function getNameDiscoverableLocalCandidates({
+  queryText,
+  primaryToken,
+  tokens,
+  viewerId,
+  candidateLimit,
+}) {
+  const patterns = Array.from(new Set([queryText, primaryToken].filter(Boolean)));
+  const queries = [];
+  for (const pattern of patterns) {
+    for (const field of USER_NAME_SEARCH_FIELDS) {
+      queries.push(
+        supabaseAdmin
+          .from('User')
+          .select(USER_NAME_SEARCH_SELECT)
+          .ilike(field, ilikePattern(pattern))
+          .neq('id', viewerId)
+          .limit(candidateLimit),
+      );
+    }
+  }
+
+  const settled = await Promise.allSettled(queries);
+  const usersById = new Map();
+  for (const item of settled) {
+    if (item.status !== 'fulfilled') continue;
+    if (item.value?.error) {
+      logger.warn('User name search lookup error', { error: item.value.error.message });
+      continue;
+    }
+    for (const user of item.value?.data || []) {
+      if (user?.id && !usersById.has(user.id)) usersById.set(user.id, user);
+    }
+  }
+
+  const nameMatchedUsers = [...usersById.values()]
+    .map((user) => ({ user, nameSearchText: searchableUserNameText(user) }))
+    .filter(({ nameSearchText }) => tokens.every((token) => nameSearchText.includes(token)));
+
+  if (!nameMatchedUsers.length) return [];
+
+  const matchedUserIds = [...new Set(nameMatchedUsers.map(({ user }) => user.id).filter(Boolean))];
+  const { data: privacyRows, error: privacyError } = await supabaseAdmin
+    .from('UserPrivacySettings')
+    .select('user_id, findable_by_name')
+    .in('user_id', matchedUserIds)
+    .eq('findable_by_name', true);
+
+  if (privacyError) {
+    logger.warn('User name search privacy lookup error', { error: privacyError.message });
+    return [];
+  }
+
+  const nameFindableUserIds = new Set((privacyRows || []).map((row) => row.user_id));
+  const findableUsers = nameMatchedUsers.filter(({ user }) => nameFindableUserIds.has(user.id));
+  if (!findableUsers.length) return [];
+
+  const userById = new Map(findableUsers.map(({ user, nameSearchText }) => [user.id, { user, nameSearchText }]));
+  const { data: profiles, error: profileError } = await supabaseAdmin
+    .from('LocalProfile')
+    .select(LOCAL_PROFILE_SEARCH_SELECT)
+    .in('user_id', [...userById.keys()])
+    .limit(candidateLimit);
+
+  if (profileError) {
+    logger.warn('User name search local profile lookup error', { error: profileError.message });
+    return [];
+  }
+
+  return (profiles || [])
+    .map((profile) => {
+      const match = userById.get(profile.user_id);
+      if (!match) return null;
+      return {
+        profile,
+        account: {
+          id: match.user.id,
+          account_type: match.user.account_type,
+        },
+        nameSearchText: match.nameSearchText,
+      };
+    })
+    .filter(Boolean);
+}
+
+async function canDiscoverLocalProfileForUserSearch(profile, viewerId) {
+  if (!profile?.user_id || profile.user_id === viewerId) return false;
+  if (!(await isSearchable(viewerId, profile.user_id))) return false;
+  if (await isScopedBlocked(viewerId, profile.user_id, 'search_only')) return false;
+
+  const searchVisibility = profile.search_visibility || 'everyone';
+  if (searchVisibility === 'nobody') return false;
+  if (searchVisibility === 'mutuals' && !(await isConnected(viewerId, profile.user_id))) {
+    return false;
+  }
+
+  const profileVisibility = profile.profile_visibility || 'public';
+  if (profileVisibility === 'private') return false;
+  if (profileVisibility === 'connections' && !(await isConnected(viewerId, profile.user_id))) {
+    return false;
+  }
+  // Legacy 'followers' value is treated as 'connections' after peer-follow removal.
+  if (profileVisibility === 'followers' && !(await isConnected(viewerId, profile.user_id))) {
+    return false;
+  }
+
+  return true;
+}
+
+function serializeCompatibilitySearchUser(profile, user = {}) {
+  const showLocality = profile.show_neighborhood === true;
+  const accountType = user.account_type || profile.account_type || 'individual';
+  return {
+    id: profile.user_id,
+    username: profile.handle,
+    name: profile.display_name || profile.handle,
+    profilePicture: profile.avatar_url || null,
+    city: showLocality ? (profile.public_city || null) : null,
+    state: showLocality ? (profile.public_state || null) : null,
+    accountType,
+    followersCount: 0,
+    type: 'local_profile',
+    localProfileId: profile.id,
+    href: profile.handle ? `/${profile.handle}` : null,
+  };
+}
+
+async function canAccessPublicUserProfile(viewerId, targetUserId, visibility = 'public') {
+  if (viewerId && viewerId === targetUserId) return true;
+  if (!canViewProfile(viewerId, targetUserId, visibility)) return false;
+  if (!(await isSearchable(viewerId, targetUserId))) return false;
+  if (viewerId && await isScopedBlocked(viewerId, targetUserId, 'any')) return false;
+  return true;
+}
+
+async function canAccessLegacyLocalProfileRoute(profile, viewerId, userData) {
+  if (!profile?.user_id) return false;
+  if (viewerId && viewerId === profile.user_id) return true;
+  if (!(await canAccessPublicUserProfile(viewerId, profile.user_id, userData?.profile_visibility || 'public'))) {
+    return false;
+  }
+  return canDiscoverLocalProfileForUserSearch(profile, viewerId);
+}
+
+function applyLocalProfilePublicOverlay(userData, localProfile) {
+  if (!localProfile) return userData;
+  const showLocality = localProfile.show_neighborhood === true;
+  const publicUsername = localProfile.handle || userData.username;
+  return {
+    ...userData,
+    username: publicUsername,
+    name: localProfile.display_name || userData.name,
+    bio: localProfile.bio ?? userData.bio,
+    tagline: localProfile.tagline ?? userData.tagline,
+    profile_picture_url: localProfile.avatar_url || userData.profile_picture_url,
+    city: showLocality ? (localProfile.public_city || null) : null,
+    state: showLocality ? (localProfile.public_state || null) : null,
+  };
+}
+
+const PUBLIC_USER_PROFILE_SELECT = [
+  'id',
+  'username',
+  'name',
+  'first_name',
+  'last_name',
+  'email',
+  'phone_number',
+  'bio',
+  'tagline',
+  'profile_picture_url',
+  'city',
+  'state',
+  'account_type',
+  'verified',
+  'profile_visibility',
+  'show_email',
+  'show_phone',
+  'created_at',
+  'average_rating',
+  'followers_count',
+  'social_links',
+].join(', ');
+
+const FOLLOW_USER_SELECT = 'id, username, name, first_name, last_name, profile_picture_url, city, state, account_type';
 
 // ── Auth cookie helpers (AUTH-3.3) ──────────────────────────
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+// Avoid a shared in-process Supabase session on the server (login/refresh/OAuth).
+const SUPABASE_AUTH_CLIENT_OPTIONS = {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
+};
+
+function createAuthClient() {
+  return createServerSupabaseClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY,
+    SUPABASE_AUTH_CLIENT_OPTIONS
+  );
+}
 
 /**
  * Set httpOnly auth cookies + non-httpOnly CSRF cookie on the response.
- * Also returns tokens in JSON body for mobile backward compat.
  */
 function setAuthCookies(res, accessToken, refreshToken, userId) {
   res.cookie('pantopus_access', accessToken, {
@@ -82,6 +447,84 @@ function clearAuthCookies(res) {
   res.clearCookie('pantopus_refresh', { path: '/api/users/refresh' });
   res.clearCookie('pantopus_csrf', { path: '/' });
   res.clearCookie('pantopus_session', { path: '/' });
+}
+
+function applyAuthTransport(req, res, accessToken, refreshToken, userId) {
+  if (isCookieTransport(req)) {
+    setAuthCookies(res, accessToken, refreshToken, userId);
+    return;
+  }
+
+  // Mobile uses Bearer tokens persisted in SecureStore. Clear any old cookies
+  // that CFNetwork / native cookie jars may send so they cannot shadow the
+  // current refresh token in the JSON body on future refreshes.
+  clearAuthCookies(res);
+}
+
+// Web: refresh lives in httpOnly cookie only. Mobile: ignore that cookie so a stale jar cannot win.
+function getRefreshTokenFromRequest(req) {
+  if (isCookieTransport(req)) {
+    return req.cookies?.pantopus_refresh;
+  }
+
+  return req.body?.refreshToken || req.body?.refresh_token;
+}
+
+function getHeader(req, name) {
+  if (typeof req.get === 'function') return req.get(name);
+  const key = String(name || '').toLowerCase();
+  return req.headers?.[key] || req.headers?.[name];
+}
+
+function getBearerToken(req) {
+  const authHeader = getHeader(req, 'authorization');
+  if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  return authHeader.slice(7).trim() || null;
+}
+
+// Body before cookie: native apps can POST explicit tokens while the cookie jar is stale.
+function getLogoutAccessToken(req) {
+  return (
+    getBearerToken(req) ||
+    req.body?.accessToken ||
+    req.body?.access_token ||
+    req.cookies?.pantopus_access ||
+    null
+  );
+}
+
+// Admin sign-out with scope 'local' revokes only this access JWT (not every device).
+async function revokeSessionByAccessToken(accessToken, context = {}) {
+  if (!accessToken || typeof accessToken !== 'string') return false;
+
+  try {
+    const { error } = await supabaseAdmin.auth.admin.signOut(accessToken, 'local');
+    if (error) {
+      const status = Number(error.status);
+      if ([401, 403, 404].includes(status)) {
+        logger.info('auth.session_revoke_already_invalid', {
+          ...context,
+          status,
+        });
+        return true;
+      }
+      logger.warn('auth.session_revoke_failed', {
+        ...context,
+        error: error.message,
+        status,
+      });
+      return false;
+    }
+    return true;
+  } catch (err) {
+    logger.warn('auth.session_revoke_error', {
+      ...context,
+      error: err.message,
+    });
+    return false;
+  }
 }
 
 // ============ RATE LIMITERS ============
@@ -313,7 +756,7 @@ const verifyEmailSchema = Joi.object({
   tokenHash: Joi.string().optional(),
   token: Joi.string().optional(),
   email: Joi.string().email().optional(),
-  type: Joi.string().valid('signup', 'email').default('signup'),
+  type: Joi.string().valid('signup', 'email', 'magiclink').default('signup'),
 }).or('tokenHash', 'token');
 
 // Optional: loose URL validation (allows empty string / null for clearing)
@@ -348,6 +791,17 @@ const updateProfileSchema = Joi.object({
 
   // Profile visibility (stealth mode)
   profileVisibility: Joi.string().valid('public', 'registered', 'private'),
+  profile_visibility: Joi.string().valid('public', 'registered', 'private'),
+
+  // Settings aliases used by web/mobile settings screens.
+  showEmail: Joi.boolean(),
+  show_email: Joi.boolean(),
+  showPhone: Joi.boolean(),
+  show_phone: Joi.boolean(),
+  emailNotifications: Joi.boolean(),
+  email_notifications: Joi.boolean(),
+  pushNotifications: Joi.boolean(),
+  push_notifications: Joi.boolean(),
 }).min(1);
 
 function getAuthProviders(authUser) {
@@ -529,12 +983,62 @@ const isTransientFetchError = (err) => {
   );
 };
 
+/**
+ * Build a verify-email URL that points at our own frontend page, carrying
+ * the hashed OTP token (from supabaseAdmin.auth.admin.generateLink). Clicking
+ * this lands the user on /verify-email, which calls POST /api/users/verify-email,
+ * which calls supabase.auth.verifyOtp. This keeps verification off Supabase's
+ * shared mail sender so we can brand the email and improve deliverability.
+ */
+function buildVerifyEmailUrl(req, hashedToken, email, type = 'signup') {
+  const base = getAuthRedirectBaseUrl(req);
+  const params = new URLSearchParams({
+    token_hash: hashedToken,
+    type,
+  });
+  if (email) params.set('email', email);
+  return `${base}/verify-email?${params.toString()}`;
+}
+
+/**
+ * Build a password-reset URL for our own frontend. Supabase still mints and
+ * verifies the recovery token_hash, but users never see a Supabase action_link.
+ */
+function buildPasswordResetUrl(req, hashedToken, email) {
+  const base = getAuthRedirectBaseUrl(req);
+  const params = new URLSearchParams({
+    token_hash: hashedToken,
+    type: 'recovery',
+  });
+  if (email) params.set('email', email);
+  return `${base}/reset-password?${params.toString()}`;
+}
+
+/**
+ * Create a new auth user via the admin generateLink flow, which returns a
+ * verification link without triggering Supabase's own email sender. The caller
+ * sends the email via our SMTP using the returned `hashedToken`.
+ *
+ * Normalizes the response to { data: { user, session, hashedToken, actionLink }, error }
+ * so the caller can still read data.user.id, data.user.email_confirmed_at, etc.
+ */
 const signUpWithRetry = async (payload) => {
+  const { email, password, options = {} } = payload;
+  const generatePayload = {
+    type: 'signup',
+    email,
+    password,
+    options: {
+      data: options.data,
+      redirectTo: options.emailRedirectTo,
+    },
+  };
+
   let lastThrown;
 
   for (let attempt = 1; attempt <= REGISTRATION_AUTH_RETRY_ATTEMPTS; attempt++) {
     try {
-      const result = await supabase.auth.signUp(payload);
+      const result = await supabaseAdmin.auth.admin.generateLink(generatePayload);
 
       if (
         result?.error &&
@@ -550,7 +1054,19 @@ const signUpWithRetry = async (payload) => {
         continue;
       }
 
-      return result;
+      if (result?.error) {
+        return { data: null, error: result.error };
+      }
+
+      return {
+        data: {
+          user: result.data?.user || null,
+          session: null,
+          hashedToken: result.data?.properties?.hashed_token || null,
+          actionLink: result.data?.properties?.action_link || null,
+        },
+        error: null,
+      };
     } catch (err) {
       lastThrown = err;
       if (!isTransientFetchError(err) || attempt >= REGISTRATION_AUTH_RETRY_ATTEMPTS) {
@@ -897,6 +1413,27 @@ router.post(
         }
       }
 
+      // ============ SEND VERIFICATION EMAIL ============
+      // Sent through our own SMTP (admin.generateLink already returned
+      // the hashed token when the auth user was created).
+      if (authData.hashedToken) {
+        try {
+          const verifyLink = buildVerifyEmailUrl(req, authData.hashedToken, email, 'signup');
+          const sendResult = await emailService.sendVerificationEmail({
+            toEmail: email,
+            verifyLink,
+            isResend: false,
+          });
+          if (!sendResult?.success) {
+            logger.error('Verification email send failed', { email, error: sendResult?.error });
+          }
+        } catch (mailErr) {
+          logger.error('Verification email send threw', { email, error: mailErr.message });
+        }
+      } else {
+        logger.error('No hashedToken from signup — verification email not sent', { email });
+      }
+
       res.status(201).json({
         message: 'Registration successful. Please verify your email before signing in.',
         requiresEmailVerification: true,
@@ -958,7 +1495,8 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res) => {
   logger.info('Login attempt', { email });
 
   try {
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    const authClient = createAuthClient();
+    const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
       email,
       password,
     });
@@ -982,7 +1520,10 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res) => {
 
     if (!authData.user.email_confirmed_at) {
       logger.warn('Login blocked - email not verified', { email });
-      await supabase.auth.signOut();
+      await revokeSessionByAccessToken(authData.session.access_token, {
+        source: 'login_unverified',
+        userId: authData.user.id,
+      });
       return res.status(403).json({
         error: 'Please verify your email before signing in.',
         needsVerification: true,
@@ -991,7 +1532,8 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res) => {
 
     const userId = authData.user.id;
 
-    const { data: userData, error: userError } = await supabase
+    // Use service role to fetch the profile row reliably (RLS may block anon reads).
+    const { data: userData, error: userError } = await supabaseAdmin
       .from('User')
       .select(`
         id,
@@ -1012,15 +1554,22 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res) => {
         created_at
       `)
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (userError || !userData) {
       logger.error('User profile not found', {
         userId,
         error: userError?.message,
       });
-      return res.status(500).json({
-        error: 'User profile not found. Please contact support.',
+      // Auth succeeded but app profile is missing/inaccessible; revoke the just-issued session.
+      await revokeSessionByAccessToken(authData.session.access_token, {
+        source: 'login_missing_profile',
+        userId,
+      });
+      clearAuthCookies(res);
+      return res.status(404).json({
+        error: 'User profile not found',
+        code: 'PROFILE_NOT_FOUND',
       });
     }
 
@@ -1049,8 +1598,7 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res) => {
       username: userData.username,
     });
 
-    // Set auth cookies for web clients (AUTH-3.3)
-    setAuthCookies(res, authData.session.access_token, authData.session.refresh_token, userId);
+    applyAuthTransport(req, res, authData.session.access_token, authData.session.refresh_token, userId);
 
     // Web clients get tokens via httpOnly cookies; omit from body to reduce XSS exposure.
     const tokenFields = isCookieTransport(req) ? {} : {
@@ -1107,11 +1655,7 @@ router.post('/reauthenticate', verifyToken, reauthLimiter, validate(reauthentica
     });
   }
 
-  const scopedClient = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  );
+  const scopedClient = createAuthClient();
 
   try {
     const { data: authData, error: authError } = await scopedClient.auth.signInWithPassword({
@@ -1162,13 +1706,13 @@ router.post('/reauthenticate', verifyToken, reauthLimiter, validate(reauthentica
     }
 
     if (!sessionRevoked) {
-      try {
-        await supabaseAdmin.auth.admin.signOut(authData.session.access_token, 'local');
-        sessionRevoked = true;
-      } catch (adminSignOutError) {
+      sessionRevoked = await revokeSessionByAccessToken(authData.session.access_token, {
+        source: 'reauthenticate_temp_session',
+        userId,
+      });
+      if (!sessionRevoked) {
         logger.error('Admin sign-out of temporary re-auth session also failed — dangling session', {
           userId,
-          error: adminSignOutError.message,
         });
       }
     }
@@ -1264,11 +1808,7 @@ router.post('/password', verifyToken, reauthLimiter, validate(updatePasswordSche
         });
       }
 
-      const scopedClient = createClient(
-        process.env.SUPABASE_URL,
-        process.env.SUPABASE_ANON_KEY,
-        { auth: { persistSession: false, autoRefreshToken: false } }
-      );
+      const scopedClient = createAuthClient();
 
       const { data: authData, error: authError } = await scopedClient.auth.signInWithPassword({
         email,
@@ -1305,13 +1845,13 @@ router.post('/password', verifyToken, reauthLimiter, validate(updatePasswordSche
       }
 
       if (!sessionRevoked) {
-        try {
-          await supabaseAdmin.auth.admin.signOut(authData.session.access_token, 'local');
-          sessionRevoked = true;
-        } catch (adminSignOutError) {
+        sessionRevoked = await revokeSessionByAccessToken(authData.session.access_token, {
+          source: 'password_update_temp_session',
+          userId,
+        });
+        if (!sessionRevoked) {
           logger.error('Admin sign-out of temporary password-update session also failed — dangling session', {
             userId,
-            error: adminSignOutError.message,
           });
         }
       }
@@ -1368,17 +1908,13 @@ router.post('/password', verifyToken, reauthLimiter, validate(updatePasswordSche
  * Enables persistent sessions: clients store refresh_token and call this when access token expires.
  */
 router.post('/refresh', refreshLimiter, async (req, res) => {
-  const refreshToken = req.cookies?.pantopus_refresh || req.body?.refreshToken || req.body?.refresh_token;
+  const refreshToken = getRefreshTokenFromRequest(req);
   if (!refreshToken || typeof refreshToken !== 'string') {
     return res.status(400).json({ error: 'refreshToken is required' });
   }
 
   try {
-    const scopedClient = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY,
-      { auth: { persistSession: false, autoRefreshToken: false } }
-    );
+    const scopedClient = createAuthClient();
     const { data, error } = await scopedClient.auth.refreshSession({ refresh_token: refreshToken });
 
     if (error) {
@@ -1403,8 +1939,7 @@ router.post('/refresh', refreshLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Invalid session' });
     }
 
-    // Set refreshed auth cookies for web clients (AUTH-3.3)
-    setAuthCookies(res, session.access_token, session.refresh_token, data.user?.id);
+    applyAuthTransport(req, res, session.access_token, session.refresh_token, data.user?.id);
 
     const tokenFields = isCookieTransport(req) ? {} : {
       accessToken: session.access_token,
@@ -1440,13 +1975,14 @@ router.get('/profile', verifyToken, async (req, res) => {
     }
 
     // Fetch skills and invite progress in parallel
-    const [skillsResult, inviteProgress] = await Promise.all([
+    const [skillsResult, inviteProgress, mailPrefs] = await Promise.all([
       supabaseAdmin
         .from('UserSkill')
         .select('skill_name')
         .eq('user_id', userId)
         .order('display_order', { ascending: true }),
       inviteRewardService.getInviteProgress(userId),
+      getOrCreateMailPreferences(userId),
     ]);
     const userSkills = skillsResult.data;
 
@@ -1480,11 +2016,24 @@ router.get('/profile', verifyToken, async (req, res) => {
         tagline: userData.tagline || null,
         socialLinks: userData.social_links || {},
         skills: (userSkills || []).map(s => s.skill_name),
-        followers_count: userData.followers_count || 0,
         average_rating: userData.average_rating || 0,
         gigs_posted: userData.gigs_posted || 0,
         gigs_completed: userData.gigs_completed || 0,
         profileVisibility: userData.profile_visibility || 'public',
+        profile_visibility: userData.profile_visibility || 'public',
+        showEmail: userData.show_email || false,
+        show_email: userData.show_email || false,
+        showPhone: userData.show_phone || false,
+        show_phone: userData.show_phone || false,
+        email_notifications: mailPrefs.email_notifications ?? true,
+        push_notifications: mailPrefs.push_notifications ?? true,
+        settings: {
+          emailNotifications: mailPrefs.email_notifications ?? true,
+          pushNotifications: mailPrefs.push_notifications ?? true,
+          profileVisibility: userData.profile_visibility || 'public',
+          showEmail: userData.show_email || false,
+          showPhone: userData.show_phone || false,
+        },
         createdAt: userData.created_at,
         updatedAt: userData.updated_at,
       },
@@ -1522,8 +2071,16 @@ router.patch('/profile', verifyToken, validate(updateProfileSchema), async (req,
     if (req.body.bio !== undefined) updates.bio = req.body.bio || null;
     if (req.body.tagline !== undefined) updates.tagline = req.body.tagline || null;
 
-    // Profile visibility (stealth mode)
-    if (req.body.profileVisibility !== undefined) updates.profile_visibility = req.body.profileVisibility;
+    // Profile visibility and contact visibility.
+    const profileVisibility = req.body.profileVisibility ?? req.body.profile_visibility;
+    const showEmail = req.body.showEmail ?? req.body.show_email;
+    const showPhone = req.body.showPhone ?? req.body.show_phone;
+    const emailNotifications = req.body.emailNotifications ?? req.body.email_notifications;
+    const pushNotifications = req.body.pushNotifications ?? req.body.push_notifications;
+
+    if (profileVisibility !== undefined) updates.profile_visibility = profileVisibility;
+    if (showEmail !== undefined) updates.show_email = showEmail;
+    if (showPhone !== undefined) updates.show_phone = showPhone;
 
     // If name parts changed, rebuild full name
     if (req.body.firstName !== undefined || req.body.middleName !== undefined || req.body.lastName !== undefined) {
@@ -1605,6 +2162,31 @@ router.patch('/profile', verifyToken, validate(updateProfileSchema), async (req,
       return res.status(500).json({ error: 'Failed to update profile' });
     }
 
+    let mailPrefs = null;
+    if (emailNotifications !== undefined || pushNotifications !== undefined) {
+      const preferenceUpdates = {
+        user_id: userId,
+        updated_at: new Date().toISOString(),
+      };
+      if (emailNotifications !== undefined) preferenceUpdates.email_notifications = emailNotifications;
+      if (pushNotifications !== undefined) preferenceUpdates.push_notifications = pushNotifications;
+
+      const { data: prefs, error: prefsError } = await supabaseAdmin
+        .from('MailPreferences')
+        .upsert(preferenceUpdates, { onConflict: 'user_id' })
+        .select('*')
+        .single();
+
+      if (prefsError) {
+        logger.error('Profile settings update error', { error: prefsError.message, userId });
+        return res.status(500).json({ error: 'Failed to update notification settings' });
+      }
+
+      mailPrefs = prefs;
+    } else {
+      mailPrefs = await getOrCreateMailPreferences(userId);
+    }
+
     logger.info('Profile updated', { userId });
 
     res.json({
@@ -1629,6 +2211,20 @@ router.patch('/profile', verifyToken, validate(updateProfileSchema), async (req,
         tagline: userData.tagline,
         socialLinks: userData.social_links || {},
         profileVisibility: userData.profile_visibility || 'public',
+        profile_visibility: userData.profile_visibility || 'public',
+        showEmail: userData.show_email || false,
+        show_email: userData.show_email || false,
+        showPhone: userData.show_phone || false,
+        show_phone: userData.show_phone || false,
+        email_notifications: mailPrefs.email_notifications ?? true,
+        push_notifications: mailPrefs.push_notifications ?? true,
+        settings: {
+          emailNotifications: mailPrefs.email_notifications ?? true,
+          pushNotifications: mailPrefs.push_notifications ?? true,
+          profileVisibility: userData.profile_visibility || 'public',
+          showEmail: userData.show_email || false,
+          showPhone: userData.show_phone || false,
+        },
 
         updatedAt: userData.updated_at,
       },
@@ -1765,7 +2361,7 @@ router.delete('/skills/:skillId', verifyToken, async (req, res) => {
 
 /**
  * GET /api/users/search?q=<query>&limit=5&type=all|people|business
- * Search users by username/name/email for discovery and invite flows.
+ * Search users by public account fields for discovery and invite flows.
  * Returns basic public info only.
  */
 router.get('/search', verifyToken, async (req, res) => {
@@ -1789,22 +2385,16 @@ router.get('/search', verifyToken, async (req, res) => {
     const fullSearchTerm = `%${queryText}%`;
     const broadSearchTerm = `%${primaryToken}%`;
     const candidateLimit = Math.min(Math.max(limit * 8, 40), 200);
+    const searchFilters = LOCAL_SEARCH_FIELDS
+      .flatMap((field) => [`${field}.ilike.${fullSearchTerm}`, `${field}.ilike.${broadSearchTerm}`])
+      .join(',');
 
-    let query = supabaseAdmin
-      .from('User')
-      .select('id, username, name, first_name, last_name, profile_picture_url, city, state, email, account_type, followers_count')
-      .or(
-        `username.ilike.${fullSearchTerm},name.ilike.${fullSearchTerm},first_name.ilike.${fullSearchTerm},last_name.ilike.${fullSearchTerm},email.ilike.${fullSearchTerm},username.ilike.${broadSearchTerm},name.ilike.${broadSearchTerm},first_name.ilike.${broadSearchTerm},last_name.ilike.${broadSearchTerm},email.ilike.${broadSearchTerm}`
-      )
-      .neq('id', userId) // Exclude self
-      .neq('account_type', 'curator') // Exclude curator accounts — platform-owned, not a real neighbor
+    const query = supabaseAdmin
+      .from('LocalProfile')
+      .select(LOCAL_PROFILE_SEARCH_SELECT)
+      .or(searchFilters)
+      .neq('user_id', userId) // Exclude self
       .limit(candidateLimit);
-
-    if (normalizedType === 'people') {
-      query = query.neq('account_type', 'business');
-    } else if (normalizedType === 'business') {
-      query = query.eq('account_type', 'business');
-    }
 
     const { data, error } = await query;
 
@@ -1813,62 +2403,80 @@ router.get('/search', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Search failed' });
     }
 
-    const scored = (data || [])
-      .filter((u) => {
-        const searchable = [
-          u.username,
-          u.name,
-          u.first_name,
-          u.last_name,
-          u.email,
-          [u.first_name, u.last_name].filter(Boolean).join(' '),
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
+    const accountRows = (data || []).length
+      ? await supabaseAdmin
+        .from('User')
+        .select('id, account_type')
+        .in('id', [...new Set((data || []).map((profile) => profile.user_id).filter(Boolean))])
+      : { data: [], error: null };
+    if (accountRows.error) {
+      logger.warn('User search account lookup error', { error: accountRows.error.message });
+    }
+    const accountById = new Map((accountRows.data || []).map((user) => [user.id, user]));
 
-        return tokens.every((token) => searchable.includes(token));
-      })
-      .map((u) => {
-        const username = String(u.username || '').toLowerCase();
-        const fullName = String(u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || '').trim().toLowerCase();
-        const email = String(u.email || '').toLowerCase();
-        const searchable = [username, fullName, email].filter(Boolean).join(' ');
+    const candidateByProfileId = new Map();
+    for (const profile of data || []) {
+      candidateByProfileId.set(profile.id, {
+        profile,
+        account: accountById.get(profile.user_id) || {},
+        nameSearchText: '',
+      });
+    }
 
-        let score = 4;
-        if (username === normalizedQuery || fullName === normalizedQuery || email === normalizedQuery) {
-          score = 0;
-        } else if (username.startsWith(normalizedQuery) || fullName.startsWith(normalizedQuery)) {
-          score = 1;
-        } else if (searchable.includes(normalizedQuery)) {
-          score = 2;
-        } else if (tokens.every((token) => searchable.includes(token))) {
-          score = 3;
+    const nameCandidates = await getNameDiscoverableLocalCandidates({
+      queryText,
+      primaryToken,
+      tokens,
+      viewerId: userId,
+      candidateLimit,
+    });
+
+    for (const candidate of nameCandidates) {
+      const existing = candidateByProfileId.get(candidate.profile.id);
+      if (existing) {
+        existing.nameSearchText = candidate.nameSearchText;
+        if (!existing.account?.account_type && candidate.account?.account_type) {
+          existing.account = candidate.account;
         }
+      } else {
+        candidateByProfileId.set(candidate.profile.id, candidate);
+      }
+    }
 
-        return { u, score };
+    const visibleCandidates = [];
+    for (const candidate of candidateByProfileId.values()) {
+      const { profile } = candidate;
+      const account = candidate.account || {};
+      const accountType = account.account_type || 'individual';
+      if (accountType === 'curator') continue;
+      if (normalizedType === 'people' && accountType === 'business') continue;
+      if (normalizedType === 'business' && accountType !== 'business') continue;
+      if (!(await canDiscoverLocalProfileForUserSearch(profile, userId))) continue;
+      visibleCandidates.push({ profile, account, nameSearchText: candidate.nameSearchText || '' });
+    }
+
+    const scored = visibleCandidates
+      .filter(({ profile, nameSearchText }) => {
+        const searchable = profileWithNameSearchText(profile, nameSearchText);
+        return matchesSearchTokens(searchable.profile, searchable.fields, tokens);
+      })
+      .map(({ profile, account, nameSearchText }) => {
+        const searchable = profileWithNameSearchText(profile, nameSearchText);
+        return {
+          profile,
+          account,
+          score: scoreLocalProfile(searchable.profile, searchable.fields, normalizedQuery, tokens),
+        };
       })
       .sort((a, b) => {
         if (a.score !== b.score) return a.score - b.score;
-        const followersA = Number(a.u.followers_count) || 0;
-        const followersB = Number(b.u.followers_count) || 0;
-        if (followersA !== followersB) return followersB - followersA;
-        return String(a.u.username || '').localeCompare(String(b.u.username || ''));
+        return String(a.profile.handle || '').localeCompare(String(b.profile.handle || ''));
       })
       .slice(0, limit)
-      .map(({ u }) => u);
+      .map(({ profile, account }) => ({ profile, account }));
 
-    // Map to safe public shape
-    const users = scored.map(u => ({
-      id: u.id,
-      username: u.username,
-      name: u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username,
-      profilePicture: u.profile_picture_url || null,
-      city: u.city || null,
-      state: u.state || null,
-      accountType: u.account_type || 'individual',
-      followersCount: u.followers_count || 0,
-    }));
+    // Compatibility shape for legacy chat/invite callers, backed by LocalProfile.
+    const users = scored.map(({ profile, account }) => serializeCompatibilitySearchUser(profile, account));
 
     res.json({ users });
   } catch (err) {
@@ -2038,19 +2646,45 @@ router.post('/me/signals', verifyToken, async (req, res) => {
  * GET /api/users/id/:id
  * Get full public profile by user UUID
  */
-router.get('/id/:id', async (req, res) => {
+router.get('/id/:id', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data: userData, error } = await supabaseAdmin
+    const userResult = await supabaseAdmin
       .from('User')
-      .select('*')
+      .select(PUBLIC_USER_PROFILE_SELECT)
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
-    if (error || !userData) {
+    let userData = userResult.data || null;
+    let localProfileRouteMatch = null;
+
+    if (!userData) {
+      localProfileRouteMatch = await getLocalProfileByLegacyRouteId(id);
+      if (localProfileRouteMatch?.user_id) {
+        const localUserResult = await supabaseAdmin
+          .from('User')
+          .select(PUBLIC_USER_PROFILE_SELECT)
+          .eq('id', localProfileRouteMatch.user_id)
+          .maybeSingle();
+        userData = localUserResult.data || null;
+      }
+    }
+
+    if (!userData) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    const viewerId = req.user?.id || null;
+    const isOwnProfile = viewerId === userData.id;
+    const profileVisibility = userData.profile_visibility || 'public';
+    const canAccess = localProfileRouteMatch
+      ? await canAccessLegacyLocalProfileRoute(localProfileRouteMatch, viewerId, userData)
+      : await canAccessPublicUserProfile(viewerId, userData.id, profileVisibility);
+    if (!canAccess) {
+      return res.status(403).json({ error: 'This profile is private' });
+    }
+    const publicUserData = applyLocalProfilePublicOverlay(userData, localProfileRouteMatch);
 
     // Compute live gig counts + fetch skills in parallel
     const [postedRes, completedRes, skillsRes] = await Promise.allSettled([
@@ -2106,29 +2740,38 @@ router.get('/id/:id', async (req, res) => {
     const residency = await getPublicResidencySummary(userData.id);
 
     res.json({
-      id: userData.id,
-      username: userData.username,
-      firstName: userData.first_name,
-      lastName: userData.last_name,
-      name: userData.name,
-      bio: userData.bio,
-      tagline: userData.tagline,
-      avatar_url: userData.avatar_url,
-      profile_picture_url: userData.profile_picture_url,
-      profilePicture: userData.profile_picture_url,
-      city: userData.city,
-      state: userData.state,
-      accountType: userData.account_type,
-      verified: userData.verified,
+      id: publicUserData.id,
+      username: publicUserData.username,
+      firstName: publicUserData.first_name,
+      lastName: publicUserData.last_name,
+      email: isOwnProfile || publicUserData.show_email ? publicUserData.email : null,
+      phoneNumber: isOwnProfile || publicUserData.show_phone ? publicUserData.phone_number : null,
+      phone_number: isOwnProfile || publicUserData.show_phone ? publicUserData.phone_number : null,
+      name: publicUserData.name,
+      bio: publicUserData.bio,
+      tagline: publicUserData.tagline,
+      avatar_url: publicUserData.profile_picture_url,
+      profile_picture_url: publicUserData.profile_picture_url,
+      profilePicture: publicUserData.profile_picture_url,
+      city: publicUserData.city,
+      state: publicUserData.state,
+      accountType: publicUserData.account_type,
+      verified: publicUserData.verified,
       residency,
-      created_at: userData.created_at,
+      profileVisibility,
+      profile_visibility: profileVisibility,
+      showEmail: publicUserData.show_email || false,
+      show_email: publicUserData.show_email || false,
+      showPhone: publicUserData.show_phone || false,
+      show_phone: publicUserData.show_phone || false,
+      created_at: publicUserData.created_at,
       gigs_posted: gigsPosted,
       gigs_completed: gigsCompleted,
-      average_rating: averageRating || userData.average_rating || 0,
+      average_rating: averageRating || publicUserData.average_rating || 0,
       review_count: reviewCount,
-      followers_count: userData.followers_count || 0,
+      followers_count: publicUserData.followers_count || 0,
       reviews: reviews,
-      socialLinks: userData.social_links || {},
+      socialLinks: publicUserData.social_links || {},
       skills: (profileSkills || []).map(s => s.skill_name),
     });
   } catch (err) {
@@ -2356,18 +2999,24 @@ router.get('/public/join/:code', async (req, res) => {
  * GET /api/users/:username
  * Get public profile by username
  */
-router.get('/:username', async (req, res) => {
+router.get('/:username', optionalAuth, async (req, res) => {
   try {
     const { username } = req.params;
 
     const { data: userData, error } = await supabaseAdmin
       .from('User')
-      .select('id, username, name, first_name, middle_name, last_name, bio, city, state, profile_picture_url, created_at')
+      .select('id, username, name, first_name, middle_name, last_name, bio, city, state, profile_picture_url, created_at, profile_visibility')
       .eq('username', username)
       .single();
 
     if (error || !userData) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    const viewerId = req.user?.id || null;
+    const profileVisibility = userData.profile_visibility || 'public';
+    if (!(await canAccessPublicUserProfile(viewerId, userData.id, profileVisibility))) {
+      return res.status(403).json({ error: 'This profile is private' });
     }
 
     res.json({
@@ -2383,6 +3032,7 @@ router.get('/:username', async (req, res) => {
         state: userData.state,
         profile_picture_url: userData.profile_picture_url,
         memberSince: userData.created_at,
+        profile_visibility: profileVisibility,
       },
     });
   } catch (err) {
@@ -2393,30 +3043,67 @@ router.get('/:username', async (req, res) => {
 
 /**
  * POST /api/users/resend-verification
- * Resend email verification
+ * Resend an email-verification link via our own SMTP. Uses a magiclink token
+ * (doesn't require password) which, when clicked, also confirms the email.
  */
 router.post('/resend-verification', resendVerificationLimiter, validate(resendVerificationSchema), async (req, res) => {
-  try {
-    const { email } = req.body;
+  const email = req.body?.email;
 
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
+  try {
+    const { data: existingUser, error: lookupError } = await supabaseAdmin
+      .from('User')
+      .select('id, verified')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (lookupError) {
+      logger.warn('Resend verification: user lookup failed', { email, error: lookupError.message });
+      return res.json({ message: 'If that email exists, a verification email has been sent.' });
+    }
+
+    if (!existingUser || existingUser.verified === true) {
+      logger.info('Resend verification skipped for missing or already verified user', {
+        email,
+        found: Boolean(existingUser),
+        verified: existingUser?.verified === true,
+      });
+      return res.json({ message: 'If that email exists, a verification email has been sent.' });
+    }
+
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
       email,
       options: {
-        emailRedirectTo: `${getAuthRedirectBaseUrl(req)}/verify-email`,
+        redirectTo: `${getAuthRedirectBaseUrl(req)}/verify-email`,
       },
     });
 
-    if (error) {
-      logger.error('Resend verification error', { error: error.message, email });
-      // Don't reveal if email exists
+    if (linkError) {
+      // Most common causes: no such user, or user already confirmed. Stay quiet.
+      logger.warn('Resend verification: generateLink failed', { email, error: linkError.message });
+    } else {
+      const hashedToken = linkData?.properties?.hashed_token;
+      if (hashedToken) {
+        const verifyLink = buildVerifyEmailUrl(req, hashedToken, email, 'magiclink');
+        const sendResult = await emailService.sendVerificationEmail({
+          toEmail: email,
+          verifyLink,
+          isResend: true,
+          linkExpiresIn: '1 hour',
+        });
+        if (sendResult?.success) {
+          logger.info('Verification email resent via app SMTP', { email });
+        } else {
+          logger.error('Resend verification: email send failed', { email, error: sendResult?.error });
+        }
+      } else {
+        logger.error('Resend verification: generateLink returned no hashed_token', { email });
+      }
     }
-
-    logger.info('Verification email resent', { email });
 
     res.json({ message: 'If that email exists, a verification email has been sent.' });
   } catch (err) {
-    logger.error('Resend verification error', { error: err.message, email: req.body?.email });
+    logger.error('Resend verification error', { error: err.message, email });
     res.json({ message: 'If that email exists, a verification email has been sent.' });
   }
 });
@@ -2455,7 +3142,8 @@ router.post('/verify-email', validate(verifyEmailSchema), async (req, res) => {
       };
     }
 
-    const { data, error } = await supabase.auth.verifyOtp(verifyPayload);
+    const authClient = createAuthClient();
+    const { data, error } = await authClient.auth.verifyOtp(verifyPayload);
     if (error) {
       logger.warn('Email verification failed', {
         error: error.message,
@@ -2484,6 +3172,12 @@ router.post('/verify-email', validate(verifyEmailSchema), async (req, res) => {
       }
     }
 
+    // verifyOtp may establish a session we never return to the client; drop it so the link isn't a login shortcut.
+    await revokeSessionByAccessToken(data?.session?.access_token, {
+      source: 'verify_email',
+      userId: verifiedUserId,
+    });
+
     return res.json({
       message: 'Email verified successfully. You can now sign in.',
       verified: true,
@@ -2496,8 +3190,9 @@ router.post('/verify-email', validate(verifyEmailSchema), async (req, res) => {
 
 /**
  * POST /api/users/forgot-password
- * Send a password reset email via Supabase's built-in email delivery
- * (same transport that handles signup verification emails).
+ * Generate a recovery link via Supabase admin API and deliver it through
+ * our own SMTP transport (branded template, better deliverability than
+ * Supabase's shared mail sender).
  */
 router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSchema), async (req, res) => {
   try {
@@ -2508,15 +3203,29 @@ router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSc
     }
 
     const redirectTo = `${getAuthRedirectBaseUrl(req)}/reset-password`;
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo,
+
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: { redirectTo },
     });
 
-    if (error) {
-      logger.error('Forgot password: Supabase error', { email, error: error.message });
-      // Don't reveal if email exists
+    if (linkError) {
+      // Most common cause: no user with this email. Stay quiet to prevent enumeration.
+      logger.warn('Forgot password: generateLink failed', { email, error: linkError.message });
     } else {
-      logger.info('Password reset email sent via Supabase', { email });
+      const hashedToken = linkData?.properties?.hashed_token;
+      if (hashedToken) {
+        const resetLink = buildPasswordResetUrl(req, hashedToken, email);
+        const result = await emailService.sendPasswordResetEmail({ toEmail: email, resetLink });
+        if (result?.success) {
+          logger.info('Password reset email sent via app SMTP', { email });
+        } else {
+          logger.error('Password reset email send failed', { email, error: result?.error });
+        }
+      } else {
+        logger.error('Forgot password: generateLink returned no hashed_token', { email });
+      }
     }
 
     // Always return same message to prevent email enumeration
@@ -2537,11 +3246,12 @@ router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSc
  */
 router.post('/reset-password', validate(resetPasswordSchema), async (req, res) => {
   try {
-    const { token, newPassword, email } = req.body;
+    const { token, newPassword } = req.body;
     const isJwtAccessToken = token.split('.').length === 3;
 
     if (isJwtAccessToken) {
-      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      const authClient = createAuthClient();
+      const { data: userData, error: userError } = await authClient.auth.getUser(token);
       if (userError || !userData?.user?.id) {
         logger.warn('Reset password failed - invalid access token', { error: userError?.message });
         return res.status(400).json({ error: 'Invalid or expired reset token' });
@@ -2557,37 +3267,49 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res) =
         return res.status(400).json({ error: 'Unable to reset password' });
       }
     } else {
+      // Supabase verifyOtp for recovery + token_hash accepts only { type, token_hash }.
+      // Including email causes: "Only the token_hash and type should be provided".
       const verifyPayload = {
         type: 'recovery',
         token_hash: token,
       };
 
-      if (email) {
-        verifyPayload.email = email;
-      }
-
-      const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp(verifyPayload);
+      const authClient = createAuthClient();
+      const { data: verifyData, error: verifyError } = await authClient.auth.verifyOtp(verifyPayload);
       const session = verifyData?.session;
       if (verifyError || !session?.access_token || !session?.refresh_token) {
         logger.warn('Reset password failed - verify otp failed', { error: verifyError?.message });
         return res.status(400).json({ error: 'Invalid or expired reset token' });
       }
 
-      const scopedClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+      const scopedClient = createAuthClient();
       const { error: sessionError } = await scopedClient.auth.setSession({
         access_token: session.access_token,
         refresh_token: session.refresh_token,
       });
       if (sessionError) {
+        await revokeSessionByAccessToken(session.access_token, {
+          source: 'reset_password_set_session_failed',
+          userId: verifyData?.user?.id,
+        });
         logger.error('Reset password failed - set session failed', { error: sessionError.message });
         return res.status(400).json({ error: 'Invalid reset session' });
       }
 
       const { error: updateError } = await scopedClient.auth.updateUser({ password: newPassword });
       if (updateError) {
+        await revokeSessionByAccessToken(session.access_token, {
+          source: 'reset_password_failed',
+          userId: verifyData?.user?.id,
+        });
         logger.error('Reset password failed - update user failed', { error: updateError.message });
         return res.status(400).json({ error: 'Unable to reset password' });
       }
+
+      await revokeSessionByAccessToken(session.access_token, {
+        source: 'reset_password',
+        userId: verifyData?.user?.id,
+      });
     }
 
     return res.json({ message: 'Password reset successful. You can now sign in.' });
@@ -2642,19 +3364,45 @@ router.delete('/cleanup/:email', verifyToken, verifyToken.requireAdmin, async (r
  * GET /api/users/username/:username
  * Get user profile by username (for public profiles)
  */
-router.get('/username/:username', async (req, res) => {
+router.get('/username/:username', optionalAuth, async (req, res) => {
   try {
     const { username } = req.params;
 
-    const { data: userData, error } = await supabaseAdmin
+    const userResult = await supabaseAdmin
       .from('User')
-      .select('*')
+      .select(PUBLIC_USER_PROFILE_SELECT)
       .eq('username', username)
-      .single();
+      .maybeSingle();
 
-    if (error || !userData) {
+    let userData = userResult.data || null;
+    let localProfileRouteMatch = null;
+
+    if (!userData) {
+      localProfileRouteMatch = await getLocalProfileByLegacyRouteHandle(username);
+      if (localProfileRouteMatch?.user_id) {
+        const localUserResult = await supabaseAdmin
+          .from('User')
+          .select(PUBLIC_USER_PROFILE_SELECT)
+          .eq('id', localProfileRouteMatch.user_id)
+          .maybeSingle();
+        userData = localUserResult.data || null;
+      }
+    }
+
+    if (!userData) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    const viewerId = req.user?.id || null;
+    const isOwnProfile = viewerId === userData.id;
+    const profileVisibility = userData.profile_visibility || 'public';
+    const canAccess = localProfileRouteMatch
+      ? await canAccessLegacyLocalProfileRoute(localProfileRouteMatch, viewerId, userData)
+      : await canAccessPublicUserProfile(viewerId, userData.id, profileVisibility);
+    if (!canAccess) {
+      return res.status(403).json({ error: 'This profile is private' });
+    }
+    const publicUserData = applyLocalProfilePublicOverlay(userData, localProfileRouteMatch);
 
     // Compute live gig counts + fetch skills in parallel
     const [postedRes, completedRes, skillsRes2] = await Promise.allSettled([
@@ -2712,29 +3460,38 @@ router.get('/username/:username', async (req, res) => {
     const residency = await getPublicResidencySummary(userData.id);
 
     res.json({
-      id: userData.id,
-      username: userData.username,
-      firstName: userData.first_name,
-      lastName: userData.last_name,
-      name: userData.name,
-      bio: userData.bio,
-      tagline: userData.tagline,
-      avatar_url: userData.avatar_url,
-      profile_picture_url: userData.profile_picture_url,
-      profilePicture: userData.profile_picture_url,
-      city: userData.city,
-      state: userData.state,
-      accountType: userData.account_type,
-      verified: userData.verified,
+      id: publicUserData.id,
+      username: publicUserData.username,
+      firstName: publicUserData.first_name,
+      lastName: publicUserData.last_name,
+      email: isOwnProfile || publicUserData.show_email ? publicUserData.email : null,
+      phoneNumber: isOwnProfile || publicUserData.show_phone ? publicUserData.phone_number : null,
+      phone_number: isOwnProfile || publicUserData.show_phone ? publicUserData.phone_number : null,
+      name: publicUserData.name,
+      bio: publicUserData.bio,
+      tagline: publicUserData.tagline,
+      avatar_url: publicUserData.profile_picture_url,
+      profile_picture_url: publicUserData.profile_picture_url,
+      profilePicture: publicUserData.profile_picture_url,
+      city: publicUserData.city,
+      state: publicUserData.state,
+      accountType: publicUserData.account_type,
+      verified: publicUserData.verified,
       residency,
-      created_at: userData.created_at,
+      profileVisibility,
+      profile_visibility: profileVisibility,
+      showEmail: publicUserData.show_email || false,
+      show_email: publicUserData.show_email || false,
+      showPhone: publicUserData.show_phone || false,
+      show_phone: publicUserData.show_phone || false,
+      created_at: publicUserData.created_at,
       gigs_posted: gigsPosted,
       gigs_completed: gigsCompleted,
-      average_rating: averageRating || userData.average_rating || 0,
+      average_rating: averageRating || publicUserData.average_rating || 0,
       review_count: reviewCount,
-      followers_count: userData.followers_count || 0,
+      followers_count: publicUserData.followers_count || 0,
       reviews: reviews,
-      socialLinks: userData.social_links || {},
+      socialLinks: publicUserData.social_links || {},
       skills: (profileSkills2 || []).map(s => s.skill_name),
     });
   } catch (err) {
@@ -2746,7 +3503,16 @@ router.get('/username/:username', async (req, res) => {
 
 // ============ FOLLOW ENDPOINTS (canonical location) ============
 
-const FOLLOW_USER_SELECT = 'id, username, name, first_name, last_name, profile_picture_url, city, state, account_type';
+async function isUserFollowing(followerId, followingId) {
+  if (!followerId || !followingId) return false;
+  const { data } = await supabaseAdmin
+    .from('UserFollow')
+    .select('id')
+    .eq('follower_id', followerId)
+    .eq('following_id', followingId)
+    .maybeSingle();
+  return !!data;
+}
 
 /**
  * POST /:id/follow - Follow a user
@@ -2760,35 +3526,30 @@ router.post('/:id/follow', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'You cannot follow yourself' });
     }
 
-    // Verify target user exists
     const { data: user } = await supabaseAdmin
       .from('User')
       .select('id, username, account_type')
       .eq('id', followingId)
-      .single();
+      .maybeSingle();
 
     if (!user) return res.status(404).json({ error: 'User not found' });
-
-    // Exclude curator accounts — platform-owned, not a real neighbor
     if (user.account_type === 'curator') {
-      return res.status(403).json({ error: 'This account cannot be followed' });
+      return res.status(403).json({ error: 'Cannot follow curator accounts' });
     }
 
-    // Check for existing follow
     const { data: existing } = await supabaseAdmin
       .from('UserFollow')
       .select('id')
       .eq('follower_id', followerId)
       .eq('following_id', followingId)
-      .single();
+      .maybeSingle();
 
     if (existing) {
       return res.status(400).json({ error: 'You are already following this user' });
     }
 
-    // Check block status
-    const { isBlocked } = require('../utils/visibilityPolicy');
-    if (await isBlocked(followerId, followingId)) {
+    const visibility = require('../utils/visibilityPolicy');
+    if (await visibility.isBlocked(followerId, followingId)) {
       return res.status(403).json({ error: 'Cannot follow this user' });
     }
 
@@ -2801,13 +3562,12 @@ router.post('/:id/follow', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to follow user' });
     }
 
-    // Fire notification (non-blocking)
     const notificationService = require('../services/notificationService');
     const { data: followerUser } = await supabaseAdmin
       .from('User')
       .select('username, name, first_name')
       .eq('id', followerId)
-      .single();
+      .maybeSingle();
 
     const followerName = followerUser?.name || followerUser?.first_name || followerUser?.username || 'Someone';
     notificationService.createNotification({
@@ -2870,7 +3630,6 @@ router.get('/:id/followers', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch followers' });
     }
 
-    // Exclude curator accounts — platform-owned, not a real neighbor
     const filtered = (followers || []).filter(f => f.follower?.account_type !== 'curator');
     res.json({ followers: filtered });
   } catch (err) {
@@ -2896,7 +3655,6 @@ router.get('/:id/following', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch following list' });
     }
 
-    // Exclude curator accounts — platform-owned, not a real neighbor
     const filtered = (following || []).filter(f => f.following?.account_type !== 'curator');
     res.json({ following: filtered });
   } catch (err) {
@@ -2913,14 +3671,7 @@ router.get('/:id/follow/status', verifyToken, async (req, res) => {
     const targetId = req.params.id;
     const viewerId = req.user.id;
 
-    const { data } = await supabaseAdmin
-      .from('UserFollow')
-      .select('id')
-      .eq('follower_id', viewerId)
-      .eq('following_id', targetId)
-      .single();
-
-    res.json({ following: !!data });
+    res.json({ following: await isUserFollowing(viewerId, targetId) });
   } catch (err) {
     logger.error('Follow status error', { error: err.message });
     res.status(500).json({ error: 'Failed to check follow status' });
@@ -2928,7 +3679,7 @@ router.get('/:id/follow/status', verifyToken, async (req, res) => {
 });
 
 /**
- * GET /:id/relationship - Get relationship status with another user
+ * GET /:id/relationship - Get relationship status with another user.
  * Returns combined follow + connection status for profile display.
  */
 router.get('/:id/relationship', verifyToken, async (req, res) => {
@@ -2937,11 +3688,10 @@ router.get('/:id/relationship', verifyToken, async (req, res) => {
     const viewerId = req.user.id;
 
     const visibility = require('../utils/visibilityPolicy');
-
     const [relationshipStatus, followingThem, theyFollowMe] = await Promise.all([
       visibility.getRelationshipStatus(viewerId, targetId),
-      visibility.isFollowing(viewerId, targetId),
-      visibility.isFollowing(targetId, viewerId),
+      isUserFollowing(viewerId, targetId),
+      isUserFollowing(targetId, viewerId),
     ]);
 
     res.json({
@@ -3046,6 +3796,10 @@ router.post('/oauth/token', oauthLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Access token is required' });
   }
 
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    return res.status(400).json({ error: 'Refresh token is required for OAuth token login' });
+  }
+
   try {
     // Verify the token and get the user
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
@@ -3075,12 +3829,11 @@ router.post('/oauth/token', oauthLimiter, async (req, res) => {
 
     logger.info('OAuth token login successful', { userId, email });
 
-    // Set auth cookies for web clients (AUTH-3.3)
-    setAuthCookies(res, accessToken, refreshToken || null, userId);
+    applyAuthTransport(req, res, accessToken, refreshToken, userId);
 
     const tokenFields = isCookieTransport(req) ? {} : {
       accessToken,
-      ...(refreshToken ? { refreshToken } : {}),
+      refreshToken,
     };
 
     res.json({
@@ -3115,7 +3868,8 @@ router.post('/oauth/callback', oauthLimiter, async (req, res) => {
 
   try {
     // Exchange code for session
-    const { data: sessionData, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+    const authClient = createAuthClient();
+    const { data: sessionData, error: sessionError } = await authClient.auth.exchangeCodeForSession(code);
 
     if (sessionError || !sessionData?.session) {
       logger.error('OAuth code exchange error', { error: sessionError?.message });
@@ -3143,8 +3897,7 @@ router.post('/oauth/callback', oauthLimiter, async (req, res) => {
 
     logger.info('OAuth login successful', { userId, email });
 
-    // Set auth cookies for web clients (AUTH-3.3)
-    setAuthCookies(res, session.access_token, session.refresh_token, userId);
+    applyAuthTransport(req, res, session.access_token, session.refresh_token, userId);
 
     const tokenFields = isCookieTransport(req) ? {} : {
       accessToken: session.access_token,
@@ -3485,11 +4238,16 @@ router.post('/:userId/report', verifyToken, validate(reportUserSchema), async (r
 router.post('/logout', logoutLimiter, async (req, res) => {
   clearAuthCookies(res);
 
-  try {
-    await supabase.auth.signOut();
-  } catch {
-    // Non-fatal — cookies are already cleared
-  }
+  const accessToken = getLogoutAccessToken(req);
+  const sessionRevoked = await revokeSessionByAccessToken(accessToken, {
+    source: 'logout',
+    transport: getBearerToken(req) ? 'bearer' : accessToken ? 'cookie_or_body' : 'none',
+  });
+
+  logger.info('Logout completed', {
+    hasAccessToken: Boolean(accessToken),
+    sessionRevoked,
+  });
 
   res.json({ success: true });
 });

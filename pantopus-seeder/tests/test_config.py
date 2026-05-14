@@ -67,6 +67,29 @@ class TestConstants:
             assert cat in CATEGORY_TO_POST_TYPE
             assert cat in CATEGORY_TO_PURPOSE
 
+    def test_stale_windows_cover_every_category(self):
+        """Every known category must have a stale window so the fetcher's
+        hygiene pass never leaves rows in the queue indefinitely."""
+        from src.config.constants import QUEUE_STALE_HOURS_BY_CATEGORY
+        for cat in ALL_CATEGORIES:
+            assert cat in QUEUE_STALE_HOURS_BY_CATEGORY, (
+                f"category {cat!r} missing from QUEUE_STALE_HOURS_BY_CATEGORY"
+            )
+
+    def test_time_sensitive_categories_use_short_stale_window(self):
+        """Regression guard: current-day / alert categories must not inherit
+        the long enrichment window."""
+        from src.config.constants import QUEUE_STALE_HOURS_BY_CATEGORY
+        assert QUEUE_STALE_HOURS_BY_CATEGORY["history"] <= 24
+        for cat in ("weather", "safety", "air_quality", "earthquake"):
+            assert QUEUE_STALE_HOURS_BY_CATEGORY[cat] <= 48
+
+    def test_enrichment_categories_have_long_stale_window(self):
+        """Sports + community_resource need the long window to avoid starving."""
+        from src.config.constants import QUEUE_STALE_HOURS_BY_CATEGORY
+        for cat in ("sports", "community_resource"):
+            assert QUEUE_STALE_HOURS_BY_CATEGORY[cat] >= 96
+
     def test_legacy_regions_have_required_keys(self):
         """Legacy REGIONS dict is still available for backward compat."""
         assert isinstance(REGIONS, dict)

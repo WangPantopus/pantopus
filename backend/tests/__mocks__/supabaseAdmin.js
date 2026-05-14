@@ -61,6 +61,25 @@ let _authMocks = {
     },
     error: null,
   }),
+  adminGenerateLink: async () => ({
+    data: {
+      user: {
+        id: 'mock-auth-user-id',
+        email: 'mock@example.com',
+        email_confirmed_at: null,
+        user_metadata: {},
+      },
+      properties: {
+        action_link: 'https://example.com/verify?token=mock',
+        hashed_token: 'mock-hashed-token',
+        email_otp: '123456',
+        redirect_to: 'https://example.com/verify-email',
+        verification_type: 'signup',
+      },
+    },
+    error: null,
+  }),
+  adminSignOut: async () => ({ data: null, error: null }),
 };
 
 function resetTables() {
@@ -121,15 +140,104 @@ function resetTables() {
       },
       error: null,
     }),
+    adminGenerateLink: async () => ({
+      data: {
+        user: {
+          id: 'mock-auth-user-id',
+          email: 'mock@example.com',
+          email_confirmed_at: null,
+          user_metadata: {},
+        },
+        properties: {
+          action_link: 'https://example.com/verify?token=mock',
+          hashed_token: 'mock-hashed-token',
+          email_otp: '123456',
+          redirect_to: 'https://example.com/verify-email',
+          verification_type: 'signup',
+        },
+      },
+      error: null,
+    }),
+    adminSignOut: async () => ({ data: null, error: null }),
   };
 }
 
+// ---------------------------------------------------------------------------
+// PersonaFollow → PersonaMembership view aliasing
+//
+// After P0.1 (collapse migration) PersonaFollow is a SQL view over
+// PersonaMembership: rows live in PersonaMembership; the view exposes the
+// legacy column shape (most importantly user_id → follower_user_id). After
+// migration 136 it includes rank-1 free Follower memberships only; paid
+// memberships are checked explicitly through PersonaMembership.
+//
+// In tests we keep the same fiction: any reference to 'PersonaFollow' is
+// internally redirected to 'PersonaMembership' with column projection so
+// existing tests that seed/inspect 'PersonaFollow' keep working unchanged.
+// ---------------------------------------------------------------------------
+const PERSONA_FOLLOW_VIEW = 'PersonaFollow';
+const PERSONA_MEMBERSHIP_TABLE = 'PersonaMembership';
+const PERSONA_FOLLOW_COLUMN_MAP = { follower_user_id: 'user_id' };
+
+function isPersonaFollowView(name) {
+  return name === PERSONA_FOLLOW_VIEW;
+}
+
+function projectMembershipAsFollow(row) {
+  if (!row) return row;
+  return { ...row, follower_user_id: row.user_id };
+}
+
+function membershipVisibleInPersonaFollow(row) {
+  if (!row) return false;
+  if (row.tier_id == null) return true;
+  const tier = (tables.PersonaTier || []).find((candidate) => candidate.id === row.tier_id);
+  return Number(tier?.rank || 0) === 1;
+}
+
+function fanHandleFromId(id) {
+  // Match the production generator (crypto.randomBytes(4).toString('hex')):
+  // 8 hex chars. When seeding from an existing id, hash it through to hex so
+  // fan_handles look the same whether they came from the generator or a test
+  // fixture.
+  const raw = String(id || '');
+  const hexish = raw.replace(/[^a-f0-9]/gi, '').toLowerCase();
+  if (hexish.length >= 8) return `fan_${hexish.slice(0, 8)}`;
+  // Fallback: generate fresh random hex.
+  return `fan_${require('crypto').randomBytes(4).toString('hex')}`;
+}
+
+function reverseProjectFollowAsMembership(row) {
+  if (!row) return row;
+  const out = { ...row };
+  if ('follower_user_id' in out) {
+    if (out.user_id === undefined) out.user_id = out.follower_user_id;
+    delete out.follower_user_id;
+  }
+  if (out.tier_id === undefined) out.tier_id = null;
+  if (out.fan_handle === undefined) out.fan_handle = fanHandleFromId(out.id);
+  if (out.fan_handle_normalized === undefined) {
+    out.fan_handle_normalized = String(out.fan_handle).toLowerCase();
+  }
+  return out;
+}
+
 function getTable(name) {
+  if (isPersonaFollowView(name)) {
+    if (!tables[PERSONA_MEMBERSHIP_TABLE]) tables[PERSONA_MEMBERSHIP_TABLE] = [];
+    return tables[PERSONA_MEMBERSHIP_TABLE]
+      .filter(membershipVisibleInPersonaFollow)
+      .map(projectMembershipAsFollow);
+  }
   if (!tables[name]) tables[name] = [];
   return tables[name];
 }
 
 function seedTable(name, rows) {
+  if (isPersonaFollowView(name)) {
+    tables[PERSONA_MEMBERSHIP_TABLE] = rows.map(reverseProjectFollowAsMembership);
+    return;
+  }
   tables[name] = [...rows];
 }
 
@@ -147,13 +255,21 @@ function setAuthMocks(overrides = {}) {
  * Chainable query builder that mimics supabaseAdmin.from(table)
  */
 function createQueryBuilder(tableName) {
-  let rows = () => getTable(tableName);
-  let filters = [];
+  // 'PersonaFollow' is a SQL view over PersonaMembership; redirect storage to
+  // PersonaMembership and translate column names on the way in/out.
+  const viewAlias = isPersonaFollowView(tableName);
+  const storageTable = viewAlias ? PERSONA_MEMBERSHIP_TABLE : tableName;
+  const fieldFor = (field) => (viewAlias && PERSONA_FOLLOW_COLUMN_MAP[field]) || field;
+  const projectOut = viewAlias ? projectMembershipAsFollow : (r) => r;
+
+  let rows = () => getTable(storageTable);
+  let filters = viewAlias ? [membershipVisibleInPersonaFollow] : [];
   let selectFields = '*';
   let updatePayload = null;
   let insertPayload = null;
   let isSingle = false;
   let isUpsert = false;
+  let upsertOnConflict = null;
   let isCountMode = false;
   let isHeadMode = false;
   let rangeStart = null;
@@ -167,65 +283,87 @@ function createQueryBuilder(tableName) {
       return builder;
     },
     eq(field, value) {
-      filters.push((row) => row[field] === value);
+      const f = fieldFor(field);
+      filters.push((row) => row[f] === value);
+      return builder;
+    },
+    ilike(field, pattern) {
+      const raw = String(pattern || '').toLowerCase();
+      const escaped = raw
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/%/g, '.*')
+        .replace(/_/g, '.');
+      const re = new RegExp(`^${escaped}$`, 'i');
+      const f = fieldFor(field);
+      filters.push((row) => re.test(String(row[f] || '')));
       return builder;
     },
     neq(field, value) {
-      filters.push((row) => row[field] !== value);
+      const f = fieldFor(field);
+      filters.push((row) => row[f] !== value);
       return builder;
     },
     in(field, values) {
-      filters.push((row) => values.includes(row[field]));
+      const f = fieldFor(field);
+      filters.push((row) => values.includes(row[f]));
       return builder;
     },
     not(field, operator, value) {
+      const f = fieldFor(field);
       if (operator === 'in') {
         // value like '("a","b")' — parse it
         const vals = value
           .replace(/[()]/g, '')
           .split(',')
           .map((s) => s.replace(/"/g, '').trim());
-        filters.push((row) => !vals.includes(row[field]));
+        filters.push((row) => !vals.includes(row[f]));
       } else if (operator === 'eq') {
-        filters.push((row) => row[field] !== value);
+        filters.push((row) => row[f] !== value);
       } else if (operator === 'is') {
-        filters.push((row) => row[field] !== value);
+        filters.push((row) => row[f] !== value);
       }
       return builder;
     },
     lte(field, value) {
-      filters.push((row) => row[field] <= value);
+      const f = fieldFor(field);
+      filters.push((row) => row[f] <= value);
       return builder;
     },
     gte(field, value) {
-      filters.push((row) => row[field] >= value);
+      const f = fieldFor(field);
+      filters.push((row) => row[f] >= value);
       return builder;
     },
     lt(field, value) {
-      filters.push((row) => row[field] < value);
+      const f = fieldFor(field);
+      filters.push((row) => row[f] < value);
       return builder;
     },
     gt(field, value) {
-      filters.push((row) => row[field] > value);
+      const f = fieldFor(field);
+      filters.push((row) => row[f] > value);
       return builder;
     },
     is(field, value) {
-      filters.push((row) => row[field] === value);
+      const f = fieldFor(field);
+      filters.push((row) => row[f] === value);
       return builder;
     },
     contains(field, values) {
+      const f = fieldFor(field);
       // Supabase .contains() — array column must include ALL of the given values
       filters.push((row) => {
-        const col = row[field];
+        const col = row[f];
         if (!Array.isArray(col)) return false;
         return values.every((v) => col.includes(v));
       });
       return builder;
     },
     overlaps(field, values) {
+      const f = fieldFor(field);
       // Supabase .overlaps() — array column shares at least one element
       filters.push((row) => {
-        const col = row[field];
+        const col = row[f];
         if (!Array.isArray(col)) return false;
         return values.some((v) => col.includes(v));
       });
@@ -307,8 +445,9 @@ function createQueryBuilder(tableName) {
       return builder;
     },
     filter(field, operator, value) {
+      const f = fieldFor(field);
       if (operator === 'is') {
-        filters.push((row) => row[field] === (value === 'null' ? null : value));
+        filters.push((row) => row[f] === (value === 'null' ? null : value));
       }
       return builder;
     },
@@ -336,9 +475,15 @@ function createQueryBuilder(tableName) {
       insertPayload = Array.isArray(payload) ? payload : [payload];
       return builder;
     },
-    upsert(payload) {
+    upsert(payload, options) {
       insertPayload = Array.isArray(payload) ? payload : [payload];
       isUpsert = true;
+      // Capture the onConflict key so the executor can do conflict
+      // resolution by composite columns (e.g. 'persona_id,user_id'),
+      // matching real Postgres ON CONFLICT semantics.
+      upsertOnConflict = options && typeof options.onConflict === 'string'
+        ? options.onConflict.split(',').map((s) => s.trim()).filter(Boolean)
+        : null;
       return builder;
     },
     // UPDATE
@@ -365,24 +510,91 @@ function createQueryBuilder(tableName) {
       return builder.then(undefined, handler);
     },
     _execute() {
-      const table = getTable(tableName);
+      const table = (() => {
+        if (!tables[storageTable]) tables[storageTable] = [];
+        return tables[storageTable];
+      })();
 
       // INSERT
       if (insertPayload) {
-        const inserted = insertPayload.map((row) => {
-          if (!row.id)
-            row.id = `mock-${tableName.toLowerCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          if (isUpsert) {
-            const idx = table.findIndex((r) => r.id === row.id);
-            if (idx >= 0) {
-              table[idx] = { ...table[idx], ...row };
-              return table[idx];
+        // Persona-scoped fan_handle uniqueness: real Postgres has
+        // UNIQUE (persona_id, fan_handle_normalized) on PersonaMembership.
+        // The check is applied for both inserts and upserts whose
+        // resolved-write target lands on a row that doesn't own the
+        // conflicting handle.
+        const findFanHandleCollision = (row) => {
+          if (storageTable !== 'PersonaMembership') return null;
+          if (!row.persona_id || !row.fan_handle_normalized) return null;
+          return table.find((existing) =>
+            existing.persona_id === row.persona_id
+            && existing.user_id !== row.user_id
+            && String(existing.fan_handle_normalized || '').toLowerCase()
+              === String(row.fan_handle_normalized).toLowerCase());
+        };
+        const findAudienceIdentityCollision = (row) => {
+          if (storageTable !== 'AudienceIdentity') return null;
+          const normalized = String(row.handle_normalized || '').toLowerCase();
+          return table.find((existing) =>
+            existing.id !== row.id
+            && (
+              existing.user_id === row.user_id
+              || (normalized && String(existing.handle_normalized || '').toLowerCase() === normalized)
+            ));
+        };
+
+        const inserted = [];
+        for (const rawRow of insertPayload) {
+          const row = viewAlias ? reverseProjectFollowAsMembership({ ...rawRow }) : { ...rawRow };
+          if (!row.id) {
+            row.id = `mock-${storageTable.toLowerCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          }
+          if (viewAlias) {
+            if (!rawRow.fan_handle) row.fan_handle = fanHandleFromId(row.id);
+            if (!rawRow.fan_handle_normalized) {
+              row.fan_handle_normalized = String(row.fan_handle).toLowerCase();
             }
           }
+
+          if (isUpsert) {
+            // ON CONFLICT (cols...) DO UPDATE — match by the composite
+            // key first, falling back to id for legacy callers.
+            let idx = -1;
+            if (Array.isArray(upsertOnConflict) && upsertOnConflict.length > 0) {
+              idx = table.findIndex((r) =>
+                upsertOnConflict.every((col) => r[col] === row[col]));
+            }
+            if (idx < 0 && row.id) {
+              idx = table.findIndex((r) => r.id === row.id);
+            }
+            if (idx >= 0) {
+              table[idx] = { ...table[idx], ...row };
+              inserted.push(table[idx]);
+              continue;
+            }
+          }
+
+          // Both fresh inserts AND upserts that resolved as inserts
+          // (no matching conflict row) must respect the persona-scoped
+          // fan_handle uniqueness constraint.
+          if (findFanHandleCollision(row)) {
+            return { data: null, error: {
+              code: '23505',
+              message: 'duplicate key value violates unique constraint "PersonaMembership_persona_handle_key"',
+            } };
+          }
+          if (findAudienceIdentityCollision(row)) {
+            return { data: null, error: {
+              code: '23505',
+              message: 'duplicate key value violates unique constraint "AudienceIdentity_handle_normalized_key"',
+            } };
+          }
+
           table.push({ ...row });
-          return row;
-        });
-        return { data: isSingle ? inserted[0] : inserted, error: null };
+          inserted.push(row);
+        }
+
+        const projected = inserted.map(projectOut);
+        return { data: isSingle ? projected[0] : projected, error: null };
       }
 
       // FILTER
@@ -397,15 +609,19 @@ function createQueryBuilder(tableName) {
 
       // UPDATE
       if (updatePayload && updatePayload !== '__DELETE__') {
+        const payload = viewAlias
+          ? reverseProjectFollowAsMembership({ ...updatePayload })
+          : updatePayload;
         matched.forEach((row) => {
           const idx = table.indexOf(row);
-          table[idx] = { ...row, ...updatePayload };
+          table[idx] = { ...row, ...payload };
         });
         const updated = matched.map((row) => {
           const idx = table.findIndex((r) => r.id === row.id);
           return table[idx];
         });
-        return { data: isSingle ? updated[0] || null : updated, error: null };
+        const projected = updated.map(projectOut);
+        return { data: isSingle ? projected[0] || null : projected, error: null };
       }
 
       // DELETE
@@ -414,15 +630,16 @@ function createQueryBuilder(tableName) {
           const idx = table.indexOf(row);
           if (idx >= 0) table.splice(idx, 1);
         });
-        return { data: matched, error: null };
+        return { data: matched.map(projectOut), error: null };
       }
 
       // SELECT
+      const projectedMatched = matched.map(projectOut);
       let result;
       if (isSingle) {
-        result = { data: matched[0] || null, error: null };
+        result = { data: projectedMatched[0] || null, error: null };
       } else {
-        result = { data: isHeadMode ? null : matched, error: null };
+        result = { data: isHeadMode ? null : projectedMatched, error: null };
       }
       if (isCountMode) {
         result.count = matchedCount;
@@ -451,6 +668,8 @@ const supabaseAdmin = {
     getUser: (...args) => _authMocks.getUser(...args),
     admin: {
       deleteUser: jest.fn().mockResolvedValue({ data: {}, error: null }),
+      generateLink: (...args) => _authMocks.adminGenerateLink(...args),
+      signOut: (...args) => _authMocks.adminSignOut(...args),
     },
   },
 };

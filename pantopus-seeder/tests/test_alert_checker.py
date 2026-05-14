@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import sys
+import time
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
+import httpx
 import pytest
 
 # Stub supabase module
@@ -17,8 +19,10 @@ from src.handlers.alert_checker import (
     handler,
     _already_notified,
     _check_weather_alerts,
+    _fetch_weatherkit_alerts,
     _get_user_geohashes,
 )
+from src.handlers import alert_checker as alert_checker_module
 from src.utils.supabase_errors import clear_missing_table_warnings
 
 _HANDLER = "src.handlers.alert_checker"
@@ -30,6 +34,19 @@ def _mock_secrets():
     s.supabase_service_role_key = "test-key"
     s.pantopus_api_base_url = "https://api.test.com"
     s.internal_api_key = "test-internal-key"
+    s.weatherkit_key_id = ""
+    s.weatherkit_team_id = ""
+    s.weatherkit_service_id = ""
+    s.weatherkit_private_key = ""
+    return s
+
+
+def _mock_weatherkit_secrets():
+    s = _mock_secrets()
+    s.weatherkit_key_id = "key-id"
+    s.weatherkit_team_id = "team-id"
+    s.weatherkit_service_id = "service-id"
+    s.weatherkit_private_key = "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
     return s
 
 
@@ -214,6 +231,78 @@ class TestEndToEnd:
 
         # Should not crash, just log the error
         assert result["geohashes_checked"] == 1
+
+
+class TestWeatherKitFallback:
+    def test_weatherkit_503_sets_backoff_and_returns_none(self):
+        secrets = _mock_weatherkit_secrets()
+        response = MagicMock(status_code=503)
+        alert_checker_module._weatherkit_disabled_until = 0
+        alert_checker_module._weatherkit_disabled_reason = None
+
+        with (
+            patch(f"{_HANDLER}._get_weatherkit_jwt", return_value="token"),
+            patch(f"{_HANDLER}.httpx.get", return_value=response) as mock_get,
+        ):
+            result = _fetch_weatherkit_alerts(45.5773, -122.3255, secrets)
+
+            assert result is None
+            assert alert_checker_module._weatherkit_disabled_until > time.time()
+            mock_get.assert_called_once()
+
+        with (
+            patch(f"{_HANDLER}._get_weatherkit_jwt", return_value="token"),
+            patch(f"{_HANDLER}.httpx.get") as mock_get,
+        ):
+            result = _fetch_weatherkit_alerts(45.5878, -122.3671, secrets)
+
+            assert result is None
+            mock_get.assert_not_called()
+
+        alert_checker_module._weatherkit_disabled_until = 0
+        alert_checker_module._weatherkit_disabled_reason = None
+
+    def test_weatherkit_timeout_logs_without_traceback(self, caplog):
+        secrets = _mock_weatherkit_secrets()
+        alert_checker_module._weatherkit_disabled_until = 0
+        alert_checker_module._weatherkit_disabled_reason = None
+
+        with (
+            patch(f"{_HANDLER}._get_weatherkit_jwt", return_value="token"),
+            patch(f"{_HANDLER}.httpx.get", side_effect=httpx.ReadTimeout("timeout")),
+            caplog.at_level("WARNING"),
+        ):
+            result = _fetch_weatherkit_alerts(45.5878, -122.3671, secrets)
+
+        assert result is None
+        timeout_logs = [r for r in caplog.records if "WeatherKit timed out" in r.message]
+        assert timeout_logs
+        assert all(record.exc_info is None for record in timeout_logs)
+        alert_checker_module._weatherkit_disabled_until = 0
+        alert_checker_module._weatherkit_disabled_reason = None
+
+    def test_weatherkit_fallback_is_not_push_error_when_noaa_succeeds(self):
+        stats = {"push_errors": 0}
+
+        with (
+            patch(f"{_HANDLER}._weatherkit_available", return_value=True),
+            patch(f"{_HANDLER}._weatherkit_backoff_active", return_value=False),
+            patch(f"{_HANDLER}._fetch_weatherkit_alerts", return_value=None),
+            patch(f"{_HANDLER}._fetch_noaa_alerts", return_value=[]),
+        ):
+            result = _check_weather_alerts(
+                _mock_supabase(),
+                _mock_weatherkit_secrets(),
+                "c20g8",
+                45.5773,
+                -122.3255,
+                ["u1"],
+                stats,
+            )
+
+        assert result == 0
+        assert stats["push_errors"] == 0
+        assert stats["weatherkit_fallbacks"] == 1
 
 
 class TestSendAlertPush:

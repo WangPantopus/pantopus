@@ -3,6 +3,7 @@
 // Endpoints:
 //   GET /api/hub              — Aggregated hub payload
 //   GET /api/hub/today        — Hub Today context card
+//   GET /api/hub/briefings/:id — Saved briefing delivery detail
 //   GET /api/hub/preferences  — Notification preferences
 //   PUT /api/hub/preferences  — Update notification preferences
 //   GET /api/hub/discovery    — Nearby discovery items (gigs, people, businesses, posts)
@@ -601,6 +602,42 @@ router.get('/today', verifyToken, async (req, res) => {
   } catch (err) {
     logger.error('Hub today error', { error: err.message, userId: req.user.id });
     res.json({ today: null, error: 'CONTEXT_UNAVAILABLE' });
+  }
+});
+
+// ============================================================
+// GET /api/hub/briefings/:id
+// Saved daily/evening briefing delivery detail for notification taps.
+// ============================================================
+router.get('/briefings/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRe.test(id)) {
+      return res.status(400).json({ error: 'Invalid briefing id' });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('DailyBriefingDelivery')
+      .select('id, briefing_date_local, briefing_kind, summary_text, signals_snapshot, location_geohash, composition_mode, status, delivered_at, created_at')
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (error) {
+      logger.error('Briefing delivery read error', { error: error.message, userId: req.user.id, briefingId: id });
+      return res.status(500).json({ error: 'Failed to fetch briefing' });
+    }
+
+    if (!data || !data.summary_text) {
+      return res.status(404).json({ error: 'Briefing not found' });
+    }
+
+    res.set('Cache-Control', 'private, max-age=300');
+    res.json({ briefing: data });
+  } catch (err) {
+    logger.error('Briefing delivery error', { error: err.message, userId: req.user.id });
+    res.status(500).json({ error: 'Failed to fetch briefing' });
   }
 });
 

@@ -10,7 +10,8 @@
  */
 
 const SUPPORTED_REGIONS = [
-  { label: 'Clark County', lat: 45.6387, lng: -122.6615, radius_meters: 30_000 },
+  // Vancouver, WA centroid — Clark County, Washington (not other U.S. Clark Counties).
+  { label: 'Clark County, WA', lat: 45.6387, lng: -122.6615, radius_meters: 30_000 },
   { label: 'Portland Metro', lat: 45.5152, lng: -122.6784, radius_meters: 30_000 },
 ];
 
@@ -107,11 +108,11 @@ const SEASONAL_TIPS = {
   spring_cleanup: [
     {
       condition: (ctx) => ctx.homeYearBuilt && ctx.homeYearBuilt < 1990,
-      tip: 'Spring cleanup season starts now. Moss removal, gutter flush, and pressure washing are the top needs in Clark County.',
+      tip: 'Spring cleanup season starts now. Moss removal, gutter flush, and pressure washing are the top needs in Clark County, WA.',
       homeTip: 'Your {{year}} home likely has significant moss buildup after winter. Roof moss treatment now prevents damage later.',
     },
     {
-      tip: 'Spring cleanup season is here. Moss removal, gutter flush, and pressure washing are the top residential needs in Clark County.',
+      tip: 'Spring cleanup season is here. Moss removal, gutter flush, and pressure washing are the top residential needs in Clark County, WA.',
       homeTip: null,
     },
   ],
@@ -151,7 +152,7 @@ const SEASONAL_TIPS = {
   fall_prep: [
     {
       condition: (ctx) => ctx.homeYearBuilt && ctx.homeYearBuilt < 1990,
-      tip: 'October is peak gutter season in Clark County. Homes built before 1990 typically need annual gutter cleaning.',
+      tip: 'October is peak gutter season in Clark County, WA. Homes built before 1990 typically need annual gutter cleaning.',
       homeTip: 'Your {{year}} home likely has original gutters. Consider scheduling professional cleaning before the November rains.',
     },
     {

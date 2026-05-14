@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,7 +12,9 @@ from src.pipeline.humanizer import (
     SYSTEM_PROMPT,
     _build_system_prompt,
     _is_pnw_region,
+    _validate_humanized_text,
     _validate_output,
+    _validate_seasonal_timing,
     humanize,
 )
 
@@ -134,6 +137,36 @@ class TestValidateOutput:
         assert _validate_output(text) is None
 
 
+class TestSeasonalTimingValidation:
+    def test_rejects_early_march_after_window_passed(self):
+        text = "Clearing gutters early in March can prevent basement leaks. Source: Pantopus Seasonal"
+        reason = _validate_seasonal_timing(text, today=date(2026, 4, 20))
+        assert reason is not None
+        assert reason.startswith("stale_calendar_window")
+
+    def test_allows_early_march_during_window(self):
+        text = "Clearing gutters early March can prevent basement leaks. Source: Pantopus Seasonal"
+        assert _validate_seasonal_timing(text, today=date(2026, 3, 5)) is None
+
+    def test_allows_month_range_that_includes_current_month(self):
+        text = "Yard debris pickup runs in March and April. Source: Pantopus Seasonal"
+        assert _validate_seasonal_timing(text, today=date(2026, 4, 20)) is None
+
+    def test_rejects_month_range_after_it_passes(self):
+        text = "Yard debris pickup runs in March and April. Source: Pantopus Seasonal"
+        assert _validate_seasonal_timing(text, today=date(2026, 5, 1)) == "stale_calendar_month"
+
+    def test_rejects_before_current_month(self):
+        text = "Weatherstripping before November helps with heating bills. Source: Pantopus Seasonal"
+        reason = _validate_seasonal_timing(text, today=date(2026, 11, 2))
+        assert reason is not None
+        assert reason.startswith("stale_calendar_window")
+
+    def test_non_seasonal_category_skips_timing_check(self):
+        text = "The March council meeting notes were released today. Source: City"
+        assert _validate_humanized_text(text, "local_news", today=date(2026, 4, 20)) is None
+
+
 # ---------------------------------------------------------------------------
 # humanize function
 # ---------------------------------------------------------------------------
@@ -145,6 +178,60 @@ class TestHumanize:
         text, error = result
         assert text == good_text
         assert error is None
+
+    def test_stale_seasonal_source_skips_before_openai_call(self):
+        class FakeDate(date):
+            @classmethod
+            def today(cls):
+                return cls(2026, 4, 20)
+
+        with (
+            patch("src.pipeline.humanizer.date", FakeDate),
+            patch("src.pipeline.humanizer.openai") as mock_mod,
+        ):
+            text, error = humanize(
+                raw_title=(
+                    "Gutters packed with winter debris cause basement leaks during spring rain. "
+                    "Flushing them in early March saves a lot of headaches later."
+                ),
+                raw_body=None,
+                source_url=None,
+                source_display_name="Pantopus Seasonal",
+                category="seasonal",
+                region="clark_county",
+                openai_api_key="key",
+            )
+
+        assert text is None
+        assert error == "ai_quality_gate:skipped"
+        mock_mod.OpenAI.assert_not_called()
+
+    def test_stale_exact_source_window_skips_even_with_current_month_reference(self):
+        class FakeDate(date):
+            @classmethod
+            def today(cls):
+                return cls(2026, 11, 2)
+
+        with (
+            patch("src.pipeline.humanizer.date", FakeDate),
+            patch("src.pipeline.humanizer.openai") as mock_mod,
+        ):
+            text, error = humanize(
+                raw_title=(
+                    "Roof inspections are easiest in dry October weather. Missing or cracked shingles "
+                    "caught now won't become leaks during November rain."
+                ),
+                raw_body=None,
+                source_url=None,
+                source_display_name="Pantopus Seasonal",
+                category="seasonal",
+                region="clark_county",
+                openai_api_key="key",
+            )
+
+        assert text is None
+        assert error == "ai_quality_gate:skipped"
+        mock_mod.OpenAI.assert_not_called()
 
     def test_retry_on_too_long(self):
         long_text = "x" * 501

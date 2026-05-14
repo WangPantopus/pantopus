@@ -80,6 +80,7 @@ function findHandler(method, path) {
 const getInviteHandler = findHandler('GET', '/invitations/token/:token');
 const acceptInviteHandler = findHandler('POST', '/invitations/token/:token/accept');
 const declineInviteHandler = findHandler('POST', '/invitations/token/:token/decline');
+const createInviteHandler = findHandler('POST', '/:id/invite');
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -231,8 +232,8 @@ describe('HomeInvite token hashing (AUTH-3.1)', () => {
         status: 'pending',
         token: null,
         token_hash: expectedHash,
-        proposed_role: 'member',
-        proposed_role_base: 'member',
+        proposed_role: 'owner',
+        proposed_role_base: 'owner',
         proposed_preset_key: 'claim_merge:claim-2',
         expires_at: new Date(Date.now() + 86400000).toISOString(),
       },
@@ -254,12 +255,14 @@ describe('HomeInvite token hashing (AUTH-3.1)', () => {
       home_id: 'home-1',
       subject_id: 'owner-1',
       owner_status: 'verified',
+      is_primary_owner: true,
     }]);
     seedTable('HomeOwnershipClaim', [
       {
         id: 'claim-1',
         home_id: 'home-1',
         claimant_user_id: 'owner-1',
+        claim_type: 'owner',
         state: 'approved',
         claim_phase_v2: 'verified',
         created_at: '2026-04-04T00:00:00.000Z',
@@ -268,6 +271,7 @@ describe('HomeInvite token hashing (AUTH-3.1)', () => {
         id: 'claim-2',
         home_id: 'home-1',
         claimant_user_id: 'user-1',
+        claim_type: 'owner',
         state: 'submitted',
         claim_phase_v2: 'under_review',
         identity_status: 'verified',
@@ -287,12 +291,41 @@ describe('HomeInvite token hashing (AUTH-3.1)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.merged).toBe(true);
     expect(res.body.claim?.id).toBe('claim-2');
-    expect(res.body.claim?.claim_phase_v2).toBe('merged_into_household');
+    expect(res.body.claim?.claim_phase_v2).toBe('verified');
+    expect(res.body.claim?.terminal_reason).toBe('none');
+    expect(res.body.accepted_as_owner).toBe(true);
 
     const mergedClaim = getTable('HomeOwnershipClaim').find((claim) => claim.id === 'claim-2');
-    expect(mergedClaim.claim_phase_v2).toBe('merged_into_household');
-    expect(mergedClaim.terminal_reason).toBe('merged_via_invite');
+    expect(mergedClaim.claim_phase_v2).toBe('verified');
+    expect(mergedClaim.terminal_reason).toBe('none');
+    expect(mergedClaim.merged_into_claim_id).toBe(null);
+    const invitedOwner = getTable('HomeOwner').find((owner) => owner.subject_id === 'user-1');
+    expect(invitedOwner).toEqual(expect.objectContaining({
+      owner_status: 'verified',
+      is_primary_owner: false,
+      verification_tier: 'weak',
+    }));
     expect(getTable('HomeInvite')[0].status).toBe('accepted');
+  });
+
+  test('generic invite creation rejects reserved claim-merge preset keys', async () => {
+    seedTable('HomeInvite', []);
+
+    const req = mockReq({
+      params: { id: 'home-1' },
+      body: {
+        user_id: 'user-2',
+        relationship: 'owner',
+        preset_key: 'claim_merge:claim-2',
+      },
+    });
+    const res = mockRes();
+
+    await createInviteHandler(req, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.code).toBe('CLAIM_MERGE_PRESET_FORBIDDEN');
+    expect(getTable('HomeInvite')).toHaveLength(0);
   });
 
   test('decline-invite lookup works via token hash', async () => {

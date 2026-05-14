@@ -7,7 +7,7 @@
  *
  * Enforcement rules:
  *  1. Address must have a valid AddressClaim (status = 'verified') —
- *     or an escalated method (landlord_invite, admin_override, owner_bootstrap)
+ *     or an escalated method (landlord_invite, admin_override, owner_bootstrap, owner_invite)
  *  2. Multi-unit buildings require a unit number
  *  3. Verification tier determines role/permissions
  *  4. Household conflict handling (attach policy)
@@ -27,6 +27,7 @@ const VERIFICATION_ROLE_MAP = {
   mail_code:          'member',       // NEVER admin; limited permissions
   landlord_approval:  'lease_resident',
   landlord_invite:    'lease_resident',
+  owner_invite:       'owner',
   doc_upload:         null,           // role derived from claim_type
   manual_review:      null,           // role derived from claim_type
 };
@@ -36,6 +37,7 @@ const ESCALATED_METHODS = new Set([
   'landlord_invite',
   'admin_override',
   'owner_bootstrap',
+  'owner_invite',
 ]);
 
 /** claim_type → default occupancy role. */
@@ -59,7 +61,7 @@ class OccupancyAttachService {
    * @param {string} params.userId         - User UUID
    * @param {string} params.method         - How the user was verified:
    *   'autocomplete_ok' | 'mail_code' | 'landlord_approval' | 'landlord_invite' |
-   *   'doc_upload' | 'manual_review' | 'admin_override' | 'owner_bootstrap'
+   *   'doc_upload' | 'manual_review' | 'admin_override' | 'owner_bootstrap' | 'owner_invite'
    * @param {string} [params.claimType]    - 'owner' | 'admin' | 'resident' | 'member'
    * @param {string} [params.roleOverride] - Force a specific role (for admin/system paths)
    * @param {string} [params.unitNumber]   - Unit/apt for multi-unit buildings
@@ -377,6 +379,7 @@ class OccupancyAttachService {
       case 'autocomplete_ok':
       case 'mail_code':
       case 'landlord_invite':
+      case 'owner_invite':
       case 'admin_override':
       case 'doc_upload':
         return 'verified';

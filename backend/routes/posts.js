@@ -8,6 +8,19 @@ const validate = require('../middleware/validate');
 const Joi = require('joi');
 const logger = require('../utils/logger');
 const { computeTrustState, getPostingIdentities, canPostToAudience, canPostToPlace } = require('../utils/trustState');
+const { canPostWithIdentityToAudience } = require('../utils/identityPolicy');
+const {
+  ensureLocalProfile,
+  getPersonaById,
+  getPersonaMembershipForUser,
+  getViewerTierRankForPersona,
+} = require('../utils/identityProfiles');
+const { isPersonaEnabled } = require('../utils/featureFlags');
+const {
+  SAFE_CREATOR_SELECT,
+  serializeUserAsLocalIdentity,
+  serializeUserIdentityForViewer,
+} = require('../serializers/identitySerializers');
 const { matchBusinessesForPost } = require('../jobs/organicMatch');
 const { checkHomePermission, getActiveOccupancy, mapLegacyRole } = require('../utils/homePermissions');
 const { computeUtilityScore } = require('../utils/feedRanking');
@@ -29,6 +42,7 @@ function _buildSeededItem(fact, timestamp, systemAuthor) {
     content: fact.body,
     media_urls: [],
     media_types: [],
+    media_thumbnails: [],
     media_live_urls: [],
     post_type: fact.post_type || 'general',
     post_format: 'standard',
@@ -78,18 +92,20 @@ function _buildSeededItem(fact, timestamp, systemAuthor) {
 
 const DISMISSED_FACTS_CAP = 50;
 const notificationService = require('../services/notificationService');
+const { isFanBlockedFromPersona } = require('../services/personaBlockService');
+const { runPostCreatedHooks } = require('../services/postCreationHooksService');
 const {
   normalizeFeedPostRow,
   normalizeMediaUrls,
   getMuteAndHideFilters,
   applyMuteHideFilters,
   enrichWithUserStatus,
+  attachIdentityAuthors,
   applyPostLocationPrivacy,
   applyPostLocationPrivacyBatch,
   applyCursorCondition,
   buildCursorPagination,
   FEED_POST_SELECT,
-  CREATOR_SELECT,
 } = feedService;
 
 // ============ VALIDATION SCHEMAS ============
@@ -103,7 +119,7 @@ const POST_TYPES = [
   'resources_howto', 'progress_wins',
 ];
 
-const FEED_SURFACES = ['place', 'following', 'connections'];
+const FEED_SURFACES = ['place', 'connections', 'personas'];
 
 const PLACE_POST_TYPES = [
   'ask_local', 'recommendation', 'event', 'lost_found',
@@ -152,15 +168,37 @@ function toDbSafetyKind(kind) {
   return kind ? (SAFETY_KIND_TO_DB[kind] || kind) : null;
 }
 
-const POST_AS_TYPES = ['personal', 'business', 'home'];
-const AUDIENCE_TYPES = ['connections', 'followers', 'network', 'nearby', 'saved_place', 'household', 'neighborhood', 'target_area'];
+const POST_AS_TYPES = ['personal', 'business', 'home', 'persona'];
+const AUDIENCE_TYPES = ['connections', 'followers', 'network', 'nearby', 'saved_place', 'household', 'neighborhood', 'target_area', 'national', 'public'];
 const LOCAL_AUDIENCES = ['nearby', 'neighborhood', 'saved_place', 'target_area'];
+
+const TOPIC_VALUES = ['sports'];
+const SPORTS_SCOPES = ['local', 'regional', 'national', 'youth', 'school', 'rec', 'watch'];
+const SPORTS_LEAGUES = ['nba', 'nfl', 'mls', 'nwsl', 'mlb', 'nhl', 'college', 'youth', 'other'];
+const DISTRIBUTION_TARGET_VALUES = ['place', 'connections', 'persona_followers', 'public', 'country:US'];
+const METERS_PER_MILE = 1609.34;
+const LEGACY_LOCAL_POST_RADIUS_METERS = 40000; // ~25 miles
+const MAX_POST_RADIUS_MILES = 25000;
+
+function resolvePostVisibilityRadiusMeters(post) {
+  if (post.visibility !== 'radius') {
+    return LEGACY_LOCAL_POST_RADIUS_METERS;
+  }
+
+  const radiusMiles = Number(post.radius_miles);
+  if (!Number.isFinite(radiusMiles) || radiusMiles <= 0) {
+    return LEGACY_LOCAL_POST_RADIUS_METERS;
+  }
+
+  return Math.round(Math.min(radiusMiles, MAX_POST_RADIUS_MILES) * METERS_PER_MILE);
+}
 
 const createPostSchema = Joi.object({
   content: Joi.string().min(1).max(5000).required(),
   title: Joi.string().max(255).optional(),
   mediaUrls: Joi.array().items(Joi.string().uri()).max(10).optional(),
   mediaTypes: Joi.array().items(Joi.string().valid('image', 'video', 'live_photo')).optional(),
+  mediaThumbnails: Joi.array().items(Joi.string().uri().allow('', null)).max(10).optional(),
   mediaLiveUrls: Joi.array().items(Joi.string().uri().allow('', null)).max(10).optional(),
   postType: Joi.string().valid(...POST_TYPES).default('general'),
   postFormat: Joi.string().valid(...POST_FORMATS).default('standard'),
@@ -170,7 +208,8 @@ const createPostSchema = Joi.object({
   homeId: Joi.string().uuid().optional(),
   // New: Post As + Audience
   postAs: Joi.string().valid(...POST_AS_TYPES).default('personal'),
-  audience: Joi.string().valid(...AUDIENCE_TYPES).default('nearby'),
+  audience: Joi.string().valid(...AUDIENCE_TYPES).optional(),
+  identityContextId: Joi.string().uuid().optional(),
   targetPlaceId: Joi.string().uuid().optional(),
   businessId: Joi.string().uuid().optional(),
   isStory: Joi.boolean().default(false),
@@ -211,10 +250,9 @@ const createPostSchema = Joi.object({
   refListingId: Joi.string().uuid().optional(),
   refTaskId: Joi.string().uuid().optional(),
   // Radius for radius-based visibility
-  radiusMiles: Joi.number().min(1).max(100).optional(),
+  radiusMiles: Joi.number().min(1).max(25000).optional(),
   // v1.1: Distribution targets & cross-post
-  distributionTargets: Joi.array().items(Joi.string().valid('place', 'followers', 'connections')).optional(),
-  crossPostToFollowers: Joi.boolean().default(false),
+  distributionTargets: Joi.array().items(Joi.string().valid(...DISTRIBUTION_TARGET_VALUES)).optional(),
   crossPostToConnections: Joi.boolean().default(false),
   // v1.1: GPS timestamp for freshness validation
   gpsTimestamp: Joi.date().iso().optional(),
@@ -233,6 +271,19 @@ const createPostSchema = Joi.object({
   geocodeProvider: Joi.string().max(50).allow('', null).optional(),
   geocodeAccuracy: Joi.string().max(50).allow('', null).optional(),
   geocodePlaceId: Joi.string().max(255).allow('', null).optional(),
+  // Sports topic lane (Phase 1)
+  topic: Joi.string().valid(...TOPIC_VALUES).optional(),
+  sportsScope: Joi.string().valid(...SPORTS_SCOPES).optional(),
+  postMetadata: Joi.object({
+    league: Joi.string().valid(...SPORTS_LEAGUES),
+    team_tag: Joi.string().max(64),
+    event_key: Joi.string().max(64),
+    is_game_thread: Joi.boolean(),
+    is_watch_prompt: Joi.boolean(),
+    fresh_until: Joi.string().isoDate(),
+    /** Sports Pulse starter / composer template (matches mobile SPORTS_PULSE_STARTERS keys). */
+    starter_key: Joi.string().valid('anyone_watching', 'best_place_watch', 'youth_signups', 'pickup_weekend').optional(),
+  }).unknown(true).optional(),
 }).custom((value, helpers) => {
   if ((value.latitude != null) !== (value.longitude != null)) {
     return helpers.error('any.custom', { message: 'latitude and longitude must both be provided together' });
@@ -249,6 +300,7 @@ const updatePostSchema = Joi.object({
   title: Joi.string().max(255).allow(null, ''),
   mediaUrls: Joi.array().items(Joi.string().uri()).max(10),
   mediaTypes: Joi.array().items(Joi.string().valid('image', 'video', 'live_photo')),
+  mediaThumbnails: Joi.array().items(Joi.string().uri().allow('', null)).max(10),
   mediaLiveUrls: Joi.array().items(Joi.string().uri().allow('', null)).max(10),
   postType: Joi.string().valid(...POST_TYPES),
   postFormat: Joi.string().valid(...POST_FORMATS),
@@ -272,7 +324,7 @@ const updatePostSchema = Joi.object({
   lostFoundType: Joi.string().valid('lost', 'found').allow(null),
   lostFoundContactPref: Joi.string().valid('dm', 'comment', 'phone').allow(null),
   serviceCategory: Joi.string().max(100).allow(null, ''),
-  radiusMiles: Joi.number().min(1).max(100).allow(null),
+  radiusMiles: Joi.number().min(1).max(25000).allow(null),
 }).min(1);
 
 const createCommentSchema = Joi.object({
@@ -313,7 +365,7 @@ function derivePurposeFromPostType(postType) {
 
 /** Map surface tab names to DB-valid surface enum values */
 function normalizeSurface(surface) {
-  const map = { place: 'nearby', nearby: 'nearby', following: 'followers', connections: 'connections' };
+  const map = { place: 'nearby', nearby: 'nearby', connections: 'connections' };
   return map[surface] || 'nearby';
 }
 
@@ -406,17 +458,37 @@ async function attachFilesToComments(comments) {
   }));
 }
 
-
-
-async function isFollowerOfUser(viewerId, authorId) {
-  const { data: follow } = await supabaseAdmin
-    .from('UserFollow')
-    .select('id')
-    .eq('follower_id', viewerId)
-    .eq('following_id', authorId)
-    .maybeSingle();
-  return !!follow;
+function serializeCommentForViewer(comment) {
+  if (!comment) return null;
+  const { author: rawAuthor, ...safe } = comment;
+  return {
+    ...safe,
+    author: serializeUserAsLocalIdentity(rawAuthor),
+  };
 }
+
+function serializeLikeForViewer(like) {
+  if (!like) return null;
+  const { user: rawUser, ...safe } = like;
+  const identity = serializeUserIdentityForViewer(rawUser);
+  return {
+    ...safe,
+    user: identity,
+    identity,
+  };
+}
+
+async function serializePostForViewer(post, viewerUserId) {
+  if (!post) return null;
+  const [serialized] = await attachIdentityAuthors([post], viewerUserId);
+  return serialized || post;
+}
+
+async function serializePostsForViewer(posts, viewerUserId) {
+  return attachIdentityAuthors(posts || [], viewerUserId);
+}
+
+
 
 async function isConnectedToUser(viewerId, authorId) {
   const { data: rel } = await supabaseAdmin
@@ -428,6 +500,29 @@ async function isConnectedToUser(viewerId, authorId) {
     )
     .maybeSingle();
   return !!rel;
+}
+
+async function isPersonaAudienceMember(viewerId, personaId) {
+  if (!viewerId || !personaId) return false;
+  const membership = await getPersonaMembershipForUser(personaId, viewerId);
+  return ['active', 'past_due'].includes(membership?.status);
+}
+
+async function canViewPersonaPostAudience(post, viewerId) {
+  if (!viewerId || !post?.identity_context_id) return false;
+
+  const requiredRank = Number(post.target_tier_rank || 0);
+  if (!requiredRank) {
+    return isPersonaAudienceMember(viewerId, post.identity_context_id);
+  }
+
+  const rank = await getViewerTierRankForPersona(post.identity_context_id, viewerId);
+  if (rank >= requiredRank) return true;
+
+  const membership = await getPersonaMembershipForUser(post.identity_context_id, viewerId);
+  return ['active', 'past_due'].includes(membership?.status)
+    && membership.relationship_type === 'subscriber'
+    && requiredRank <= 2;
 }
 
 async function hasExternalShare(postId) {
@@ -443,6 +538,15 @@ async function hasExternalShare(postId) {
 const canViewPost = async (post, userId) => {
   if (post.user_id === userId) return true;
 
+  if (
+    userId
+    && post.identity_context_type === 'persona'
+    && post.identity_context_id
+    && await isFanBlockedFromPersona(post.identity_context_id, userId)
+  ) {
+    return false;
+  }
+
   if (!userId) {
     // Direct-link views from outside the app should only work for posts that
     // are already public, or that a user explicitly shared externally.
@@ -453,27 +557,39 @@ const canViewPost = async (post, userId) => {
   const targets = Array.isArray(post.distribution_targets) ? post.distribution_targets : [];
   if (targets.length > 0) {
     if (targets.includes('place')) return true;
-    if (targets.includes('followers') && await isFollowerOfUser(userId, post.user_id)) return true;
-    if (targets.includes('connections') && await isConnectedToUser(userId, post.user_id)) return true;
+    if (targets.includes('persona_followers') && await canViewPersonaPostAudience(post, userId)) return true;
+    if (targets.includes('public')) return true;
+    // Legacy 'followers' target is treated as 'connections' after the
+    // peer-follow removal — see migration 140.
+    if ((targets.includes('connections') || targets.includes('followers')) && await isConnectedToUser(userId, post.user_id)) return true;
+    if (
+      targets.includes('country:US')
+      && post.audience === 'national'
+      && post.origin === 'curator'
+    ) {
+      return true;
+    }
     return false;
   }
 
   if (post.visibility === 'followers' || post.audience === 'followers') {
-    return isFollowerOfUser(userId, post.user_id);
+    // Persona-context posts target Beacon members (PersonaMembership).
+    // Personal posts no longer use a peer 'followers' audience — any straggler
+    // value here is treated as 'connections' for safety.
+    if (post.identity_context_type === 'persona') {
+      return canViewPersonaPostAudience(post, userId);
+    }
+    return isConnectedToUser(userId, post.user_id);
   }
 
   if (post.visibility === 'connections' || post.audience === 'connections') {
     return isConnectedToUser(userId, post.user_id);
   }
 
-  if (LOCAL_AUDIENCES.includes(post.audience)) {
-    return true;
-  }
-
   if (post.visibility === 'public') return true;
 
   if (['neighborhood', 'city', 'radius'].includes(post.visibility)) {
-    // Allow if post has coordinates and viewer is within ~25 miles / 40km
+    const visibilityRadiusMeters = resolvePostVisibilityRadiusMeters(post);
     if (post.latitude && post.longitude) {
       const { data: viewer } = await supabaseAdmin
         .from('User')
@@ -487,7 +603,7 @@ const canViewPost = async (post, userId) => {
             post.latitude, post.longitude,
             viewer.latitude, viewer.longitude
           );
-          if (distMeters <= 40000) return true; // ~25 miles
+          if (distMeters <= visibilityRadiusMeters) return true;
         }
         // Fallback: city match
         if (viewer.city && post.location_name &&
@@ -518,8 +634,12 @@ const canViewPost = async (post, userId) => {
 const POST_VISIBILITY_SELECT = [
   'id',
   'user_id',
+  'identity_context_type',
+  'identity_context_id',
+  'target_tier_rank',
   'visibility',
   'audience',
+  'origin',
   'latitude',
   'longitude',
   'location_name',
@@ -543,33 +663,6 @@ function postEngagementNotificationLink(post, postId) {
     };
   }
   return { link: `/posts/${postId}`, extraMeta: {} };
-}
-
-function newPostFanoutLinkAndMeta(post) {
-  if (post?.ref_task_id) {
-    return {
-      link: `/gigs/${post.ref_task_id}`,
-      meta: {
-        post_id: post.id,
-        ref_task_id: post.ref_task_id,
-        gig_id: post.ref_task_id,
-      },
-    };
-  }
-  if (post?.ref_listing_id) {
-    return {
-      link: `/listing/${post.ref_listing_id}`,
-      meta: {
-        post_id: post.id,
-        ref_listing_id: post.ref_listing_id,
-        listing_id: post.ref_listing_id,
-      },
-    };
-  }
-  return {
-    link: `/posts/${post.id}`,
-    meta: { post_id: post.id },
-  };
 }
 
 async function requireVisiblePost({ postId, userId, res, select = POST_VISIBILITY_SELECT }) {
@@ -769,7 +862,7 @@ function resolveHomeCoordinates(home) {
 router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
   try {
     const {
-      content, title, mediaUrls, mediaTypes, mediaLiveUrls, postType, postFormat,
+      content, title, mediaUrls, mediaTypes, mediaThumbnails, mediaLiveUrls, postType, postFormat,
       visibility, visibilityScope, locationPrecision,
       homeId, latitude, longitude, locationName, locationAddress,
       tags, eventDate, eventEndDate, eventVenue,
@@ -781,11 +874,27 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
       dealExpiresAt,
       lostFoundType,
       serviceCategory, refListingId, refTaskId, radiusMiles,
-      postAs: rawPostAs, audience, targetPlaceId, businessId, isStory,
-      distributionTargets, crossPostToFollowers, crossPostToConnections, gpsTimestamp, gpsLatitude, gpsLongitude,
+      postAs: rawPostAs, audience, identityContextId, targetPlaceId, businessId, isStory,
+      distributionTargets, crossPostToConnections, gpsTimestamp, gpsLatitude, gpsLongitude,
       purpose, profileVisibilityScope, showOnProfile,
       geocodeProvider, geocodeAccuracy, geocodePlaceId,
+      topic, sportsScope, postMetadata,
     } = req.body;
+    // P2.4 / unified-IA §4.1 — defense-in-depth. Persona-context posts
+    // must go through the audience-zone composer (P2.5) and the
+    // /api/personas/:id/posts (or broadcast) routes, not /api/posts.
+    // Even if a malicious or stale client sends postAs='persona' here,
+    // refuse with a clear error so the route can never accidentally
+    // create cross-zone Post rows. UI enforcement lives in PostComposer.tsx.
+    //
+    // Beacon/broadcast publishing now has its own route that writes
+    // persona-context Post rows with the proper distribution and tier fields.
+    if (rawPostAs === 'persona') {
+      return res.status(400).json({
+        error: 'Persona-context posts must use /api/personas/:id/posts',
+        code: 'wrong_post_route',
+      });
+    }
     // Infer postAs from homeId/businessId when client sends 'personal' (backwards compat)
     const postAs = (rawPostAs === 'personal' && homeId) ? 'home'
       : (rawPostAs === 'personal' && businessId) ? 'business'
@@ -798,15 +907,54 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
       ? `phone|${contactPhone}` : _resolvedContactPref;
     // Auto-fill safetyHappenedAt if not provided for alert posts
     const safetyHappenedAt = req.body.safetyHappenedAt || (postType === 'alert' ? new Date().toISOString() : null);
-    const userId = req.user.id;
-    const requestedAudience = audience || 'nearby';
+	    const userId = req.user.id;
+	    let requestedAudience = audience || (postAs === 'persona' ? 'followers' : 'nearby');
+	    if (postAs === 'business' && (requestedAudience === 'followers' || visibility === 'followers')) {
+	      return res.status(400).json({
+	        error: 'Business posts can no longer target followers. Use Target Area or Public instead.',
+	        code: 'business_followers_audience_removed',
+	      });
+	    }
+	    if (postAs !== 'persona' && requestedAudience === 'followers') {
+	      requestedAudience = 'connections';
+	    }
+    const requestedVisibility = postAs !== 'persona' && visibility === 'followers'
+      ? 'connections'
+      : visibility;
+    if (postAs === 'persona' && !isPersonaEnabled()) {
+      return res.status(404).json({ error: 'Beacons are not enabled.' });
+    }
     // Curator accounts are platform-owned content seeders — they post with
     // explicit lat/lng and skip home/trust/place-eligibility checks.
     const isCurator = req.user.accountType === 'curator';
+
+    // Origin is server-derived from the caller's account type. It is the
+    // durable "is this a seeded post?" marker. Never trusted from the body.
+    const origin =
+      req.user.accountType === 'curator' ? 'curator' :
+      req.user.accountType === 'system'  ? 'system'  :
+      'user';
+
+    // 'national' audience is a curator-only distribution (Sports lane Phase 1).
+    // Reject early before any expensive validation so misuse returns a clear 403.
+    if (requestedAudience === 'national' && !isCurator) {
+      return res.status(403).json({ error: 'National audience is restricted to curator accounts.' });
+    }
+    const requestedDistributionTargets = Array.isArray(distributionTargets) ? distributionTargets : [];
+    const hasCountryDistributionTarget = requestedDistributionTargets.some((target) => (
+      typeof target === 'string' && target.startsWith('country:')
+    ));
+    if (hasCountryDistributionTarget && !isCurator) {
+      return res.status(403).json({ error: 'Country-wide distribution is restricted to curator accounts.' });
+    }
+    if (hasCountryDistributionTarget && requestedAudience !== 'national') {
+      return res.status(400).json({ error: 'Country-wide distribution requires national audience.' });
+    }
+
     let homeContext = null;
 
     // ── Post As validation ──
-    if (homeId) {
+    if (homeId && postAs !== 'persona') {
       const { data: home, error: homeErr } = await supabaseAdmin
         .from('Home')
         .select('id, owner_id, name, address, city, state, location')
@@ -874,6 +1022,26 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
       }
     }
 
+    let personaContext = null;
+    if (postAs === 'persona') {
+      const policy = canPostWithIdentityToAudience({
+        identityType: 'persona',
+        audience: requestedAudience,
+      });
+      if (!policy.allowed) {
+        return res.status(403).json({ error: policy.reason, code: policy.code });
+      }
+
+      if (!identityContextId) {
+        return res.status(400).json({ error: 'identityContextId is required when posting as a Beacon.' });
+      }
+
+      personaContext = await getPersonaById(identityContextId);
+      if (!personaContext || personaContext.user_id !== userId || personaContext.status !== 'active') {
+        return res.status(403).json({ error: 'You cannot post as this Beacon.' });
+      }
+    }
+
     let effectiveLatitude = latitude;
     let effectiveLongitude = longitude;
     let effectiveLocationName = locationName;
@@ -897,7 +1065,7 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
 
     // ── Audience guardrails ──
     // Curator accounts bypass trust-state checks — they are platform-owned, not a real neighbor
-    if (!isCurator) {
+    if (!isCurator && postAs !== 'persona') {
       if (effectiveLatitude != null && effectiveLongitude != null) {
         const trustState = isHomeIdentityPost
           ? { level: 'verified_resident', roleBase: homeContext.roleBase }
@@ -925,8 +1093,10 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
 
     // ── v1.1: Place posting eligibility gate ──
     const placeAudiences = ['nearby', 'neighborhood', 'saved_place', 'target_area'];
-    const isPlacePost = placeAudiences.includes(requestedAudience) ||
-      (distributionTargets && distributionTargets.includes('place'));
+    const isPlacePost = postAs !== 'persona' && (
+      placeAudiences.includes(requestedAudience) ||
+      (distributionTargets && distributionTargets.includes('place'))
+    );
 
     if (isPlacePost && (effectiveLatitude == null || effectiveLongitude == null)) {
       return res.status(400).json({ error: 'Place posts require a target location or a verified home address.' });
@@ -1002,17 +1172,33 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
     const effectiveLocationPrecision =
       (isPlacePost && postAs === 'home') ? 'approx_area' : (locationPrecision || 'approx_area');
 
+    const localProfile = postAs === 'personal' ? await ensureLocalProfile(userId) : null;
+    const identityContextType = postAs === 'persona' ? 'persona'
+      : postAs === 'home' ? 'home'
+      : postAs === 'business' ? 'business'
+      : 'local';
+    const resolvedIdentityContextId = postAs === 'persona' ? personaContext.id
+      : postAs === 'home' ? (homeId || null)
+      : postAs === 'business' ? (businessId || null)
+      : (localProfile?.id || null);
+
     const postData = {
       user_id: userId,
+      author_user_id: userId,
+      identity_context_type: identityContextType,
+      identity_context_id: resolvedIdentityContextId,
       home_id: homeId || null,
       title: title || null,
       content,
       media_urls: mediaUrls || [],
       media_types: mediaTypes || [],
+      media_thumbnails: mediaThumbnails || [],
       media_live_urls: mediaLiveUrls || [],
       post_type: postType || 'general',
       post_format: postFormat || 'standard',
-      visibility: visibility || 'neighborhood',
+      visibility: postAs === 'persona'
+        ? (requestedAudience === 'public' ? 'public' : 'followers')
+        : (requestedVisibility || 'neighborhood'),
       visibility_scope: visibilityScope || 'neighborhood',
       location_precision: effectiveLocationPrecision,
       latitude: effectiveLatitude ?? null,
@@ -1060,6 +1246,11 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
       // All posts start as 'open'; only Ask posts can be transitioned to 'solved'.
       // DB CHECK constraint requires state IN ('open', 'solved') — null is not allowed.
       state: 'open',
+      // Sports topic lane (Phase 1)
+      topic: topic || null,
+      sports_scope: sportsScope || null,
+      post_metadata: postMetadata || {},
+      origin,
     };
 
     // v1.1: Compute distribution_targets from audience + cross-post toggles
@@ -1070,23 +1261,40 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
       // Auto-compute from audience
       const targets = [];
       const placeAudiences = ['nearby', 'neighborhood', 'saved_place', 'target_area'];
-      if (placeAudiences.includes(requestedAudience)) targets.push('place');
-      if (requestedAudience === 'followers') targets.push('followers');
-      if (requestedAudience === 'connections') targets.push('connections');
-      if (requestedAudience === 'network') { targets.push('followers'); targets.push('connections'); }
+      if (postAs === 'persona') {
+        if (requestedAudience === 'followers') targets.push('persona_followers');
+        if (requestedAudience === 'public') targets.push('public');
+      } else {
+	        if (placeAudiences.includes(requestedAudience)) targets.push('place');
+	        if (requestedAudience === 'connections') targets.push('connections');
+	        if (requestedAudience === 'network') targets.push('connections');
+	      }
+      // National audience is country-scoped so the model stays correct when
+      // Pantopus adds more countries. Do NOT use a bare 'national' marker.
+      if (requestedAudience === 'national') targets.push('country:US');
 
-      // Cross-post toggles (only when primary is place)
+      // Cross-post toggle (only when primary is place)
       if (targets.includes('place')) {
-        if (crossPostToFollowers && !targets.includes('followers')) targets.push('followers');
         if (crossPostToConnections && !targets.includes('connections')) targets.push('connections');
       }
 
       postData.distribution_targets = targets;
     }
 
+    // Safety net: if a client/seeder supplies audience='national' with an
+    // explicit distributionTargets that omits the country scope, stamp it.
+    if (requestedAudience === 'national'
+        && Array.isArray(postData.distribution_targets)
+        && !postData.distribution_targets.includes('country:US')) {
+      postData.distribution_targets = Array.from(new Set([
+        ...postData.distribution_targets,
+        'country:US',
+      ]));
+    }
+
     // v1.2: Auto-detect visitor post (user's home is far from posting location)
     // Curator accounts have no home — skip visitor detection (platform-owned, not a real neighbor)
-    if (!isCurator && (targetPlaceId || (effectiveLatitude != null && effectiveLongitude != null))) {
+    if (!isCurator && postAs !== 'persona' && (targetPlaceId || (effectiveLatitude != null && effectiveLongitude != null))) {
       try {
         const { data: userHome } = await supabaseAdmin
           .from('HomeOccupancy')
@@ -1125,7 +1333,7 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
     if (effectiveLatitude != null && effectiveLongitude != null) {
       postData.effective_latitude = parseFloat(effectiveLatitude);
       postData.effective_longitude = parseFloat(effectiveLongitude);
-    } else if (homeId) {
+    } else if (homeId && postAs !== 'persona') {
       try {
         const { data: home } = await supabaseAdmin
           .from('Home')
@@ -1142,13 +1350,36 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
       }
     }
 
+    if (postAs === 'persona') {
+      Object.assign(postData, {
+        home_id: null,
+        latitude: null,
+        longitude: null,
+        effective_latitude: null,
+        effective_longitude: null,
+        location_name: null,
+        location_address: null,
+        target_place_id: null,
+        radius_miles: null,
+        gps_timestamp: null,
+        gps_latitude: null,
+        gps_longitude: null,
+        geocode_provider: null,
+        geocode_mode: null,
+        geocode_accuracy: null,
+        geocode_place_id: null,
+        geocode_source_flow: null,
+        geocode_created_at: null,
+      });
+    }
+
     // Compute initial utility_score so the post ranks properly before the background job runs
     postData.utility_score = computeUtilityScore(postData);
 
     const { data: post, error } = await supabaseAdmin
       .from('Post')
       .insert(postData)
-      .select(`*, creator:user_id (${CREATOR_SELECT}), business_author:business_author_id (${CREATOR_SELECT}), home:home_id (id, address, city)`)
+      .select(`*, creator:user_id (${SAFE_CREATOR_SELECT}), business_author:business_author_id (${SAFE_CREATOR_SELECT}), home:home_id (id, address, city)`)
       .single();
 
     if (error) {
@@ -1174,81 +1405,23 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
       });
     }
 
-    // Fire-and-forget: notify followers/connections of new post
-    const targets = postData.distribution_targets || [];
-    const notifyFollowers = targets.includes('followers');
-    const notifyConnections = targets.includes('connections');
-    if (notifyFollowers || notifyConnections) {
-      setImmediate(async () => {
-        try {
-          // Rate limit: skip if user posted 3+ notifying posts in the last hour
-          const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-          const { count: recentCount } = await supabaseAdmin
-            .from('Post')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId)
-            .gte('created_at', oneHourAgo)
-            .overlaps('distribution_targets', ['followers', 'connections']);
-          if (recentCount >= 3) {
-            logger.info('[newPostNotify] Skipping — rate limit (3+ posts/hour)', { userId, postId: post.id });
-            return;
-          }
+    runPostCreatedHooks({
+      post,
+      userId,
+      personaContext,
+      targets: postData.distribution_targets || [],
+    });
 
-          const recipientIds = new Set();
-
-          if (notifyFollowers) {
-            const { data: followers } = await supabaseAdmin
-              .from('UserFollow')
-              .select('follower_id')
-              .eq('following_id', userId);
-            (followers || []).forEach(f => recipientIds.add(f.follower_id));
-          }
-
-          if (notifyConnections) {
-            const { data: rels } = await supabaseAdmin
-              .from('Relationship')
-              .select('requester_id, addressee_id')
-              .eq('status', 'accepted')
-              .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
-            (rels || []).forEach(r => {
-              recipientIds.add(r.requester_id === userId ? r.addressee_id : r.requester_id);
-            });
-          }
-
-          // Never notify the author themselves
-          recipientIds.delete(userId);
-
-          if (recipientIds.size === 0) return;
-
-          const displayName = await getUserDisplayName(userId);
-          const bodyText = post.title || (post.content || '').slice(0, 80);
-          // Cap at 200 recipients to prevent fan-out explosion
-          const capped = [...recipientIds].slice(0, 200);
-
-          const { link: fanoutLink, meta: fanoutMeta } = newPostFanoutLinkAndMeta(post);
-
-          const notifications = capped.map(recipientId => ({
-            userId: recipientId,
-            type: 'new_post',
-            title: `${displayName} shared a new post`,
-            body: bodyText,
-            icon: '📝',
-            link: fanoutLink,
-            metadata: fanoutMeta,
-            contextType: 'post',
-            contextId: post.id,
-          }));
-
-          await notificationService.createBulkNotifications(notifications);
-        } catch (err) {
-          logger.warn('[newPostNotify] Notification failed (non-blocking)', { postId: post.id, error: err.message });
-        }
-      });
-    }
+    const responsePost = await serializePostForViewer({
+      ...post,
+      media_urls: normalizeMediaUrls(post.media_urls),
+      media_thumbnails: normalizeMediaUrls(post.media_thumbnails),
+      media_live_urls: normalizeMediaUrls(post.media_live_urls),
+    }, userId);
 
     res.status(201).json({
       message: 'Post created successfully',
-      post: { ...post, media_urls: normalizeMediaUrls(post.media_urls), media_live_urls: normalizeMediaUrls(post.media_live_urls) },
+      post: responsePost,
     });
   } catch (err) {
     logger.error('Post creation error', { error: err.message, userId: req.user.id });
@@ -1263,7 +1436,7 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
  * GET /api/posts/feed — v1.1 Surface-aware feed with cursor pagination
  *
  * Query params:
- *   - surface                — 'place' | 'following' | 'connections' (default: 'place')
+ *   - surface                — 'place' | 'connections' | 'personas'
  *   - cursorCreatedAt, cursorId — cursor for keyset pagination
  *   - limit                  — items per page (default 20)
  *   - postType               — filter by post type
@@ -1276,7 +1449,21 @@ router.post('/', verifyToken, validate(createPostSchema), async (req, res) => {
 router.get('/feed', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { surface, limit = 20, cursorCreatedAt, cursorId, postType, latitude, longitude, radiusMiles, tags } = req.query;
+    const {
+      surface,
+      limit = 20,
+      cursorCreatedAt,
+      cursorId,
+      cursorRankBucket,
+      postType,
+      latitude,
+      longitude,
+      radiusMiles,
+      tags,
+      topic,
+      sportsMode,
+      eventKey,
+    } = req.query;
 
     if (!surface || !FEED_SURFACES.includes(surface)) {
       return res.status(400).json({
@@ -1284,8 +1471,24 @@ router.get('/feed', verifyToken, async (req, res) => {
         validSurfaces: FEED_SURFACES,
       });
     }
+    if (surface === 'personas' && !isPersonaEnabled()) {
+      return res.status(404).json({ error: 'Not found' });
+    }
 
-    const radiusMeters = radiusMiles ? Math.round(parseFloat(radiusMiles) * 1609.34) : 16000;
+    // Validate topic / sportsMode when present — prevents unknown values
+    // from silently falling through to generic branches.
+    if (topic && !TOPIC_VALUES.includes(topic)) {
+      return res.status(400).json({ error: `Invalid topic: ${topic}` });
+    }
+    if (topic && surface !== 'place') {
+      return res.status(400).json({ error: 'Topic lanes are only supported on the Place surface.' });
+    }
+    const SPORTS_MODES = ['for_you', 'local', 'event', 'watch'];
+    if (sportsMode && !SPORTS_MODES.includes(sportsMode)) {
+      return res.status(400).json({ error: `Invalid sportsMode: ${sportsMode}` });
+    }
+
+    const radiusMeters = radiusMiles ? Math.round(parseFloat(radiusMiles) * 1609.34) : 160934;
 
     // Place requires location
     if (surface === 'place') {
@@ -1310,14 +1513,18 @@ router.get('/feed', verifyToken, async (req, res) => {
       postType: postType || null,
       cursorCreatedAt: cursorCreatedAt || null,
       cursorId: cursorId || null,
+      cursorRankBucket: cursorRankBucket != null ? Number(cursorRankBucket) : null,
       limit: Math.min(parseInt(limit) || 20, 50),
       tags: tags || null,
+      topic: topic || null,
+      sportsMode: sportsMode || null,
+      eventKey: eventKey || null,
     });
 
     // Cold-start seeding: inject neighborhood facts when real posts are sparse
     // Only on first page of the place surface, when fewer than 5 real posts
     const realPostCount = result.posts.length;
-    const isColdStart = surface === 'place' && !cursorCreatedAt && !cursorId && !postType && latitude && longitude;
+    const isColdStart = surface === 'place' && !topic && !cursorCreatedAt && !cursorId && !postType && latitude && longitude;
 
     if (isColdStart && realPostCount < 5) {
       try {
@@ -1692,7 +1899,7 @@ router.get('/saved', verifyToken, async (req, res) => {
       .select(`
         id, created_at,
         post:post_id (
-          *, creator:user_id (${CREATOR_SELECT}), home:home_id (id, address, city)
+          *, creator:user_id (${SAFE_CREATOR_SELECT}), home:home_id (id, address, city)
         )
       `)
       .eq('user_id', userId)
@@ -1709,9 +1916,10 @@ router.get('/saved', verifyToken, async (req, res) => {
       validSaves.map(s => ({ ...s.post, savedAt: s.created_at })),
       userId
     );
+    const serializedPosts = await serializePostsForViewer(privacySafePosts, userId);
 
     res.json({
-      posts: privacySafePosts,
+      posts: serializedPosts,
       pagination: { limit: parseInt(limit), offset: parseInt(offset) },
     });
   } catch (err) {
@@ -1762,7 +1970,12 @@ router.get('/place-eligibility', verifyToken, async (req, res) => {
 
 router.get('/identities', verifyToken, async (req, res) => {
   try {
-    const identities = await getPostingIdentities(req.user.id);
+    const all = await getPostingIdentities(req.user.id);
+    // P2.4 / unified-IA §4.1 — the personal-zone composer never offers
+    // persona. Strip it server-side so the picker can't even render the
+    // option. The audience composer (P2.5) reads persona separately
+    // from /api/personas/me, not this endpoint.
+    const identities = (all || []).filter((i) => i && i.type !== 'persona');
     res.json({ identities });
   } catch (err) {
     logger.error('Identities fetch error', { error: err.message });
@@ -1814,9 +2027,10 @@ router.get('/feed/home', verifyToken, async (req, res) => {
       (posts || []).map(r => normalizeFeedPostRow(r, new Set(), new Set())),
       userId
     );
+    const serialized = await serializePostsForViewer(enriched, userId);
 
     res.json({
-      posts: enriched,
+      posts: serialized,
       pagination: { limit: parseInt(limit), offset: parseInt(offset), hasMore: (posts || []).length >= parseInt(limit) },
     });
   } catch (err) {
@@ -1849,7 +2063,7 @@ router.get('/feed/saved-place/:placeId', verifyToken, async (req, res) => {
 
     const radiusMeters = radiusMiles
       ? Math.round(parseFloat(radiusMiles) * 1609.34)
-      : 16000; // default ~10 miles
+      : 160934; // default ~100 miles
 
     const result = await feedService.getListFeed({
       userId,
@@ -1973,7 +2187,7 @@ router.patch('/resolve/:id', verifyToken, async (req, res) => {
       .from('Post')
       .update({ resolved_at: now, state: 'solved', solved_at: now })
       .eq('id', postId)
-      .select(`*, creator:user_id (${CREATOR_SELECT})`)
+      .select(`*, creator:user_id (${SAFE_CREATOR_SELECT})`)
       .single();
 
     if (error) {
@@ -1981,7 +2195,7 @@ router.patch('/resolve/:id', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to resolve post' });
     }
 
-    res.json({ message: 'Question marked as resolved', post: updated });
+    res.json({ message: 'Question marked as resolved', post: await serializePostForViewer(updated, userId) });
   } catch (err) {
     logger.error('Resolve post error', { error: err.message });
     res.status(500).json({ error: 'Failed to resolve post' });
@@ -2019,7 +2233,7 @@ router.patch('/global-pin/:id', verifyToken, async (req, res) => {
       .from('Post')
       .update({ is_global_pin: newValue, is_pinned: newValue })
       .eq('id', postId)
-      .select(`*, creator:user_id (${CREATOR_SELECT})`)
+      .select(`*, creator:user_id (${SAFE_CREATOR_SELECT})`)
       .single();
 
     if (error) {
@@ -2027,7 +2241,7 @@ router.patch('/global-pin/:id', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to toggle global pin' });
     }
 
-    res.json({ message: newValue ? 'Post globally pinned' : 'Global pin removed', post: updated });
+    res.json({ message: newValue ? 'Post globally pinned' : 'Global pin removed', post: await serializePostForViewer(updated, userId) });
   } catch (err) {
     logger.error('Global pin error', { error: err.message });
     res.status(500).json({ error: 'Failed to toggle global pin' });
@@ -2053,7 +2267,6 @@ router.get('/feed-preferences', verifyToken, async (req, res) => {
         user_id: userId,
         hide_deals_place: false,
         hide_alerts_place: false,
-        show_politics_following: false,
         show_politics_connections: false,
         show_politics_place: false,
         created_at: new Date().toISOString(),
@@ -2074,7 +2287,7 @@ router.put('/feed-preferences', verifyToken, async (req, res) => {
     const userId = req.user.id;
     const {
       hideDealsPlace, hideAlertsPlace,
-      showPoliticsFollowing, showPoliticsConnections, showPoliticsPlace,
+      showPoliticsConnections, showPoliticsPlace,
     } = req.body;
 
     // Only include fields that were explicitly provided to avoid
@@ -2085,7 +2298,6 @@ router.put('/feed-preferences', verifyToken, async (req, res) => {
     };
     if (hideDealsPlace !== undefined) upsertData.hide_deals_place = !!hideDealsPlace;
     if (hideAlertsPlace !== undefined) upsertData.hide_alerts_place = !!hideAlertsPlace;
-    if (showPoliticsFollowing !== undefined) upsertData.show_politics_following = !!showPoliticsFollowing;
     if (showPoliticsConnections !== undefined) upsertData.show_politics_connections = !!showPoliticsConnections;
     if (showPoliticsPlace !== undefined) upsertData.show_politics_place = !!showPoliticsPlace;
 
@@ -2119,7 +2331,7 @@ router.post('/mute/topic', verifyToken, async (req, res) => {
 
     if (!postType) return res.status(400).json({ error: 'postType is required' });
     if (surface != null && !FEED_SURFACES.includes(surface)) {
-      return res.status(400).json({ error: 'surface must be one of place, following, or connections' });
+      return res.status(400).json({ error: 'surface must be one of place, connections, or personas' });
     }
 
     await ensurePostMute({
@@ -2146,7 +2358,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
     const { data: post, error } = await supabaseAdmin
       .from('Post')
-      .select(`*, creator:user_id (${CREATOR_SELECT}), home:home_id (id, address, city, state)`)
+      .select(`*, creator:user_id (${SAFE_CREATOR_SELECT}), home:home_id (id, address, city, state)`)
       .eq('id', id).single();
 
     if (error || !post) return res.status(404).json({ error: 'Post not found' });
@@ -2159,7 +2371,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
       .select(`*, author:user_id (id, username, name, first_name, last_name, profile_picture_url)`)
       .eq('post_id', id).eq('is_deleted', false).order('created_at', { ascending: true });
 
-    const commentRows = await attachFilesToComments(comments || []);
+    const commentRows = (await attachFilesToComments(comments || [])).map(serializeCommentForViewer);
 
     let userLike = null;
     let userSave = null;
@@ -2193,17 +2405,19 @@ router.get('/:id', optionalAuth, async (req, res) => {
     }
 
     applyPostLocationPrivacy(post, userId);
+    const responsePost = await serializePostForViewer({
+      ...post,
+      media_urls: normalizeMediaUrls(post.media_urls),
+      media_thumbnails: normalizeMediaUrls(post.media_thumbnails),
+      media_live_urls: normalizeMediaUrls(post.media_live_urls),
+      userHasLiked: !!userLike,
+      userHasSaved: !!userSave,
+      userHasReposted: !!userRepost,
+      comments: commentRows,
+    }, userId);
 
     res.json({
-      post: {
-        ...post,
-        media_urls: normalizeMediaUrls(post.media_urls),
-        media_live_urls: normalizeMediaUrls(post.media_live_urls),
-        userHasLiked: !!userLike,
-        userHasSaved: !!userSave,
-        userHasReposted: !!userRepost,
-        comments: commentRows,
-      },
+      post: responsePost,
     });
   } catch (err) {
     logger.error('Post fetch error', { error: err.message, postId: req.params.id });
@@ -2222,7 +2436,7 @@ router.patch('/:id', verifyToken, validate(updatePostSchema), async (req, res) =
 
     const fieldMap = {
       content: 'content', title: 'title',
-      mediaUrls: 'media_urls', mediaTypes: 'media_types', mediaLiveUrls: 'media_live_urls',
+      mediaUrls: 'media_urls', mediaTypes: 'media_types', mediaThumbnails: 'media_thumbnails', mediaLiveUrls: 'media_live_urls',
       postType: 'post_type', postFormat: 'post_format',
       visibility: 'visibility', visibilityScope: 'visibility_scope',
       locationPrecision: 'location_precision',
@@ -2247,12 +2461,18 @@ router.patch('/:id', verifyToken, validate(updatePostSchema), async (req, res) =
 
     const { data: post, error } = await supabaseAdmin
       .from('Post').update(updates).eq('id', id)
-      .select(`*, creator:user_id (${CREATOR_SELECT}), home:home_id (id, address, city)`).single();
+      .select(`*, creator:user_id (${SAFE_CREATOR_SELECT}), home:home_id (id, address, city)`).single();
 
     if (error) { logger.error('Error updating post', { error: error.message, postId: id }); return res.status(500).json({ error: 'Failed to update post' }); }
+    const responsePost = await serializePostForViewer({
+      ...post,
+      media_urls: normalizeMediaUrls(post.media_urls),
+      media_thumbnails: normalizeMediaUrls(post.media_thumbnails),
+      media_live_urls: normalizeMediaUrls(post.media_live_urls),
+    }, userId);
     res.json({
       message: 'Post updated successfully',
-      post: { ...post, media_urls: normalizeMediaUrls(post.media_urls), media_live_urls: normalizeMediaUrls(post.media_live_urls) },
+      post: responsePost,
     });
   } catch (err) {
     logger.error('Post update error', { error: err.message, postId: req.params.id });
@@ -2415,11 +2635,11 @@ router.get('/:id/likes', verifyToken, async (req, res) => {
     if (!post) return;
 
     const { data: likes, error } = await supabase.from('PostLike')
-      .select(`id, created_at, user:user_id (${CREATOR_SELECT})`)
+      .select(`id, created_at, user:user_id (${SAFE_CREATOR_SELECT})`)
       .eq('post_id', id).order('created_at', { ascending: false })
       .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
     if (error) { logger.error('Error fetching likes', { error: error.message, postId: id }); return res.status(500).json({ error: 'Failed to fetch likes' }); }
-    res.json({ likes: likes || [], pagination: { limit: parseInt(limit), offset: parseInt(offset) } });
+    res.json({ likes: (likes || []).map(serializeLikeForViewer), pagination: { limit: parseInt(limit), offset: parseInt(offset) } });
   } catch (err) {
     logger.error('Likes fetch error', { error: err.message, postId: req.params.id });
     res.status(500).json({ error: 'Failed to fetch likes' });
@@ -2510,7 +2730,10 @@ router.post('/:id/comments', verifyToken, validate(createCommentSchema), async (
       }
     }
 
-    res.status(201).json({ message: 'Comment added successfully', comment: { ...newComment, attachments: [] } });
+    res.status(201).json({
+      message: 'Comment added successfully',
+      comment: serializeCommentForViewer({ ...newComment, attachments: [] }),
+    });
   } catch (err) {
     logger.error('Comment creation error', { error: err.message, postId: req.params.id });
     res.status(500).json({ error: 'Failed to create comment' });
@@ -2545,7 +2768,7 @@ router.get('/:id/comments', verifyToken, async (req, res) => {
 
     const enrichedComments = await attachFilesToComments(comments || []);
     const commentsWithLikes = enrichedComments.map(c => ({
-      ...c,
+      ...serializeCommentForViewer(c),
       userHasLiked: userLikedSet.has(c.id),
     }));
     res.json({ comments: commentsWithLikes, pagination: { limit: parseInt(limit), offset: parseInt(offset) } });
@@ -2674,7 +2897,7 @@ router.patch('/:postId/comments/:commentId', verifyToken, validate(updateComment
       .eq('id', commentId)
       .select(`*, author:user_id (id, username, name, first_name, last_name, profile_picture_url)`).single();
     if (error) { logger.error('Error updating comment', { error: error.message, commentId }); return res.status(500).json({ error: 'Failed to update comment' }); }
-    res.json({ message: 'Comment updated successfully', comment: updated });
+    res.json({ message: 'Comment updated successfully', comment: serializeCommentForViewer(updated) });
   } catch (err) {
     logger.error('Comment update error', { error: err.message });
     res.status(500).json({ error: 'Failed to update comment' });
@@ -2798,25 +3021,10 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
     const parsedLimit = parseInt(limit);
 
     // v1.1: Determine viewer relationship to filter visible surfaces
-    let visibleTargets = ['place']; // Everyone can see Place posts
     const isOwn = userId === requestingUserId;
-    let follow = null;
     let connection = null;
 
-    if (isOwn) {
-      // Own profile: see everything
-      visibleTargets = ['place', 'followers', 'connections'];
-    } else {
-      // Check if viewer follows this user
-      const { data: followData } = await supabaseAdmin
-        .from('UserFollow')
-        .select('id')
-        .eq('follower_id', requestingUserId)
-        .eq('following_id', userId)
-        .maybeSingle();
-      follow = followData;
-      if (follow) visibleTargets.push('followers');
-
+    if (!isOwn) {
       // Check if there's an accepted relationship (connection)
       const { data: connectionData } = await supabaseAdmin
         .from('Relationship')
@@ -2825,7 +3033,6 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
         .or(`and(requester_id.eq.${requestingUserId},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${requestingUserId})`)
         .maybeSingle();
       connection = connectionData;
-      if (connection) visibleTargets.push('connections');
     }
 
     // Profile previews honor both:
@@ -2839,7 +3046,7 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
     // scope allows them.
 
     let query = supabaseAdmin.from('Post')
-      .select(`*, creator:user_id (${CREATOR_SELECT}), home:home_id (id, address, city)`)
+      .select(`*, creator:user_id (${SAFE_CREATOR_SELECT}), home:home_id (id, address, city)`)
       .eq('user_id', userId)
       .is('archived_at', null)
       .order('created_at', { ascending: false })
@@ -2867,11 +3074,12 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
 
     // Non-own profiles: enforce relationship-scoped profile visibility
     if (!isOwn) {
-      const isFollower = !!follow;
       const isConnection = !!connection;
+      // Legacy 'followers' scope/target is treated as 'connections' after peer-follow removal.
+      const NETWORK_TARGETS = ['followers', 'connections'];
       filtered = filtered.filter(post => {
         const scope = post.profile_visibility_scope;
-        if (scope === 'followers' && !isFollower) return false;
+        if (scope === 'followers' && !isConnection) return false;
         if (scope === 'connections' && !isConnection) return false;
 
         const targets = Array.isArray(post.distribution_targets)
@@ -2879,14 +3087,10 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
           : [];
 
         if (targets.length > 0) {
-          const networkOnly = targets.every((target) => ['followers', 'connections'].includes(target));
-          if (networkOnly) {
-            if (targets.includes('followers') && isFollower) return true;
-            if (targets.includes('connections') && isConnection) return true;
-            return false;
-          }
+          const networkOnly = targets.every((target) => NETWORK_TARGETS.includes(target));
+          if (networkOnly) return isConnection;
         } else {
-          if ((post.visibility === 'followers' || post.audience === 'followers') && !isFollower) return false;
+          if ((post.visibility === 'followers' || post.audience === 'followers') && !isConnection) return false;
           if ((post.visibility === 'connections' || post.audience === 'connections') && !isConnection) return false;
         }
 
@@ -2898,67 +3102,15 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
 
     const normalized = filtered.map(r => normalizeFeedPostRow(r, new Set(), new Set()));
     const enriched = await enrichWithUserStatus(normalized, requestingUserId);
+    const serialized = await serializePostsForViewer(enriched, requestingUserId);
 
     res.json({
-      posts: enriched,
-      pagination: buildCursorPagination(enriched, parsedLimit),
+      posts: serialized,
+      pagination: buildCursorPagination(serialized, parsedLimit),
     });
   } catch (err) {
     logger.error('User posts fetch error', { error: err.message });
     res.status(500).json({ error: 'Failed to fetch user posts' });
-  }
-});
-
-// ============ FOLLOWS ============
-
-router.post('/follow/:userId', verifyToken, async (req, res) => {
-  try {
-    const { userId: followingId } = req.params;
-    const followerId = req.user.id;
-    if (followerId === followingId) return res.status(400).json({ error: 'You cannot follow yourself' });
-    const { data: user } = await supabase.from('User').select('id, username, account_type').eq('id', followingId).single();
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    // Exclude curator accounts — platform-owned, not a real neighbor
-    if (user.account_type === 'curator') return res.status(403).json({ error: 'This account cannot be followed' });
-    const { data: existing } = await supabase.from('UserFollow').select('id').eq('follower_id', followerId).eq('following_id', followingId).single();
-    if (existing) return res.status(400).json({ error: 'You are already following this user' });
-    // followers_count auto-incremented by DB trigger
-    const { error } = await supabaseAdmin.from('UserFollow').insert({ follower_id: followerId, following_id: followingId });
-    if (error) { logger.error('Error following user', { error: error.message, followerId, followingId }); return res.status(500).json({ error: 'Failed to follow user' }); }
-    res.status(200).json({ message: `You are now following ${user.username}`, following: true });
-  } catch (err) {
-    logger.error('Follow error', { error: err.message });
-    res.status(500).json({ error: 'Failed to follow user' });
-  }
-});
-
-router.delete('/follow/:userId', verifyToken, async (req, res) => {
-  try {
-    const { userId: followingId } = req.params;
-    const followerId = req.user.id;
-    // followers_count auto-decremented by DB trigger
-    const { error } = await supabase.from('UserFollow').delete().eq('follower_id', followerId).eq('following_id', followingId);
-    if (error) { logger.error('Error unfollowing user', { error: error.message, followerId, followingId }); return res.status(500).json({ error: 'Failed to unfollow user' }); }
-    res.json({ message: 'Unfollowed successfully', following: false });
-  } catch (err) {
-    logger.error('Unfollow error', { error: err.message });
-    res.status(500).json({ error: 'Failed to unfollow user' });
-  }
-});
-
-router.get('/following', verifyToken, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { data: following, error } = await supabase.from('UserFollow')
-      .select(`following:following_id (${CREATOR_SELECT}), created_at`)
-      .eq('follower_id', userId).order('created_at', { ascending: false });
-    if (error) { logger.error('Error fetching following', { error: error.message, userId }); return res.status(500).json({ error: 'Failed to fetch following list' }); }
-    // Exclude curator accounts — platform-owned, not a real neighbor
-    const filtered = (following || []).filter(f => f.following?.account_type !== 'curator');
-    res.json({ following: filtered });
-  } catch (err) {
-    logger.error('Following fetch error', { error: err.message });
-    res.status(500).json({ error: 'Failed to fetch following list' });
   }
 });
 

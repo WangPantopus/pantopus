@@ -41,7 +41,7 @@ SEASONAL_CALENDAR: list[dict] = [
         "start": (3, 1),
         "end": (4, 30),
         "tips": [
-            "Clark County and Portland both run yard debris pickup in March and April. "
+            "Clark County, WA and Portland both run yard debris pickup in March and April. "
             "Check your hauler's schedule so you don't miss the free pickup window.",
             "Gutters packed with winter debris cause basement leaks during spring rain. "
             "Flushing them in early March saves a lot of headaches later.",
@@ -90,7 +90,7 @@ SEASONAL_CALENDAR: list[dict] = [
         "start": (9, 1),
         "end": (11, 30),
         "tips": [
-            "Late October is when most Clark County homeowners schedule gutter cleaning. "
+            "Late October is when most Clark County, WA homeowners schedule gutter cleaning. "
             "Booking early usually means better rates and more availability.",
             "Big-leaf maples drop an enormous volume of leaves in the Portland-Vancouver area. "
             "Mulching them into the lawn with a mower is faster than raking and feeds the soil.",
@@ -119,6 +119,62 @@ SEASONAL_CALENDAR: list[dict] = [
     },
 ]
 
+# Optional narrower publication windows for tips that mention specific timing.
+# The broad seasonal calendar says when a theme is relevant; these windows keep
+# date-specific copy from being posted after its useful window has passed.
+TIP_ACTIVE_WINDOWS: dict[str, tuple[tuple[int, int], tuple[int, int]]] = {
+    "January is a great month for indoor projects — organizing the garage, painting a room, "
+    "or finally fixing that sticky cabinet door. The daylight is short anyway.": (
+        (1, 1),
+        (1, 31),
+    ),
+    "Schedule a furnace tune-up before the coldest stretch hits. Most HVAC companies "
+    "offer lower rates in early December before the holiday rush.": (
+        (12, 1),
+        (12, 15),
+    ),
+    "Gutters packed with winter debris cause basement leaks during spring rain. "
+    "Flushing them in early March saves a lot of headaches later.": (
+        (3, 1),
+        (3, 15),
+    ),
+    "Pressure washing the driveway and siding in April clears a winter's worth "
+    "of algae and grime before it stains permanently.": (
+        (4, 1),
+        (4, 30),
+    ),
+    "Early spring is the best planting window for PNW natives — Oregon grape, "
+    "sword fern, and red flowering currant all do well when planted before May.": (
+        (3, 1),
+        (4, 30),
+    ),
+    "Smoke season typically runs July through September in the Portland-Vancouver area. "
+    "Replacing HVAC filters before it starts makes a real difference indoors.": (
+        (6, 1),
+        (7, 14),
+    ),
+    "Late October is when most Clark County, WA homeowners schedule gutter cleaning. "
+    "Booking early usually means better rates and more availability.": (
+        (9, 1),
+        (10, 31),
+    ),
+    "Weatherstripping doors and windows before November pays for itself in a single "
+    "heating season. The foam tape from any hardware store takes about ten minutes per door.": (
+        (9, 1),
+        (10, 31),
+    ),
+    "Roof inspections are easiest in dry October weather. Missing or cracked shingles "
+    "caught now won't become leaks during November rain.": (
+        (10, 1),
+        (10, 31),
+    ),
+    "Winterization deadlines sneak up fast — disconnect garden hoses and shut off "
+    "exterior spigot valves before the first hard freeze, usually by mid-December here.": (
+        (11, 15),
+        (12, 15),
+    ),
+}
+
 
 def _tip_hash(tip: str) -> str:
     """Return a short hash for a tip string."""
@@ -145,6 +201,16 @@ def get_active_seasons(month: int, day: int) -> list[dict]:
     ]
 
 
+def is_tip_active(tip: str, month: int, day: int) -> bool:
+    """Return whether a tip is appropriate to publish on the given date."""
+    window = TIP_ACTIVE_WINDOWS.get(tip)
+    if window is None:
+        return True
+
+    start, end = window
+    return _date_in_range(month, day, start, end)
+
+
 class SeasonalSource(ContentSource):
     """Generates seasonal tips based on the current date and PNW seasonal calendar."""
 
@@ -165,7 +231,7 @@ class SeasonalSource(ContentSource):
         now_utc = now.astimezone(timezone.utc)
 
         for season in active:
-            tip = self._pick_tip(season["tips"])
+            tip = self._pick_tip(season["tips"], now.month, now.day)
             if tip is None:
                 self.log.info("All tips exhausted for season %s", season["name"])
                 continue
@@ -177,12 +243,14 @@ class SeasonalSource(ContentSource):
 
         return items
 
-    def _pick_tip(self, tips: list[str]) -> str | None:
+    def _pick_tip(self, tips: list[str], month: int, day: int) -> str | None:
         """Pick a tip not in the recently-used set. Falls back to random if all used."""
-        available = [t for t in tips if _tip_hash(t) not in self._recently_used]
+        active_tips = [t for t in tips if is_tip_active(t, month, day)]
+        available = [t for t in active_tips if _tip_hash(t) not in self._recently_used]
         if available:
             return random.choice(available)
-        # All tips have been used recently — pick any
-        if tips:
-            return random.choice(tips)
+        # All active tips have been used recently — repeat an active tip rather
+        # than falling back to stale copy from another part of the season.
+        if active_tips:
+            return random.choice(active_tips)
         return None

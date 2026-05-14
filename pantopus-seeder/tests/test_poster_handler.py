@@ -12,6 +12,7 @@ from src.config.region_registry import RegionConfig
 from src.handlers.poster import (
     _detect_slot,
     _score_item,
+    _select_candidates_for_slot,
     _select_item,
     handler,
 )
@@ -99,7 +100,7 @@ def _make_region_config(region="test_region", **overrides):
 
 
 _TWO_REGIONS = [
-    _make_region_config("clark_county", lat=45.6387, lng=-122.6615, display_name="Clark County"),
+    _make_region_config("clark_county", lat=45.6387, lng=-122.6615, display_name="Clark County, WA"),
     _make_region_config("portland_metro", lat=45.5152, lng=-122.6784, display_name="Portland Metro"),
 ]
 
@@ -301,6 +302,20 @@ class TestItemScoring:
         p3 = _make_queue_item(category="sports", source_priority=3)
         assert _score_item(p2, None) > _score_item(p3, None)
 
+    def test_playoff_blazers_sports_beats_routine_news_but_not_alerts(self):
+        """Game-day local sports gets surfaced without outranking P1 alerts."""
+        blazers = _make_queue_item(
+            category="sports",
+            source="google_news:trail_blazers",
+            source_priority=3,
+            raw_title="Trail Blazers face Spurs in NBA Playoffs Game 5 tonight",
+        )
+        news = _make_queue_item(category="local_news", source_priority=2)
+        alert = _make_queue_item(category="weather", source_priority=1)
+
+        assert _score_item(blazers, None) > _score_item(news, None)
+        assert _score_item(alert, None) > _score_item(blazers, None)
+
     def test_p3_beats_p4(self):
         """Priority 3 (enrichment) items score higher than priority 4 (filler)."""
         p3 = _make_queue_item(category="sports", source_priority=3)
@@ -376,6 +391,106 @@ class TestSelectItem:
         result = _select_item(sb, "clark_county", ["local_news", "seasonal"])
         assert result is not None
         assert result["id"] == "news-1"
+
+
+class TestEveningEnrichmentBias:
+    """The evening slot should prefer P3 enrichment when no P1 alert is waiting."""
+
+    _ALLOWED_CATS = [
+        "local_news", "event", "weather", "seasonal",
+        "community_resource", "safety", "sports",
+    ]
+
+    def test_non_evening_slot_uses_full_categories(self):
+        with patch(f"{_HANDLER}._select_items") as mock_select, \
+             patch(f"{_HANDLER}._has_queued_p1_alert") as mock_p1:
+            mock_select.return_value = [_make_queue_item()]
+            result = _select_candidates_for_slot(
+                _mock_supabase(), "clark_county", self._ALLOWED_CATS, "morning"
+            )
+            assert result == [_make_queue_item()]
+            mock_select.assert_called_once_with(
+                mock_select.call_args.args[0], "clark_county", self._ALLOWED_CATS
+            )
+            mock_p1.assert_not_called()
+
+    def test_evening_reserves_enrichment_when_no_p1_alert(self):
+        sports = _make_queue_item(category="sports", id="sp-1", source_priority=3)
+        with patch(f"{_HANDLER}._select_items") as mock_select, \
+             patch(f"{_HANDLER}._has_queued_p1_alert", return_value=False):
+            mock_select.return_value = [sports]
+            result = _select_candidates_for_slot(
+                _mock_supabase(), "clark_county", self._ALLOWED_CATS, "evening"
+            )
+            assert result == [sports]
+            passed_cats = mock_select.call_args.args[2]
+            assert set(passed_cats) == {"community_resource", "sports"}
+
+    def test_evening_falls_back_when_p1_alert_queued(self):
+        news = _make_queue_item(category="local_news", id="ln-1")
+        with patch(f"{_HANDLER}._select_items") as mock_select, \
+             patch(f"{_HANDLER}._has_queued_p1_alert", return_value=True):
+            mock_select.return_value = [news]
+            result = _select_candidates_for_slot(
+                _mock_supabase(), "clark_county", self._ALLOWED_CATS, "evening"
+            )
+            assert result == [news]
+            passed_cats = mock_select.call_args.args[2]
+            assert passed_cats == self._ALLOWED_CATS
+
+    def test_evening_falls_back_when_no_enrichment_queued(self):
+        news = _make_queue_item(category="local_news", id="ln-1")
+
+        def fake_select(sb, region, cats):
+            if set(cats) & {"sports", "community_resource"} and set(cats) <= {
+                "sports", "community_resource",
+            }:
+                return []  # no enrichment queued
+            return [news]
+
+        with patch(f"{_HANDLER}._select_items", side_effect=fake_select), \
+             patch(f"{_HANDLER}._has_queued_p1_alert", return_value=False):
+            result = _select_candidates_for_slot(
+                _mock_supabase(), "clark_county", self._ALLOWED_CATS, "evening"
+            )
+            assert result == [news]
+
+    def test_evening_stage_without_enrichment_uses_full_categories(self):
+        """Stages like 'minimal' strip sports/community from allowed_categories."""
+        minimal_cats = ["event", "weather", "seasonal", "safety"]
+        news = _make_queue_item(category="event", id="ev-1")
+        with patch(f"{_HANDLER}._select_items", return_value=[news]) as mock_select, \
+             patch(f"{_HANDLER}._has_queued_p1_alert") as mock_p1:
+            result = _select_candidates_for_slot(
+                _mock_supabase(), "clark_county", minimal_cats, "evening"
+            )
+            assert result == [news]
+            # No enrichment in minimal → we never consult P1 gate.
+            mock_p1.assert_not_called()
+            passed_cats = mock_select.call_args.args[2]
+            assert passed_cats == minimal_cats
+
+    def test_p1_lookup_failure_preserves_safety_priority(self):
+        """If the P1 lookup raises, _has_queued_p1_alert returns True so the
+        evening bias falls back and safety/weather keeps priority."""
+        from src.handlers.poster import _has_queued_p1_alert
+
+        sb = MagicMock()
+        sb.table.side_effect = RuntimeError("boom")
+        assert _has_queued_p1_alert(sb, "clark_county") is True
+
+    def test_evening_falls_back_on_p1_lookup_failure(self):
+        """End-to-end: P1 check failure must not reserve evening for enrichment."""
+        news = _make_queue_item(category="local_news", id="ln-1")
+        with patch(f"{_HANDLER}._select_items", return_value=[news]) as mock_select, \
+             patch(f"{_HANDLER}._has_queued_p1_alert", return_value=True):
+            result = _select_candidates_for_slot(
+                _mock_supabase(), "clark_county", self._ALLOWED_CATS, "evening"
+            )
+            assert result == [news]
+            # Full category set used, not narrowed to enrichment.
+            passed_cats = mock_select.call_args.args[2]
+            assert passed_cats == self._ALLOWED_CATS
 
 
 # ---------------------------------------------------------------------------

@@ -38,6 +38,12 @@ const businessFoundingRoutes = require('./routes/businessFounding'); // Founding
 const walletRoutes = require('./routes/wallet');           // Wallet/balance
 const relationshipRoutes = require('./routes/relationships'); // Trust graph (connections)
 const professionalRoutes = require('./routes/professional'); // Professional mode
+const localProfileRoutes = require('./routes/localProfiles'); // Local Profile identity surface
+const personaRoutes = require('./routes/personas'); // Audience Profile / PublicPersona
+const broadcastChannelRoutes = require('./routes/broadcastChannels'); // Persona broadcast
+const identityCenterRoutes = require('./routes/identityCenter'); // Identity Center + View As
+const identitySearchRoutes = require('./routes/identitySearch'); // Identity Firewall profile discovery
+const { isIdentityFirewallEnabled, isPersonaEnabled, isPersonaBroadcastEnabled } = require('./utils/featureFlags');
 const hubRoutes = require('./routes/hub');                     // Hub (Mission Control)
 const locationRoutes = require('./routes/location');           // Viewing Location
 const listingRoutes = require('./routes/listings');             // Marketplace Listings
@@ -192,6 +198,15 @@ app.use(
   lobWebhookRouter
 );
 
+// Internal email-inbound webhook (P2.9 / §17 #8). The Lambda signs the
+// raw body, so this route MUST receive the raw bytes — mount before
+// the JSON body parser, same pattern as the Stripe + Lob webhooks.
+app.use(
+  '/api/internal/email-inbound',
+  express.raw({ type: '*/*', limit: '5mb' }),
+  require('./routes/internalEmailInbound'),
+);
+
 // Body parsing middleware
 app.use(bodyParser.json({ limit: '20mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '20mb' }));
@@ -305,6 +320,7 @@ app.use('/api/homes', require('./routes/homeIam'));
 app.use('/api/homes', require('./routes/homeOwnership'));
 app.use('/api/homes', homeRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/sports', require('./routes/sports'));  // Sports topic lane (active events)
 app.use('/api/files', fileRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/payments', payRoutes);
@@ -312,6 +328,9 @@ app.use('/api/debug', debugRoutes);
 app.use('/api/geo', geoRoutes);
 app.use('/api/offers', offersRoutes);
 app.use('/api/notifications', notificationRoutes);
+// P0.8 — feature flags. Mounts both /api/feature-flags/:flagName (read,
+// authenticated) and /api/admin/feature-flags/:flagName (write, admin).
+app.use('/api', require('./routes/featureFlags'));
 app.use('/api/upload', uploadRoutes);        // NEW: S3 upload routes
 app.use('/api/reviews', reviewRoutes);       // NEW: Review routes
 app.use('/api/transaction-reviews', transactionReviewRoutes); // Transaction reviews (marketplace)
@@ -327,6 +346,37 @@ app.use('/api/b', businessPublicPageRoutes);  // Public business page (SEO-frien
 app.use('/api/wallet', walletRoutes);          // Wallet/balance
 app.use('/api/relationships', relationshipRoutes); // Trust graph (connections)
 app.use('/api/privacy', privacyRoutes);            // Privacy settings & blocks (Identity Firewall)
+if (isIdentityFirewallEnabled()) {
+  app.use('/api/local-profiles', localProfileRoutes); // Local Profile identity surface
+  app.use('/api/identity-center', identityCenterRoutes); // Private Identity Center + View As
+  app.use('/api/identity', identitySearchRoutes); // Profile-safe search and discovery
+}
+if (isPersonaEnabled()) {
+  // P1.5 — owner-only tier CRUD. Mounted FIRST so requests like
+  // GET /api/personas/UUID/tiers route here. The router itself rejects
+  // non-UUID :id values via next('router'), letting handle-shaped URLs
+  // fall through to the public GET /api/personas/:handle/tiers in
+  // personaRoutes below. (Express 5 / path-to-regexp 8 dropped the
+  // inline :id(regex) shorthand, so the UUID gate lives in the router.)
+  app.use('/api/personas/:id/tiers', require('./routes/personaTiers'));
+  // P1.7 — Stripe Connect onboarding + status. Same UUID gate pattern.
+  app.use('/api/personas/:id/payments', require('./routes/personaPayments'));
+  // P1.12 — DM threads + messages. Same UUID gate pattern.
+  app.use('/api/personas/:id/dms', require('./routes/personaDms'));
+  // P1.13 — fan membership lifecycle (cancel/upgrade/downgrade/refund-request).
+  app.use('/api/personas/:id/membership', require('./routes/personaMembership'));
+  // P1.14 — persona blocks (creator-driven /fans/:membershipId/block +
+  // /blocks list). The router has its OWN UUID gate; mounted at
+  // /api/personas/:id last among the UUID-gated routers because its
+  // internal paths (/fans/:membershipId/block, /blocks) can't be
+  // expressed as more-specific external mounts without conflicting
+  // with the others.
+  app.use('/api/personas/:id', require('./routes/personaBlocks'));
+  app.use('/api/personas', personaRoutes);            // Audience Profile / PublicPersona
+}
+if (isPersonaBroadcastEnabled()) {
+  app.use('/api/broadcast', broadcastChannelRoutes);  // One-way persona broadcast
+}
 app.use('/api/professional', professionalRoutes);  // Professional mode
 app.use('/api/hub', hubRoutes);                        // Hub (Mission Control)
 app.use('/api/location', locationRoutes);              // Viewing Location
@@ -386,6 +436,13 @@ app.use((err, req, res, next) => {
 });
 
 // ============ SERVER STARTUP ============
+
+// Phase 0 / P0.1: refuse to boot if the deployment claims PersonaFollow is
+// pre-migration (PERSONA_FOLLOW_VIEW_ACTIVE explicitly false). This catches
+// the SQL-rolled-back-but-code-not-rolled-back case before the first request
+// touches PersonaMembership.
+const { assertPersonaFollowViewActive } = require('./utils/personaFollowViewGuard');
+assertPersonaFollowViewActive();
 
 const PORT = process.env.PORT || 8000;
 const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 = accept connections from LAN (e.g. mobile device)

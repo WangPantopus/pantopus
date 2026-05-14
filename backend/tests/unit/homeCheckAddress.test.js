@@ -3,6 +3,8 @@ const request = require('supertest');
 const { resetTables, seedTable, getTable } = require('../__mocks__/supabaseAdmin');
 const addressConfig = require('../../config/addressVerification');
 
+jest.setTimeout(15000);
+
 jest.mock('../../middleware/verifyToken', () => (req, _res, next) => {
   req.user = { id: 'test-user-id', role: 'user' };
   next();

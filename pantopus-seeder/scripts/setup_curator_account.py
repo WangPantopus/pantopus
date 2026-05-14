@@ -47,11 +47,12 @@ DEFAULT_USERNAME = "pantopus_local"
 # Default regions with their geographic config
 DEFAULT_REGIONS: dict[str, dict] = {
     "clark_county": {
+        # Clark County, Washington (Vancouver area — not KY/NV/OH etc.)
         "lat": 45.6387,
         "lng": -122.6615,
         "radius_meters": 25000,
         "timezone": "America/Los_Angeles",
-        "display_name": "Clark County",
+        "display_name": "Clark County, WA",
     },
     "portland_metro": {
         "lat": 45.5152,

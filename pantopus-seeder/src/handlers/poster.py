@@ -10,6 +10,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from src.config.constants import (
+    ENRICHMENT_CATEGORIES,
     MAX_JITTER_MINUTES,
     POSTING_SLOTS,
 )
@@ -140,7 +141,7 @@ def _process_region(region_cfg: RegionConfig, slot_name: str, supabase, secrets)
 
     cats = allowed_categories(stage)
 
-    candidates = _select_items(supabase, region, cats)
+    candidates = _select_candidates_for_slot(supabase, region, cats, slot_name)
     if not candidates:
         log.info("No queued items for %s", region)
         return {"stage": stage, "outcome": "skipped"}
@@ -189,6 +190,8 @@ def _process_region(region_cfg: RegionConfig, slot_name: str, supabase, secrets)
         # Post (include media if present in the queue item)
         item_media_urls = item.get("media_urls") or []
         item_media_types = item.get("media_types") or []
+        is_sports_item = item.get("category") == "sports"
+        sports_metadata = _build_local_sports_metadata(item) if is_sports_item else None
 
         post_id, post_error = post_to_pantopus(
             api_base_url=secrets.pantopus_api_base_url,
@@ -199,6 +202,9 @@ def _process_region(region_cfg: RegionConfig, slot_name: str, supabase, secrets)
             region_lng=region_cfg.lng,
             media_urls=item_media_urls if item_media_urls else None,
             media_types=item_media_types if item_media_types else None,
+            topic="sports" if is_sports_item else None,
+            sports_scope="regional" if is_sports_item else None,
+            post_metadata=sports_metadata,
         )
 
         if post_error:
@@ -276,6 +282,70 @@ def _select_item(supabase, region: str, categories: list[str]) -> dict | None:
     return items[0] if items else None
 
 
+def _select_candidates_for_slot(
+    supabase,
+    region: str,
+    categories: list[str],
+    slot_name: str,
+) -> list[dict]:
+    """Pick candidates for a slot, reserving the evening slot for enrichment.
+
+    In the evening slot, if (a) enrichment categories (sports, community_resource)
+    are allowed at the current tapering stage, (b) enrichment items are queued,
+    and (c) no P1 safety/weather alert is waiting, restrict the candidate pool
+    to enrichment. This prevents P3 items from starving behind the steady
+    stream of P1/P2 news. If no enrichment is available, fall back to the full
+    allowed-category set so the slot is not wasted.
+    """
+    if slot_name != "evening":
+        return _select_items(supabase, region, categories)
+
+    enrichment_cats = [c for c in categories if c in ENRICHMENT_CATEGORIES]
+    if not enrichment_cats:
+        return _select_items(supabase, region, categories)
+
+    if _has_queued_p1_alert(supabase, region):
+        return _select_items(supabase, region, categories)
+
+    enrichment_candidates = _select_items(supabase, region, enrichment_cats)
+    if enrichment_candidates:
+        log.info(
+            "Evening slot reserved for enrichment in %s (%d candidates)",
+            region,
+            len(enrichment_candidates),
+        )
+        return enrichment_candidates
+
+    return _select_items(supabase, region, categories)
+
+
+def _has_queued_p1_alert(supabase, region: str) -> bool:
+    """Return True if any P1 (priority=1) item is queued for this region.
+
+    Fails *closed* (returns True) on error. A transient failure in this lookup
+    must not let enrichment steal a slot from a waiting safety/weather alert;
+    the caller simply falls back to the full category set, where P1 items
+    outrank enrichment in the scorer anyway.
+    """
+    try:
+        result = (
+            supabase.table("seeder_content_queue")
+            .select("id")
+            .eq("status", "queued")
+            .eq("region", region)
+            .eq("source_priority", 1)
+            .limit(1)
+            .execute()
+        )
+        return bool(result.data)
+    except Exception:
+        log.warning(
+            "Failed to check for P1 alerts in %s; assuming alert present",
+            region, exc_info=True,
+        )
+        return True
+
+
 def _score_item(
     item: dict,
     last_source: str | None,
@@ -305,6 +375,11 @@ def _score_item(
     elif cat == "seasonal":
         score += 100
 
+    # Game-day local sports should not disappear behind routine P2 news during
+    # a playoff run, but it must still stay below P1 alerts/weather.
+    if _is_priority_local_sports_item(item):
+        score += 1400
+
     # Source diversity bonus
     if last_source and item.get("source") != last_source:
         score += 50
@@ -322,6 +397,46 @@ def _score_item(
         score += 1050
 
     return score
+
+
+def _is_priority_local_sports_item(item: dict) -> bool:
+    """Return True for local playoff/game-day sports items worth surfacing."""
+    if item.get("category") != "sports":
+        return False
+
+    haystack = " ".join([
+        str(item.get("source") or ""),
+        str(item.get("raw_title") or ""),
+        str(item.get("raw_body") or ""),
+    ]).lower()
+
+    team_tokens = (
+        "trail_blazers",
+        "trail blazers",
+        "blazers",
+        "timbers",
+        "thorns",
+        "mariners",
+        "seahawks",
+        "kraken",
+        "sounders",
+    )
+    urgency_tokens = (
+        "playoff",
+        "postseason",
+        "game 5",
+        "game 6",
+        "game 7",
+        "tonight",
+        "elimination",
+        "finals",
+        "championship",
+        "cup final",
+    )
+
+    return any(token in haystack for token in team_tokens) and any(
+        token in haystack for token in urgency_tokens
+    )
 
 
 def _is_seasonal_allowed(supabase, region: str) -> bool:
@@ -373,6 +488,53 @@ def _get_source_display_name(source_id: str, region: str, supabase) -> str:
     except Exception:
         log.warning("Failed to look up display name for %s", source_id, exc_info=True)
     return source_id
+
+
+def _build_local_sports_metadata(item: dict) -> dict:
+    """Infer lightweight sports metadata for regional seeded sports posts."""
+    haystack = " ".join([
+        str(item.get("source") or ""),
+        str(item.get("raw_title") or ""),
+        str(item.get("raw_body") or ""),
+    ]).lower()
+
+    league = "other"
+    if any(token in haystack for token in ("trail_blazers", "trail blazers", "blazers", "nba")):
+        league = "nba"
+    elif any(token in haystack for token in ("seahawks", "nfl")):
+        league = "nfl"
+    elif any(token in haystack for token in ("timbers", "mls")):
+        league = "mls"
+    elif any(token in haystack for token in ("thorns", "nwsl")):
+        league = "nwsl"
+    elif any(token in haystack for token in ("mariners", "mlb")):
+        league = "mlb"
+    elif any(token in haystack for token in ("winterhawks", "nhl", "hockey")):
+        league = "nhl"
+    elif any(token in haystack for token in ("college", "ducks", "beavers", "vikings")):
+        league = "college"
+    elif any(token in haystack for token in ("youth", "school", "high school", "little league")):
+        league = "youth"
+
+    team_tag = None
+    for tag, tokens in (
+        ("blazers", ("trail_blazers", "trail blazers", "blazers")),
+        ("timbers", ("timbers",)),
+        ("thorns", ("thorns",)),
+        ("seahawks", ("seahawks",)),
+        ("mariners", ("mariners",)),
+        ("winterhawks", ("winterhawks",)),
+        ("ducks", ("ducks",)),
+        ("beavers", ("beavers",)),
+    ):
+        if any(token in haystack for token in tokens):
+            team_tag = tag
+            break
+
+    metadata = {"league": league}
+    if team_tag:
+        metadata["team_tag"] = team_tag
+    return metadata
 
 
 def _update_queue_item(

@@ -81,9 +81,14 @@ targets:
         CFBundleDisplayName: Pantopus
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        PantopusAPIBaseURL: $(PANTOPUS_API_BASE_URL)
+        PantopusSocketURL: $(PANTOPUS_SOCKET_URL)
         StripePublishableKey: $(STRIPE_PUBLISHABLE_KEY)
         SentryDSN: $(SENTRY_DSN)
         LSRequiresIPhoneOS: true
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: "Pantopus connects to the local development server on your Mac while testing."
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:

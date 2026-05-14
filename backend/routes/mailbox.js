@@ -15,6 +15,12 @@ const smsService = require('../services/smsService');
 
 // ============ VALIDATION SCHEMAS ============
 
+const HOME_ADDRESS_VERIFICATION_REQUIRED_CODE = 'HOME_ADDRESS_VERIFICATION_REQUIRED';
+const HOME_ADDRESS_VERIFICATION_REQUIRED_MESSAGE =
+  'Verify your home address before sending mail.';
+const HOME_ADDRESS_VERIFICATION_REQUIRED_DETAIL =
+  'Verify your home address before sending mail. Open Homes and finish address verification, then try sending again.';
+
 const sendMailSchema = Joi.object({
   recipientUserId: Joi.string().uuid().optional(),
   recipientHomeId: Joi.string().uuid().optional(),
@@ -108,13 +114,21 @@ const createCampaignSchema = Joi.object({
 
 const updatePreferencesSchema = Joi.object({
   receiveAds: Joi.boolean().optional(),
+  receive_ads: Joi.boolean().optional(),
   receivePromotions: Joi.boolean().optional(),
+  receive_promotions: Joi.boolean().optional(),
   receiveNewsletters: Joi.boolean().optional(),
+  receive_newsletters: Joi.boolean().optional(),
   maxAdsPerDay: Joi.number().min(0).max(20).optional(),
+  max_ads_per_day: Joi.number().min(0).max(20).optional(),
   preferredAdCategories: Joi.array().items(Joi.string()).optional(),
+  preferred_ad_categories: Joi.array().items(Joi.string()).optional(),
   blockedSenders: Joi.array().items(Joi.string().uuid()).optional(),
+  blocked_senders: Joi.array().items(Joi.string().uuid()).optional(),
   emailNotifications: Joi.boolean().optional(),
-  pushNotifications: Joi.boolean().optional()
+  email_notifications: Joi.boolean().optional(),
+  pushNotifications: Joi.boolean().optional(),
+  push_notifications: Joi.boolean().optional()
 });
 
 const seedMailboxSchema = Joi.object({
@@ -701,6 +715,38 @@ const isUserLinkedToHome = async (home, userId) => {
   const mailAccess = await checkHomePermission(home.id, userId, 'finance.view');
   return mailAccess.hasAccess;
 };
+
+const hasVerifiedSenderHome = async (userId) => {
+  const [occupancyRes, ownerRes] = await Promise.allSettled([
+    supabaseAdmin
+      .from('HomeOccupancy')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .eq('verification_status', 'verified')
+      .limit(1),
+    supabaseAdmin
+      .from('HomeOwner')
+      .select('home_id')
+      .eq('subject_id', userId)
+      .eq('owner_status', 'verified')
+      .limit(1),
+  ]);
+
+  const verifiedOccupancies =
+    occupancyRes.status === 'fulfilled' ? occupancyRes.value?.data || [] : [];
+  const verifiedOwnerRows =
+    ownerRes.status === 'fulfilled' ? ownerRes.value?.data || [] : [];
+
+  return verifiedOccupancies.length > 0 || verifiedOwnerRows.length > 0;
+};
+
+const sendHomeVerificationRequired = (res) =>
+  res.status(403).json({
+    error: HOME_ADDRESS_VERIFICATION_REQUIRED_MESSAGE,
+    message: HOME_ADDRESS_VERIFICATION_REQUIRED_DETAIL,
+    code: HOME_ADDRESS_VERIFICATION_REQUIRED_CODE,
+  });
 
 const getAccessibleHomeIds = async (userId) => {
   const homeIdSet = new Set();
@@ -1709,6 +1755,18 @@ router.post('/send', verifyToken, validate(sendMailSchema), async (req, res) => 
     const escrowContact = normalizeEscrowContact(req.body.recipientEmail || req.body.recipientPhone || null);
     const isEscrowSend = escrowContact && !recipientUserId && !recipientHomeId;
 
+    const senderHasVerifiedHome = await hasVerifiedSenderHome(senderId);
+    if (!senderHasVerifiedHome) {
+      logger.info('Mailbox send blocked: sender home verification required', {
+        senderId,
+        recipientUserId: recipientUserId || null,
+        recipientHomeId: recipientHomeId || null,
+        addressHomeId: addressHomeId || null,
+        deliveryTargetType: deliveryTargetType || null,
+      });
+      return sendHomeVerificationRequired(res);
+    }
+
     if (isEscrowSend) {
       // Rate limit check
       const rateCheck = await checkEscrowRateLimits(senderId, escrowContact);
@@ -1855,7 +1913,16 @@ router.post('/send', verifyToken, validate(sendMailSchema), async (req, res) => 
         return res.status(404).json({ error: 'That home address wasn\u2019t found. It may have been removed.' });
       }
       if (!homeAccess.allowed) {
-        return res.status(403).json({ error: 'You don\u2019t have permission to send mail to this address.' });
+        logger.info('Mailbox send blocked: destination address not allowed', {
+          senderId,
+          addressHomeId,
+          recipientUserId: recipientUserId || null,
+          deliveryTargetType: deliveryTargetType || null,
+        });
+        return res.status(403).json({
+          error: 'You don\u2019t have permission to send mail to this address.',
+          code: 'MAILBOX_DESTINATION_ADDRESS_FORBIDDEN',
+        });
       }
       addressHome = homeAccess.home;
     }
@@ -1866,7 +1933,16 @@ router.post('/send', verifyToken, validate(sendMailSchema), async (req, res) => 
         return res.status(404).json({ error: 'That home wasn\u2019t found. It may have been removed.' });
       }
       if (!homeAccess.allowed) {
-        return res.status(403).json({ error: 'You don\u2019t have permission to send mail to this home.' });
+        logger.info('Mailbox send blocked: destination home not allowed', {
+          senderId,
+          recipientHomeId,
+          recipientUserId: recipientUserId || null,
+          deliveryTargetType: deliveryTargetType || null,
+        });
+        return res.status(403).json({
+          error: 'You don\u2019t have permission to send mail to this home.',
+          code: 'MAILBOX_DESTINATION_HOME_FORBIDDEN',
+        });
       }
       addressHome = homeAccess.home;
     }

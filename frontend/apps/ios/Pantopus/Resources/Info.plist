@@ -47,8 +47,19 @@
 	<string>Pantopus uses your location to show gigs and neighbors near you, and for location-based notifications.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Pantopus uses your location to show gigs and neighbors near you.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Pantopus connects to the local development server on your Mac while testing.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Pantopus uses the microphone for voice messages in chat.</string>
+	<key>PantopusAPIBaseURL</key>
+	<string>$(PANTOPUS_API_BASE_URL)</string>
+	<key>PantopusSocketURL</key>
+	<string>$(PANTOPUS_SOCKET_URL)</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Pantopus uses your photo library to upload profile photos, listing images, and mail.</string>
 	<key>SentryDSN</key>

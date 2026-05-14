@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
+const { createServerSupabaseClient } = require('./supabaseClient');
 require('dotenv').config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -9,7 +9,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 // Admin client with service role (bypasses RLS) - use for server-only operations
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+const supabaseAdmin = createServerSupabaseClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false

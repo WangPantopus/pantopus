@@ -1054,16 +1054,18 @@ describe('constants', () => {
       mail_code: 'member',
       landlord_approval: 'lease_resident',
       landlord_invite: 'lease_resident',
+      owner_invite: 'owner',
       doc_upload: null,
       manual_review: null,
     });
   });
 
-  test('ESCALATED_METHODS contains 3 methods', () => {
-    expect(OccupancyAttachService.ESCALATED_METHODS.size).toBe(3);
+  test('ESCALATED_METHODS contains expected methods', () => {
+    expect(OccupancyAttachService.ESCALATED_METHODS.size).toBe(4);
     expect(OccupancyAttachService.ESCALATED_METHODS.has('landlord_invite')).toBe(true);
     expect(OccupancyAttachService.ESCALATED_METHODS.has('admin_override')).toBe(true);
     expect(OccupancyAttachService.ESCALATED_METHODS.has('owner_bootstrap')).toBe(true);
+    expect(OccupancyAttachService.ESCALATED_METHODS.has('owner_invite')).toBe(true);
   });
 
   test('CLAIM_TYPE_ROLE_MAP maps claim types to roles', () => {
@@ -1113,6 +1115,7 @@ describe('_resolveVerificationStatus logic', () => {
     ['autocomplete_ok', 'verified'],
     ['mail_code', 'verified'],
     ['landlord_invite', 'verified'],
+    ['owner_invite', 'verified'],
     ['admin_override', 'verified'],
     ['doc_upload', 'verified'],
     ['landlord_approval', 'verified'],
