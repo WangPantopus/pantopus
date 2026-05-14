@@ -215,7 +215,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 }
             }
             composable(PantopusRoute.Nearby.path) { NearbyScreen() }
-            composable(PantopusRoute.Inbox.path) { InboxScreen() }
+            composable(PantopusRoute.Inbox.path) {
+                InboxScreen(
+                    onOpenConversation = { row ->
+                        navController.navigate(ChildRoutes.placeholder(row.displayName))
+                    },
+                    onCompose = { navController.navigate(ChildRoutes.placeholder("New message")) },
+                    onOpenSearch = { navController.navigate(ChildRoutes.placeholder("Chat search")) },
+                )
+            }
             composable(PantopusRoute.You.path) {
                 YouScreen(
                     onOpenPublicProfile = { userId ->
