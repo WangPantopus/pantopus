@@ -82,3 +82,71 @@ data class ChatStats(
 data class ChatStatsResponse(
     val stats: ChatStats,
 )
+
+// MARK: - Messages (T2.2)
+
+/** Sender projection embedded in a `ChatMessage` row. */
+@JsonClass(generateAdapter = true)
+data class ChatMessageSender(
+    val id: String,
+    val username: String? = null,
+    val name: String? = null,
+    @Json(name = "profile_picture_url") val profilePictureUrl: String? = null,
+)
+
+/** One row from `/messages`. */
+@JsonClass(generateAdapter = true)
+data class ChatMessageDto(
+    val id: String,
+    @Json(name = "room_id") val roomId: String,
+    @Json(name = "user_id") val userId: String? = null,
+    @Json(name = "message_text") val messageText: String? = null,
+    @Json(name = "message_type") val messageType: String = "text",
+    val metadata: Map<String, Any>? = null,
+    @Json(name = "reply_to_id") val replyToId: String? = null,
+    @Json(name = "client_message_id") val clientMessageId: String? = null,
+    @Json(name = "created_at") val createdAt: String,
+    @Json(name = "edited_at") val editedAt: String? = null,
+    @Json(name = "deleted_at") val deletedAt: String? = null,
+    @Json(name = "delivered_at") val deliveredAt: String? = null,
+    @Json(name = "read_at") val readAt: String? = null,
+    val sender: ChatMessageSender? = null,
+)
+
+/** `GET /messages` envelope. */
+@JsonClass(generateAdapter = true)
+data class ChatMessagesResponse(
+    val messages: List<ChatMessageDto>,
+    val hasMore: Boolean? = null,
+    val roomIds: List<String>? = null,
+)
+
+/** `POST /messages` body. */
+@JsonClass(generateAdapter = true)
+data class SendChatMessageBody(
+    val roomId: String,
+    val messageText: String? = null,
+    val messageType: String = "text",
+    val clientMessageId: String? = null,
+    val replyToId: String? = null,
+)
+
+/** `POST /messages` envelope. */
+@JsonClass(generateAdapter = true)
+data class SendChatMessageResponse(
+    val message: ChatMessageDto,
+)
+
+/** `POST /messages/:id/react` body. */
+@JsonClass(generateAdapter = true)
+data class ReactToChatMessageBody(
+    val reaction: String,
+)
+
+/** `POST /messages/:id/react` envelope. */
+@JsonClass(generateAdapter = true)
+data class ReactToChatMessageResponse(
+    val messageId: String? = null,
+    val reaction: String? = null,
+    val counts: Map<String, Int>? = null,
+)

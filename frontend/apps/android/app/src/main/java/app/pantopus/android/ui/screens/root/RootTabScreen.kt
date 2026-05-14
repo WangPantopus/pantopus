@@ -46,6 +46,12 @@ import app.pantopus.android.ui.screens.hub.HubScreen
 import app.pantopus.android.ui.screens.hub.JumpBackItem
 import app.pantopus.android.ui.screens.hub.PillarTile
 import app.pantopus.android.ui.screens.inbox.InboxScreen
+import app.pantopus.android.ui.screens.inbox.chat.ConversationIdentityChip
+import app.pantopus.android.ui.screens.inbox.chat.ConversationRowContent
+import app.pantopus.android.ui.screens.inbox.chat.ConversationRowVariant
+import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationHost
+import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
+import app.pantopus.android.ui.screens.inbox.conversation.ChatThreadMode
 import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
@@ -94,6 +100,24 @@ private object ChildRoutes {
     /** Pulse tab (T1.2). Reached from Hub → pillar(.Pulse). */
     const val PULSE_FEED = "feed/pulse"
 
+    /** Chat conversation (T2.2). Reached from Inbox → row tap. */
+    const val CHAT_KIND_KEY = "kind"
+    const val CHAT_ID_KEY = "id"
+    const val CHAT_NAME_KEY = "name"
+    const val CHAT_INITIALS_KEY = "initials"
+    const val CHAT_VERIFIED_KEY = "verified"
+    const val CHAT_IDENTITY_KEY = "identity"
+    const val CHAT_LOCALITY_KEY = "locality"
+    const val CHAT_ONLINE_KEY = "online"
+    const val CHAT_CONVERSATION =
+        "chat/{$CHAT_KIND_KEY}/{$CHAT_ID_KEY}?" +
+            "$CHAT_NAME_KEY={$CHAT_NAME_KEY}" +
+            "&$CHAT_INITIALS_KEY={$CHAT_INITIALS_KEY}" +
+            "&$CHAT_VERIFIED_KEY={$CHAT_VERIFIED_KEY}" +
+            "&$CHAT_IDENTITY_KEY={$CHAT_IDENTITY_KEY}" +
+            "&$CHAT_LOCALITY_KEY={$CHAT_LOCALITY_KEY}" +
+            "&$CHAT_ONLINE_KEY={$CHAT_ONLINE_KEY}"
+
     /** Compose post target — placeholder until the compose flow ships. */
     const val COMPOSE_INTENT_KEY = "intent"
     const val COMPOSE_POST = "feed/compose?$COMPOSE_INTENT_KEY={$COMPOSE_INTENT_KEY}"
@@ -135,6 +159,30 @@ private object ChildRoutes {
     /** Build the compose-post path with the pre-fill intent encoded. */
     fun composePost(intent: String): String =
         "feed/compose?$COMPOSE_INTENT_KEY=${java.net.URLEncoder.encode(intent, "UTF-8")}"
+
+    /** Build the chat-conversation path with all header context encoded. */
+    fun chatConversation(row: ConversationRowContent): String {
+        val kind =
+            when (row.variant) {
+                ConversationRowVariant.AiAssistant -> "ai"
+                is ConversationRowVariant.Group -> "room"
+                ConversationRowVariant.Dm -> "person"
+            }
+        val identity =
+            when (row.identityChip) {
+                ConversationIdentityChip.Business -> "business"
+                ConversationIdentityChip.Home -> "home"
+                null -> ""
+            }
+        fun enc(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
+        return "chat/$kind/${enc(row.id)}?" +
+            "$CHAT_NAME_KEY=${enc(row.displayName)}" +
+            "&$CHAT_INITIALS_KEY=${enc(row.initials)}" +
+            "&$CHAT_VERIFIED_KEY=${row.verified}" +
+            "&$CHAT_IDENTITY_KEY=${enc(identity)}" +
+            "&$CHAT_LOCALITY_KEY=" +
+            "&$CHAT_ONLINE_KEY=false"
+    }
 }
 
 /**
@@ -218,7 +266,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(PantopusRoute.Inbox.path) {
                 InboxScreen(
                     onOpenConversation = { row ->
-                        navController.navigate(ChildRoutes.placeholder(row.displayName))
+                        navController.navigate(ChildRoutes.chatConversation(row))
                     },
                     onCompose = { navController.navigate(ChildRoutes.placeholder("New message")) },
                     onOpenSearch = { navController.navigate(ChildRoutes.placeholder("Chat search")) },
@@ -338,6 +386,71 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenDrawer = { drawer ->
                         navController.navigate(ChildRoutes.placeholder("Drawer · $drawer"))
                     },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.CHAT_CONVERSATION,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.CHAT_KIND_KEY) { type = NavType.StringType },
+                        navArgument(ChildRoutes.CHAT_ID_KEY) { type = NavType.StringType },
+                        navArgument(ChildRoutes.CHAT_NAME_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                        navArgument(ChildRoutes.CHAT_INITIALS_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                        navArgument(ChildRoutes.CHAT_VERIFIED_KEY) {
+                            type = NavType.StringType
+                            defaultValue = "false"
+                        },
+                        navArgument(ChildRoutes.CHAT_IDENTITY_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                        navArgument(ChildRoutes.CHAT_LOCALITY_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                        navArgument(ChildRoutes.CHAT_ONLINE_KEY) {
+                            type = NavType.StringType
+                            defaultValue = "false"
+                        },
+                    ),
+            ) { entry ->
+                val args = entry.arguments ?: return@composable
+                val kind = args.getString(ChildRoutes.CHAT_KIND_KEY).orEmpty()
+                val id = args.getString(ChildRoutes.CHAT_ID_KEY).orEmpty()
+                val name = args.getString(ChildRoutes.CHAT_NAME_KEY).orEmpty()
+                val initials = args.getString(ChildRoutes.CHAT_INITIALS_KEY).orEmpty()
+                val verified = args.getString(ChildRoutes.CHAT_VERIFIED_KEY) == "true"
+                val locality = args.getString(ChildRoutes.CHAT_LOCALITY_KEY).orEmpty().takeIf { it.isNotEmpty() }
+                val online = args.getString(ChildRoutes.CHAT_ONLINE_KEY) == "true"
+                val mode: ChatThreadMode =
+                    when (kind) {
+                        "ai" -> ChatThreadMode.Ai
+                        "room" -> ChatThreadMode.Room(id)
+                        else -> ChatThreadMode.Person(otherUserId = id)
+                    }
+                val counterparty: ChatCounterparty =
+                    when (kind) {
+                        "ai" -> ChatCounterparty.Ai(displayName = name)
+                        "room" -> ChatCounterparty.Group(displayName = name, memberCount = null)
+                        else ->
+                            ChatCounterparty.Person(
+                                displayName = name,
+                                initials = initials,
+                                locality = locality,
+                                verified = verified,
+                                online = online,
+                            )
+                    }
+                ChatConversationHost(
+                    mode = mode,
+                    counterparty = counterparty,
                     onBack = { navController.popBackStack() },
                 )
             }

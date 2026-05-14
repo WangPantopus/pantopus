@@ -191,3 +191,135 @@ public struct ChatMessageEvent: Decodable, Sendable, Hashable {
     public let createdAt: String?
     public let unreadFor: Int?
 }
+
+// MARK: - Messages (T2.2)
+
+/// One sender row inline on a `ChatMessageDTO`. Only the fields the
+/// conversation view actually reads.
+public struct ChatMessageSender: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let username: String?
+    public let name: String?
+    public let profilePictureURL: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, username, name
+        case profilePictureURL = "profile_picture_url"
+    }
+}
+
+/// One message row in a chat thread. Backed by the `ChatMessage` row
+/// joined with its sender (`user_id` → `sender`).
+public struct ChatMessageDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let roomId: String
+    public let userId: String?
+    public let messageText: String?
+    public let messageType: String
+    public let metadata: JSONValue?
+    public let replyToId: String?
+    public let clientMessageId: String?
+    public let createdAt: String
+    public let editedAt: String?
+    public let deletedAt: String?
+    public let deliveredAt: String?
+    public let readAt: String?
+    public let sender: ChatMessageSender?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case roomId = "room_id"
+        case userId = "user_id"
+        case messageText = "message_text"
+        case messageType = "message_type"
+        case metadata
+        case replyToId = "reply_to_id"
+        case clientMessageId = "client_message_id"
+        case createdAt = "created_at"
+        case editedAt = "edited_at"
+        case deletedAt = "deleted_at"
+        case deliveredAt = "delivered_at"
+        case readAt = "read_at"
+        case sender
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        roomId = try c.decode(String.self, forKey: .roomId)
+        userId = try c.decodeIfPresent(String.self, forKey: .userId)
+        messageText = try c.decodeIfPresent(String.self, forKey: .messageText)
+        messageType = try c.decodeIfPresent(String.self, forKey: .messageType) ?? "text"
+        metadata = try c.decodeIfPresent(JSONValue.self, forKey: .metadata)
+        replyToId = try c.decodeIfPresent(String.self, forKey: .replyToId)
+        clientMessageId = try c.decodeIfPresent(String.self, forKey: .clientMessageId)
+        createdAt = try c.decode(String.self, forKey: .createdAt)
+        editedAt = try c.decodeIfPresent(String.self, forKey: .editedAt)
+        deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
+        deliveredAt = try c.decodeIfPresent(String.self, forKey: .deliveredAt)
+        readAt = try c.decodeIfPresent(String.self, forKey: .readAt)
+        sender = try c.decodeIfPresent(ChatMessageSender.self, forKey: .sender)
+    }
+}
+
+/// `GET /api/chat/rooms/:roomId/messages` /
+/// `GET /api/chat/conversations/:otherUserId/messages` envelope.
+public struct ChatMessagesResponse: Decodable, Sendable, Hashable {
+    public let messages: [ChatMessageDTO]
+    public let hasMore: Bool?
+    public let roomIds: [String]?
+
+    private enum CodingKeys: String, CodingKey {
+        case messages, hasMore, roomIds
+    }
+}
+
+/// `POST /api/chat/messages` envelope.
+public struct SendChatMessageResponse: Decodable, Sendable, Hashable {
+    public let message: ChatMessageDTO
+}
+
+/// `POST /api/chat/messages/:id/react` envelope.
+public struct ReactToChatMessageResponse: Decodable, Sendable, Hashable {
+    public let messageId: String?
+    public let reaction: String?
+    public let counts: [String: Int]?
+}
+
+// MARK: - Realtime message envelopes
+
+/// `message:new` socket payload at the conversation view-model layer
+/// — richer than `ChatMessageEvent` used by the list. The socket
+/// decoder converts snake_case → camelCase automatically.
+public struct ChatRealtimeMessage: Decodable, Sendable, Hashable {
+    public let id: String
+    public let roomId: String
+    public let userId: String?
+    public let messageText: String?
+    public let messageType: String?
+    public let createdAt: String?
+    public let clientMessageId: String?
+}
+
+/// `messageUpdated` socket payload.
+public struct ChatRealtimeMessageUpdate: Decodable, Sendable, Hashable {
+    public let id: String
+    public let roomId: String?
+    public let messageText: String?
+    public let editedAt: String?
+    public let deliveredAt: String?
+    public let readAt: String?
+}
+
+/// `messageDeleted` socket payload.
+public struct ChatRealtimeMessageDelete: Decodable, Sendable, Hashable {
+    public let id: String
+    public let roomId: String?
+}
+
+/// `message:react` socket payload.
+public struct ChatRealtimeReaction: Decodable, Sendable, Hashable {
+    public let messageId: String
+    public let reaction: String?
+    public let counts: [String: Int]?
+}
