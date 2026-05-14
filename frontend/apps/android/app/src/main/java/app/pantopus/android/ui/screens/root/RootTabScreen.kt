@@ -60,7 +60,9 @@ import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
-import app.pantopus.android.ui.screens.nearby.NearbyScreen
+import app.pantopus.android.ui.screens.nearby.map.MapEntity
+import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
+import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
@@ -282,7 +284,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     })
                 }
             }
-            composable(PantopusRoute.Nearby.path) { NearbyScreen() }
+            composable(PantopusRoute.Nearby.path) {
+                NearbyMapScreen(
+                    onOpenEntity = { entity: MapEntity ->
+                        when (entity.kind) {
+                            MapEntityKind.Gig -> navController.navigate(ChildRoutes.gigDetail(entity.id))
+                            MapEntityKind.Listing -> navController.navigate(ChildRoutes.placeholder("Listing · ${entity.id}"))
+                        }
+                    },
+                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Map filters")) },
+                )
+            }
             composable(PantopusRoute.Inbox.path) {
                 InboxScreen(
                     onOpenConversation = { row ->

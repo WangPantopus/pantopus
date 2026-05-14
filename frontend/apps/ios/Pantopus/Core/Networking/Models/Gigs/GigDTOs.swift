@@ -109,3 +109,15 @@ public struct GigSaveResponse: Decodable, Sendable {
     public let message: String?
     public let saved: Bool?
 }
+
+/// Envelope from `GET /api/gigs/in-bounds`. Carries a backend hint for
+/// where to recenter when the current viewport is empty.
+public struct GigsInBoundsResponse: Decodable, Sendable {
+    public let gigs: [GigDTO]
+    public let nearestActivityCenter: NearestActivityCenter?
+
+    enum CodingKeys: String, CodingKey {
+        case gigs
+        case nearestActivityCenter = "nearest_activity_center"
+    }
+}

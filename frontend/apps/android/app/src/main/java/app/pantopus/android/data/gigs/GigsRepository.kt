@@ -1,6 +1,7 @@
 package app.pantopus.android.data.gigs
 
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
+import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
@@ -50,7 +51,7 @@ class GigsRepository
             maxLat: Double,
             maxLon: Double,
             category: String? = null,
-        ): NetworkResult<GigsListResponse> = safeApiCall { api.inBounds(minLat, minLon, maxLat, maxLon, category = category) }
+        ): NetworkResult<GigsInBoundsResponse> = safeApiCall { api.inBounds(minLat, minLon, maxLat, maxLon, category = category) }
 
         suspend fun save(id: String): NetworkResult<GigSaveResponse> = safeApiCall { api.save(id) }
 

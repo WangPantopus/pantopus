@@ -1,0 +1,173 @@
+//
+//  NearbyMapViewModelTests.swift
+//  PantopusTests
+//
+//  Covers the Nearby map VM (T2.4): combined gigs + listings load,
+//  category filter triggers a refetch, sheet-stop transitions,
+//  selection mirror, and error fallback when both endpoints fail.
+//
+
+import CoreLocation
+import XCTest
+@testable import Pantopus
+
+@MainActor
+final class NearbyMapViewModelTests: XCTestCase {
+    private let center = UserCoordinate(latitude: 40.7484, longitude: -73.9857, accuracyMeters: 50)
+
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    private func makeAPI() -> APIClient {
+        APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
+    }
+
+    private static let gigJSON = """
+    {
+      "id": "g1",
+      "title": "Hang 3 floating shelves",
+      "description": "Need 3 IKEA Lack shelves mounted.",
+      "price": 60,
+      "category": "handyman",
+      "status": "open",
+      "user_id": "u1",
+      "bid_count": 4,
+      "latitude": 40.749,
+      "longitude": -73.984
+    }
+    """
+
+    private static let pendingGigJSON = """
+    {
+      "id": "g2",
+      "title": "Pending cleanup",
+      "price": 40,
+      "category": "cleaning",
+      "status": "pending",
+      "user_id": "u1",
+      "latitude": 40.747,
+      "longitude": -73.986
+    }
+    """
+
+    private static let listingJSON = """
+    {
+      "id": "l1",
+      "title": "Lightly-used couch",
+      "category": "moving",
+      "layer": "marketplace",
+      "price": 250,
+      "latitude": 40.750,
+      "longitude": -73.985
+    }
+    """
+
+    private static func gigsBoundsJSON(_ rows: String...) -> String {
+        "{\"gigs\":[\(rows.joined(separator: ","))]}"
+    }
+
+    private static func listingsBoundsJSON(_ rows: String...) -> String {
+        "{\"listings\":[\(rows.joined(separator: ","))]}"
+    }
+
+    func testLoadCombinesGigsAndListings() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsBoundsJSON(Self.gigJSON, Self.pendingGigJSON)),
+            .status(200, body: Self.listingsBoundsJSON(Self.listingJSON))
+        ]
+        let vm = NearbyMapViewModel(
+            api: makeAPI(),
+            location: FixedLocationProvider(center)
+        )
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(loaded.entities.count, 3)
+        let gigs = loaded.entities.filter { $0.kind == .gig }
+        let listings = loaded.entities.filter { $0.kind == .listing }
+        XCTAssertEqual(gigs.count, 2)
+        XCTAssertEqual(listings.count, 1)
+        let pending = gigs.first { $0.id == "g2" }
+        XCTAssertEqual(pending?.state, .pending)
+    }
+
+    func testLoadFallsBackToErrorWhenBothEndpointsFail() async {
+        SequencedURLProtocol.sequence = [
+            .status(500, body: "{}"),
+            .status(500, body: "{}")
+        ]
+        let vm = NearbyMapViewModel(
+            api: makeAPI(),
+            location: FixedLocationProvider(center)
+        )
+        await vm.load()
+        guard case .error = vm.state else {
+            XCTFail("Expected .error when both endpoints fail")
+            return
+        }
+    }
+
+    func testSelectCategoryRefetches() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsBoundsJSON(Self.gigJSON, Self.pendingGigJSON)),
+            .status(200, body: Self.listingsBoundsJSON(Self.listingJSON)),
+            .status(200, body: Self.gigsBoundsJSON(Self.gigJSON)),
+            .status(200, body: Self.listingsBoundsJSON())
+        ]
+        let vm = NearbyMapViewModel(
+            api: makeAPI(),
+            location: FixedLocationProvider(center)
+        )
+        await vm.load()
+        await vm.selectCategory(.handyman)
+        XCTAssertEqual(vm.activeCategory, .handyman)
+        guard case let .loaded(loaded) = vm.state else {
+            XCTFail("Expected .loaded after category switch")
+            return
+        }
+        XCTAssertEqual(loaded.entities.count, 1)
+        XCTAssertEqual(loaded.entities.first?.id, "g1")
+    }
+
+    func testSelectEntityMirrorsSelectedId() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.gigsBoundsJSON(Self.gigJSON)),
+            .status(200, body: Self.listingsBoundsJSON())
+        ]
+        let vm = NearbyMapViewModel(
+            api: makeAPI(),
+            location: FixedLocationProvider(center)
+        )
+        await vm.load()
+        vm.selectEntity("g1")
+        if case let .loaded(loaded) = vm.state {
+            XCTAssertEqual(loaded.selectedId, "g1")
+        } else {
+            XCTFail("Expected .loaded with selectedId")
+        }
+        vm.selectEntity(nil)
+        if case let .loaded(loaded) = vm.state {
+            XCTAssertNil(loaded.selectedId)
+        }
+    }
+
+    func testSheetStopTransitions() {
+        let vm = NearbyMapViewModel(
+            api: makeAPI(),
+            location: FixedLocationProvider(center)
+        )
+        XCTAssertEqual(vm.sheetStop, .standard)
+        vm.setSheetStop(.expanded)
+        XCTAssertEqual(vm.sheetStop, .expanded)
+        vm.setSheetStop(.collapsed)
+        XCTAssertEqual(vm.sheetStop, .collapsed)
+    }
+}

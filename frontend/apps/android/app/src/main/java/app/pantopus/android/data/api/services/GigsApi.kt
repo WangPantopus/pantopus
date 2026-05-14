@@ -1,6 +1,7 @@
 package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
+import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -52,7 +53,7 @@ interface GigsApi {
         @Query("status") status: String = "open",
         @Query("category") category: String? = null,
         @Query("includeRemote") includeRemote: Boolean? = null,
-    ): GigsListResponse
+    ): GigsInBoundsResponse
 
     /** `POST /api/gigs/:id/save` — bookmark. */
     @POST("api/gigs/{id}/save")

@@ -73,3 +73,17 @@ data class GigSaveResponse(
     val message: String? = null,
     val saved: Boolean? = null,
 )
+
+/** Backend recenter hint for empty map viewports. */
+@JsonClass(generateAdapter = true)
+data class GigsNearestActivityCenter(
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+)
+
+/** Envelope from `GET /api/gigs/in-bounds`. */
+@JsonClass(generateAdapter = true)
+data class GigsInBoundsResponse(
+    val gigs: List<GigDto>,
+    @Json(name = "nearest_activity_center") val nearestActivityCenter: GigsNearestActivityCenter? = null,
+)
