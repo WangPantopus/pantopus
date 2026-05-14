@@ -14,7 +14,6 @@ import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,38 +61,29 @@ class MeViewModel
 
         private fun fetch() {
             viewModelScope.launch {
-                val (profileResult, homesResult) =
-                    awaitAll(
-                        async { profileRepo.ownProfile() },
-                        async { homesRepo.myHomes() },
-                    )
+                // Run profile + homes in parallel; their types differ so we
+                // keep two `async` handles rather than `awaitAll` on a
+                // common-supertype list.
+                val profileDeferred = async { profileRepo.ownProfile() }
+                val homesDeferred = async { homesRepo.myHomes() }
+                val profileResult = profileDeferred.await()
+                val homesResult = homesDeferred.await()
 
-                val profileRes = profileResult as? NetworkResult<*>
-                val homesRes = homesResult as? NetworkResult<*>
-                if (profileRes !is NetworkResult.Success<*>) {
-                    val failure = profileRes as? NetworkResult.Failure
-                    _state.value = MeUiState.Error(failure?.error?.message ?: "Couldn't load your profile.")
-                    return@launch
-                }
-                @Suppress("UNCHECKED_CAST")
                 val profile =
-                    (profileRes.data as? app.pantopus.android.data.api.models.users.ProfileResponse)?.user
+                    (profileResult as? NetworkResult.Success)?.data?.user
                         ?: run {
-                            _state.value = MeUiState.Error("Couldn't load your profile.")
+                            val message =
+                                (profileResult as? NetworkResult.Failure)
+                                    ?.error?.message
+                                    ?: "Couldn't load your profile."
+                            _state.value = MeUiState.Error(message)
                             return@launch
                         }
                 val homes: List<MyHome> =
-                    when (homesRes) {
-                        is NetworkResult.Success<*> ->
-                            (homesRes.data as? app.pantopus.android.data.api.models.homes.MyHomesResponse)
-                                ?.homes
-                                .orEmpty()
-                        else -> emptyList()
-                    }
+                    (homesResult as? NetworkResult.Success)?.data?.homes.orEmpty()
 
-                val statsResult = profileRepo.stats(profile.id)
                 val stats =
-                    (statsResult as? NetworkResult.Success<UserStatsDto>)?.data
+                    (profileRepo.stats(profile.id) as? NetworkResult.Success)?.data
 
                 _state.value =
                     MeUiState.Loaded(

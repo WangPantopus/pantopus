@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +68,7 @@ fun MeView(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeIdentity by viewModel.activeIdentity.collectAsStateWithLifecycle()
 
-    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.load() }
+    LaunchedEffect(Unit) { viewModel.load() }
 
     Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg).testTag("meScreen")) {
         when (val s = state) {
