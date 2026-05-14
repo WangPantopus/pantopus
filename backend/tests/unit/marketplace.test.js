@@ -271,6 +271,21 @@ describe('Marketplace Integration Tests', () => {
       expect(res.body.listing.location_address).toBeNull();
     });
 
+    it('detail uses the seller name for displayName while keeping username as handle', async () => {
+      const res = await asUser(
+        request(app).get(`/api/listings/${LISTING_APPROX}`),
+        USER_A,
+      ).set('Authorization', 'Bearer mock-token')
+        .expect(200);
+
+      expect(res.body.listing.creator).toMatchObject({
+        type: 'local',
+        handle: 'bob',
+        displayName: 'Bob B',
+      });
+      expect(res.body.listing.creator).not.toHaveProperty('username');
+    });
+
     it('approx_area → blurred coordinates for non-owner', async () => {
       const res = await asUser(
         request(app).get(`/api/listings/${LISTING_APPROX}`),
@@ -345,6 +360,10 @@ describe('Marketplace Integration Tests', () => {
       // userHasSaved should be true for the saved listing
       const normal = res.body.listings.find(l => l.id === LISTING_NORMAL);
       expect(normal.userHasSaved).toBe(true);
+      expect(normal.creator).toMatchObject({
+        handle: 'bob',
+        displayName: 'Bob B',
+      });
     });
 
     it('anonymous → all public listings, no saved state', async () => {

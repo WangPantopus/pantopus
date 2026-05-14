@@ -16,12 +16,22 @@ const logger = require('../../utils/logger');
 const s3 = require('../s3Service');
 const { applyLocationPrivacyBatch } = require('./locationPrivacy');
 const { LISTING_CATEGORIES } = require('../../constants/marketplace');
+const { hydrateListingCreatorIdentities } = require('../../utils/listingCreatorIdentity');
+const {
+  SAFE_CREATOR_SELECT,
+  serializeUserAsLocalIdentity,
+} = require('../../serializers/identitySerializers');
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const CREATOR_SELECT = 'id, username, name, first_name, profile_picture_url, city, state';
+// P0.3: legacy creator-select constant replaced by SAFE_CREATOR_SELECT.
+// See Audience Profile design v2 §16 item 2.
+const METERS_PER_MILE = 1609.34;
+const DEFAULT_DISCOVERY_RADIUS_METERS = Math.round(100 * METERS_PER_MILE);
+const GLOBAL_RADIUS_METERS = Math.round(25000 * METERS_PER_MILE);
+const WORLD_BOUNDS = { south: -90, west: -180, north: 90, east: 180 };
 
 const LISTING_BROWSE_SELECT = `
   id, user_id, title, description, price, is_free,
@@ -33,7 +43,7 @@ const LISTING_BROWSE_SELECT = `
   layer, listing_type, home_id, is_address_attached,
   quality_score, context_tags, is_wanted, budget_max, expires_at,
   created_at, updated_at,
-  creator:user_id (${CREATOR_SELECT})
+  creator:user_id (${SAFE_CREATOR_SELECT})
 `.replace(/\s+/g, ' ').trim();
 
 // ---------------------------------------------------------------------------
@@ -119,7 +129,9 @@ function normalizeListingRow(row, savedIds = new Set(), refLat = null, refLng = 
     updated_at: row.updated_at,
     distance_meters: distanceMeters,
     userHasSaved: savedIds.has(row.id),
-    creator: row.creator || null,
+    // Project the raw/enriched User row through the serializer wall so only
+    // the public identity shape reaches clients.
+    creator: row.creator ? serializeUserAsLocalIdentity(row.creator) : null,
   };
 }
 
@@ -143,13 +155,24 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
 // ---------------------------------------------------------------------------
 
 function boundingBoxFromCenter(lat, lng, radiusMeters) {
-  const latDelta = radiusMeters / 111000;
-  const lngDelta = radiusMeters / (111000 * Math.cos(lat * Math.PI / 180));
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return WORLD_BOUNDS;
+
+  const radius = Number.isFinite(radiusMeters) && radiusMeters > 0
+    ? radiusMeters
+    : DEFAULT_DISCOVERY_RADIUS_METERS;
+  if (radius >= GLOBAL_RADIUS_METERS) return WORLD_BOUNDS;
+
+  const latDelta = radius / 111000;
+  const cosLat = Math.max(Math.abs(Math.cos(lat * Math.PI / 180)), 0.01);
+  const lngDelta = radius / (111000 * cosLat);
+  const west = lng - lngDelta;
+  const east = lng + lngDelta;
+
   return {
-    south: lat - latDelta,
-    north: lat + latDelta,
-    west: lng - lngDelta,
-    east: lng + lngDelta,
+    south: Math.min(Math.max(lat - latDelta, -90), 90),
+    north: Math.min(Math.max(lat + latDelta, -90), 90),
+    west: west < -180 || east > 180 || lngDelta >= 180 ? -180 : west,
+    east: west < -180 || east > 180 || lngDelta >= 180 ? 180 : east,
   };
 }
 
@@ -431,18 +454,6 @@ async function browseListings({
     }
     listings = rpcData || [];
 
-    // RPC doesn't include the nested creator join — fetch profiles in bulk
-    if (listings.length > 0) {
-      const creatorIds = [...new Set(listings.map(l => l.user_id))];
-      const { data: profiles } = await supabaseAdmin
-        .from('User')
-        .select(CREATOR_SELECT)
-        .in('id', creatorIds);
-      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
-      for (const l of listings) {
-        l.creator = profileMap.get(l.user_id) || null;
-      }
-    }
   } else {
     const { data: rawListings, error } = await query;
     if (error) {
@@ -574,6 +585,7 @@ async function browseListings({
   // 7. Apply mute/block exclusions
   const filters = userId ? await getMuteAndBlockFilters(userId) : null;
   listings = applyListingExclusions(listings, filters);
+  await hydrateListingCreatorIdentities(listings);
 
   // 8. Get saved status
   const listingIds = listings.map(l => l.id);
@@ -696,7 +708,7 @@ async function runCountQuery(south, west, north, east, filterOpts, cacheKey) {
  * Returns curated sections for the marketplace landing experience.
  * Runs multiple targeted queries in parallel.
  */
-async function discoverListings({ lat, lng, radius = 8047, userId }) {
+async function discoverListings({ lat, lng, radius = DEFAULT_DISCOVERY_RADIUS_METERS, userId }) {
   if (lat == null || lng == null) {
     throw new Error('lat and lng are required for discover');
   }

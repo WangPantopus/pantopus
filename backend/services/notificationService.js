@@ -12,6 +12,133 @@ const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('../utils/logger');
 const badgeService = require('./badgeService');
 const pushService = require('./pushService');
+const {
+  CONTEXTS: NOTIFICATION_CONTEXT_LIST,
+  registerTemplate,
+} = require('./notificationTemplateRegistry');
+
+// Set lookup for createNotification's `context` arg validation. The full
+// allowed set comes from the registry so additions there flow here for free.
+const NOTIFICATION_CONTEXTS = new Set(NOTIFICATION_CONTEXT_LIST);
+
+// ============================================================
+//  P0.6 — TEMPLATE REGISTRY
+// ============================================================
+// Every existing notification fires from one of the imperative notifyX
+// helpers below. The registry pairs each one with a declared template that
+// documents the placeholders the body MAY use, tagged with the firewall
+// context. The imperative helpers still build their bodies with template
+// literals (we are not refactoring user-visible behavior at P0.6); the
+// registry exists so that:
+//   1. A unit test can assert every template validates against its
+//      context's field allowlist (catches cross-context placeholders
+//      before deployment).
+//   2. Phase 1 audience-side notifications can be added by registering
+//      a new template + calling renderTemplate() — the firewall is
+//      enforced by construction.
+// Existing personal-side notifications remain context: 'personal'. Public
+// Profile follower notifications are registered separately with audience
+// context because the actor shown to the creator is a PersonaMembership fan
+// identity, not the follower's private Local Profile identity.
+const PERSONAL_TEMPLATES = [
+  { name: 'home_invite', pushTitle: '{actor.displayName} invited you to join a home', pushBody: "You've been invited to {home.name} as a household member." },
+  { name: 'home_invite_accepted', pushTitle: '{actor.displayName} joined your home', pushBody: '{actor.displayName} accepted your invitation to {home.name}.' },
+  { name: 'task_assigned', pushTitle: '{actor.displayName} assigned you a task', pushBody: '{task.title}' },
+  { name: 'task_completed', pushTitle: 'Task completed: {task.title}', pushBody: '{actor.displayName} marked this task as done.' },
+  { name: 'bid_received', pushTitle: 'New bid on "{gig.title}"', pushBody: '{actor.displayName} placed a bid on your gig.' },
+  { name: 'first_bid_received', pushTitle: 'Your first response! 🎉', pushBody: "{actor.displayName} wants to help with '{gig.title}'" },
+  { name: 'bid_accepted', pushTitle: 'Your bid was accepted!', pushBody: 'Your bid on "{gig.title}" was accepted. You can start a chat to coordinate.' },
+  { name: 'bid_rejected', pushTitle: 'Your bid was not selected', pushBody: 'Your bid on "{gig.title}" was declined.' },
+  { name: 'bid_withdrawn', pushTitle: '{actor.displayName} withdrew their bid', pushBody: 'A bid on "{gig.title}" was withdrawn.' },
+  { name: 'address_revealed', pushTitle: 'Address shared with you', pushBody: 'The seller shared their pickup address for "{listing.title}".' },
+  { name: 'gig_started', pushTitle: 'Gig started: {gig.title}', pushBody: '{actor.displayName} has started your gig.' },
+  { name: 'gig_completed', pushTitle: 'Gig completed: {gig.title}', pushBody: '{actor.displayName} marked the gig as completed.' },
+  { name: 'gig_confirmed', pushTitle: 'Gig completion confirmed', pushBody: 'Your gig "{gig.title}" was confirmed complete.' },
+  { name: 'payment_auth_failed', pushTitle: 'Payment failed for "{gig.title}"', pushBody: 'Please update your payment method to continue.' },
+  { name: 'payment_captured', pushTitle: 'Payment captured', pushBody: '{amount} captured for "{gig.title}".' },
+  { name: 'transfer_completed', pushTitle: 'Transfer completed', pushBody: '{amount} for "{gig.title}" has been transferred.' },
+  { name: 'dispute_created', pushTitle: 'Dispute opened on "{gig.title}"', pushBody: 'A dispute was opened on your gig.' },
+  { name: 'dispute_resolved', pushTitle: 'Dispute resolved on "{gig.title}"', pushBody: 'The dispute on your gig has been resolved.' },
+  { name: 'gig_auto_cancelled', pushTitle: 'Gig auto-cancelled: "{gig.title}"', pushBody: '{reason}' },
+  { name: 'setup_failed', pushTitle: 'Setup failed for "{gig.title}"', pushBody: 'We could not finish setting up your gig.' },
+  { name: 'connection_request', pushTitle: 'New connection request', pushBody: '{actor.displayName} wants to connect with you.' },
+  { name: 'connection_accepted', pushTitle: 'Connection accepted', pushBody: '{actor.displayName} accepted your connection request.' },
+  { name: 'residency_claim', pushTitle: 'New residency claim', pushBody: '{actor.displayName} claims to live at {home.name}.' },
+  { name: 'residency_approved', pushTitle: 'Residency approved at {home.name}', pushBody: 'Your residency claim was approved.' },
+  { name: 'residency_rejected', pushTitle: 'Residency claim not approved', pushBody: '{reason}' },
+  { name: 'ownership_verification_needed', pushTitle: 'Verify ownership of {home.name}', pushBody: 'Provide a proof document to continue.' },
+  { name: 'ownership_claim_approved', pushTitle: 'Ownership approved at {home.name}', pushBody: 'Your ownership claim was approved.' },
+  { name: 'ownership_claim_rejected', pushTitle: 'Ownership claim not approved', pushBody: '{reason}' },
+  { name: 'ownership_claim_needs_more_info', pushTitle: 'More info needed', pushBody: 'We need additional details for {home.name}.' },
+  { name: 'new_ownership_claim', pushTitle: 'New ownership claim', pushBody: '{actor.displayName} claims ownership of {home.name}.' },
+  { name: 'ownership_dispute', pushTitle: 'Ownership dispute at {home.name}', pushBody: 'A counter-claim was filed.' },
+  { name: 'mail_delivered', pushTitle: 'Mail delivered', pushBody: 'New mail at {mailbox.id}.' },
+  { name: 'density_milestone', pushTitle: 'Neighborhood milestone reached', pushBody: '{message}' },
+  { name: 'household_access_request', pushTitle: 'Household access request', pushBody: '{actor.displayName} requested access to your home.' },
+  { name: 'household_access_request_rejected', pushTitle: 'Household request not approved', pushBody: 'Your request for {home.name} was not approved.' },
+];
+
+for (const tpl of PERSONAL_TEMPLATES) {
+  registerTemplate({ ...tpl, context: 'personal', type: tpl.name });
+}
+
+const AUDIENCE_TEMPLATES = [
+  { name: 'persona_follow', pushTitle: 'New follower', pushBody: '{fan.displayName} joined your Beacon.' },
+  { name: 'persona_follow_request', pushTitle: 'Review a new audience request', pushBody: '{fan.displayName} wants to join your Beacon.' },
+  { name: 'persona_follow_approved', pushTitle: 'Beacon request approved', pushBody: '{persona.displayName} approved your request.' },
+  { name: 'persona_broadcast', pushTitle: 'Beacon update', pushBody: 'A Beacon shared an update.' },
+  // P1.12 — DM lifecycle. Notifications consume the audience-side
+  // identity allowlist only (fan.handle, persona.displayName, etc.);
+  // never the personal-side display name or user_id of either party.
+  {
+    name: 'persona_dm_received_creator',
+    pushTitle: 'New message from {fan.handle}',
+    pushBody: '{message}',
+    title: 'New message from {fan.handle}',
+    body: '{message}',
+    link: '/app/audience/inbox/{membership.id}',
+  },
+  {
+    name: 'persona_dm_reply_fan',
+    pushTitle: '{persona.displayName} replied',
+    pushBody: '{message}',
+    title: '{persona.displayName} replied',
+    body: '{message}',
+    link: '/app/audience/membership/{persona.id}/inbox',
+  },
+  {
+    name: 'persona_member_joined',
+    pushTitle: 'New {membership.tierName}: {fan.handle}',
+    pushBody: 'Welcome them in your dashboard',
+    title: '{fan.handle} joined as {membership.tierName}',
+    link: '/app/audience/fans/{membership.id}',
+  },
+];
+
+for (const tpl of AUDIENCE_TEMPLATES) {
+  registerTemplate({ ...tpl, context: 'audience', type: tpl.name });
+}
+
+// P1.12 — platform-context billing notifications. Carry no identity
+// of either side; only billing primitives (periodEnd, amount, etc.).
+const PLATFORM_TEMPLATES = [
+  {
+    name: 'persona_subscription_canceled',
+    pushTitle: 'Your subscription was canceled',
+    pushBody: 'You can keep your access until {periodEnd}',
+    title: 'Subscription canceled',
+    body: 'Your access continues until {periodEnd}.',
+  },
+  {
+    name: 'persona_payment_failed',
+    pushTitle: 'Payment failed',
+    pushBody: 'Update your payment method to keep your subscription',
+  },
+];
+
+for (const tpl of PLATFORM_TEMPLATES) {
+  registerTemplate({ ...tpl, context: 'platform', type: tpl.name });
+}
 
 // Socket.IO references — set by chatSocketio.js after connection
 let _io = null;
@@ -125,6 +252,30 @@ async function isTypeEnabled(userId, type) {
   }
 }
 
+async function shouldSuppressAudienceNotification(userId, type, metadata) {
+  if (!metadata?.persona_id) return false;
+  try {
+    const personaBlockService = require('./personaBlockService');
+    const isBlocked = await personaBlockService.isFanBlockedFromPersona(
+      metadata.persona_id, userId,
+    );
+    if (isBlocked) {
+      logger.info('notification.suppressed_blocked', {
+        userId, type, personaId: metadata.persona_id,
+      });
+      return true;
+    }
+  } catch (err) {
+    // Suppression is a defense-in-depth check; an error reading the
+    // block table should not block the notification entirely because
+    // route/service gates already prevent new blocked-fan actions.
+    logger.warn('notification.block_check_failed', {
+      userId, type, personaId: metadata.persona_id, error: err.message,
+    });
+  }
+  return false;
+}
+
 /**
  * Create a notification for a user.
  * @param {Object} opts
@@ -137,13 +288,30 @@ async function isTypeEnabled(userId, type) {
  * @param {Object} [opts.metadata] - extra data (home_id, gig_id, etc.)
  * @param {string} [opts.contextType] - 'personal' or 'business' (Identity Firewall)
  * @param {string} [opts.contextId] - business_user_id when contextType='business'
+ * @param {string} [opts.context] - 'personal' | 'audience' | 'platform'
+ *   (P0.6 Notification firewall — defaults to 'personal'; every existing
+ *   notifyX is personal-side and Phase 1 audience-side notifications must
+ *   pass `context: 'audience'` explicitly).
  * @returns {Promise<Object|null>} notification or null on error
  */
-async function createNotification({ userId, type, title, body, icon, link, metadata, contextType, contextId }) {
+async function createNotification({ userId, type, title, body, icon, link, metadata, contextType, contextId, context }) {
   if (!userId || !type || !title) {
     logger.warn('createNotification called with missing required fields', { userId, type, title });
     return null;
   }
+  const resolvedContext = NOTIFICATION_CONTEXTS.has(context) ? context : 'personal';
+
+  // P1.14 — audience-context notifications are suppressed when the
+  // recipient is currently blocked from the originating persona. Per
+  // audience-profile §9 + §6.2: a blocked fan must not receive a
+  // "@personahandle replied to your message" push the moment they
+  // get blocked. Lazy-required to avoid a circular dependency
+  // (personaBlockService imports the lifecycle service which has
+  // shared utilities; notificationService is loaded everywhere).
+  if (resolvedContext === 'audience' && metadata?.persona_id) {
+    if (await shouldSuppressAudienceNotification(userId, type, metadata)) return null;
+  }
+
   try {
     const { data, error } = await supabaseAdmin
       .from('Notification')
@@ -157,6 +325,7 @@ async function createNotification({ userId, type, title, body, icon, link, metad
         metadata: metadata || {},
         context_type: contextType || 'personal',
         context_id: contextId || null,
+        context: resolvedContext,
       })
       .select()
       .single();
@@ -205,17 +374,30 @@ async function createNotification({ userId, type, title, body, icon, link, metad
  */
 async function createBulkNotifications(notifications) {
   try {
-    const rows = notifications.map(n => ({
-      user_id: n.userId,
-      type: n.type,
-      title: n.title,
-      body: n.body || null,
-      icon: n.icon || '🔔',
-      link: n.link || null,
-      metadata: n.metadata || {},
-      context_type: n.contextType || 'personal',
-      context_id: n.contextId || null,
-    }));
+    const rows = [];
+    for (const n of notifications) {
+      const resolvedContext = NOTIFICATION_CONTEXTS.has(n.context) ? n.context : 'personal';
+      if (resolvedContext === 'audience'
+          && await shouldSuppressAudienceNotification(n.userId, n.type, n.metadata || {})) {
+        continue;
+      }
+      rows.push({
+        user_id: n.userId,
+        type: n.type,
+        title: n.title,
+        body: n.body || null,
+        icon: n.icon || '🔔',
+        link: n.link || null,
+        metadata: n.metadata || {},
+        context_type: n.contextType || 'personal',
+        context_id: n.contextId || null,
+        // P0.6: every row is tagged with the new firewall context. Existing
+        // notifyX call sites are personal-side and inherit the default.
+        context: resolvedContext,
+      });
+    }
+
+    if (rows.length === 0) return [];
 
     const { data, error } = await supabaseAdmin
       .from('Notification')
@@ -228,7 +410,7 @@ async function createBulkNotifications(notifications) {
     }
 
     // Push updated badge counts to all affected users
-    const uniqueUserIds = [...new Set(notifications.map((n) => n.userId))];
+    const uniqueUserIds = [...new Set(rows.map((n) => n.user_id))];
     badgeService.emitBadgeUpdateToMany(uniqueUserIds);
 
     // Push each notification to its recipient if they're connected
@@ -608,17 +790,111 @@ async function notifyConnectionAccepted({ requesterUserId, accepterName, accepte
 }
 
 /**
- * Notify a user someone started following them.
+ * Notify a Beacon owner when someone follows or requests access.
  */
-async function notifyNewFollower({ followedUserId, followerName, followerId, followerUsername }) {
+async function notifyPersonaFollow({
+  ownerUserId,
+  fanDisplayName,
+  fanHandle,
+  membershipId,
+  personaId,
+  personaHandle,
+  personaDisplayName,
+  followId,
+  followStatus,
+}) {
+  const isPending = followStatus === 'pending';
+  const handle = String(personaHandle || '').replace(/^@/, '');
+  const safeFanName = fanDisplayName || fanHandle || 'Someone';
   return createNotification({
-    userId: followedUserId,
-    type: 'new_follower',
-    title: `${followerName} started following you`,
-    icon: '👤',
-    link: `/${followerUsername || followerId}`,
-    metadata: { follower_id: followerId },
+    userId: ownerUserId,
+    type: isPending ? 'persona_follow_request' : 'persona_follow',
+    title: isPending
+      ? `Review a new audience request`
+      : `New follower`,
+    body: isPending
+      ? `${safeFanName} wants to join ${personaDisplayName || 'your Beacon'}. Approve, remove, or block them from Audience settings.`
+      : `${safeFanName} joined ${personaDisplayName || 'your Beacon'}. You can manage followers from Audience settings.`,
+    icon: '📣',
+    link: '/app/persona?tab=followers',
+    context: 'audience',
+    metadata: {
+      persona_id: personaId,
+      persona_handle: handle || null,
+      membership_id: membershipId || followId || null,
+      fan_handle: fanHandle || null,
+      follow_id: followId || null,
+      follow_status: followStatus,
+    },
   });
+}
+
+/**
+ * Notify a fan that a Beacon owner approved their follow request.
+ */
+async function notifyPersonaFollowApproved({
+  fanUserId,
+  personaId,
+  personaHandle,
+  personaDisplayName,
+  membershipId,
+}) {
+  const handle = String(personaHandle || '').replace(/^@/, '');
+  const displayName = personaDisplayName || (handle ? `@${handle}` : 'A Beacon');
+  return createNotification({
+    userId: fanUserId,
+    type: 'persona_follow_approved',
+    title: 'Beacon request approved',
+    body: `${displayName} approved your request. You can now view follower posts.`,
+    icon: '📣',
+    link: handle ? `/@${handle}` : null,
+    context: 'audience',
+    metadata: {
+      persona_id: personaId,
+      persona_handle: handle || null,
+      membership_id: membershipId || null,
+      follow_status: 'active',
+    },
+  });
+}
+
+/**
+ * Notify Beacon followers about a new one-way broadcast.
+ */
+async function notifyPersonaBroadcast({
+  recipientUserIds,
+  personaId,
+  personaHandle,
+  personaDisplayName,
+  messageId,
+  postId,
+  visibility,
+  bodyPreview,
+}) {
+  const uniqueRecipientIds = [...new Set((recipientUserIds || []).filter(Boolean))];
+  if (uniqueRecipientIds.length === 0) return [];
+
+  const handle = String(personaHandle || '').replace(/^@/, '');
+  const body = bodyPreview
+    ? String(bodyPreview).slice(0, 180)
+    : 'Open the Beacon to read the latest update.';
+
+  return createBulkNotifications(uniqueRecipientIds.map((userId) => ({
+    userId,
+    type: 'persona_broadcast',
+    title: `${personaDisplayName || 'A Beacon'} shared an update`,
+    body,
+    icon: '📣',
+    link: postId ? `/post/${postId}` : (handle ? `/@${handle}` : null),
+    context: 'audience',
+    metadata: {
+      persona_id: personaId,
+      persona_handle: handle || null,
+      broadcast_message_id: messageId,
+      post_id: postId || null,
+      visibility,
+    },
+  })));
 }
 
 /**
@@ -1005,7 +1281,9 @@ module.exports = {
   // Connection/relationship notifications
   notifyConnectionRequest,
   notifyConnectionAccepted,
-  notifyNewFollower,
+  notifyPersonaFollow,
+  notifyPersonaFollowApproved,
+  notifyPersonaBroadcast,
   // Residency notifications
   notifyResidencyClaim,
   notifyResidencyApproved,

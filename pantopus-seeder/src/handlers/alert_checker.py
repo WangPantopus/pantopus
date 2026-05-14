@@ -27,6 +27,7 @@ logging.basicConfig(level=logging.INFO, force=True)
 log = logging.getLogger("seeder.handlers.alert_checker")
 
 FETCH_TIMEOUT_S = 10
+WEATHERKIT_TIMEOUT_S = 4
 SEND_TIMEOUT_S = 30
 AQI_UNHEALTHY_THRESHOLD = 101  # AQI >= 101 triggers notification
 NOAA_USER_AGENT = "(Pantopus, admin@pantopus.app)"
@@ -35,8 +36,12 @@ NOAA_USER_AGENT = "(Pantopus, admin@pantopus.app)"
 WEATHERKIT_BASE_URL = "https://weatherkit.apple.com/api/v1"
 WEATHERKIT_JWT_LIFETIME_S = 3600       # 1 hour
 WEATHERKIT_JWT_REFRESH_S = 50 * 60     # Refresh at 50 minutes
+WEATHERKIT_BACKOFF_S = 5 * 60          # Avoid repeated slow calls during provider incidents
+WEATHERKIT_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
 _cached_wk_jwt: str | None = None
 _cached_wk_jwt_expires_at: float = 0
+_weatherkit_disabled_until: float = 0
+_weatherkit_disabled_reason: str | None = None
 
 # ── Pure-Python geohash encoder (replaces ngeohash C-extension) ──
 _BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz"
@@ -111,6 +116,8 @@ def _run(event: dict[str, Any], context: Any) -> dict[str, Any]:
         "aqi_alerts_found": 0,
         "users_notified": 0,
         "push_errors": 0,
+        "weatherkit_fallbacks": 0,
+        "weatherkit_backoff_skips": 0,
     }
 
     # 2. For each geohash, check weather alerts and AQI
@@ -219,6 +226,22 @@ def _weatherkit_available(secrets: BriefingSecrets) -> bool:
     )
 
 
+def _weatherkit_backoff_active() -> bool:
+    """Return True when WeatherKit is temporarily disabled after failures."""
+    return time.time() < _weatherkit_disabled_until
+
+
+def _weatherkit_backoff_remaining_s() -> int:
+    return max(0, int(_weatherkit_disabled_until - time.time()))
+
+
+def _disable_weatherkit_temporarily(reason: str) -> None:
+    """Disable WeatherKit briefly so one outage does not stall every geohash."""
+    global _weatherkit_disabled_until, _weatherkit_disabled_reason
+    _weatherkit_disabled_until = time.time() + WEATHERKIT_BACKOFF_S
+    _weatherkit_disabled_reason = reason
+
+
 def _get_weatherkit_jwt(secrets: BriefingSecrets) -> str | None:
     """Generate or return cached WeatherKit ES256 JWT."""
     global _cached_wk_jwt, _cached_wk_jwt_expires_at
@@ -255,18 +278,35 @@ def _fetch_weatherkit_alerts(
     Returns a list of normalised alert dicts (same shape as NOAA features)
     or None if WeatherKit is unavailable/fails.
     """
+    if _weatherkit_backoff_active():
+        log.info(
+            "WeatherKit backoff active (%ss remaining, reason=%s); using NOAA fallback for %.4f,%.4f",
+            _weatherkit_backoff_remaining_s(),
+            _weatherkit_disabled_reason or "unknown",
+            lat,
+            lng,
+        )
+        return None
+
     token = _get_weatherkit_jwt(secrets)
     if not token:
         return None
 
+    url = f"{WEATHERKIT_BASE_URL}/weather/en/{lat:.4f}/{lng:.4f}?dataSets=weatherAlerts&country=US"
     try:
-        url = f"{WEATHERKIT_BASE_URL}/weather/en/{lat:.4f}/{lng:.4f}?dataSets=weatherAlerts&country=US"
-        resp = httpx.get(url, timeout=FETCH_TIMEOUT_S, headers={
+        resp = httpx.get(url, timeout=WEATHERKIT_TIMEOUT_S, headers={
             "Authorization": f"Bearer {token}",
             "Accept": "application/json",
         })
         if resp.status_code != 200:
-            log.warning("WeatherKit API returned %d for %.4f,%.4f", resp.status_code, lat, lng)
+            if resp.status_code in WEATHERKIT_TRANSIENT_STATUS_CODES:
+                _disable_weatherkit_temporarily(f"http_{resp.status_code}")
+            log.warning(
+                "WeatherKit API returned %d for %.4f,%.4f; using NOAA fallback",
+                resp.status_code,
+                lat,
+                lng,
+            )
             return None
 
         data = resp.json()
@@ -293,8 +333,26 @@ def _fetch_weatherkit_alerts(
             })
         log.info("WeatherKit returned %d alerts for %.4f,%.4f", len(features), lat, lng)
         return features
+    except httpx.TimeoutException:
+        _disable_weatherkit_temporarily("timeout")
+        log.warning(
+            "WeatherKit timed out for %.4f,%.4f after %ss; using NOAA fallback",
+            lat,
+            lng,
+            WEATHERKIT_TIMEOUT_S,
+        )
+        return None
+    except httpx.TransportError as exc:
+        _disable_weatherkit_temporarily(exc.__class__.__name__)
+        log.warning(
+            "WeatherKit network error for %.4f,%.4f (%s); using NOAA fallback",
+            lat,
+            lng,
+            exc.__class__.__name__,
+        )
+        return None
     except Exception:
-        log.warning("WeatherKit fetch failed for %.4f,%.4f", lat, lng, exc_info=True)
+        log.warning("WeatherKit response handling failed for %.4f,%.4f", lat, lng, exc_info=True)
         return None
 
 
@@ -335,9 +393,12 @@ def _check_weather_alerts(
 
     # 1. Try Apple WeatherKit first
     if _weatherkit_available(secrets):
+        was_backing_off = _weatherkit_backoff_active()
         features = _fetch_weatherkit_alerts(lat, lng, secrets)
         if features is None:
-            stats["push_errors"] += 1
+            stats["weatherkit_fallbacks"] = stats.get("weatherkit_fallbacks", 0) + 1
+            if was_backing_off:
+                stats["weatherkit_backoff_skips"] = stats.get("weatherkit_backoff_skips", 0) + 1
 
     # 2. Fall back to NOAA
     if features is None:
@@ -602,6 +663,7 @@ def _publish_metrics(stats: dict) -> None:
                 {"MetricName": "WeatherAlertsFound", "Value": stats.get("weather_alerts_found", 0), "Unit": "Count"},
                 {"MetricName": "AqiAlertsFound", "Value": stats.get("aqi_alerts_found", 0), "Unit": "Count"},
                 {"MetricName": "UsersNotified", "Value": stats.get("users_notified", 0), "Unit": "Count"},
+                {"MetricName": "WeatherKitFallbacks", "Value": stats.get("weatherkit_fallbacks", 0), "Unit": "Count"},
                 {"MetricName": "AlertCheckerLatencyMs", "Value": stats.get("latency_ms", 0), "Unit": "Milliseconds"},
             ],
         )

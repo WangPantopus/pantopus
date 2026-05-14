@@ -3,7 +3,12 @@
 
 SCHEME     := Pantopus
 PROJECT    := Pantopus.xcodeproj
-DESTINATION_SIM := platform=iOS Simulator,name=iPhone 15,OS=latest
+DEFAULT_SIMULATOR_ID := $(shell xcrun simctl list devices available 2>/dev/null | awk -F '[()]' '/iPhone/ { print $$2; exit }')
+ifeq ($(strip $(DEFAULT_SIMULATOR_ID)),)
+DESTINATION_SIM ?= platform=iOS Simulator,name=iPhone 17,OS=latest
+else
+DESTINATION_SIM ?= platform=iOS Simulator,id=$(DEFAULT_SIMULATOR_ID)
+endif
 
 ENV_FILE        := .env
 SECRETS_XCCONFIG := Config/Secrets.xcconfig
@@ -33,10 +38,11 @@ env-to-xcconfig:
 		: > $(SECRETS_XCCONFIG); \
 	else \
 		echo "// Generated from $(ENV_FILE) — do not edit by hand." > $(SECRETS_XCCONFIG); \
-		grep -E '^[A-Z_][A-Z0-9_]*=' $(ENV_FILE) \
-			| grep -v '^#' \
-			| sed -E 's/^([A-Z_][A-Z0-9_]*)=(.*)$$/\1 = \2/' \
-			>> $(SECRETS_XCCONFIG); \
+		awk -F= '/^[A-Z_][A-Z0-9_]*=/ { \
+			key=$$1; value=$$0; sub(/^[^=]*=/, "", value); \
+			gsub("://", ":/$$()/", value); \
+			print key " = " value \
+		}' $(ENV_FILE) >> $(SECRETS_XCCONFIG); \
 		echo "✓ $(SECRETS_XCCONFIG) written from $(ENV_FILE)"; \
 	fi
 

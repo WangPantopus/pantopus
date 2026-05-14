@@ -333,7 +333,7 @@ describe('GET /api/gigs/browse', () => {
     expect(capturedParams.p_radius_meters).toBe(16000);
   });
 
-  it('caps radius at 50 miles', async () => {
+  it('allows radius above the old 50 mile cap', async () => {
     let capturedParams = null;
     setRpcMock((rpcName, params) => {
       if (rpcName === 'find_gigs_nearby_v2') capturedParams = params;
@@ -342,7 +342,19 @@ describe('GET /api/gigs/browse', () => {
 
     await request(app).get('/api/gigs/browse?lat=37.77&lng=-122.42&radius=999999');
 
-    expect(capturedParams.p_radius_meters).toBe(80467);
+    expect(capturedParams.p_radius_meters).toBe(999999);
+  });
+
+  it('caps very large radius at global distance', async () => {
+    let capturedParams = null;
+    setRpcMock((rpcName, params) => {
+      if (rpcName === 'find_gigs_nearby_v2') capturedParams = params;
+      return { data: [], error: null };
+    });
+
+    await request(app).get('/api/gigs/browse?lat=37.77&lng=-122.42&radius=999999999');
+
+    expect(capturedParams.p_radius_meters).toBe(40233500);
   });
 
   it('returns total_active and radius_used in response', async () => {
@@ -351,7 +363,7 @@ describe('GET /api/gigs/browse', () => {
 
     const res = await request(app).get('/api/gigs/browse?lat=37.77&lng=-122.42');
     expect(res.body.total_active).toBe(7);
-    expect(res.body.radius_used).toBe(8047); // default
+    expect(res.body.radius_used).toBe(160934); // default 100 mi
   });
 
   it('best_matches limited to 5', async () => {

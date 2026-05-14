@@ -364,6 +364,23 @@ function buildProfileFromAttomResponses(home, { detailData, avmData, trendData }
 
   const trendItem = trendData?.salesTrend?.[0] || {};
 
+  const toNumberOrNull = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  // ATTOM AVM is ideal, but some environments/accounts only return property/detail.
+  // Fall back to assessor-style market/assessed totals when AVM is unavailable.
+  const fallbackMarketValue =
+    toNumberOrNull(assessment?.market?.mktTtlValue)
+    ?? toNumberOrNull(assessment?.market?.marketTtlValue)
+    ?? toNumberOrNull(assessment?.market?.mktTotalValue);
+  const fallbackAssessedValue =
+    toNumberOrNull(assessment?.assessed?.assdTtlValue)
+    ?? toNumberOrNull(assessment?.assessed?.assessedTtlValue)
+    ?? toNumberOrNull(assessment?.assessed?.assdTotalValue);
+
   let zipMedianSalePriceTrend = 'flat';
   if (trendItem.medianSalePrice && trendItem.prevMedianSalePrice) {
     const current = parseFloat(trendItem.medianSalePrice);
@@ -381,10 +398,10 @@ function buildProfileFromAttomResponses(home, { detailData, avmData, trendData }
     bathrooms: roomPick.bathrooms ?? home.bathrooms ?? null,
     lot_sqft: sl.lot_sq_ft ?? home.lot_sq_ft ?? null,
     property_type: sl.raw_property_type ?? home.home_type ?? null,
-    estimated_value: avmAmount.value || null,
-    value_range_low: avmAmount.low || null,
-    value_range_high: avmAmount.high || null,
-    value_confidence: avm.confidence || null,
+    estimated_value: toNumberOrNull(avmAmount.value) ?? fallbackMarketValue ?? fallbackAssessedValue,
+    value_range_low: toNumberOrNull(avmAmount.low),
+    value_range_high: toNumberOrNull(avmAmount.high),
+    value_confidence: toNumberOrNull(avm.confidence),
     zip_median_value: assessment.assessed?.assdTtlValue || null,
     zip_median_sale_price_trend: zipMedianSalePriceTrend,
     cached_at: new Date().toISOString(),

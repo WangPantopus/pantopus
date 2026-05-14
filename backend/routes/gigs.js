@@ -33,6 +33,11 @@ const rankingService = require('../services/gig/rankingService');
 const optionalAuth = require('../middleware/optionalAuth');
 const gigPricingService = require('../services/gig/gigPricingService');
 const { haversineMiles } = require('../utils/geo');
+const {
+  serializeGigAuthorForViewer,
+  serializeUserAsLocalIdentity,
+  serializeUserIdentityForViewer,
+} = require('../serializers/identitySerializers');
 
 // ============ HELPERS ============
 
@@ -40,6 +45,12 @@ const IMAGE_EXT_RE = /\.(jpe?g|png|webp|gif)(\?.*)?$/i;
 const unavailableGigFeatureTables = new Set();
 const GIG_START_REMINDER_TYPE = 'gig_start_reminder';
 const GIG_START_REMINDER_COOLDOWN_MS = 15 * 60 * 1000;
+const METERS_PER_MILE = 1609.34;
+const DEFAULT_BROWSE_RADIUS_MILES = 100;
+const MAX_BROWSE_RADIUS_MILES = 25000;
+const DEFAULT_BROWSE_RADIUS_METERS = Math.round(DEFAULT_BROWSE_RADIUS_MILES * METERS_PER_MILE);
+const MIN_BROWSE_RADIUS_METERS = 500;
+const MAX_BROWSE_RADIUS_METERS = Math.round(MAX_BROWSE_RADIUS_MILES * METERS_PER_MILE);
 
 /**
  * Extract the first image URL from an attachments array.
@@ -154,6 +165,53 @@ function summarizeGigBids(bids) {
   return byGigId;
 }
 
+function serializeGigForViewer(gig) {
+  if (!gig) return null;
+  const { creator, acceptedBy, ...safe } = gig;
+  return {
+    ...safe,
+    creator: creator
+      ? serializeUserIdentityForViewer(creator)
+      : serializeGigAuthorForViewer({
+          identity_context_type: 'local',
+          creator: {
+            id: gig.user_id,
+            username: gig.creator_username,
+            name: gig.creator_name,
+            profile_picture_url: gig.profile_picture_url,
+          },
+        }),
+    acceptedBy: serializeUserAsLocalIdentity(acceptedBy),
+  };
+}
+
+function serializeGigQuestionForViewer(question) {
+  if (!question) return null;
+  const { asker, answerer, ...safe } = question;
+  return {
+    ...safe,
+    asker: serializeUserAsLocalIdentity(asker),
+    answerer: serializeUserIdentityForViewer(answerer),
+  };
+}
+
+function serializeGigBidForViewer(bid) {
+  if (!bid) return null;
+  const { bidder, ...safe } = bid;
+  const bidderIdentity = serializeUserAsLocalIdentity(bidder);
+  return {
+    ...safe,
+    bidder: bidderIdentity ? {
+      ...bidderIdentity,
+      average_rating: bidder?.average_rating ?? null,
+      review_count: bidder?.review_count ?? null,
+      reliability_score: bidder?.reliability_score ?? null,
+      no_show_count: bidder?.no_show_count ?? null,
+      gigs_completed: bidder?.gigs_completed ?? null,
+    } : null,
+  };
+}
+
 function normalizeArrayQueryParam(rawValue) {
   if (rawValue == null) return [];
 
@@ -215,12 +273,14 @@ function resolvePublicStatusFilter(query, defaultStatus = 'open') {
 function resolveBrowseRadiusMeters(maxDistanceRaw, radiusMilesRaw) {
   const rawMaxDistance = parseInt(maxDistanceRaw, 10);
   if (Number.isFinite(rawMaxDistance) && rawMaxDistance > 0) {
-    return Math.min(rawMaxDistance, 80467);
+    return Math.min(rawMaxDistance, MAX_BROWSE_RADIUS_METERS);
   }
 
   const rawRadius = parseFloat(radiusMilesRaw);
-  const miles = Number.isFinite(rawRadius) ? Math.max(1, Math.min(100, rawRadius)) : 25;
-  return Math.round(miles * 1609.34);
+  const miles = Number.isFinite(rawRadius)
+    ? Math.max(1, Math.min(MAX_BROWSE_RADIUS_MILES, rawRadius))
+    : DEFAULT_BROWSE_RADIUS_MILES;
+  return Math.round(miles * METERS_PER_MILE);
 }
 
 async function getViewerSavedGigIds(userId, gigIds) {
@@ -306,7 +366,7 @@ const createGigSchema = Joi.object({
     .valid('neighborhood', 'city', 'radius', 'global')
     .default('city')
     .optional(),
-  radius_miles: Joi.number().min(1).max(100).default(10).optional(),
+  radius_miles: Joi.number().min(1).max(25000).default(100).optional(),
   is_urgent: Joi.boolean().default(false).optional(),
   tags: Joi.array().items(Joi.string().max(50)).max(5).optional(),
   ref_listing_id: Joi.string().uuid().allow(null).optional(),
@@ -519,7 +579,7 @@ const updateGigSchema = Joi.object({
   location_precision: Joi.string().valid('exact_place', 'approx_area', 'neighborhood_only', 'none'),
   reveal_policy: Joi.string().valid('public', 'after_interest', 'after_assignment', 'never_public'),
   visibility_scope: Joi.string().valid('neighborhood', 'city', 'radius', 'global'),
-  radius_miles: Joi.number().min(1).max(100),
+  radius_miles: Joi.number().min(1).max(25000),
   location: Joi.object({
     mode: Joi.string().valid('home', 'address', 'current', 'custom').optional(),
     latitude: Joi.number().min(-90).max(90).required(),
@@ -790,7 +850,7 @@ router.post('/', verifyToken, validate(createGigSchema), async (req, res) => {
       location_precision: location_precision || 'approx_area',
       reveal_policy: reveal_policy || 'after_assignment',
       visibility_scope: visibility_scope || 'city',
-      radius_miles: radius_miles || 10,
+      radius_miles: radius_miles || 100,
       is_urgent: is_urgent || false,
       tags: tags || [],
       ref_listing_id: ref_listing_id || null,
@@ -1090,7 +1150,12 @@ router.get('/assignments/me', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch your assignments' });
     }
 
-    res.json({ assignments: assignments || [] });
+    res.json({
+      assignments: (assignments || []).map((assignment) => ({
+        ...assignment,
+        gig: serializeGigForViewer(assignment.gig),
+      })),
+    });
   } catch (err) {
     logger.error('User assignments fetch error', { error: err.message, userId: req.user.id });
     res.status(500).json({ error: 'Failed to fetch your assignments' });
@@ -2954,7 +3019,7 @@ const { getGigClusters } = require('../services/gig/clusterService');
 /**
  * GET /api/gigs/browse
  * Returns pre-sectioned data for the task browse feed.
- * Query params: lat, lng (required), radius (optional, meters, default 8047)
+ * Query params: lat, lng (required), radius (optional, meters, default 100mi)
  */
 router.get('/browse', async (req, res) => {
   const startTime = Date.now();
@@ -2973,7 +3038,10 @@ router.get('/browse', async (req, res) => {
       return res.status(400).json({ error: 'Valid lat and lng query parameters are required' });
     }
 
-    const radius = Math.min(Math.max(parseInt(req.query.radius) || 8047, 500), 80467); // 500m–50mi
+    const radius = Math.min(
+      Math.max(parseInt(req.query.radius, 10) || DEFAULT_BROWSE_RADIUS_METERS, MIN_BROWSE_RADIUS_METERS),
+      MAX_BROWSE_RADIUS_METERS
+    );
     const taskArchetype = req.query.task_archetype || null;
     const userId = await extractOptionalUserId(req);
 
@@ -3339,7 +3407,7 @@ router.get('/:id', async (req, res) => {
     applyLocationPrecision(gig, precision, isOwner);
     gig.locationUnlocked = locationUnlocked;
 
-    res.json({ gig });
+    res.json({ gig: serializeGigForViewer(gig) });
   } catch (err) {
     logger.error('Gig fetch error', { error: err.message, gigId: req.params.id });
     res.status(500).json({ error: 'Failed to fetch gig' });
@@ -3782,7 +3850,7 @@ router.get('/:gigId/bids', verifyToken, async (req, res) => {
 
     // Normalize 'assigned' → 'accepted' for backwards compat
     const normalizedBids = (bids || []).map((b) => ({
-      ...b,
+      ...serializeGigBidForViewer(b),
       status: b.status === 'assigned' ? 'accepted' : b.status,
     }));
 
@@ -6947,7 +7015,7 @@ router.get('/:gigId/questions', async (req, res) => {
       'Business';
 
     const normalized = (questions || []).map((q) => ({
-      ...q,
+      ...serializeGigQuestionForViewer(q),
       question_attachments: q.question_attachments || [],
       answer_attachments: q.answer_attachments || [],
       answerer_display_name: ownerIsBusiness && q.answer ? ownerDisplayName : null,
@@ -7048,7 +7116,7 @@ router.post('/:gigId/questions', verifyToken, async (req, res) => {
     }
 
     emitGigUpdate(req, gigId, 'qa-update');
-    res.status(201).json({ question: q });
+    res.status(201).json({ question: serializeGigQuestionForViewer(q) });
   } catch (err) {
     logger.error('Question create error', { error: err.message });
     res.status(500).json({ error: 'Failed to post question' });
@@ -7145,7 +7213,7 @@ router.post('/:gigId/questions/:questionId/answer', verifyToken, async (req, res
     emitGigUpdate(req, gigId, 'qa-update');
     res.json({
       question: {
-        ...updated,
+        ...serializeGigQuestionForViewer(updated),
         answerer_display_name: ownerIsBusiness ? ownerDisplayName : null,
         answerer_display_id: ownerIsBusiness ? owner?.id : null,
         answerer_display_username: ownerIsBusiness ? owner?.username || null : null,
@@ -8210,9 +8278,19 @@ router.get('/:gigId/payment', verifyToken, async (req, res) => {
       .from('Gig')
       .select('id, user_id, accepted_by, payment_id')
       .eq('id', gigId)
-      .single();
+      .maybeSingle();
 
     if (gigFetchErr) {
+      logger.error('Get gig payment error: failed to fetch gig', {
+        gigId,
+        userId,
+        supabase: {
+          code: gigFetchErr.code,
+          message: gigFetchErr.message,
+          details: gigFetchErr.details,
+          hint: gigFetchErr.hint,
+        },
+      });
       return res.status(500).json({ error: 'Failed to fetch gig' });
     }
     if (!gig) return res.status(404).json({ error: 'Gig not found' });

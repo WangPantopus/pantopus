@@ -4,6 +4,7 @@ const supabaseAdmin = require('../config/supabaseAdmin');
 const verifyToken = require('../middleware/verifyToken');
 const logger = require('../utils/logger');
 const { invalidateBlockCache } = require('../services/blockService');
+const { writeIdentityAuditLog } = require('../utils/identityAudit');
 
 /**
  * POST /api/users/:userId/block
@@ -47,6 +48,37 @@ router.post('/:userId/block', verifyToken, async (req, res) => {
     }
 
     invalidateBlockCache(blockerId, blockedId);
+
+    // P1.14: audience-profile §9 + unified-IA §5.1 — personal-side
+    // block cascades to every persona the blocker owns. The cascade
+    // is fire-and-forget so this HTTP request stays fast; failures
+    // log but do not bubble. Audience-side blocks NEVER cascade
+    // back to personal — that path is intentionally absent.
+    setImmediate(async () => {
+      try {
+        await require('../services/personaBlockService')
+          .propagatePersonalBlock({
+            blockerUserId: blockerId,
+            blockedUserId: blockedId,
+          });
+      } catch (err) {
+        logger.error('block.persona_propagation_async_error', {
+          blockerId, blockedId, error: err.message,
+        });
+      }
+    });
+
+    await writeIdentityAuditLog({
+      req,
+      actorUserId: blockerId,
+      targetUserId: blockedId,
+      action: 'user.blocked',
+      targetType: 'UserBlock',
+      targetId: blockedId,
+      metadata: {
+        has_reason: !!reason,
+      },
+    });
     res.json({ success: true });
   } catch (err) {
     logger.error('Block user error', { error: err.message });
@@ -57,6 +89,14 @@ router.post('/:userId/block', verifyToken, async (req, res) => {
 /**
  * DELETE /api/users/:userId/block
  * Unblock a user.
+ *
+ * P1.14: deliberately does NOT cascade an unblock to PersonaBlock
+ * rows created by the personal-block propagation. The propagation
+ * created persona_block_propagation rows when the personal block
+ * happened; if the creator later wants the fan back, they remove
+ * the persona block deliberately on the persona side
+ * (DELETE /api/personas/:id/fans/:membershipId/block). Unified-IA
+ * §5.1: cascades are one-way and conservative.
  */
 router.delete('/:userId/block', verifyToken, async (req, res) => {
   try {
@@ -75,6 +115,15 @@ router.delete('/:userId/block', verifyToken, async (req, res) => {
     }
 
     invalidateBlockCache(blockerId, blockedId);
+    await writeIdentityAuditLog({
+      req,
+      actorUserId: blockerId,
+      targetUserId: blockedId,
+      action: 'user.unblocked',
+      targetType: 'UserBlock',
+      targetId: blockedId,
+      metadata: {},
+    });
     res.json({ success: true });
   } catch (err) {
     logger.error('Unblock user error', { error: err.message });

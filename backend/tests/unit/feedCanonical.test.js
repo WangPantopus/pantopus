@@ -375,8 +375,8 @@ describe('Feed Canonical Contract', () => {
     });
 
     it('pagination from feed is correct on exact-final-page', async () => {
-      seedTable('UserFollow', [
-        { follower_id: USER_ID, following_id: OTHER_USER },
+      seedTable('Relationship', [
+        { id: 'r-1', requester_id: USER_ID, addressee_id: OTHER_USER, status: 'accepted' },
       ]);
 
       // Create exactly 10 posts
@@ -384,7 +384,7 @@ describe('Feed Canonical Contract', () => {
       for (let i = 0; i < 10; i++) {
         posts.push(makePost({
           user_id: OTHER_USER,
-          distribution_targets: ['followers'],
+          distribution_targets: ['connections'],
           created_at: new Date(Date.now() - i * 60000).toISOString(),
         }));
       }
@@ -393,7 +393,7 @@ describe('Feed Canonical Contract', () => {
       // Fetch with limit 10 — should get all 10 and hasMore should be false
       const result = await getListFeed({
         userId: USER_ID,
-        surface: 'following',
+        surface: 'connections',
         limit: 10,
       });
 
@@ -402,8 +402,8 @@ describe('Feed Canonical Contract', () => {
     });
 
     it('pagination hasMore is true when more posts exist beyond limit', async () => {
-      seedTable('UserFollow', [
-        { follower_id: USER_ID, following_id: OTHER_USER },
+      seedTable('Relationship', [
+        { id: 'r-1', requester_id: USER_ID, addressee_id: OTHER_USER, status: 'accepted' },
       ]);
 
       // Create 25 posts
@@ -411,7 +411,7 @@ describe('Feed Canonical Contract', () => {
       for (let i = 0; i < 25; i++) {
         posts.push(makePost({
           user_id: OTHER_USER,
-          distribution_targets: ['followers'],
+          distribution_targets: ['connections'],
           created_at: new Date(Date.now() - i * 60000).toISOString(),
         }));
       }
@@ -420,7 +420,7 @@ describe('Feed Canonical Contract', () => {
       // Fetch with limit 10 — should indicate hasMore
       const result = await getListFeed({
         userId: USER_ID,
-        surface: 'following',
+        surface: 'connections',
         limit: 10,
       });
 
@@ -438,7 +438,6 @@ describe('Feed Canonical Contract', () => {
           user_id: USER_ID,
           hide_deals_place: true,
           hide_alerts_place: false,
-          show_politics_following: false,
           show_politics_connections: false,
           show_politics_place: false,
         },
@@ -469,7 +468,6 @@ describe('Feed Canonical Contract', () => {
           user_id: USER_ID,
           hide_deals_place: false,
           hide_alerts_place: true,
-          show_politics_following: false,
           show_politics_connections: false,
           show_politics_place: false,
         },

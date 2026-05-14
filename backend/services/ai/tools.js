@@ -11,6 +11,7 @@ const supabaseAdmin = require('../../config/supabaseAdmin');
 const noaa = require('../external/noaa');
 const logger = require('../../utils/logger');
 const { getAuthorizedMail } = require('./mailAccess');
+const { listEffectivelyOpenSlots } = require('../supportTrainSlotAvailability');
 
 const {
   validateGigDraft,
@@ -442,12 +443,10 @@ async function _executeToolImpl(name, args, userId, _signal) {
 
         if (!hasAccess) return { error: 'NOT_AUTHORIZED' };
 
-        // Count open slots
-        const { count: openSlots } = await supabaseAdmin
-          .from('SupportTrainSlot')
-          .select('id', { count: 'exact', head: true })
-          .eq('support_train_id', stId)
-          .eq('status', 'open');
+        const openSlots = await listEffectivelyOpenSlots({
+          supportTrainId: stId,
+          columns: 'id, support_train_id, slot_date, status, capacity, filled_count',
+        });
 
         // Fetch recipient profile for summary (no address/phone/private notes)
         const { data: profile } = await supabaseAdmin
@@ -465,7 +464,7 @@ async function _executeToolImpl(name, args, userId, _signal) {
           title: st.Activity?.title || null,
           status: st.status,
           recipient_summary: recipientSummary,
-          open_slots_count: openSlots || 0,
+          open_slots_count: openSlots.length,
           summary_chips: [],  // populated from AI draft payload if available
         };
       } catch (err) {

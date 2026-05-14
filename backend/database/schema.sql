@@ -1,3 +1,34 @@
+-- ============================================================================
+-- WARNING: this file is a frozen snapshot. It is NOT the source of truth
+-- and is NOT applied by any migration runner.
+-- ============================================================================
+-- The runnable migrations live under:
+--   backend/database/migrations/   (numbered NNN_*.sql)
+--   supabase/migrations/           (timestamped YYYYMMDD*_*.sql, byte-identical)
+--
+-- Phase 0 (audience-profile foundation) added migrations 132–135 but those
+-- changes are NOT reflected here. To regenerate this snapshot from a
+-- migrated database run:
+--
+--   pg_dump --schema-only --no-owner --no-privileges --no-publications \
+--     --no-subscriptions "$DATABASE_URL" > backend/database/schema.sql
+--
+-- Until that's done, the following tables / columns are missing here but
+-- ARE present in any migrated environment:
+--   * PersonaMembership  (migration 132 — replaces PersonaFollow as the
+--                          base table; PersonaFollow becomes a SQL view)
+--   * LocalProfileDisplayNameMigrationP02
+--                        (migration 133 — display-name migration audit
+--                          snapshot)
+--   * Notification.context  (migration 134 — personal | audience | platform)
+--   * idx_notification_user_context
+--   * FeatureFlag         (migration 135 — audience_profile rollout gate)
+--
+-- The migration smoke script
+--   `pnpm --filter pantopus-backend run smoke:identity-firewall`
+-- enumerates every required table / column and is the operational
+-- source of truth for what the schema looks like in production.
+-- ============================================================================
 
 
 
@@ -598,7 +629,8 @@ ALTER TYPE "public"."identity_status" OWNER TO "postgres";
 CREATE TYPE "public"."post_as_type" AS ENUM (
     'personal',
     'business',
-    'home'
+    'home',
+    'persona'
 );
 
 
@@ -613,7 +645,9 @@ CREATE TYPE "public"."post_audience" AS ENUM (
     'saved_place',
     'household',
     'neighborhood',
-    'target_area'
+    'target_area',
+    'public',
+    'national'
 );
 
 
@@ -5624,7 +5658,7 @@ CREATE TABLE IF NOT EXISTS "public"."Gig" (
     "location_precision" "public"."location_precision" DEFAULT 'approx_area'::"public"."location_precision",
     "reveal_policy" "public"."reveal_policy" DEFAULT 'after_assignment'::"public"."reveal_policy",
     "visibility_scope" "public"."visibility_scope" DEFAULT 'city'::"public"."visibility_scope",
-    "radius_miles" numeric(6,2) DEFAULT 10,
+    "radius_miles" numeric(8,2) DEFAULT 100,
     "is_urgent" boolean DEFAULT false,
     "tags" "text"[] DEFAULT '{}'::"text"[],
     "ref_listing_id" "uuid",
@@ -6934,7 +6968,7 @@ CREATE TABLE IF NOT EXISTS "public"."Listing" (
     "location_precision" "public"."location_precision" DEFAULT 'approx_area'::"public"."location_precision",
     "reveal_policy" "public"."reveal_policy" DEFAULT 'after_interest'::"public"."reveal_policy",
     "visibility_scope" "public"."visibility_scope" DEFAULT 'city'::"public"."visibility_scope",
-    "radius_miles" numeric(6,2) DEFAULT 10,
+    "radius_miles" numeric(8,2) DEFAULT 100,
     "meetup_preference" "text" DEFAULT 'public_meetup'::"text",
     "delivery_available" boolean DEFAULT false,
     "available_from" timestamp with time zone,
@@ -7758,7 +7792,7 @@ CREATE TABLE IF NOT EXISTS "public"."Post" (
     "service_category" "text",
     "ref_listing_id" "uuid",
     "ref_task_id" "uuid",
-    "radius_miles" numeric(6,2),
+    "radius_miles" numeric(8,2),
     "post_as" "public"."post_as_type" DEFAULT 'personal'::"public"."post_as_type",
     "audience" "public"."post_audience" DEFAULT 'nearby'::"public"."post_audience",
     "target_place_id" "uuid",
@@ -7769,10 +7803,15 @@ CREATE TABLE IF NOT EXISTS "public"."Post" (
     "is_story" boolean DEFAULT false,
     "story_expires_at" timestamp with time zone,
     "distribution_targets" "text"[] DEFAULT '{}'::"text"[],
+    "broadcast_channel_id" "uuid",
+    "target_tier_rank" integer,
+    "delivered_count" integer DEFAULT 0 NOT NULL,
+    "read_count" integer DEFAULT 0 NOT NULL,
     "gps_timestamp" timestamp with time zone,
     "matched_business_ids" "uuid"[] DEFAULT '{}'::"uuid"[],
     "matched_businesses_cache" "jsonb" DEFAULT '[]'::"jsonb",
     CONSTRAINT "Post_post_type_check" CHECK ((("post_type")::"text" = ANY ((ARRAY['general'::character varying, 'event'::character varying, 'lost_found'::character varying, 'recommendation'::character varying, 'question'::character varying, 'complaint'::character varying, 'announcement'::character varying, 'safety_alert'::character varying, 'deals_promos'::character varying, 'service_offer'::character varying, 'poll'::character varying, 'services_offers'::character varying, 'resources_howto'::character varying, 'progress_wins'::character varying, 'ask_local'::character varying, 'deal'::character varying, 'alert'::character varying, 'local_update'::character varying, 'neighborhood_win'::character varying, 'visitor_guide'::character varying, 'personal_update'::character varying])::"text"[]))),
+    CONSTRAINT "Post_target_tier_rank_check" CHECK ((("target_tier_rank" IS NULL) OR (("target_tier_rank" >= 1) AND ("target_tier_rank" <= 4)))),
     CONSTRAINT "Post_visibility_check" CHECK ((("visibility")::"text" = ANY (ARRAY['public'::"text", 'neighborhood'::"text", 'followers'::"text", 'private'::"text", 'city'::"text", 'radius'::"text", 'connections'::"text"])))
 );
 
@@ -8156,6 +8195,8 @@ CREATE TABLE IF NOT EXISTS "public"."User" (
     "reliability_score" numeric(5,2) DEFAULT 100.00,
     "stripe_customer_id" character varying(255),
     "profile_visibility" character varying(20) DEFAULT 'public'::character varying,
+    "show_email" boolean DEFAULT false,
+    "show_phone" boolean DEFAULT false,
     "mailbox_notification_time" time without time zone DEFAULT '08:00:00'::time without time zone,
     "mail_party_enabled" boolean DEFAULT true,
     "earn_suspended_until" timestamp with time zone,
@@ -8407,7 +8448,7 @@ CREATE TABLE IF NOT EXISTS "public"."UserRecentLocation" (
     "type" "public"."viewing_location_type" DEFAULT 'searched'::"public"."viewing_location_type" NOT NULL,
     "latitude" double precision NOT NULL,
     "longitude" double precision NOT NULL,
-    "radius_miles" smallint DEFAULT 10 NOT NULL,
+    "radius_miles" smallint DEFAULT 100 NOT NULL,
     "source_id" "uuid",
     "city" "text",
     "state" "text",
@@ -8451,7 +8492,7 @@ CREATE TABLE IF NOT EXISTS "public"."UserViewingLocation" (
     "type" "public"."viewing_location_type" DEFAULT 'gps'::"public"."viewing_location_type" NOT NULL,
     "latitude" double precision NOT NULL,
     "longitude" double precision NOT NULL,
-    "radius_miles" smallint DEFAULT 10 NOT NULL,
+    "radius_miles" smallint DEFAULT 100 NOT NULL,
     "is_pinned" boolean DEFAULT false NOT NULL,
     "source_id" "uuid",
     "city" "text",
@@ -8459,7 +8500,7 @@ CREATE TABLE IF NOT EXISTS "public"."UserViewingLocation" (
     "zipcode" "text",
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "UserViewingLocation_radius_chk" CHECK (("radius_miles" = ANY (ARRAY[1, 3, 10, 25])))
+    CONSTRAINT "UserViewingLocation_radius_chk" CHECK (("radius_miles" = ANY (ARRAY[1, 3, 10, 25, 100, 1000, 25000])))
 );
 
 
@@ -9739,6 +9780,14 @@ CREATE INDEX "Post_cursor_idx" ON "public"."Post" USING "btree" ("created_at" DE
 
 
 CREATE INDEX "Post_distribution_targets_idx" ON "public"."Post" USING "gin" ("distribution_targets") WHERE ("archived_at" IS NULL);
+
+
+
+CREATE INDEX "idx_post_broadcast_channel_created" ON "public"."Post" USING "btree" ("broadcast_channel_id", "created_at" DESC) WHERE ((("identity_context_type")::"text" = 'persona'::"text") AND ("archived_at" IS NULL));
+
+
+
+CREATE INDEX "idx_post_persona_tier_feed" ON "public"."Post" USING "btree" ("identity_context_id", "target_tier_rank", "created_at" DESC) WHERE ((("identity_context_type")::"text" = 'persona'::"text") AND ("archived_at" IS NULL));
 
 
 
@@ -13067,6 +13116,11 @@ ALTER TABLE ONLY "public"."PostView"
 
 ALTER TABLE ONLY "public"."Post"
     ADD CONSTRAINT "Post_home_id_fkey" FOREIGN KEY ("home_id") REFERENCES "public"."Home"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."Post"
+    ADD CONSTRAINT "Post_broadcast_channel_id_fkey" FOREIGN KEY ("broadcast_channel_id") REFERENCES "public"."BroadcastChannel"("id") ON DELETE SET NULL;
 
 
 

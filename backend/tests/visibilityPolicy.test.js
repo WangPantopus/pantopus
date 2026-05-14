@@ -1,12 +1,11 @@
 // ============================================================
 // TEST: Visibility Policy
-// Validates the three-graph visibility system: residency,
-// trust/connections, and distribution/follows.
+// Validates the two-graph visibility system: residency (Home)
+// and trust (Connections / Relationships).
 // ============================================================
 
 const { resetTables, seedTable } = require('./__mocks__/supabaseAdmin');
 const {
-  isFollowing,
   getRelationshipStatus,
   isConnected,
   isBlocked,
@@ -18,39 +17,6 @@ const {
 } = require('../utils/visibilityPolicy');
 
 beforeEach(() => resetTables());
-
-// ── isFollowing ─────────────────────────────────────────────
-describe('isFollowing', () => {
-  test('returns true when follow exists', async () => {
-    seedTable('UserFollow', [{
-      id: 'uf-1', follower_id: 'a', following_id: 'b',
-    }]);
-    expect(await isFollowing('a', 'b')).toBe(true);
-  });
-
-  test('returns false when no follow', async () => {
-    seedTable('UserFollow', []);
-    expect(await isFollowing('a', 'b')).toBe(false);
-  });
-
-  test('returns false for self', async () => {
-    expect(await isFollowing('a', 'a')).toBe(false);
-  });
-
-  test('returns false for null/empty IDs', async () => {
-    expect(await isFollowing(null, 'b')).toBe(false);
-    expect(await isFollowing('a', null)).toBe(false);
-    expect(await isFollowing('', 'b')).toBe(false);
-  });
-
-  test('direction matters — a→b ≠ b→a', async () => {
-    seedTable('UserFollow', [{
-      id: 'uf-1', follower_id: 'a', following_id: 'b',
-    }]);
-    expect(await isFollowing('a', 'b')).toBe(true);
-    expect(await isFollowing('b', 'a')).toBe(false);
-  });
-});
 
 // ── getRelationshipStatus ───────────────────────────────────
 describe('getRelationshipStatus', () => {
@@ -184,29 +150,17 @@ describe('canViewContent', () => {
     expect(await canViewContent('b', post)).toBe(false);
   });
 
-  test('followers content visible to followers', async () => {
-    seedTable('Relationship', []);
-    seedTable('UserFollow', [
-      { id: 'uf-1', follower_id: 'b', following_id: 'a' },
-    ]);
-    seedTable('HomeOccupancy', []);
-    const post = { user_id: 'a', visibility: 'followers' };
-    expect(await canViewContent('b', post)).toBe(true);
-  });
-
-  test('followers content visible to connections', async () => {
+  test('legacy "followers" visibility visible to connections', async () => {
     seedTable('Relationship', [{
       id: 'r-1', requester_id: 'a', addressee_id: 'b', status: 'accepted',
     }]);
-    seedTable('UserFollow', []);
     seedTable('HomeOccupancy', []);
     const post = { user_id: 'a', visibility: 'followers' };
     expect(await canViewContent('b', post)).toBe(true);
   });
 
-  test('followers content hidden from non-followers/non-connections', async () => {
+  test('legacy "followers" visibility hidden from non-connections', async () => {
     seedTable('Relationship', []);
-    seedTable('UserFollow', []);
     seedTable('HomeOccupancy', []);
     const post = { user_id: 'a', visibility: 'followers' };
     expect(await canViewContent('b', post)).toBe(false);
@@ -221,11 +175,8 @@ describe('canViewContent', () => {
     expect(await canViewContent('b', post)).toBe(true);
   });
 
-  test('connections content hidden from followers (non-connections)', async () => {
+  test('connections content hidden from non-connections', async () => {
     seedTable('Relationship', []);
-    seedTable('UserFollow', [
-      { id: 'uf-1', follower_id: 'b', following_id: 'a' },
-    ]);
     seedTable('HomeOccupancy', []);
     const post = { user_id: 'a', visibility: 'connections' };
     expect(await canViewContent('b', post)).toBe(false);
@@ -278,23 +229,12 @@ describe('getProfileVisibility', () => {
       id: 'r-1', requester_id: 'a', addressee_id: 'b', status: 'accepted',
     }]);
     seedTable('HomeOccupancy', []);
-    seedTable('UserFollow', []);
     expect(await getProfileVisibility('a', 'b')).toBe('connected');
-  });
-
-  test('follower = follower', async () => {
-    seedTable('Relationship', []);
-    seedTable('HomeOccupancy', []);
-    seedTable('UserFollow', [
-      { id: 'uf-1', follower_id: 'a', following_id: 'b' },
-    ]);
-    expect(await getProfileVisibility('a', 'b')).toBe('follower');
   });
 
   test('stranger = public', async () => {
     seedTable('Relationship', []);
     seedTable('HomeOccupancy', []);
-    seedTable('UserFollow', []);
     expect(await getProfileVisibility('a', 'b')).toBe('public');
   });
 });

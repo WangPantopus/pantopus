@@ -12,6 +12,7 @@
 const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('../utils/logger');
 const { emitSupportTrainEvent } = require('../services/supportTrainNotifications');
+const { listEffectivelyOpenSlots } = require('../services/supportTrainSlotAvailability');
 
 async function runSupportTrainReminders() {
   await _send24hReminders();
@@ -161,15 +162,17 @@ async function _sendOpenSlotNudges() {
     const weekDate = sevenDaysLater.toISOString().split('T')[0];
     const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
 
-    // Find active/published trains with open slots in the next 7 days
-    const { data: openSlots, error } = await supabaseAdmin
-      .from('SupportTrainSlot')
-      .select('support_train_id')
-      .eq('status', 'open')
-      .gte('slot_date', todayDate)
-      .lte('slot_date', weekDate);
-
-    if (error) {
+    // Find slots with real remaining capacity in the next 7 days. Do not trust
+    // denormalized slot counters alone; stale rows can otherwise nudge organizers
+    // after every visible slot already has an active reservation.
+    let openSlots;
+    try {
+      openSlots = await listEffectivelyOpenSlots({
+        fromDate: todayDate,
+        toDate: weekDate,
+        columns: 'id, support_train_id, slot_date, status, capacity, filled_count',
+      });
+    } catch (error) {
       logger.error('[supportTrainReminders] open slots query failed', { error: error.message });
       return;
     }

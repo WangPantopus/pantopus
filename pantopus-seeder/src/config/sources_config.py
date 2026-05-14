@@ -17,14 +17,17 @@ from __future__ import annotations
 #   display_name: human-readable name for source attribution
 #   priority:     1=critical, 2=core, 3=enrichment, 4=filler
 
+# Clark County, Washington (SW WA; centroid near Vancouver). Coordinates must not be reused for
+# other U.S. jurisdictions named "Clark County" (e.g. KY, NV, IN, OH, WI, MO).
 CLARK_COUNTY_SOURCES: list[dict] = [
     # --- P1: Critical (safety/weather) ---
     {
         "source_id": "nws_alerts:clark_county",
         "source_type": "nws_alerts",
+        # Vancouver, WA area — NWS alerts for this point are Clark County, WA + surrounds.
         "url": "45.6387,-122.6615",
         "category": "weather",
-        "display_name": "NWS Weather Alerts",
+        "display_name": "NWS Weather Alerts (Clark County, WA)",
         "priority": 1,
     },
     # --- P2: Core (local news, events, seasonal) ---
@@ -39,9 +42,13 @@ CLARK_COUNTY_SOURCES: list[dict] = [
     {
         "source_id": "google_news:clark_county",
         "source_type": "google_news",
-        "url": "Clark County WA local news",
+        # Anchor to SW Washington so Google News does not mix in other U.S. Clark Counties.
+        "url": (
+            "Clark County Washington WA Vancouver Camas Washougal "
+            "Battle Ground Ridgefield southwest Washington local news"
+        ),
         "category": "local_news",
-        "display_name": "Google News (Clark County)",
+        "display_name": "Google News (Clark County, WA)",
         "priority": 2,
     },
     {
@@ -80,7 +87,7 @@ CLARK_COUNTY_SOURCES: list[dict] = [
     {
         "source_id": "google_news:trail_blazers",
         "source_type": "google_news",
-        "url": "Portland Trail Blazers -odds -betting -fantasy -player props",
+        "url": '"Portland Trail Blazers" ("NBA Playoffs" OR playoffs OR Spurs OR "Game 5" OR elimination) -odds -betting -fantasy -player props -DraftKings -FanDuel',
         "category": "sports",
         "display_name": "Trail Blazers News",
         "priority": 3,
@@ -117,12 +124,163 @@ CLARK_COUNTY_SOURCES: list[dict] = [
         "display_name": "Winterhawks News",
         "priority": 3,
     },
+    # Seattle teams — Clark County users follow PNW pro sports broadly.
+    {
+        "source_id": "google_news:mariners",
+        "source_type": "google_news",
+        "url": "Seattle Mariners -odds -betting -fantasy -DraftKings -FanDuel -picks",
+        "category": "sports",
+        "display_name": "Mariners News",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:kraken",
+        "source_type": "google_news",
+        "url": "Seattle Kraken NHL -odds -betting -fantasy -DraftKings -FanDuel",
+        "category": "sports",
+        "display_name": "Kraken News",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:sounders",
+        "source_type": "google_news",
+        "url": "Seattle Sounders -odds -betting -fantasy -DraftKings -FanDuel",
+        "category": "sports",
+        "display_name": "Sounders News",
+        "priority": 3,
+    },
+    # PNW college — big local conversation drivers during football/basketball season.
+    {
+        "source_id": "google_news:oregon_ducks",
+        "source_type": "google_news",
+        "url": "Oregon Ducks football basketball -odds -betting -fantasy -DraftKings -FanDuel -props",
+        "category": "sports",
+        "display_name": "Oregon Ducks News",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:oregon_state_beavers",
+        "source_type": "google_news",
+        "url": "Oregon State Beavers football basketball -odds -betting -fantasy -DraftKings -FanDuel -props",
+        "category": "sports",
+        "display_name": "Oregon State Beavers News",
+        "priority": 3,
+    },
+    {
+        "source_id": "rss:kgw_sports",
+        "source_type": "rss",
+        "url": "https://www.kgw.com/feeds/syndication/rss/sports",
+        "category": "sports",
+        "display_name": "KGW Sports",
+        "priority": 3,
+    },
     {
         "source_id": "google_news:world_cup_portland",
         "source_type": "google_news",
         "url": "FIFA World Cup 2026 Portland Seattle",
         "category": "sports",
         "display_name": "World Cup 2026",
+        "priority": 3,
+    },
+    # Official/publisher sports sources via Google News. Direct RSS from many
+    # league sites is unreliable, so scope queries to source-owned domains.
+    {
+        "source_id": "google_news:nba_official",
+        "source_type": "google_news",
+        "url": 'site:nba.com "Portland Trail Blazers" OR "NBA Playoffs" OR "NBA Finals" -odds -betting -fantasy -DraftKings -FanDuel -props',
+        "category": "sports",
+        "display_name": "NBA.com",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:mlb_official",
+        "source_type": "google_news",
+        "url": 'site:mlb.com "Seattle Mariners" OR "World Series" OR MLB playoffs -odds -betting -fantasy -DraftKings -FanDuel -props',
+        "category": "sports",
+        "display_name": "MLB.com",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:nfl_official",
+        "source_type": "google_news",
+        "url": 'site:nfl.com "Seattle Seahawks" OR "Super Bowl" OR "NFL Playoffs" -odds -betting -fantasy -DraftKings -FanDuel -props',
+        "category": "sports",
+        "display_name": "NFL.com",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:bleacher_report_sports",
+        "source_type": "google_news",
+        "url": 'site:bleacherreport.com Portland Seattle sports "Trail Blazers" Seahawks Mariners Timbers Thorns -odds -betting -fantasy -DraftKings -FanDuel -props',
+        "category": "sports",
+        "display_name": "Bleacher Report Sports",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:fox_sports",
+        "source_type": "google_news",
+        "url": 'site:foxsports.com Portland Seattle sports NBA NFL MLB MLS NWSL -odds -betting -fantasy -DraftKings -FanDuel -props',
+        "category": "sports",
+        "display_name": "FOX Sports",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:olympics_official",
+        "source_type": "google_news",
+        "url": 'site:olympics.com Olympics "Team USA" Portland Seattle -odds -betting -fantasy',
+        "category": "sports",
+        "display_name": "Olympics.com",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:fifa_official",
+        "source_type": "google_news",
+        "url": 'site:fifa.com "FIFA World Cup 2026" Seattle Portland Vancouver -odds -betting -fantasy',
+        "category": "sports",
+        "display_name": "FIFA.com",
+        "priority": 3,
+    },
+    # ESPN league-level feeds — cover every team in each league without
+    # relying on team-specific RSS (those have been deprecated by ESPN and
+    # by league official sites). Verified reachable 2026-04-22.
+    {
+        "source_id": "rss:espn_nba",
+        "source_type": "rss",
+        "url": "https://www.espn.com/espn/rss/nba/news",
+        "category": "sports",
+        "display_name": "ESPN NBA",
+        "priority": 3,
+    },
+    {
+        "source_id": "rss:espn_nfl",
+        "source_type": "rss",
+        "url": "https://www.espn.com/espn/rss/nfl/news",
+        "category": "sports",
+        "display_name": "ESPN NFL",
+        "priority": 3,
+    },
+    {
+        "source_id": "rss:espn_mlb",
+        "source_type": "rss",
+        "url": "https://www.espn.com/espn/rss/mlb/news",
+        "category": "sports",
+        "display_name": "ESPN MLB",
+        "priority": 3,
+    },
+    {
+        "source_id": "rss:espn_nhl",
+        "source_type": "rss",
+        "url": "https://www.espn.com/espn/rss/nhl/news",
+        "category": "sports",
+        "display_name": "ESPN NHL",
+        "priority": 3,
+    },
+    {
+        "source_id": "rss:espn_soccer",
+        "source_type": "rss",
+        "url": "https://www.espn.com/espn/rss/soccer/news",
+        "category": "sports",
+        "display_name": "ESPN Soccer",
         "priority": 3,
     },
 ]
@@ -207,7 +365,7 @@ PORTLAND_METRO_SOURCES: list[dict] = [
     {
         "source_id": "google_news:trail_blazers",
         "source_type": "google_news",
-        "url": "Portland Trail Blazers -odds -betting -fantasy -player props",
+        "url": '"Portland Trail Blazers" ("NBA Playoffs" OR playoffs OR Spurs OR "Game 5" OR elimination) -odds -betting -fantasy -player props -DraftKings -FanDuel',
         "category": "sports",
         "display_name": "Trail Blazers News",
         "priority": 3,
@@ -253,6 +411,46 @@ PORTLAND_METRO_SOURCES: list[dict] = [
         "priority": 3,
     },
     {
+        "source_id": "google_news:mariners",
+        "source_type": "google_news",
+        "url": "Seattle Mariners -odds -betting -fantasy -DraftKings -FanDuel -picks",
+        "category": "sports",
+        "display_name": "Mariners News",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:kraken",
+        "source_type": "google_news",
+        "url": "Seattle Kraken NHL -odds -betting -fantasy -DraftKings -FanDuel",
+        "category": "sports",
+        "display_name": "Kraken News",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:sounders",
+        "source_type": "google_news",
+        "url": "Seattle Sounders -odds -betting -fantasy -DraftKings -FanDuel",
+        "category": "sports",
+        "display_name": "Sounders News",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:oregon_ducks",
+        "source_type": "google_news",
+        "url": "Oregon Ducks football basketball -odds -betting -fantasy -DraftKings -FanDuel -props",
+        "category": "sports",
+        "display_name": "Oregon Ducks News",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:oregon_state_beavers",
+        "source_type": "google_news",
+        "url": "Oregon State Beavers football basketball -odds -betting -fantasy -DraftKings -FanDuel -props",
+        "category": "sports",
+        "display_name": "Oregon State Beavers News",
+        "priority": 3,
+    },
+    {
         "source_id": "google_news:world_cup_portland",
         "source_type": "google_news",
         "url": "FIFA World Cup 2026 Portland Seattle",
@@ -266,6 +464,105 @@ PORTLAND_METRO_SOURCES: list[dict] = [
         "url": "https://www.kgw.com/feeds/syndication/rss/sports",
         "category": "sports",
         "display_name": "KGW Sports",
+        "priority": 3,
+    },
+    # Official/publisher sports sources via Google News. Direct RSS from many
+    # league sites is unreliable, so scope queries to source-owned domains.
+    {
+        "source_id": "google_news:nba_official",
+        "source_type": "google_news",
+        "url": 'site:nba.com "Portland Trail Blazers" OR "NBA Playoffs" OR "NBA Finals" -odds -betting -fantasy -DraftKings -FanDuel -props',
+        "category": "sports",
+        "display_name": "NBA.com",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:mlb_official",
+        "source_type": "google_news",
+        "url": 'site:mlb.com "Seattle Mariners" OR "World Series" OR MLB playoffs -odds -betting -fantasy -DraftKings -FanDuel -props',
+        "category": "sports",
+        "display_name": "MLB.com",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:nfl_official",
+        "source_type": "google_news",
+        "url": 'site:nfl.com "Seattle Seahawks" OR "Super Bowl" OR "NFL Playoffs" -odds -betting -fantasy -DraftKings -FanDuel -props',
+        "category": "sports",
+        "display_name": "NFL.com",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:bleacher_report_sports",
+        "source_type": "google_news",
+        "url": 'site:bleacherreport.com Portland Seattle sports "Trail Blazers" Seahawks Mariners Timbers Thorns -odds -betting -fantasy -DraftKings -FanDuel -props',
+        "category": "sports",
+        "display_name": "Bleacher Report Sports",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:fox_sports",
+        "source_type": "google_news",
+        "url": 'site:foxsports.com Portland Seattle sports NBA NFL MLB MLS NWSL -odds -betting -fantasy -DraftKings -FanDuel -props',
+        "category": "sports",
+        "display_name": "FOX Sports",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:olympics_official",
+        "source_type": "google_news",
+        "url": 'site:olympics.com Olympics "Team USA" Portland Seattle -odds -betting -fantasy',
+        "category": "sports",
+        "display_name": "Olympics.com",
+        "priority": 3,
+    },
+    {
+        "source_id": "google_news:fifa_official",
+        "source_type": "google_news",
+        "url": 'site:fifa.com "FIFA World Cup 2026" Seattle Portland Vancouver -odds -betting -fantasy',
+        "category": "sports",
+        "display_name": "FIFA.com",
+        "priority": 3,
+    },
+    # ESPN league-level feeds — see note in CLARK_COUNTY_SOURCES above.
+    {
+        "source_id": "rss:espn_nba",
+        "source_type": "rss",
+        "url": "https://www.espn.com/espn/rss/nba/news",
+        "category": "sports",
+        "display_name": "ESPN NBA",
+        "priority": 3,
+    },
+    {
+        "source_id": "rss:espn_nfl",
+        "source_type": "rss",
+        "url": "https://www.espn.com/espn/rss/nfl/news",
+        "category": "sports",
+        "display_name": "ESPN NFL",
+        "priority": 3,
+    },
+    {
+        "source_id": "rss:espn_mlb",
+        "source_type": "rss",
+        "url": "https://www.espn.com/espn/rss/mlb/news",
+        "category": "sports",
+        "display_name": "ESPN MLB",
+        "priority": 3,
+    },
+    {
+        "source_id": "rss:espn_nhl",
+        "source_type": "rss",
+        "url": "https://www.espn.com/espn/rss/nhl/news",
+        "category": "sports",
+        "display_name": "ESPN NHL",
+        "priority": 3,
+    },
+    {
+        "source_id": "rss:espn_soccer",
+        "source_type": "rss",
+        "url": "https://www.espn.com/espn/rss/soccer/news",
+        "category": "sports",
+        "display_name": "ESPN Soccer",
         "priority": 3,
     },
 ]

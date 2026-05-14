@@ -19,7 +19,7 @@ const Joi = require('joi');
 const router = express.Router();
 
 const multer = require('multer');
-const { Readable } = require('stream');
+const { toFile } = require('openai/uploads');
 const verifyToken = require('../middleware/verifyToken');
 const validate = require('../middleware/validate');
 const { aiChatLimiter, aiDraftLimiter } = require('../middleware/rateLimiter');
@@ -80,7 +80,7 @@ const draftListingVisionSchema = Joi.object({
 
 const draftPostSchema = Joi.object({
   text: Joi.string().min(1).max(2000).required(),
-  surface: Joi.string().valid('place', 'following', 'connections').optional(),
+  surface: Joi.string().valid('place', 'connections').optional(),
   coarseLocation: Joi.object({
     city: Joi.string().max(100),
     state: Joi.string().max(50),
@@ -404,12 +404,14 @@ router.post('/transcribe', verifyToken, aiDraftLimiter, (req, res, next) => {
     return res.status(503).json({ error: 'AI transcription service unavailable' });
   }
 
-  // Convert buffer to a readable stream with a name (required by OpenAI SDK)
-  const audioStream = Readable.from(req.file.buffer);
-  audioStream.name = req.file.originalname || 'audio.m4a';
+  // OpenAI SDK multipart upload expects File / Blob / fs.ReadStream — not Readable.from().
+  // toFile() accepts Buffer and produces a uploadable File (see openai/uploads.js).
+  const uploadable = await toFile(req.file.buffer, req.file.originalname || 'audio.m4a', {
+    type: req.file.mimetype || 'application/octet-stream',
+  });
 
   const transcription = await openai.audio.transcriptions.create({
-    file: audioStream,
+    file: uploadable,
     model: 'whisper-1',
     language: 'en',
   });

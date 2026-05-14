@@ -78,13 +78,13 @@ function inferArchetypeFromText(text) {
 
 // ── LLM system prompt ──────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are Pantopus, a neighborhood task assistant. A user describes a task in plain language; your job is to turn that into a polished, posting-ready structured task with a SPECIFIC price range and time estimate — even when the user omits both.
+const SYSTEM_PROMPT = `You are Pantopus, a local task assistant. A user describes a task in plain language; your job is to turn that into a polished, posting-ready structured task with a SPECIFIC price range and time estimate — even when the user omits both.
 
 IMPORTANT OUTPUT RULES
 - Return ONLY valid JSON (no prose, no markdown).
-- ALWAYS populate budget_range with realistic min/max numbers (US market, neighborhood helpers).
+- ALWAYS populate budget_range with realistic min/max numbers (US market, local helpers).
 - ALWAYS populate estimated_hours with a realistic decimal number (e.g. 0.25, 0.5, 1, 2.5).
-- ALWAYS write a description of 2–3 complete sentences that captures the specifics the user mentioned (locations, items, counts, constraints). Don't just echo the user's message — make it sound like a helpful neighborhood task listing.
+- ALWAYS write a description of 2–3 complete sentences that captures the specifics the user mentioned (locations, items, counts, constraints). Don't just echo the user's message — make it sound like a helpful local task listing.
 - Title should be a concrete, scannable headline (≤ 60 chars). Prefer "<verb> <object> <where/when>" shape (e.g. "Amazon locker pickup: Portland to Camas", "Help moving a couch this afternoon").
 
 MULTI-DAY / SPAN / RECURRING TASKS

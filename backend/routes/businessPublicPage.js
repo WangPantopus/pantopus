@@ -65,7 +65,7 @@ router.get('/:username/:slug', async (req, res) => {
 
     const { data: bizUser, error: userErr } = await supabaseAdmin
       .from('User')
-      .select('id, username, name, email, profile_picture_url, cover_photo_url, bio, tagline, average_rating, review_count, followers_count, account_type, gigs_completed')
+      .select('id, username, name, email, profile_picture_url, cover_photo_url, bio, tagline, average_rating, review_count, account_type, gigs_completed')
       .eq('username', username)
       .eq('account_type', 'business')
       .single();
@@ -195,7 +195,6 @@ router.get('/:username/:slug', async (req, res) => {
         tagline: bizUser.tagline,
         average_rating: parseFloat(bizUser.average_rating) || null,
         review_count: bizUser.review_count || 0,
-        followers_count: bizUser.followers_count || 0,
       },
       profile: {
         ...profile,
@@ -250,7 +249,7 @@ router.get('/:username', async (req, res) => {
     // 1. Get business user
     const { data: bizUser, error: userErr } = await supabaseAdmin
       .from('User')
-      .select('id, username, name, email, profile_picture_url, cover_photo_url, bio, tagline, average_rating, review_count, followers_count, account_type, gigs_completed')
+      .select('id, username, name, email, profile_picture_url, cover_photo_url, bio, tagline, average_rating, review_count, account_type, gigs_completed')
       .eq('username', username)
       .eq('account_type', 'business')
       .single();
@@ -384,7 +383,6 @@ router.get('/:username', async (req, res) => {
         tagline: bizUser.tagline,
         average_rating: parseFloat(bizUser.average_rating) || null,
         review_count: bizUser.review_count || 0,
-        followers_count: bizUser.followers_count || 0,
       },
       profile: {
         ...profile,

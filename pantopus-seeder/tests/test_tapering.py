@@ -27,7 +27,7 @@ def _make_region_config(region="clark_county", **overrides):
         "lng": -122.6615,
         "radius_meters": 25000,
         "timezone": "America/Los_Angeles",
-        "display_name": "Clark County",
+        "display_name": "Clark County, WA",
         "curator_user_id": "curator-uuid",
     }
     defaults.update(overrides)

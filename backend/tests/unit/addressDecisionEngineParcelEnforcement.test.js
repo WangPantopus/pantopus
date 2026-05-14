@@ -1,6 +1,8 @@
 const engine = require('../../services/addressValidation/addressDecisionEngine');
 const { AddressVerdictStatus } = require('../../services/addressValidation/types');
 
+const freshValidatedAt = () => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
 function makeGoogle(overrides = {}) {
   return {
     normalized: {
@@ -64,7 +66,7 @@ function makeProviderPlace(primaryType, types = [primaryType, 'point_of_interest
     lookup_mode: 'place_details',
     verification_level: 'shadow_provider_observed',
     risk_flags: ['named_poi'],
-    validated_at: '2026-04-02T12:00:00.000Z',
+    validated_at: freshValidatedAt(),
     ...overrides,
   };
 }
@@ -83,7 +85,7 @@ function makeParcelIntel(overrides = {}) {
     confidence: 0.93,
     lookup_mode: 'property_detail',
     from_cache: false,
-    validated_at: '2026-04-02T18:00:00.000Z',
+    validated_at: freshValidatedAt(),
     ...overrides,
   };
 }

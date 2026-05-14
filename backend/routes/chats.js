@@ -12,6 +12,11 @@ const validate = require('../middleware/validate');
 const Joi = require('joi');
 const logger = require('../utils/logger');
 const badgeService = require('../services/badgeService');
+const {
+  serializeLocalProfileForViewer,
+  serializeUserAsLocalIdentity,
+  serializeUserIdentityForViewer,
+} = require('../serializers/identitySerializers');
 const { hasPermission } = require('../utils/businessPermissions');
 const s3Service = require('../services/s3Service');
 const { isBlocked } = require('../services/blockService');
@@ -20,6 +25,59 @@ const pushService = require('../services/pushService');
 const rateLimit = require('express-rate-limit');
 const CHAT_DELETED_REDACT_DAYS = Math.max(parseInt(process.env.CHAT_DELETED_REDACT_DAYS || '180', 10) || 180, 1);
 const REDACTED_DELETED_MESSAGE = '[deleted message]';
+const LOCAL_PROFILE_IDENTITY_SELECT = [
+  'id',
+  'user_id',
+  'handle',
+  'display_name',
+  'avatar_url',
+  'bio',
+  'public_city',
+  'public_state',
+  'public_neighborhood',
+  'show_neighborhood',
+  'show_verified_resident_badge',
+  'show_gig_history',
+  'verified_resident',
+  'review_count',
+  'gigs_completed',
+  'marketplace_sales',
+].join(', ');
+
+async function loadLocalIdentityMapForUsers(users) {
+  const userRows = (users || []).filter(Boolean);
+  const usersById = new Map();
+  for (const user of userRows) {
+    if (user?.id) usersById.set(String(user.id), user);
+  }
+  if (usersById.size === 0) return new Map();
+
+  const { data: profiles, error } = await supabaseAdmin
+    .from('LocalProfile')
+    .select(LOCAL_PROFILE_IDENTITY_SELECT)
+    .in('user_id', [...usersById.keys()]);
+
+  if (error) {
+    logger.warn('chat.local_profile_identity_lookup_error', { error: error.message });
+  }
+
+  const profilesByUserId = new Map();
+  for (const profile of profiles || []) {
+    if (profile?.user_id) profilesByUserId.set(String(profile.user_id), profile);
+  }
+
+  const identitiesByUserId = new Map();
+  for (const [userId, user] of usersById) {
+    const profile = profilesByUserId.get(userId);
+    identitiesByUserId.set(
+      userId,
+      profile
+        ? serializeLocalProfileForViewer({ ...profile, user })
+        : serializeUserAsLocalIdentity(user)
+    );
+  }
+  return identitiesByUserId;
+}
 
 // ============ CHAT RATE LIMITERS ============
 // Keyed by authenticated user ID (not IP) since all routes require auth.
@@ -39,7 +97,9 @@ function chatRateLimiter(windowMs, max, label) {
 }
 
 const messageSendLimiter = chatRateLimiter(60_000, 30, 'message-send');
-const directChatLimiter = chatRateLimiter(60_000, 10, 'direct-chat');
+// Idempotent get-or-create; UI may resolve the same peer from multiple effects — keep headroom.
+const directChatMax = Math.max(parseInt(process.env.CHAT_DIRECT_RATE_LIMIT_PER_MIN || '40', 10) || 40, 1);
+const directChatLimiter = chatRateLimiter(60_000, directChatMax, 'direct-chat');
 const groupChatLimiter = chatRateLimiter(60_000, 5, 'group-chat');
 const reactionLimiter = chatRateLimiter(60_000, 60, 'reaction');
 const messageEditLimiter = chatRateLimiter(60_000, 20, 'message-edit');
@@ -326,6 +386,35 @@ function stripActorIdentity(message) {
   return rest;
 }
 
+function serializeChatParticipantForViewer(participant) {
+  if (!participant) return null;
+  const { user, ...safe } = participant;
+  return {
+    ...safe,
+    user: serializeUserAsLocalIdentity(user),
+  };
+}
+
+function serializeChatRoomForViewer(room) {
+  if (!room) return null;
+  return {
+    ...room,
+    participants: Array.isArray(room.participants)
+      ? room.participants.map(serializeChatParticipantForViewer)
+      : room.participants,
+  };
+}
+
+function serializeChatMessageForViewer(message, options = {}) {
+  if (!message) return null;
+  const base = options.includeActorIdentity ? message : stripActorIdentity(message);
+  const { sender, ...safe } = base;
+  return {
+    ...safe,
+    sender: serializeUserIdentityForViewer(sender),
+  };
+}
+
 /**
  * Parse a pagination cursor: either "timestamp|uuid" composite or plain timestamp.
  * Returns { beforeTs, beforeId } where beforeId may be null (legacy format).
@@ -467,7 +556,7 @@ router.get('/rooms', verifyToken, async (req, res) => {
     const [{ data: allOtherParts }, { data: roomPreviews }] = await Promise.all([
       supabaseAdmin
         .from('ChatParticipant')
-        .select('room_id, user:user_id(id, username, name, first_name, last_name, profile_picture_url)')
+        .select('room_id, user:user_id(id, username, name, first_name, middle_name, last_name, profile_picture_url)')
         .in('room_id', allRoomIds)
         .neq('user_id', userId)
         .order('is_active', { ascending: false }),
@@ -479,12 +568,16 @@ router.get('/rooms', verifyToken, async (req, res) => {
     for (const p of allOtherParts || []) {
       if (!partByRoom[p.room_id] && p.user) partByRoom[p.room_id] = p.user;
     }
+    const identityByUserId = await loadLocalIdentityMapForUsers(Object.values(partByRoom));
     // Index previews by room_id (RPC returns exactly one row per room)
     const msgByRoom = await resolveRoomPreviewMap(roomPreviews, req.requestId, 'chat_rooms');
 
     const enrichedRooms = roomList.map((p) => {
       const roomId = p.room.id;
       const u = partByRoom[roomId] || null;
+      const otherIdentity = u
+        ? (identityByUserId.get(String(u.id)) || serializeUserAsLocalIdentity(u))
+        : null;
       const lastMsg = msgByRoom[roomId] || null;
 
       let lastMessagePreview = null;
@@ -510,10 +603,11 @@ router.get('/rooms', verifyToken, async (req, res) => {
         unread_count: p.unread_count || 0,
         last_read_at: p.last_read_at,
         role: p.role,
-        other_participant_id: u?.id || null,
-        other_participant_name: u ? (u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username) : null,
-        other_participant_username: u?.username || null,
-        other_participant_avatar: u?.profile_picture_url || null,
+        other_participant_id: u?.id || otherIdentity?.id || null,
+        other_participant_name: otherIdentity?.displayName || null,
+        other_participant_username: otherIdentity?.handle || null,
+        other_participant_avatar: otherIdentity?.avatarUrl || null,
+        other_participant_identity: otherIdentity,
       };
     });
 
@@ -605,7 +699,7 @@ router.get('/business/:businessUserId/rooms', verifyToken, async (req, res) => {
     const [{ data: allBizParts }, { data: bizRoomPreviews }] = await Promise.all([
       supabaseAdmin
         .from('ChatParticipant')
-        .select('room_id, user:user_id(id, username, name, first_name, last_name)')
+        .select('room_id, user:user_id(id, username, name, first_name, middle_name, last_name)')
         .in('room_id', allBizRoomIds)
         .eq('is_active', true),
       supabaseAdmin.rpc('get_room_previews', { p_room_ids: allBizRoomIds }),
@@ -617,6 +711,9 @@ router.get('/business/:businessUserId/rooms', verifyToken, async (req, res) => {
       if (!bizPartsByRoom[p.room_id]) bizPartsByRoom[p.room_id] = [];
       if (p.user) bizPartsByRoom[p.room_id].push(p.user);
     }
+    const bizIdentityByUserId = await loadLocalIdentityMapForUsers(
+      Object.values(bizPartsByRoom).flat()
+    );
     // Index previews by room_id (RPC returns exactly one row per room)
     const bizMsgByRoom = await resolveRoomPreviewMap(bizRoomPreviews, req.requestId, 'business_chat_rooms');
 
@@ -626,6 +723,9 @@ router.get('/business/:businessUserId/rooms', verifyToken, async (req, res) => {
       const external = users.find((u) => !teamSet.has(String(u.id)));
       const fallback = users.find((u) => String(u.id) !== String(businessUserId));
       const chosen = external || fallback || null;
+      const otherIdentity = chosen
+        ? (bizIdentityByUserId.get(String(chosen.id)) || serializeUserAsLocalIdentity(chosen))
+        : null;
 
       let lastMessagePreview = null;
       let lastMessageAt = null;
@@ -650,9 +750,10 @@ router.get('/business/:businessUserId/rooms', verifyToken, async (req, res) => {
         unread_count: p.unread_count || 0,
         last_read_at: p.last_read_at,
         role: p.role,
-        other_participant_id: chosen?.id || null,
-        other_participant_name: chosen ? (chosen.name || [chosen.first_name, chosen.last_name].filter(Boolean).join(' ') || chosen.username) : null,
-        other_participant_username: chosen?.username || null,
+        other_participant_id: chosen?.id || otherIdentity?.id || null,
+        other_participant_name: otherIdentity?.displayName || null,
+        other_participant_username: otherIdentity?.handle || null,
+        other_participant_identity: otherIdentity,
       };
     });
 
@@ -737,7 +838,7 @@ router.get('/rooms/:roomId', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'Room not found' });
     }
 
-    res.json({ room });
+    res.json({ room: serializeChatRoomForViewer(room) });
     
   } catch (err) {
     logger.error('Room fetch error', { requestId: req.requestId, userId: req.user?.id, roomId: req.params.roomId, error: err.message });
@@ -1140,7 +1241,7 @@ router.get('/conversations/:otherUserId/messages', verifyToken, async (req, res)
     const messageIds = visibleMessages.map((m) => m.id).filter(Boolean);
     const reactionMap = await buildReactionSummary(messageIds, userId);
     const messagesWithReactions = visibleMessages.map((m) => ({
-      ...(asBusinessUserId ? m : stripActorIdentity(m)),
+      ...serializeChatMessageForViewer(m),
       reactions: reactionMap.get(m.id) || [],
     }));
 
@@ -1312,7 +1413,7 @@ router.get('/rooms/:roomId/messages', verifyToken, async (req, res) => {
     const messageIds = visibleMessages.map((m) => m.id).filter(Boolean);
     const reactionMap = await buildReactionSummary(messageIds, userId);
     const messagesWithReactions = visibleMessages.map((m) => ({
-      ...(asBusinessUserId ? m : stripActorIdentity(m)),
+      ...serializeChatMessageForViewer(m),
       reactions: reactionMap.get(m.id) || [],
     }));
 
@@ -1576,7 +1677,7 @@ router.post('/messages', verifyToken, messageSendLimiter, validate(sendMessageSc
         .maybeSingle();
 
       if (existingMsg) {
-        return res.json({ message: existingMsg });
+        return res.json({ message: serializeChatMessageForViewer(existingMsg) });
       }
     }
 
@@ -1649,7 +1750,7 @@ router.post('/messages', verifyToken, messageSendLimiter, validate(sendMessageSc
     // Strip actor_user_id from broadcast — it's internal business data.
     const io = req.app.get('io');
     if (io) {
-      io.to(roomId).emit('message:new', stripActorIdentity(message));
+      io.to(roomId).emit('message:new', serializeChatMessageForViewer(message));
     }
 
     const sideEffectStamp = new Date().toISOString();
@@ -1708,7 +1809,7 @@ router.post('/messages', verifyToken, messageSendLimiter, validate(sendMessageSc
           const pushEnabledIds = (enabledRows || []).map((r) => r.user_id);
           if (pushEnabledIds.length === 0) return;
 
-          const senderName = message.sender?.name || 'Someone';
+          const senderName = serializeUserIdentityForViewer(message.sender)?.displayName || 'Someone';
           const preview = resolvedType === 'text'
             ? (resolvedMessage.length > 100 ? resolvedMessage.slice(0, 100) + '…' : resolvedMessage)
             : resolvedType === 'file' ? '📎 Sent an attachment' : '💬 New message';
@@ -1723,7 +1824,7 @@ router.post('/messages', verifyToken, messageSendLimiter, validate(sendMessageSc
       })();
     }
 
-    res.status(201).json({ message });
+    res.status(201).json({ message: serializeChatMessageForViewer(message) });
     
   } catch (err) {
     logger.error('Message send error', { requestId, roomId, userId, durationMs: Date.now() - sendStartMs, error: err.message });
@@ -1773,14 +1874,15 @@ router.put('/messages/:messageId', verifyToken, messageEditLimiter, async (req, 
     }
 
     incCounter('chat.message.edited');
+    const responseMessage = serializeChatMessageForViewer(updated);
 
     // Broadcast via socket
     const io = req.app.get('io');
     if (io && message.room_id) {
-      io.to(message.room_id).emit('message:edited', { messageId, message: updated });
+      io.to(message.room_id).emit('message:edited', { messageId, message: responseMessage });
     }
 
-    res.json({ message: updated });
+    res.json({ message: responseMessage });
     
   } catch (err) {
     logger.error('Message edit error', { requestId: req.requestId, userId: req.user?.id, messageId: req.params.messageId, error: err.message });
@@ -1963,7 +2065,7 @@ router.post('/rooms/:roomId/participants', verifyToken, participantLimiter, asyn
         type: 'system'
       });
     
-    res.status(201).json({ participant: newParticipant });
+    res.status(201).json({ participant: serializeChatParticipantForViewer(newParticipant) });
     
   } catch (err) {
     logger.error('Add participant error', { requestId: req.requestId, userId: req.user?.id, roomId: req.params.roomId, error: err.message });
@@ -2147,13 +2249,16 @@ router.get('/unified-conversations', verifyToken, async (req, res) => {
         .select(`
           room_id,
           user_id,
-          user:user_id(id, username, name, first_name, last_name, profile_picture_url)
+          user:user_id(id, username, name, first_name, middle_name, last_name, profile_picture_url)
         `)
         .in('room_id', mergeableRoomIds)
         .neq('user_id', userId)
         .eq('is_active', true);
       allOtherParticipants = otherParts || [];
     }
+    const identityByUserId = await loadLocalIdentityMapForUsers(
+      allOtherParticipants.map((participant) => participant.user)
+    );
 
     // Step 3: Group rooms by other_participant_id
     const conversationMap = new Map();
@@ -2166,11 +2271,13 @@ router.get('/unified-conversations', verifyToken, async (req, res) => {
       const otherId = otherP.user.id;
       if (!conversationMap.has(otherId)) {
         const u = otherP.user;
+        const otherIdentity = identityByUserId.get(String(otherId)) || serializeUserAsLocalIdentity(u);
         conversationMap.set(otherId, {
           other_participant_id: otherId,
-          other_participant_name: u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username,
-          other_participant_username: u.username,
-          other_participant_avatar: u.profile_picture_url || null,
+          other_participant_name: otherIdentity?.displayName || null,
+          other_participant_username: otherIdentity?.handle || null,
+          other_participant_avatar: otherIdentity?.avatarUrl || null,
+          other_participant_identity: otherIdentity,
           room_ids: [],
           total_unread: 0,
           last_message_at: null,
@@ -2391,7 +2498,7 @@ router.get('/conversations/:otherUserId/topics', verifyToken, async (req, res) =
 /**
  * Build a reaction summary array for the given message IDs.
  * Returns a Map<messageId, ReactionSummary[]> where each entry is:
- *   { reaction, count, users: [{ id, name }], reacted_by_me }
+ *   { reaction, count, users: [{ id, name, username, identity }], reacted_by_me }
  */
 async function buildReactionSummary(messageIds, requestingUserId) {
   if (!messageIds || messageIds.length === 0) return new Map();
@@ -2407,7 +2514,7 @@ async function buildReactionSummary(messageIds, requestingUserId) {
   const userIds = [...new Set(reactions.map((r) => r.user_id))];
   const { data: users } = await supabaseAdmin
     .from('User')
-    .select('id, name')
+    .select('id, username, name, first_name, middle_name, last_name, profile_picture_url, account_type')
     .in('id', userIds);
 
   const userMap = {};
@@ -2426,7 +2533,15 @@ async function buildReactionSummary(messageIds, requestingUserId) {
     const summary = Object.entries(reactionMap).map(([reaction, uids]) => ({
       reaction,
       count: uids.length,
-      users: uids.map((uid) => ({ id: uid, name: (userMap[uid] || {}).name || 'Unknown' })),
+      users: uids.map((uid) => {
+        const identity = serializeUserAsLocalIdentity(userMap[uid]);
+        return {
+          id: identity?.id || uid,
+          name: identity?.displayName || 'Unknown',
+          username: identity?.handle || null,
+          identity,
+        };
+      }),
       reacted_by_me: uids.includes(requestingUserId),
     }));
     result.set(msgId, summary);

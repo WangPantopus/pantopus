@@ -1,10 +1,15 @@
 const { resetTables, setAuthMocks, getTable } = require('../__mocks__/supabaseAdmin');
+const mockCreateClient = jest.fn();
 
 // Keep rate limit middleware from interfering with direct handler tests
 jest.mock('../../middleware/rateLimiter', () => ({
   globalWriteLimiter: (req, _res, next) => next(),
   addressValidationLimiter: (req, _res, next) => next(),
   addressClaimLimiter: (req, _res, next) => next(),
+}));
+
+jest.mock('@supabase/supabase-js', () => ({
+  createClient: (...args) => mockCreateClient(...args),
 }));
 
 jest.mock('../../config/auth', () => ({
@@ -28,7 +33,7 @@ function findHandler(method, path) {
   throw new Error(`Handler not found: ${method} ${path}`);
 }
 
-function mockReq({ params = {}, query = {}, body = {}, headers = {} } = {}) {
+function mockReq({ params = {}, query = {}, body = {}, headers = {}, cookies = {} } = {}) {
   const normalizedHeaders = Object.fromEntries(
     Object.entries(headers).map(([k, v]) => [String(k).toLowerCase(), v])
   );
@@ -36,6 +41,7 @@ function mockReq({ params = {}, query = {}, body = {}, headers = {} } = {}) {
     params,
     query,
     body,
+    cookies,
     method: 'POST',
     path: '/test',
     originalUrl: '/api/users/test',
@@ -51,21 +57,26 @@ function mockRes() {
   const res = {
     _status: 200,
     _json: null,
+    _cookies: {},
+    _clearedCookies: [],
     status(code) { this._status = code; return this; },
     json(payload) { this._json = payload; return this; },
-    cookie() { return this; },
-    clearCookie() { return this; },
+    cookie(name, val, opts) { this._cookies[name] = { val, opts }; return this; },
+    clearCookie(name) { this._clearedCookies.push(name); return this; },
   };
   return res;
 }
 
 const oauthUrlHandler = findHandler('GET', '/oauth/:provider');
+const refreshHandler = findHandler('POST', '/refresh');
 const oauthTokenHandler = findHandler('POST', '/oauth/token');
 const oauthCallbackHandler = findHandler('POST', '/oauth/callback');
+const logoutHandler = findHandler('POST', '/logout');
 
 beforeEach(() => {
   resetTables();
   jest.clearAllMocks();
+  mockCreateClient.mockReset();
   process.env.AUTH_REDIRECT_URL = 'https://pantopus.com';
 });
 
@@ -162,6 +173,83 @@ describe('GET /oauth/:provider', () => {
   });
 });
 
+describe('POST /refresh', () => {
+  test('mobile refresh uses body token even when a stale refresh cookie is present', async () => {
+    const refreshSession = jest.fn().mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'new-access-token',
+          refresh_token: 'new-refresh-token',
+          expires_in: 3600,
+          expires_at: 1_700_000_000,
+        },
+        user: { id: 'user-1' },
+      },
+      error: null,
+    });
+    mockCreateClient.mockReturnValue({ auth: { refreshSession } });
+
+    const req = mockReq({
+      body: { refreshToken: 'fresh-body-refresh-token' },
+      cookies: { pantopus_refresh: 'stale-cookie-refresh-token' },
+      headers: { 'user-agent': 'Pantopus/70 CFNetwork/3860.400.51 Darwin/25.3.0' },
+    });
+    const res = mockRes();
+
+    await refreshHandler(req, res);
+
+    expect(mockCreateClient.mock.calls[0][2]).toMatchObject({
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    expect(refreshSession).toHaveBeenCalledWith({
+      refresh_token: 'fresh-body-refresh-token',
+    });
+    expect(res._status).toBe(200);
+    expect(res._json).toMatchObject({
+      ok: true,
+      accessToken: 'new-access-token',
+      refreshToken: 'new-refresh-token',
+    });
+    expect(res._cookies.pantopus_refresh).toBeUndefined();
+    expect(res._clearedCookies).toContain('pantopus_refresh');
+  });
+
+  test('web cookie transport refresh uses cookie token and omits JSON tokens', async () => {
+    const refreshSession = jest.fn().mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'web-access-token',
+          refresh_token: 'web-refresh-token',
+          expires_in: 3600,
+          expires_at: 1_700_000_001,
+        },
+        user: { id: 'user-1' },
+      },
+      error: null,
+    });
+    mockCreateClient.mockReturnValue({ auth: { refreshSession } });
+
+    const req = mockReq({
+      body: { refreshToken: 'body-token-should-not-win' },
+      cookies: { pantopus_refresh: 'web-cookie-refresh-token' },
+      headers: { 'x-token-transport': 'cookie' },
+    });
+    const res = mockRes();
+
+    await refreshHandler(req, res);
+
+    expect(refreshSession).toHaveBeenCalledWith({
+      refresh_token: 'web-cookie-refresh-token',
+    });
+    expect(res._status).toBe(200);
+    expect(res._json).toEqual({ ok: true });
+    expect(res._cookies.pantopus_refresh).toMatchObject({
+      val: 'web-refresh-token',
+    });
+    expect(res._clearedCookies).not.toContain('pantopus_refresh');
+  });
+});
+
 describe('POST /oauth/token', () => {
   test('returns access token and refresh token when provided', async () => {
     setAuthMocks({
@@ -201,6 +289,15 @@ describe('POST /oauth/token', () => {
     expect(res._json.error).toContain('Access token is required');
   });
 
+  test('rejects missing refresh token to avoid access-token-only persistence', async () => {
+    const req = mockReq({ body: { accessToken: 'access-token-abc' } });
+    const res = mockRes();
+    await oauthTokenHandler(req, res);
+
+    expect(res._status).toBe(400);
+    expect(res._json.error).toContain('Refresh token is required');
+  });
+
   test('rejects token when Supabase cannot resolve user', async () => {
     setAuthMocks({
       getUser: jest.fn().mockResolvedValue({
@@ -209,7 +306,7 @@ describe('POST /oauth/token', () => {
       }),
     });
 
-    const req = mockReq({ body: { accessToken: 'bad-token' } });
+    const req = mockReq({ body: { accessToken: 'bad-token', refreshToken: 'refresh-token' } });
     const res = mockRes();
     await oauthTokenHandler(req, res);
 
@@ -229,30 +326,74 @@ describe('POST /oauth/callback', () => {
   });
 
   test('returns 400 when exchanged user has no email', async () => {
-    setAuthMocks({
-      exchangeCodeForSession: jest.fn().mockResolvedValue({
-        data: {
-          session: {
-            access_token: 'token',
-            refresh_token: 'refresh',
-            expires_in: 3600,
-            expires_at: Math.floor(Date.now() / 1000) + 3600,
-          },
-          user: {
-            id: 'oauth-no-email',
-            email: null,
-            user_metadata: {},
-          },
+    const exchangeCodeForSession = jest.fn().mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'token',
+          refresh_token: 'refresh',
+          expires_in: 3600,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
         },
-        error: null,
-      }),
+        user: {
+          id: 'oauth-no-email',
+          email: null,
+          user_metadata: {},
+        },
+      },
+      error: null,
     });
+    mockCreateClient.mockReturnValue({ auth: { exchangeCodeForSession } });
 
     const req = mockReq({ body: { code: 'auth-code' } });
     const res = mockRes();
     await oauthCallbackHandler(req, res);
 
+    expect(mockCreateClient.mock.calls[0][2]).toMatchObject({
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
     expect(res._status).toBe(400);
     expect(res._json.error).toContain('Email address is required');
+  });
+});
+
+describe('POST /logout', () => {
+  test('revokes the bearer session and clears auth cookies', async () => {
+    const adminSignOut = jest.fn().mockResolvedValue({ data: null, error: null });
+    setAuthMocks({ adminSignOut });
+
+    const req = mockReq({
+      headers: { authorization: 'Bearer bearer-access-token' },
+      cookies: { pantopus_access: 'stale-cookie-access-token' },
+    });
+    const res = mockRes();
+
+    await logoutHandler(req, res);
+
+    expect(adminSignOut).toHaveBeenCalledWith('bearer-access-token', 'local');
+    expect(res._status).toBe(200);
+    expect(res._json).toEqual({ success: true });
+    expect(res._clearedCookies).toEqual(expect.arrayContaining([
+      'pantopus_access',
+      'pantopus_refresh',
+      'pantopus_csrf',
+      'pantopus_session',
+    ]));
+  });
+
+  test('prefers explicit body access token over stale access cookie', async () => {
+    const adminSignOut = jest.fn().mockResolvedValue({ data: null, error: null });
+    setAuthMocks({ adminSignOut });
+
+    const req = mockReq({
+      body: { accessToken: 'body-access-token' },
+      cookies: { pantopus_access: 'stale-cookie-access-token' },
+    });
+    const res = mockRes();
+
+    await logoutHandler(req, res);
+
+    expect(adminSignOut).toHaveBeenCalledWith('body-access-token', 'local');
+    expect(res._status).toBe(200);
+    expect(res._json).toEqual({ success: true });
   });
 });

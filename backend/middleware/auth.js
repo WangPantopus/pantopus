@@ -1,5 +1,5 @@
-const { createClient } = require('@supabase/supabase-js');
-const supabaseAdmin = require('./supabaseAdmin');
+const { createServerSupabaseClient } = require('../config/supabaseClient');
+const supabaseAdmin = require('../config/supabaseAdmin');
 require('dotenv').config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -9,7 +9,14 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY');
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+function createAuthClient() {
+  return createServerSupabaseClient(supabaseUrl, supabaseKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
 
 // ============ AUTHENTICATION HELPERS ============
 
@@ -42,6 +49,7 @@ async function signUp(email, password) {
  * Sign in user with email/password
  */
 async function signIn(email, password) {
+  const supabase = createAuthClient();
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password
@@ -55,6 +63,7 @@ async function signIn(email, password) {
  * Get current session from token
  */
 async function getSession(token) {
+  const supabase = createAuthClient();
   const { data, error } = await supabase.auth.getUser(token);
   
   if (error) throw error;
@@ -64,8 +73,10 @@ async function getSession(token) {
 /**
  * Sign out user
  */
-async function signOut(token) {
-  const { error } = await supabase.auth.signOut({ scope: 'global' });
+async function signOut(token, scope = 'global') {
+  const { error } = token
+    ? await supabaseAdmin.auth.admin.signOut(token, scope)
+    : await createAuthClient().auth.signOut({ scope });
   
   if (error) throw error;
 }
@@ -74,6 +85,7 @@ async function signOut(token) {
  * Send password reset email
  */
 async function resetPassword(email) {
+  const supabase = createAuthClient();
   const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${process.env.APP_URL}/reset-password`
   });
@@ -86,6 +98,7 @@ async function resetPassword(email) {
  * Update user password
  */
 async function updatePassword(accessToken, newPassword) {
+  const supabase = createAuthClient();
   const { data, error } = await supabase.auth.updateUser(
     { password: newPassword },
     { accessToken }
@@ -99,6 +112,7 @@ async function updatePassword(accessToken, newPassword) {
  * Resend confirmation email
  */
 async function resendConfirmationEmail(email) {
+  const supabase = createAuthClient();
   const { data, error } = await supabase.auth.resend({
     type: 'signup',
     email

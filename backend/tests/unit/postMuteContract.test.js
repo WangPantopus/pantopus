@@ -118,16 +118,16 @@ describe('Post mute contract', () => {
       .post('/api/posts/mute/topic')
       .send({ postType: 'deal', surface: 'place' });
 
-    const followingMute = await request(app)
+    const connectionsMute = await request(app)
       .post('/api/posts/mute/topic')
-      .send({ postType: 'deal', surface: 'following' });
+      .send({ postType: 'deal', surface: 'connections' });
 
     expect(placeMute.status).toBe(200);
-    expect(followingMute.status).toBe(200);
+    expect(connectionsMute.status).toBe(200);
     expect(getTable('PostMute')).toHaveLength(2);
     expect(getTable('PostMute')).toEqual(expect.arrayContaining([
       expect.objectContaining({ muted_entity_type: 'topic', muted_entity_id: 'deal', surface: 'place' }),
-      expect.objectContaining({ muted_entity_type: 'topic', muted_entity_id: 'deal', surface: 'following' }),
+      expect.objectContaining({ muted_entity_type: 'topic', muted_entity_id: 'deal', surface: 'connections' }),
     ]));
   });
 
@@ -139,7 +139,7 @@ describe('Post mute contract', () => {
       .send({ postType: 'deal', surface: 'nearby' });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/surface must be one of place, following, or connections/i);
+    expect(res.body.error).toMatch(/surface must be one of place, connections, or personas/i);
     expect(getTable('PostMute')).toHaveLength(0);
   });
 });

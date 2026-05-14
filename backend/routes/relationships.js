@@ -24,6 +24,7 @@ const logger = require('../utils/logger');
 const notificationService = require('../services/notificationService');
 const { isBlocked, getRelationshipStatus } = require('../utils/visibilityPolicy');
 const { invalidateFilterCache } = require('../services/feedService');
+const { writeIdentityAuditLog } = require('../utils/identityAudit');
 const rateLimit = require('express-rate-limit');
 
 // ============ RATE LIMITERS ============
@@ -129,7 +130,8 @@ router.post('/requests', verifyToken, connectionRequestLimiter, validate(request
             return res.status(500).json({ error: 'Failed to accept connection' });
           }
 
-          // Auto-follow both ways on mutual request acceptance
+          // Main profile behavior: accepting a mutual connection also creates
+          // mutual follows so both profiles show the relationship immediately.
           await Promise.allSettled([
             supabaseAdmin
               .from('UserFollow')
@@ -253,7 +255,7 @@ router.post('/:id/accept', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to accept connection' });
     }
 
-    // Auto-follow both ways: connecting auto-creates mutual follow
+    // Main profile behavior: connecting auto-creates mutual follows.
     await Promise.allSettled([
       supabaseAdmin
         .from('UserFollow')
@@ -376,14 +378,24 @@ router.post('/:id/block', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to block user' });
     }
 
-    // Also remove any follow relationships in both directions
     const otherUserId = rel.requester_id === userId ? rel.addressee_id : rel.requester_id;
-    await Promise.all([
+    await Promise.allSettled([
       supabaseAdmin.from('UserFollow').delete().eq('follower_id', userId).eq('following_id', otherUserId),
       supabaseAdmin.from('UserFollow').delete().eq('follower_id', otherUserId).eq('following_id', userId),
     ]);
 
     invalidateFilterCache(userId);
+    await writeIdentityAuditLog({
+      req,
+      actorUserId: userId,
+      targetUserId: otherUserId,
+      action: 'relationship.blocked',
+      targetType: 'Relationship',
+      targetId: relationshipId,
+      metadata: {
+        had_reason: !!reason,
+      },
+    });
     res.json({ message: 'User blocked', relationship: updated });
   } catch (err) {
     logger.error('Block user error', { error: err.message });
@@ -439,13 +451,24 @@ router.post('/block-user', verifyToken, async (req, res) => {
         return res.status(500).json({ error: 'Failed to block user' });
       }
 
-      // Remove follows
-      await Promise.all([
+      await Promise.allSettled([
         supabaseAdmin.from('UserFollow').delete().eq('follower_id', userId).eq('following_id', targetId),
         supabaseAdmin.from('UserFollow').delete().eq('follower_id', targetId).eq('following_id', userId),
       ]);
 
       invalidateFilterCache(userId);
+      await writeIdentityAuditLog({
+        req,
+        actorUserId: userId,
+        targetUserId: targetId,
+        action: 'relationship.blocked',
+        targetType: 'Relationship',
+        targetId: existing.id,
+        metadata: {
+          had_reason: !!reason,
+          mode: 'existing_relationship',
+        },
+      });
       return res.json({ message: 'User blocked', relationship: updated });
     }
 
@@ -468,13 +491,24 @@ router.post('/block-user', verifyToken, async (req, res) => {
       return res.status(500).json({ error: 'Failed to block user' });
     }
 
-    // Remove follows
-    await Promise.all([
+    await Promise.allSettled([
       supabaseAdmin.from('UserFollow').delete().eq('follower_id', userId).eq('following_id', targetId),
       supabaseAdmin.from('UserFollow').delete().eq('follower_id', targetId).eq('following_id', userId),
     ]);
 
     invalidateFilterCache(userId);
+    await writeIdentityAuditLog({
+      req,
+      actorUserId: userId,
+      targetUserId: targetId,
+      action: 'relationship.blocked',
+      targetType: 'Relationship',
+      targetId: rel.id,
+      metadata: {
+        had_reason: !!reason,
+        mode: 'created_relationship',
+      },
+    });
     res.json({ message: 'User blocked', relationship: rel });
   } catch (err) {
     logger.error('Block user error', { error: err.message });
@@ -510,6 +544,7 @@ router.post('/:id/unblock', verifyToken, async (req, res) => {
     }
 
     // Delete the relationship entirely (they can re-request if desired)
+    const otherUserId = rel.requester_id === userId ? rel.addressee_id : rel.requester_id;
     const { error } = await supabaseAdmin
       .from('Relationship')
       .delete()
@@ -521,6 +556,15 @@ router.post('/:id/unblock', verifyToken, async (req, res) => {
     }
 
     invalidateFilterCache(userId);
+    await writeIdentityAuditLog({
+      req,
+      actorUserId: userId,
+      targetUserId: otherUserId,
+      action: 'relationship.unblocked',
+      targetType: 'Relationship',
+      targetId: relationshipId,
+      metadata: {},
+    });
     res.json({ message: 'User unblocked' });
   } catch (err) {
     logger.error('Unblock error', { error: err.message });

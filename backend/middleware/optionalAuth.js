@@ -40,15 +40,15 @@ async function optionalAuth(req, _res, next) {
   req.user = null;
 
   try {
-    // Extract token: prefer httpOnly cookie, fall back to Bearer header
+    // Extract token: prefer Bearer header (mobile) over httpOnly cookie (web).
+    // Native clients can retain stale cookies in the platform cookie jar, so a
+    // deliberate Bearer token must win when both transports are present.
     let token = null;
-    if (req.cookies?.pantopus_access) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7);
+    } else if (req.cookies?.pantopus_access) {
       token = req.cookies.pantopus_access;
-    } else {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        token = authHeader.slice(7);
-      }
     }
 
     if (!token) return next();

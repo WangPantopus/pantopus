@@ -108,12 +108,49 @@ MAX_JITTER_MINUTES: int = 5
 # Queue hygiene
 # ---------------------------------------------------------------------------
 
+# Default stale window. Used when a queue row has no category or a category
+# not listed in QUEUE_STALE_HOURS_BY_CATEGORY.
 QUEUE_STALE_HOURS: int = 48
+
+# Per-category stale windows. Time-sensitive categories (weather, air quality,
+# earthquake, history) keep the short window so we never post a stale alert or
+# yesterday's "On This Day". Evergreen enrichment (sports, community_resource,
+# seasonal) gets a long window so it can survive busy news cycles without
+# being swept before the poster picks it up.
+#
+# MUST cover every entry in ALL_CATEGORIES — the fetcher's stale pass buckets
+# rows by these values and falls back to QUEUE_STALE_HOURS for anything
+# missing or null.
+QUEUE_STALE_HOURS_BY_CATEGORY: dict[str, int] = {
+    "history": 24,             # On This Day is only relevant today
+    "local_news": 48,
+    "weather": 48,             # current conditions / active alerts
+    "safety": 48,
+    "air_quality": 48,         # current AQI
+    "earthquake": 48,          # immediate alerts
+    "event": 72,               # events are often published 1–3 days before
+    "seasonal": 168,           # seasonal tips are evergreen within a season
+    "sports": 168,
+    "community_resource": 168,
+}
 
 QUEUE_PURGE_DAYS: dict[str, int] = {
     "filtered_out": 7,
     "skipped": 7,
     "posted": 30,
+}
+
+# Categories treated as enrichment when biasing slots.
+ENRICHMENT_CATEGORIES: tuple[str, ...] = ("sports", "community_resource")
+
+# Sports topic lane — maps a seeded item's `scope` (from seeder_content_queue)
+# to the audience value sent to the backend. Local regional sports stays
+# 'nearby' at the region centroid; national lane goes out as 'national' with
+# country:US distribution.
+SPORTS_SCOPE_TO_AUDIENCE: dict[str, str] = {
+    "local": "nearby",
+    "regional": "nearby",
+    "national": "national",
 }
 
 # ---------------------------------------------------------------------------
@@ -135,6 +172,7 @@ MAX_SEASONAL_POSTS_PER_WEEK: int = 1
 # ---------------------------------------------------------------------------
 
 REGIONS: dict[str, dict[str, Any]] = {
+    # Clark County, Washington — map centroid near Vancouver, WA (-122° = West of Mississippi).
     "clark_county": {
         "lat": 45.6387,
         "lng": -122.6615,
@@ -168,7 +206,7 @@ BLOCKLIST_TERMS: list[str] = [
     "indicted", "indictment",
     "sentenced",
     # Politics
-    "republican", "democrat", "election", "ballot", "campaign",
+    "democrat", "democrats", "democratic",
     "partisan", "conservative", "liberal",
     # Paywalled content
     "subscribe to read", "for subscribers", "premium content",

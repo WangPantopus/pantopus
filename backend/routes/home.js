@@ -1934,11 +1934,13 @@ router.post('/invitations/:invitationId/accept', verifyToken, async (req, res) =
           claim: {
             id: claimId,
             state: 'approved',
-            claim_phase_v2: 'merged_into_household',
-            terminal_reason: 'merged_via_invite',
+            claim_phase_v2: mergeResult.claimPhaseV2,
+            terminal_reason: mergeResult.terminalReason,
             merged_into_claim_id: mergeResult.mergedIntoClaimId,
           },
           merged: true,
+          accepted_role_base: mergeResult.acceptedRoleBase,
+          accepted_as_owner: mergeResult.acceptedAsOwner,
         });
       } catch (mergeError) {
         if (mergeError.status) {
@@ -2119,11 +2121,13 @@ router.post('/invitations/token/:token/accept', verifyToken, async (req, res) =>
           claim: {
             id: claimId,
             state: 'approved',
-            claim_phase_v2: 'merged_into_household',
-            terminal_reason: 'merged_via_invite',
+            claim_phase_v2: mergeResult.claimPhaseV2,
+            terminal_reason: mergeResult.terminalReason,
             merged_into_claim_id: mergeResult.mergedIntoClaimId,
           },
           merged: true,
+          accepted_role_base: mergeResult.acceptedRoleBase,
+          accepted_as_owner: mergeResult.acceptedAsOwner,
         });
       } catch (mergeError) {
         if (mergeError.status) {
@@ -2137,7 +2141,7 @@ router.post('/invitations/token/:token/accept', verifyToken, async (req, res) =>
     }
 
     // Create HomeOccupancy via applyOccupancyTemplate (single write path)
-    const roleBase = mapLegacyRole(invite.proposed_role || 'member');
+    const roleBase = invite.proposed_role_base || mapLegacyRole(invite.proposed_role || 'member');
     let occupancy;
     try {
       const result = await applyOccupancyTemplate(invite.home_id, userId, roleBase, 'verified');
@@ -5664,6 +5668,13 @@ router.post('/:id/invite', verifyToken, async (req, res) => {
     if (!access.hasAccess) return res.status(403).json({ error: 'No permission to invite members' });
 
     const { email, user_id, relationship, message } = req.body;
+    const requestedPresetKey = typeof req.body.preset_key === 'string' ? req.body.preset_key : null;
+    if (requestedPresetKey?.startsWith('claim_merge:')) {
+      return res.status(400).json({
+        error: 'Claim merge invitations must be created from ownership claim review',
+        code: 'CLAIM_MERGE_PRESET_FORBIDDEN',
+      });
+    }
 
     // Compute is_open_invite server-side: true when no specific invitee is provided
     const isOpenInvite = !email && !user_id;
@@ -5760,7 +5771,7 @@ router.post('/:id/invite', verifyToken, async (req, res) => {
         token_hash: tokenHash,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
         proposed_role_base: proposedRoleBase,
-        proposed_preset_key: req.body.preset_key || null,
+        proposed_preset_key: requestedPresetKey,
         is_open_invite: isOpenInvite,
       })
       .select()
@@ -7256,7 +7267,7 @@ router.get('/:id/health-score', verifyToken, async (req, res) => {
 
     const force = req.query.force === 'true';
     const result = await getHealthScore(homeId, { force });
-    res.set('Cache-Control', 'private, max-age=300');
+    res.set('Cache-Control', force ? 'no-store' : 'private, max-age=300');
     res.json(result);
   } catch (err) {
     logger.error('Health score error', { error: err.message, homeId: req.params.id });

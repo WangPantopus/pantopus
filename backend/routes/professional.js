@@ -10,7 +10,7 @@
  *
  * Routes:
  *   POST   /api/professional/profile            - Enable/create professional profile
- *   GET    /api/professional/profile/me          - Get my professional profile
+ *   GET    /api/professional/profile/me          - Get my professional profile (200, profile null if not enabled)
  *   PATCH  /api/professional/profile/me          - Update my professional profile
  *   DELETE /api/professional/profile/me          - Disable professional mode
  *   GET    /api/professional/:username           - Get public professional profile
@@ -169,13 +169,15 @@ router.get('/profile/me', verifyToken, async (req, res) => {
       .from('UserProfessionalProfile')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
-    if (error || !profile) {
-      return res.status(404).json({ error: 'No professional profile found. Enable professional mode to create one.' });
+    if (error) {
+      logger.error('Get my professional profile query error', { error: error.message });
+      return res.status(500).json({ error: 'Failed to fetch professional profile' });
     }
 
-    res.json({ profile });
+    // 200 + null: user has not enabled professional mode (avoid 404 in browser for normal case)
+    res.json({ profile: profile ?? null });
   } catch (err) {
     logger.error('Get my professional profile error', { error: err.message });
     res.status(500).json({ error: 'Failed to fetch professional profile' });
@@ -259,7 +261,7 @@ router.get('/discover', async (req, res) => {
       .from('UserProfessionalProfile')
       .select(`
         *,
-        user:user_id (id, username, name, first_name, last_name, profile_picture_url, city, state, average_rating, followers_count)
+        user:user_id (id, username, name, first_name, last_name, profile_picture_url, city, state, average_rating)
       `)
       .eq('is_active', true)
       .eq('is_public', true)
@@ -405,7 +407,7 @@ router.get('/:username', async (req, res) => {
     // Get user by username
     const { data: user } = await supabaseAdmin
       .from('User')
-      .select('id, username, name, first_name, last_name, profile_picture_url, city, state, average_rating, followers_count')
+      .select('id, username, name, first_name, last_name, profile_picture_url, city, state, average_rating')
       .eq('username', username)
       .single();
 
@@ -471,7 +473,6 @@ router.get('/:username', async (req, res) => {
         profile_picture_url: user.profile_picture_url,
         city: user.city,
         state: user.state,
-        followers_count: user.followers_count || 0,
       },
       professional: {
         headline: profile.headline,

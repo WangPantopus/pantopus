@@ -70,10 +70,30 @@ function connectSocket(token, opts = {}) {
       forceNew: true,
       ...opts,
     });
-    socket.on('connect', () => resolve(socket));
-    socket.on('connect_error', (err) => reject(err));
-    // Auto-timeout
-    setTimeout(() => reject(new Error('Socket connect timeout')), 5000);
+    const cleanup = () => {
+      clearTimeout(timer);
+      socket.off('connect', onConnect);
+      socket.off('connect_error', onConnectError);
+    };
+    const onConnect = () => {
+      cleanup();
+      resolve(socket);
+    };
+    const onConnectError = (err) => {
+      cleanup();
+      socket.disconnect();
+      reject(err);
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      socket.disconnect();
+      reject(new Error('Socket connect timeout'));
+    }, 5000);
+    if (typeof timer.unref === 'function') {
+      timer.unref();
+    }
+    socket.once('connect', onConnect);
+    socket.once('connect_error', onConnectError);
   });
 }
 

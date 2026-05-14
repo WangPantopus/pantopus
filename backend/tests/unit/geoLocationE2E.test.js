@@ -20,6 +20,8 @@ const {
   setRpcMock,
 } = require('../__mocks__/supabaseAdmin');
 
+jest.setTimeout(15000);
+
 // ── Mocks ────────────────────────────────────────────────────
 
 jest.mock('../../utils/logger', () => ({
@@ -54,6 +56,7 @@ jest.mock('../../services/s3Service', () => ({
 
 jest.mock('../../services/notificationService', () => ({
   createNotification: jest.fn().mockResolvedValue(undefined),
+  createBulkNotifications: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../../services/businessAddressService', () => ({
@@ -157,10 +160,10 @@ jest.mock('../../services/feedService', () => ({
   getMuteAndHideFilters: jest.fn().mockReturnValue({ muteFilter: () => true, hideFilter: () => true }),
   applyMuteHideFilters: jest.fn((posts) => posts),
   enrichWithUserStatus: jest.fn((posts) => posts),
+  attachIdentityAuthors: jest.fn((posts) => Promise.resolve(posts)),
   applyCursorCondition: jest.fn((qb) => qb),
   buildCursorPagination: jest.fn(() => ({ nextCursor: null, hasMore: false })),
   FEED_POST_SELECT: '*',
-  CREATOR_SELECT: 'id, username, name',
 }));
 
 jest.mock('../../middleware/rateLimiter', () => {

@@ -15,6 +15,7 @@ from src.sources.seasonal import (
     SeasonalSource,
     _tip_hash,
     get_active_seasons,
+    is_tip_active,
 )
 
 PACIFIC = ZoneInfo("America/Los_Angeles")
@@ -134,16 +135,16 @@ class TestSeasonalSourceFetch:
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
 
         winter = next(s for s in SEASONAL_CALENDAR if s["name"] == "winter_ice")
-        all_hashes = [_tip_hash(t) for t in winter["tips"]]
+        active_tips = [t for t in winter["tips"] if is_tip_active(t, 1, 15)]
 
         # Mark all but one tip as used
-        used = all_hashes[:-1]
+        used = [_tip_hash(t) for t in active_tips[:-1]]
         src = SeasonalSource(_make_config(), recently_used_tip_hashes=used)
         items = src.fetch()
 
         assert len(items) == 1
         # The returned tip should be the one NOT in the used set
-        assert items[0].title == winter["tips"][-1]
+        assert items[0].title == active_tips[-1]
 
     @patch("src.sources.seasonal.datetime")
     def test_falls_back_when_all_tips_used(self, mock_dt):
@@ -159,6 +160,40 @@ class TestSeasonalSourceFetch:
         # Should still return something (random fallback)
         assert len(items) == 1
         assert items[0].title in winter["tips"]
+
+    @patch("src.sources.seasonal.datetime")
+    def test_does_not_publish_early_march_tip_in_late_april(self, mock_dt):
+        mock_dt.now.return_value = _mock_now(4, 20)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+
+        spring = next(s for s in SEASONAL_CALENDAR if s["name"] == "spring_cleanup")
+        stale_tip = next(t for t in spring["tips"] if "early March" in t)
+        used = [
+            _tip_hash(t)
+            for t in spring["tips"]
+            if t != stale_tip and is_tip_active(t, 4, 20)
+        ]
+
+        src = SeasonalSource(_make_config(), recently_used_tip_hashes=used)
+        items = src.fetch()
+
+        assert len(items) == 1
+        assert "early March" not in items[0].title
+
+    @patch("src.sources.seasonal.datetime")
+    def test_can_publish_early_march_tip_during_early_march(self, mock_dt):
+        mock_dt.now.return_value = _mock_now(3, 5)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+
+        spring = next(s for s in SEASONAL_CALENDAR if s["name"] == "spring_cleanup")
+        stale_tip = next(t for t in spring["tips"] if "early March" in t)
+        used = [_tip_hash(t) for t in spring["tips"] if t != stale_tip]
+
+        src = SeasonalSource(_make_config(), recently_used_tip_hashes=used)
+        items = src.fetch()
+
+        assert len(items) == 1
+        assert items[0].title == stale_tip
 
 
 # ---------------------------------------------------------------------------

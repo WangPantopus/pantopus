@@ -788,12 +788,12 @@ router.get('/discover', verifyToken, async (req, res) => {
     // 1) Candidate business users
     const { data: businesses, error: bizErr } = await supabaseAdmin
       .from('User')
-      .select('id, username, name, profile_picture_url, city, state, followers_count, average_rating, review_count')
+      .select('id, username, name, profile_picture_url, city, state, average_rating, review_count')
       .eq('account_type', 'business')
       .or(
         `username.ilike.${fullSearchTerm},name.ilike.${fullSearchTerm},city.ilike.${fullSearchTerm},state.ilike.${fullSearchTerm},username.ilike.${broadSearchTerm},name.ilike.${broadSearchTerm},city.ilike.${broadSearchTerm},state.ilike.${broadSearchTerm}`
       )
-      .order('followers_count', { ascending: false })
+      .order('review_count', { ascending: false })
       .range(0, candidateLimit - 1);
 
     if (bizErr) {
@@ -821,15 +821,15 @@ router.get('/discover', verifyToken, async (req, res) => {
         .in('business_user_id', businessIds)
         .eq('is_primary', true),
       supabaseAdmin
-        .from('UserFollow')
-        .select('following_id')
-        .eq('follower_id', viewerId)
-        .in('following_id', businessIds),
+        .from('BusinessFollow')
+        .select('business_user_id')
+        .eq('user_id', viewerId)
+        .in('business_user_id', businessIds),
     ]);
 
     const profileMap = new Map((profiles || []).map((p) => [p.business_user_id, p]));
     const locationMap = new Map((primaryLocations || []).map((l) => [l.business_user_id, l]));
-    const followingSet = new Set((follows || []).map((f) => f.following_id));
+    const followingSet = new Set((follows || []).map((f) => f.business_user_id));
 
     const ranked = rows
       .filter((b) => profileMap.has(b.id))
@@ -874,7 +874,6 @@ router.get('/discover', verifyToken, async (req, res) => {
           profile_picture_url: b.profile_picture_url,
           city,
           state,
-          followers_count: b.followers_count || 0,
           average_rating: b.average_rating || 0,
           review_count: b.review_count || 0,
           business_type: businessType,
@@ -890,7 +889,7 @@ router.get('/discover', verifyToken, async (req, res) => {
       .filter((b) => tokens.every((token) => b._searchable.includes(token)))
       .sort((a, b) => {
         if (a._score !== b._score) return a._score - b._score;
-        if (a.followers_count !== b.followers_count) return b.followers_count - a.followers_count;
+        if (a.review_count !== b.review_count) return b.review_count - a.review_count;
         return String(a.username || '').localeCompare(String(b.username || ''));
       });
 
@@ -996,7 +995,7 @@ router.get('/:businessId/dashboard', verifyToken, async (req, res) => {
       { data: pages },
       profileCompleteness,
     ] = await Promise.all([
-      supabaseAdmin.from('User').select('id, username, name, email, profile_picture_url, cover_photo_url, bio, tagline, average_rating, review_count, followers_count, account_type, gigs_completed, created_at').eq('id', businessId).single(),
+      supabaseAdmin.from('User').select('id, username, name, email, profile_picture_url, cover_photo_url, bio, tagline, average_rating, review_count, account_type, gigs_completed, created_at').eq('id', businessId).single(),
       supabaseAdmin.from('BusinessProfile').select('*').eq('business_user_id', businessId).single(),
       supabaseAdmin.from('BusinessLocation').select('*').eq('business_user_id', businessId).eq('is_active', true).order('sort_order'),
       // Firewall-safe: use BusinessSeat (no user data leaked)
@@ -3281,7 +3280,7 @@ router.get('/public/:username', async (req, res) => {
     // Get user
     const { data: bizUser, error: userErr } = await supabaseAdmin
       .from('User')
-      .select('id, username, name, email, profile_picture_url, cover_photo_url, bio, tagline, average_rating, review_count, followers_count, account_type')
+      .select('id, username, name, email, profile_picture_url, cover_photo_url, bio, tagline, average_rating, review_count, account_type')
       .eq('username', username)
       .eq('account_type', 'business')
       .single();

@@ -157,6 +157,13 @@ async function getAccessibleHomeIds(userId) {
   return (data || []).map(r => r.home_id);
 }
 
+function isUuid(value) {
+  if (typeof value !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value.trim(),
+  );
+}
+
 function warrantyStatus(expiresAt) {
   if (!expiresAt) return 'none';
   const exp = new Date(expiresAt);
@@ -176,7 +183,8 @@ router.get('/records/assets', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const homeId = req.query.homeId;
-    const homeIds = homeId ? [homeId] : await getAccessibleHomeIds(userId);
+    const homeIds =
+      homeId && isUuid(homeId) ? [homeId] : await getAccessibleHomeIds(userId);
     if (!homeIds.length) return res.json({ assets: [], rooms: [] });
 
     const { data: assets, error } = await supabaseAdmin
@@ -425,7 +433,8 @@ router.get('/map/pins', verifyToken, async (req, res) => {
     const userId = req.user.id;
     const homeId = req.query.homeId;
     const pinType = req.query.type;
-    const homeIds = homeId ? [homeId] : await getAccessibleHomeIds(userId);
+    const homeIds =
+      homeId && isUuid(homeId) ? [homeId] : await getAccessibleHomeIds(userId);
     if (!homeIds.length) return res.json({ pins: [] });
 
     let query = supabaseAdmin
@@ -823,7 +832,8 @@ router.get('/tasks', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const homeId = req.query.homeId;
-    const homeIds = homeId ? [homeId] : await getAccessibleHomeIds(userId);
+    const homeIds =
+      homeId && isUuid(homeId) ? [homeId] : await getAccessibleHomeIds(userId);
     if (!homeIds.length) return res.json({ active: [], completed: [] });
 
     const { data: tasks, error } = await supabaseAdmin

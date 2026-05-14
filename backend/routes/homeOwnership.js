@@ -25,6 +25,7 @@ const householdClaimConfig = require('../config/householdClaims');
 const { ownershipClaimLimiter, postcardLimiter, verificationAttemptLimiter } = require('../middleware/rateLimiter');
 const logger = require('../utils/logger');
 const { findHomeOwnerRowForClaimant } = require('../utils/homeOwnerRowLookup');
+const { getClaimMergeRoleForClaim } = require('../utils/homeClaimMergeRoles');
 
 // ============================================================
 // VALIDATION SCHEMAS
@@ -99,7 +100,7 @@ async function markHomeSecurityDisputed(_homeId) {
 }
 
 async function getVerifiedHouseholdAuthority(homeId, userId) {
-  const [ownerResult, occupancyResult] = await Promise.all([
+  const [ownerResult, occupancyResult, homeResult] = await Promise.all([
     supabaseAdmin
       .from('HomeOwner')
       .select('id, subject_id')
@@ -114,13 +115,23 @@ async function getVerifiedHouseholdAuthority(homeId, userId) {
       .eq('user_id', userId)
       .eq('is_active', true)
       .maybeSingle(),
+    supabaseAdmin
+      .from('Home')
+      .select('id, owner_id')
+      .eq('id', homeId)
+      .maybeSingle(),
   ]);
 
   if (ownerResult.error) throw ownerResult.error;
   if (occupancyResult.error) throw occupancyResult.error;
+  if (homeResult.error) throw homeResult.error;
 
   if (ownerResult.data) {
     return { authorityType: 'owner', roleBase: 'owner' };
+  }
+
+  if (homeResult.data?.owner_id === userId) {
+    return { authorityType: 'legacy_owner', roleBase: 'owner' };
   }
 
   const occupancy = occupancyResult.data;
@@ -175,10 +186,38 @@ async function findPendingHomeInvite({
   return invite;
 }
 
-async function createRelationshipInvite({ homeId, inviterUserId, inviteeUserId, claimId }) {
+function getRelationshipInviteRole(claim) {
+  const role = getClaimMergeRoleForClaim(claim);
+  return { proposedRole: role.proposedRole, proposedRoleBase: role.proposedRoleBase };
+}
+
+function canInviteClaimAsOwner(authority) {
+  return authority?.authorityType === 'owner' || authority?.authorityType === 'legacy_owner';
+}
+
+async function createRelationshipInvite({ homeId, inviterUserId, inviteeUserId, claim }) {
+  const claimId = claim.id;
   const presetKey = `claim_merge:${claimId}`;
+  const { proposedRole, proposedRoleBase } = getRelationshipInviteRole(claim);
   const existingInvite = await findPendingHomeInvite({ homeId, inviteeUserId, presetKey });
   if (existingInvite) {
+    if (
+      existingInvite.proposed_role !== proposedRole ||
+      existingInvite.proposed_role_base !== proposedRoleBase
+    ) {
+      const { data: updatedInvite, error: updateError } = await supabaseAdmin
+        .from('HomeInvite')
+        .update({
+          proposed_role: proposedRole,
+          proposed_role_base: proposedRoleBase,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingInvite.id)
+        .select()
+        .single();
+      if (updateError) throw updateError;
+      return { invitation: updatedInvite, token: null, reused: true };
+    }
     return { invitation: existingInvite, token: null, reused: true };
   }
 
@@ -191,8 +230,8 @@ async function createRelationshipInvite({ homeId, inviterUserId, inviteeUserId, 
       home_id: homeId,
       invited_by: inviterUserId,
       invitee_user_id: inviteeUserId,
-      proposed_role: 'member',
-      proposed_role_base: 'member',
+      proposed_role: proposedRole,
+      proposed_role_base: proposedRoleBase,
       proposed_preset_key: presetKey,
       token,
       token_hash: tokenHash,
@@ -994,7 +1033,7 @@ router.post('/:id/ownership-claims/:claimId/resolve-relationship', verifyToken, 
 
     const { data: claim, error: claimError } = await supabaseAdmin
       .from('HomeOwnershipClaim')
-      .select('id, home_id, claimant_user_id, state, claim_phase_v2, terminal_reason, challenge_state, routing_classification, identity_status, merged_into_claim_id')
+      .select('id, home_id, claimant_user_id, claim_type, state, claim_phase_v2, terminal_reason, challenge_state, routing_classification, identity_status, merged_into_claim_id')
       .eq('id', claimId)
       .eq('home_id', homeId)
       .maybeSingle();
@@ -1013,11 +1052,19 @@ router.post('/:id/ownership-claims/:claimId/resolve-relationship', verifyToken, 
     }
 
     if (action === 'invite_to_household') {
+      const inviteRole = getRelationshipInviteRole(claim);
+      if (inviteRole.proposedRoleBase === 'owner' && !canInviteClaimAsOwner(authority)) {
+        return res.status(403).json({
+          error: 'Only verified owners can invite co-owners',
+          code: 'OWNER_INVITE_AUTHORITY_REQUIRED',
+        });
+      }
+
       const { invitation, token, reused } = await createRelationshipInvite({
         homeId,
         inviterUserId: userId,
         inviteeUserId: claim.claimant_user_id,
-        claimId,
+        claim,
       });
 
       const { error: updateError } = await supabaseAdmin
@@ -1059,10 +1106,15 @@ router.post('/:id/ownership-claims/:claimId/resolve-relationship', verifyToken, 
         invitation_id: invitation.id,
         authority_type: authority.authorityType,
         reused_existing_invite: reused,
+        proposed_role: invitation.proposed_role,
+        proposed_role_base: invitation.proposed_role_base,
       });
 
+      const invitedAsOwner = invitation.proposed_role_base === 'owner';
       return res.json({
-        message: 'Household invitation issued for the claimant',
+        message: invitedAsOwner
+          ? 'Co-owner invitation issued for the claimant'
+          : 'Household invitation issued for the claimant',
         action,
         claim: {
           id: claim.id,
@@ -1072,6 +1124,8 @@ router.post('/:id/ownership-claims/:claimId/resolve-relationship', verifyToken, 
           id: invitation.id,
           status: invitation.status,
           expires_at: invitation.expires_at,
+          proposed_role: invitation.proposed_role,
+          proposed_role_base: invitation.proposed_role_base,
         },
       });
     }
@@ -1193,16 +1247,20 @@ router.post('/:id/ownership-claims/:claimId/accept-merge', verifyToken, validate
     });
 
     res.json({
-      message: 'Claim merged into the verified household',
+      message: mergeResult.acceptedAsOwner
+        ? 'Ownership invitation accepted'
+        : 'Claim merged into the verified household',
       claim: {
         id: claimId,
         state: 'approved',
-        claim_phase_v2: 'merged_into_household',
-        terminal_reason: 'merged_via_invite',
+        claim_phase_v2: mergeResult.claimPhaseV2,
+        terminal_reason: mergeResult.terminalReason,
         merged_into_claim_id: mergeResult.mergedIntoClaimId,
       },
       home_resolution_state: mergeResult.homeResolutionState,
       occupancy: mergeResult.occupancy,
+      accepted_role_base: mergeResult.acceptedRoleBase,
+      accepted_as_owner: mergeResult.acceptedAsOwner,
     });
   } catch (err) {
     if (err.status) {

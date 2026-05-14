@@ -45,8 +45,14 @@ final class AppEnvironment {
 
         switch target {
         case .local:
-            apiBaseURL = Self.mustURL("http://localhost:8000")
-            socketURL = Self.mustURL("http://localhost:8000")
+            apiBaseURL = Self.bundleURL(
+                forInfoKey: "PantopusAPIBaseURL",
+                fallback: "http://localhost:8000"
+            )
+            socketURL = Self.bundleURL(
+                forInfoKey: "PantopusSocketURL",
+                fallback: "http://localhost:8000"
+            )
         case .staging:
             apiBaseURL = Self.mustURL("https://staging.api.pantopus.app")
             socketURL = Self.mustURL("https://staging.api.pantopus.app")
@@ -65,5 +71,12 @@ final class AppEnvironment {
             preconditionFailure("Invalid URL literal: \(string)")
         }
         return url
+    }
+
+    private static func bundleURL(forInfoKey key: String, fallback: String) -> URL {
+        let configured = Bundle.main.object(forInfoDictionaryKey: key) as? String
+        let trimmed = configured?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let value = trimmed.isEmpty || trimmed.hasPrefix("$(") ? fallback : trimmed
+        return mustURL(value)
     }
 }

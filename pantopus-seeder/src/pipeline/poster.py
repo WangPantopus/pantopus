@@ -37,15 +37,28 @@ def post_to_pantopus(
     access_token: str,
     content: str,
     category: str,
-    region_lat: float,
-    region_lng: float,
+    region_lat: float | None,
+    region_lng: float | None,
     media_urls: list[str] | None = None,
     media_types: list[str] | None = None,
+    audience: str = "nearby",
+    topic: str | None = None,
+    sports_scope: str | None = None,
+    post_metadata: dict | None = None,
 ) -> tuple[str | None, str | None]:
     """POST content to the Pantopus API as the curator.
 
     Returns (post_id, error_reason). On success error_reason is None.
     On failure post_id is None. Never raises.
+
+    audience:
+        'nearby' (default) — uses region_lat/region_lng as the target
+        'national' — country-scoped (US); the backend stamps
+                     distribution_targets=['country:US']. No lat/lng needed.
+    topic / sports_scope / post_metadata:
+        Optional sports-topic metadata (Phase 1). `topic='sports'` flips the
+        post into the Sports lane; `post_metadata` may include event_key,
+        team_tag, league, is_game_thread, is_watch_prompt, fresh_until.
     """
     post_type = CATEGORY_TO_POST_TYPE.get(category, "local_update")
     purpose = CATEGORY_TO_PURPOSE.get(category, "local_update")
@@ -57,10 +70,22 @@ def post_to_pantopus(
         "postType": post_type,
         "purpose": purpose,
         "visibility": "public",
-        "audience": "nearby",
-        "latitude": region_lat,
-        "longitude": region_lng,
+        "audience": audience,
     }
+
+    # National posts are country-scoped by the backend; do not send coords.
+    # Any other audience (nearby, neighborhood, etc.) requires them.
+    if audience != "national":
+        body["latitude"] = region_lat
+        body["longitude"] = region_lng
+
+    # Sports topic lane
+    if topic:
+        body["topic"] = topic
+    if sports_scope:
+        body["sportsScope"] = sports_scope
+    if post_metadata:
+        body["postMetadata"] = dict(post_metadata)
 
     # Alert posts require safetyAlertKind
     if post_type == "alert":

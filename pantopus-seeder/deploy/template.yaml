@@ -108,6 +108,100 @@ Resources:
               Resource: !Ref SeederSecret
 
   # ---------------------------------------------------------------------------
+  # Sports National Fetcher Lambda — pulls Google News items for each active
+  # major event into the seeder queue with scope='national', so the Sports
+  # National Poster has news-linked items to humanize instead of only the
+  # templated fallback starters. Event-gated; no-op when nothing is active.
+  # ---------------------------------------------------------------------------
+  SeederSportsNationalFetcherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub pantopus-seeder-sports-national-fetcher-${Environment}
+      Handler: src.handlers.sports_national_fetcher.handler
+      Description: !Sub 'Fetches Google News items for each active sports event into the national queue [${Environment}]'
+      CodeUri: ../build/
+      Timeout: 180
+      MemorySize: 256
+      Events:
+        SportsNationalFetchSchedule:
+          Type: Schedule
+          Properties:
+            Name: !Sub pantopus-seeder-sports-national-fetch-${Environment}
+            # Every 3h — enough to keep the poster's 3x/day cadence fed with
+            # fresh items without thrashing Google News or the queue.
+            Schedule: rate(3 hours)
+            Description: !Sub 'Sports national fetcher — every 3 hours [${Environment}]'
+            Enabled: true
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref SeederSecret
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cloudwatch:PutMetricData
+              Resource: '*'
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: !Sub Pantopus/SportsSeeder/${Environment}
+
+  # ---------------------------------------------------------------------------
+  # Sports Poster Lambda — posts national Sports topic threads during major events
+  # (NBA Playoffs, Super Bowl, World Cup). Event-gated via sports_events; cap,
+  # dedup, and freshness logic live in src/handlers/sports_poster.py.
+  # ---------------------------------------------------------------------------
+  SeederSportsPosterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub pantopus-seeder-sports-poster-${Environment}
+      Handler: src.handlers.sports_poster.handler
+      Description: !Sub 'Posts national Sports topic threads during active major events [${Environment}]'
+      CodeUri: ../build/
+      Timeout: 180
+      MemorySize: 256
+      Events:
+        SportsPostMorning:
+          Type: Schedule
+          Properties:
+            Name: !Sub pantopus-seeder-sports-morning-${Environment}
+            # Offset from the regular poster (14:00 UTC) by 30 min so we don't
+            # compete for auth tokens. 14:30 UTC = ~7:30am PT.
+            Schedule: cron(30 14 * * ? *)
+            Description: !Sub 'Sports national poster — morning window [${Environment}]'
+            Enabled: true
+        SportsPostMidday:
+          Type: Schedule
+          Properties:
+            Name: !Sub pantopus-seeder-sports-midday-${Environment}
+            Schedule: cron(30 19 * * ? *)
+            Description: !Sub 'Sports national poster — midday window [${Environment}]'
+            Enabled: true
+        SportsPostEvening:
+          Type: Schedule
+          Properties:
+            Name: !Sub pantopus-seeder-sports-evening-${Environment}
+            # 00:30 UTC = ~5:30pm PT — after most game tip-offs on the West coast.
+            Schedule: cron(30 0 * * ? *)
+            Description: !Sub 'Sports national poster — evening window [${Environment}]'
+            Enabled: true
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref SeederSecret
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cloudwatch:PutMetricData
+              Resource: '*'
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: !Sub Pantopus/SportsSeeder/${Environment}
+
+  # ---------------------------------------------------------------------------
   # Discovery Lambda — detects user clusters and provisions new regions
   # ---------------------------------------------------------------------------
   SeederDiscoveryFunction:
@@ -376,6 +470,18 @@ Outputs:
   PosterFunctionName:
     Description: Name of the poster Lambda function
     Value: !Ref SeederPosterFunction
+  SportsPosterFunctionArn:
+    Description: ARN of the sports poster Lambda function
+    Value: !GetAtt SeederSportsPosterFunction.Arn
+  SportsPosterFunctionName:
+    Description: Name of the sports poster Lambda function
+    Value: !Ref SeederSportsPosterFunction
+  SportsNationalFetcherFunctionArn:
+    Description: ARN of the sports national fetcher Lambda function
+    Value: !GetAtt SeederSportsNationalFetcherFunction.Arn
+  SportsNationalFetcherFunctionName:
+    Description: Name of the sports national fetcher Lambda function
+    Value: !Ref SeederSportsNationalFetcherFunction
   DiscoveryFunctionArn:
     Description: ARN of the discovery Lambda function
     Value: !GetAtt SeederDiscoveryFunction.Arn

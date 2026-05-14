@@ -25,8 +25,8 @@ final class PantopusTests: XCTestCase {
         let env = AppEnvironment.current
         switch env.target {
         case .local:
-            XCTAssertTrue(env.apiBaseURL.absoluteString.contains("localhost") ||
-                env.apiBaseURL.absoluteString.contains("127.0.0.1"))
+            XCTAssertNotNil(env.apiBaseURL.host)
+            XCTAssertTrue(["http", "https"].contains(env.apiBaseURL.scheme))
         case .staging:
             XCTAssertTrue(env.apiBaseURL.absoluteString.contains("staging"))
         case .production:
