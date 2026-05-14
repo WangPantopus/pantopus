@@ -230,6 +230,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onDisambiguateMail = { mailId ->
                         navController.navigate(ChildRoutes.disambiguateMail(mailId))
                     },
+                    onOpenMailbox = { navController.navigate(ChildRoutes.MAILBOX_LIST) },
+                    onOpenEditProfile = {
+                        navController.navigate(ChildRoutes.placeholder("Edit profile"))
+                    },
+                    onOpenPlaceholder = { label ->
+                        navController.navigate(ChildRoutes.placeholder(label))
+                    },
                 )
             }
 

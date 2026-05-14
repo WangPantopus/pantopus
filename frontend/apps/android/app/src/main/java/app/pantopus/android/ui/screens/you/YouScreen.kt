@@ -1,19 +1,8 @@
-@file:Suppress("UnusedPrivateMember", "LongMethod")
+@file:Suppress("UnusedPrivateMember", "LongMethod", "PackageNaming", "MagicNumber")
 
 package app.pantopus.android.ui.screens.you
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,20 +13,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.BuildConfig
 import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.ui.screens.you.me.MeView
 import app.pantopus.android.ui.theme.PantopusColors
-import app.pantopus.android.ui.theme.PantopusTextStyle
-import app.pantopus.android.ui.theme.Spacing
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -50,29 +33,32 @@ object YouScreenTags {
     const val EMAIL_LABEL = "youEmailLabel"
 }
 
-/** Exposes auth state + sign-out to [YouScreen]. */
+/** Auth bridge for [YouScreen]. */
 @HiltViewModel
 class YouViewModel
     @Inject
     constructor(
         private val authRepository: AuthRepository,
     ) : ViewModel() {
-        /** Live auth state. */
         val authState: StateFlow<AuthRepository.State> = authRepository.state
 
-        /** Fire-and-forget sign-out. */
         fun signOut() = viewModelScope.launch { authRepository.signOut() }
     }
 
 /**
- * Account summary + sign-out. Sign-out is gated behind a confirmation
- * dialog to prevent fat-finger tap-outs.
+ * "You" tab — the user's identity command center. Hosts [MeView] in
+ * the body and keeps the sign-out confirmation + DEBUG deep-link
+ * dialogs that the legacy screen exposed.
  *
  * @param onOpenPublicProfile Debug-build hook for the "Open public
- *     profile by ID" affordance. Wired from the nav host; no-op in
- *     release builds.
+ *     profile by ID" affordance.
  * @param onOpenPulsePost Debug-build hook for the "Open Pulse post by
  *     ID" affordance.
+ * @param onOpenMailbox Pushed by the Personal Mail action tile.
+ * @param onOpenPlaceholder Catch-all for action / section taps whose
+ *     dedicated screen doesn't exist yet.
+ * @param onOpenEditProfile Pushed by the Personal "Edit profile"
+ *     section row.
  */
 @Composable
 fun YouScreen(
@@ -81,6 +67,9 @@ fun YouScreen(
     onOpenPulsePost: (String) -> Unit = {},
     onInviteOwner: (String, String) -> Unit = { _, _ -> },
     onDisambiguateMail: (String) -> Unit = {},
+    onOpenPlaceholder: (String) -> Unit = {},
+    onOpenMailbox: () -> Unit = {},
+    onOpenEditProfile: () -> Unit = {},
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
     val signedIn = state as? AuthRepository.State.SignedIn
@@ -94,90 +83,25 @@ fun YouScreen(
     var debugInviteHomeId by remember { mutableStateOf("") }
     var debugDisambiguateMailId by remember { mutableStateOf("") }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(PantopusColors.appBg)
-                .padding(Spacing.s6),
-        verticalArrangement = Arrangement.Top,
-    ) {
-        Text(
-            "You",
-            style = PantopusTextStyle.h2,
-            color = PantopusColors.appText,
-            modifier = Modifier.semantics { heading() },
-        )
-        Spacer(Modifier.height(Spacing.s4))
-
-        signedIn?.user?.let { user ->
-            Text(
-                "Email: ${user.email}",
-                style = PantopusTextStyle.body,
-                color = PantopusColors.appText,
-                modifier =
-                    Modifier
-                        .testTag(YouScreenTags.EMAIL_LABEL)
-                        .semantics { contentDescription = "Email: ${user.email}" },
-            )
-            Text(
-                "User ID: ${user.id}",
-                style = PantopusTextStyle.small,
-                color = PantopusColors.appTextSecondary,
-            )
-        }
-        Spacer(Modifier.height(Spacing.s6))
-
-        Button(
-            onClick = { confirmVisible = true },
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                ),
-            modifier =
-                Modifier
-                    .testTag(YouScreenTags.SIGN_OUT_BUTTON)
-                    .sizeIn(minHeight = 48.dp)
-                    .semantics { contentDescription = "Sign out of Pantopus" },
-        ) {
-            Text("Sign out")
-        }
-
-        if (BuildConfig.DEBUG) {
-            Spacer(Modifier.height(Spacing.s6))
-            Text(
-                "Debug",
-                style = PantopusTextStyle.overline,
-                color = PantopusColors.appTextSecondary,
-            )
-            Spacer(Modifier.height(Spacing.s2))
-            TextButton(
-                onClick = { debugProfileDialog = true },
-                modifier = Modifier.testTag("youDebugOpenProfile"),
-            ) {
-                Text("Open public profile by ID", color = PantopusColors.primary600)
+    MeView(
+        onAction = { tile ->
+            when (tile.routeKey) {
+                "me.mail" -> onOpenMailbox()
+                else -> onOpenPlaceholder(tile.label)
             }
-            TextButton(
-                onClick = { debugPostDialog = true },
-                modifier = Modifier.testTag("youDebugOpenPost"),
-            ) {
-                Text("Open Pulse post by ID", color = PantopusColors.primary600)
+        },
+        onSection = { row ->
+            when (row.routeKey) {
+                "me.editProfile" -> onOpenEditProfile()
+                "me.debug.openProfile" -> if (BuildConfig.DEBUG) debugProfileDialog = true
+                "me.debug.openPost" -> if (BuildConfig.DEBUG) debugPostDialog = true
+                "me.debug.inviteOwner" -> if (BuildConfig.DEBUG) debugInviteDialog = true
+                "me.debug.disambiguate" -> if (BuildConfig.DEBUG) debugDisambiguateDialog = true
+                else -> onOpenPlaceholder(row.label)
             }
-            TextButton(
-                onClick = { debugInviteDialog = true },
-                modifier = Modifier.testTag("youDebugInviteOwner"),
-            ) {
-                Text("Invite owner to home by ID", color = PantopusColors.primary600)
-            }
-            TextButton(
-                onClick = { debugDisambiguateDialog = true },
-                modifier = Modifier.testTag("youDebugDisambiguate"),
-            ) {
-                Text("Disambiguate mail by ID", color = PantopusColors.primary600)
-            }
-        }
-    }
+        },
+        onLogOut = { confirmVisible = true },
+    )
 
     if (confirmVisible) {
         AlertDialog(
@@ -194,9 +118,7 @@ fun YouScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmVisible = false }) {
-                    Text("Cancel")
-                }
+                TextButton(onClick = { confirmVisible = false }) { Text("Cancel") }
             },
         )
     }
@@ -313,11 +235,4 @@ fun YouScreen(
             },
         )
     }
-}
-
-@Preview(showBackground = true, widthDp = 360, heightDp = 640)
-@Composable
-private fun YouScreenPreview() {
-    // Preview won't provide a real AuthRepository; skip the composable body.
-    Text("YouScreen preview — runtime Hilt graph required")
 }

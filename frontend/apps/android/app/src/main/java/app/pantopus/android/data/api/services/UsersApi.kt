@@ -4,6 +4,7 @@ import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.models.users.ProfileResponse
 import app.pantopus.android.data.api.models.users.ProfileUpdateRequest
 import app.pantopus.android.data.api.models.users.ProfileUpdateResponse
+import app.pantopus.android.data.api.models.users.UserStatsDto
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
@@ -11,11 +12,11 @@ import retrofit2.http.Path
 
 /** User profile routes from `backend/routes/users.js`. */
 interface UsersApi {
-    /** `GET /api/users/profile` — route `backend/routes/users.js:1427`. */
+    /** `GET /api/users/profile` — route `backend/routes/users.js:1962`. */
     @GET("api/users/profile")
     suspend fun profile(): ProfileResponse
 
-    /** `PATCH /api/users/profile` — route `backend/routes/users.js:1503`. */
+    /** `PATCH /api/users/profile` — route `backend/routes/users.js:2052`. */
     @PATCH("api/users/profile")
     suspend fun updateProfile(
         @Body body: ProfileUpdateRequest,
@@ -26,4 +27,10 @@ interface UsersApi {
     suspend fun publicProfile(
         @Path("id") id: String,
     ): PublicProfileDto
+
+    /** `GET /api/users/:id/stats` — route `backend/routes/users.js:2787`. */
+    @GET("api/users/{id}/stats")
+    suspend fun stats(
+        @Path("id") id: String,
+    ): UserStatsDto
 }

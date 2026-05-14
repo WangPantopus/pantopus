@@ -109,3 +109,16 @@ data class ProfileUpdateResponse(
     val message: String,
     val user: UserProfile,
 )
+
+/**
+ * `GET /api/users/:id/stats` envelope — route
+ * `backend/routes/users.js:2787`.
+ */
+@JsonClass(generateAdapter = true)
+data class UserStatsDto(
+    @Json(name = "total_gigs_posted") val totalGigsPosted: Int = 0,
+    @Json(name = "total_gigs_completed") val totalGigsCompleted: Int = 0,
+    @Json(name = "total_earnings") val totalEarnings: Double = 0.0,
+    @Json(name = "average_rating") val averageRating: Double = 0.0,
+    @Json(name = "total_ratings") val totalRatings: Int = 0,
+)
