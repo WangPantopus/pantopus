@@ -27,6 +27,12 @@ sealed class AnalyticsEvent(
 
     data object ScreenMyClaimsViewed : AnalyticsEvent("screen.my_claims.viewed")
 
+    data class ScreenPulseFeedViewed(
+        val intent: String,
+    ) : AnalyticsEvent("screen.pulse_feed.viewed") {
+        override val properties = mapOf("intent" to intent)
+    }
+
     data object CtaMailboxItemLogReceived : AnalyticsEvent("cta.mailbox_item.log_received")
 
     data object CtaAddHomeSubmit : AnalyticsEvent("cta.add_home.submit")

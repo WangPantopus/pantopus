@@ -27,6 +27,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenAddHomeWizardStepViewed(stepNumber: Int, stepName: String)
     case screenClaimOwnershipStepViewed(stepName: String)
     case screenMyClaimsViewed
+    case screenPulseFeedViewed(intent: String)
     case ctaHubActionStripTapped(label: String)
     case ctaHubPillarTapped(pillar: String)
     case ctaMailboxItemLogReceived
@@ -49,6 +50,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenAddHomeWizardStepViewed: "screen.add_home_wizard.step_viewed"
         case .screenClaimOwnershipStepViewed: "screen.claim_ownership_wizard.step_viewed"
         case .screenMyClaimsViewed: "screen.my_claims.viewed"
+        case .screenPulseFeedViewed: "screen.pulse_feed.viewed"
         case .ctaHubActionStripTapped: "cta.hub.action_strip_tapped"
         case .ctaHubPillarTapped: "cta.hub.pillar_tapped"
         case .ctaMailboxItemLogReceived: "cta.mailbox_item.log_received"
@@ -73,6 +75,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["label": label]
         case let .ctaHubPillarTapped(pillar):
             ["pillar": pillar]
+        case let .screenPulseFeedViewed(intent):
+            ["intent": intent]
         case let .ctaClaimOwnershipSubmit(result):
             ["result": result.rawValue]
         case let .formEditProfileSubmit(result):

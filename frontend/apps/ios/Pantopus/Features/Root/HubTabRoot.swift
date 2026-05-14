@@ -21,6 +21,10 @@ public enum HubRoute: Hashable {
     case homeDashboard(homeId: String)
     case publicProfile(userId: String)
     case pulsePost(postId: String)
+    /// Pulse tab (T1.2). Reached from Hub → pillar(.pulse).
+    case pulseFeed
+    /// Compose post target — placeholder until the compose flow ships.
+    case composePost(intent: String)
     /// Bell icon target. Replaced by the real notifications screen in T4.1.
     case notifications
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
@@ -73,7 +77,7 @@ public struct HubTabRoot: View {
             case .action(.postTask): path.append(.placeholder(label: "Post a gig"))
             case .action(.snapAndSell): path.append(.placeholder(label: "Snap & sell"))
             case .pillar(.mail): path.append(.mailbox)
-            case .pillar(.pulse): path.append(.placeholder(label: "Pulse"))
+            case .pillar(.pulse): path.append(.pulseFeed)
             case .pillar(.gigs): path.append(.placeholder(label: "Gigs"))
             case .pillar(.marketplace): path.append(.placeholder(label: "Marketplace"))
             case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
@@ -231,6 +235,18 @@ public struct HubTabRoot: View {
             )
         case let .drawerDetail(drawer):
             NotYetAvailableView(tabName: "Drawer · \(drawer)", icon: .mailbox)
+        case .pulseFeed:
+            FeedView(
+                onOpenPost: { postId in
+                    Task { @MainActor in push(.pulsePost(postId: postId)) }
+                },
+                onCompose: { intent in
+                    Task { @MainActor in push(.composePost(intent: intent.rawValue)) }
+                },
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
+        case let .composePost(intent):
+            NotYetAvailableView(tabName: "Compose · \(intent.capitalized)", icon: .pencil)
         case .notifications:
             NotYetAvailableView(tabName: "Notifications", icon: .bell)
         case .menu:

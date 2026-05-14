@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Edit
@@ -27,6 +29,11 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
@@ -106,6 +113,14 @@ enum class PantopusIcon(
     Heart("heart"),
     ThumbsUp("thumbs-up"),
     Star("star"),
+    HelpCircle("help-circle"),
+    Calendar("calendar"),
+    Lightbulb("lightbulb"),
+    Eye("eye"),
+    Share("share"),
+    Radio("radio"),
+    MapPin("map-pin"),
+    Pencil("pencil"),
     ;
 
     companion object {
@@ -185,6 +200,14 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Heart -> IconSource.Material(Icons.Filled.Favorite)
         PantopusIcon.ThumbsUp -> IconSource.Material(Icons.Filled.ThumbUp)
         PantopusIcon.Star -> IconSource.Material(Icons.Filled.Star)
+        PantopusIcon.HelpCircle -> IconSource.Material(Icons.AutoMirrored.Filled.Help)
+        PantopusIcon.Calendar -> IconSource.Material(Icons.Filled.DateRange)
+        PantopusIcon.Lightbulb -> IconSource.Material(Icons.Filled.Lightbulb)
+        PantopusIcon.Eye -> IconSource.Material(Icons.Filled.Visibility)
+        PantopusIcon.Share -> IconSource.Material(Icons.Filled.Share)
+        PantopusIcon.Radio -> IconSource.Material(Icons.Filled.Public)
+        PantopusIcon.MapPin -> IconSource.Material(Icons.Filled.LocationOn)
+        PantopusIcon.Pencil -> IconSource.Material(Icons.Filled.Edit)
     }
 
 /**

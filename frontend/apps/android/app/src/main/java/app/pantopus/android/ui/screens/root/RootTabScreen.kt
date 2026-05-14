@@ -36,6 +36,8 @@ import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.feed.FeedScreen
+import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
@@ -89,6 +91,13 @@ private object ChildRoutes {
     const val PLACEHOLDER_LABEL_KEY = "label"
     const val PLACEHOLDER = "_placeholder/generic?$PLACEHOLDER_LABEL_KEY={$PLACEHOLDER_LABEL_KEY}"
 
+    /** Pulse tab (T1.2). Reached from Hub → pillar(.Pulse). */
+    const val PULSE_FEED = "feed/pulse"
+
+    /** Compose post target — placeholder until the compose flow ships. */
+    const val COMPOSE_INTENT_KEY = "intent"
+    const val COMPOSE_POST = "feed/compose?$COMPOSE_INTENT_KEY={$COMPOSE_INTENT_KEY}"
+
     /** Debug-only route reached via 5-tap easter egg on the Hub. */
     const val TOKEN_GALLERY = "_debug/token-gallery"
 
@@ -122,6 +131,10 @@ private object ChildRoutes {
     /** Build the generic placeholder path with an encoded label. */
     fun placeholder(label: String): String =
         "_placeholder/generic?$PLACEHOLDER_LABEL_KEY=${java.net.URLEncoder.encode(label, "UTF-8")}"
+
+    /** Build the compose-post path with the pre-fill intent encoded. */
+    fun composePost(intent: String): String =
+        "feed/compose?$COMPOSE_INTENT_KEY=${java.net.URLEncoder.encode(intent, "UTF-8")}"
 }
 
 /**
@@ -187,7 +200,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     PillarTile.Pillar.Mail ->
                                         navController.navigate(ChildRoutes.MAILBOX_LIST)
                                     PillarTile.Pillar.Pulse ->
-                                        navController.navigate(ChildRoutes.placeholder("Pulse"))
+                                        navController.navigate(ChildRoutes.PULSE_FEED)
                                     PillarTile.Pillar.Marketplace ->
                                         navController.navigate(ChildRoutes.placeholder("Marketplace"))
                                     PillarTile.Pillar.Gigs ->
@@ -311,6 +324,30 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.placeholder("Drawer · $drawer"))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.PULSE_FEED) {
+                FeedScreen(
+                    onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
+                    onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.COMPOSE_POST,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.COMPOSE_INTENT_KEY) {
+                            type = NavType.StringType
+                            defaultValue = PulseIntent.All.key
+                        },
+                    ),
+            ) { entry ->
+                val raw = entry.arguments?.getString(ChildRoutes.COMPOSE_INTENT_KEY) ?: PulseIntent.All.key
+                val intent = PulseIntent.fromKey(raw)
+                NotYetAvailableView(
+                    tabName = "Compose · ${intent.label}",
+                    icon = PantopusIcon.Pencil,
                 )
             }
             composable(ChildRoutes.NOTIFICATIONS) {
