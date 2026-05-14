@@ -125,7 +125,7 @@ class PublicProfileViewModelTest {
     @Test fun connect_sends_request_and_marks_succeeded() =
         runTest {
             coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile())
-            coEvery { relationships.sendRequest("u1") } returns
+            coEvery { relationships.sendRequest("u1", null) } returns
                 NetworkResult.Success(ConnectionRequestResponse(message = "ok"))
             val vm = makeVm()
             vm.load()
@@ -137,7 +137,7 @@ class PublicProfileViewModelTest {
     @Test fun connect_failure_surfaces_toast() =
         runTest {
             coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile())
-            coEvery { relationships.sendRequest("u1") } returns
+            coEvery { relationships.sendRequest("u1", null) } returns
                 NetworkResult.Failure(NetworkError.Forbidden)
             val vm = makeVm()
             vm.load()

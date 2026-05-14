@@ -115,8 +115,9 @@ public final class PublicProfileViewModel {
         connectState = .inFlight
         let body = ConnectionRequestBody(addresseeId: userId)
         do {
-            let _: ConnectionRequestResponse = try await client.request(
-                RelationshipsEndpoints.sendRequest(body: body)
+            _ = try await client.request(
+                RelationshipsEndpoints.sendRequest(body: body),
+                as: ConnectionRequestResponse.self
             )
             connectState = .succeeded
             toastMessage = "Connection request sent"
@@ -138,7 +139,10 @@ public final class PublicProfileViewModel {
         guard blockState != .inFlight else { return }
         blockState = .inFlight
         do {
-            _ = try await client.request(BlocksEndpoints.block(userId: userId))
+            _ = try await client.request(
+                BlocksEndpoints.block(userId: userId),
+                as: EmptyResponse.self
+            )
             blockState = .succeeded
             toastMessage = "User blocked"
         } catch let error as APIError {
