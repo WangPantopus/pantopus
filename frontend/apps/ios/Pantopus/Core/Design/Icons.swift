@@ -67,6 +67,9 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case radio
     case mapPin = "map-pin"
     case pencil
+    case briefcase
+    case gavel
+    case slidersHorizontal = "sliders-horizontal"
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
@@ -123,6 +126,9 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .radio: "antenna.radiowaves.left.and.right"
         case .mapPin: "mappin"
         case .pencil: "pencil"
+        case .briefcase: "briefcase"
+        case .gavel: "hammer.fill"
+        case .slidersHorizontal: "slider.horizontal.3"
         }
     }
 }

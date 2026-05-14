@@ -25,6 +25,12 @@ public enum HubRoute: Hashable {
     case pulseFeed
     /// Compose post target — placeholder until the compose flow ships.
     case composePost(intent: String)
+    /// Gigs feed (T2.3). Reached from Hub → pillar(.gigs).
+    case gigsFeed
+    /// Gig detail target — placeholder until the Transactional Detail (T2.6) ships.
+    case gigDetail(gigId: String)
+    /// Compose gig target — placeholder until the compose flow ships.
+    case composeGig(category: String)
     /// Bell icon target. Replaced by the real notifications screen in T4.1.
     case notifications
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
@@ -78,7 +84,7 @@ public struct HubTabRoot: View {
             case .action(.snapAndSell): path.append(.placeholder(label: "Snap & sell"))
             case .pillar(.mail): path.append(.mailbox)
             case .pillar(.pulse): path.append(.pulseFeed)
-            case .pillar(.gigs): path.append(.placeholder(label: "Gigs"))
+            case .pillar(.gigs): path.append(.gigsFeed)
             case .pillar(.marketplace): path.append(.placeholder(label: "Marketplace"))
             case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
             case let .jumpBackIn(item): path.append(Self.route(forJumpBackIn: item))
@@ -113,8 +119,11 @@ public struct HubTabRoot: View {
         if path.hasPrefix("/app/chat") {
             return .placeholder(label: "Messages")
         }
+        if path.hasPrefix("/gigs/new") {
+            return .composeGig(category: GigsCategory.all.rawValue)
+        }
         if path.hasPrefix("/gigs") {
-            return .placeholder(label: "Post a gig")
+            return .gigsFeed
         }
         return .placeholder(label: item.title)
     }
@@ -247,6 +256,23 @@ public struct HubTabRoot: View {
             )
         case let .composePost(intent):
             NotYetAvailableView(tabName: "Compose · \(intent.capitalized)", icon: .pencil)
+        case .gigsFeed:
+            GigsFeedView(
+                onOpenGig: { gigId in
+                    Task { @MainActor in push(.gigDetail(gigId: gigId)) }
+                },
+                onCompose: { category in
+                    Task { @MainActor in push(.composeGig(category: category.rawValue)) }
+                },
+                onOpenMap: { Task { @MainActor in push(.placeholder(label: "Map & list")) } },
+                onOpenSearch: { Task { @MainActor in push(.placeholder(label: "Gig search")) } },
+                onOpenFilters: { Task { @MainActor in push(.placeholder(label: "Gig filters")) } },
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
+        case let .gigDetail(gigId):
+            NotYetAvailableView(tabName: "Gig · \(gigId)", icon: .briefcase)
+        case let .composeGig(category):
+            NotYetAvailableView(tabName: "Post a task · \(category.capitalized)", icon: .pencil)
         case .notifications:
             NotYetAvailableView(tabName: "Notifications", icon: .bell)
         case .menu:

@@ -38,6 +38,8 @@ import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_K
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
 import app.pantopus.android.ui.screens.feed.FeedScreen
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
+import app.pantopus.android.ui.screens.gigs.GigsCategory
+import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
@@ -100,6 +102,17 @@ private object ChildRoutes {
     /** Pulse tab (T1.2). Reached from Hub → pillar(.Pulse). */
     const val PULSE_FEED = "feed/pulse"
 
+    /** Gigs feed (T2.3). Reached from Hub → pillar(.Gigs). */
+    const val GIGS_FEED = "gigs/feed"
+
+    /** Gig detail target — placeholder until T2.6 Transactional Detail. */
+    const val GIG_DETAIL_ID_KEY = "gigId"
+    const val GIG_DETAIL = "gigs/{$GIG_DETAIL_ID_KEY}"
+
+    /** Compose gig target — placeholder until the compose flow ships. */
+    const val COMPOSE_GIG_CATEGORY_KEY = "category"
+    const val COMPOSE_GIG = "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY={$COMPOSE_GIG_CATEGORY_KEY}"
+
     /** Chat conversation (T2.2). Reached from Inbox → row tap. */
     const val CHAT_KIND_KEY = "kind"
     const val CHAT_ID_KEY = "id"
@@ -159,6 +172,13 @@ private object ChildRoutes {
     /** Build the compose-post path with the pre-fill intent encoded. */
     fun composePost(intent: String): String =
         "feed/compose?$COMPOSE_INTENT_KEY=${java.net.URLEncoder.encode(intent, "UTF-8")}"
+
+    /** Build the gig-detail path. */
+    fun gigDetail(gigId: String): String = "gigs/$gigId"
+
+    /** Build the compose-gig path with the active category pre-fill. */
+    fun composeGig(category: String): String =
+        "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
 
     /** Build the chat-conversation path with all header context encoded. */
     fun chatConversation(row: ConversationRowContent): String {
@@ -252,7 +272,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     PillarTile.Pillar.Marketplace ->
                                         navController.navigate(ChildRoutes.placeholder("Marketplace"))
                                     PillarTile.Pillar.Gigs ->
-                                        navController.navigate(ChildRoutes.placeholder("Gigs"))
+                                        navController.navigate(ChildRoutes.GIGS_FEED)
                                 }
                             is HubNavigationIntent.DiscoveryTapped ->
                                 routeForDiscovery(intent.item).also { navController.navigate(it) }
@@ -461,6 +481,38 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onBack = { navController.popBackStack() },
                 )
             }
+            composable(ChildRoutes.GIGS_FEED) {
+                GigsFeedScreen(
+                    onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
+                    onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
+                    onOpenMap = { navController.navigate(ChildRoutes.placeholder("Map & list")) },
+                    onOpenSearch = { navController.navigate(ChildRoutes.placeholder("Gig search")) },
+                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Gig filters")) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.GIG_DETAIL,
+                arguments = listOf(navArgument(ChildRoutes.GIG_DETAIL_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val gigId = entry.arguments?.getString(ChildRoutes.GIG_DETAIL_ID_KEY) ?: ""
+                NotYetAvailableView(tabName = "Gig · $gigId", icon = PantopusIcon.Briefcase)
+            }
+            composable(
+                route = ChildRoutes.COMPOSE_GIG,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.COMPOSE_GIG_CATEGORY_KEY) {
+                            type = NavType.StringType
+                            defaultValue = GigsCategory.All.key
+                        },
+                    ),
+            ) { entry ->
+                val raw = entry.arguments?.getString(ChildRoutes.COMPOSE_GIG_CATEGORY_KEY) ?: GigsCategory.All.key
+                val label =
+                    GigsCategory.entries.firstOrNull { it.key == raw }?.label ?: raw.replaceFirstChar { it.uppercase() }
+                NotYetAvailableView(tabName = "Post a task · $label", icon = PantopusIcon.Pencil)
+            }
             composable(
                 route = ChildRoutes.COMPOSE_POST,
                 arguments =
@@ -608,7 +660,8 @@ private fun routeForJumpBackIn(item: JumpBackItem): String {
     if (path.startsWith("/app/mailbox")) return ChildRoutes.MAILBOX_LIST
     homeIdFromRoute(path)?.let { return ChildRoutes.homeDashboard(it) }
     if (path.startsWith("/app/chat")) return ChildRoutes.placeholder("Messages")
-    if (path.startsWith("/gigs")) return ChildRoutes.placeholder("Post a gig")
+    if (path.startsWith("/gigs/new")) return ChildRoutes.composeGig(GigsCategory.All.key)
+    if (path.startsWith("/gigs")) return ChildRoutes.GIGS_FEED
     return ChildRoutes.placeholder(item.title)
 }
 

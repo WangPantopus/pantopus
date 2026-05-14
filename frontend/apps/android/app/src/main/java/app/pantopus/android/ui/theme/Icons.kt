@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -49,7 +50,9 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.outlined.Inbox
@@ -121,6 +124,9 @@ enum class PantopusIcon(
     Radio("radio"),
     MapPin("map-pin"),
     Pencil("pencil"),
+    Briefcase("briefcase"),
+    Gavel("gavel"),
+    SlidersHorizontal("sliders-horizontal"),
     ;
 
     companion object {
@@ -208,6 +214,9 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Radio -> IconSource.Material(Icons.Filled.Public)
         PantopusIcon.MapPin -> IconSource.Material(Icons.Filled.LocationOn)
         PantopusIcon.Pencil -> IconSource.Material(Icons.Filled.Edit)
+        PantopusIcon.Briefcase -> IconSource.Material(Icons.Filled.Work)
+        PantopusIcon.Gavel -> IconSource.Material(Icons.Filled.Gavel)
+        PantopusIcon.SlidersHorizontal -> IconSource.Material(Icons.Filled.Tune)
     }
 
 /**
