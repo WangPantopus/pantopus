@@ -127,11 +127,17 @@ class HubViewModel
                                     meta = it.meta,
                                     category = it.category,
                                     avatarInitials = initials(it.title),
+                                    kind = DiscoveryKind.fromRawType(it.type),
                                 )
                             },
                         jumpBackIn =
                             hub.jumpBackIn.take(2).map {
-                                JumpBackItem(id = it.title, title = it.title, icon = iconFromRaw(it.icon))
+                                JumpBackItem(
+                                    id = it.title,
+                                    title = it.title,
+                                    icon = iconFromRaw(it.icon),
+                                    route = it.route,
+                                )
                             },
                         activity =
                             hub.activity.take(3).map {

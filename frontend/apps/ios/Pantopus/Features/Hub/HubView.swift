@@ -108,8 +108,8 @@ enum HubNavigationIntent {
     case action(ActionChipContent.Kind)
     case startVerification
     case pillar(PillarTile.Pillar)
-    case openDiscovery(String)
-    case jumpBackIn(String)
+    case openDiscovery(DiscoveryCardContent)
+    case jumpBackIn(JumpBackItem)
 }
 
 private struct ErrorView: View {

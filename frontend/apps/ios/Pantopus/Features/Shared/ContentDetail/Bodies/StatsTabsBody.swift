@@ -265,11 +265,12 @@ public struct StatsTabsBody: View {
     }
 
     private var gigsTabContent: some View {
-        // TODO: gigs feature not yet integrated in mobile
+        // The public gigs feed is not surfaced on profile yet; this
+        // empty state stands in until the Gigs feature lands (T2.3).
         EmptyState(
             icon: .hammer,
-            headline: "Gigs coming soon",
-            subcopy: "Recent gigs from this user will show up here."
+            headline: "No recent gigs",
+            subcopy: "Recent gigs from this user will appear here."
         )
         .frame(minHeight: 200)
     }

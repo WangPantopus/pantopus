@@ -3,7 +3,7 @@
 //  PantopusTests
 //
 //  Covers happy-path load, optimistic reaction toggle (success + rollback),
-//  comment send, and the "coming soon" toast for Heart / Going.
+//  comment send, and the safety-guard on non-wired reaction kinds.
 //
 
 import XCTest
@@ -160,12 +160,16 @@ final class PulsePostDetailViewModelTests: XCTestCase {
         XCTAssertNotNil(vm.toastMessage)
     }
 
-    func testHeartShowsComingSoonToast() async {
+    func testHeartReactionIsDisplayOnly() async {
+        // The view renders Heart and Going as non-tappable display chips,
+        // so tapReaction should only ever be invoked for `.helpful`. The
+        // safety guard in the VM returns silently for the others — no
+        // toast, no state change.
         SequencedURLProtocol.sequence = [.status(200, body: Self.postJSON)]
         let vm = PulsePostDetailViewModel(postId: "p1", client: makeAPI())
         await vm.load()
         await vm.tapReaction(.heart)
-        XCTAssertEqual(vm.toastMessage, "Loved reactions coming soon")
+        XCTAssertNil(vm.toastMessage)
     }
 
     // MARK: - Comments

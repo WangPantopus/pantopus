@@ -277,7 +277,7 @@ struct HubPillarGrid: View {
 
 struct HubDiscoveryRail: View {
     let items: [DiscoveryCardContent]
-    let onTap: (String) -> Void
+    let onTap: (DiscoveryCardContent) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
@@ -286,7 +286,7 @@ struct HubDiscoveryRail: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Spacing.s3) {
                     ForEach(items) { item in
-                        Button { onTap(item.id) } label: {
+                        Button { onTap(item) } label: {
                             VStack(alignment: .leading, spacing: Spacing.s2) {
                                 AvatarWithIdentityRing(
                                     name: item.avatarInitials,
@@ -324,7 +324,7 @@ struct HubDiscoveryRail: View {
 
 struct HubJumpBackIn: View {
     let items: [JumpBackItem]
-    let onTap: (String) -> Void
+    let onTap: (JumpBackItem) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
@@ -332,7 +332,7 @@ struct HubJumpBackIn: View {
                 .padding(.horizontal, Spacing.s4)
             HStack(spacing: Spacing.s3) {
                 ForEach(items) { item in
-                    Button { onTap(item.id) } label: {
+                    Button { onTap(item) } label: {
                         VStack(alignment: .leading, spacing: Spacing.s2) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: Radii.md)

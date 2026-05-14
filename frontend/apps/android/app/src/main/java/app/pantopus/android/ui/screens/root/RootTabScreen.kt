@@ -37,8 +37,11 @@ import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_E
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
+import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
+import app.pantopus.android.ui.screens.hub.DiscoveryKind
 import app.pantopus.android.ui.screens.hub.HubNavigationIntent
 import app.pantopus.android.ui.screens.hub.HubScreen
+import app.pantopus.android.ui.screens.hub.JumpBackItem
 import app.pantopus.android.ui.screens.hub.PillarTile
 import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
@@ -53,6 +56,7 @@ import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
 import app.pantopus.android.ui.screens.profile.PublicProfileScreen
 import app.pantopus.android.ui.screens.you.YouScreen
+import app.pantopus.android.ui.theme.PantopusIcon
 
 /** Non-tab routes reachable from within the Hub stack. */
 private object ChildRoutes {
@@ -62,6 +66,7 @@ private object ChildRoutes {
     const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
     const val MAILBOX_LIST = "mailbox/list"
     const val MAILBOX_DRAWERS = "mailbox/drawers"
+    const val MAILBOX_SEARCH = "mailbox/search"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
     const val HOME_DASHBOARD = "homes/{$HOME_DASHBOARD_HOME_ID_KEY}"
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
@@ -69,6 +74,20 @@ private object ChildRoutes {
     const val INVITE_OWNER =
         "homes/{$INVITE_OWNER_HOME_ID_KEY}/invite?email={$INVITE_OWNER_CURRENT_EMAIL_KEY}"
     const val DISAMBIGUATE_MAIL = "mailbox/disambiguate/{$DISAMBIGUATE_MAIL_ID_KEY}"
+
+    /** Bell icon target. Replaced by the real notifications screen in T4.1. */
+    const val NOTIFICATIONS = "_placeholder/notifications"
+
+    /** Hub menu icon target. Replaced by Settings in T3.1. */
+    const val MENU = "_placeholder/menu"
+
+    /**
+     * Generic placeholder for intents whose destination hasn't been
+     * built yet. `label` is URL-encoded into the path and rendered by
+     * the placeholder composable.
+     */
+    const val PLACEHOLDER_LABEL_KEY = "label"
+    const val PLACEHOLDER = "_placeholder/generic?$PLACEHOLDER_LABEL_KEY={$PLACEHOLDER_LABEL_KEY}"
 
     /** Debug-only route reached via 5-tap easter egg on the Hub. */
     const val TOKEN_GALLERY = "_debug/token-gallery"
@@ -99,6 +118,10 @@ private object ChildRoutes {
 
     /** Build the claim-ownership wizard path. */
     fun claimOwnership(homeId: String): String = "homes/$homeId/claim"
+
+    /** Build the generic placeholder path with an encoded label. */
+    fun placeholder(label: String): String =
+        "_placeholder/generic?$PLACEHOLDER_LABEL_KEY=${java.net.URLEncoder.encode(label, "UTF-8")}"
 }
 
 /**
@@ -142,25 +165,38 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 HubWithDebugFiveTap(navController = navController) {
                     HubScreen(onIntent = { intent ->
                         when (intent) {
-                            is HubNavigationIntent.PillarTapped ->
-                                when (intent.pillar) {
-                                    PillarTile.Pillar.Mail -> navController.navigate(ChildRoutes.MAILBOX_LIST)
-                                    else -> Unit
-                                }
-                            is HubNavigationIntent.ActionTapped ->
-                                when (intent.kind) {
-                                    ActionChipContent.Kind.AddHome -> navController.navigate(ChildRoutes.ADD_HOME)
-                                    ActionChipContent.Kind.ScanMail -> navController.navigate(ChildRoutes.MAILBOX_DRAWERS)
-                                    else -> Unit
-                                }
+                            HubNavigationIntent.OpenNotifications ->
+                                navController.navigate(ChildRoutes.NOTIFICATIONS)
+                            HubNavigationIntent.OpenMenu ->
+                                navController.navigate(ChildRoutes.MENU)
                             HubNavigationIntent.StartVerification ->
                                 navController.navigate(ChildRoutes.ADD_HOME)
-                            // TODO(routing): re-enable DiscoveryTapped → publicProfile
-                            // once HubViewModel surfaces the discovery item type.
-                            // P17 routed unconditionally, but discovery currently
-                            // fetches `filter=gigs` and the gig UUIDs do not resolve
-                            // as user IDs.
-                            else -> Unit
+                            is HubNavigationIntent.ActionTapped ->
+                                when (intent.kind) {
+                                    ActionChipContent.Kind.AddHome ->
+                                        navController.navigate(ChildRoutes.ADD_HOME)
+                                    ActionChipContent.Kind.ScanMail ->
+                                        navController.navigate(ChildRoutes.MAILBOX_DRAWERS)
+                                    ActionChipContent.Kind.PostTask ->
+                                        navController.navigate(ChildRoutes.placeholder("Post a gig"))
+                                    ActionChipContent.Kind.SnapAndSell ->
+                                        navController.navigate(ChildRoutes.placeholder("Snap & sell"))
+                                }
+                            is HubNavigationIntent.PillarTapped ->
+                                when (intent.pillar) {
+                                    PillarTile.Pillar.Mail ->
+                                        navController.navigate(ChildRoutes.MAILBOX_LIST)
+                                    PillarTile.Pillar.Pulse ->
+                                        navController.navigate(ChildRoutes.placeholder("Pulse"))
+                                    PillarTile.Pillar.Marketplace ->
+                                        navController.navigate(ChildRoutes.placeholder("Marketplace"))
+                                    PillarTile.Pillar.Gigs ->
+                                        navController.navigate(ChildRoutes.placeholder("Gigs"))
+                                }
+                            is HubNavigationIntent.DiscoveryTapped ->
+                                routeForDiscovery(intent.item).also { navController.navigate(it) }
+                            is HubNavigationIntent.JumpBackTapped ->
+                                routeForJumpBackIn(intent.item).also { navController.navigate(it) }
                         }
                     })
                 }
@@ -204,6 +240,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.claimOwnership(homeId))
                     },
                     onOpenClaimsList = { navController.navigate(ChildRoutes.MY_CLAIMS) },
+                    onOpenPlaceholder = { label ->
+                        navController.navigate(ChildRoutes.placeholder(label))
+                    },
                 )
             }
             composable(ChildRoutes.MAILBOX_LIST) {
@@ -211,6 +250,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenMail = { mailId ->
                         navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
                     },
+                    onOpenSearch = { navController.navigate(ChildRoutes.MAILBOX_SEARCH) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -229,7 +269,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.PUBLIC_PROFILE,
                 arguments = listOf(navArgument(PUBLIC_PROFILE_USER_ID_KEY) { type = NavType.StringType }),
             ) {
-                PublicProfileScreen(onBack = { navController.popBackStack() })
+                PublicProfileScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                    onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report")) },
+                )
             }
             composable(
                 route = ChildRoutes.PULSE_POST,
@@ -263,9 +307,33 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(ChildRoutes.MAILBOX_DRAWERS) {
                 MailboxDrawersScreen(
-                    onOpenDrawer = { /* drawer detail lands later */ },
+                    onOpenDrawer = { drawer ->
+                        navController.navigate(ChildRoutes.placeholder("Drawer · $drawer"))
+                    },
                     onBack = { navController.popBackStack() },
                 )
+            }
+            composable(ChildRoutes.NOTIFICATIONS) {
+                NotYetAvailableView(tabName = "Notifications", icon = PantopusIcon.Bell)
+            }
+            composable(ChildRoutes.MENU) {
+                NotYetAvailableView(tabName = "Menu", icon = PantopusIcon.MoreHorizontal)
+            }
+            composable(ChildRoutes.MAILBOX_SEARCH) {
+                NotYetAvailableView(tabName = "Mail search", icon = PantopusIcon.Search)
+            }
+            composable(
+                route = ChildRoutes.PLACEHOLDER,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.PLACEHOLDER_LABEL_KEY) {
+                            type = NavType.StringType
+                            defaultValue = "This"
+                        },
+                    ),
+            ) { entry ->
+                val label = entry.arguments?.getString(ChildRoutes.PLACEHOLDER_LABEL_KEY) ?: "This"
+                NotYetAvailableView(tabName = label, icon = PantopusIcon.Info)
             }
             composable(ChildRoutes.ADD_HOME) {
                 AddHomeWizardScreen(
@@ -293,6 +361,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(ChildRoutes.MY_CLAIMS) {
                 MyClaimsListScreen(
                     onStartNewClaim = { navController.navigate(ChildRoutes.ADD_HOME) },
+                    onOpenClaim = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Claim status"))
+                    },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -346,3 +417,40 @@ private fun HubWithDebugFiveTap(
 }
 
 private const val FIVE_TAP_WINDOW_MS: Long = 1_500L
+
+/**
+ * Dispatch a Hub discovery-card tap to the matching detail route. Items
+ * whose detail screen isn't built yet land on the generic placeholder
+ * with a labelled title.
+ */
+private fun routeForDiscovery(item: DiscoveryCardContent): String =
+    when (item.kind) {
+        DiscoveryKind.Post -> ChildRoutes.pulsePost(item.id)
+        DiscoveryKind.Person -> ChildRoutes.publicProfile(item.id)
+        DiscoveryKind.Gig -> ChildRoutes.placeholder("Gig detail")
+        DiscoveryKind.Business -> ChildRoutes.placeholder("Business")
+        DiscoveryKind.Unknown -> ChildRoutes.placeholder(item.title)
+    }
+
+/**
+ * Backend `jumpBackIn` items carry a canonical web route (e.g.
+ * `/app/mailbox?scope=home&homeId=…`, `/app/homes/<id>/dashboard`,
+ * `/app/chat`, `/gigs/new`). Map onto a native destination; fall back
+ * to a labelled placeholder when nothing matches.
+ */
+private fun routeForJumpBackIn(item: JumpBackItem): String {
+    val path = item.route
+    if (path.startsWith("/app/mailbox")) return ChildRoutes.MAILBOX_LIST
+    homeIdFromRoute(path)?.let { return ChildRoutes.homeDashboard(it) }
+    if (path.startsWith("/app/chat")) return ChildRoutes.placeholder("Messages")
+    if (path.startsWith("/gigs")) return ChildRoutes.placeholder("Post a gig")
+    return ChildRoutes.placeholder(item.title)
+}
+
+/** Extracts `<id>` from `/app/homes/<id>/dashboard`. */
+private fun homeIdFromRoute(route: String): String? {
+    val prefix = "/app/homes/"
+    if (!route.startsWith(prefix)) return null
+    val segment = route.removePrefix(prefix).substringBefore('/')
+    return segment.takeIf { it.isNotEmpty() }
+}

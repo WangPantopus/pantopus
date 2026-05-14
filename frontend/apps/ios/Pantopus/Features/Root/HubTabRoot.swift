@@ -2,8 +2,7 @@
 //  HubTabRoot.swift
 //  Pantopus
 //
-//  Navigation stack for the Hub tab. Placeholder body until the full hub
-//  UI lands in Prompt P7.
+//  Navigation stack for the Hub tab.
 //
 // swiftlint:disable cyclomatic_complexity
 
@@ -16,11 +15,21 @@ public enum HubRoute: Hashable {
     case mailboxDrawers
     case mailbox
     case mailItemDetail(mailId: String)
+    case drawerDetail(drawer: String)
     case addHome
     case claimOwnership(homeId: String)
     case homeDashboard(homeId: String)
     case publicProfile(userId: String)
     case pulsePost(postId: String)
+    /// Bell icon target. Replaced by the real notifications screen in T4.1.
+    case notifications
+    /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
+    case menu
+    /// Mailbox search target. Replaced when `/api/mailbox` accepts a query.
+    case mailboxSearch
+    /// Generic placeholder for any intent whose destination hasn't been
+    /// built yet. The label is shown by `NotYetAvailableView`.
+    case placeholder(label: String)
     #if DEBUG
     case tokenGallery
     case iconGallery
@@ -56,20 +65,64 @@ public struct HubTabRoot: View {
     private var hub: some View {
         HubView { intent in
             switch intent {
-            case .pillar(.mail): path.append(.mailbox)
-            case .action(.addHome), .startVerification: path.append(.addHome)
+            case .openNotifications: path.append(.notifications)
+            case .openMenu: path.append(.menu)
+            case .startVerification: path.append(.addHome)
+            case .action(.addHome): path.append(.addHome)
             case .action(.scanMail): path.append(.mailboxDrawers)
-            case .pillar, .action, .openDiscovery, .jumpBackIn,
-                 .openNotifications, .openMenu:
-                // TODO(routing): re-enable openDiscovery → publicProfile
-                // once HubViewModel surfaces the discovery item type.
-                // P17 routed unconditionally to publicProfile, but
-                // discovery currently fetches `filter=gigs` and the
-                // gig UUIDs do not resolve as user IDs.
-                break
+            case .action(.postTask): path.append(.placeholder(label: "Post a gig"))
+            case .action(.snapAndSell): path.append(.placeholder(label: "Snap & sell"))
+            case .pillar(.mail): path.append(.mailbox)
+            case .pillar(.pulse): path.append(.placeholder(label: "Pulse"))
+            case .pillar(.gigs): path.append(.placeholder(label: "Gigs"))
+            case .pillar(.marketplace): path.append(.placeholder(label: "Marketplace"))
+            case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
+            case let .jumpBackIn(item): path.append(Self.route(forJumpBackIn: item))
             }
         }
         .overlay(alignment: .topLeading) { debugTapTarget }
+    }
+
+    /// Dispatch a discovery card tap to the matching detail route.
+    private static func route(forDiscovery item: DiscoveryCardContent) -> HubRoute {
+        switch item.kind {
+        case .post: return .pulsePost(postId: item.id)
+        case .person: return .publicProfile(userId: item.id)
+        case .gig: return .placeholder(label: "Gig detail")
+        case .business: return .placeholder(label: "Business")
+        case .unknown: return .placeholder(label: item.title)
+        }
+    }
+
+    /// Backend `jumpBackIn` items carry a canonical web route (e.g.
+    /// `/app/mailbox?scope=home&homeId=…`, `/app/homes/<id>/dashboard`,
+    /// `/app/chat`, `/gigs/new`). Map that onto a native destination;
+    /// fall back to a labeled placeholder when nothing matches.
+    private static func route(forJumpBackIn item: JumpBackItem) -> HubRoute {
+        let path = item.route
+        if path.hasPrefix("/app/mailbox") {
+            return .mailbox
+        }
+        if let homeId = Self.homeId(in: path) {
+            return .homeDashboard(homeId: homeId)
+        }
+        if path.hasPrefix("/app/chat") {
+            return .placeholder(label: "Messages")
+        }
+        if path.hasPrefix("/gigs") {
+            return .placeholder(label: "Post a gig")
+        }
+        return .placeholder(label: item.title)
+    }
+
+    /// Extracts `<id>` from `/app/homes/<id>/dashboard`. Returns `nil`
+    /// when the prefix doesn't match.
+    private static func homeId(in route: String) -> String? {
+        let prefix = "/app/homes/"
+        guard route.hasPrefix(prefix) else { return nil }
+        let after = route.dropFirst(prefix.count)
+        let segment = after.split(separator: "/").first.map(String.init)
+        return segment?.isEmpty == false ? segment : nil
     }
 
     /// 44pt invisible 5-tap target in the top-leading safe area — the
@@ -104,13 +157,21 @@ public struct HubTabRoot: View {
             )
         case .myClaims:
             MyClaimsListView(
-                viewModel: MyClaimsListViewModel { Task { @MainActor in push(.addHome) } }
+                viewModel: MyClaimsListViewModel(
+                    onStartNewClaim: { Task { @MainActor in push(.addHome) } },
+                    onOpenClaim: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Claim status")) }
+                    }
+                )
             )
         case let .homeDashboard(homeId):
             HomeDashboardView(
                 homeId: homeId,
                 onClaimOwnership: { Task { @MainActor in push(.claimOwnership(homeId: homeId)) } },
-                onOpenClaimsList: { Task { @MainActor in push(.myClaims) } }
+                onOpenClaimsList: { Task { @MainActor in push(.myClaims) } },
+                onOpenPlaceholder: { label in
+                    Task { @MainActor in push(.placeholder(label: label)) }
+                }
             )
         case let .claimOwnership(homeId):
             ClaimOwnershipWizardView(
@@ -128,9 +189,12 @@ public struct HubTabRoot: View {
             )
         case .mailbox:
             MailboxListView(
-                viewModel: MailboxListViewModel { mailId in
-                    Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
-                }
+                viewModel: MailboxListViewModel(
+                    onOpenMail: { mailId in
+                        Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
+                    },
+                    onOpenSearch: { push(.mailboxSearch) }
+                )
             )
         case let .mailItemDetail(mailId):
             MailboxItemDetailView(
@@ -143,9 +207,12 @@ public struct HubTabRoot: View {
                 }
             )
         case let .publicProfile(userId):
-            PublicProfileView(userId: userId) {
-                if !path.isEmpty { path.removeLast() }
-            }
+            PublicProfileView(
+                userId: userId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
+                onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report")) } }
+            )
         case let .pulsePost(postId):
             PulsePostDetailView(
                 postId: postId,
@@ -158,8 +225,20 @@ public struct HubTabRoot: View {
             )
         case .mailboxDrawers:
             MailboxDrawersView(
-                viewModel: MailboxDrawersViewModel { _ in /* Drawer detail lands later. */ }
+                viewModel: MailboxDrawersViewModel { drawer in
+                    Task { @MainActor in push(.drawerDetail(drawer: drawer)) }
+                }
             )
+        case let .drawerDetail(drawer):
+            NotYetAvailableView(tabName: "Drawer · \(drawer)", icon: .mailbox)
+        case .notifications:
+            NotYetAvailableView(tabName: "Notifications", icon: .bell)
+        case .menu:
+            NotYetAvailableView(tabName: "Menu", icon: .moreHorizontal)
+        case .mailboxSearch:
+            NotYetAvailableView(tabName: "Mail search", icon: .search)
+        case let .placeholder(label):
+            NotYetAvailableView(tabName: label, icon: .info)
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to

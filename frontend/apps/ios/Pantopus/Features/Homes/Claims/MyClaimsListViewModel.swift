@@ -9,12 +9,11 @@
 //  rejected the same field flips. We map those three values to chip
 //  variants below.
 //
-//  TODO(design): a richer claim-status detail view isn't drawn yet —
-//  tapping a row currently no-ops with a console log.
+//  Row taps emit `onOpenClaim(claimId)`; the host (HubTabRoot) routes
+//  to a placeholder until a claim-status detail screen is designed.
 //
 
 import Foundation
-import Logging
 import Observation
 import SwiftUI
 
@@ -37,14 +36,16 @@ final class MyClaimsListViewModel: ListOfRowsDataSource {
 
     private let api: APIClient
     private let onStartNewClaim: @Sendable () -> Void
-    private let logger = Logger(label: "app.pantopus.ios.MyClaimsList")
+    private let onOpenClaim: @Sendable (String) -> Void
 
     init(
         api: APIClient = .shared,
-        onStartNewClaim: @escaping @Sendable () -> Void = {}
+        onStartNewClaim: @escaping @Sendable () -> Void = {},
+        onOpenClaim: @escaping @Sendable (String) -> Void = { _ in }
     ) {
         self.api = api
         self.onStartNewClaim = onStartNewClaim
+        self.onOpenClaim = onOpenClaim
     }
 
     func load() async {
@@ -98,7 +99,8 @@ final class MyClaimsListViewModel: ListOfRowsDataSource {
     }
 
     private func row(for claim: OwnershipClaimDTO) -> RowModel {
-        RowModel(
+        let claimId = claim.id
+        return RowModel(
             id: claim.id,
             title: "Claim \(claim.id.prefix(8))",
             subtitle: subtitle(for: claim),
@@ -107,12 +109,9 @@ final class MyClaimsListViewModel: ListOfRowsDataSource {
             trailing: .statusChip(
                 text: statusText(for: claim.status),
                 variant: statusVariant(for: claim.status)
-            )
-        ) { @Sendable [logger] in
-            Task { @MainActor in
-                logger.info("Claim row tapped: \(claim.id) — detail view not yet designed.")
-            }
-        }
+            ),
+            onTap: { [onOpenClaim] in onOpenClaim(claimId) }
+        )
     }
 
     private func subtitle(for claim: OwnershipClaimDTO) -> String? {

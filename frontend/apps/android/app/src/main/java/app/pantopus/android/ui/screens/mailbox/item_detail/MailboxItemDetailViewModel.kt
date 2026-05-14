@@ -166,17 +166,17 @@ class MailboxItemDetailViewModel
         // MARK: - Coupon actions
 
         /**
-         * "Add to wallet" — backend has no first-class wallet endpoint
-         * today, so we flip to the "added" state client-side and
-         * surface an analytic event. Wire to a real `add_to_wallet`
-         * action when it lands in `validActions` on the V2
-         * item-action route.
+         * "Add to wallet" → POST .../action { action: "file" }. The
+         * backend has no first-class wallet endpoint yet, so we persist
+         * via the existing `file` action in the V2 whitelist
+         * (`backend/routes/mailboxV2.js:465`). When a real wallet
+         * endpoint lands, switch the action name without changing the
+         * UI.
          */
         private fun addToWallet() {
-            app.pantopus.android.data.analytics.Analytics.track(
-                app.pantopus.android.data.analytics.AnalyticsEvent.CtaMailboxItemLogReceived,
-            )
-            _ctaFlags.update { it.copy(primaryCompleted = true) }
+            callItemAction(action = "file", primary = true) {
+                _ctaFlags.update { it.copy(primaryCompleted = true) }
+            }
         }
 
         /**

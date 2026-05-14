@@ -161,6 +161,16 @@ public struct PillarTile: Identifiable, Sendable {
     }
 }
 
+/// Kind of entity surfaced by a Hub discovery card. Used by the
+/// navigation host to dispatch a tap to the matching detail screen.
+public enum DiscoveryKind: String, Sendable {
+    case gig, person, business, post, unknown
+
+    public init(rawType: String) {
+        self = DiscoveryKind(rawValue: rawType) ?? .unknown
+    }
+}
+
 /// Discovery rail card.
 public struct DiscoveryCardContent: Identifiable, Sendable {
     public let id: String
@@ -168,26 +178,39 @@ public struct DiscoveryCardContent: Identifiable, Sendable {
     public let meta: String
     public let category: String
     public let avatarInitials: String
+    public let kind: DiscoveryKind
 
-    public init(id: String, title: String, meta: String, category: String, avatarInitials: String) {
+    public init(
+        id: String,
+        title: String,
+        meta: String,
+        category: String,
+        avatarInitials: String,
+        kind: DiscoveryKind
+    ) {
         self.id = id
         self.title = title
         self.meta = meta
         self.category = category
         self.avatarInitials = avatarInitials
+        self.kind = kind
     }
 }
 
-/// "Jump back in" rail card.
+/// "Jump back in" rail card. `route` is the canonical web path
+/// returned by `GET /api/hub` (e.g. `/app/mailbox?scope=home&homeId=…`);
+/// the navigation host parses it to pick the native destination.
 public struct JumpBackItem: Identifiable, Sendable {
     public let id: String
     public let title: String
     public let icon: PantopusIcon
+    public let route: String
 
-    public init(id: String, title: String, icon: PantopusIcon) {
+    public init(id: String, title: String, icon: PantopusIcon, route: String) {
         self.id = id
         self.title = title
         self.icon = icon
+        self.route = route
     }
 }
 

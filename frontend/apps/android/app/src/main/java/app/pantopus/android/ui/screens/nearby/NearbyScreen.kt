@@ -8,7 +8,7 @@ import app.pantopus.android.ui.screens.root.NotYetAvailableView
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 
-/** Placeholder body for the Nearby tab. Real surface lands later. */
+/** Placeholder body for the Nearby tab — replaced by T2.4 Map + List. */
 @Composable
 fun NearbyScreen() {
     NotYetAvailableView(

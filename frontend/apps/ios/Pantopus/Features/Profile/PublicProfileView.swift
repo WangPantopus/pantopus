@@ -13,10 +13,19 @@ import SwiftUI
 public struct PublicProfileView: View {
     @State private var viewModel: PublicProfileViewModel
     private let onBack: @MainActor () -> Void
+    private let onOpenMessages: @MainActor () -> Void
+    private let onOpenReport: @MainActor () -> Void
 
-    public init(userId: String, onBack: @escaping @MainActor () -> Void) {
+    public init(
+        userId: String,
+        onBack: @escaping @MainActor () -> Void,
+        onOpenMessages: @escaping @MainActor () -> Void = {},
+        onOpenReport: @escaping @MainActor () -> Void = {}
+    ) {
         _viewModel = State(initialValue: PublicProfileViewModel(userId: userId))
         self.onBack = onBack
+        self.onOpenMessages = onOpenMessages
+        self.onOpenReport = onOpenReport
     }
 
     public var body: some View {
@@ -33,6 +42,20 @@ public struct PublicProfileView: View {
             }
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+        .confirmationDialog(
+            "More",
+            isPresented: Binding(
+                get: { viewModel.showOverflow },
+                set: { viewModel.showOverflow = $0 }
+            ),
+            titleVisibility: .hidden
+        ) {
+            Button("Block this user", role: .destructive) {
+                Task { await viewModel.block() }
+            }
+            Button("Report") { onOpenReport() }
+            Button("Cancel", role: .cancel) {}
+        }
         .task { await viewModel.load() }
     }
 
@@ -70,9 +93,9 @@ public struct PublicProfileView: View {
                         get: { viewModel.selectedTab },
                         set: { viewModel.selectedTab = $0 }
                     ),
-                    onMessage: { viewModel.tapMessage() },
-                    onConnect: { viewModel.tapConnect() },
-                    onOverflow: { viewModel.tapOverflow() }
+                    onMessage: { onOpenMessages() },
+                    onConnect: { Task { await viewModel.connect() } },
+                    onOverflow: { viewModel.showOverflow = true }
                 )
             },
             cta: { ActionRowCTA() }

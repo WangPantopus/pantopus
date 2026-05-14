@@ -91,13 +91,15 @@ class MailboxListViewModel
             reload()
         }
 
-        /** Show a transient toast; called when the search icon is tapped. */
+        private val _onSearchTappedEvent = MutableStateFlow(0)
+        val onSearchTappedEvent: StateFlow<Int> = _onSearchTappedEvent.asStateFlow()
+
+        /**
+         * Emit a one-shot event for the host to consume — it pushes the
+         * `MAILBOX_SEARCH` placeholder route. Replaces the prior toast.
+         */
         fun onSearchTapped() {
-            _toast.value = "Search coming soon"
-            viewModelScope.launch {
-                kotlinx.coroutines.delay(1_800)
-                _toast.value = null
-            }
+            _onSearchTappedEvent.value = _onSearchTappedEvent.value + 1
         }
 
         /** Called when the list nears the bottom — fetches the next page. */

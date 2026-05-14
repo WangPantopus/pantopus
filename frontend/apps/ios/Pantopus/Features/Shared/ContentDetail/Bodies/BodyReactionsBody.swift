@@ -232,20 +232,26 @@ private struct ReactionsBar: View {
                 kind: .helpful,
                 icon: .thumbsUp,
                 count: counts.helpful,
-                isSelected: counts.userReaction == .helpful
-            ) { onTap(.helpful) }
+                isSelected: counts.userReaction == .helpful,
+                onTap: { onTap(.helpful) }
+            )
+            // Heart and Going are display-only until the backend supports
+            // reactions beyond `like`. They show the count but don't
+            // announce as buttons or accept taps.
             ReactionPill(
                 kind: .heart,
                 icon: .heart,
                 count: counts.heart,
-                isSelected: counts.userReaction == .heart
-            ) { onTap(.heart) }
+                isSelected: counts.userReaction == .heart,
+                onTap: nil
+            )
             ReactionPill(
                 kind: .going,
                 icon: .check,
                 count: counts.going,
-                isSelected: counts.userReaction == .going
-            ) { onTap(.going) }
+                isSelected: counts.userReaction == .going,
+                onTap: nil
+            )
             Spacer()
         }
     }
@@ -256,28 +262,37 @@ private struct ReactionPill: View {
     let icon: PantopusIcon
     let count: Int
     let isSelected: Bool
-    let onTap: @MainActor () -> Void
+    /// `nil` renders the pill as display-only (no Button wrapper).
+    let onTap: (@MainActor () -> Void)?
 
     var body: some View {
-        Button(action: { onTap() }) {
-            HStack(spacing: Spacing.s1) {
-                Icon(icon, size: 14, color: foreground)
-                Text(label)
-                    .font(.system(size: PantopusTextStyle.caption.size, weight: .semibold))
-                    .foregroundStyle(foreground)
-                Text("\(count)")
-                    .font(.system(size: PantopusTextStyle.caption.size, weight: .regular))
-                    .foregroundStyle(foreground.opacity(0.85))
-            }
-            .padding(.horizontal, Spacing.s3)
-            .frame(height: 32)
-            .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
+        if let onTap {
+            Button(action: { onTap() }) { pillBody }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44, alignment: .center)
+                .accessibilityLabel("\(kind.accessibilityLabel), \(count)")
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        } else {
+            pillBody
+                .accessibilityElement()
+                .accessibilityLabel("\(kind.accessibilityLabel), \(count)")
         }
-        .buttonStyle(.plain)
-        .frame(minHeight: 44, alignment: .center)
-        .accessibilityLabel("\(kind.accessibilityLabel), \(count)")
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private var pillBody: some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(icon, size: 14, color: foreground)
+            Text(label)
+                .font(.system(size: PantopusTextStyle.caption.size, weight: .semibold))
+                .foregroundStyle(foreground)
+            Text("\(count)")
+                .font(.system(size: PantopusTextStyle.caption.size, weight: .regular))
+                .foregroundStyle(foreground.opacity(0.85))
+        }
+        .padding(.horizontal, Spacing.s3)
+        .frame(height: 32)
+        .background(background)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
     }
 
     private var label: String {

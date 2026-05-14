@@ -65,7 +65,9 @@ public struct ProfileHeader: View {
     private let avatarURL: URL?
     private let isVerified: Bool
     private let identityBadges: [IdentityPillarBadge]
-    private let onBadgeTap: @MainActor (IdentityPillar) -> Void
+    /// `nil` renders the badges as non-tappable status chips. Pass a
+    /// real handler to make them open an identity-detail surface.
+    private let onBadgeTap: (@MainActor (IdentityPillar) -> Void)?
 
     public init(
         displayName: String,
@@ -74,7 +76,7 @@ public struct ProfileHeader: View {
         avatarURL: URL?,
         isVerified: Bool,
         identityBadges: [IdentityPillarBadge],
-        onBadgeTap: @escaping @MainActor (IdentityPillar) -> Void = { _ in }
+        onBadgeTap: (@MainActor (IdentityPillar) -> Void)? = nil
     ) {
         self.displayName = displayName
         self.handle = handle
@@ -119,14 +121,29 @@ public struct ProfileHeader: View {
             if !identityBadges.isEmpty {
                 HStack(spacing: Spacing.s2) {
                     ForEach(identityBadges) { badge in
-                        Button {
-                            // TODO(routing): identity-detail screens not designed yet
-                            onBadgeTap(badge.pillar)
-                        } label: {
-                            StatusChip(badge.label, variant: badge.chipVariant, icon: badge.leadingIcon)
+                        if let onBadgeTap {
+                            Button { onBadgeTap(badge.pillar) } label: {
+                                StatusChip(
+                                    badge.label,
+                                    variant: badge.chipVariant,
+                                    icon: badge.leadingIcon
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                "\(badge.label) identity, \(badge.state == .verified ? "verified" : "not verified")"
+                            )
+                        } else {
+                            StatusChip(
+                                badge.label,
+                                variant: badge.chipVariant,
+                                icon: badge.leadingIcon
+                            )
+                            .accessibilityElement()
+                            .accessibilityLabel(
+                                "\(badge.label) identity, \(badge.state == .verified ? "verified" : "not verified")"
+                            )
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("\(badge.label) identity, \(badge.state == .verified ? "verified" : "not verified")")
                     }
                 }
             }

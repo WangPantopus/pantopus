@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
@@ -32,8 +31,9 @@ import javax.inject.Inject
  * state to a generic `status` string; we map the three known values to
  * chip variants below.
  *
- * TODO(design): claim-status detail screen not yet designed — taps
- * currently log only.
+ * Row taps emit `onOpenClaim(claimId)`; the host (RootTabScreen)
+ * currently pushes a placeholder until a claim-status detail screen
+ * is designed.
  */
 @HiltViewModel
 class MyClaimsListViewModel
@@ -45,9 +45,14 @@ class MyClaimsListViewModel
         val state: StateFlow<ListOfRowsUiState> = _state.asStateFlow()
 
         private var onStartNewClaim: () -> Unit = {}
+        private var onOpenClaim: (String) -> Unit = {}
 
-        fun configureNavigation(onStartNewClaim: () -> Unit) {
+        fun configureNavigation(
+            onStartNewClaim: () -> Unit,
+            onOpenClaim: (String) -> Unit = {},
+        ) {
             this.onStartNewClaim = onStartNewClaim
+            this.onOpenClaim = onOpenClaim
         }
 
         fun load() {
@@ -107,7 +112,7 @@ class MyClaimsListViewModel
                         text = statusText(claim.status),
                         variant = statusVariant(claim.status),
                     ),
-                onTap = { Timber.tag("MyClaimsList").i("Claim row tapped: %s", claim.id) },
+                onTap = { onOpenClaim(claim.id) },
             )
 
         private fun subtitleFor(claim: OwnershipClaimDto): String? {

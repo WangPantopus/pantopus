@@ -28,22 +28,32 @@ import app.pantopus.android.ui.theme.Spacing
 
 /**
  * `GET /api/mailbox` wrapped in the List-of-Rows archetype with
- * All / Unread / Starred tabs, pagination, and pull-to-refresh. A stubbed
- * search icon in the top bar surfaces a toast.
+ * All / Unread / Starred tabs, pagination, and pull-to-refresh.
+ *
+ * `onOpenSearch` is a nav-host callback; it currently routes to the
+ * `NotYetAvailableScreen` placeholder until `/api/mailbox` supports a
+ * query parameter.
  */
 @Composable
 fun MailboxListScreen(
     onOpenMail: (String) -> Unit,
+    onOpenSearch: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     viewModel: MailboxListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
+    val searchEvent by viewModel.onSearchTappedEvent.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         viewModel.configureNavigation(onOpenMail = onOpenMail)
         viewModel.load()
         Analytics.track(AnalyticsEvent.ScreenMailboxListViewed)
+    }
+
+    LaunchedEffect(searchEvent) {
+        // Skip the initial value emitted on subscription.
+        if (searchEvent > 0) onOpenSearch()
     }
 
     Box {

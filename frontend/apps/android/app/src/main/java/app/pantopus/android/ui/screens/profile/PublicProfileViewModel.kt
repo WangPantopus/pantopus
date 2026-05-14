@@ -8,7 +8,9 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.blocks.BlocksRepository
 import app.pantopus.android.data.profile.ProfileRepository
+import app.pantopus.android.data.relationships.RelationshipsRepository
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileReviewCard
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileStatCell
@@ -55,12 +57,25 @@ sealed interface PublicProfileUiState {
     data class Error(val message: String) : PublicProfileUiState
 }
 
+/** In-flight state for an action button (Connect, Block). */
+sealed interface PublicProfileActionState {
+    data object Idle : PublicProfileActionState
+
+    data object InFlight : PublicProfileActionState
+
+    data object Succeeded : PublicProfileActionState
+
+    data class Failed(val message: String) : PublicProfileActionState
+}
+
 /** Loads `GET /api/users/id/:id` and exposes a stable tab + toast surface. */
 @HiltViewModel
 class PublicProfileViewModel
     @Inject
     constructor(
         private val repo: ProfileRepository,
+        private val relationships: RelationshipsRepository,
+        private val blocks: BlocksRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val userId: String =
@@ -76,6 +91,17 @@ class PublicProfileViewModel
 
         private val _toastMessage = MutableStateFlow<String?>(null)
         val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
+
+        private val _connectState =
+            MutableStateFlow<PublicProfileActionState>(PublicProfileActionState.Idle)
+        val connectState: StateFlow<PublicProfileActionState> = _connectState.asStateFlow()
+
+        private val _blockState =
+            MutableStateFlow<PublicProfileActionState>(PublicProfileActionState.Idle)
+        val blockState: StateFlow<PublicProfileActionState> = _blockState.asStateFlow()
+
+        private val _showOverflow = MutableStateFlow(false)
+        val showOverflow: StateFlow<Boolean> = _showOverflow.asStateFlow()
 
         fun load() {
             if (_state.value is PublicProfileUiState.Loaded) return
@@ -95,16 +121,47 @@ class PublicProfileViewModel
             _toastMessage.value = null
         }
 
-        fun tapMessage() {
-            _toastMessage.value = "Messaging coming soon"
+        fun setShowOverflow(show: Boolean) {
+            _showOverflow.value = show
         }
 
-        fun tapConnect() {
-            _toastMessage.value = "Connect coming soon"
+        /** Send a connection request via `POST /api/relationships/requests`. */
+        fun connect() {
+            if (_connectState.value is PublicProfileActionState.InFlight) return
+            if (_connectState.value is PublicProfileActionState.Succeeded) return
+            _connectState.value = PublicProfileActionState.InFlight
+            viewModelScope.launch {
+                when (val result = relationships.sendRequest(userId)) {
+                    is NetworkResult.Success -> {
+                        _connectState.value = PublicProfileActionState.Succeeded
+                        _toastMessage.value = "Connection request sent"
+                    }
+                    is NetworkResult.Failure -> {
+                        val message = friendlyMessage(result.error)
+                        _connectState.value = PublicProfileActionState.Failed(message)
+                        _toastMessage.value = message
+                    }
+                }
+            }
         }
 
-        fun tapOverflow() {
-            _toastMessage.value = "More actions coming soon"
+        /** Block this user via `POST /api/users/:userId/block`. */
+        fun block() {
+            if (_blockState.value is PublicProfileActionState.InFlight) return
+            _blockState.value = PublicProfileActionState.InFlight
+            viewModelScope.launch {
+                when (val result = blocks.block(userId)) {
+                    is NetworkResult.Success -> {
+                        _blockState.value = PublicProfileActionState.Succeeded
+                        _toastMessage.value = "User blocked"
+                    }
+                    is NetworkResult.Failure -> {
+                        val message = friendlyMessage(result.error)
+                        _blockState.value = PublicProfileActionState.Failed(message)
+                        _toastMessage.value = message
+                    }
+                }
+            }
         }
 
         private suspend fun fetch() {

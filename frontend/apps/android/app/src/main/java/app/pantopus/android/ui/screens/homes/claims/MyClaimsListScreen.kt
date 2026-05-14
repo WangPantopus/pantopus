@@ -16,17 +16,24 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
  * to `GET /api/homes/my-ownership-claims`.
  *
  * @param onStartNewClaim Invoked when the empty-state CTA fires.
+ * @param onOpenClaim Invoked when a claim row is tapped. The host
+ *     currently pushes a placeholder until claim-status detail is
+ *     designed.
  * @param onBack Optional back handler.
  */
 @Composable
 fun MyClaimsListScreen(
     onStartNewClaim: () -> Unit,
+    onOpenClaim: (String) -> Unit = {},
     onBack: (() -> Unit)? = null,
     viewModel: MyClaimsListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
-        viewModel.configureNavigation(onStartNewClaim = onStartNewClaim)
+        viewModel.configureNavigation(
+            onStartNewClaim = onStartNewClaim,
+            onOpenClaim = onOpenClaim,
+        )
         viewModel.load()
         Analytics.track(AnalyticsEvent.ScreenMyClaimsViewed)
     }
@@ -34,7 +41,7 @@ fun MyClaimsListScreen(
         title = "My claims",
         state = state,
         onRefresh = { viewModel.refresh() },
-        onEndReached = { /* not paginated */ },
+        onEndReached = { },
         onBack = onBack,
     )
 }

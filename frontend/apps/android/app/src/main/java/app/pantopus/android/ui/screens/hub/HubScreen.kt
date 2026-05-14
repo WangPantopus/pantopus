@@ -299,10 +299,27 @@ private fun sampleContent(): PopulatedContent =
             ),
         discovery =
             listOf(
-                DiscoveryCardContent("g1", "Mow front lawn", "\$40 · 0.3mi", "Yardwork", "AB"),
-                DiscoveryCardContent("g2", "Pick up grocery", "\$15 · 0.6mi", "Errands", "CD"),
+                DiscoveryCardContent(
+                    "g1",
+                    "Mow front lawn",
+                    "\$40 · 0.3mi",
+                    "Yardwork",
+                    "AB",
+                    DiscoveryKind.Gig,
+                ),
+                DiscoveryCardContent(
+                    "g2",
+                    "Pick up grocery",
+                    "\$15 · 0.6mi",
+                    "Errands",
+                    "CD",
+                    DiscoveryKind.Gig,
+                ),
             ),
-        jumpBackIn = listOf(JumpBackItem("j1", "Finish profile", PantopusIcon.User)),
+        jumpBackIn =
+            listOf(
+                JumpBackItem("j1", "Finish profile", PantopusIcon.User, route = "/app/me"),
+            ),
         activity =
             listOf(
                 ActivityEntry(

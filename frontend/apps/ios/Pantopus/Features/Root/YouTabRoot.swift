@@ -212,9 +212,10 @@ public struct YouTabRoot: View {
             EmptyView()
         #if DEBUG
         case let .publicProfile(userId):
-            PublicProfileView(userId: userId) {
-                if !path.isEmpty { path.removeLast() }
-            }
+            PublicProfileView(
+                userId: userId,
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
         case let .pulsePost(postId):
             PulsePostDetailView(
                 postId: postId,

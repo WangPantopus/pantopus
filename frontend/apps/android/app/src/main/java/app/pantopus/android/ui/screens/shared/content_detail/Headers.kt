@@ -137,8 +137,8 @@ private fun StubContainer(
     ) {
         EmptyState(
             icon = icon,
-            headline = "$label coming soon",
-            subcopy = "We're designing this header next.",
+            headline = "$label isn't here yet",
+            subcopy = "This header ships in a later tier.",
         )
     }
 }

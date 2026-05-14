@@ -109,14 +109,13 @@ public final class PulsePostDetailViewModel {
         state = .loaded(rebuildContent(from: content.post))
     }
 
-    /// Tap one of the reaction pills.
-    /// Helpful → backend toggle. Heart / Going → "coming soon" toast.
+    /// Tap one of the reaction pills. Only `.helpful` is wired to a
+    /// backend route today; the `ReactionsBar` view renders the other
+    /// kinds as display-only so this method only ever sees `.helpful`,
+    /// but we keep the guard as a safety net.
     public func tapReaction(_ kind: PostReactionKind) async {
         guard case var .loaded(content) = state else { return }
-        guard kind.isBackendWired else {
-            toastMessage = "\(kind.accessibilityLabel) reactions coming soon"
-            return
-        }
+        guard kind.isBackendWired else { return }
 
         // Optimistic update on the helpful (likes) bucket.
         var optimistic = content.reactions

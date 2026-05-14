@@ -101,9 +101,8 @@ class MyHomesListViewModel
                         identity = IdentityPillar.Home,
                         ringProgress = progress,
                     ),
-                trailing = RowTrailing.Kebab,
+                trailing = RowTrailing.Chevron,
                 onTap = { onOpenHome(home.id) },
-                onSecondary = { /* kebab bottom sheet lands later */ },
             )
         }
     }

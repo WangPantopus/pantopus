@@ -6,12 +6,14 @@ import app.pantopus.android.data.api.ApiService
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequestJsonAdapter
 import app.pantopus.android.data.api.net.RetryInterceptor
 import app.pantopus.android.data.api.services.AuthApi
+import app.pantopus.android.data.api.services.BlocksApi
 import app.pantopus.android.data.api.services.FilesApi
 import app.pantopus.android.data.api.services.HomesApi
 import app.pantopus.android.data.api.services.HubApi
 import app.pantopus.android.data.api.services.MailboxApi
 import app.pantopus.android.data.api.services.MailboxV2Api
 import app.pantopus.android.data.api.services.PostsApi
+import app.pantopus.android.data.api.services.RelationshipsApi
 import app.pantopus.android.data.api.services.UsersApi
 import app.pantopus.android.data.auth.AuthInterceptor
 import com.squareup.moshi.Moshi
@@ -138,6 +140,13 @@ object NetworkModule {
 
     @Provides @Singleton
     fun providePostsApi(retrofit: Retrofit): PostsApi = retrofit.create(PostsApi::class.java)
+
+    @Provides @Singleton
+    fun provideRelationshipsApi(retrofit: Retrofit): RelationshipsApi =
+        retrofit.create(RelationshipsApi::class.java)
+
+    @Provides @Singleton
+    fun provideBlocksApi(retrofit: Retrofit): BlocksApi = retrofit.create(BlocksApi::class.java)
 
     // Legacy aggregate — retained for existing AuthRepository / FeedScreen.
     @Provides @Singleton

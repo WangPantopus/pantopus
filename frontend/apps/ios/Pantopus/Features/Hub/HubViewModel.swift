@@ -132,7 +132,8 @@ final class HubViewModel {
                     JumpBackItem(
                         id: $0.title,
                         title: $0.title,
-                        icon: Self.icon(from: $0.icon)
+                        icon: Self.icon(from: $0.icon),
+                        route: $0.route
                     )
                 },
                 activity: hub.activity.prefix(3).map {
@@ -179,7 +180,8 @@ final class HubViewModel {
             title: item.title,
             meta: item.meta,
             category: item.category,
-            avatarInitials: initials(from: item.title)
+            avatarInitials: initials(from: item.title),
+            kind: DiscoveryKind(rawType: item.type)
         )
     }
 
