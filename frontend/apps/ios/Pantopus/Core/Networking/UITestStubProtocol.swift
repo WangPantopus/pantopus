@@ -88,6 +88,26 @@ final class UITestStubProtocol: URLProtocol {
             let body = env["UI_TESTS_HOMES_MYHOMES_BODY"] ?? Self.defaultMyHomesJSON
             finishWith(status: 200, body: Data(body.utf8))
 
+        case ("GET", "/api/gigs"):
+            let body = env["UI_TESTS_GIGS_LIST_BODY"] ?? Self.defaultGigsListJSON
+            finishWith(status: 200, body: Data(body.utf8))
+
+        case let ("GET", path)
+            where path.hasPrefix("/api/gigs/")
+            && !path.hasSuffix("/bids")
+            && !path.contains("/in-bounds")
+            && !path.contains("/nearby")
+            && !path.contains("/browse")
+            && !path.contains("/categories"):
+            let body = env["UI_TESTS_GIG_DETAIL_BODY"] ?? Self.defaultGigDetailJSON
+            finishWith(status: 200, body: Data(body.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/gigs/") && path.hasSuffix("/bids"):
+            // Owner-only on real backend; the stub returns an empty
+            // list so the detail screen renders the trust capsules
+            // without a bids module under the UI test.
+            finishWith(status: 200, body: Data("{\"bids\":[]}".utf8))
+
         default:
             // Unknown endpoint under test — surface a recognizable 599
             // so test failures point clearly at a missing stub.
@@ -196,6 +216,40 @@ final class UITestStubProtocol: URLProtocol {
       "hasVerifiedOwner":false,"verifiedOwner":null,
       "userMembershipStatus":"member","userResidencyClaim":null,
       "memberCount":1,"nearbyGigs":0
+    }}
+    """
+
+    /// Single-row `GigsListResponse` for the Gigs feed + the matching
+    /// detail row for the T2.6 ContentDetailShell capture.
+    static let defaultGigsListJSON = """
+    {"gigs":[{
+      "id":"g_demo",
+      "title":"Hang 3 shelves",
+      "description":"Three IKEA Lack shelves on drywall — studs already located.",
+      "price":60,
+      "category":"handyman",
+      "status":"open",
+      "created_at":"2025-01-01T00:00:00Z",
+      "user_id":"u_demo",
+      "bid_count":4,
+      "distance_miles":0.2,
+      "pickup_address":"Rose Court, Unit 4B"
+    }],"total":1}
+    """
+
+    static let defaultGigDetailJSON = """
+    {"gig":{
+      "id":"g_demo",
+      "title":"Hang 3 shelves",
+      "description":"Three IKEA Lack shelves on drywall — studs already located.",
+      "price":60,
+      "category":"handyman",
+      "status":"open",
+      "created_at":"2025-01-01T00:00:00Z",
+      "user_id":"u_demo",
+      "bid_count":4,
+      "distance_miles":0.2,
+      "pickup_address":"Rose Court, Unit 4B"
     }}
     """
 }

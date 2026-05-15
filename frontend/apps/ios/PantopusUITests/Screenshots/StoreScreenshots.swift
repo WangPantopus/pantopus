@@ -119,6 +119,20 @@ final class StoreScreenshots: XCTestCase {
                 .matching(identifier: "gigsFeed").firstMatch
                 .waitForExistence(timeout: 5)
             snapshot("09_GigsFeed")
+
+            // Drill into the first gig row → T2.6 ContentDetailShell.
+            let firstGigRow = app.descendants(matching: .any)
+                .matching(identifier: "gigsRow_g_demo").firstMatch
+            if firstGigRow.waitForExistence(timeout: 3) {
+                firstGigRow.tap()
+                if app.descendants(matching: .any)
+                    .matching(identifier: "contentDetailShell").firstMatch
+                    .waitForExistence(timeout: 5)
+                {
+                    snapshot("12_GigDetail")
+                }
+                app.buttons["contentDetailBackButton"].firstMatch.tap()
+            }
             app.buttons["gigsBackButton"].firstMatch.tap()
         }
 
