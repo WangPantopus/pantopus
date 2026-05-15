@@ -19,7 +19,6 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import app.pantopus.android.ui.screens.hub.HUB_SCREEN_TAG
-import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.nearby.NearbyScreen
 import app.pantopus.android.ui.screens.root.NotYetAvailableView
 import app.pantopus.android.ui.screens.root.PantopusBottomBar
@@ -75,7 +74,11 @@ class A11yLabelAudit {
                     when (selected) {
                         PantopusRoute.Hub -> Box(Modifier.fillMaxSize().testTag(HUB_SCREEN_TAG))
                         PantopusRoute.Nearby -> NearbyScreen()
-                        PantopusRoute.Inbox -> InboxScreen()
+                        PantopusRoute.Inbox ->
+                            NotYetAvailableView(
+                                tabName = "Inbox",
+                                icon = PantopusIcon.Inbox,
+                            )
                         PantopusRoute.You ->
                             NotYetAvailableView(tabName = "You", icon = PantopusIcon.User)
                     }

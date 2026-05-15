@@ -15,7 +15,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import app.pantopus.android.ui.screens.hub.HUB_SCREEN_TAG
-import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.nearby.NearbyScreen
 import app.pantopus.android.ui.theme.PantopusIcon
 import org.junit.Rule
@@ -25,7 +24,7 @@ import org.junit.Test
  * Drives the root tab scaffold without Hilt by hosting the bottom bar
  * directly. Verifies that:
  * - Hub is the default selection.
- * - Each un-designed tab renders the NotYetAvailable empty state.
+ * - Each stubbed tab renders the NotYetAvailable empty state.
  * - Re-selecting Hub returns to the Hub container.
  *
  * The Hub destination is stubbed with a tagged Box so the test stays free
@@ -53,7 +52,11 @@ class RootTabTest {
                     when (selected) {
                         PantopusRoute.Hub -> Box(Modifier.fillMaxSize().testTag(HUB_SCREEN_TAG))
                         PantopusRoute.Nearby -> NearbyScreen()
-                        PantopusRoute.Inbox -> InboxScreen()
+                        PantopusRoute.Inbox ->
+                            NotYetAvailableView(
+                                tabName = "Inbox",
+                                icon = PantopusIcon.Inbox,
+                            )
                         PantopusRoute.You ->
                             NotYetAvailableView(
                                 tabName = "You",
