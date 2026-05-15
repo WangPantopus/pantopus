@@ -87,8 +87,8 @@ data class UpdateBridgesBody(
     @Json(name = "show_local_on_persona") val showLocalOnPersona: Boolean? = null,
 )
 
-/** Acknowledgement envelope from the PATCH. */
+/** Acknowledgement envelope from the PATCH — backend emits `{ "bridge": {...} }` (singular). */
 @JsonClass(generateAdapter = true)
 data class BridgesEchoResponse(
-    val bridges: BridgesDto? = null,
+    val bridge: BridgesDto? = null,
 )

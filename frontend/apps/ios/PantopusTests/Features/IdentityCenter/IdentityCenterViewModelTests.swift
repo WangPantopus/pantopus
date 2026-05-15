@@ -129,7 +129,7 @@ final class IdentityCenterViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.fullJSON),
             .status(200, body: """
-            {"bridges": {"show_persona_on_local": true, "show_local_on_persona": false}}
+            {"bridge": {"show_persona_on_local": true, "show_local_on_persona": false}}
             """)
         ]
         let vm = IdentityCenterViewModel(api: makeAPI())

@@ -17,6 +17,7 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.identity.IdentityCenterRepository
 import io.mockk.coEvery
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -150,7 +151,7 @@ class IdentityCenterViewModelTest {
         runTest {
             coEvery { repository.overview() } returns NetworkResult.Success(fullResponse())
             coEvery { repository.updateBridges(any<String>(), any<UpdateBridgesBody>()) } returns
-                NetworkResult.Success(BridgesEchoResponse(bridges = BridgesDto(showPersonaOnLocal = true, showLocalOnPersona = false)))
+                NetworkResult.Success(BridgesEchoResponse(bridge = BridgesDto(showPersonaOnLocal = true, showLocalOnPersona = false)))
             val vm = IdentityCenterViewModel(repository)
             vm.load()
             vm.setBridge("showPublicOnLocal", isOn = true)
@@ -256,6 +257,23 @@ class IdentityCenterViewModelTest {
             vm.load()
             val loaded = vm.state.value as IdentityCenterUiState.Loaded
             loaded.content.bridges.forEach { row -> assertNotNull(row.subtext) }
+        }
+
+    @Test fun setBridge_sends_both_booleans_to_satisfy_backend_validation() =
+        runTest {
+            // Backend Joi schema marks BOTH `show_persona_on_local` and
+            // `show_local_on_persona` as required(). Verify we send the
+            // current snapshot for the untouched key, not a null.
+            coEvery { repository.overview() } returns
+                NetworkResult.Success(fullResponse(showPersonaOnLocal = false, showLocalOnPersona = true))
+            val captured = slot<UpdateBridgesBody>()
+            coEvery { repository.updateBridges(any(), capture(captured)) } returns
+                NetworkResult.Success(BridgesEchoResponse(bridge = null))
+            val vm = IdentityCenterViewModel(repository)
+            vm.load()
+            vm.setBridge("showPublicOnLocal", isOn = true)
+            assertEquals(true, captured.captured.showPersonaOnLocal)
+            assertEquals(true, captured.captured.showLocalOnPersona) // preserved from snapshot
         }
 
     @Test fun privacy_preview_row_has_no_trailing() =

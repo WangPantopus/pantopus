@@ -43,7 +43,13 @@ public final class IdentityCenterViewModel {
     public func setBridge(_ rowId: String, isOn: Bool) async {
         guard let raw, let personaId = raw.audienceProfile?.id else { return }
         let previous = raw.bridges
-        var body = UpdateBridgesBody()
+        // Backend `Joi` schema requires BOTH booleans on every PATCH —
+        // seed with the current snapshot so the untouched row keeps
+        // its server-canonical value.
+        var body = UpdateBridgesBody(
+            showPersonaOnLocal: previous?.showPersonaOnLocal ?? false,
+            showLocalOnPersona: previous?.showLocalOnPersona ?? false
+        )
         switch rowId {
         case "showPublicOnLocal":
             body.showPersonaOnLocal = isOn
@@ -276,6 +282,7 @@ private extension IdentityCenterResponse {
 }
 
 /// PATCH response — we ignore the body, just need the success signal.
+/// Backend route emits `{ "bridge": {...} }` (singular).
 struct BridgesEchoResponse: Decodable, Sendable {
-    let bridges: BridgesDTO?
+    let bridge: BridgesDTO?
 }

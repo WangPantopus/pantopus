@@ -66,10 +66,17 @@ class IdentityCenterViewModel
             val snapshot = raw ?: return
             val personaId = snapshot.audienceProfile?.id ?: return
             val previous = snapshot.bridges
+            // Backend `Joi` schema requires BOTH booleans on every PATCH
+            // — seed with the current snapshot so the untouched row
+            // keeps its server-canonical value.
+            val basePersonaOnLocal = previous?.showPersonaOnLocal ?: false
+            val baseLocalOnPersona = previous?.showLocalOnPersona ?: false
             val body =
                 when (rowId) {
-                    "showPublicOnLocal" -> UpdateBridgesBody(showPersonaOnLocal = isOn)
-                    "showLocalOnPublic" -> UpdateBridgesBody(showLocalOnPersona = isOn)
+                    "showPublicOnLocal" ->
+                        UpdateBridgesBody(showPersonaOnLocal = isOn, showLocalOnPersona = baseLocalOnPersona)
+                    "showLocalOnPublic" ->
+                        UpdateBridgesBody(showPersonaOnLocal = basePersonaOnLocal, showLocalOnPersona = isOn)
                     else -> return
                 }
             raw = snapshot.updatingBridges(rowId = rowId, isOn = isOn)
