@@ -36,7 +36,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -385,12 +384,12 @@ class NotificationsViewModel
                 zone: ZoneId,
                 onTap: (NotificationDto) -> Unit,
             ): List<RowSection> {
-                val today = LocalDate.ofInstant(now, zone)
+                val today = now.atZone(zone).toLocalDate()
                 val todayRows = mutableListOf<RowModel>()
                 val earlierRows = mutableListOf<RowModel>()
                 for (dto in dtos) {
                     val created = parseInstant(dto.createdAt) ?: now
-                    val createdDate = LocalDate.ofInstant(created, zone)
+                    val createdDate = created.atZone(zone).toLocalDate()
                     val row = row(dto = dto, now = now, zone = zone) { onTap(dto) }
                     if (!createdDate.isBefore(today)) {
                         todayRows.add(row)
@@ -469,19 +468,30 @@ class NotificationsViewModel
             ): String? {
                 val date = parseInstant(raw) ?: return null
                 val seconds = ChronoUnit.SECONDS.between(date, now)
-                if (seconds < 60) return "now"
-                if (seconds < 3600) return "${seconds / 60}m"
-                if (seconds < 86_400) return "${seconds / 3600}h"
-                val today = LocalDate.ofInstant(now, zone)
-                val createdDate = LocalDate.ofInstant(date, zone)
-                val days = ChronoUnit.DAYS.between(createdDate, today)
-                if (days == 1L) return "Yesterday"
-                if (days < 7L) {
-                    return createdDate.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.US)
-                }
-                return DateTimeFormatter.ofPattern("MMM d", Locale.US)
-                    .withZone(zone)
-                    .format(date)
+                val label =
+                    when {
+                        seconds < 60 -> "now"
+                        seconds < 3600 -> "${seconds / 60}m"
+                        seconds < 86_400 -> "${seconds / 3600}h"
+                        else -> {
+                            val today = now.atZone(zone).toLocalDate()
+                            val createdDate = date.atZone(zone).toLocalDate()
+                            val days = ChronoUnit.DAYS.between(createdDate, today)
+                            when {
+                                days == 1L -> "Yesterday"
+                                days < 7L ->
+                                    createdDate.dayOfWeek.getDisplayName(
+                                        TextStyle.SHORT,
+                                        Locale.US,
+                                    )
+                                else ->
+                                    DateTimeFormatter.ofPattern("MMM d", Locale.US)
+                                        .withZone(zone)
+                                        .format(date)
+                            }
+                        }
+                    }
+                return label
             }
         }
     }

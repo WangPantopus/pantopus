@@ -17,6 +17,8 @@ import XCTest
 
 // swiftlint:disable file_length type_body_length
 
+private let notificationsTestsUTC = TimeZone(secondsFromGMT: 0) ?? .current
+
 @MainActor
 final class NotificationsViewModelTests: XCTestCase {
     override func setUp() {
@@ -33,7 +35,7 @@ final class NotificationsViewModelTests: XCTestCase {
         )
     }
 
-    private static let utc = TimeZone(secondsFromGMT: 0) ?? .current
+    private static let utc = notificationsTestsUTC
 
     /// Fixed clock + calendar so date-bucketing tests are deterministic.
     /// 2026-05-15 12:00:00 UTC — Friday.
@@ -45,14 +47,14 @@ final class NotificationsViewModelTests: XCTestCase {
         components.hour = 12
         components.minute = 0
         components.second = 0
-        components.timeZone = Self.utc
+        components.timeZone = notificationsTestsUTC
         return Calendar(identifier: .gregorian).date(from: components)
             ?? Date(timeIntervalSince1970: 1_778_846_400)
     }()
 
     private static let utcCalendar: Calendar = {
         var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = Self.utc
+        cal.timeZone = notificationsTestsUTC
         return cal
     }()
 
@@ -420,7 +422,7 @@ final class NotificationsViewModelTests: XCTestCase {
                 "2026-05-15T11:55:00Z",
                 now: Self.fixedNow,
                 calendar: cal,
-                timeZone: utc
+                timeZone: Self.utc
             ),
             "5m"
         )
@@ -429,7 +431,7 @@ final class NotificationsViewModelTests: XCTestCase {
                 "2026-05-15T09:00:00Z",
                 now: Self.fixedNow,
                 calendar: cal,
-                timeZone: utc
+                timeZone: Self.utc
             ),
             "3h"
         )
@@ -438,7 +440,7 @@ final class NotificationsViewModelTests: XCTestCase {
                 "2026-05-14T08:00:00Z",
                 now: Self.fixedNow,
                 calendar: cal,
-                timeZone: utc
+                timeZone: Self.utc
             ),
             "Yesterday"
         )
@@ -447,7 +449,7 @@ final class NotificationsViewModelTests: XCTestCase {
                 "2026-05-12T08:00:00Z",
                 now: Self.fixedNow,
                 calendar: cal,
-                timeZone: utc
+                timeZone: Self.utc
             ),
             "Tue"
         )
@@ -456,7 +458,7 @@ final class NotificationsViewModelTests: XCTestCase {
                 "2026-04-20T08:00:00Z",
                 now: Self.fixedNow,
                 calendar: cal,
-                timeZone: utc
+                timeZone: Self.utc
             ),
             "Apr 20"
         )

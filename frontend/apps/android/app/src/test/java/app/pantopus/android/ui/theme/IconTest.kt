@@ -64,6 +64,13 @@ class IconTest {
             "briefcase",
             "gavel",
             "sliders-horizontal",
+            "message-circle",
+            "at-sign",
+            "badge-check",
+            "tag",
+            "shield-alert",
+            "check-check",
+            "history",
         )
 
     @Test
