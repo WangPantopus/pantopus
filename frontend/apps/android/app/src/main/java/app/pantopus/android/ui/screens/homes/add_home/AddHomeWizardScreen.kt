@@ -40,7 +40,8 @@ import app.pantopus.android.ui.screens.shared.wizard.blocks.HeadlineBlock
 import app.pantopus.android.ui.screens.shared.wizard.blocks.ReviewSummaryBlock
 import app.pantopus.android.ui.screens.shared.wizard.blocks.ReviewSummaryRow
 import app.pantopus.android.ui.screens.shared.wizard.blocks.SubcopyBlock
-import app.pantopus.android.ui.screens.shared.wizard.blocks.SuccessHeroBlock
+import app.pantopus.android.ui.screens.status.StatusWaitingBody
+import app.pantopus.android.ui.screens.status.StatusWaitingContent
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -242,9 +243,15 @@ private fun ReviewStep(state: AddHomeUiState) {
 
 @Composable
 private fun SuccessStep() {
-    SuccessHeroBlock(
-        headline = "Home added",
-        subcopy = "We'll email you when verification completes.",
+    // Reuse the T3.6 Status / Waiting body. The headline + subcopy
+    // are the Add-Home variants of the success frame; everything
+    // else (illustration, action cards, explainer bullets) is shared.
+    StatusWaitingBody(
+        content =
+            StatusWaitingContent.claimSubmitted().copy(
+                headline = "Home added",
+                subcopy = "We'll email you when verification completes.",
+            ),
     )
 }
 

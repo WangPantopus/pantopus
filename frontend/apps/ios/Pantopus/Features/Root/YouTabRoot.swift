@@ -21,6 +21,7 @@ public enum YouRoute: Hashable {
     case publicProfile(userId: String)
     case pulsePost(postId: String)
     case privacyHandshake(personaHandle: String)
+    case statusWaiting
     #endif
 }
 
@@ -229,6 +230,9 @@ public struct YouTabRoot: View {
         case "me.debug.openInviteToken":
             debugInviteTokenSheet = true
             return
+        case "me.debug.openStatusWaiting":
+            path.append(.statusWaiting)
+            return
         default:
             break
         }
@@ -305,6 +309,12 @@ public struct YouTabRoot: View {
                     personaHandle: personaHandle,
                     onDismiss: { if !path.isEmpty { path.removeLast() } }
                 )
+            )
+        case .statusWaiting:
+            StatusWaitingView(
+                content: .claimSubmitted(homeName: "412 Elm St"),
+                onPrimary: { _ in if !path.isEmpty { path.removeLast() } },
+                onSecondary: { _ in if !path.isEmpty { path.removeLast() } }
             )
         #endif
         }

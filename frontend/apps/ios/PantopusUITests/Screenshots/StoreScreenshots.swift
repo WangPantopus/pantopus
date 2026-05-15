@@ -210,6 +210,21 @@ final class StoreScreenshots: XCTestCase {
                 .matching(identifier: "meIdentityPill_personal").firstMatch.tap()
         }
 
+        // You tab → debug menu → Status / Waiting (T3.6) so the
+        // marketing matrix has a visual of the claim-submitted frame.
+        let statusRow = app.descendants(matching: .any)
+            .matching(identifier: "meSectionRow_debug_openStatusWaiting").firstMatch
+        if statusRow.waitForExistence(timeout: 3) {
+            statusRow.tap()
+            if app.descendants(matching: .any)
+                .matching(identifier: "statusWaiting").firstMatch
+                .waitForExistence(timeout: 5)
+            {
+                snapshot("18_StatusWaiting")
+            }
+            app.buttons["statusPrimaryCta"].firstMatch.tap()
+        }
+
         // You tab → debug menu → Privacy Handshake (T3.4) so the
         // marketing matrix has a visual of the wizard archetype +
         // persona preview card.
