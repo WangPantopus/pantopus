@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.ui.screens.shared.identity.IdentityOption
+import app.pantopus.android.ui.screens.shared.identity.IdentitySwitcherPillRow
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -121,7 +123,7 @@ private fun LoadingFrame() {
 }
 
 @Composable
-private fun PopulatedFrame(
+internal fun PopulatedFrame(
     active: MeIdentityContent,
     onSwitch: (MeIdentity) -> Unit,
     onAction: (MeActionTile) -> Unit,
@@ -229,7 +231,20 @@ private fun MeHeader(
                 }
             }
         }
-        IdentityPillRow(active = content.identity, onSwitch = onSwitch)
+        IdentitySwitcherPillRow(
+            options =
+                MeIdentity.entries.map { identity ->
+                    IdentityOption(
+                        id = identity.key,
+                        label = identity.label,
+                        icon = identity.icon,
+                        accent = identity.accent,
+                    )
+                },
+            activeId = content.identity.key,
+            identifierPrefix = "meIdentityPill",
+            onSelect = { key -> onSwitch(MeIdentity.fromKey(key)) },
+        )
         if (!content.bio.isNullOrEmpty()) {
             Text(
                 text = content.bio,
@@ -287,56 +302,6 @@ private fun Avatar(content: MeIdentityContent) {
                     size = 11.dp,
                     tint = PantopusColors.appTextInverse,
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun IdentityPillRow(
-    active: MeIdentity,
-    onSwitch: (MeIdentity) -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
-                .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        MeIdentity.entries.forEach { identity ->
-            val isActive = identity == active
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .height(30.dp)
-                        .clip(RoundedCornerShape(Radii.pill))
-                        .background(if (isActive) identity.accent else Color.Transparent)
-                        .clickable { onSwitch(identity) }
-                        .testTag("meIdentityPill_${identity.key}"),
-                contentAlignment = Alignment.Center,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    PantopusIconImage(
-                        icon = identity.icon,
-                        contentDescription = null,
-                        size = 11.dp,
-                        tint = if (isActive) PantopusColors.appTextInverse else PantopusColors.appTextStrong,
-                    )
-                    Text(
-                        text = identity.label,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isActive) PantopusColors.appTextInverse else PantopusColors.appTextStrong,
-                    )
-                }
             }
         }
     }

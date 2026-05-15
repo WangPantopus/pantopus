@@ -251,39 +251,23 @@ private struct MeHeader: View {
     }
 
     private var identityPillRow: some View {
-        HStack(spacing: 6) {
-            ForEach(MeIdentity.allCases, id: \.rawValue) { identity in
-                Button {
+        IdentitySwitcherPillRow(
+            options: MeIdentity.allCases.map { identity in
+                IdentityOption(
+                    id: identity.rawValue,
+                    label: identity.label,
+                    icon: identity.icon,
+                    accent: identity.accent
+                )
+            },
+            activeId: content.identity.rawValue,
+            identifierPrefix: "meIdentityPill",
+            onSelect: { rawValue in
+                if let identity = MeIdentity(rawValue: rawValue) {
                     onSwitch(identity)
-                } label: {
-                    HStack(spacing: 5) {
-                        Icon(
-                            identity.icon,
-                            size: 11,
-                            strokeWidth: 2.4,
-                            color: identity == content.identity ? Theme.Color.appTextInverse : Theme.Color.appTextStrong
-                        )
-                        Text(identity.label)
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(identity == content.identity ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 30)
-                    .background(identity == content.identity ? identity.accent : Color.clear)
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("meIdentityPill_\(identity.rawValue)")
-                .accessibilityAddTraits(identity == content.identity ? [.isButton, .isSelected] : .isButton)
             }
-        }
-        .padding(3)
-        .background(Theme.Color.appSurface)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
     }
 }
 

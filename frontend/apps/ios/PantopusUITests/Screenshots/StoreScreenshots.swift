@@ -88,15 +88,35 @@ final class StoreScreenshots: XCTestCase {
         // Back to Hub.
         app.buttons["tab.hub"].firstMatch.tap()
 
-        // You tab → Edit Profile sheet.
+        // You tab → Me view (Personal identity by default).
         app.buttons["tab.you"].firstMatch.tap()
+        _ = app.descendants(matching: .any)
+            .matching(identifier: "meHeader_personal").firstMatch
+            .waitForExistence(timeout: 5)
+        snapshot("06_Me_Personal")
+
+        // Rebind to Home identity — chrome stays, content swaps.
+        let homePill = app.descendants(matching: .any)
+            .matching(identifier: "meIdentityPill_home").firstMatch
+        if homePill.waitForExistence(timeout: 3) {
+            homePill.tap()
+            _ = app.descendants(matching: .any)
+                .matching(identifier: "meHeader_home").firstMatch
+                .waitForExistence(timeout: 5)
+            snapshot("07_Me_Home")
+            // Restore Personal before continuing.
+            app.descendants(matching: .any)
+                .matching(identifier: "meIdentityPill_personal").firstMatch.tap()
+        }
+
+        // You tab → Edit Profile sheet.
         let editProfile = app.buttons["youEditProfileButton"]
         if editProfile.waitForExistence(timeout: 3) {
             editProfile.tap()
             _ = app.descendants(matching: .any)
                 .matching(identifier: "editProfileShell").firstMatch
                 .waitForExistence(timeout: 5)
-            snapshot("06_EditProfile")
+            snapshot("08_EditProfile")
             app.buttons["formCloseButton"].tap()
         }
 
