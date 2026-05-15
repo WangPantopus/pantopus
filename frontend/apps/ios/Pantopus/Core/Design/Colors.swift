@@ -12,6 +12,10 @@ import SwiftUI
 public extension Theme.Color {
     // MARK: - Primary (sky) scale
 
+    /// Primary 25 — `#f8fbff`. Off-white tinted background; sits between
+    /// `appSurface` and `primary50`. Used for the unread-row tint in
+    /// notifications and any "barely there" primary surface.
+    static let primary25 = SwiftUI.Color("Primary/Primary25", bundle: Theme.bundle)
     /// Primary 50 — `#f0f9ff`.
     static let primary50 = SwiftUI.Color("Primary/Primary50", bundle: Theme.bundle)
     /// Primary 100 — `#e0f2fe`.

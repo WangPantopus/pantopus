@@ -8,6 +8,49 @@ screen built in those tiers against three lenses: **iOS ↔ Android parity**,
 Every drift found in this pass is either fixed below or recorded as an
 intentional, acceptable difference with a one-line justification.
 
+## T5.0 archetype evolution
+
+The shared `ListOfRows` archetype was extended in T5.0 to express all 12
+designs in `docs/t5-buildout-plan.md` without bespoke shells. The
+extension is **strictly additive**: every existing call site
+(`NotificationsViewModel`, `MyHomesListViewModel`, `MyClaimsListViewModel`,
+`MailboxListViewModel`, `MailboxDrawersViewModel`) compiles unchanged
+with no migration. New surface area:
+
+- **`RowLeading`** — adds `typeIcon`, `categoryGradientIcon`,
+  `avatarWithBadge` (36/40/44pt, optional verified overlay),
+  `thumbnail` (56/64pt), `bidderStack` (22pt overlapping mini-avatars
+  + `+N` overflow). Existing `.icon` / `.avatar` / `.none` unchanged.
+- **`RowTrailing`** — adds `amountWithChip`, `circularAction`,
+  `verticalActions` (28-30pt compact pairs), `priceStack`. Existing
+  `.statusChip` / `.chevron` / `.kebab` / `.none` unchanged.
+- **`RowModel`** — adds optional `body`, `inlineChip`, `chips[]`,
+  `timeMeta`, `metaTail`, `note`, `highlight` (`unread` / `leading` /
+  `archived`), and `footer` (1–3 in-card 34pt buttons).
+- **`RowSection`** — adds optional `count`, `onSeeAll`, `style`
+  (`flat` default / `card` for Discover hub).
+- **`FABAction.Variant`** — `canonicalCreate` (56pt, default for
+  backwards compat), `secondaryCreate` (52pt), `extendedNav(label)`
+  (48pt pill).
+- **Chrome slots** — optional `searchBar`, `chipStrip` (alt to tabs),
+  `banner` (primary-tinted summary card above the first row).
+- **New theme token** — `primary25` = `#f8fbff` (notification unread
+  row background) on iOS asset catalog, Android `Color.kt`, and the
+  `@pantopus/theme` package + Tailwind preset.
+- **New shared components** — `CompactButton` (34pt footer / 28-30pt
+  inline-action) and `BidderStack` (22pt overlapping mini-avatars +
+  `+N` overflow tile). Both iOS and Android.
+- **Web mirror** — `frontend/apps/web/src/components/list-of-rows/`
+  exposes the same shell (`<ListOfRowsShell />`, `<RowCard />`,
+  `<TabStrip />`, `<LoadingRows />`, `<EmptyState />`,
+  `<ErrorBanner />`, `<FabButton />`). Token-only via Tailwind
+  utilities. Preview at `/list-of-rows-preview`.
+
+Future row screens (Notifications V2, My posts, My bids, My tasks V2,
+Connections, Discover hub, Bills, Pets, Offers, Listing offers, Review
+claims) project their DTOs straight into the contract above; no shell
+change should be required to ship them.
+
 ## How to read this
 
 Each row lists:

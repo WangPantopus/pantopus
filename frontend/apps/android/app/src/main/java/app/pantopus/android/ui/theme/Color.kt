@@ -15,6 +15,13 @@ import androidx.compose.ui.graphics.Color
 @Suppress("TooManyFunctions", "MagicNumber")
 object PantopusColors {
     // Primary (sky)
+    /**
+     * Primary 25 — `#F8FBFF`. Off-white tinted background; sits between
+     * [appSurface] and [primary50]. Used for the unread-row tint in
+     * notifications and any "barely there" primary surface that needs to
+     * read as inert against a clean white tab strip.
+     */
+    val primary25 = Color(0xFFF8FBFF)
     val primary50 = Color(0xFFF0F9FF)
     val primary100 = Color(0xFFE0F2FE)
     val primary200 = Color(0xFFBAE6FD)
