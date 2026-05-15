@@ -67,6 +67,20 @@ final class StoreScreenshots: XCTestCase {
                         .waitForExistence(timeout: 5)
                     {
                         snapshot("14_IdentityCenter")
+                        // Identity Center → Public profile card (T3.3
+                        // Public Profile management dashboard).
+                        let publicCard = app.descendants(matching: .any)
+                            .matching(identifier: "identityCard_publicProfile").firstMatch
+                        if publicCard.waitForExistence(timeout: 3) {
+                            publicCard.tap()
+                            if app.descendants(matching: .any)
+                                .matching(identifier: "audienceProfileContent").firstMatch
+                                .waitForExistence(timeout: 5)
+                            {
+                                snapshot("15_PublicProfile")
+                            }
+                            app.buttons["audienceProfileBackButton"].firstMatch.tap()
+                        }
                     }
                     app.buttons["identityCenterBackButton"].firstMatch.tap()
                 }

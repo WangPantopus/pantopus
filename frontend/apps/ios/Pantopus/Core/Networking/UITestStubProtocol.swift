@@ -115,6 +115,28 @@ final class UITestStubProtocol: URLProtocol {
         case ("GET", "/api/privacy/blocks"):
             finishWith(status: 200, body: Data("{\"blocks\":[]}".utf8))
 
+        case ("GET", "/api/personas/me"):
+            finishWith(status: 200, body: Data(Self.defaultPersonaMeJSON.utf8))
+
+        case ("GET", "/api/personas/me/audience"):
+            finishWith(status: 200, body: Data(Self.defaultAudienceJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.hasSuffix("/posts"):
+            finishWith(status: 200, body: Data(Self.defaultPersonaPostsJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.hasSuffix("/tiers"):
+            finishWith(status: 200, body: Data(Self.defaultPersonaTiersJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.hasSuffix("/membership-stats"):
+            finishWith(status: 200, body: Data(Self.defaultMembershipStatsJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.contains("/dms/threads"):
+            finishWith(status: 200, body: Data(Self.defaultPersonaThreadsJSON.utf8))
+
         default:
             // Unknown endpoint under test — surface a recognizable 599
             // so test failures point clearly at a missing stub.
@@ -258,6 +280,82 @@ final class UITestStubProtocol: URLProtocol {
       "distance_miles":0.2,
       "pickup_address":"Rose Court, Unit 4B"
     }}
+    """
+
+    /// Persona overview for `/api/personas/me` — paired with the
+    /// audience / posts / tiers / stats / threads stubs below to keep
+    /// the T3.3 Public Profile screen stable for the 15_PublicProfile
+    /// screenshot.
+    static let defaultPersonaMeJSON = """
+    {
+      "persona": {
+        "id": "p_demo",
+        "handle": "mayabuilds",
+        "displayName": "Maya Builds",
+        "avatarUrl": null,
+        "bio": "Building things in the Mission.",
+        "category": "creator",
+        "audienceLabel": "followers",
+        "followerCount": 12,
+        "postCount": 7
+      },
+      "channel": {
+        "id": "ch_demo", "title": "Maya Broadcast", "status": "active"
+      }
+    }
+    """
+
+    static let defaultAudienceJSON = """
+    {
+      "persona": null,
+      "items": [
+        {"membershipId":"m1","fanHandle":"alex","fanDisplayName":"Alex M.",
+         "status":"active","tier":{"rank":1,"name":"Followers"},
+         "verifiedLocal":true,"tenureMonths":3,"joinedMonth":"2026-02"},
+        {"membershipId":"m2","fanHandle":"billie","fanDisplayName":"Billie B.",
+         "status":"active","tier":{"rank":2,"name":"Members"},
+         "tenureMonths":12,"joinedMonth":"2025-05"},
+        {"membershipId":"m3","fanHandle":"casey","fanDisplayName":"Casey K.",
+         "status":"active","tier":{"rank":3,"name":"Insiders"},
+         "tenureMonths":6,"joinedMonth":"2025-11"}
+      ],
+      "counts": {
+        "totalActive": 12, "pending": 3,
+        "byTier": {"1": 8, "2": 3, "3": 1, "4": 0}
+      }
+    }
+    """
+
+    static let defaultPersonaPostsJSON = """
+    {"posts":[
+      {"id":"u1","body":"New mural going up next week.",
+       "created_at":"2026-05-14T18:00:00Z","visibility":"followers",
+       "delivered_count":40,"read_count":31},
+      {"id":"u2","body":"Workshop seats just opened — Members get first pick.",
+       "created_at":"2026-05-13T09:00:00Z","visibility":"tier_or_above",
+       "target_tier_rank":2,"delivered_count":3,"read_count":2}
+    ]}
+    """
+
+    static let defaultPersonaTiersJSON = """
+    {"tiers":[
+      {"id":"t1","rank":1,"name":"Followers","priceCents":0,"currency":"usd"},
+      {"id":"t2","rank":2,"name":"Members","priceCents":500,"currency":"usd"},
+      {"id":"t3","rank":3,"name":"Insiders","priceCents":2500,"currency":"usd"}
+    ]}
+    """
+
+    static let defaultMembershipStatsJSON = """
+    {"counts":{"followers":8,"members":3,"insiders":1,"direct":0}}
+    """
+
+    static let defaultPersonaThreadsJSON = """
+    {"threads":[
+      {"id":"th1","membershipId":"m1","fanHandle":"alex","fanDisplayName":"Alex M.",
+       "tier":{"rank":2,"name":"Members"},
+       "lastMessagePreview":"Loved the workshop! Any plans for July?",
+       "lastMessageAt":"2026-05-15T10:00:00Z","unreadCount":2}
+    ]}
     """
 
     /// Identity Center overview — all four identities populated so the

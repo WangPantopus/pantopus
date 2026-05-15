@@ -72,6 +72,7 @@ import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
 import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
+import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
 import app.pantopus.android.ui.screens.identity_center.IdentityCenterScreen
 import app.pantopus.android.ui.screens.identity_center.IdentityKind
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
@@ -114,6 +115,9 @@ private object ChildRoutes {
 
     /** Profiles & Privacy / Identity Center (T3.2). */
     const val IDENTITY_CENTER = "identity-center"
+
+    /** Public Profile management / Creator audience dashboard (T3.3). */
+    const val AUDIENCE_PROFILE = "audience-profile"
 
     /**
      * Generic placeholder for intents whose destination hasn't been
@@ -677,18 +681,34 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(ChildRoutes.SETTINGS_PRIVACY) {
                 PrivacySettingsScreen(onBack = { navController.popBackStack() })
             }
+            composable(ChildRoutes.AUDIENCE_PROFILE) {
+                AudienceProfileScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenFollower = { row ->
+                        navController.navigate(ChildRoutes.placeholder("Follower · ${row.displayName}"))
+                    },
+                    onOpenThread = { row ->
+                        navController.navigate(ChildRoutes.placeholder("Thread · ${row.displayName}"))
+                    },
+                    onOpenSetup = {
+                        navController.navigate(ChildRoutes.placeholder("Set up Public Profile"))
+                    },
+                )
+            }
             composable(ChildRoutes.IDENTITY_CENTER) {
                 IdentityCenterScreen(
                     onBack = { navController.popBackStack() },
                     onOpenIdentity = { card ->
-                        val label =
-                            when (card.kind) {
-                                IdentityKind.Local -> "Local profile"
-                                IdentityKind.Personal -> "Personal"
-                                IdentityKind.PublicProfile -> "Public profile"
-                                IdentityKind.Professional -> "Professional"
-                            }
-                        navController.navigate(ChildRoutes.placeholder(label))
+                        when (card.kind) {
+                            IdentityKind.PublicProfile ->
+                                navController.navigate(ChildRoutes.AUDIENCE_PROFILE)
+                            IdentityKind.Local ->
+                                navController.navigate(ChildRoutes.placeholder("Local profile"))
+                            IdentityKind.Personal ->
+                                navController.navigate(ChildRoutes.placeholder("Personal"))
+                            IdentityKind.Professional ->
+                                navController.navigate(ChildRoutes.placeholder("Professional"))
+                        }
                     },
                     onOpenPlaceholder = { label ->
                         navController.navigate(ChildRoutes.placeholder(label))

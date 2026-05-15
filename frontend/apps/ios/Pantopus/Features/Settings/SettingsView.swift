@@ -15,6 +15,7 @@ public enum SettingsStackRoute: Hashable {
     case notifications
     case privacy
     case identityCenter
+    case audienceProfile
     case placeholder(label: String)
 }
 
@@ -68,6 +69,15 @@ public struct SettingsView: View {
             )
         case .identityCenter:
             IdentityCenterView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOpenIdentity: { card in
+                    if card.kind == .publicProfile {
+                        path.append(.audienceProfile)
+                    }
+                }
+            )
+        case .audienceProfile:
+            AudienceProfileView(
                 onBack: { if !path.isEmpty { path.removeLast() } }
             )
         case let .placeholder(label):

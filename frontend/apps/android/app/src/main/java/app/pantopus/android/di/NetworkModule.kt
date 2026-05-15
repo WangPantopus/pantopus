@@ -7,6 +7,7 @@ import app.pantopus.android.data.api.models.homes.UploadEvidenceRequestJsonAdapt
 import app.pantopus.android.data.api.net.RetryInterceptor
 import app.pantopus.android.data.api.services.AuthApi
 import app.pantopus.android.data.api.services.BlocksApi
+import app.pantopus.android.data.api.services.AudienceProfileApi
 import app.pantopus.android.data.api.services.ChatApi
 import app.pantopus.android.data.api.services.FilesApi
 import app.pantopus.android.data.api.services.GigsApi
@@ -171,6 +172,11 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideIdentityCenterApi(retrofit: Retrofit): IdentityCenterApi = retrofit.create(IdentityCenterApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideAudienceProfileApi(retrofit: Retrofit): AudienceProfileApi =
+        retrofit.create(AudienceProfileApi::class.java)
 
     // Legacy aggregate — retained for existing AuthRepository / FeedScreen.
     @Provides @Singleton
