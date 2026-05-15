@@ -39,6 +39,7 @@ struct HubTopBar: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Notifications")
+                .accessibilityIdentifier("hubBellButton")
                 if content.unreadCount > 0 {
                     Circle()
                         .fill(Theme.Color.error)

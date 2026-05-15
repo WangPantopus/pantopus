@@ -70,6 +70,7 @@ import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
+import app.pantopus.android.ui.screens.notifications.NotificationsScreen
 import app.pantopus.android.ui.screens.nearby.map.MapEntity
 import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
 import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
@@ -108,8 +109,8 @@ private object ChildRoutes {
         "homes/{$INVITE_OWNER_HOME_ID_KEY}/invite?email={$INVITE_OWNER_CURRENT_EMAIL_KEY}"
     const val DISAMBIGUATE_MAIL = "mailbox/disambiguate/{$DISAMBIGUATE_MAIL_ID_KEY}"
 
-    /** Bell icon target. Replaced by the real notifications screen in T4.1. */
-    const val NOTIFICATIONS = "_placeholder/notifications"
+    /** Notifications center (T4.1). Reached from the Hub bell icon. */
+    const val NOTIFICATIONS = "notifications"
 
     /** Hub menu icon target. Replaced by Settings in T3.1. */
     const val MENU = "settings"
@@ -312,17 +313,76 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
     val badges: Map<PantopusRoute, Int> =
         if (inboxBadgeCount > 0) mapOf(PantopusRoute.Inbox to inboxBadgeCount) else emptyMap()
 
-    // Consume pending deep links — when the host activity routed
-    // `pantopus://invite/:token` (or the https equivalent) through the
-    // DeepLinkRouter, push the token-accept route.
+    // Consume pending deep links — when the host activity (or a
+    // notification tap) routed a URL or path through DeepLinkRouter,
+    // dispatch to the matching screen. Mirrors the iOS T4.1 routing
+    // table from `docs/07-frontend-mobile-app.md §9`.
     val pendingDeepLink by DeepLinkRouter.pending.collectAsStateWithLifecycle()
     LaunchedEffect(pendingDeepLink) {
         when (val pending = pendingDeepLink) {
+            null -> Unit
             is DeepLinkRouter.Destination.Invite -> {
                 navController.navigate(ChildRoutes.tokenAccept(pending.token))
                 DeepLinkRouter.consume()
             }
-            else -> Unit
+            DeepLinkRouter.Destination.Notifications -> {
+                navController.navigate(ChildRoutes.NOTIFICATIONS)
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.Feed -> {
+                navController.navigate(ChildRoutes.PULSE_FEED)
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.Home -> {
+                navController.navigate(PantopusRoute.Hub.path)
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.Connections -> {
+                navController.navigate(ChildRoutes.placeholder("Connections"))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.Post -> {
+                navController.navigate(ChildRoutes.pulsePost(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.Conversation -> {
+                // Drop the user on the Inbox tab — the chat-conversation
+                // route needs counterparty metadata the deep link doesn't
+                // carry. Mirrors iOS, which selects the Inbox tab.
+                navController.navigate(PantopusRoute.Inbox.path)
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.SupportTrain -> {
+                navController.navigate(ChildRoutes.placeholder("Support train · ${pending.id}"))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.Gig -> {
+                navController.navigate(ChildRoutes.gigDetail(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.Listing -> {
+                navController.navigate(ChildRoutes.listingDetail(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.HomeDetail -> {
+                navController.navigate(ChildRoutes.homeDashboard(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.HomeDashboard -> {
+                navController.navigate(ChildRoutes.homeDashboard(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.HomeMemberRequests -> {
+                navController.navigate(ChildRoutes.placeholder("Member requests · ${pending.id}"))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.User -> {
+                navController.navigate(ChildRoutes.publicProfile(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.Unknown -> {
+                DeepLinkRouter.consume()
+            }
         }
     }
 
@@ -710,7 +770,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.NOTIFICATIONS) {
-                NotYetAvailableView(tabName = "Notifications", icon = PantopusIcon.Bell)
+                NotificationsScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.MENU) {
                 SettingsIndexScreen(

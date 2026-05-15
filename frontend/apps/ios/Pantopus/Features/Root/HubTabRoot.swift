@@ -329,7 +329,10 @@ public struct HubTabRoot: View {
                 onBack: { if !path.isEmpty { path.removeLast() } }
             )
         case .notifications:
-            NotYetAvailableView(tabName: "Notifications", icon: .bell)
+            NotificationsView(
+                viewModel: NotificationsViewModel(),
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
         case .menu:
             SettingsView(
                 onClose: { if !path.isEmpty { path.removeLast() } },

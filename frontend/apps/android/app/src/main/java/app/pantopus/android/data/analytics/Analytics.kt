@@ -27,6 +27,8 @@ sealed class AnalyticsEvent(
 
     data object ScreenMyClaimsViewed : AnalyticsEvent("screen.my_claims.viewed")
 
+    data object ScreenNotificationsViewed : AnalyticsEvent("screen.notifications.viewed")
+
     data class ScreenPulseFeedViewed(
         val intent: String,
     ) : AnalyticsEvent("screen.pulse_feed.viewed") {

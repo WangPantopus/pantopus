@@ -99,8 +99,32 @@ public struct RootTabView: View {
     }
 
     private func consumeInviteDeepLinkIfNeeded(pending: DeepLinkRouter.Destination?) {
-        if case let .invite(token) = pending {
+        guard let pending else { return }
+        // Tab-level destinations: switch tabs (the per-tab route stack
+        // handles deeper drill-downs when those tabs route the
+        // pending entry into their own NavigationStack — for the T4.1
+        // pass we just land the user on the matching tab and let the
+        // user finish the drill).
+        switch pending {
+        case .invite(let token):
             pendingInviteToken = token
+            _ = router.consume()
+        case .feed, .post, .supportTrain, .user, .connections:
+            model.selected = .hub
+            _ = router.consume()
+        case .gig, .listing, .homeDetail, .homeDashboard, .homeMemberRequests:
+            model.selected = .hub
+            _ = router.consume()
+        case .conversation:
+            model.selected = .inbox
+            _ = router.consume()
+        case .notifications:
+            model.selected = .hub
+            _ = router.consume()
+        case .home:
+            model.selected = .hub
+            _ = router.consume()
+        case .unknown:
             _ = router.consume()
         }
     }

@@ -15,6 +15,7 @@ import app.pantopus.android.data.api.services.HomesApi
 import app.pantopus.android.data.api.services.IdentityCenterApi
 import app.pantopus.android.data.api.services.ListingsApi
 import app.pantopus.android.data.api.services.MailComposeApi
+import app.pantopus.android.data.api.services.NotificationsApi
 import app.pantopus.android.data.api.services.PrivacyApi
 import app.pantopus.android.data.api.services.PrivacyHandshakeApi
 import app.pantopus.android.data.api.services.TokenAcceptApi
@@ -195,6 +196,11 @@ object NetworkModule {
     @Singleton
     fun provideMailComposeApi(retrofit: Retrofit): MailComposeApi =
         retrofit.create(MailComposeApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideNotificationsApi(retrofit: Retrofit): NotificationsApi =
+        retrofit.create(NotificationsApi::class.java)
 
     // Legacy aggregate — retained for existing AuthRepository / FeedScreen.
     @Provides @Singleton

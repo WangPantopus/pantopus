@@ -175,6 +175,19 @@ final class UITestStubProtocol: URLProtocol {
         case let ("GET", path) where path.hasPrefix("/api/mailbox/v2/item/"):
             finishWith(status: 200, body: Data(Self.defaultCeremonialMailItemJSON.utf8))
 
+        case ("GET", "/api/notifications"):
+            let body = env["UI_TESTS_NOTIFICATIONS_LIST_BODY"] ?? Self.defaultNotificationsListJSON
+            finishWith(status: 200, body: Data(body.utf8))
+
+        case ("GET", "/api/notifications/unread-count"):
+            finishWith(status: 200, body: Data("{\"count\":2}".utf8))
+
+        case let ("PATCH", path) where path.hasPrefix("/api/notifications/") && path.hasSuffix("/read"):
+            finishWith(status: 200, body: Data("{\"ok\":true}".utf8))
+
+        case ("POST", "/api/notifications/read-all"):
+            finishWith(status: 200, body: Data("{\"count\":0}".utf8))
+
         // The handshake screen calls GET /api/personas/:handle ahead
         // of its tiers / suggestion / status fetches. Match exactly 3
         // path segments (`/api`, `/personas`, `/<handle>`) so the
@@ -491,6 +504,27 @@ final class UITestStubProtocol: URLProtocol {
 
     static let defaultMailSendJSON = """
     {"message":"Letter sent","mail":{"id":"mail_demo","subject":"A note from a friend","created_at":"2026-05-15T12:00:00Z"}}
+    """
+
+    /// Notifications list used by the 21_Notifications screenshot. Two
+    /// unread rows so the "Mark all read" action lights up and the
+    /// projection covers both NEW chip + chevron variants once any one
+    /// row gets tapped.
+    static let defaultNotificationsListJSON = """
+    {"notifications":[
+      {"id":"n_1","user_id":"u_test","type":"post","title":"Maya posted in your block",
+       "body":"\\"Anyone seen the moving truck on Elm?\\"","icon":null,
+       "link":"/post/p_demo","is_read":false,
+       "created_at":"2026-05-15T10:00:00Z","context":null},
+      {"id":"n_2","user_id":"u_test","type":"gig","title":"New bid on your gig",
+       "body":"$60 — Hang 3 shelves","icon":null,
+       "link":"/gig/g_demo","is_read":false,
+       "created_at":"2026-05-15T09:30:00Z","context":null},
+      {"id":"n_3","user_id":"u_test","type":"home_member_request","title":"Membership request",
+       "body":"Sam wants to join your home","icon":null,
+       "link":"/homes/home_test/members?tab=requests","is_read":true,
+       "created_at":"2026-05-15T08:00:00Z","context":null}
+    ],"unreadCount":2,"hasMore":false}
     """
 
     /// Ceremonial mail item — used by the 20_CeremonialMailOpen

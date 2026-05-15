@@ -311,7 +311,23 @@ final class StoreScreenshots: XCTestCase {
             app.buttons["tokenAcceptDecline"].firstMatch.tap()
         }
 
+        // Hub bell → Notifications center (T4.1).
+        app.buttons["tab.hub"].firstMatch.tap()
+        let hubBell = app.descendants(matching: .any)
+            .matching(identifier: "hubBellButton").firstMatch
+        if hubBell.waitForExistence(timeout: 3) {
+            hubBell.tap()
+            if app.descendants(matching: .any)
+                .matching(identifier: "notifications").firstMatch
+                .waitForExistence(timeout: 5)
+            {
+                snapshot("21_Notifications")
+            }
+            app.buttons["notificationsBackButton"].firstMatch.tap()
+        }
+
         // You tab → Edit Profile sheet.
+        app.buttons["tab.you"].firstMatch.tap()
         let editProfile = app.buttons["youEditProfileButton"]
         if editProfile.waitForExistence(timeout: 3) {
             editProfile.tap()

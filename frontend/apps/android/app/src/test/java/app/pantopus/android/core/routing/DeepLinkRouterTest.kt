@@ -77,4 +77,131 @@ class DeepLinkRouterTest {
             DeepLinkRouter.resolveString("https://pantopus.app/invite/abc-123?utm_source=email#anchor"),
         )
     }
+
+    // MARK: - T4.1 routing table
+
+    @Test
+    fun notifications_routes_to_notifications() {
+        assertEquals(DeepLinkRouter.Destination.Notifications, DeepLinkRouter.resolveString("pantopus://notifications"))
+        assertEquals(
+            DeepLinkRouter.Destination.Notifications,
+            DeepLinkRouter.resolveString("https://pantopus.app/notifications"),
+        )
+    }
+
+    @Test
+    fun support_train_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.SupportTrain("st_1"),
+            DeepLinkRouter.resolveString("pantopus://support-trains/st_1"),
+        )
+        assertEquals(
+            DeepLinkRouter.Destination.SupportTrain("st_2"),
+            DeepLinkRouter.resolveString("pantopus://support_train/st_2"),
+        )
+    }
+
+    @Test
+    fun gig_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.Gig("g_1"),
+            DeepLinkRouter.resolveString("pantopus://gig/g_1"),
+        )
+        assertEquals(
+            DeepLinkRouter.Destination.Gig("g_2"),
+            DeepLinkRouter.resolveString("https://pantopus.app/gigs/g_2"),
+        )
+    }
+
+    @Test
+    fun listing_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.Listing("l_1"),
+            DeepLinkRouter.resolveString("pantopus://listing/l_1"),
+        )
+        assertEquals(
+            DeepLinkRouter.Destination.Listing("l_2"),
+            DeepLinkRouter.resolveString("https://pantopus.app/listings/l_2"),
+        )
+    }
+
+    @Test
+    fun home_detail_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.HomeDetail("h_1"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_1"),
+        )
+    }
+
+    @Test
+    fun home_dashboard_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.HomeDashboard("h_1"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_1/dashboard"),
+        )
+    }
+
+    @Test
+    fun home_member_requests_requires_tab_query() {
+        assertEquals(
+            DeepLinkRouter.Destination.HomeMemberRequests("h_1"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_1/members?tab=requests"),
+        )
+    }
+
+    @Test
+    fun home_members_without_tab_falls_back_to_detail() {
+        assertEquals(
+            DeepLinkRouter.Destination.HomeDetail("h_1"),
+            DeepLinkRouter.resolveString("pantopus://homes/h_1/members"),
+        )
+    }
+
+    @Test
+    fun chat_route_uses_conversation_case() {
+        assertEquals(
+            DeepLinkRouter.Destination.Conversation("c_1"),
+            DeepLinkRouter.resolveString("pantopus://chat/c_1"),
+        )
+    }
+
+    @Test
+    fun user_route() {
+        assertEquals(
+            DeepLinkRouter.Destination.User("u_1"),
+            DeepLinkRouter.resolveString("pantopus://user/u_1"),
+        )
+        assertEquals(
+            DeepLinkRouter.Destination.User("u_2"),
+            DeepLinkRouter.resolveString("https://pantopus.app/users/u_2"),
+        )
+    }
+
+    @Test
+    fun connections_route() {
+        assertEquals(DeepLinkRouter.Destination.Connections, DeepLinkRouter.resolveString("pantopus://connections"))
+    }
+
+    // MARK: - Path-form (notification payload) entry point
+
+    @Test
+    fun handle_path_boxes_absolute_path_into_router() {
+        DeepLinkRouter.handle("/post/abc-123")
+        val pending = DeepLinkRouter.consume()
+        assertEquals(DeepLinkRouter.Destination.Post("abc-123"), pending)
+    }
+
+    @Test
+    fun handle_path_boxes_relative_into_router() {
+        DeepLinkRouter.handle("homes/h_1/dashboard")
+        val pending = DeepLinkRouter.consume()
+        assertEquals(DeepLinkRouter.Destination.HomeDashboard("h_1"), pending)
+    }
+
+    @Test
+    fun handle_path_passes_through_full_urls() {
+        DeepLinkRouter.handle("pantopus://gigs/g_99")
+        val pending = DeepLinkRouter.consume()
+        assertEquals(DeepLinkRouter.Destination.Gig("g_99"), pending)
+    }
 }
