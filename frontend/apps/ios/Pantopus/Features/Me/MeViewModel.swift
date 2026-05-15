@@ -102,6 +102,7 @@ public final class MeViewModel {
             MeSectionRow(id: "openProfile", icon: .search, label: "Open public profile by ID", routeKey: "me.debug.openProfile"),
             MeSectionRow(id: "openPost", icon: .search, label: "Open Pulse post by ID", routeKey: "me.debug.openPost"),
             MeSectionRow(id: "openHandshake", icon: .userPlus, label: "Open Privacy Handshake by persona handle", routeKey: "me.debug.openHandshake"),
+            MeSectionRow(id: "openInviteToken", icon: .mailbox, label: "Open invite by token", routeKey: "me.debug.openInviteToken"),
             MeSectionRow(id: "inviteOwner", icon: .userPlus, label: "Invite owner to home by ID", routeKey: "me.debug.inviteOwner"),
             MeSectionRow(id: "disambiguate", icon: .mailbox, label: "Disambiguate mail by ID", routeKey: "me.debug.disambiguate")
         ])

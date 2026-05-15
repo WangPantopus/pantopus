@@ -68,6 +68,7 @@ fun YouScreen(
     onInviteOwner: (String, String) -> Unit = { _, _ -> },
     onDisambiguateMail: (String) -> Unit = {},
     onOpenPrivacyHandshake: (String) -> Unit = {},
+    onOpenInviteToken: (String) -> Unit = {},
     onOpenPlaceholder: (String) -> Unit = {},
     onOpenMailbox: () -> Unit = {},
     onOpenEditProfile: () -> Unit = {},
@@ -81,11 +82,13 @@ fun YouScreen(
     var debugInviteDialog by remember { mutableStateOf(false) }
     var debugDisambiguateDialog by remember { mutableStateOf(false) }
     var debugHandshakeDialog by remember { mutableStateOf(false) }
+    var debugInviteTokenDialog by remember { mutableStateOf(false) }
     var debugProfileId by remember { mutableStateOf("") }
     var debugPostId by remember { mutableStateOf("") }
     var debugInviteHomeId by remember { mutableStateOf("") }
     var debugDisambiguateMailId by remember { mutableStateOf("") }
     var debugHandshakeHandle by remember { mutableStateOf("") }
+    var debugInviteToken by remember { mutableStateOf("") }
 
     MeView(
         onAction = { tile ->
@@ -103,6 +106,7 @@ fun YouScreen(
                 "me.debug.inviteOwner" -> if (BuildConfig.DEBUG) debugInviteDialog = true
                 "me.debug.disambiguate" -> if (BuildConfig.DEBUG) debugDisambiguateDialog = true
                 "me.debug.openHandshake" -> if (BuildConfig.DEBUG) debugHandshakeDialog = true
+                "me.debug.openInviteToken" -> if (BuildConfig.DEBUG) debugInviteTokenDialog = true
                 else -> onOpenPlaceholder(row.label)
             }
         },
@@ -266,6 +270,34 @@ fun YouScreen(
             },
             dismissButton = {
                 TextButton(onClick = { debugHandshakeDialog = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (BuildConfig.DEBUG && debugInviteTokenDialog) {
+        AlertDialog(
+            onDismissRequest = { debugInviteTokenDialog = false },
+            title = { Text("Open invite by token") },
+            text = {
+                OutlinedTextField(
+                    value = debugInviteToken,
+                    onValueChange = { debugInviteToken = it },
+                    label = { Text("Invite token") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val token = debugInviteToken.trim()
+                    debugInviteTokenDialog = false
+                    if (token.isNotEmpty()) {
+                        debugInviteToken = ""
+                        onOpenInviteToken(token)
+                    }
+                }) { Text("Open") }
+            },
+            dismissButton = {
+                TextButton(onClick = { debugInviteTokenDialog = false }) { Text("Cancel") }
             },
         )
     }

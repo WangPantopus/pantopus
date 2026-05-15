@@ -54,4 +54,26 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertNil(DeepLinkRouter.shared.pending)
         XCTAssertNil(DeepLinkRouter.shared.consume())
     }
+
+    func testInviteTokenCustomScheme() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://invite/abc-123"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .invite(token: "abc-123"))
+    }
+
+    func testInviteTokenHTTPSHost() throws {
+        let url = try XCTUnwrap(URL(string: "https://pantopus.app/invite/xyz789"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .invite(token: "xyz789"))
+    }
+
+    func testInviteWithoutTokenFallsBack() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://invite"))
+        DeepLinkRouter.shared.handle(url: url)
+        if case .unknown = DeepLinkRouter.shared.pending {
+            // ok
+        } else {
+            XCTFail("Expected .unknown when /invite is missing the token")
+        }
+    }
 }

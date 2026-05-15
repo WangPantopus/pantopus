@@ -235,6 +235,30 @@ final class StoreScreenshots: XCTestCase {
             app.buttons["wizardLeadingButton"].firstMatch.tap()
         }
 
+        // You tab → debug menu → Token Accept (T3.5) so the marketing
+        // matrix has a visual of the single-decision invite screen.
+        let tokenRow = app.descendants(matching: .any)
+            .matching(identifier: "meSectionRow_debug_openInviteToken").firstMatch
+        if tokenRow.waitForExistence(timeout: 3) {
+            tokenRow.tap()
+            let alert = app.alerts.firstMatch
+            if alert.waitForExistence(timeout: 3) {
+                let field = alert.textFields.firstMatch
+                if field.waitForExistence(timeout: 1) {
+                    field.tap()
+                    field.typeText("demo-home-token")
+                }
+                alert.buttons["Open"].firstMatch.tap()
+            }
+            if app.descendants(matching: .any)
+                .matching(identifier: "tokenAcceptOffer").firstMatch
+                .waitForExistence(timeout: 5)
+            {
+                snapshot("17_TokenAccept")
+            }
+            app.buttons["tokenAcceptDecline"].firstMatch.tap()
+        }
+
         // You tab → Edit Profile sheet.
         let editProfile = app.buttons["youEditProfileButton"]
         if editProfile.waitForExistence(timeout: 3) {

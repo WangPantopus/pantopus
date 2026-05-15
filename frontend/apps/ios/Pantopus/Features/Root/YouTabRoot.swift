@@ -46,11 +46,13 @@ public struct YouTabRoot: View {
     @State private var debugInviteHomeSheet = false
     @State private var debugDisambiguateSheet = false
     @State private var debugHandshakeSheet = false
+    @State private var debugInviteTokenSheet = false
     @State private var debugProfileId = ""
     @State private var debugPostId = ""
     @State private var debugInviteHomeId = ""
     @State private var debugDisambiguateMailId = ""
     @State private var debugHandshakeHandle = ""
+    @State private var debugInviteToken = ""
     @State private var debugInviteFormHomeId: String?
     @State private var debugDisambiguateFormMailId: String?
     #endif
@@ -150,6 +152,19 @@ public struct YouTabRoot: View {
             } message: {
                 Text("Type a persona handle to open the handshake")
             }
+            .alert("Open invite by token", isPresented: $debugInviteTokenSheet) {
+                TextField("Invite token", text: $debugInviteToken)
+                Button("Open") {
+                    let token = debugInviteToken.trimmingCharacters(in: .whitespaces)
+                    if !token.isEmpty {
+                        DeepLinkRouter.shared.handle(url: URL(string: "pantopus://invite/\(token)")!)
+                        debugInviteToken = ""
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Type a token to fire pantopus://invite/<token>")
+            }
             .sheet(item: Binding<DebugInviteHomeItem?>(
                 get: { debugInviteFormHomeId.map { DebugInviteHomeItem(id: $0) } },
                 set: { debugInviteFormHomeId = $0?.id }
@@ -210,6 +225,9 @@ public struct YouTabRoot: View {
             return
         case "me.debug.openHandshake":
             debugHandshakeSheet = true
+            return
+        case "me.debug.openInviteToken":
+            debugInviteTokenSheet = true
             return
         default:
             break

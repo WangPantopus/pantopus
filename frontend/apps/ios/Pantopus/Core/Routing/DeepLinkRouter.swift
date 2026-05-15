@@ -17,6 +17,7 @@ final class DeepLinkRouter {
         case home
         case post(id: String)
         case conversation(id: String)
+        case invite(token: String)
         case unknown(URL)
     }
 
@@ -72,6 +73,11 @@ final class DeepLinkRouter {
             return .unknown(url)
         case "message", "messages", "conversation":
             if let id = segments.dropFirst().first { return .conversation(id: id) }
+            return .unknown(url)
+        case "invite":
+            if let token = segments.dropFirst().first, !token.isEmpty {
+                return .invite(token: token)
+            }
             return .unknown(url)
         default:
             return .unknown(url)

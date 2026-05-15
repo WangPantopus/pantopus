@@ -50,6 +50,8 @@ public final class RootTabModel {
 /// NavigationStack so deep navigation within a tab survives tab switches.
 public struct RootTabView: View {
     @State private var model = RootTabModel()
+    @State private var router = DeepLinkRouter.shared
+    @State private var pendingInviteToken: String?
 
     public init() {}
 
@@ -74,6 +76,33 @@ public struct RootTabView: View {
         }
         .tint(Theme.Color.primary600)
         .environment(model)
+        .onChange(of: router.pending) { _, pending in
+            consumeInviteDeepLinkIfNeeded(pending: pending)
+        }
+        .task {
+            consumeInviteDeepLinkIfNeeded(pending: router.pending)
+        }
+        .fullScreenCover(
+            item: Binding<InviteSheetToken?>(
+                get: { pendingInviteToken.map(InviteSheetToken.init(token:)) },
+                set: { pendingInviteToken = $0?.token }
+            )
+        ) { item in
+            TokenAcceptView(
+                viewModel: TokenAcceptViewModel(
+                    token: item.token,
+                    onAccepted: { _ in pendingInviteToken = nil },
+                    onDeclined: { pendingInviteToken = nil }
+                )
+            )
+        }
+    }
+
+    private func consumeInviteDeepLinkIfNeeded(pending: DeepLinkRouter.Destination?) {
+        if case let .invite(token) = pending {
+            pendingInviteToken = token
+            _ = router.consume()
+        }
     }
 
     private var tabBinding: Binding<RootTab> {
@@ -93,6 +122,13 @@ public struct RootTabView: View {
         .accessibilityLabel(tab.label)
         .accessibilityIdentifier("tab.\(tab)")
     }
+}
+
+/// `Identifiable` wrapper so `fullScreenCover(item:)` can fire when
+/// the token string is non-nil.
+private struct InviteSheetToken: Identifiable, Equatable {
+    let token: String
+    var id: String { token }
 }
 
 #Preview {

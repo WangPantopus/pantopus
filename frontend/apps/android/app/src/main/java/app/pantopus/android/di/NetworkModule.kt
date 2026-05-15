@@ -16,6 +16,7 @@ import app.pantopus.android.data.api.services.IdentityCenterApi
 import app.pantopus.android.data.api.services.ListingsApi
 import app.pantopus.android.data.api.services.PrivacyApi
 import app.pantopus.android.data.api.services.PrivacyHandshakeApi
+import app.pantopus.android.data.api.services.TokenAcceptApi
 import app.pantopus.android.data.api.services.HubApi
 import app.pantopus.android.data.api.services.MailboxApi
 import app.pantopus.android.data.api.services.MailboxV2Api
@@ -183,6 +184,11 @@ object NetworkModule {
     @Singleton
     fun providePrivacyHandshakeApi(retrofit: Retrofit): PrivacyHandshakeApi =
         retrofit.create(PrivacyHandshakeApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideTokenAcceptApi(retrofit: Retrofit): TokenAcceptApi =
+        retrofit.create(TokenAcceptApi::class.java)
 
     // Legacy aggregate — retained for existing AuthRepository / FeedScreen.
     @Provides @Singleton

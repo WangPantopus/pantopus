@@ -9,7 +9,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.core.routing.DeepLinkRouter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -74,6 +77,7 @@ import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
+import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.identity_center.IdentityCenterScreen
 import app.pantopus.android.ui.screens.identity_center.IdentityKind
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
@@ -126,6 +130,15 @@ private object ChildRoutes {
 
     fun privacyHandshake(handle: String): String =
         "handshake/${java.net.URLEncoder.encode(handle, "UTF-8")}"
+
+    /** Token / Accept screen (T3.5). Resolves the token then accepts
+     *  via the matching backend route. Mirrors iOS DeepLinkRouter's
+     *  `.invite(token)` destination. */
+    const val TOKEN_ACCEPT_TOKEN_KEY = "token"
+    const val TOKEN_ACCEPT = "invite/{$TOKEN_ACCEPT_TOKEN_KEY}"
+
+    fun tokenAccept(token: String): String =
+        "invite/${java.net.URLEncoder.encode(token, "UTF-8")}"
 
     /**
      * Generic placeholder for intents whose destination hasn't been
@@ -287,6 +300,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
     val badges: Map<PantopusRoute, Int> =
         if (inboxBadgeCount > 0) mapOf(PantopusRoute.Inbox to inboxBadgeCount) else emptyMap()
 
+    // Consume pending deep links — when the host activity routed
+    // `pantopus://invite/:token` (or the https equivalent) through the
+    // DeepLinkRouter, push the token-accept route.
+    val pendingDeepLink by DeepLinkRouter.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingDeepLink) {
+        when (val pending = pendingDeepLink) {
+            is DeepLinkRouter.Destination.Invite -> {
+                navController.navigate(ChildRoutes.tokenAccept(pending.token))
+                DeepLinkRouter.consume()
+            }
+            else -> Unit
+        }
+    }
+
     Scaffold(
         bottomBar = {
             PantopusBottomBar(
@@ -384,6 +411,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenPrivacyHandshake = { handle ->
                         navController.navigate(ChildRoutes.privacyHandshake(handle))
+                    },
+                    onOpenInviteToken = { token ->
+                        navController.navigate(ChildRoutes.tokenAccept(token))
                     },
                     onOpenMailbox = { navController.navigate(ChildRoutes.MAILBOX_LIST) },
                     onOpenEditProfile = {
@@ -702,6 +732,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     ),
             ) {
                 PrivacyHandshakeScreen(
+                    onDismiss = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.TOKEN_ACCEPT,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.TOKEN_ACCEPT_TOKEN_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                TokenAcceptScreen(
                     onDismiss = { navController.popBackStack() },
                 )
             }

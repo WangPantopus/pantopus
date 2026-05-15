@@ -150,6 +150,19 @@ final class UITestStubProtocol: URLProtocol {
             // Tier-1 success — returns the active follower membership.
             finishWith(status: 201, body: Data(Self.defaultHandshakeSuccessJSON.utf8))
 
+        case let ("GET", path) where path.hasPrefix("/api/homes/invitations/token/"):
+            finishWith(status: 200, body: Data(Self.defaultHomeInviteJSON.utf8))
+
+        case ("GET", "/api/businesses/seats/invite-details"):
+            finishWith(status: 404, body: Data("{\"error\":\"Invite not found\"}".utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/homes/guest/"):
+            finishWith(status: 404, body: Data("{\"error\":\"Guest pass not found\"}".utf8))
+
+        case let ("POST", path) where path.hasPrefix("/api/homes/invitations/token/")
+            && path.hasSuffix("/accept"):
+            finishWith(status: 200, body: Data(Self.defaultHomeAcceptJSON.utf8))
+
         // The handshake screen calls GET /api/personas/:handle ahead
         // of its tiers / suggestion / status fetches. Match exactly 3
         // path segments (`/api`, `/personas`, `/<handle>`) so the
@@ -406,6 +419,35 @@ final class UITestStubProtocol: URLProtocol {
     {"follow":{"id":"f_demo","status":"active","relationshipType":"follower"},
      "status":"active",
      "membership":{"id":"m_demo","fan_handle":"fan_8a2c41","tier_id":"t1","status":"active"}}
+    """
+
+    /// Home invite preview — used by the 17_TokenAccept screenshot.
+    static let defaultHomeInviteJSON = """
+    {
+      "invitation": {
+        "id": "inv_demo", "status": "pending",
+        "proposed_role": "co_owner",
+        "invitee_email": "alice@example.com",
+        "expires_at": "2026-06-01T00:00:00Z",
+        "created_at": "2026-05-15T10:00:00Z"
+      },
+      "home": {
+        "id": "home_demo", "name": "412 Elm St",
+        "city": "Portland, OR", "home_type": "single_family"
+      },
+      "inviter": {
+        "name": "Maya K.", "username": "mayak", "profilePicture": null
+      }
+    }
+    """
+
+    static let defaultHomeAcceptJSON = """
+    {
+      "homeId": "home_demo",
+      "occupancy": {"id": "occ_demo", "role": "co_owner"},
+      "merged": false,
+      "accepted_role_base": "co_owner"
+    }
     """
 
     /// Identity Center overview — all four identities populated so the
