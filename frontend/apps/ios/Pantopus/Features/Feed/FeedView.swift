@@ -38,7 +38,7 @@ public struct FeedView: View {
                     activeId: viewModel.activeIntent.rawValue
                 ) { id in
                     let intent = PulseIntent(rawValue: id) ?? .all
-                    Task { await viewModel.selectIntent(intent) }
+                    selectIntent(intent)
                 }
                 content
             }
@@ -92,7 +92,7 @@ public struct FeedView: View {
     }
 
     private var loadingFrame: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: true) {
             VStack(spacing: Spacing.s2) {
                 FeedSkeletonCard()
                 FeedSkeletonCard(withTitle: true)
@@ -165,17 +165,10 @@ public struct FeedView: View {
     }
 
     private func populatedFrame(_ rows: [PulsePostCardContent]) -> some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: true) {
             LazyVStack(spacing: Spacing.s2) {
-                ForEach(rows) { row in
-                    PulsePostCard(
-                        content: row,
-                        onTap: { onOpenPost(row.id) },
-                        onPrimaryReaction: { Task { await viewModel.tapReaction(postId: row.id) } },
-                        onRSVP: row.attendees == nil ? nil : {
-                            _ = Task { await viewModel.tapReaction(postId: row.id) }
-                        }
-                    )
+                ForEach(rows.indices, id: \.self) { index in
+                    postCard(rows[index])
                 }
                 Spacer(minLength: 80)
             }
@@ -183,6 +176,19 @@ public struct FeedView: View {
         }
         .refreshable { await viewModel.refresh() }
         .accessibilityIdentifier("pulseFeedList")
+    }
+
+    private func postCard(_ row: PulsePostCardContent) -> some View {
+        let onRSVP: (@MainActor () -> Void)? = {
+            guard row.attendees != nil else { return nil }
+            return { @MainActor in react(to: row.id) }
+        }()
+        return PulsePostCard(
+            content: row,
+            onTap: { onOpenPost(row.id) },
+            onPrimaryReaction: { react(to: row.id) },
+            onRSVP: onRSVP
+        )
     }
 
     private func errorFrame(message: String) -> some View {
@@ -197,7 +203,7 @@ public struct FeedView: View {
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
             Button {
-                Task { await viewModel.refresh() }
+                refresh()
             } label: {
                 Text("Try again")
                     .font(.system(size: 14, weight: .bold))
@@ -214,6 +220,27 @@ public struct FeedView: View {
         .padding(Spacing.s5)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("pulseFeedError")
+    }
+
+    @MainActor
+    private func selectIntent(_ intent: PulseIntent) {
+        let _: Task<Void, Never> = Task(priority: nil) { @MainActor in
+            await viewModel.selectIntent(intent)
+        }
+    }
+
+    @MainActor
+    private func react(to postId: String) {
+        let _: Task<Void, Never> = Task(priority: nil) { @MainActor in
+            await viewModel.tapReaction(postId: postId)
+        }
+    }
+
+    @MainActor
+    private func refresh() {
+        let _: Task<Void, Never> = Task(priority: nil) { @MainActor in
+            await viewModel.refresh()
+        }
     }
 }
 

@@ -59,7 +59,8 @@ class CeremonialMailOpenViewModelTest {
                 .build()
         val payload =
             objectPayloadJson?.let {
-                moshi.adapter(Any::class.java).fromJson(it)
+                @Suppress("UNCHECKED_CAST")
+                moshi.adapter(Any::class.java).fromJson(it) as Map<String, Any?>
             }
         coEvery { repository.item(any()) } returns
             NetworkResult.Success(

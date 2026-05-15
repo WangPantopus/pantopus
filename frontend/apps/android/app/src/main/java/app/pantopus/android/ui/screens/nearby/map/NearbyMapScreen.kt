@@ -248,9 +248,14 @@ private fun MapLayer(
             when (marker) {
                 is MapMarker.Cluster -> {
                     val cluster = marker.cluster
+                    val clusterPosition = LatLng(cluster.latitude, cluster.longitude)
+                    val clusterMarkerState =
+                        remember(cluster.id, cluster.latitude, cluster.longitude) {
+                            MarkerState(position = clusterPosition)
+                        }
                     MarkerComposable(
                         keys = arrayOf<Any>(cluster.id, cluster.count),
-                        state = MarkerState(position = LatLng(cluster.latitude, cluster.longitude)),
+                        state = clusterMarkerState,
                         anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
                         onClick = { _ ->
                             onClusterTap(cluster)
@@ -263,9 +268,14 @@ private fun MapLayer(
                 is MapMarker.Entity -> {
                     val entity = marker.entity
                     val active = entity.id == selectedId
+                    val entityPosition = LatLng(entity.latitude, entity.longitude)
+                    val entityMarkerState =
+                        remember(entity.id, entity.latitude, entity.longitude) {
+                            MarkerState(position = entityPosition)
+                        }
                     MarkerComposable(
                         keys = arrayOf<Any>(entity.id, active),
-                        state = MarkerState(position = LatLng(entity.latitude, entity.longitude)),
+                        state = entityMarkerState,
                         anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
                         onClick = { _ ->
                             onPinTap(entity)
@@ -278,9 +288,14 @@ private fun MapLayer(
             }
         }
         if (userCoordinate != null) {
+            val userPosition = LatLng(userCoordinate.latitude, userCoordinate.longitude)
+            val userMarkerState =
+                remember(userCoordinate.latitude, userCoordinate.longitude) {
+                    MarkerState(position = userPosition)
+                }
             MarkerComposable(
                 keys = arrayOf<Any>("user"),
-                state = MarkerState(position = LatLng(userCoordinate.latitude, userCoordinate.longitude)),
+                state = userMarkerState,
                 anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
             ) {
                 YouAreHereDot()
@@ -338,7 +353,6 @@ internal fun MapPinDot(
     }
 }
 
-@Composable
 @Composable
 internal fun MapClusterDot(cluster: MapCluster) {
     Box(

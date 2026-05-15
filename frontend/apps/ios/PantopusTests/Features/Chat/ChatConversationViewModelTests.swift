@@ -14,13 +14,13 @@ import XCTest
 final class ChatConversationViewModelTests: XCTestCase {
     override func setUp() {
         super.setUp()
-        SequencedURLProtocol.reset()
+        URLProtocolStub.reset()
     }
 
     private func makeAPI() -> APIClient {
         APIClient(
             environment: .current,
-            session: SequencedURLProtocol.makeSession(),
+            session: TestSession.make(),
             retryPolicy: .none
         )
     }
@@ -59,13 +59,14 @@ final class ChatConversationViewModelTests: XCTestCase {
     }
 
     func testLoadProducesLoadedWithDayDividerAndBubbles() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.messagesJSON(
+        URLProtocolStub.stub(
+            path: "/api/chat/conversations/u_other/messages",
+            response: .json(Self.messagesJSON(
                 Self.messageJSON(id: "m1", userId: "u_other", text: "hi"),
                 Self.messageJSON(id: "m2", userId: "u_me", text: "hello", createdAt: "2026-04-20T10:00:30.000Z")
-            )),
-            .status(200, body: "{}") // markRead
-        ]
+            ))
+        )
+        URLProtocolStub.stub(path: "/api/chat/conversations/u_other/read", response: .json("{}"))
         let vm = ChatConversationViewModel(
             mode: .person(otherUserId: "u_other"),
             counterparty: Self.counterpartyPerson,
@@ -96,11 +97,9 @@ final class ChatConversationViewModelTests: XCTestCase {
     }
 
     func testSendFailureMarksClientIdAsFailed() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.messagesJSON()),
-            .status(200, body: "{}"), // markRead
-            .status(500, body: "{}") // POST /messages
-        ]
+        URLProtocolStub.stub(path: "/api/chat/conversations/u_other/messages", response: .json(Self.messagesJSON()))
+        URLProtocolStub.stub(path: "/api/chat/conversations/u_other/read", response: .json("{}"))
+        URLProtocolStub.stub(path: "/api/chat/messages", response: .json("{}", status: 500))
         let vm = ChatConversationViewModel(
             mode: .person(otherUserId: "u_other"),
             counterparty: Self.counterpartyPerson,
@@ -127,17 +126,20 @@ final class ChatConversationViewModelTests: XCTestCase {
     func testLoadOlderPaginatesBackward() async {
         // First load: 1 message at 10:00, hasMore: true.
         // loadOlder(): 1 older message at 09:59, hasMore: false.
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.messagesJSON(
-                Self.messageJSON(id: "m2", userId: "u_other", text: "hi"),
-                hasMore: true
-            )),
-            .status(200, body: "{}"), // markRead
-            .status(200, body: Self.messagesJSON(
-                Self.messageJSON(id: "m1", userId: "u_other", text: "earlier", createdAt: "2026-04-20T09:59:00.000Z"),
-                hasMore: false
-            ))
-        ]
+        URLProtocolStub.stub(
+            path: "/api/chat/conversations/u_other/messages",
+            responses: [
+                .json(Self.messagesJSON(
+                    Self.messageJSON(id: "m2", userId: "u_other", text: "hi"),
+                    hasMore: true
+                )),
+                .json(Self.messagesJSON(
+                    Self.messageJSON(id: "m1", userId: "u_other", text: "earlier", createdAt: "2026-04-20T09:59:00.000Z"),
+                    hasMore: false
+                ))
+            ]
+        )
+        URLProtocolStub.stub(path: "/api/chat/conversations/u_other/read", response: .json("{}"))
         let vm = ChatConversationViewModel(
             mode: .person(otherUserId: "u_other"),
             counterparty: Self.counterpartyPerson,
@@ -159,19 +161,21 @@ final class ChatConversationViewModelTests: XCTestCase {
     }
 
     func testRefreshMergesNewMessageIntoLoadedThread() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.messagesJSON(
-                Self.messageJSON(id: "m1", userId: "u_other", text: "hi")
-            )),
-            .status(200, body: "{}"), // markRead
-            // Second fetch (simulating realtime-merge handler calling refresh())
-            // returns the same row plus a new server-side echo.
-            .status(200, body: Self.messagesJSON(
-                Self.messageJSON(id: "m1", userId: "u_other", text: "hi"),
-                Self.messageJSON(id: "m2", userId: "u_other", text: "follow-up", createdAt: "2026-04-20T10:01:00.000Z")
-            )),
-            .status(200, body: "{}") // markRead after refresh
-        ]
+        URLProtocolStub.stub(
+            path: "/api/chat/conversations/u_other/messages",
+            responses: [
+                .json(Self.messagesJSON(
+                    Self.messageJSON(id: "m1", userId: "u_other", text: "hi")
+                )),
+                // Second fetch (simulating realtime-merge handler calling refresh())
+                // returns the same row plus a new server-side echo.
+                .json(Self.messagesJSON(
+                    Self.messageJSON(id: "m2", userId: "u_other", text: "follow-up", createdAt: "2026-04-20T10:01:00.000Z"),
+                    Self.messageJSON(id: "m1", userId: "u_other", text: "hi")
+                ))
+            ]
+        )
+        URLProtocolStub.stub(path: "/api/chat/conversations/u_other/read", response: .json("{}"))
         let vm = ChatConversationViewModel(
             mode: .person(otherUserId: "u_other"),
             counterparty: Self.counterpartyPerson,

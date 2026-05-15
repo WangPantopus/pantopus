@@ -55,25 +55,22 @@ public final class MeViewModel {
     // MARK: - Fetch
 
     private func fetch() async {
-        // Personal profile + stats. Home and Business data run in
-        // parallel; either failing degrades the relevant identity into
-        // its `isUnbound` empty state rather than failing the whole
+        // Personal profile is the only hard requirement. Home and stats
+        // failures degrade their own surface instead of failing the whole
         // screen.
-        async let profileTask: ProfileResponse? = optional {
+        guard let profile: ProfileResponse = await optional({
             try await self.api.request(UsersEndpoints.profile())
-        }
-        async let homesTask: MyHomesResponse? = optional {
-            try await self.api.request(HomesEndpoints.myHomes())
-        }
-        guard let profile = await profileTask else {
+        }) else {
             state = .error(message: "Couldn't load your profile.")
             return
         }
-        let homes = await homesTask
-        async let statsTask: UserStatsDTO? = optional {
+
+        let homes: MyHomesResponse? = await optional {
+            try await self.api.request(HomesEndpoints.myHomes())
+        }
+        let stats: UserStatsDTO? = await optional {
             try await self.api.request(UsersEndpoints.stats(userId: profile.user.id))
         }
-        let stats = await statsTask
 
         let personal = Self.buildPersonal(profile: profile.user, stats: stats)
         let home = Self.buildHome(homes: homes?.homes ?? [], profileLocality: Self.localityString(profile.user))

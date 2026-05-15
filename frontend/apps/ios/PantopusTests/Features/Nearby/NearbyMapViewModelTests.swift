@@ -17,13 +17,13 @@ final class NearbyMapViewModelTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        SequencedURLProtocol.reset()
+        URLProtocolStub.reset()
     }
 
     private func makeAPI() -> APIClient {
         APIClient(
             environment: .current,
-            session: SequencedURLProtocol.makeSession(),
+            session: TestSession.make(),
             retryPolicy: .none
         )
     }
@@ -77,10 +77,14 @@ final class NearbyMapViewModelTests: XCTestCase {
     }
 
     func testLoadCombinesGigsAndListings() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.gigsBoundsJSON(Self.gigJSON, Self.pendingGigJSON)),
-            .status(200, body: Self.listingsBoundsJSON(Self.listingJSON))
-        ]
+        URLProtocolStub.stub(
+            path: "/api/gigs/in-bounds",
+            response: .json(Self.gigsBoundsJSON(Self.gigJSON, Self.pendingGigJSON))
+        )
+        URLProtocolStub.stub(
+            path: "/api/listings/in-bounds",
+            response: .json(Self.listingsBoundsJSON(Self.listingJSON))
+        )
         let vm = NearbyMapViewModel(
             api: makeAPI(),
             location: FixedLocationProvider(center)
@@ -100,10 +104,8 @@ final class NearbyMapViewModelTests: XCTestCase {
     }
 
     func testLoadFallsBackToErrorWhenBothEndpointsFail() async {
-        SequencedURLProtocol.sequence = [
-            .status(500, body: "{}"),
-            .status(500, body: "{}")
-        ]
+        URLProtocolStub.stub(path: "/api/gigs/in-bounds", response: .json("{}", status: 500))
+        URLProtocolStub.stub(path: "/api/listings/in-bounds", response: .json("{}", status: 500))
         let vm = NearbyMapViewModel(
             api: makeAPI(),
             location: FixedLocationProvider(center)
@@ -116,12 +118,20 @@ final class NearbyMapViewModelTests: XCTestCase {
     }
 
     func testSelectCategoryRefetches() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.gigsBoundsJSON(Self.gigJSON, Self.pendingGigJSON)),
-            .status(200, body: Self.listingsBoundsJSON(Self.listingJSON)),
-            .status(200, body: Self.gigsBoundsJSON(Self.gigJSON)),
-            .status(200, body: Self.listingsBoundsJSON())
-        ]
+        URLProtocolStub.stub(
+            path: "/api/gigs/in-bounds",
+            responses: [
+                .json(Self.gigsBoundsJSON(Self.gigJSON, Self.pendingGigJSON)),
+                .json(Self.gigsBoundsJSON(Self.gigJSON))
+            ]
+        )
+        URLProtocolStub.stub(
+            path: "/api/listings/in-bounds",
+            responses: [
+                .json(Self.listingsBoundsJSON(Self.listingJSON)),
+                .json(Self.listingsBoundsJSON())
+            ]
+        )
         let vm = NearbyMapViewModel(
             api: makeAPI(),
             location: FixedLocationProvider(center)
@@ -138,10 +148,8 @@ final class NearbyMapViewModelTests: XCTestCase {
     }
 
     func testSelectEntityMirrorsSelectedId() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.gigsBoundsJSON(Self.gigJSON)),
-            .status(200, body: Self.listingsBoundsJSON())
-        ]
+        URLProtocolStub.stub(path: "/api/gigs/in-bounds", response: .json(Self.gigsBoundsJSON(Self.gigJSON)))
+        URLProtocolStub.stub(path: "/api/listings/in-bounds", response: .json(Self.listingsBoundsJSON()))
         let vm = NearbyMapViewModel(
             api: makeAPI(),
             location: FixedLocationProvider(center)

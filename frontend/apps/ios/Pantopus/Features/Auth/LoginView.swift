@@ -79,7 +79,6 @@ struct LoginView: View {
             }
             .padding(24)
             .navigationBarHidden(true)
-            .accessibilityIdentifier("loginScreen")
         }
     }
 }

@@ -23,7 +23,11 @@ final class SequencedURLProtocol: URLProtocol {
     nonisolated(unsafe) static var sequence: [Response] = []
     nonisolated(unsafe) static var capturedRequests: [URLRequest] = []
 
+    private static let lock = NSLock()
+
     static func reset() {
+        lock.lock()
+        defer { lock.unlock() }
         sequence = []
         capturedRequests = []
     }
@@ -46,12 +50,7 @@ final class SequencedURLProtocol: URLProtocol {
     override func stopLoading() {}
 
     override func startLoading() {
-        Self.capturedRequests.append(request)
-        let response: Response = if Self.sequence.isEmpty {
-            Response.status(599, body: "{\"error\":\"no stubbed response\"}")
-        } else {
-            Self.sequence.removeFirst()
-        }
+        let response = Self.nextResponse(for: request)
 
         guard let url = request.url,
               let http = HTTPURLResponse(
@@ -64,5 +63,15 @@ final class SequencedURLProtocol: URLProtocol {
         client?.urlProtocol(self, didReceive: http, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: response.body)
         client?.urlProtocolDidFinishLoading(self)
+    }
+
+    private static func nextResponse(for request: URLRequest) -> Response {
+        lock.lock()
+        defer { lock.unlock() }
+        capturedRequests.append(request)
+        if sequence.isEmpty {
+            return Response.status(599, body: "{\"error\":\"no stubbed response\"}")
+        }
+        return sequence.removeFirst()
     }
 }

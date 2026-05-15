@@ -50,7 +50,7 @@ class GigDetailViewModel
                             is NetworkResult.Success -> bids = bidsResult.data.bids
                             else -> Unit
                         }
-                        _state.value = ContentDetailUiState.Loaded(project(result.data.gig, bids))
+                        _state.value = ContentDetailUiState.Loaded(Projection.project(result.data.gig, bids))
                     }
                     is NetworkResult.Failure -> {
                         _state.value = ContentDetailUiState.Error(result.error.message)

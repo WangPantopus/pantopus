@@ -30,6 +30,12 @@ final class AuthManager {
         return manager
     }()
 
+    static let previewSignedOut: AuthManager = {
+        let manager = AuthManager(store: InMemoryStore())
+        manager.state = .signedOut
+        return manager
+    }()
+
     private(set) var state: State = .unknown
     private(set) var accessToken: String?
 

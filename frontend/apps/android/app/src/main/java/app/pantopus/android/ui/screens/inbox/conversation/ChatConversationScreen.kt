@@ -856,7 +856,7 @@ private fun TypingIndicator(name: String) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, top = 4.dp)
+                .padding(start = 16.dp, top = 4.dp, end = 16.dp)
                 .testTag("chatTypingIndicator"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(7.dp),

@@ -14,13 +14,13 @@ import XCTest
 final class ChatListViewModelTests: XCTestCase {
     override func setUp() {
         super.setUp()
-        SequencedURLProtocol.reset()
+        URLProtocolStub.reset()
     }
 
     private func makeAPI() -> APIClient {
         APIClient(
             environment: .current,
-            session: SequencedURLProtocol.makeSession(),
+            session: TestSession.make(),
             retryPolicy: .none
         )
     }
@@ -95,10 +95,11 @@ final class ChatListViewModelTests: XCTestCase {
     """
 
     func testLoadProducesLoadedWithAIRowPinned() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.listJSON(Self.directConversationJSON, Self.businessConversationJSON, Self.groupRoomJSON)),
-            .status(200, body: Self.statsJSON)
-        ]
+        URLProtocolStub.stub(
+            path: "/api/chat/unified-conversations",
+            response: .json(Self.listJSON(Self.directConversationJSON, Self.businessConversationJSON, Self.groupRoomJSON))
+        )
+        URLProtocolStub.stub(path: "/api/chat/stats", response: .json(Self.statsJSON))
         let vm = ChatListViewModel(api: makeAPI(), socket: .shared)
         await vm.load()
         guard case let .loaded(rows) = vm.state else {
@@ -118,10 +119,8 @@ final class ChatListViewModelTests: XCTestCase {
     }
 
     func testLoadEmptyTransitionsEmpty() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.listJSON()),
-            .status(200, body: Self.statsJSON)
-        ]
+        URLProtocolStub.stub(path: "/api/chat/unified-conversations", response: .json(Self.listJSON()))
+        URLProtocolStub.stub(path: "/api/chat/stats", response: .json(Self.statsJSON))
         let vm = ChatListViewModel(api: makeAPI(), socket: .shared)
         await vm.load()
         if case .empty = vm.state { /* ok */ } else {
@@ -130,9 +129,8 @@ final class ChatListViewModelTests: XCTestCase {
     }
 
     func testLoadFailureTransitionsError() async {
-        SequencedURLProtocol.sequence = [
-            .status(500, body: "{}")
-        ]
+        URLProtocolStub.stub(path: "/api/chat/unified-conversations", response: .json("{}", status: 500))
+        URLProtocolStub.stub(path: "/api/chat/stats", response: .json("{}", status: 500))
         let vm = ChatListViewModel(api: makeAPI(), socket: .shared)
         await vm.load()
         if case .error = vm.state { /* ok */ } else {
@@ -141,10 +139,11 @@ final class ChatListViewModelTests: XCTestCase {
     }
 
     func testSelectFilterFiltersRowsWithoutRefetch() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.listJSON(Self.directConversationJSON, Self.businessConversationJSON, Self.groupRoomJSON)),
-            .status(200, body: Self.statsJSON)
-        ]
+        URLProtocolStub.stub(
+            path: "/api/chat/unified-conversations",
+            response: .json(Self.listJSON(Self.directConversationJSON, Self.businessConversationJSON, Self.groupRoomJSON))
+        )
+        URLProtocolStub.stub(path: "/api/chat/stats", response: .json(Self.statsJSON))
         let vm = ChatListViewModel(api: makeAPI(), socket: .shared)
         await vm.load()
         vm.selectFilter(.gigs)
@@ -159,10 +158,11 @@ final class ChatListViewModelTests: XCTestCase {
     }
 
     func testUnreadFilterShowsOnlyUnreadRows() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.listJSON(Self.directConversationJSON, Self.businessConversationJSON, Self.groupRoomJSON)),
-            .status(200, body: Self.statsJSON)
-        ]
+        URLProtocolStub.stub(
+            path: "/api/chat/unified-conversations",
+            response: .json(Self.listJSON(Self.directConversationJSON, Self.businessConversationJSON, Self.groupRoomJSON))
+        )
+        URLProtocolStub.stub(path: "/api/chat/stats", response: .json(Self.statsJSON))
         let vm = ChatListViewModel(api: makeAPI(), socket: .shared)
         await vm.load()
         vm.selectFilter(.unread)

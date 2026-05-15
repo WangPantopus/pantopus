@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import javax.inject.Inject
 
 @HiltViewModel
@@ -99,15 +98,14 @@ class CeremonialMailOpenViewModel
                 // map — pull the ceremonial slots by key. The wider
                 // payload is intentionally untyped at the repo layer
                 // because each mail_type has a different shape.
-                val payload =
-                    runCatching {
-                        item.objectPayload?.let { JSONObject(it.toString()) }
-                    }.getOrNull()
+                val payload = item.objectPayload
+
+                fun payloadString(key: String): String? = payload?.get(key) as? String
                 val stationery =
-                    CeremonialMailStationeryTone.fromWire(payload?.optString("stationeryTheme")?.takeIf { it.isNotEmpty() })
-                val ink = CeremonialMailInkTone.fromWire(payload?.optString("inkSelection")?.takeIf { it.isNotEmpty() })
-                val seal = CeremonialMailSealTone.fromWire(payload?.optString("sealChoice")?.takeIf { it.isNotEmpty() })
-                val voiceUri = payload?.optString("voicePostscriptUri")?.takeIf { it.isNotEmpty() }
+                    CeremonialMailStationeryTone.fromWire(payloadString("stationeryTheme")?.takeIf { it.isNotEmpty() })
+                val ink = CeremonialMailInkTone.fromWire(payloadString("inkSelection")?.takeIf { it.isNotEmpty() })
+                val seal = CeremonialMailSealTone.fromWire(payloadString("sealChoice")?.takeIf { it.isNotEmpty() })
+                val voiceUri = payloadString("voicePostscriptUri")?.takeIf { it.isNotEmpty() }
                 val body = item.content.orEmpty()
                 val paragraphs =
                     body.split("\n\n")

@@ -14,20 +14,19 @@ import XCTest
 final class TokenAcceptViewModelTests: XCTestCase {
     override func setUp() {
         super.setUp()
-        SequencedURLProtocol.reset()
+        URLProtocolStub.reset()
     }
 
     private func makeAPI() -> APIClient {
         APIClient(
             environment: .current,
-            session: SequencedURLProtocol.makeSession(),
+            session: TestSession.make(),
             retryPolicy: .none
         )
     }
 
-    // The resolver hits 3 GETs in parallel; SequencedURLProtocol
-    // hands them back in declaration order. Tests stub all three so
-    // routing is deterministic across runs.
+    // The resolver hits 3 GETs in parallel. Path-keyed stubs keep the
+    // tests deterministic regardless of request scheduling.
 
     private static let homeInviteJSON = """
     {
@@ -67,18 +66,10 @@ final class TokenAcceptViewModelTests: XCTestCase {
     }
     """
 
-    private static let notFoundJSON = """
-    {"error":"Invitation not found"}
-    """
-
     // MARK: - Home invite
 
     func testHomeInviteResolves() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.homeInviteJSON),
-            .status(404, body: Self.notFoundJSON),
-            .status(404, body: Self.notFoundJSON)
-        ]
+        URLProtocolStub.stub(path: "/api/homes/invitations/token/demo", response: .json(Self.homeInviteJSON))
         let vm = TokenAcceptViewModel(token: "demo", api: makeAPI())
         await vm.load()
         guard case let .ready(offer) = vm.state else {
@@ -94,14 +85,13 @@ final class TokenAcceptViewModelTests: XCTestCase {
     }
 
     func testHomeInviteAcceptSucceeds() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.homeInviteJSON),
-            .status(404, body: Self.notFoundJSON),
-            .status(404, body: Self.notFoundJSON),
-            .status(200, body: """
+        URLProtocolStub.stub(path: "/api/homes/invitations/token/demo", response: .json(Self.homeInviteJSON))
+        URLProtocolStub.stub(
+            path: "/api/homes/invitations/token/demo/accept",
+            response: .json("""
             {"homeId":"h1","occupancy":{"id":"occ1","role":"co_owner"},"accepted_role_base":"co_owner"}
             """)
-        ]
+        )
         let vm = TokenAcceptViewModel(token: "demo", api: makeAPI())
         await vm.load()
         await vm.accept()
@@ -113,13 +103,12 @@ final class TokenAcceptViewModelTests: XCTestCase {
     }
 
     func testHomeInviteExpired() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: """
+        URLProtocolStub.stub(
+            path: "/api/homes/invitations/token/demo",
+            response: .json("""
             {"invitation":{"id":"inv1","status":"expired"},"expired":true}
-            """),
-            .status(404, body: Self.notFoundJSON),
-            .status(404, body: Self.notFoundJSON)
-        ]
+            """)
+        )
         let vm = TokenAcceptViewModel(token: "demo", api: makeAPI())
         await vm.load()
         guard case .expired = vm.state else {
@@ -129,13 +118,12 @@ final class TokenAcceptViewModelTests: XCTestCase {
     }
 
     func testHomeInviteAlreadyUsed() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: """
+        URLProtocolStub.stub(
+            path: "/api/homes/invitations/token/demo",
+            response: .json("""
             {"invitation":{"id":"inv1","status":"accepted"},"alreadyUsed":true}
-            """),
-            .status(404, body: Self.notFoundJSON),
-            .status(404, body: Self.notFoundJSON)
-        ]
+            """)
+        )
         let vm = TokenAcceptViewModel(token: "demo", api: makeAPI())
         await vm.load()
         guard case .expired = vm.state else {
@@ -147,11 +135,7 @@ final class TokenAcceptViewModelTests: XCTestCase {
     // MARK: - Business seat
 
     func testBusinessSeatResolves() async {
-        SequencedURLProtocol.sequence = [
-            .status(404, body: Self.notFoundJSON),
-            .status(200, body: Self.businessSeatJSON),
-            .status(404, body: Self.notFoundJSON)
-        ]
+        URLProtocolStub.stub(path: "/api/businesses/seats/invite-details", response: .json(Self.businessSeatJSON))
         let vm = TokenAcceptViewModel(token: "demo", api: makeAPI())
         await vm.load()
         guard case let .ready(offer) = vm.state else {
@@ -166,14 +150,13 @@ final class TokenAcceptViewModelTests: XCTestCase {
     }
 
     func testBusinessSeatAcceptSucceeds() async {
-        SequencedURLProtocol.sequence = [
-            .status(404, body: Self.notFoundJSON),
-            .status(200, body: Self.businessSeatJSON),
-            .status(404, body: Self.notFoundJSON),
-            .status(200, body: """
+        URLProtocolStub.stub(path: "/api/businesses/seats/invite-details", response: .json(Self.businessSeatJSON))
+        URLProtocolStub.stub(
+            path: "/api/businesses/seats/accept-invite",
+            response: .json("""
             {"message":"Invite accepted","seat_id":"s1","business_user_id":"b1","role_base":"manager"}
             """)
-        ]
+        )
         let vm = TokenAcceptViewModel(token: "demo", api: makeAPI())
         await vm.load()
         await vm.accept()
@@ -187,11 +170,7 @@ final class TokenAcceptViewModelTests: XCTestCase {
     // MARK: - Guest pass
 
     func testGuestPassResolves() async {
-        SequencedURLProtocol.sequence = [
-            .status(404, body: Self.notFoundJSON),
-            .status(404, body: Self.notFoundJSON),
-            .status(200, body: Self.guestPassJSON)
-        ]
+        URLProtocolStub.stub(path: "/api/homes/guest/demo", response: .json(Self.guestPassJSON))
         let vm = TokenAcceptViewModel(token: "demo", api: makeAPI())
         await vm.load()
         guard case let .ready(offer) = vm.state else {
@@ -206,30 +185,21 @@ final class TokenAcceptViewModelTests: XCTestCase {
     }
 
     func testGuestPassAcceptIsLocalNoPostNeeded() async {
-        SequencedURLProtocol.sequence = [
-            .status(404, body: Self.notFoundJSON),
-            .status(404, body: Self.notFoundJSON),
-            .status(200, body: Self.guestPassJSON)
-        ]
+        URLProtocolStub.stub(path: "/api/homes/guest/demo", response: .json(Self.guestPassJSON))
         let vm = TokenAcceptViewModel(token: "demo", api: makeAPI())
         await vm.load()
+        let postCountBeforeAccept = URLProtocolStub.capturedRequests.filter { $0.httpMethod == "POST" }.count
         await vm.accept()
         guard case .accepted = vm.state else {
             XCTFail("Expected .accepted (local-only)")
             return
         }
-        // Sequence should be fully drained — no extra POST consumed.
-        XCTAssertEqual(SequencedURLProtocol.sequence.count, 0)
+        XCTAssertEqual(URLProtocolStub.capturedRequests.filter { $0.httpMethod == "POST" }.count, postCountBeforeAccept)
     }
 
     // MARK: - Resolver edge cases
 
     func testAllNotFoundFallsToExpired() async {
-        SequencedURLProtocol.sequence = [
-            .status(404, body: Self.notFoundJSON),
-            .status(404, body: Self.notFoundJSON),
-            .status(404, body: Self.notFoundJSON)
-        ]
         let vm = TokenAcceptViewModel(token: "demo", api: makeAPI())
         await vm.load()
         guard case let .expired(message) = vm.state else {
@@ -240,12 +210,8 @@ final class TokenAcceptViewModelTests: XCTestCase {
     }
 
     func testDeclineTransitionsToDeclined() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.homeInviteJSON),
-            .status(404, body: Self.notFoundJSON),
-            .status(404, body: Self.notFoundJSON),
-            .status(200, body: "{}")
-        ]
+        URLProtocolStub.stub(path: "/api/homes/invitations/token/demo", response: .json(Self.homeInviteJSON))
+        URLProtocolStub.stub(path: "/api/homes/invitations/inv1/reject", response: .json("{}"))
         let vm = TokenAcceptViewModel(token: "demo", api: makeAPI())
         await vm.load()
         await vm.decline()

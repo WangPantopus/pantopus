@@ -14,13 +14,13 @@ import XCTest
 final class MeViewModelTests: XCTestCase {
     override func setUp() {
         super.setUp()
-        SequencedURLProtocol.reset()
+        URLProtocolStub.reset()
     }
 
     private func makeAPI() -> APIClient {
         APIClient(
             environment: .current,
-            session: SequencedURLProtocol.makeSession(),
+            session: TestSession.make(),
             retryPolicy: .none
         )
     }
@@ -95,12 +95,14 @@ final class MeViewModelTests: XCTestCase {
     }
     """
 
+    private func stubSuccessfulLoad(homesJSON: String = MeViewModelTests.homesJSON) {
+        URLProtocolStub.stub(path: "/api/users/profile", response: .json(Self.profileJSON))
+        URLProtocolStub.stub(path: "/api/homes/my-homes", response: .json(homesJSON))
+        URLProtocolStub.stub(path: "/api/users/u1/stats", response: .json(Self.statsJSON))
+    }
+
     func testLoadProducesAllThreeIdentitiesWhenHomeExists() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.profileJSON),
-            .status(200, body: Self.homesJSON),
-            .status(200, body: Self.statsJSON)
-        ]
+        stubSuccessfulLoad()
         let vm = MeViewModel(api: makeAPI())
         await vm.load()
         guard case let .loaded(personal, home, business) = vm.state else {
@@ -126,11 +128,7 @@ final class MeViewModelTests: XCTestCase {
     }
 
     func testLoadProducesUnboundHomeWhenNoHomeClaimed() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.profileJSON),
-            .status(200, body: Self.emptyHomesJSON),
-            .status(200, body: Self.statsJSON)
-        ]
+        stubSuccessfulLoad(homesJSON: Self.emptyHomesJSON)
         let vm = MeViewModel(api: makeAPI())
         await vm.load()
         guard case let .loaded(_, home, _) = vm.state else {
@@ -142,11 +140,7 @@ final class MeViewModelTests: XCTestCase {
     }
 
     func testSelectIdentityFlipsActiveWithoutRefetch() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.profileJSON),
-            .status(200, body: Self.homesJSON),
-            .status(200, body: Self.statsJSON)
-        ]
+        stubSuccessfulLoad()
         let vm = MeViewModel(api: makeAPI())
         await vm.load()
         XCTAssertEqual(vm.activeIdentity, .personal)
@@ -159,7 +153,7 @@ final class MeViewModelTests: XCTestCase {
     }
 
     func testLoadFailureWhenProfileFailsTransitionsError() async {
-        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
+        URLProtocolStub.stub(path: "/api/users/profile", response: .json("{}", status: 500))
         let vm = MeViewModel(api: makeAPI())
         await vm.load()
         if case .error = vm.state { /* ok */ } else {

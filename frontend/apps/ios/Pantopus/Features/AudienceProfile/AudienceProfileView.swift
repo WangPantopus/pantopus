@@ -479,32 +479,24 @@ public struct AudienceProfileView: View {
     }
 
     private func tierStackedBar(_ breakdown: TierBreakdownContent) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let segments = breakdown.segments
+
+        return VStack(alignment: .leading, spacing: 6) {
             Text("Audience by tier")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
             GeometryReader { geo in
                 HStack(spacing: 2) {
-                    ForEach(breakdown.segments) { segment in
-                        let width = breakdown.total > 0
-                            ? geo.size.width * CGFloat(segment.count) / CGFloat(breakdown.total)
-                            : 0
-                        Rectangle()
-                            .fill(Self.tierColor(rank: segment.rank))
-                            .frame(width: max(width, !segment.isEmpty ? 4 : 0), height: 14)
+                    ForEach(segments, id: \.id) { segment in
+                        tierSegmentBar(segment, total: breakdown.total, availableWidth: geo.size.width)
                     }
                 }
                 .frame(height: 14)
             }
             .frame(height: 14)
             HStack(spacing: 12) {
-                ForEach(breakdown.segments) { segment in
-                    HStack(spacing: 4) {
-                        Circle().fill(Self.tierColor(rank: segment.rank)).frame(width: 8, height: 8)
-                        Text("\(segment.name) · \(segment.count)")
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(Theme.Color.appTextSecondary)
-                    }
+                ForEach(segments, id: \.id) { segment in
+                    tierLegendItem(segment)
                 }
             }
         }
@@ -516,6 +508,28 @@ public struct AudienceProfileView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityIdentifier("tierStackedBar")
+    }
+
+    private func tierSegmentBar(
+        _ segment: TierBreakdownContent.TierSegment,
+        total: Int,
+        availableWidth: CGFloat
+    ) -> some View {
+        let width = total > 0
+            ? availableWidth * CGFloat(segment.count) / CGFloat(total)
+            : 0
+        return Rectangle()
+            .fill(Self.tierColor(rank: segment.rank))
+            .frame(width: max(width, segment.count >= 1 ? 4 : 0), height: 14)
+    }
+
+    private func tierLegendItem(_ segment: TierBreakdownContent.TierSegment) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(Self.tierColor(rank: segment.rank)).frame(width: 8, height: 8)
+            Text("\(segment.name) · \(segment.count)")
+                .font(.system(size: 10.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
     }
 
     private func tierChipRow(_ chips: [TierChipContent]) -> some View {
