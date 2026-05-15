@@ -53,6 +53,7 @@ struct HubTopBar: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Menu")
+            .accessibilityIdentifier("hubMenuButton")
         }
         .padding(.horizontal, Spacing.s4)
         .frame(height: 56)

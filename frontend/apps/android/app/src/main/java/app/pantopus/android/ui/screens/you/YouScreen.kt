@@ -70,6 +70,7 @@ fun YouScreen(
     onOpenPlaceholder: (String) -> Unit = {},
     onOpenMailbox: () -> Unit = {},
     onOpenEditProfile: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
     val signedIn = state as? AuthRepository.State.SignedIn
@@ -93,6 +94,7 @@ fun YouScreen(
         onSection = { row ->
             when (row.routeKey) {
                 "me.editProfile" -> onOpenEditProfile()
+                "me.settings" -> onOpenSettings()
                 "me.debug.openProfile" -> if (BuildConfig.DEBUG) debugProfileDialog = true
                 "me.debug.openPost" -> if (BuildConfig.DEBUG) debugPostDialog = true
                 "me.debug.inviteOwner" -> if (BuildConfig.DEBUG) debugInviteDialog = true

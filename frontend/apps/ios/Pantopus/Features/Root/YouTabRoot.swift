@@ -15,6 +15,7 @@ public enum YouRoute: Hashable {
     case signOutConfirm
     case mailbox
     case mailItemDetail(mailId: String)
+    case settings
     case placeholder(label: String)
     #if DEBUG
     case publicProfile(userId: String)
@@ -176,6 +177,9 @@ public struct YouTabRoot: View {
         case "me.editProfile":
             showsEditProfile = true
             return
+        case "me.settings":
+            path.append(.settings)
+            return
         case "me.debug.openProfile":
             debugProfileSheet = true
             return
@@ -194,6 +198,10 @@ public struct YouTabRoot: View {
         #else
         if row.routeKey == "me.editProfile" {
             showsEditProfile = true
+            return
+        }
+        if row.routeKey == "me.settings" {
+            path.append(.settings)
             return
         }
         #endif
@@ -231,6 +239,12 @@ public struct YouTabRoot: View {
                     // deferred until the You tab gets its own user-
                     // detail destination.
                 }
+            )
+        case .settings:
+            SettingsView(
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onEditProfile: { showsEditProfile = true },
+                onSignedOut: { if !path.isEmpty { path.removeLast() } }
             )
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)

@@ -12,6 +12,7 @@ import app.pantopus.android.data.api.services.FilesApi
 import app.pantopus.android.data.api.services.GigsApi
 import app.pantopus.android.data.api.services.HomesApi
 import app.pantopus.android.data.api.services.ListingsApi
+import app.pantopus.android.data.api.services.PrivacyApi
 import app.pantopus.android.data.api.services.HubApi
 import app.pantopus.android.data.api.services.MailboxApi
 import app.pantopus.android.data.api.services.MailboxV2Api
@@ -161,6 +162,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideListingsApi(retrofit: Retrofit): ListingsApi = retrofit.create(ListingsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun providePrivacyApi(retrofit: Retrofit): PrivacyApi = retrofit.create(PrivacyApi::class.java)
 
     // Legacy aggregate — retained for existing AuthRepository / FeedScreen.
     @Provides @Singleton

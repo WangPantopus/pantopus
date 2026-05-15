@@ -45,6 +45,20 @@ final class StoreScreenshots: XCTestCase {
         // 1. Hub populated
         snapshot("01_Hub_populated")
 
+        // Hub → menu → Settings (T3.1 GroupedList).
+        let menuButton = app.descendants(matching: .any)
+            .matching(identifier: "hubMenuButton").firstMatch
+        if menuButton.waitForExistence(timeout: 3) {
+            menuButton.tap()
+            if app.descendants(matching: .any)
+                .matching(identifier: "groupedList").firstMatch
+                .waitForExistence(timeout: 5)
+            {
+                snapshot("13_Settings")
+            }
+            app.buttons["groupedListBackButton"].firstMatch.tap()
+        }
+
         // 2. MyHomes — open via the You tab → Edit profile is on the
         //    same surface; MyHomes lives off the Hub via the addHome /
         //    pillar paths. Use the You tab → Edit Profile button only

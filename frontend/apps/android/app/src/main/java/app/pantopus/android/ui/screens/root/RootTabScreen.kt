@@ -74,6 +74,10 @@ import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
 import app.pantopus.android.ui.screens.profile.PublicProfileScreen
+import app.pantopus.android.ui.screens.settings.NotificationSettingsScreen
+import app.pantopus.android.ui.screens.settings.PrivacySettingsScreen
+import app.pantopus.android.ui.screens.settings.SettingsIndexScreen
+import app.pantopus.android.ui.screens.settings.SettingsRoute
 import app.pantopus.android.ui.screens.you.YouScreen
 import app.pantopus.android.ui.theme.PantopusIcon
 
@@ -98,7 +102,13 @@ private object ChildRoutes {
     const val NOTIFICATIONS = "_placeholder/notifications"
 
     /** Hub menu icon target. Replaced by Settings in T3.1. */
-    const val MENU = "_placeholder/menu"
+    const val MENU = "settings"
+
+    /** Notification preferences (T3.1). */
+    const val SETTINGS_NOTIFICATIONS = "settings/notifications"
+
+    /** Privacy preferences (T3.1). */
+    const val SETTINGS_PRIVACY = "settings/privacy"
 
     /**
      * Generic placeholder for intents whose destination hasn't been
@@ -362,6 +372,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenPlaceholder = { label ->
                         navController.navigate(ChildRoutes.placeholder(label))
                     },
+                    onOpenSettings = { navController.navigate(ChildRoutes.MENU) },
                 )
             }
 
@@ -634,7 +645,31 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 NotYetAvailableView(tabName = "Notifications", icon = PantopusIcon.Bell)
             }
             composable(ChildRoutes.MENU) {
-                NotYetAvailableView(tabName = "Menu", icon = PantopusIcon.MoreHorizontal)
+                SettingsIndexScreen(
+                    onClose = { navController.popBackStack() },
+                    onNavigate = { route ->
+                        when (route) {
+                            SettingsRoute.Notifications -> navController.navigate(ChildRoutes.SETTINGS_NOTIFICATIONS)
+                            SettingsRoute.Privacy -> navController.navigate(ChildRoutes.SETTINGS_PRIVACY)
+                            SettingsRoute.EditProfile -> navController.navigate(ChildRoutes.placeholder("Edit profile"))
+                            SettingsRoute.Password -> navController.navigate(ChildRoutes.placeholder("Password"))
+                            SettingsRoute.Verification -> navController.navigate(ChildRoutes.placeholder("Verification"))
+                            SettingsRoute.Blocks -> navController.navigate(ChildRoutes.placeholder("Blocked users"))
+                            SettingsRoute.DataExport -> navController.navigate(ChildRoutes.placeholder("Data export"))
+                            SettingsRoute.PaymentsPayouts -> navController.navigate(ChildRoutes.placeholder("Payments & payouts"))
+                            SettingsRoute.Help -> navController.navigate(ChildRoutes.placeholder("Help"))
+                            SettingsRoute.Legal -> navController.navigate(ChildRoutes.placeholder("Legal"))
+                            SettingsRoute.About -> navController.navigate(ChildRoutes.placeholder("About"))
+                            SettingsRoute.DidSignOut -> navController.popBackStack()
+                        }
+                    },
+                )
+            }
+            composable(ChildRoutes.SETTINGS_NOTIFICATIONS) {
+                NotificationSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.SETTINGS_PRIVACY) {
+                PrivacySettingsScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.MAILBOX_SEARCH) {
                 NotYetAvailableView(tabName = "Mail search", icon = PantopusIcon.Search)

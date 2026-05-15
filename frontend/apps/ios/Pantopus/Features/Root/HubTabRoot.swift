@@ -331,7 +331,11 @@ public struct HubTabRoot: View {
         case .notifications:
             NotYetAvailableView(tabName: "Notifications", icon: .bell)
         case .menu:
-            NotYetAvailableView(tabName: "Menu", icon: .moreHorizontal)
+            SettingsView(
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onEditProfile: { Task { @MainActor in push(.placeholder(label: "Edit profile")) } },
+                onSignedOut: { if !path.isEmpty { path.removeLast() } }
+            )
         case .mailboxSearch:
             NotYetAvailableView(tabName: "Mail search", icon: .search)
         case let .placeholder(label):
