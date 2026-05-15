@@ -56,6 +56,13 @@ class NearbyMapViewModel
         private var entities: List<MapEntity> = emptyList()
         private var loading = false
 
+        /**
+         * Grid-bucket cluster radius in degrees. ~0.005° ≈ 500m at
+         * NYC latitude — fine default for the standard zoom; the
+         * screen shrinks it on camera zoom-in via [setClusterRadius].
+         */
+        private var clusterRadiusDegrees: Double = 0.005
+
         fun load() {
             if (_state.value is NearbyMapUiState.Loaded) return
             fetch()
@@ -135,9 +142,84 @@ class NearbyMapViewModel
             val sorted = sortFor(entities)
             _state.value = NearbyMapUiState.Loaded(
                 entities = sorted,
+                markers = cluster(entities = sorted, radiusDegrees = clusterRadiusDegrees),
                 userCoordinate = _userCoordinate.value,
                 selectedId = selectedId,
             )
+        }
+
+        /**
+         * Shrink (or grow) the cluster radius — called by the screen
+         * when the user zooms in (e.g. tap on cluster). Rebuilds
+         * markers but preserves the selection.
+         */
+        fun setClusterRadius(radiusDegrees: Double) {
+            val clamped = radiusDegrees.coerceIn(0.0005, 0.05)
+            if (kotlin.math.abs(clamped - clusterRadiusDegrees) < 1e-6) return
+            clusterRadiusDegrees = clamped
+            val current = _state.value as? NearbyMapUiState.Loaded ?: return
+            rebuild(selectedId = current.selectedId)
+        }
+
+        companion object {
+            /**
+             * Grid-bucket clusterer. Snaps each entity coordinate to a
+             * `radiusDegrees` grid; buckets of size 1 stay as
+             * [MapMarker.Entity], buckets of size ≥2 collapse into a
+             * [MapMarker.Cluster]. Order is stable (sorted by bucket
+             * key) so the map doesn't re-shuffle across rebuilds.
+             */
+            fun cluster(
+                entities: List<MapEntity>,
+                radiusDegrees: Double,
+            ): List<MapMarker> {
+                if (radiusDegrees <= 0) return entities.map { MapMarker.Entity(it) }
+                val buckets = linkedMapOf<String, MutableList<MapEntity>>()
+                entities.forEach { entity ->
+                    val key = bucketKey(entity.latitude, entity.longitude, radiusDegrees)
+                    buckets.getOrPut(key) { mutableListOf() }.add(entity)
+                }
+                return buckets.entries.sortedBy { it.key }.map { (key, group) ->
+                    if (group.size == 1) {
+                        MapMarker.Entity(group[0])
+                    } else {
+                        val lats = group.map { it.latitude }
+                        val lons = group.map { it.longitude }
+                        val centerLat = lats.average()
+                        val centerLon = lons.average()
+                        val representative =
+                            group
+                                .groupingBy { it.category }
+                                .eachCount()
+                                .maxByOrNull { it.value }
+                                ?.key ?: group[0].category
+                        MapMarker.Cluster(
+                            MapCluster(
+                                id = key,
+                                latitude = centerLat,
+                                longitude = centerLon,
+                                category = representative,
+                                count = group.size,
+                                entityIds = group.map { it.id },
+                                minLatitude = lats.min(),
+                                maxLatitude = lats.max(),
+                                minLongitude = lons.min(),
+                                maxLongitude = lons.max(),
+                            ),
+                        )
+                    }
+                }
+            }
+
+            private fun bucketKey(
+                latitude: Double,
+                longitude: Double,
+                radius: Double,
+            ): String {
+                val latBucket = kotlin.math.floor(latitude / radius).toInt()
+                val lonBucket = kotlin.math.floor(longitude / radius).toInt()
+                return "${latBucket}_${lonBucket}"
+            }
         }
 
         private fun sortFor(source: List<MapEntity>): List<MapEntity> =

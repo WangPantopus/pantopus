@@ -47,12 +47,56 @@ enum class NearbySort(val key: String, val label: String) {
     FewestBids("fewest_bids", "Fewest bids"),
 }
 
+/**
+ * One drawable marker on the map. Either a single entity pin or a
+ * cluster glyph standing in for ≥2 entities that fall inside the
+ * current cluster radius.
+ */
+sealed interface MapMarker {
+    val id: String
+    val latitude: Double
+    val longitude: Double
+
+    @Immutable
+    data class Entity(val entity: MapEntity) : MapMarker {
+        override val id: String get() = "entity_${entity.id}"
+        override val latitude: Double get() = entity.latitude
+        override val longitude: Double get() = entity.longitude
+    }
+
+    @Immutable
+    data class Cluster(val cluster: MapCluster) : MapMarker {
+        override val id: String get() = "cluster_${cluster.id}"
+        override val latitude: Double get() = cluster.latitude
+        override val longitude: Double get() = cluster.longitude
+    }
+}
+
+/**
+ * A clustered group of ≥2 entities. Tap zooms the camera to the
+ * cluster's bounding box.
+ */
+@Immutable
+data class MapCluster(
+    val id: String,
+    val latitude: Double,
+    val longitude: Double,
+    val category: GigsCategory,
+    val count: Int,
+    val entityIds: List<String>,
+    val minLatitude: Double,
+    val maxLatitude: Double,
+    val minLongitude: Double,
+    val maxLongitude: Double,
+)
+
 /** Render state for the Nearby map screen. */
 sealed interface NearbyMapUiState {
     data object Loading : NearbyMapUiState
 
     data class Loaded(
         val entities: List<MapEntity>,
+        val markers: List<MapMarker>,
         val userCoordinate: UserCoordinate?,
         val selectedId: String?,
     ) : NearbyMapUiState

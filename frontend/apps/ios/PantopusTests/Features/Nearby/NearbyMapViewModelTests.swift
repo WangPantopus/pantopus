@@ -170,4 +170,64 @@ final class NearbyMapViewModelTests: XCTestCase {
         vm.setSheetStop(.collapsed)
         XCTAssertEqual(vm.sheetStop, .collapsed)
     }
+
+    func testClusterMergesNearbyPinsAndKeepsLoneOnesAsEntities() {
+        // Three entities: two are inside the same 0.005° bucket
+        // (Manhattan-ish) and one ~2 km away. Expect 1 cluster + 1
+        // entity marker.
+        let nearbyA = MapEntity(
+            id: "a",
+            kind: .gig,
+            category: .handyman,
+            state: .confirmed,
+            latitude: 40.7484,
+            longitude: -73.9857,
+            title: "A",
+            summary: nil,
+            price: nil,
+            distanceLabel: nil,
+            bidCount: 0
+        )
+        let nearbyB = MapEntity(
+            id: "b",
+            kind: .gig,
+            category: .handyman,
+            state: .confirmed,
+            latitude: 40.7486,
+            longitude: -73.9855,
+            title: "B",
+            summary: nil,
+            price: nil,
+            distanceLabel: nil,
+            bidCount: 0
+        )
+        let lone = MapEntity(
+            id: "c",
+            kind: .listing,
+            category: .moving,
+            state: .confirmed,
+            latitude: 40.7600,
+            longitude: -73.9700,
+            title: "C",
+            summary: nil,
+            price: nil,
+            distanceLabel: nil,
+            bidCount: 0
+        )
+        let markers = NearbyMapViewModel.cluster(
+            entities: [nearbyA, nearbyB, lone],
+            radiusDegrees: 0.005
+        )
+        XCTAssertEqual(markers.count, 2)
+        let clusters = markers.compactMap { marker -> MapCluster? in
+            if case let .cluster(c) = marker { return c } else { return nil }
+        }
+        XCTAssertEqual(clusters.count, 1)
+        XCTAssertEqual(clusters.first?.count, 2)
+        XCTAssertEqual(Set(clusters.first?.entityIds ?? []), Set(["a", "b"]))
+        let entities = markers.compactMap { marker -> MapEntity? in
+            if case let .entity(e) = marker { return e } else { return nil }
+        }
+        XCTAssertEqual(entities.first?.id, "c")
+    }
 }

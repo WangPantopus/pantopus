@@ -88,6 +88,16 @@ final class StoreScreenshots: XCTestCase {
         // Back to Hub.
         app.buttons["tab.hub"].firstMatch.tap()
 
+        // Nearby tab → Map+List Hybrid.
+        app.buttons["tab.nearby"].firstMatch.tap()
+        if app.descendants(matching: .any)
+            .matching(identifier: "nearbyMap").firstMatch
+            .waitForExistence(timeout: 5)
+        {
+            snapshot("10_NearbyMap")
+        }
+        app.buttons["tab.hub"].firstMatch.tap()
+
         // Hub → Gigs pillar → Gigs feed.
         let gigsPillar = app.descendants(matching: .any)
             .matching(identifier: "hub.pillar.gigs").firstMatch

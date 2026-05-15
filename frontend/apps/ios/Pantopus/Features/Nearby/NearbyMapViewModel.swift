@@ -37,6 +37,10 @@ public final class NearbyMapViewModel {
     private let location: LocationProviding
     private var entities: [MapEntity] = []
     private var fetchTask: Task<Void, Never>?
+    /// Grid-bucket cluster radius. ~0.005° ≈ 500m at NYC latitude —
+    /// good default for the standard zoom; the view shrinks it on
+    /// camera zoom-in via `setClusterRadius(...)`.
+    private var clusterRadiusDegrees: Double = 0.005
 
     public init(
         api: APIClient = .shared,
@@ -82,6 +86,7 @@ public final class NearbyMapViewModel {
         guard case let .loaded(loaded) = state else { return }
         state = .loaded(NearbyMapLoaded(
             entities: loaded.entities,
+            markers: loaded.markers,
             userCoordinate: loaded.userCoordinate,
             selectedId: id
         ))
@@ -152,9 +157,69 @@ public final class NearbyMapViewModel {
         let sorted = sorted(entities)
         state = .loaded(NearbyMapLoaded(
             entities: sorted,
+            markers: Self.cluster(entities: sorted, radiusDegrees: clusterRadiusDegrees),
             userCoordinate: userCoordinate,
             selectedId: selectedId
         ))
+    }
+
+    /// Reduce the cluster radius (e.g. when the camera zooms in) and
+    /// rebuild markers. The current selection is preserved.
+    public func setClusterRadius(_ radiusDegrees: Double) {
+        let clamped = max(0.0005, min(radiusDegrees, 0.05))
+        guard abs(clamped - clusterRadiusDegrees) > 1e-6 else { return }
+        clusterRadiusDegrees = clamped
+        if case let .loaded(loaded) = state {
+            rebuild(selectedId: loaded.selectedId)
+        }
+    }
+
+    // MARK: - Clustering
+
+    /// Grid-bucket clusterer. Snaps each entity coordinate to a
+    /// `radiusDegrees` grid; buckets of size 1 stay as `.entity`
+    /// markers, buckets of size ≥2 collapse into a `.cluster`. Order
+    /// is stable (sorted by bucket key) so the map doesn't re-shuffle
+    /// across rebuilds.
+    static func cluster(entities: [MapEntity], radiusDegrees: Double) -> [MapMarker] {
+        guard radiusDegrees > 0 else { return entities.map(MapMarker.entity) }
+        var buckets: [String: [MapEntity]] = [:]
+        for entity in entities {
+            let key = bucketKey(latitude: entity.latitude, longitude: entity.longitude, radius: radiusDegrees)
+            buckets[key, default: []].append(entity)
+        }
+        return buckets.keys.sorted().map { key in
+            let group = buckets[key]!
+            if group.count == 1 { return .entity(group[0]) }
+            let lats = group.map(\.latitude)
+            let lons = group.map(\.longitude)
+            let centerLat = lats.reduce(0, +) / Double(group.count)
+            let centerLon = lons.reduce(0, +) / Double(group.count)
+            // Pick the most common category as the cluster accent.
+            let representative = group
+                .reduce(into: [:]) { (counts: inout [GigsCategory: Int], entity: MapEntity) in
+                    counts[entity.category, default: 0] += 1
+                }
+                .max { $0.value < $1.value }?.key ?? group[0].category
+            return .cluster(MapCluster(
+                id: key,
+                latitude: centerLat,
+                longitude: centerLon,
+                category: representative,
+                count: group.count,
+                entityIds: group.map(\.id),
+                minLatitude: lats.min() ?? centerLat,
+                maxLatitude: lats.max() ?? centerLat,
+                minLongitude: lons.min() ?? centerLon,
+                maxLongitude: lons.max() ?? centerLon
+            ))
+        }
+    }
+
+    private static func bucketKey(latitude: Double, longitude: Double, radius: Double) -> String {
+        let latBucket = Int((latitude / radius).rounded(.down))
+        let lonBucket = Int((longitude / radius).rounded(.down))
+        return "\(latBucket)_\(lonBucket)"
     }
 
     private func sorted(_ source: [MapEntity]) -> [MapEntity] {

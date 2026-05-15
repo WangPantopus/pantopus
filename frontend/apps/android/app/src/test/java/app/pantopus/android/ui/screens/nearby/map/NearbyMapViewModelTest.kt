@@ -149,4 +149,40 @@ class NearbyMapViewModelTest {
         vm.setSheetStop(SheetStop.Collapsed)
         assertEquals(SheetStop.Collapsed, vm.sheetStop.value)
     }
+
+    @Test fun cluster_merges_nearby_pins_and_keeps_lone_ones_as_entities() {
+        // Two entities inside the same 0.005° bucket and one ~2 km
+        // away → expect 1 cluster + 1 entity marker.
+        val nearbyA =
+            MapEntity(
+                id = "a",
+                kind = MapEntityKind.Gig,
+                category = app.pantopus.android.ui.screens.gigs.GigsCategory.Handyman,
+                state = MapEntityState.Confirmed,
+                latitude = 40.7484,
+                longitude = -73.9857,
+                title = "A",
+                summary = null,
+                price = null,
+                distanceLabel = null,
+                bidCount = 0,
+            )
+        val nearbyB = nearbyA.copy(id = "b", latitude = 40.7486, longitude = -73.9855)
+        val lone =
+            nearbyA.copy(
+                id = "c",
+                kind = MapEntityKind.Listing,
+                category = app.pantopus.android.ui.screens.gigs.GigsCategory.Moving,
+                latitude = 40.7600,
+                longitude = -73.9700,
+            )
+        val markers = NearbyMapViewModel.cluster(listOf(nearbyA, nearbyB, lone), 0.005)
+        assertEquals(2, markers.size)
+        val clusters = markers.filterIsInstance<MapMarker.Cluster>()
+        val entitiesOnly = markers.filterIsInstance<MapMarker.Entity>()
+        assertEquals(1, clusters.size)
+        assertEquals(2, clusters.first().cluster.count)
+        assertEquals(setOf("a", "b"), clusters.first().cluster.entityIds.toSet())
+        assertEquals("c", entitiesOnly.first().entity.id)
+    }
 }

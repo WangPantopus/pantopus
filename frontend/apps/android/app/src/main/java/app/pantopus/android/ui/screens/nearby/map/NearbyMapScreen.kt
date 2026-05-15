@@ -143,12 +143,21 @@ fun NearbyMapScreen(
     ) {
         MapLayer(
             cameraState = cameraState,
-            entities = (state as? NearbyMapUiState.Loaded)?.entities.orEmpty(),
+            markers = (state as? NearbyMapUiState.Loaded)?.markers.orEmpty(),
             selectedId = (state as? NearbyMapUiState.Loaded)?.selectedId,
             userCoordinate = userCoord,
             onPinTap = { entity ->
                 viewModel.selectEntity(entity.id)
                 onOpenEntity(entity)
+            },
+            onClusterTap = { cluster ->
+                zoomToCluster(cameraState, cluster)
+                viewModel.setClusterRadius(
+                    maxOf(
+                        cluster.maxLatitude - cluster.minLatitude,
+                        cluster.maxLongitude - cluster.minLongitude,
+                    ).coerceAtLeast(0.001) * 0.35,
+                )
             },
         )
         FloatingTopPill(
@@ -204,10 +213,11 @@ fun NearbyMapScreen(
 @Composable
 private fun MapLayer(
     cameraState: CameraPositionState,
-    entities: List<MapEntity>,
+    markers: List<MapMarker>,
     selectedId: String?,
     userCoordinate: UserCoordinate?,
     onPinTap: (MapEntity) -> Unit,
+    onClusterTap: (MapCluster) -> Unit,
 ) {
     val mapProperties =
         remember {
@@ -231,18 +241,37 @@ private fun MapLayer(
         properties = mapProperties,
         uiSettings = uiSettings,
     ) {
-        entities.forEach { entity ->
-            val active = entity.id == selectedId
-            MarkerComposable(
-                keys = arrayOf<Any>(entity.id, active),
-                state = MarkerState(position = LatLng(entity.latitude, entity.longitude)),
-                anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
-                onClick = { _ ->
-                    onPinTap(entity)
-                    true
-                },
-            ) {
-                MapPinDot(entity = entity, isActive = active)
+        markers.forEach { marker ->
+            when (marker) {
+                is MapMarker.Cluster -> {
+                    val cluster = marker.cluster
+                    MarkerComposable(
+                        keys = arrayOf<Any>(cluster.id, cluster.count),
+                        state = MarkerState(position = LatLng(cluster.latitude, cluster.longitude)),
+                        anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
+                        onClick = { _ ->
+                            onClusterTap(cluster)
+                            true
+                        },
+                    ) {
+                        MapClusterDot(cluster = cluster)
+                    }
+                }
+                is MapMarker.Entity -> {
+                    val entity = marker.entity
+                    val active = entity.id == selectedId
+                    MarkerComposable(
+                        keys = arrayOf<Any>(entity.id, active),
+                        state = MarkerState(position = LatLng(entity.latitude, entity.longitude)),
+                        anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
+                        onClick = { _ ->
+                            onPinTap(entity)
+                            true
+                        },
+                    ) {
+                        MapPinDot(entity = entity, isActive = active)
+                    }
+                }
             }
         }
         if (userCoordinate != null) {
@@ -258,7 +287,7 @@ private fun MapLayer(
 }
 
 @Composable
-private fun MapPinDot(
+internal fun MapPinDot(
     entity: MapEntity,
     isActive: Boolean,
 ) {
@@ -307,7 +336,41 @@ private fun MapPinDot(
 }
 
 @Composable
-private fun YouAreHereDot() {
+@Composable
+internal fun MapClusterDot(cluster: MapCluster) {
+    Box(
+        modifier = Modifier.size(44.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(cluster.category.color.copy(alpha = 0.20f)),
+        )
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(cluster.category.color)
+                    .border(2.dp, Color.White, CircleShape)
+                    .shadow(elevation = 2.dp, shape = CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "${cluster.count}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun YouAreHereDot() {
     Box(
         modifier = Modifier.size(28.dp),
         contentAlignment = Alignment.Center,
@@ -560,6 +623,32 @@ private fun BottomSheet(
                 }
         }
     }
+}
+
+/**
+ * Cluster tap — recenter the camera on the cluster's bounding box
+ * (+40 % margin) so the underlying pins re-split as the user zooms in.
+ * Companion in the VM shrinks the cluster radius accordingly.
+ */
+private fun zoomToCluster(
+    cameraState: CameraPositionState,
+    cluster: MapCluster,
+) {
+    val latDelta = (cluster.maxLatitude - cluster.minLatitude).coerceAtLeast(0.003) * 1.4
+    val lonDelta = (cluster.maxLongitude - cluster.minLongitude).coerceAtLeast(0.003) * 1.4
+    val degreesAcross = maxOf(latDelta, lonDelta)
+    // Convert the largest delta into a Google Maps zoom level. The
+    // formula `log2(360 / degrees)` is the well-known approximation
+    // for the standard 256-pixel-tile projection.
+    val zoom = (kotlin.math.ln(360.0 / degreesAcross) / kotlin.math.ln(2.0)).toFloat().coerceIn(2f, 19f)
+    cameraState.position =
+        CameraPosition.fromLatLngZoom(
+            LatLng(
+                (cluster.minLatitude + cluster.maxLatitude) / 2,
+                (cluster.minLongitude + cluster.maxLongitude) / 2,
+            ),
+            zoom,
+        )
 }
 
 private fun resolveStop(

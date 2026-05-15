@@ -56,19 +56,33 @@ public struct NearbyMapView: View {
     @ViewBuilder private var mapLayer: some View {
         Map(position: $cameraPosition, interactionModes: [.pan, .zoom]) {
             if case let .loaded(loaded) = viewModel.state {
-                ForEach(loaded.entities) { entity in
-                    Annotation("", coordinate: entity.coordinate, anchor: .center) {
-                        Button {
-                            viewModel.selectEntity(entity.id)
-                            Task { @MainActor in onOpenEntity(entity) }
-                        } label: {
-                            MapPinDot(
-                                entity: entity,
-                                isActive: loaded.selectedId == entity.id
-                            )
+                ForEach(loaded.markers) { marker in
+                    switch marker {
+                    case let .entity(entity):
+                        Annotation("", coordinate: entity.coordinate, anchor: .center) {
+                            Button {
+                                viewModel.selectEntity(entity.id)
+                                Task { @MainActor in onOpenEntity(entity) }
+                            } label: {
+                                MapPinDot(
+                                    entity: entity,
+                                    isActive: loaded.selectedId == entity.id
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("mapPin_\(entity.id)")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("mapPin_\(entity.id)")
+                    case let .cluster(cluster):
+                        Annotation("", coordinate: marker.coordinate, anchor: .center) {
+                            Button {
+                                zoomToCluster(cluster)
+                            } label: {
+                                MapClusterDot(cluster: cluster)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("mapCluster_\(cluster.id)")
+                            .accessibilityLabel("Cluster of \(cluster.count) nearby pins")
+                        }
                     }
                 }
                 if let coord = loaded.userCoordinate {
@@ -95,6 +109,22 @@ public struct NearbyMapView: View {
             center: CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude),
             span: MKCoordinateSpan(latitudeDelta: 0.024, longitudeDelta: 0.024)
         ))
+    }
+
+    /// Cluster tap — zoom the camera to fit the cluster's bounding box
+    /// (with a 20 % margin) and shrink the cluster radius so the same
+    /// pins re-split into singletons on the next rebuild.
+    private func zoomToCluster(_ cluster: MapCluster) {
+        let latDelta = max((cluster.maxLatitude - cluster.minLatitude) * 1.4, 0.004)
+        let lonDelta = max((cluster.maxLongitude - cluster.minLongitude) * 1.4, 0.004)
+        cameraPosition = .region(MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: (cluster.minLatitude + cluster.maxLatitude) / 2,
+                longitude: (cluster.minLongitude + cluster.maxLongitude) / 2
+            ),
+            span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta)
+        ))
+        viewModel.setClusterRadius(max(latDelta, lonDelta) * 0.25)
     }
 
     // MARK: - Floating pill
@@ -450,6 +480,27 @@ private struct MapPinDot: View {
         }
         .onChange(of: isActive) { _, newValue in
             pulse = newValue
+        }
+    }
+}
+
+/// Cluster glyph — colored disc with the entity count.
+private struct MapClusterDot: View {
+    let cluster: MapCluster
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(cluster.category.color.opacity(0.20))
+                .frame(width: 44, height: 44)
+            Circle()
+                .fill(cluster.category.color)
+                .frame(width: 32, height: 32)
+                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                .shadow(color: .black.opacity(0.30), radius: 2, x: 0, y: 2)
+            Text("\(cluster.count)")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
         }
     }
 }
