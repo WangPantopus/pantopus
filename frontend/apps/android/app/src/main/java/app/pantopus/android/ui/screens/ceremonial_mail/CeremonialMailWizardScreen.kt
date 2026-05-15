@@ -539,7 +539,7 @@ private fun PickerRow(
                             .clickable { onSelect(wire) }
                             .padding(horizontal = 12.dp)
                             .height(32.dp)
-                            .testTag("${testTag}_${wire}"),
+                            .testTag("${testTag}_$wire"),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(

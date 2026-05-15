@@ -38,22 +38,30 @@ interface AudienceProfileApi {
     /** `GET /api/personas/:handle/posts` — recent Update posts.
      *  Route `backend/routes/personas.js:1046`. */
     @GET("api/personas/{handle}/posts")
-    suspend fun posts(@Path("handle") handle: String): PersonaPostsResponse
+    suspend fun posts(
+        @Path("handle") handle: String,
+    ): PersonaPostsResponse
 
     /** `GET /api/personas/:handle/tiers` — tier ladder (chips).
      *  Route `backend/routes/personas.js:1111`. */
     @GET("api/personas/{handle}/tiers")
-    suspend fun tiers(@Path("handle") handle: String): PersonaTiersResponse
+    suspend fun tiers(
+        @Path("handle") handle: String,
+    ): PersonaTiersResponse
 
     /** `GET /api/personas/:id/membership-stats` — owner-only counts by
      *  tier for analytics cells. Route `backend/routes/personas.js:1256`. */
     @GET("api/personas/{id}/membership-stats")
-    suspend fun membershipStats(@Path("id") personaId: String): MembershipStatsResponse
+    suspend fun membershipStats(
+        @Path("id") personaId: String,
+    ): MembershipStatsResponse
 
     /** `GET /api/personas/:id/dms/threads` — owner inbox of fan threads.
      *  Route `backend/routes/personaDms.js:185`. */
     @GET("api/personas/{id}/dms/threads")
-    suspend fun threads(@Path("id") personaId: String): PersonaThreadsResponse
+    suspend fun threads(
+        @Path("id") personaId: String,
+    ): PersonaThreadsResponse
 
     /** `POST /api/broadcast/channels/:channelId/messages` — publish a
      *  new Update. Route `backend/routes/broadcastChannels.js:450`. */

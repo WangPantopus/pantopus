@@ -17,7 +17,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Wraps `/api/personas/*` handshake calls in [NetworkResult]. The
+ * Wraps `/api/personas/[*]` handshake calls in [NetworkResult]. The
  * submit() helper unwraps Retrofit's `Response<T>` so callers can
  * branch on the typed [HandshakeError] without re-parsing the body.
  */
@@ -35,8 +35,7 @@ class PrivacyHandshakeRepository
         suspend fun fanHandleSuggestion(handle: String): NetworkResult<FanHandleSuggestionResponse> =
             safeApiCall { api.fanHandleSuggestion(handle) }
 
-        suspend fun followStatus(personaId: String): NetworkResult<FollowStatusResponse> =
-            safeApiCall { api.followStatus(personaId) }
+        suspend fun followStatus(personaId: String): NetworkResult<FollowStatusResponse> = safeApiCall { api.followStatus(personaId) }
 
         suspend fun updatePreferences(
             personaId: String,
@@ -101,4 +100,3 @@ sealed interface HandshakeError {
 
     data class Other(val message: String) : HandshakeError
 }
-

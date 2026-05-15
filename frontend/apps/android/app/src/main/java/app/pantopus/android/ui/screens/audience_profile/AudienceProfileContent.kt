@@ -19,8 +19,7 @@ enum class UpdateVisibility(val wire: String, val title: String) {
     ;
 
     companion object {
-        fun fromWire(value: String?): UpdateVisibility =
-            values().firstOrNull { it.wire == value } ?: Followers
+        fun fromWire(value: String?): UpdateVisibility = values().firstOrNull { it.wire == value } ?: Followers
     }
 }
 

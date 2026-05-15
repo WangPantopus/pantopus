@@ -259,7 +259,12 @@ class MeViewModel
                                 header = "Business",
                                 rows =
                                     listOf(
-                                        MeSectionRow("profile", PantopusIcon.Edit2, "Edit business profile", routeKey = "me.business.editProfile"),
+                                        MeSectionRow(
+                                            "profile",
+                                            PantopusIcon.Edit2,
+                                            "Edit business profile",
+                                            routeKey = "me.business.editProfile",
+                                        ),
                                         MeSectionRow("settings", PantopusIcon.Menu, "Settings", routeKey = "me.business.settings"),
                                     ),
                             ),
@@ -329,14 +334,54 @@ class MeViewModel
                     header = "Debug",
                     rows =
                         listOf(
-                            MeSectionRow("openProfile", PantopusIcon.Search, "Open public profile by ID", routeKey = "me.debug.openProfile"),
-                            MeSectionRow("openPost", PantopusIcon.Search, "Open Pulse post by ID", routeKey = "me.debug.openPost"),
-                            MeSectionRow("openHandshake", PantopusIcon.UserPlus, "Open Privacy Handshake by persona handle", routeKey = "me.debug.openHandshake"),
-                            MeSectionRow("openInviteToken", PantopusIcon.Mailbox, "Open invite by token", routeKey = "me.debug.openInviteToken"),
-                            MeSectionRow("openCeremonialMail", PantopusIcon.Send, "Open Ceremonial Mail Compose", routeKey = "me.debug.openCeremonialMail"),
-                            MeSectionRow("openCeremonialMailOpen", PantopusIcon.Mailbox, "Open Ceremonial Mail by ID", routeKey = "me.debug.openCeremonialMailOpen"),
-                            MeSectionRow("inviteOwner", PantopusIcon.UserPlus, "Invite owner to home by ID", routeKey = "me.debug.inviteOwner"),
-                            MeSectionRow("disambiguate", PantopusIcon.Mailbox, "Disambiguate mail by ID", routeKey = "me.debug.disambiguate"),
+                            MeSectionRow(
+                                "openProfile",
+                                PantopusIcon.Search,
+                                "Open public profile by ID",
+                                routeKey = "me.debug.openProfile",
+                            ),
+                            MeSectionRow(
+                                "openPost",
+                                PantopusIcon.Search,
+                                "Open Pulse post by ID",
+                                routeKey = "me.debug.openPost",
+                            ),
+                            MeSectionRow(
+                                "openHandshake",
+                                PantopusIcon.UserPlus,
+                                "Open Privacy Handshake by persona handle",
+                                routeKey = "me.debug.openHandshake",
+                            ),
+                            MeSectionRow(
+                                "openInviteToken",
+                                PantopusIcon.Mailbox,
+                                "Open invite by token",
+                                routeKey = "me.debug.openInviteToken",
+                            ),
+                            MeSectionRow(
+                                "openCeremonialMail",
+                                PantopusIcon.Send,
+                                "Open Ceremonial Mail Compose",
+                                routeKey = "me.debug.openCeremonialMail",
+                            ),
+                            MeSectionRow(
+                                "openCeremonialMailOpen",
+                                PantopusIcon.Mailbox,
+                                "Open Ceremonial Mail by ID",
+                                routeKey = "me.debug.openCeremonialMailOpen",
+                            ),
+                            MeSectionRow(
+                                "inviteOwner",
+                                PantopusIcon.UserPlus,
+                                "Invite owner to home by ID",
+                                routeKey = "me.debug.inviteOwner",
+                            ),
+                            MeSectionRow(
+                                "disambiguate",
+                                PantopusIcon.Mailbox,
+                                "Disambiguate mail by ID",
+                                routeKey = "me.debug.disambiguate",
+                            ),
                         ),
                 )
         }

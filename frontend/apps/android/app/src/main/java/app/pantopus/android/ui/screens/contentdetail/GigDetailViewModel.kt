@@ -7,8 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.GigBidDto
 import app.pantopus.android.data.api.models.gigs.GigDto
-import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
+import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -128,46 +128,64 @@ class GigDetailViewModel
                             ContentDetailStat(it.replace("_", " ").replaceFirstChar { c -> c.uppercase() }, "mode")
                         },
                     ).take(3)
-                val modules = buildList {
-                    gig.description?.takeIf { it.isNotEmpty() }?.let {
-                        add(ContentDetailModule.Description(id = "desc", title = "What needs doing", icon = PantopusIcon.File, body = it))
+                val modules =
+                    buildList {
+                        gig.description?.takeIf { it.isNotEmpty() }?.let {
+                            add(
+                                ContentDetailModule.Description(
+                                    id = "desc",
+                                    title = "What needs doing",
+                                    icon = PantopusIcon.File,
+                                    body = it,
+                                ),
+                            )
+                        }
+                        gig.pickupAddress?.takeIf { it.isNotEmpty() }?.let { pickup ->
+                            add(
+                                ContentDetailModule.DetailRow(
+                                    id = "where",
+                                    title = "Where",
+                                    sectionIcon = PantopusIcon.MapPin,
+                                    rowIcon = PantopusIcon.MapPin,
+                                    label = pickup,
+                                    trailing = distanceLabel(gig.distanceMiles),
+                                ),
+                            )
+                        }
+                        gig.scheduledStart?.takeIf { it.isNotEmpty() }?.let { iso ->
+                            add(
+                                ContentDetailModule.CaptionedText(
+                                    id = "when",
+                                    title = "When",
+                                    icon = PantopusIcon.Calendar,
+                                    label = iso,
+                                ),
+                            )
+                        }
+                        if (bids.isNotEmpty()) {
+                            add(
+                                ContentDetailModule.Bids(
+                                    id = "bids",
+                                    title = "$bidCount bids",
+                                    bids = bids.map(::projectBid),
+                                ),
+                            )
+                        }
                     }
-                    gig.pickupAddress?.takeIf { it.isNotEmpty() }?.let { pickup ->
-                        add(
-                            ContentDetailModule.DetailRow(
-                                id = "where",
-                                title = "Where",
-                                sectionIcon = PantopusIcon.MapPin,
-                                rowIcon = PantopusIcon.MapPin,
-                                label = pickup,
-                                trailing = distanceLabel(gig.distanceMiles),
-                            ),
-                        )
-                    }
-                    gig.scheduledStart?.takeIf { it.isNotEmpty() }?.let { iso ->
-                        add(
-                            ContentDetailModule.CaptionedText(
-                                id = "when",
-                                title = "When",
-                                icon = PantopusIcon.Calendar,
-                                label = iso,
-                            ),
-                        )
-                    }
-                    if (bids.isNotEmpty()) {
-                        add(
-                            ContentDetailModule.Bids(
-                                id = "bids",
-                                title = "$bidCount bids",
-                                bids = bids.map(::projectBid),
-                            ),
-                        )
-                    }
-                }
                 val trust =
                     listOf(
-                        ContentDetailPill(id = "addr", label = "Verified address", icon = PantopusIcon.ShieldCheck, tone = ContentDetailPill.Tone.Info),
-                        ContentDetailPill(id = "local", label = "Local Pantopus job", icon = PantopusIcon.Check, tone = ContentDetailPill.Tone.Success),
+                        ContentDetailPill(
+                            id = "addr",
+                            label = "Verified address",
+                            icon = PantopusIcon.ShieldCheck,
+                            tone = ContentDetailPill.Tone.Info,
+                        ),
+                        ContentDetailPill(
+                            id = "local",
+                            label = "Local Pantopus job",
+                            icon = PantopusIcon.Check,
+                            tone = ContentDetailPill.Tone.Success,
+                        ),
                     )
                 val dock =
                     ContentDetailDock(

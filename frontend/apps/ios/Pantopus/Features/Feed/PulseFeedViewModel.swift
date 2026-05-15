@@ -54,7 +54,7 @@ public final class PulseFeedViewModel {
     private var loadedItems: [FeedPostDTO] = []
     private var isLoading = false
 
-    public init(
+    init(
         api: APIClient = .shared,
         latitude: Double? = nil,
         longitude: Double? = nil

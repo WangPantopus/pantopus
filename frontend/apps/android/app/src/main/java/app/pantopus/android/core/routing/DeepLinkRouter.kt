@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Full routing table from `docs/07-frontend-mobile-app.md §9`.
  * `Home` (singular) keeps the legacy "go to Hub" semantics; the typed
  * `HomeDetail` / `HomeDashboard` / `HomeMemberRequests` variants
- * cover `/homes/:id/*`.
+ * cover `/homes/:id/[*]`.
  */
 object DeepLinkRouter {
     sealed interface Destination {
@@ -67,11 +67,12 @@ object DeepLinkRouter {
      * full URL deep links.
      */
     fun handle(path: String) {
-        val normalized = when {
-            path.startsWith("pantopus://") || path.startsWith("http") -> path
-            path.startsWith("/") -> "pantopus://" + path.drop(1)
-            else -> "pantopus://$path"
-        }
+        val normalized =
+            when {
+                path.startsWith("pantopus://") || path.startsWith("http") -> path
+                path.startsWith("/") -> "pantopus://" + path.drop(1)
+                else -> "pantopus://$path"
+            }
         _pending.value = resolveString(normalized)
     }
 
@@ -103,8 +104,9 @@ object DeepLinkRouter {
         // Split off the query / fragment so the segment match below sees
         // just the path components.
         val pathPart = rest.substringBefore('?').substringBefore('#')
-        val queryPart = rest.substringAfter('?', missingDelimiterValue = "")
-            .substringBefore('#')
+        val queryPart =
+            rest.substringAfter('?', missingDelimiterValue = "")
+                .substringBefore('#')
         val parts = pathPart.split('/').filter { it.isNotBlank() }
         val segments: List<String> =
             if (scheme == "http" || scheme == "https") {
@@ -163,7 +165,10 @@ object DeepLinkRouter {
         }
     }
 
-    private fun parseQueryParam(query: String, key: String): String? {
+    private fun parseQueryParam(
+        query: String,
+        key: String,
+    ): String? {
         if (query.isBlank()) return null
         for (pair in query.split('&')) {
             val eq = pair.indexOf('=')

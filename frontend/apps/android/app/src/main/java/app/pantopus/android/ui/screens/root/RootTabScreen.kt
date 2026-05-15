@@ -11,14 +11,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.pantopus.android.core.routing.DeepLinkRouter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -28,7 +27,19 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.pantopus.android.BuildConfig
+import app.pantopus.android.core.routing.DeepLinkRouter
 import app.pantopus.android.ui.screens._internal.TokenGalleryScreen
+import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
+import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
+import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
+import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
+import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
+import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
+import app.pantopus.android.ui.screens.feed.FeedScreen
+import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
+import app.pantopus.android.ui.screens.gigs.GigsCategory
+import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
+import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
@@ -39,17 +50,6 @@ import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
-import app.pantopus.android.ui.screens.feed.FeedScreen
-import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
-import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
-import app.pantopus.android.ui.screens.contentdetail.GigDetailViewModel
-import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
-import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailViewModel
-import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
-import app.pantopus.android.ui.screens.contentdetail.ListingDetailViewModel
-import app.pantopus.android.ui.screens.gigs.GigsCategory
-import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
-import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
@@ -57,6 +57,8 @@ import app.pantopus.android.ui.screens.hub.HubNavigationIntent
 import app.pantopus.android.ui.screens.hub.HubScreen
 import app.pantopus.android.ui.screens.hub.JumpBackItem
 import app.pantopus.android.ui.screens.hub.PillarTile
+import app.pantopus.android.ui.screens.identity_center.IdentityCenterScreen
+import app.pantopus.android.ui.screens.identity_center.IdentityKind
 import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.inbox.chat.ConversationIdentityChip
 import app.pantopus.android.ui.screens.inbox.chat.ConversationRowContent
@@ -70,25 +72,20 @@ import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
-import app.pantopus.android.ui.screens.notifications.NotificationsScreen
+import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
 import app.pantopus.android.ui.screens.nearby.map.MapEntity
 import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
 import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
+import app.pantopus.android.ui.screens.notifications.NotificationsScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
-import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
-import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
-import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
-import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
-import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
-import app.pantopus.android.ui.screens.identity_center.IdentityCenterScreen
-import app.pantopus.android.ui.screens.identity_center.IdentityKind
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
 import app.pantopus.android.ui.screens.profile.PublicProfileScreen
 import app.pantopus.android.ui.screens.settings.NotificationSettingsScreen
 import app.pantopus.android.ui.screens.settings.PrivacySettingsScreen
 import app.pantopus.android.ui.screens.settings.SettingsIndexScreen
 import app.pantopus.android.ui.screens.settings.SettingsRoute
+import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.you.YouScreen
 import app.pantopus.android.ui.theme.PantopusIcon
 
@@ -134,15 +131,13 @@ private object ChildRoutes {
     const val CEREMONIAL_MAIL_OPEN_ID_KEY = "mailId"
     const val CEREMONIAL_MAIL_OPEN = "mailbox/letter/{$CEREMONIAL_MAIL_OPEN_ID_KEY}"
 
-    fun ceremonialMailOpen(mailId: String): String =
-        "mailbox/letter/${java.net.URLEncoder.encode(mailId, "UTF-8")}"
+    fun ceremonialMailOpen(mailId: String): String = "mailbox/letter/${java.net.URLEncoder.encode(mailId, "UTF-8")}"
 
     /** Privacy Handshake wizard (T3.4). `:handle` is the persona being followed. */
     const val PRIVACY_HANDSHAKE_HANDLE_KEY = "personaHandle"
     const val PRIVACY_HANDSHAKE = "handshake/{$PRIVACY_HANDSHAKE_HANDLE_KEY}"
 
-    fun privacyHandshake(handle: String): String =
-        "handshake/${java.net.URLEncoder.encode(handle, "UTF-8")}"
+    fun privacyHandshake(handle: String): String = "handshake/${java.net.URLEncoder.encode(handle, "UTF-8")}"
 
     /** Token / Accept screen (T3.5). Resolves the token then accepts
      *  via the matching backend route. Mirrors iOS DeepLinkRouter's
@@ -150,8 +145,7 @@ private object ChildRoutes {
     const val TOKEN_ACCEPT_TOKEN_KEY = "token"
     const val TOKEN_ACCEPT = "invite/{$TOKEN_ACCEPT_TOKEN_KEY}"
 
-    fun tokenAccept(token: String): String =
-        "invite/${java.net.URLEncoder.encode(token, "UTF-8")}"
+    fun tokenAccept(token: String): String = "invite/${java.net.URLEncoder.encode(token, "UTF-8")}"
 
     /**
      * Generic placeholder for intents whose destination hasn't been
@@ -248,19 +242,16 @@ private object ChildRoutes {
     fun claimOwnership(homeId: String): String = "homes/$homeId/claim"
 
     /** Build the generic placeholder path with an encoded label. */
-    fun placeholder(label: String): String =
-        "_placeholder/generic?$PLACEHOLDER_LABEL_KEY=${java.net.URLEncoder.encode(label, "UTF-8")}"
+    fun placeholder(label: String): String = "_placeholder/generic?$PLACEHOLDER_LABEL_KEY=${java.net.URLEncoder.encode(label, "UTF-8")}"
 
     /** Build the compose-post path with the pre-fill intent encoded. */
-    fun composePost(intent: String): String =
-        "feed/compose?$COMPOSE_INTENT_KEY=${java.net.URLEncoder.encode(intent, "UTF-8")}"
+    fun composePost(intent: String): String = "feed/compose?$COMPOSE_INTENT_KEY=${java.net.URLEncoder.encode(intent, "UTF-8")}"
 
     /** Build the gig-detail path. */
     fun gigDetail(gigId: String): String = "gigs/$gigId"
 
     /** Build the compose-gig path with the active category pre-fill. */
-    fun composeGig(category: String): String =
-        "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
+    fun composeGig(category: String): String = "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
 
     /** Build the Nearby-map-for-gigs path with the active category seed. */
     fun nearbyMapForGigs(category: String): String =
@@ -286,6 +277,7 @@ private object ChildRoutes {
                 ConversationIdentityChip.Home -> "home"
                 null -> ""
             }
+
         fun enc(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
         return "chat/$kind/${enc(row.id)}?" +
             "$CHAT_NAME_KEY=${enc(row.displayName)}" +

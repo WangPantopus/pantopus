@@ -24,8 +24,7 @@ class NotificationsRepository
             limit: Int,
             offset: Int,
             unreadOnly: Boolean? = null,
-        ): NetworkResult<NotificationsListResponse> =
-            safeApiCall { api.list(limit = limit, offset = offset, unreadOnly = unreadOnly) }
+        ): NetworkResult<NotificationsListResponse> = safeApiCall { api.list(limit = limit, offset = offset, unreadOnly = unreadOnly) }
 
         suspend fun unreadCount(): NetworkResult<NotificationUnreadCountResponse> = safeApiCall { api.unreadCount() }
 

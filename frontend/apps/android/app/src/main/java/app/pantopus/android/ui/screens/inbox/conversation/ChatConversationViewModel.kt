@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import timber.log.Timber
-import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -294,8 +293,9 @@ class ChatConversationViewModel
          * so the server-canonical count lands in the projection.
          */
         private fun handleReaction(json: JSONObject) {
-            val id = json.optString("message_id").takeIf { it.isNotEmpty() }
-                ?: json.optString("messageId").takeIf { it.isNotEmpty() } ?: return
+            val id =
+                json.optString("message_id").takeIf { it.isNotEmpty() }
+                    ?: json.optString("messageId").takeIf { it.isNotEmpty() } ?: return
             if (messages.none { it.id == id }) return
             fetch(initial = true)
         }

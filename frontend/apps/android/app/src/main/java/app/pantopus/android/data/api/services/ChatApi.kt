@@ -14,7 +14,7 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
- * Chat endpoints under `/api/chat/*` from `backend/routes/chats.js`.
+ * Chat endpoints under `/api/chat/[*]` from `backend/routes/chats.js`.
  * Mounted at `/api/chat` (see `backend/app.js:325`).
  */
 interface ChatApi {

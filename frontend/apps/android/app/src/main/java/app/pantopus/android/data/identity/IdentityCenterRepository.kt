@@ -9,7 +9,7 @@ import app.pantopus.android.data.api.services.IdentityCenterApi
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Wraps `/api/identity-center/*` in the [NetworkResult] taxonomy. */
+/** Wraps `/api/identity-center/[*]` in the [NetworkResult] taxonomy. */
 @Singleton
 class IdentityCenterRepository
     @Inject

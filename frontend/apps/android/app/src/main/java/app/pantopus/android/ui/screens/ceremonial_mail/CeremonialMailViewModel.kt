@@ -335,8 +335,7 @@ class CeremonialMailViewModel
                 CeremonialMailIntent.JustBecause -> "Just because"
             }
 
-        private fun displayName(recipient: MailRecipientDto?): String =
-            recipient?.name ?: recipient?.username ?: ""
+        private fun displayName(recipient: MailRecipientDto?): String = recipient?.name ?: recipient?.username ?: ""
 
         private suspend fun searchRecipients(query: String) {
             _isSearching.value = true

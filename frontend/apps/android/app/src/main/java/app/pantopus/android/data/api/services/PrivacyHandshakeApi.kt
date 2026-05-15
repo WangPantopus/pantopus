@@ -25,21 +25,29 @@ interface PrivacyHandshakeApi {
     /** `GET /api/personas/:handle` — visitor-side persona summary.
      *  Route `backend/routes/personas.js:1028`. */
     @GET("api/personas/{handle}")
-    suspend fun persona(@Path("handle") handle: String): PersonaMeResponse
+    suspend fun persona(
+        @Path("handle") handle: String,
+    ): PersonaMeResponse
 
     /** `GET /api/personas/:handle/tiers` — public tier ladder. */
     @GET("api/personas/{handle}/tiers")
-    suspend fun tiers(@Path("handle") handle: String): PersonaTiersResponse
+    suspend fun tiers(
+        @Path("handle") handle: String,
+    ): PersonaTiersResponse
 
     /** `GET /api/personas/:handle/fan-handle-suggestion` — random or
      *  bound fan handle suggestion. */
     @GET("api/personas/{handle}/fan-handle-suggestion")
-    suspend fun fanHandleSuggestion(@Path("handle") handle: String): FanHandleSuggestionResponse
+    suspend fun fanHandleSuggestion(
+        @Path("handle") handle: String,
+    ): FanHandleSuggestionResponse
 
     /** `GET /api/personas/:id/follow/status` — short-circuit for the
      *  return-visitor-already-member frame. */
     @GET("api/personas/{id}/follow/status")
-    suspend fun followStatus(@Path("id") personaId: String): FollowStatusResponse
+    suspend fun followStatus(
+        @Path("id") personaId: String,
+    ): FollowStatusResponse
 
     /** `POST /api/personas/:id/follow` — handshake submit.
      *  `Response<HandshakeSubmitResponse>` so the repository can

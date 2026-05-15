@@ -23,7 +23,7 @@ public final class TokenAcceptViewModel {
     private let onAccepted: @MainActor (InviteType) -> Void
     private let onDeclined: @MainActor () -> Void
 
-    public init(
+    init(
         token: String,
         api: APIClient = .shared,
         auth: AuthManager = .shared,

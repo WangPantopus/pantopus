@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.theme.PantopusColors
-import app.pantopus.android.ui.theme.Radii
 
 @Composable
 fun GigDetailScreen(

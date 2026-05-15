@@ -38,7 +38,7 @@ public final class GigsFeedViewModel {
     private var loadedItems: [GigDTO] = []
     private var isLoading = false
 
-    public init(
+    init(
         api: APIClient = .shared,
         latitude: Double? = nil,
         longitude: Double? = nil,

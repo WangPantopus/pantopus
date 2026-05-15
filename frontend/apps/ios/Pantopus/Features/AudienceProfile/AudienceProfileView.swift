@@ -20,7 +20,7 @@ public struct AudienceProfileView: View {
     private let onOpenThread: @MainActor (ThreadRowContent) -> Void
     private let onOpenSetup: @MainActor () -> Void
 
-    public init(
+    init(
         viewModel: AudienceProfileViewModel = AudienceProfileViewModel(),
         onBack: @escaping @MainActor () -> Void = {},
         onOpenFollower: @escaping @MainActor (FollowerRowContent) -> Void = { _ in },

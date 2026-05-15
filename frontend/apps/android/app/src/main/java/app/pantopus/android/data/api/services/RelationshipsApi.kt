@@ -7,7 +7,7 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 
 /**
- * `/api/relationships/*` — trust-graph endpoints from
+ * `/api/relationships/[*]` — trust-graph endpoints from
  * `backend/routes/relationships.js`. Mounted at `/api/relationships`
  * (see `backend/app.js:347`).
  */

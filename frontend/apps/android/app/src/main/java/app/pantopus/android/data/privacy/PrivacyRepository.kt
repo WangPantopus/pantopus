@@ -9,7 +9,7 @@ import app.pantopus.android.data.api.services.PrivacyApi
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Wraps `/api/privacy/*` in the [NetworkResult] taxonomy. */
+/** Wraps `/api/privacy/[*]` in the [NetworkResult] taxonomy. */
 @Singleton
 class PrivacyRepository
     @Inject
@@ -18,7 +18,12 @@ class PrivacyRepository
     ) {
         suspend fun settings(): NetworkResult<PrivacySettingsResponse> = safeApiCall { api.settings() }
 
-        suspend fun updateSettings(body: PrivacySettingsUpdate): NetworkResult<PrivacySettingsResponse> = safeApiCall { api.updateSettings(body) }
+        suspend fun updateSettings(body: PrivacySettingsUpdate): NetworkResult<PrivacySettingsResponse> =
+            safeApiCall {
+                api.updateSettings(
+                    body,
+                )
+            }
 
         suspend fun blocks(): NetworkResult<PrivacyBlocksResponse> = safeApiCall { api.blocks() }
     }

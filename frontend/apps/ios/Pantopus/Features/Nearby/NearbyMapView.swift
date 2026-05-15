@@ -22,7 +22,7 @@ public struct NearbyMapView: View {
     private let onOpenFilters: @MainActor () -> Void
     private let onBack: (@MainActor () -> Void)?
 
-    public init(
+    init(
         viewModel: NearbyMapViewModel = NearbyMapViewModel(),
         onOpenEntity: @escaping @MainActor (MapEntity) -> Void = { _ in },
         onOpenFilters: @escaping @MainActor () -> Void = {},

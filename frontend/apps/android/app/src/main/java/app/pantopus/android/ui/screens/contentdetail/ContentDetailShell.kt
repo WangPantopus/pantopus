@@ -45,11 +45,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
+import coil.compose.AsyncImage
 
 /**
  * T2.6 Transactional Detail shell — single canvas shared by gig,
@@ -355,8 +355,11 @@ private fun HeroBlock(content: ContentDetailContent) {
                     fontSize = 32.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color =
-                        if (content.kind == ContentDetailKind.Listing) PantopusColors.primary600
-                        else PantopusColors.appText,
+                        if (content.kind == ContentDetailKind.Listing) {
+                            PantopusColors.primary600
+                        } else {
+                            PantopusColors.appText
+                        },
                 )
                 content.hero.priceCaption?.let {
                     Text(
@@ -482,7 +485,12 @@ private fun CounterpartyCard(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 party.rating?.let {
                     PantopusIconImage(icon = PantopusIcon.Star, contentDescription = null, size = 10.dp, tint = PantopusColors.warning)
-                    Text(text = String.format("%.1f", it), fontSize = 11.5.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextSecondary)
+                    Text(
+                        text = String.format("%.1f", it),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = PantopusColors.appTextSecondary,
+                    )
                 }
                 party.trailing?.let {
                     val prefix = if (party.rating != null) " · " else ""
@@ -540,153 +548,159 @@ private fun IdentityChip(kind: String) {
 @Composable
 private fun ModuleView(module: ContentDetailModule) {
     when (module) {
-        is ContentDetailModule.Description -> SectionCard(title = module.title, icon = module.icon) {
-            Text(
-                text = module.body,
-                fontSize = 13.5.sp,
-                color = PantopusColors.appTextStrong,
-                lineHeight = 20.sp,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        is ContentDetailModule.DetailRow -> SectionCard(title = module.title, icon = module.sectionIcon) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(PantopusColors.appSurfaceSunken)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                PantopusIconImage(icon = module.rowIcon, contentDescription = null, size = 14.dp, tint = PantopusColors.primary600)
-                Text(text = module.label, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
-                Spacer(modifier = Modifier.weight(1f))
-                module.trailing?.let {
-                    Text(text = it, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextSecondary)
-                }
+        is ContentDetailModule.Description ->
+            SectionCard(title = module.title, icon = module.icon) {
+                Text(
+                    text = module.body,
+                    fontSize = 13.5.sp,
+                    color = PantopusColors.appTextStrong,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
-        }
-        is ContentDetailModule.CaptionedText -> SectionCard(title = module.title, icon = module.icon) {
-            Text(
-                text = module.label,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = PantopusColors.appTextStrong,
-            )
-        }
-        is ContentDetailModule.PhotoStrip -> SectionCard(title = module.title, icon = module.icon, sub = module.countLabel) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                module.tiles.forEach { tile ->
-                    Box(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    Brush.linearGradient(colors = listOf(tile.gradient.start, tile.gradient.end)),
-                                ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        PantopusIconImage(
-                            icon = tile.icon,
-                            contentDescription = null,
-                            size = 24.dp,
-                            strokeWidth = 1.8f,
-                            tint = Color.White.copy(alpha = 0.9f),
-                        )
+        is ContentDetailModule.DetailRow ->
+            SectionCard(title = module.title, icon = module.sectionIcon) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(PantopusColors.appSurfaceSunken)
+                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    PantopusIconImage(icon = module.rowIcon, contentDescription = null, size = 14.dp, tint = PantopusColors.primary600)
+                    Text(text = module.label, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+                    Spacer(modifier = Modifier.weight(1f))
+                    module.trailing?.let {
+                        Text(text = it, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextSecondary)
                     }
                 }
             }
-        }
-        is ContentDetailModule.SimilarStrip -> SectionCard(title = module.title, icon = null, sub = module.sub) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(items = module.items, key = { it.id }) { item ->
-                    Column(modifier = Modifier.width(120.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        is ContentDetailModule.CaptionedText ->
+            SectionCard(title = module.title, icon = module.icon) {
+                Text(
+                    text = module.label,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = PantopusColors.appTextStrong,
+                )
+            }
+        is ContentDetailModule.PhotoStrip ->
+            SectionCard(title = module.title, icon = module.icon, sub = module.countLabel) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    module.tiles.forEach { tile ->
                         Box(
                             modifier =
                                 Modifier
-                                    .size(120.dp)
+                                    .weight(1f)
+                                    .aspectRatio(1f)
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(
-                                        Brush.linearGradient(colors = listOf(item.gradient.start, item.gradient.end)),
+                                        Brush.linearGradient(colors = listOf(tile.gradient.start, tile.gradient.end)),
                                     ),
-                        )
-                        Text(
-                            text = item.title,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = PantopusColors.appText,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = item.price,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PantopusColors.primary600,
-                        )
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            PantopusIconImage(
+                                icon = tile.icon,
+                                contentDescription = null,
+                                size = 24.dp,
+                                strokeWidth = 1.8f,
+                                tint = Color.White.copy(alpha = 0.9f),
+                            )
+                        }
                     }
                 }
             }
-        }
-        is ContentDetailModule.Bids -> SectionCard(title = module.title, icon = null) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
-            ) {
-                module.bids.forEachIndexed { index, bid ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        AvatarView(initials = bid.initials, verified = bid.verified, size = 36.dp)
-                        Column(modifier = Modifier.weight(1f)) {
+        is ContentDetailModule.SimilarStrip ->
+            SectionCard(title = module.title, icon = null, sub = module.sub) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(items = module.items, key = { it.id }) { item ->
+                        Column(modifier = Modifier.width(120.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(120.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(
+                                            Brush.linearGradient(colors = listOf(item.gradient.start, item.gradient.end)),
+                                        ),
+                            )
                             Text(
-                                text = bid.displayName,
-                                fontSize = 12.5.sp,
+                                text = item.title,
+                                fontSize = 11.5.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = PantopusColors.appText,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                PantopusIconImage(
-                                    icon = PantopusIcon.Star,
-                                    contentDescription = null,
-                                    size = 9.dp,
-                                    tint = PantopusColors.warning,
-                                )
-                                Text(
-                                    text = bid.ratingLine,
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = PantopusColors.appTextSecondary,
-                                )
-                            }
+                            Text(
+                                text = item.price,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PantopusColors.primary600,
+                            )
                         }
-                        Text(
-                            text = bid.amount,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PantopusColors.primary600,
-                        )
-                    }
-                    if (index < module.bids.size - 1) {
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder.copy(alpha = 0.5f)))
                     }
                 }
             }
-        }
+        is ContentDetailModule.Bids ->
+            SectionCard(title = module.title, icon = null) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(PantopusColors.appSurface)
+                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
+                ) {
+                    module.bids.forEachIndexed { index, bid ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            AvatarView(initials = bid.initials, verified = bid.verified, size = 36.dp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = bid.displayName,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = PantopusColors.appText,
+                                )
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    PantopusIconImage(
+                                        icon = PantopusIcon.Star,
+                                        contentDescription = null,
+                                        size = 9.dp,
+                                        tint = PantopusColors.warning,
+                                    )
+                                    Text(
+                                        text = bid.ratingLine,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = PantopusColors.appTextSecondary,
+                                    )
+                                }
+                            }
+                            Text(
+                                text = bid.amount,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PantopusColors.primary600,
+                            )
+                        }
+                        if (index < module.bids.size - 1) {
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder.copy(alpha = 0.5f)))
+                        }
+                    }
+                }
+            }
         is ContentDetailModule.FromTo ->
             Row(
                 modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
@@ -695,9 +709,10 @@ private fun ModuleView(module: ContentDetailModule) {
                 PartyCard(party = module.from, modifier = Modifier.weight(1f))
                 PartyCard(party = module.to, modifier = Modifier.weight(1f))
             }
-        is ContentDetailModule.LineItems -> SectionCard(title = module.title, icon = module.icon) {
-            LineItemsTable(rows = module.rows)
-        }
+        is ContentDetailModule.LineItems ->
+            SectionCard(title = module.title, icon = module.icon) {
+                LineItemsTable(rows = module.rows)
+            }
         is ContentDetailModule.Summary ->
             SummaryCard(summary = module, modifier = Modifier.padding(horizontal = 20.dp))
     }
@@ -780,20 +795,72 @@ private fun LineItemsTable(rows: List<ContentDetailLineItem>) {
                     .background(PantopusColors.appSurfaceSunken)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
-            Text(text = "ITEM", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextMuted, modifier = Modifier.weight(1f))
-            Text(text = "QTY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextMuted, textAlign = TextAlign.Center, modifier = Modifier.width(36.dp))
-            Text(text = "UNIT", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextMuted, textAlign = TextAlign.End, modifier = Modifier.width(60.dp))
-            Text(text = "TOTAL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextMuted, textAlign = TextAlign.End, modifier = Modifier.width(60.dp))
+            Text(
+                text = "ITEM",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextMuted,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "QTY",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(36.dp),
+            )
+            Text(
+                text = "UNIT",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextMuted,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(60.dp),
+            )
+            Text(
+                text = "TOTAL",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextMuted,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(60.dp),
+            )
         }
         rows.forEachIndexed { index, row ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(text = row.item, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appText, modifier = Modifier.weight(1f))
-                Text(text = row.qty, fontSize = 12.sp, color = PantopusColors.appTextSecondary, textAlign = TextAlign.Center, modifier = Modifier.width(36.dp))
-                Text(text = row.unit, fontSize = 12.sp, color = PantopusColors.appTextSecondary, textAlign = TextAlign.End, modifier = Modifier.width(60.dp))
-                Text(text = row.total, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText, textAlign = TextAlign.End, modifier = Modifier.width(60.dp))
+                Text(
+                    text = row.item,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = row.qty,
+                    fontSize = 12.sp,
+                    color = PantopusColors.appTextSecondary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.width(36.dp),
+                )
+                Text(
+                    text = row.unit,
+                    fontSize = 12.sp,
+                    color = PantopusColors.appTextSecondary,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(60.dp),
+                )
+                Text(
+                    text = row.total,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(60.dp),
+                )
             }
             if (index < rows.size - 1) {
                 Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder.copy(alpha = 0.5f)))
@@ -882,7 +949,13 @@ private fun StickyDock(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     secondary.icon?.let {
-                        PantopusIconImage(icon = it, contentDescription = null, size = 15.dp, strokeWidth = 2.2f, tint = PantopusColors.appText)
+                        PantopusIconImage(
+                            icon = it,
+                            contentDescription = null,
+                            size = 15.dp,
+                            strokeWidth = 2.2f,
+                            tint = PantopusColors.appText,
+                        )
                     }
                     Text(text = secondary.label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
                 }
@@ -901,7 +974,13 @@ private fun StickyDock(
                 horizontalArrangement = Arrangement.Center,
             ) {
                 dock.primary.icon?.let {
-                    PantopusIconImage(icon = it, contentDescription = null, size = 16.dp, strokeWidth = 2.2f, tint = PantopusColors.appTextInverse)
+                    PantopusIconImage(
+                        icon = it,
+                        contentDescription = null,
+                        size = 16.dp,
+                        strokeWidth = 2.2f,
+                        tint = PantopusColors.appTextInverse,
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                 }
                 Text(text = dock.primary.label, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)

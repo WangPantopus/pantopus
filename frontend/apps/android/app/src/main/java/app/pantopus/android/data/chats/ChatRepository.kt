@@ -30,29 +30,23 @@ class ChatRepository
             before: String? = null,
             after: String? = null,
             limit: Int = 60,
-        ): NetworkResult<ChatMessagesResponse> =
-            safeApiCall { api.roomMessages(roomId, limit, before, after) }
+        ): NetworkResult<ChatMessagesResponse> = safeApiCall { api.roomMessages(roomId, limit, before, after) }
 
         suspend fun conversationMessages(
             otherUserId: String,
             before: String? = null,
             after: String? = null,
             limit: Int = 60,
-        ): NetworkResult<ChatMessagesResponse> =
-            safeApiCall { api.conversationMessages(otherUserId, limit, before, after) }
+        ): NetworkResult<ChatMessagesResponse> = safeApiCall { api.conversationMessages(otherUserId, limit, before, after) }
 
-        suspend fun sendMessage(body: SendChatMessageBody): NetworkResult<SendChatMessageResponse> =
-            safeApiCall { api.sendMessage(body) }
+        suspend fun sendMessage(body: SendChatMessageBody): NetworkResult<SendChatMessageResponse> = safeApiCall { api.sendMessage(body) }
 
         suspend fun reactToMessage(
             messageId: String,
             reaction: String,
-        ): NetworkResult<ReactToChatMessageResponse> =
-            safeApiCall { api.reactToMessage(messageId, ReactToChatMessageBody(reaction)) }
+        ): NetworkResult<ReactToChatMessageResponse> = safeApiCall { api.reactToMessage(messageId, ReactToChatMessageBody(reaction)) }
 
-        suspend fun markRoomRead(roomId: String): NetworkResult<Unit> =
-            safeApiCall { api.markRoomRead(roomId) }
+        suspend fun markRoomRead(roomId: String): NetworkResult<Unit> = safeApiCall { api.markRoomRead(roomId) }
 
-        suspend fun markConversationRead(otherUserId: String): NetworkResult<Unit> =
-            safeApiCall { api.markConversationRead(otherUserId) }
+        suspend fun markConversationRead(otherUserId: String): NetworkResult<Unit> = safeApiCall { api.markConversationRead(otherUserId) }
     }

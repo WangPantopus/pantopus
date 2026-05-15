@@ -16,7 +16,7 @@ public struct MarketplaceView: View {
     private let onCompose: @MainActor () -> Void
     private let onBack: (@MainActor () -> Void)?
 
-    public init(
+    init(
         viewModel: MarketplaceViewModel = MarketplaceViewModel(),
         onOpenListing: @escaping @MainActor (String) -> Void = { _ in },
         onCompose: @escaping @MainActor () -> Void = {},

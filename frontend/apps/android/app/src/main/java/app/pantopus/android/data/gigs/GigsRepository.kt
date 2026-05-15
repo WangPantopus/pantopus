@@ -46,8 +46,7 @@ class GigsRepository
             longitude: Double,
             radiusMeters: Int = 5_000,
             limit: Int = 20,
-        ): NetworkResult<GigsListResponse> =
-            safeApiCall { api.nearby(latitude, longitude, radiusMeters, limit = limit) }
+        ): NetworkResult<GigsListResponse> = safeApiCall { api.nearby(latitude, longitude, radiusMeters, limit = limit) }
 
         suspend fun inBounds(
             minLat: Double,

@@ -1147,4 +1147,3 @@ private fun iconFor(
         GigsCategory.All -> PantopusIcon.Circle
     }
 }
-

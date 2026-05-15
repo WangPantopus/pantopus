@@ -25,7 +25,7 @@ public final class MarketplaceViewModel {
     private var loadedItems: [ListingDTO] = []
     private var isLoading = false
 
-    public init(
+    init(
         api: APIClient = .shared,
         location: LocationProviding = FallbackLocationProvider.shared,
         radiusMiles: Double = 2

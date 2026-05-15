@@ -8,7 +8,7 @@ import app.pantopus.android.data.api.services.RelationshipsApi
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Wraps `/api/relationships/*` calls in the [NetworkResult] taxonomy. */
+/** Wraps `/api/relationships/[*]` calls in the [NetworkResult] taxonomy. */
 @Singleton
 class RelationshipsRepository
     @Inject

@@ -18,7 +18,7 @@ public struct ChatListView: View {
     private let onCompose: @MainActor () -> Void
     private let onOpenSearch: @MainActor () -> Void
 
-    public init(
+    init(
         viewModel: ChatListViewModel = ChatListViewModel(),
         onOpenConversation: @escaping @MainActor (ConversationRowContent) -> Void = { _ in },
         onCompose: @escaping @MainActor () -> Void = {},

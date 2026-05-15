@@ -84,8 +84,18 @@ class MeSnapshotTest {
                         header = "Account",
                         rows =
                             listOf(
-                                MeSectionRow(id = "editProfile", icon = PantopusIcon.User, label = "Edit profile", routeKey = "me.editProfile"),
-                                MeSectionRow(id = "notifications", icon = PantopusIcon.Bell, label = "Notifications", routeKey = "me.notifications"),
+                                MeSectionRow(
+                                    id = "editProfile",
+                                    icon = PantopusIcon.User,
+                                    label = "Edit profile",
+                                    routeKey = "me.editProfile",
+                                ),
+                                MeSectionRow(
+                                    id = "notifications",
+                                    icon = PantopusIcon.Bell,
+                                    label = "Notifications",
+                                    routeKey = "me.notifications",
+                                ),
                             ),
                     ),
                 ),
@@ -122,7 +132,13 @@ class MeSnapshotTest {
                         header = "Household",
                         rows =
                             listOf(
-                                MeSectionRow(id = "address", icon = PantopusIcon.MapPin, label = "Address", value = "Verified", routeKey = "home.address"),
+                                MeSectionRow(
+                                    id = "address",
+                                    icon = PantopusIcon.MapPin,
+                                    label = "Address",
+                                    value = "Verified",
+                                    routeKey = "home.address",
+                                ),
                             ),
                     ),
                 ),

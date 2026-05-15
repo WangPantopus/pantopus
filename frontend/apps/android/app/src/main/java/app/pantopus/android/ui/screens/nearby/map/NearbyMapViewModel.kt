@@ -113,12 +113,14 @@ class NearbyMapViewModel
                         _state.value = NearbyMapUiState.Loading
                     }
 
-                    val gigsDeferred = async {
-                        gigs.inBounds(minLat = minLat, minLon = minLon, maxLat = maxLat, maxLon = maxLon, category = categoryParam)
-                    }
-                    val listingsDeferred = async {
-                        listings.inBounds(south = minLat, west = minLon, north = maxLat, east = maxLon, category = categoryParam)
-                    }
+                    val gigsDeferred =
+                        async {
+                            gigs.inBounds(minLat = minLat, minLon = minLon, maxLat = maxLat, maxLon = maxLon, category = categoryParam)
+                        }
+                    val listingsDeferred =
+                        async {
+                            listings.inBounds(south = minLat, west = minLon, north = maxLat, east = maxLon, category = categoryParam)
+                        }
                     val gigsResult = gigsDeferred.await()
                     val listingsResult = listingsDeferred.await()
 
@@ -140,12 +142,13 @@ class NearbyMapViewModel
 
         private fun rebuild(selectedId: String?) {
             val sorted = sortFor(entities)
-            _state.value = NearbyMapUiState.Loaded(
-                entities = sorted,
-                markers = cluster(entities = sorted, radiusDegrees = clusterRadiusDegrees),
-                userCoordinate = _userCoordinate.value,
-                selectedId = selectedId,
-            )
+            _state.value =
+                NearbyMapUiState.Loaded(
+                    entities = sorted,
+                    markers = cluster(entities = sorted, radiusDegrees = clusterRadiusDegrees),
+                    userCoordinate = _userCoordinate.value,
+                    selectedId = selectedId,
+                )
         }
 
         /**
@@ -218,7 +221,7 @@ class NearbyMapViewModel
             ): String {
                 val latBucket = kotlin.math.floor(latitude / radius).toInt()
                 val lonBucket = kotlin.math.floor(longitude / radius).toInt()
-                return "${latBucket}_${lonBucket}"
+                return "${latBucket}_$lonBucket"
             }
         }
 

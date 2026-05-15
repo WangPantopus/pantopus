@@ -187,7 +187,15 @@ class SettingsIndexViewModel
                             GroupedListGroup(
                                 id = "session",
                                 overline = null,
-                                rows = listOf(GroupedListRow(id = "signOut", label = "Log out", control = RowControl.Chevron, destructive = true)),
+                                rows =
+                                    listOf(
+                                        GroupedListRow(
+                                            id = "signOut",
+                                            label = "Log out",
+                                            control = RowControl.Chevron,
+                                            destructive = true,
+                                        ),
+                                    ),
                             ),
                         ),
                 )
@@ -318,8 +326,9 @@ class NotificationSettingsViewModel
                         control = RowControl.Toggle(preferenceValue("sms", category)),
                     )
                 }
-            val emailHelper = emailAddress?.let { "Sent to $it. Digest at 7:30 a.m. local." }
-                ?: "Sent to your account email. Digest at 7:30 a.m. local."
+            val emailHelper =
+                emailAddress?.let { "Sent to $it. Digest at 7:30 a.m. local." }
+                    ?: "Sent to your account email. Digest at 7:30 a.m. local."
             _state.value =
                 GroupedListUiState.Loaded(
                     groups =

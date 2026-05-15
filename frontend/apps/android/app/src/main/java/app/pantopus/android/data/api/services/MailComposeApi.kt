@@ -12,7 +12,7 @@ import retrofit2.http.Query
 
 /**
  * Ceremonial Mail Compose endpoints. Mounted under
- * `/api/mailbox/compose/*` plus the existing `/api/mailbox/send`
+ * `/api/mailbox/compose/[*]` plus the existing `/api/mailbox/send`
  * for the final send — see `backend/app.js:311` and
  * `backend/routes/mailbox.js:1697`.
  */
@@ -26,9 +26,13 @@ interface MailComposeApi {
 
     /** `GET /api/mailbox/compose/home-context/:homeId`. */
     @GET("api/mailbox/compose/home-context/{homeId}")
-    suspend fun homeContext(@Path("homeId") homeId: String): MailHomeContextResponse
+    suspend fun homeContext(
+        @Path("homeId") homeId: String,
+    ): MailHomeContextResponse
 
     /** `POST /api/mailbox/send`. */
     @POST("api/mailbox/send")
-    suspend fun send(@Body body: SendMailBody): SendMailResponse
+    suspend fun send(
+        @Body body: SendMailBody,
+    ): SendMailResponse
 }

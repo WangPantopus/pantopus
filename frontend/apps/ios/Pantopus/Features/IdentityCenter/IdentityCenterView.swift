@@ -18,7 +18,7 @@ public struct IdentityCenterView: View {
     private let onBack: @MainActor () -> Void
     private let onOpenIdentity: @MainActor (IdentityCardContent) -> Void
 
-    public init(
+    init(
         viewModel: IdentityCenterViewModel = IdentityCenterViewModel(),
         onBack: @escaping @MainActor () -> Void = {},
         onOpenIdentity: @escaping @MainActor (IdentityCardContent) -> Void = { _ in }

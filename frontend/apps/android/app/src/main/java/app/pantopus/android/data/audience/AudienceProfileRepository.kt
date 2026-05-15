@@ -14,7 +14,7 @@ import app.pantopus.android.data.api.services.AudienceProfileApi
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Wraps `/api/personas/*` and `/api/broadcast/*` in [NetworkResult]. */
+/** Wraps `/api/personas/[*]` and `/api/broadcast/[*]` in [NetworkResult]. */
 @Singleton
 class AudienceProfileRepository
     @Inject
@@ -32,8 +32,7 @@ class AudienceProfileRepository
         suspend fun membershipStats(personaId: String): NetworkResult<MembershipStatsResponse> =
             safeApiCall { api.membershipStats(personaId) }
 
-        suspend fun threads(personaId: String): NetworkResult<PersonaThreadsResponse> =
-            safeApiCall { api.threads(personaId) }
+        suspend fun threads(personaId: String): NetworkResult<PersonaThreadsResponse> = safeApiCall { api.threads(personaId) }
 
         suspend fun publishUpdate(
             channelId: String,

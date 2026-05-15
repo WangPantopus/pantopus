@@ -42,7 +42,7 @@ public final class NearbyMapViewModel {
     /// camera zoom-in via `setClusterRadius(...)`.
     private var clusterRadiusDegrees: Double = 0.005
 
-    public init(
+    init(
         api: APIClient = .shared,
         location: LocationProviding = FallbackLocationProvider.shared,
         initialCategory: GigsCategory = .all

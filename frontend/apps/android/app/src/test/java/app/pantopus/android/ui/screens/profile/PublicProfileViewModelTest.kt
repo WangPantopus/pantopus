@@ -5,9 +5,9 @@ package app.pantopus.android.ui.screens.profile
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.models.profile.PublicProfileReview
+import app.pantopus.android.data.api.models.relationships.ConnectionRequestResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
-import app.pantopus.android.data.api.models.relationships.ConnectionRequestResponse
 import app.pantopus.android.data.blocks.BlocksRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.data.relationships.RelationshipsRepository

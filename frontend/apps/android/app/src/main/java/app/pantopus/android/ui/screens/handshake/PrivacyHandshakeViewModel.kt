@@ -173,8 +173,9 @@ class PrivacyHandshakeViewModel
                             progressFraction = 0.5f,
                             leading = WizardLeadingControl.Close,
                             primaryCtaLabel = "Continue",
-                            primaryCtaEnabled = current.handle.isValid &&
-                                (!current.handle.matchesUsername || current.handle.acknowledgedUsingUsername),
+                            primaryCtaEnabled =
+                                current.handle.isValid &&
+                                    (!current.handle.matchesUsername || current.handle.acknowledgedUsingUsername),
                             isSubmitting = false,
                             dirty = false,
                             showsProgressBar = true,

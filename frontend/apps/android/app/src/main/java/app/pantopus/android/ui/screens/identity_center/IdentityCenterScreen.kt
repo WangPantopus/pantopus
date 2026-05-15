@@ -86,16 +86,18 @@ fun IdentityCenterScreen(
         )
         when (val current = state) {
             is IdentityCenterUiState.Loading -> LoadingFrame()
-            is IdentityCenterUiState.Loaded -> LoadedFrame(
-                loaded = current.content,
-                onOpenIdentity = onOpenIdentity,
-                onBridgeToggle = viewModel::setBridge,
-                onRowTap = onOpenPlaceholder,
-            )
-            is IdentityCenterUiState.Error -> ErrorFrame(
-                message = current.message,
-                onRetry = viewModel::load,
-            )
+            is IdentityCenterUiState.Loaded ->
+                LoadedFrame(
+                    loaded = current.content,
+                    onOpenIdentity = onOpenIdentity,
+                    onBridgeToggle = viewModel::setBridge,
+                    onRowTap = onOpenPlaceholder,
+                )
+            is IdentityCenterUiState.Error ->
+                ErrorFrame(
+                    message = current.message,
+                    onRetry = viewModel::load,
+                )
         }
     }
 

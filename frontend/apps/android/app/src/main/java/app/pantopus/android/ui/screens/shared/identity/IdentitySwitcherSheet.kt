@@ -212,4 +212,3 @@ private fun ActivePill(accent: Color) {
         )
     }
 }
-

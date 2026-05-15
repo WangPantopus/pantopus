@@ -76,9 +76,10 @@ class AudienceProfileViewModel
             val persona = me.persona
             val handle = persona?.handle
             if (persona == null || handle == null) {
-                _state.value = AudienceProfileUiState.Empty(
-                    "Create a Public Profile to send updates and manage followers.",
-                )
+                _state.value =
+                    AudienceProfileUiState.Empty(
+                        "Create a Public Profile to send updates and manage followers.",
+                    )
                 return
             }
             personaId = persona.id
@@ -91,17 +92,18 @@ class AudienceProfileViewModel
             val stats = unwrap(repository.membershipStats(persona.id)) ?: return
             val threads = unwrap(repository.threads(persona.id)) ?: return
 
-            _state.value = AudienceProfileUiState.Loaded(
-                project(
-                    persona = persona,
-                    audience = audience,
-                    posts = posts.posts,
-                    tiers = tiers.tiers,
-                    stats = stats.counts,
-                    threads = threads.threads,
-                    channelId = channelId,
-                ),
-            )
+            _state.value =
+                AudienceProfileUiState.Loaded(
+                    project(
+                        persona = persona,
+                        audience = audience,
+                        posts = posts.posts,
+                        tiers = tiers.tiers,
+                        stats = stats.counts,
+                        threads = threads.threads,
+                        channelId = channelId,
+                    ),
+                )
         }
 
         private fun <T> unwrap(result: NetworkResult<T>): T? =
@@ -127,10 +129,11 @@ class AudienceProfileViewModel
 
         fun onComposerVisibility(visibility: UpdateVisibility) {
             val current = _composer.value
-            _composer.value = current.copy(
-                visibility = visibility,
-                targetTierRank = if (visibility == UpdateVisibility.TierOrAbove) current.targetTierRank else null,
-            )
+            _composer.value =
+                current.copy(
+                    visibility = visibility,
+                    targetTierRank = if (visibility == UpdateVisibility.TierOrAbove) current.targetTierRank else null,
+                )
         }
 
         fun onComposerTier(rank: Int?) {
@@ -153,10 +156,11 @@ class AudienceProfileViewModel
             viewModelScope.launch {
                 when (repository.publishUpdate(ch, body)) {
                     is NetworkResult.Success -> {
-                        _composer.value = UpdateComposerState(
-                            visibility = snapshot.visibility,
-                            targetTierRank = snapshot.targetTierRank,
-                        )
+                        _composer.value =
+                            UpdateComposerState(
+                                visibility = snapshot.visibility,
+                                targetTierRank = snapshot.targetTierRank,
+                            )
                         load()
                     }
                     is NetworkResult.Failure -> {
@@ -187,13 +191,14 @@ class AudienceProfileViewModel
                 threads: List<PersonaThreadDto>,
                 channelId: String?,
             ): AudienceProfileLoaded {
-                val header = AudienceHeaderContent(
-                    displayName = persona.displayName ?: persona.handle ?: "Public Profile",
-                    handle = persona.handle?.let { "@$it" },
-                    followerCount = audience.counts.totalActive ?: persona.followerCount ?: 0,
-                    newThisWeek = audience.counts.pending ?: 0,
-                    postCount = persona.postCount ?: posts.size,
-                )
+                val header =
+                    AudienceHeaderContent(
+                        displayName = persona.displayName ?: persona.handle ?: "Public Profile",
+                        handle = persona.handle?.let { "@$it" },
+                        followerCount = audience.counts.totalActive ?: persona.followerCount ?: 0,
+                        newThisWeek = audience.counts.pending ?: 0,
+                        postCount = persona.postCount ?: posts.size,
+                    )
                 val updates = posts.mapNotNull(::updateCard)
                 val analytics = analyticsCells(stats)
                 val breakdown = tierBreakdown(audience.counts, tiers)

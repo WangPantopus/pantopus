@@ -26,7 +26,7 @@ public final class PrivacyHandshakeViewModel: WizardModel {
     private var ready: HandshakeReadyContent?
     private var isSubmitting: Bool = false
 
-    public init(
+    init(
         personaHandle: String,
         api: APIClient = .shared,
         onDismiss: @escaping @MainActor () -> Void = {}

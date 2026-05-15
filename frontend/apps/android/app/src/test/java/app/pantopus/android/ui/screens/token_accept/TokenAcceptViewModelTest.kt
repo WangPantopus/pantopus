@@ -55,8 +55,7 @@ class TokenAcceptViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun savedState(token: String = "demo"): SavedStateHandle =
-        SavedStateHandle(mapOf(TokenAcceptViewModel.TOKEN_KEY to token))
+    private fun savedState(token: String = "demo"): SavedStateHandle = SavedStateHandle(mapOf(TokenAcceptViewModel.TOKEN_KEY to token))
 
     // MARK: - Home invite
 

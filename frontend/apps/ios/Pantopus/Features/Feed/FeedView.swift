@@ -17,7 +17,7 @@ public struct FeedView: View {
     private let onCompose: @MainActor (PulseIntent) -> Void
     private let onBack: (@MainActor () -> Void)?
 
-    public init(
+    init(
         viewModel: PulseFeedViewModel = PulseFeedViewModel(),
         onOpenPost: @escaping @MainActor (String) -> Void = { _ in },
         onCompose: @escaping @MainActor (PulseIntent) -> Void = { _ in },

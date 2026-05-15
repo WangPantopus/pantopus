@@ -270,10 +270,11 @@ class TokenAcceptViewModel
 
             internal fun seatBenefits(role: String?): List<String> {
                 val lower = role?.lowercase().orEmpty()
-                val list = mutableListOf<String>(
-                    "Post and respond as ${humanRole(role ?: "member")}",
-                    "Access the business dashboard and team feed",
-                )
+                val list =
+                    mutableListOf<String>(
+                        "Post and respond as ${humanRole(role ?: "member")}",
+                        "Access the business dashboard and team feed",
+                    )
                 if (lower.contains("admin") || lower.contains("manager")) {
                     list.add("Invite teammates and manage seats")
                 } else {

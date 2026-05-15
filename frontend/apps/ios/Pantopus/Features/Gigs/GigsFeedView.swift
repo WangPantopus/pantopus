@@ -21,7 +21,7 @@ public struct GigsFeedView: View {
     private let onOpenFilters: @MainActor () -> Void
     private let onBack: (@MainActor () -> Void)?
 
-    public init(
+    init(
         viewModel: GigsFeedViewModel = GigsFeedViewModel(),
         onOpenGig: @escaping @MainActor (String) -> Void = { _ in },
         onCompose: @escaping @MainActor (GigsCategory) -> Void = { _ in },

@@ -22,9 +22,7 @@ class MailComposeRepository
             homeId: String? = null,
         ): NetworkResult<MailComposeRecipientsResponse> = safeApiCall { api.recipients(query, homeId) }
 
-        suspend fun homeContext(homeId: String): NetworkResult<MailHomeContextResponse> =
-            safeApiCall { api.homeContext(homeId) }
+        suspend fun homeContext(homeId: String): NetworkResult<MailHomeContextResponse> = safeApiCall { api.homeContext(homeId) }
 
-        suspend fun send(body: SendMailBody): NetworkResult<SendMailResponse> =
-            safeApiCall { api.send(body) }
+        suspend fun send(body: SendMailBody): NetworkResult<SendMailResponse> = safeApiCall { api.send(body) }
     }

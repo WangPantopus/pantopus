@@ -22,35 +22,49 @@ interface TokenAcceptApi {
     /** `GET /api/homes/invitations/token/:token`. Route
      *  `backend/routes/home.js:1793`. */
     @GET("api/homes/invitations/token/{token}")
-    suspend fun homeInvite(@Path("token") token: String): HomeInviteResponse
+    suspend fun homeInvite(
+        @Path("token") token: String,
+    ): HomeInviteResponse
 
     /** `GET /api/businesses/seats/invite-details?token=X`. Route
      *  `backend/routes/businessSeats.js:138`. */
     @GET("api/businesses/seats/invite-details")
-    suspend fun businessSeatInvite(@Query("token") token: String): BusinessSeatInviteResponse
+    suspend fun businessSeatInvite(
+        @Query("token") token: String,
+    ): BusinessSeatInviteResponse
 
     /** `GET /api/homes/guest/:token`. Route
      *  `backend/routes/homeGuest.js:20`. */
     @GET("api/homes/guest/{token}")
-    suspend fun guestPass(@Path("token") token: String): GuestPassResponse
+    suspend fun guestPass(
+        @Path("token") token: String,
+    ): GuestPassResponse
 
     /** `POST /api/homes/invitations/token/:token/accept`. Route
      *  `backend/routes/home.js:2040`. */
     @POST("api/homes/invitations/token/{token}/accept")
-    suspend fun acceptHomeInvite(@Path("token") token: String): HomeAcceptResponse
+    suspend fun acceptHomeInvite(
+        @Path("token") token: String,
+    ): HomeAcceptResponse
 
     /** `POST /api/homes/invitations/:invitationId/reject`. Route
      *  `backend/routes/home.js:2013`. */
     @POST("api/homes/invitations/{invitationId}/reject")
-    suspend fun declineHomeInvite(@Path("invitationId") invitationId: String): GenericAcknowledgement
+    suspend fun declineHomeInvite(
+        @Path("invitationId") invitationId: String,
+    ): GenericAcknowledgement
 
     /** `POST /api/businesses/seats/accept-invite`. Route
      *  `backend/routes/businessSeats.js:207`. */
     @POST("api/businesses/seats/accept-invite")
-    suspend fun acceptBusinessSeat(@Body body: BusinessSeatAcceptBody): BusinessSeatAcceptResponse
+    suspend fun acceptBusinessSeat(
+        @Body body: BusinessSeatAcceptBody,
+    ): BusinessSeatAcceptResponse
 
     /** `POST /api/businesses/seats/decline-invite`. Route
      *  `backend/routes/businessSeats.js:358`. */
     @POST("api/businesses/seats/decline-invite")
-    suspend fun declineBusinessSeat(@Body body: BusinessSeatDeclineBody): GenericAcknowledgement
+    suspend fun declineBusinessSeat(
+        @Body body: BusinessSeatDeclineBody,
+    ): GenericAcknowledgement
 }

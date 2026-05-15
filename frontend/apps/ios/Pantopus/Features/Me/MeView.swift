@@ -17,7 +17,7 @@ public struct MeView: View {
     private let onSection: @MainActor (MeSectionRow) -> Void
     private let onLogOut: @MainActor () -> Void
 
-    public init(
+    init(
         viewModel: MeViewModel = MeViewModel(),
         onAction: @escaping @MainActor (MeActionTile) -> Void = { _ in },
         onSection: @escaping @MainActor (MeSectionRow) -> Void = { _ in },

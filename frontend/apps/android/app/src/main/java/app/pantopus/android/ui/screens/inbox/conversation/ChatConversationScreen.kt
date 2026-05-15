@@ -94,17 +94,19 @@ fun ChatConversationScreen(
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (val s = state) {
                 ChatConversationUiState.Loading -> LoadingFrame()
-                ChatConversationUiState.Empty -> EmptyFrame(
-                    counterparty = activeCounterparty,
-                    aiPrompts = viewModel.aiPrompts,
-                    emptyChips = viewModel.emptyChips,
-                    onChipTap = viewModel::tapPrompt,
-                )
-                is ChatConversationUiState.Loaded -> PopulatedFrame(
-                    rows = s.rows,
-                    onRetry = viewModel::retry,
-                    onLoadOlder = viewModel::loadOlder,
-                )
+                ChatConversationUiState.Empty ->
+                    EmptyFrame(
+                        counterparty = activeCounterparty,
+                        aiPrompts = viewModel.aiPrompts,
+                        emptyChips = viewModel.emptyChips,
+                        onChipTap = viewModel::tapPrompt,
+                    )
+                is ChatConversationUiState.Loaded ->
+                    PopulatedFrame(
+                        rows = s.rows,
+                        onRetry = viewModel::retry,
+                        onLoadOlder = viewModel::loadOlder,
+                    )
                 is ChatConversationUiState.Error -> ErrorFrame(message = s.message, onRetry = viewModel::refresh)
             }
         }
@@ -264,8 +266,7 @@ private fun HeaderAvatar(counterparty: ChatCounterparty) {
     }
 }
 
-private fun String.initials(): String =
-    split(" ").take(2).mapNotNull { it.firstOrNull()?.toString() }.joinToString("").uppercase()
+private fun String.initials(): String = split(" ").take(2).mapNotNull { it.firstOrNull()?.toString() }.joinToString("").uppercase()
 
 @Composable
 private fun PersonAvatar(
@@ -739,7 +740,11 @@ private fun SystemLinkPill(body: ChatBubbleBody.SystemLink) {
                 tint = PantopusColors.appTextInverse,
             )
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.weight(1f)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.weight(1f),
+        ) {
             Text(
                 text = body.label,
                 fontSize = 11.5.sp,

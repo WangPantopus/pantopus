@@ -23,8 +23,7 @@ enum class CeremonialMailStationeryTone(val wire: String, val paperColor: Color)
     val paperShadow: Color get() = Color.Black.copy(alpha = 0.12f)
 
     companion object {
-        fun fromWire(value: String?): CeremonialMailStationeryTone =
-            values().firstOrNull { it.wire == value } ?: ClassicCream
+        fun fromWire(value: String?): CeremonialMailStationeryTone = values().firstOrNull { it.wire == value } ?: ClassicCream
     }
 }
 
@@ -36,8 +35,7 @@ enum class CeremonialMailInkTone(val wire: String, val color: Color) {
     ;
 
     companion object {
-        fun fromWire(value: String?): CeremonialMailInkTone =
-            values().firstOrNull { it.wire == value } ?: Walnut
+        fun fromWire(value: String?): CeremonialMailInkTone = values().firstOrNull { it.wire == value } ?: Walnut
     }
 }
 
@@ -49,8 +47,7 @@ enum class CeremonialMailSealTone(val wire: String, val color: Color) {
     ;
 
     companion object {
-        fun fromWire(value: String?): CeremonialMailSealTone =
-            values().firstOrNull { it.wire == value } ?: WaxRed
+        fun fromWire(value: String?): CeremonialMailSealTone = values().firstOrNull { it.wire == value } ?: WaxRed
     }
 }
 

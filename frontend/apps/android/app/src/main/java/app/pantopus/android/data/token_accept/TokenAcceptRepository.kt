@@ -22,17 +22,14 @@ class TokenAcceptRepository
     constructor(
         private val api: TokenAcceptApi,
     ) {
-        suspend fun homeInvite(token: String): NetworkResult<HomeInviteResponse> =
-            safeApiCall { api.homeInvite(token) }
+        suspend fun homeInvite(token: String): NetworkResult<HomeInviteResponse> = safeApiCall { api.homeInvite(token) }
 
         suspend fun businessSeatInvite(token: String): NetworkResult<BusinessSeatInviteResponse> =
             safeApiCall { api.businessSeatInvite(token) }
 
-        suspend fun guestPass(token: String): NetworkResult<GuestPassResponse> =
-            safeApiCall { api.guestPass(token) }
+        suspend fun guestPass(token: String): NetworkResult<GuestPassResponse> = safeApiCall { api.guestPass(token) }
 
-        suspend fun acceptHomeInvite(token: String): NetworkResult<HomeAcceptResponse> =
-            safeApiCall { api.acceptHomeInvite(token) }
+        suspend fun acceptHomeInvite(token: String): NetworkResult<HomeAcceptResponse> = safeApiCall { api.acceptHomeInvite(token) }
 
         suspend fun declineHomeInvite(invitationId: String): NetworkResult<GenericAcknowledgement> =
             safeApiCall { api.declineHomeInvite(invitationId) }

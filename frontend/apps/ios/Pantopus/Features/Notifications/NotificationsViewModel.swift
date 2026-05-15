@@ -49,7 +49,7 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
     private var notifications: [NotificationDTO] = []
     private var hasMore: Bool = false
 
-    public init(
+    init(
         api: APIClient = .shared,
         onSelect: @escaping @MainActor (NotificationDTO) -> Void = { _ in }
     ) {

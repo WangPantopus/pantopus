@@ -15,7 +15,7 @@ public struct CeremonialMailWizardView: View {
     private let onDismiss: @MainActor () -> Void
     private let onOpenMail: @MainActor (String) -> Void
 
-    public init(
+    init(
         viewModel: CeremonialMailViewModel = CeremonialMailViewModel(),
         onDismiss: @escaping @MainActor () -> Void = {},
         onOpenMail: @escaping @MainActor (String) -> Void = { _ in }

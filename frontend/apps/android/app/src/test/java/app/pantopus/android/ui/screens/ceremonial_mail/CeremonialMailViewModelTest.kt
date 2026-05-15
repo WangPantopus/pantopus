@@ -263,11 +263,9 @@ class CeremonialMailViewModelTest {
 
     // MARK: - Helpers
 
-    private fun atVerifyStep(): CeremonialMailViewModel =
-        atStep(CeremonialMailStep.Verify)
+    private fun atVerifyStep(): CeremonialMailViewModel = atStep(CeremonialMailStep.Verify)
 
-    private fun atComposeStep(): CeremonialMailViewModel =
-        atStep(CeremonialMailStep.Compose)
+    private fun atComposeStep(): CeremonialMailViewModel = atStep(CeremonialMailStep.Compose)
 
     private fun atCommitStep(): CeremonialMailViewModel {
         val vm = atStep(CeremonialMailStep.Commit)
