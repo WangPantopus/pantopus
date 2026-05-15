@@ -28,8 +28,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -481,11 +481,11 @@ private fun ComposerCard(
                     .fillMaxWidth()
                     .testTag("audienceProfileComposerInput"),
             colors =
-                TextFieldDefaults.colors(
+                OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = PantopusColors.appSurface,
                     unfocusedContainerColor = PantopusColors.appSurface,
-                    focusedIndicatorColor = PantopusColors.primary600,
-                    unfocusedIndicatorColor = PantopusColors.appBorder,
+                    focusedBorderColor = PantopusColors.primary600,
+                    unfocusedBorderColor = PantopusColors.appBorder,
                 ),
         )
         composer.error?.let {
