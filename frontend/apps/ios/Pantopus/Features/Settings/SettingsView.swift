@@ -14,6 +14,7 @@ import SwiftUI
 public enum SettingsStackRoute: Hashable {
     case notifications
     case privacy
+    case identityCenter
     case placeholder(label: String)
 }
 
@@ -65,6 +66,10 @@ public struct SettingsView: View {
                 dataSource: PrivacySettingsViewModel(),
                 onBack: { if !path.isEmpty { path.removeLast() } }
             )
+        case .identityCenter:
+            IdentityCenterView(
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
         }
@@ -74,7 +79,7 @@ public struct SettingsView: View {
         switch route {
         case .editProfile: onEditProfile()
         case .notifications: path.append(.notifications)
-        case .privacy: path.append(.privacy)
+        case .privacy: path.append(.identityCenter) // Profiles & Privacy is the unified destination.
         case .blocks: path.append(.placeholder(label: "Blocked users"))
         case .password: path.append(.placeholder(label: "Password"))
         case .verification: path.append(.placeholder(label: "Verification"))

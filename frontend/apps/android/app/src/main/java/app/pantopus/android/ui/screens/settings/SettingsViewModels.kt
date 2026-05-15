@@ -29,6 +29,7 @@ enum class SettingsRoute {
     Blocks,
     Notifications,
     Privacy,
+    IdentityCenter,
     DataExport,
     PaymentsPayouts,
     Help,
@@ -86,7 +87,8 @@ class SettingsIndexViewModel
                 "password" -> _navigation.value = SettingsRoute.Password
                 "verification" -> _navigation.value = SettingsRoute.Verification
                 "blocks" -> _navigation.value = SettingsRoute.Blocks
-                "visibility", "notificationPreferences" -> _navigation.value = SettingsRoute.Notifications
+                "visibility" -> _navigation.value = SettingsRoute.IdentityCenter
+                "notificationPreferences" -> _navigation.value = SettingsRoute.Notifications
                 "export" -> _navigation.value = SettingsRoute.DataExport
                 "paymentsPayouts" -> _navigation.value = SettingsRoute.PaymentsPayouts
                 "help" -> _navigation.value = SettingsRoute.Help
@@ -145,7 +147,7 @@ class SettingsIndexViewModel
                                                 },
                                             control = RowControl.Chevron,
                                         ),
-                                        GroupedListRow(id = "visibility", label = "Visibility preferences", control = RowControl.Chevron),
+                                        GroupedListRow(id = "visibility", label = "Profiles & Privacy", control = RowControl.Chevron),
                                         GroupedListRow(id = "export", label = "Data export", control = RowControl.Chevron),
                                     ),
                             ),

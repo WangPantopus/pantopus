@@ -108,6 +108,13 @@ final class UITestStubProtocol: URLProtocol {
             // without a bids module under the UI test.
             finishWith(status: 200, body: Data("{\"bids\":[]}".utf8))
 
+        case ("GET", "/api/identity-center"):
+            let body = env["UI_TESTS_IDENTITY_CENTER_BODY"] ?? Self.defaultIdentityCenterJSON
+            finishWith(status: 200, body: Data(body.utf8))
+
+        case ("GET", "/api/privacy/blocks"):
+            finishWith(status: 200, body: Data("{\"blocks\":[]}".utf8))
+
         default:
             // Unknown endpoint under test — surface a recognizable 599
             // so test failures point clearly at a missing stub.
@@ -251,6 +258,34 @@ final class UITestStubProtocol: URLProtocol {
       "distance_miles":0.2,
       "pickup_address":"Rose Court, Unit 4B"
     }}
+    """
+
+    /// Identity Center overview — all four identities populated so the
+    /// 14_IdentityCenter screenshot captures the loaded state with
+    /// Profile-links toggles, blocked counts, and the Live chip on the
+    /// Public profile card.
+    static let defaultIdentityCenterJSON = """
+    {
+      "private_account": {
+        "id": "u_demo", "email": "alice@example.com", "name": "Alice Doe",
+        "verified": true
+      },
+      "local_profile": {
+        "id": "lp_demo", "handle": "alice.d", "display_name": "Alice D.",
+        "post_count": 47, "connection_count": 23, "verified": true
+      },
+      "audience_profile": {
+        "id": "ap_demo", "handle": "aliceonline", "display_name": "Alice Online",
+        "follower_count": 1247, "post_cadence": "weekly", "status": "live"
+      },
+      "bridges": {"show_persona_on_local": true, "show_local_on_persona": false},
+      "homes": [{"id": "home_demo", "name": "412 Elm St"}],
+      "business_profiles": [
+        {"id": "biz_demo", "display_name": "Alice Masonry", "is_active": true}
+      ],
+      "persona_count": 1,
+      "block_counts": {"personal": 2, "audience": 5}
+    }
     """
 }
 #endif

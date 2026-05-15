@@ -55,6 +55,21 @@ final class StoreScreenshots: XCTestCase {
                 .waitForExistence(timeout: 5)
             {
                 snapshot("13_Settings")
+                // Settings → Profiles & Privacy row → Identity Center
+                // (T3.2). The "visibility" row in the Privacy group
+                // routes to the new unified destination.
+                let visibilityRow = app.descendants(matching: .any)
+                    .matching(identifier: "groupedListRow_visibility").firstMatch
+                if visibilityRow.waitForExistence(timeout: 3) {
+                    visibilityRow.tap()
+                    if app.descendants(matching: .any)
+                        .matching(identifier: "identityCenterContent").firstMatch
+                        .waitForExistence(timeout: 5)
+                    {
+                        snapshot("14_IdentityCenter")
+                    }
+                    app.buttons["identityCenterBackButton"].firstMatch.tap()
+                }
             }
             app.buttons["groupedListBackButton"].firstMatch.tap()
         }

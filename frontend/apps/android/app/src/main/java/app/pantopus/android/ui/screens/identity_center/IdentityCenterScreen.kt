@@ -1,0 +1,629 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "TooManyFunctions")
+
+package app.pantopus.android.ui.screens.identity_center
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.PrimaryButton
+import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.ui.screens.shared.identity.IdentitySwitcherCard
+import app.pantopus.android.ui.screens.shared.identity.IdentitySwitcherSheet
+import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.PantopusIconImage
+import kotlinx.coroutines.launch
+
+/**
+ * T3.2 Profiles & Privacy screen. Bespoke `identity_present` header
+ * (4 cards) sits above grouped lists for Profile links / Privacy
+ * rows / Disclosure items. The identity-switcher bottom sheet
+ * surfaces via the trailing "Switch" button.
+ */
+@Composable
+fun IdentityCenterScreen(
+    onBack: () -> Unit = {},
+    onOpenIdentity: (IdentityCardContent) -> Unit = {},
+    onOpenPlaceholder: (String) -> Unit = {},
+    viewModel: IdentityCenterViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { viewModel.load() }
+
+    var switcherVisible by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(PantopusColors.appBg)
+                .testTag("identityCenter"),
+    ) {
+        TopBar(
+            onBack = onBack,
+            onOpenSwitcher = { switcherVisible = true },
+        )
+        when (val current = state) {
+            is IdentityCenterUiState.Loading -> LoadingFrame()
+            is IdentityCenterUiState.Loaded -> LoadedFrame(
+                loaded = current.content,
+                onOpenIdentity = onOpenIdentity,
+                onBridgeToggle = viewModel::setBridge,
+                onRowTap = onOpenPlaceholder,
+            )
+            is IdentityCenterUiState.Error -> ErrorFrame(
+                message = current.message,
+                onRetry = viewModel::load,
+            )
+        }
+    }
+
+    if (switcherVisible && state is IdentityCenterUiState.Loaded) {
+        val loaded = (state as IdentityCenterUiState.Loaded).content
+        IdentitySwitcherSheet(
+            cards = loaded.identities.map { it.toSwitcherCard() },
+            sheetState = sheetState,
+            onSelect = {
+                scope.launch {
+                    sheetState.hide()
+                }.invokeOnCompletion { switcherVisible = false }
+            },
+            onDismiss = { switcherVisible = false },
+        )
+    }
+}
+
+@Composable
+private fun TopBar(
+    onBack: () -> Unit,
+    onOpenSwitcher: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onBack)
+                        .testTag("identityCenterBackButton"),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronLeft,
+                    contentDescription = "Back",
+                    size = 22.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.appText,
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "Profiles & Privacy",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+                modifier = Modifier.semantics { heading() },
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Box(
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onOpenSwitcher)
+                        .testTag("identityCenterSwitcherButton"),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Menu,
+                    contentDescription = "Open identity switcher",
+                    size = 20.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.appText,
+                )
+            }
+        }
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(PantopusColors.appBorder),
+        )
+    }
+}
+
+@Composable
+internal fun LoadingFrame() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 16.dp)
+                .testTag("identityCenterLoading"),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        repeat(4) {
+            Shimmer(
+                width = 360.dp,
+                height = 110.dp,
+                cornerRadius = 16.dp,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
+    }
+}
+
+@Composable
+internal fun LoadedFrame(
+    loaded: IdentityCenterLoaded,
+    onOpenIdentity: (IdentityCardContent) -> Unit,
+    onBridgeToggle: (String, Boolean) -> Unit,
+    onRowTap: (String) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .testTag("identityCenterContent"),
+    ) {
+        IdentityCards(cards = loaded.identities, onTap = onOpenIdentity)
+        if (loaded.bridges.isNotEmpty()) {
+            SectionOverline("Profile links")
+            BridgesCard(rows = loaded.bridges, onToggle = onBridgeToggle)
+        }
+        SectionOverline("Privacy")
+        RowsCard(rows = loaded.privacyRows, idPrefix = "privacy", onRowTap = onRowTap)
+        SectionOverline("Identities")
+        RowsCard(rows = loaded.disclosureRows, idPrefix = "disclosure", onRowTap = onRowTap)
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun IdentityCards(
+    cards: List<IdentityCardContent>,
+    onTap: (IdentityCardContent) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .padding(horizontal = 12.dp, vertical = 0.dp)
+                .padding(top = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        cards.forEach { card -> IdentityCardRow(card = card, onTap = { onTap(card) }) }
+    }
+}
+
+@Composable
+private fun IdentityCardRow(
+    card: IdentityCardContent,
+    onTap: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(card.kind.accentBg.copy(alpha = 0.5f), PantopusColors.appSurface),
+                    ),
+                )
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(16.dp))
+                .clickable(onClick = onTap)
+                .padding(14.dp)
+                .testTag("identityCard_${card.kind.key}"),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(card.kind.accentBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = card.kind.icon,
+                contentDescription = null,
+                size = 22.dp,
+                strokeWidth = 2f,
+                tint = card.kind.accent,
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = card.overline.uppercase(),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = card.kind.accent,
+                    letterSpacing = 0.8.sp,
+                )
+                val setupCta = (card.status as? IdentityStatus.SetupNeeded)?.cta
+                if (setupCta != null) {
+                    SetupPill(label = setupCta, accent = card.kind.accent)
+                }
+                card.chip?.let { ChipPill(chip = it) }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = card.name,
+                    fontSize = 15.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    maxLines = 1,
+                )
+                card.handle?.let {
+                    Text(
+                        text = it,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = PantopusColors.appTextSecondary,
+                        maxLines = 1,
+                    )
+                }
+            }
+            card.stats?.let {
+                Text(
+                    text = it,
+                    fontSize = 11.5.sp,
+                    color = PantopusColors.appTextSecondary,
+                    maxLines = 2,
+                )
+            }
+            card.summary?.let {
+                Text(
+                    text = it,
+                    fontSize = 11.5.sp,
+                    color = PantopusColors.appTextMuted,
+                    maxLines = 2,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 16.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.appTextSecondary,
+        )
+    }
+}
+
+@Composable
+private fun SetupPill(
+    label: String,
+    accent: Color,
+) {
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(accent)
+                .padding(horizontal = 6.dp, vertical = 1.dp),
+    ) {
+        Text(
+            text = label.uppercase(),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appTextInverse,
+        )
+    }
+}
+
+@Composable
+private fun ChipPill(chip: IdentityChip) {
+    val (bg, fg) =
+        when (chip.tone) {
+            IdentityChip.Tone.Info -> PantopusColors.primary50 to PantopusColors.primary700
+            IdentityChip.Tone.Success -> PantopusColors.successBg to PantopusColors.success
+            IdentityChip.Tone.Warning -> PantopusColors.warningBg to PantopusColors.warning
+            IdentityChip.Tone.Business -> PantopusColors.businessBg to PantopusColors.business
+            IdentityChip.Tone.Neutral -> PantopusColors.appSurfaceSunken to PantopusColors.appTextStrong
+        }
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(bg)
+                .padding(horizontal = 6.dp, vertical = 1.dp),
+    ) {
+        Text(
+            text = chip.label,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = fg,
+        )
+    }
+}
+
+@Composable
+private fun BridgesCard(
+    rows: List<IdentityBridgeRow>,
+    onToggle: (String, Boolean) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
+    ) {
+        rows.forEachIndexed { index, row ->
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = row.label,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = PantopusColors.appText,
+                    )
+                    row.subtext?.let {
+                        Text(
+                            text = it,
+                            fontSize = 12.sp,
+                            color = PantopusColors.appTextSecondary,
+                        )
+                    }
+                }
+                Switch(
+                    checked = row.isOn,
+                    onCheckedChange = { onToggle(row.id, it) },
+                    colors =
+                        SwitchDefaults.colors(
+                            checkedTrackColor = PantopusColors.primary600,
+                            checkedThumbColor = PantopusColors.appTextInverse,
+                        ),
+                    modifier = Modifier.testTag("identityCenterBridge_${row.id}"),
+                )
+            }
+            if (index < rows.lastIndex) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp)
+                            .height(1.dp)
+                            .background(PantopusColors.appBorder.copy(alpha = 0.6f)),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowsCard(
+    rows: List<IdentityRowContent>,
+    idPrefix: String,
+    onRowTap: (String) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
+    ) {
+        rows.forEachIndexed { index, row ->
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onRowTap(row.label) }
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                        .testTag("${idPrefix}Row_${row.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(
+                    modifier = Modifier.size(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = row.icon,
+                        contentDescription = null,
+                        size = 18.dp,
+                        strokeWidth = 2f,
+                        tint = PantopusColors.primary600,
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = row.label,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = PantopusColors.appText,
+                    )
+                    row.subtext?.let {
+                        Text(
+                            text = it,
+                            fontSize = 12.sp,
+                            color = PantopusColors.appTextSecondary,
+                        )
+                    }
+                }
+                row.trailing?.let {
+                    Text(
+                        text = it,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronRight,
+                    contentDescription = null,
+                    size = 16.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.appTextSecondary,
+                )
+            }
+            if (index < rows.lastIndex) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp)
+                            .height(1.dp)
+                            .background(PantopusColors.appBorder.copy(alpha = 0.6f)),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionOverline(text: String) {
+    Text(
+        text = text.uppercase(),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        color = PantopusColors.appTextSecondary,
+        letterSpacing = 0.9.sp,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(top = 18.dp, bottom = 8.dp),
+    )
+}
+
+@Composable
+internal fun ErrorFrame(
+    message: String,
+    onRetry: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(20.dp)
+                .testTag("identityCenterError"),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.AlertCircle,
+            contentDescription = null,
+            size = 40.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.error,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "Couldn't load Profiles & Privacy",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = message,
+            fontSize = 13.5.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        PrimaryButton(
+            title = "Try again",
+            onClick = onRetry,
+            modifier = Modifier.testTag("identityCenterRetry"),
+        )
+    }
+}
+
+internal fun IdentityCardContent.toSwitcherCard(): IdentitySwitcherCard =
+    IdentitySwitcherCard(
+        id = id,
+        kind = kind,
+        overline = overline,
+        name = name,
+        stats = stats,
+        isActive = kind == IdentityKind.Local,
+    )

@@ -89,7 +89,7 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
                         subtext: blockCount > 0 ? "\(blockCount) \(blockCount == 1 ? "person" : "people")" : nil,
                         control: .chevron
                     ),
-                    GroupedListRow(id: "visibility", label: "Visibility preferences", control: .chevron),
+                    GroupedListRow(id: "visibility", label: "Profiles & Privacy", control: .chevron),
                     GroupedListRow(id: "export", label: "Data export", control: .chevron)
                 ]
             ),
@@ -142,8 +142,8 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
         case "password": onNavigate(.password)
         case "verification": onNavigate(.verification)
         case "blocks": onNavigate(.blocks)
-        case "visibility", "notificationPreferences":
-            onNavigate(.notifications)
+        case "visibility": onNavigate(.privacy)
+        case "notificationPreferences": onNavigate(.notifications)
         case "export": onNavigate(.dataExport)
         case "paymentsPayouts": onNavigate(.paymentsPayouts)
         case "help": onNavigate(.help)

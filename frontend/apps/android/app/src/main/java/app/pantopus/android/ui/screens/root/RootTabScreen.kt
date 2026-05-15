@@ -72,6 +72,8 @@ import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
 import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
+import app.pantopus.android.ui.screens.identity_center.IdentityCenterScreen
+import app.pantopus.android.ui.screens.identity_center.IdentityKind
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
 import app.pantopus.android.ui.screens.profile.PublicProfileScreen
 import app.pantopus.android.ui.screens.settings.NotificationSettingsScreen
@@ -109,6 +111,9 @@ private object ChildRoutes {
 
     /** Privacy preferences (T3.1). */
     const val SETTINGS_PRIVACY = "settings/privacy"
+
+    /** Profiles & Privacy / Identity Center (T3.2). */
+    const val IDENTITY_CENTER = "identity-center"
 
     /**
      * Generic placeholder for intents whose destination hasn't been
@@ -651,6 +656,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         when (route) {
                             SettingsRoute.Notifications -> navController.navigate(ChildRoutes.SETTINGS_NOTIFICATIONS)
                             SettingsRoute.Privacy -> navController.navigate(ChildRoutes.SETTINGS_PRIVACY)
+                            SettingsRoute.IdentityCenter -> navController.navigate(ChildRoutes.IDENTITY_CENTER)
                             SettingsRoute.EditProfile -> navController.navigate(ChildRoutes.placeholder("Edit profile"))
                             SettingsRoute.Password -> navController.navigate(ChildRoutes.placeholder("Password"))
                             SettingsRoute.Verification -> navController.navigate(ChildRoutes.placeholder("Verification"))
@@ -670,6 +676,24 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(ChildRoutes.SETTINGS_PRIVACY) {
                 PrivacySettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.IDENTITY_CENTER) {
+                IdentityCenterScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenIdentity = { card ->
+                        val label =
+                            when (card.kind) {
+                                IdentityKind.Local -> "Local profile"
+                                IdentityKind.Personal -> "Personal"
+                                IdentityKind.PublicProfile -> "Public profile"
+                                IdentityKind.Professional -> "Professional"
+                            }
+                        navController.navigate(ChildRoutes.placeholder(label))
+                    },
+                    onOpenPlaceholder = { label ->
+                        navController.navigate(ChildRoutes.placeholder(label))
+                    },
+                )
             }
             composable(ChildRoutes.MAILBOX_SEARCH) {
                 NotYetAvailableView(tabName = "Mail search", icon = PantopusIcon.Search)
