@@ -15,6 +15,7 @@ import type {
   ChipStripChip,
   ListOfRowsShellProps,
   RowSection,
+  TopBarAction,
 } from './types';
 import TabStrip from './TabStrip';
 import LoadingRows from './LoadingRows';
@@ -77,16 +78,7 @@ export default function ListOfRowsShell(props: ListOfRowsShellProps) {
           {title}
         </h1>
         <div className="min-w-[36px] h-9 flex items-center justify-end pr-1">
-          {topBarAction && (
-            <button
-              type="button"
-              onClick={topBarAction.onClick}
-              aria-label={topBarAction.accessibilityLabel}
-              className="w-9 h-9 inline-flex items-center justify-center text-app-text rounded-md hover:bg-app-hover"
-            >
-              <topBarAction.icon className="w-[22px] h-[22px]" />
-            </button>
-          )}
+          {topBarAction && <TopBarActionButton action={topBarAction} />}
         </div>
       </header>
 
@@ -156,6 +148,42 @@ export default function ListOfRowsShell(props: ListOfRowsShellProps) {
       {/* FAB */}
       {fab && <FabButton fab={fab} />}
     </div>
+  );
+}
+
+function TopBarActionButton({ action }: { action: TopBarAction }) {
+  const enabled = action.isEnabled ?? true;
+  if (action.label) {
+    return (
+      <button
+        type="button"
+        onClick={action.onClick}
+        disabled={!enabled}
+        aria-label={action.accessibilityLabel}
+        data-testid="listOfRowsTopBarAction"
+        className={`px-2.5 h-9 inline-flex items-center justify-center rounded-md text-xs font-semibold whitespace-nowrap transition disabled:cursor-default ${
+          enabled
+            ? 'text-primary-600 hover:bg-app-hover'
+            : 'text-app-text-muted'
+        }`}
+      >
+        {action.label}
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={action.onClick}
+      disabled={!enabled}
+      aria-label={action.accessibilityLabel}
+      data-testid="listOfRowsTopBarAction"
+      className={`w-9 h-9 inline-flex items-center justify-center rounded-md ${
+        enabled ? 'text-app-text hover:bg-app-hover' : 'text-app-text-muted'
+      }`}
+    >
+      <action.icon className="w-[22px] h-[22px]" />
+    </button>
   );
 }
 

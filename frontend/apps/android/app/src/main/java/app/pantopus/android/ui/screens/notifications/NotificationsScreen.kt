@@ -17,8 +17,9 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 const val NOTIFICATIONS_TAG = "notifications"
 
 /**
- * T4.1 Notifications center. Thin wrapper around [ListOfRowsScreen] —
- * the read-all action and unread-driven empty state come from the VM.
+ * T5.1 Notifications V2. Thin wrapper around [ListOfRowsScreen] — the
+ * two tabs (All / Unread), the date-bucketed sections, and the
+ * "Mark all read" top-bar action all come from the VM.
  */
 @Composable
 fun NotificationsScreen(
@@ -27,6 +28,8 @@ fun NotificationsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val topBarAction by viewModel.topBarAction.collectAsStateWithLifecycle()
+    val tabs by viewModel.tabs.collectAsStateWithLifecycle()
+    val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         viewModel.load()
         Analytics.track(AnalyticsEvent.ScreenNotificationsViewed)
@@ -38,6 +41,9 @@ fun NotificationsScreen(
             state = state,
             onRefresh = { viewModel.refresh() },
             onEndReached = { viewModel.loadMoreIfNeeded() },
+            tabs = tabs,
+            selectedTab = selectedTab,
+            onSelectTab = { viewModel.selectTab(it) },
             topBarAction = topBarAction,
             onBack = onBack,
         )

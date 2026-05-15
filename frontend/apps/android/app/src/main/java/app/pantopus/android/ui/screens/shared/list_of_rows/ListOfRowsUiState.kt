@@ -37,11 +37,22 @@ data class ListOfRowsTab(
     val count: Int? = null,
 )
 
-/** Top-bar trailing action payload. */
+/**
+ * Top-bar trailing action payload.
+ *
+ * T5.0 additive: [label] and [isEnabled] are new optional fields with
+ * backwards-compatible defaults. Existing call sites pass
+ * `(icon=, contentDescription=, onClick=)` and render as an icon-only
+ * button. Notifications V2 passes a text [label] instead — the shell
+ * renders the text in primary tint and respects [isEnabled] for the
+ * disabled state in the design's empty-unread frame.
+ */
 data class TopBarAction(
     val icon: PantopusIcon,
     val contentDescription: String,
     val onClick: () -> Unit,
+    val label: String? = null,
+    val isEnabled: Boolean = true,
 )
 
 /**

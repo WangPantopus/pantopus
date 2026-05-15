@@ -70,6 +70,13 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case briefcase
     case gavel
     case slidersHorizontal = "sliders-horizontal"
+    case messageCircle = "message-circle"
+    case atSign = "at-sign"
+    case badgeCheck = "badge-check"
+    case tag
+    case shieldAlert = "shield-alert"
+    case checkCheck = "check-check"
+    case history
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
@@ -129,6 +136,13 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .briefcase: "briefcase"
         case .gavel: "hammer.fill"
         case .slidersHorizontal: "slider.horizontal.3"
+        case .messageCircle: "bubble.left"
+        case .atSign: "at"
+        case .badgeCheck: "checkmark.seal"
+        case .tag: "tag"
+        case .shieldAlert: "exclamationmark.shield"
+        case .checkCheck: "checkmark.circle"
+        case .history: "clock.arrow.circlepath"
         }
     }
 }

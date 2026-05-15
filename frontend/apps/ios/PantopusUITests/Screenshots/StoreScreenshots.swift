@@ -304,7 +304,7 @@ final class StoreScreenshots: XCTestCase {
             app.buttons["tokenAcceptDecline"].firstMatch.tap()
         }
 
-        // Hub bell → Notifications center (T4.1).
+        // Hub bell → Notifications center (T5.1 Notifications V2).
         app.buttons["tab.hub"].firstMatch.tap()
         let hubBell = app.descendants(matching: .any)
             .matching(identifier: "hubBellButton").firstMatch
@@ -315,7 +315,9 @@ final class StoreScreenshots: XCTestCase {
                 .waitForExistence(timeout: 5) {
                 snapshot("21_Notifications")
             }
-            app.buttons["notificationsBackButton"].firstMatch.tap()
+            // T5.1 replaced the custom top-bar with the shared shell's
+            // built-in NavigationStack chrome. Use the system back button.
+            app.navigationBars.buttons.firstMatch.tap()
         }
 
         // You tab → Edit Profile sheet.
