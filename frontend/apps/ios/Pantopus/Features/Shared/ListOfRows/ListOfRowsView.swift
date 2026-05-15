@@ -34,6 +34,7 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource>: View {
                     .padding(Spacing.s4)
             }
         }
+        .accessibilityIdentifier("listOfRowsContainer")
         .navigationTitle(dataSource.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

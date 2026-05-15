@@ -86,8 +86,11 @@ data class MailboxCTAShelfContent(
     val primaryEnabled: Boolean = true,
 )
 
-/** Test tag on the mailbox-item detail shell root. */
-const val MAILBOX_ITEM_DETAIL_TAG = "mailboxItemDetail"
+/**
+ * Test tag on the mailbox-item detail shell root. Mirrors iOS
+ * `accessibilityIdentifier("mailboxItemDetailShell")`.
+ */
+const val MAILBOX_ITEM_DETAIL_TAG = "mailboxItemDetailShell"
 
 /**
  * Scaffold for every Mailbox Item Detail screen. Slots: 4dp accent strip +

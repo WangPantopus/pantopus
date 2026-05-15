@@ -56,6 +56,7 @@ public struct PublicProfileView: View {
             Button("Report") { onOpenReport() }
             Button("Cancel", role: .cancel) {}
         }
+        .accessibilityIdentifier("publicProfile")
         .task { await viewModel.load() }
     }
 

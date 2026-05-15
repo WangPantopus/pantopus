@@ -62,8 +62,11 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
-/** Test tag on the list-of-rows root container — used by Compose tests. */
-const val LIST_OF_ROWS_TAG = "listOfRows"
+/**
+ * Test tag on the list-of-rows root container — used by Compose tests.
+ * Mirrors iOS `accessibilityIdentifier("listOfRowsContainer")`.
+ */
+const val LIST_OF_ROWS_TAG = "listOfRowsContainer"
 
 /**
  * Reusable List-of-Rows screen.

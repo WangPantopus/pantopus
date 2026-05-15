@@ -161,6 +161,7 @@ public struct MailboxItemDetailShell<CategoryBodyView: View>: View {
             }
         }
         .background(Theme.Color.appBg)
+        .accessibilityIdentifier("mailboxItemDetailShell")
     }
 }
 

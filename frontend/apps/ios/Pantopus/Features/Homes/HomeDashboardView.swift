@@ -56,6 +56,7 @@ struct HomeDashboardView: View {
             }
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+        .accessibilityIdentifier("homeDashboard")
         .onAppear { Analytics.track(.screenHomeDashboardViewed) }
         .task { await viewModel.load() }
     }
