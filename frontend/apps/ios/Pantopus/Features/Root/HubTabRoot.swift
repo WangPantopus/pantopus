@@ -45,6 +45,14 @@ public enum HubRoute: Hashable {
     case invoiceDetail(invoiceId: String)
     /// Bell icon target. Replaced by the real notifications screen in T4.1.
     case notifications
+    /// Connections center (T5.2.3). Reached from the You / Me action grid
+    /// or via the `pantopus://connections` deep link.
+    case connections
+    /// Push the chat conversation for a given counterparty. Used by the
+    /// Connections row's message-CTA — payload mirrors the Inbox tab's
+    /// `InboxConversationDestination` so the same `ChatConversationView`
+    /// can host the thread inside the Hub stack.
+    case chatConversation(InboxConversationDestination)
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
     case menu
     /// Mailbox search target. Replaced when `/api/mailbox` accepts a query.
@@ -61,12 +69,19 @@ public enum HubRoute: Hashable {
 
 /// NavigationStack wrapper for the Hub tab.
 public struct HubTabRoot: View {
+    @Environment(AuthManager.self) private var auth
     @State private var path: [HubRoute] = []
+    @State private var router = DeepLinkRouter.shared
     #if DEBUG
     @State private var debugSheet: HubRoute?
     #endif
 
     public init() {}
+
+    private var currentUserId: String {
+        if case let .signedIn(user) = auth.state { return user.id }
+        return ""
+    }
 
     public var body: some View {
         NavigationStack(path: $path) {
@@ -81,6 +96,27 @@ public struct HubTabRoot: View {
                     destination(for: route) { _ in }
                 }
             #endif
+        }
+        .onChange(of: router.pending) { _, pending in
+            consumeDeepLinkIfNeeded(pending: pending)
+        }
+        .task {
+            consumeDeepLinkIfNeeded(pending: router.pending)
+        }
+    }
+
+    /// Consume the subset of deep-link destinations that map onto a
+    /// concrete push within the Hub tab. Tab-level dispatch (selecting
+    /// `Hub` over `Inbox`/`You`) stays in `RootTabView` — this only
+    /// fires once Hub is the active tab.
+    private func consumeDeepLinkIfNeeded(pending: DeepLinkRouter.Destination?) {
+        guard let pending else { return }
+        switch pending {
+        case .connections:
+            path.append(.connections)
+            _ = router.consume()
+        default:
+            break
         }
     }
 
@@ -103,6 +139,41 @@ public struct HubTabRoot: View {
             }
         }
         .overlay(alignment: .topLeading) { debugTapTarget }
+    }
+
+    /// Project an `InboxConversationDestination.Mode` onto the
+    /// `ChatThreadMode` consumed by `ChatConversationViewModel`. Mirrors
+    /// the helper of the same name on `InboxTabRoot` so the chat shell
+    /// behaves identically when reached from Connections vs Inbox.
+    private static func chatMode(
+        for mode: InboxConversationDestination.Mode
+    ) -> ChatThreadMode {
+        switch mode {
+        case .ai: .ai
+        case let .room(id): .room(id: id)
+        case let .person(otherUserId): .person(otherUserId: otherUserId)
+        }
+    }
+
+    /// Project an `InboxConversationDestination` onto the
+    /// `ChatCounterparty` consumed by `ChatConversationViewModel`.
+    private static func chatCounterparty(
+        for dest: InboxConversationDestination
+    ) -> ChatCounterparty {
+        switch dest.mode {
+        case .ai:
+            .ai(name: dest.displayName)
+        case .room:
+            .group(name: dest.displayName, memberCount: nil)
+        case .person:
+            .person(
+                name: dest.displayName,
+                initials: dest.initials,
+                locality: nil,
+                verified: dest.verified,
+                online: false
+            )
+        }
     }
 
     /// Dispatch a discovery card tap to the matching detail route.
@@ -330,6 +401,33 @@ public struct HubTabRoot: View {
         case .notifications:
             NotificationsView(
                 viewModel: NotificationsViewModel()
+            ) { if !path.isEmpty { path.removeLast() } }
+        case .connections:
+            ConnectionsView(
+                viewModel: ConnectionsViewModel(
+                    onMessage: { target in
+                        Task { @MainActor in
+                            push(.chatConversation(InboxConversationDestination(
+                                mode: .person(otherUserId: target.userId),
+                                displayName: target.displayName,
+                                initials: target.initials,
+                                identityKind: nil,
+                                verified: target.verified
+                            )))
+                        }
+                    },
+                    onFindPeople: {
+                        Task { @MainActor in push(.placeholder(label: "Find people")) }
+                    }
+                )
+            )
+        case let .chatConversation(dest):
+            ChatConversationView(
+                viewModel: ChatConversationViewModel(
+                    mode: Self.chatMode(for: dest.mode),
+                    counterparty: Self.chatCounterparty(for: dest),
+                    currentUserId: currentUserId
+                )
             ) { if !path.isEmpty { path.removeLast() } }
         case .menu:
             SettingsView(

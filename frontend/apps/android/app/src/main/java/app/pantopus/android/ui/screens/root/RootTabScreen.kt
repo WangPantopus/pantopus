@@ -32,6 +32,8 @@ import app.pantopus.android.ui.screens._internal.TokenGalleryScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
+import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
+import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
@@ -108,6 +110,10 @@ private object ChildRoutes {
 
     /** Notifications center (T4.1). Reached from the Hub bell icon. */
     const val NOTIFICATIONS = "notifications"
+
+    /** Connections center (T5.2.3). Reached from the You / Me action grid
+     *  or via `pantopus://connections`. */
+    const val CONNECTIONS = "connections"
 
     /** Hub menu icon target. Replaced by Settings in T3.1. */
     const val MENU = "settings"
@@ -330,7 +336,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.Connections -> {
-                navController.navigate(ChildRoutes.placeholder("Connections"))
+                navController.navigate(ChildRoutes.CONNECTIONS)
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.Post -> {
@@ -763,6 +769,32 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(ChildRoutes.NOTIFICATIONS) {
                 NotificationsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.CONNECTIONS) {
+                ConnectionsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenChat = { target: ConnectionsChatTarget ->
+                        val row =
+                            ConversationRowContent(
+                                id = target.userId,
+                                variant = ConversationRowVariant.Dm,
+                                displayName = target.displayName,
+                                initials = target.initials,
+                                avatarUrl = null,
+                                identityChip = null,
+                                verified = target.verified,
+                                preview = "",
+                                timeLabel = "",
+                                unread = 0,
+                                pinned = false,
+                                topicKinds = emptySet(),
+                            )
+                        navController.navigate(ChildRoutes.chatConversation(row))
+                    },
+                    onFindPeople = {
+                        navController.navigate(ChildRoutes.placeholder("Find people"))
+                    },
+                )
             }
             composable(ChildRoutes.MENU) {
                 SettingsIndexScreen(
