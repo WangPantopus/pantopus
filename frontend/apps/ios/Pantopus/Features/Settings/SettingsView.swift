@@ -46,7 +46,7 @@ public struct SettingsView: View {
         }
     }
 
-    @ViewBuilder private var indexView: some View {
+    private var indexView: some View {
         GroupedListView(
             dataSource: SettingsIndexViewModel { route in
                 handle(route: route)

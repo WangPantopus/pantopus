@@ -38,10 +38,10 @@ public final class CeremonialMailViewModel: WizardModel {
     public var bodyText: String = ""
     public private(set) var voiceStatus: VoicePostscriptStatus = .empty
 
-    // Step 4: commit
+    /// Step 4: commit
     public var sendTiming: CeremonialMailSendTiming = .now
 
-    // Submission
+    /// Submission
     public private(set) var submitError: String?
 
     private let api: APIClient
@@ -108,15 +108,31 @@ public final class CeremonialMailViewModel: WizardModel {
         }
     }
 
-    public func toggleAddressConfirmed(_ value: Bool) { addressConfirmed = value }
-    public func toggleReturnAddressShared(_ value: Bool) { returnAddressShared = value }
+    public func toggleAddressConfirmed(_ value: Bool) {
+        addressConfirmed = value
+    }
+
+    public func toggleReturnAddressShared(_ value: Bool) {
+        returnAddressShared = value
+    }
 
     // MARK: - Step 3: compose
 
-    public func selectStationery(_ value: CeremonialMailStationery) { stationery = value }
-    public func selectInk(_ value: CeremonialMailInk) { ink = value }
-    public func selectSeal(_ value: CeremonialMailSeal) { seal = value }
-    public func updateBody(_ value: String) { bodyText = value }
+    public func selectStationery(_ value: CeremonialMailStationery) {
+        stationery = value
+    }
+
+    public func selectInk(_ value: CeremonialMailInk) {
+        ink = value
+    }
+
+    public func selectSeal(_ value: CeremonialMailSeal) {
+        seal = value
+    }
+
+    public func updateBody(_ value: String) {
+        bodyText = value
+    }
 
     /// View-layer calls this once it has produced a recorded audio
     /// file URI. The VM kicks off the multipart upload.
@@ -141,9 +157,13 @@ public final class CeremonialMailViewModel: WizardModel {
         }
     }
 
-    public func clearVoicePostscript() { voiceStatus = .empty }
+    public func clearVoicePostscript() {
+        voiceStatus = .empty
+    }
 
-    public func voicePostscriptDidStartRecording() { voiceStatus = .recording }
+    public func voicePostscriptDidStartRecording() {
+        voiceStatus = .recording
+    }
 
     /// Mark the recording as captured before the upload kicks off.
     /// The view sets the URI; the upload then runs through
@@ -154,7 +174,9 @@ public final class CeremonialMailViewModel: WizardModel {
 
     // MARK: - Step 4: commit
 
-    public func selectSendTiming(_ value: CeremonialMailSendTiming) { sendTiming = value }
+    public func selectSendTiming(_ value: CeremonialMailSendTiming) {
+        sendTiming = value
+    }
 
     // MARK: - WizardModel
 
@@ -189,7 +211,9 @@ public final class CeremonialMailViewModel: WizardModel {
         }
     }
 
-    public func discardConfirmed() { pendingEvent = .dismiss }
+    public func discardConfirmed() {
+        pendingEvent = .dismiss
+    }
 
     public func primaryTapped() {
         switch step {

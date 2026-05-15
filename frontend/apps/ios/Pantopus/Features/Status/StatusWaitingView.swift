@@ -101,7 +101,6 @@ public struct StatusWaitingView: View {
         .accessibilityIdentifier("statusEtaChip")
     }
 
-    @ViewBuilder
     private var timelineBlock: some View {
         TimelineBlock(
             stages: content.timeline.map { TimelineBlockStage(id: $0.id, label: $0.label) },

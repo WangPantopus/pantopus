@@ -119,7 +119,6 @@ public struct TransactionalDetailShell: View {
         }
     }
 
-    @ViewBuilder
     private func contentBody(_ content: ContentDetailContent) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             heroBlock(content)
@@ -147,7 +146,6 @@ public struct TransactionalDetailShell: View {
 
     // MARK: - Top nav
 
-    @ViewBuilder
     private func topNav(trailing: AnyView?, transparent: Bool) -> some View {
         HStack {
             Button(action: onBack) {
@@ -252,7 +250,6 @@ public struct TransactionalDetailShell: View {
         }
     }
 
-    @ViewBuilder
     private func heroSubtitle(_ hero: ContentDetailHero) -> some View {
         HStack(spacing: 8) {
             if let chip = hero.categoryChip {

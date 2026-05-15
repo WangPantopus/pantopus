@@ -48,7 +48,7 @@ public struct MarketplaceView: View {
 
     // MARK: - Top bar
 
-    @ViewBuilder private var topBar: some View {
+    private var topBar: some View {
         HStack {
             if let onBack {
                 Button(action: onBack) {

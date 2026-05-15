@@ -297,4 +297,4 @@ public final class TokenAcceptViewModel {
 
 /// Decodable placeholder used when we don't care about a response
 /// body (e.g. the decline endpoints).
-private struct AnyDecodable: Decodable, Sendable {}
+private struct AnyDecodable: Decodable {}

@@ -55,10 +55,21 @@ public struct IdentityCardContent: Sendable, Hashable, Identifiable {
         self.isOwner = isOwner
     }
 
-    public var accent: Color { kind.accent }
-    public var accentBg: Color { kind.accentBg }
-    public var accentBgSoft: Color { kind.accentBgSoft }
-    public var icon: PantopusIcon { kind.icon }
+    public var accent: Color {
+        kind.accent
+    }
+
+    public var accentBg: Color {
+        kind.accentBg
+    }
+
+    public var accentBgSoft: Color {
+        kind.accentBgSoft
+    }
+
+    public var icon: PantopusIcon {
+        kind.icon
+    }
 }
 
 public struct IdentityChip: Sendable, Hashable {
@@ -114,7 +125,9 @@ public extension IdentityKind {
         }
     }
 
-    var accentBgSoft: Color { accentBg.opacity(0.5) }
+    var accentBgSoft: Color {
+        accentBg.opacity(0.5)
+    }
 }
 
 /// Top-level render state.

@@ -25,8 +25,14 @@ import Observation
 @Observable
 @MainActor
 public final class SettingsIndexViewModel: GroupedListDataSource {
-    public var title: String { "Settings" }
-    public var footerCaption: String? { footer }
+    public var title: String {
+        "Settings"
+    }
+
+    public var footerCaption: String? {
+        footer
+    }
+
     public private(set) var state: GroupedListState = .loading
 
     private let api: APIClient
@@ -191,8 +197,14 @@ public enum SettingsRoute: Sendable, Hashable {
 @Observable
 @MainActor
 public final class NotificationSettingsViewModel: GroupedListDataSource {
-    public var title: String { "Notifications" }
-    public var footerCaption: String? { nil }
+    public var title: String {
+        "Notifications"
+    }
+
+    public var footerCaption: String? {
+        nil
+    }
+
     public private(set) var state: GroupedListState = .loading
 
     private static let categories = ["messages", "gigs", "listings", "mailbox", "home"]
@@ -337,8 +349,14 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
 @Observable
 @MainActor
 public final class PrivacySettingsViewModel: GroupedListDataSource {
-    public var title: String { "Privacy" }
-    public var footerCaption: String? { nil }
+    public var title: String {
+        "Privacy"
+    }
+
+    public var footerCaption: String? {
+        nil
+    }
+
     public private(set) var state: GroupedListState = .loading
 
     /// Settable from tests + previews.

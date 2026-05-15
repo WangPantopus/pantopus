@@ -32,6 +32,6 @@ public enum BlocksEndpoints {
 }
 
 /// `POST /api/users/:userId/block` body. `reason` is optional.
-private struct BlockUserBody: Encodable, Sendable {
+private struct BlockUserBody: Encodable {
     let reason: String?
 }

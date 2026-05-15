@@ -252,7 +252,6 @@ public struct AudienceProfileView: View {
 
     // MARK: - Updates tab
 
-    @ViewBuilder
     private func updatesTab(_ loaded: AudienceProfileLoaded) -> some View {
         ScrollView {
             VStack(spacing: 12) {
@@ -427,7 +426,6 @@ public struct AudienceProfileView: View {
 
     // MARK: - Followers tab
 
-    @ViewBuilder
     private func followersTab(_ loaded: AudienceProfileLoaded) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -614,7 +612,6 @@ public struct AudienceProfileView: View {
 
     // MARK: - Threads tab
 
-    @ViewBuilder
     private func threadsTab(_ loaded: AudienceProfileLoaded) -> some View {
         ScrollView {
             VStack(spacing: 8) {

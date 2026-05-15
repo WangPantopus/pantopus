@@ -140,17 +140,17 @@ final class DeepLinkRouterTests: XCTestCase {
 
     // MARK: - Path entry point (notification payload `link` field)
 
-    func testHandlePathBoxesAbsolutePathIntoRouter() throws {
+    func testHandlePathBoxesAbsolutePathIntoRouter() {
         DeepLinkRouter.shared.handle(path: "/post/abc-123")
         XCTAssertEqual(DeepLinkRouter.shared.pending, .post(id: "abc-123"))
     }
 
-    func testHandlePathBoxesRelativeIntoRouter() throws {
+    func testHandlePathBoxesRelativeIntoRouter() {
         DeepLinkRouter.shared.handle(path: "gig/g_5")
         XCTAssertEqual(DeepLinkRouter.shared.pending, .gig(id: "g_5"))
     }
 
-    func testHandlePathPassesThroughFullURLs() throws {
+    func testHandlePathPassesThroughFullURLs() {
         DeepLinkRouter.shared.handle(path: "https://pantopus.app/user/u_1")
         XCTAssertEqual(DeepLinkRouter.shared.pending, .user(id: "u_1"))
     }

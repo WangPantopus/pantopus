@@ -131,7 +131,9 @@ public struct HandshakeTierOption: Sendable, Hashable, Identifiable {
         self.currency = currency
     }
 
-    public var isFree: Bool { rank == 1 || priceCents == 0 }
+    public var isFree: Bool {
+        rank == 1 || priceCents == 0
+    }
 
     /// Formatted "Free" / "$5/mo" / "$25/mo" label for the picker row.
     public var priceLabel: String {

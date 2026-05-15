@@ -142,7 +142,6 @@ public struct PulsePostCard: View {
         }
     }
 
-    @ViewBuilder
     private func attendeeStrip(_ strip: PulseAttendeeStrip) -> some View {
         VStack(spacing: 0) {
             Rectangle()

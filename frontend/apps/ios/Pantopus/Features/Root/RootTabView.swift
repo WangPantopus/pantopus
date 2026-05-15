@@ -152,7 +152,9 @@ public struct RootTabView: View {
 /// the token string is non-nil.
 private struct InviteSheetToken: Identifiable, Equatable {
     let token: String
-    var id: String { token }
+    var id: String {
+        token
+    }
 }
 
 #Preview {

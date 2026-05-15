@@ -43,8 +43,13 @@ public final class FallbackLocationProvider: LocationProviding, @unchecked Senda
 
     public init() {}
 
-    public func cachedCoordinate() -> UserCoordinate? { fallback }
-    public func requestCurrent(timeoutSeconds _: TimeInterval = 4) async -> UserCoordinate? { fallback }
+    public func cachedCoordinate() -> UserCoordinate? {
+        fallback
+    }
+
+    public func requestCurrent(timeoutSeconds _: TimeInterval = 4) async -> UserCoordinate? {
+        fallback
+    }
 }
 
 /// Fixed-coordinate stub useful in tests / previews.
@@ -55,6 +60,11 @@ public final class FixedLocationProvider: LocationProviding, @unchecked Sendable
         self.coordinate = coordinate
     }
 
-    public func cachedCoordinate() -> UserCoordinate? { coordinate }
-    public func requestCurrent(timeoutSeconds _: TimeInterval) async -> UserCoordinate? { coordinate }
+    public func cachedCoordinate() -> UserCoordinate? {
+        coordinate
+    }
+
+    public func requestCurrent(timeoutSeconds _: TimeInterval) async -> UserCoordinate? {
+        coordinate
+    }
 }

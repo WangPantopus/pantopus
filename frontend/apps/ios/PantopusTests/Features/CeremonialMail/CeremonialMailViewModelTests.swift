@@ -81,7 +81,7 @@ final class CeremonialMailViewModelTests: XCTestCase {
         XCTAssertEqual(vm.homeContext?.homeId, "home_demo")
     }
 
-    func testVerifyContinueRequiresAddressConfirmation() async {
+    func testVerifyContinueRequiresAddressConfirmation() {
         let vm = vmAtVerifyStep()
         XCTAssertFalse(vm.chrome.primaryCTAEnabled)
         vm.toggleAddressConfirmed(true)

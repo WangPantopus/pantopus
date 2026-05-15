@@ -22,7 +22,9 @@ public struct MailRecipientDTO: Decodable, Sendable, Hashable, Identifiable {
     public let homeMediaUrl: String?
     public let isOnPantopus: Bool?
 
-    public var id: String { userId }
+    public var id: String {
+        userId
+    }
 }
 
 /// Envelope from `GET /api/mailbox/compose/home-context/:homeId`.

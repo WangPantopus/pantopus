@@ -37,7 +37,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         .accessibilityIdentifier("groupedList")
     }
 
-    @ViewBuilder private var topBar: some View {
+    private var topBar: some View {
         HStack {
             if let onBack {
                 Button(action: onBack) {

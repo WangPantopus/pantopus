@@ -70,7 +70,6 @@ public struct CeremonialMailWizardView: View {
 
     // MARK: - Step 1: decide
 
-    @ViewBuilder
     private var decideStep: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             HeadlineBlock("Decide who and why")
@@ -231,7 +230,6 @@ public struct CeremonialMailWizardView: View {
 
     // MARK: - Step 2: verify
 
-    @ViewBuilder
     private var verifyStep: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             HeadlineBlock("Verify the address")
@@ -334,7 +332,6 @@ public struct CeremonialMailWizardView: View {
 
     // MARK: - Step 3: compose
 
-    @ViewBuilder
     private var composeStep: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             HeadlineBlock("Compose the letter")
@@ -506,7 +503,6 @@ public struct CeremonialMailWizardView: View {
 
     // MARK: - Step 4: commit
 
-    @ViewBuilder
     private var commitStep: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             HeadlineBlock("Commit and send")

@@ -15,10 +15,19 @@ import Observation
 public final class NotificationsViewModel: ListOfRowsDataSource {
     // MARK: - Public state
 
-    public var title: String { "Notifications" }
-    public var tabs: [ListOfRowsTab] { [] }
+    public var title: String {
+        "Notifications"
+    }
+
+    public var tabs: [ListOfRowsTab] {
+        []
+    }
+
     public var selectedTab: String = ""
-    public var fab: FABAction? { nil }
+    public var fab: FABAction? {
+        nil
+    }
+
     public private(set) var state: ListOfRowsState = .loading
 
     public var topBarAction: TopBarAction? {
@@ -105,7 +114,9 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
 
     // MARK: - Internal
 
-    private var hasUnread: Bool { unreadCount > 0 }
+    private var hasUnread: Bool {
+        unreadCount > 0
+    }
 
     private func fetch(reset: Bool) async {
         let offset = reset ? 0 : notifications.count

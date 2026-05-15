@@ -78,7 +78,6 @@ public struct ConversationRow: View {
         }
     }
 
-    @ViewBuilder
     private var middle: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
@@ -102,7 +101,6 @@ public struct ConversationRow: View {
         }
     }
 
-    @ViewBuilder
     private var trailing: some View {
         VStack(alignment: .trailing, spacing: 6) {
             Text(content.timeLabel)
@@ -197,7 +195,6 @@ private struct GroupAvatarView: View {
     }
 }
 
-@ViewBuilder
 private func initialsCircle(size: CGFloat, color: Color, initials: String) -> some View {
     ZStack {
         Circle().fill(color)

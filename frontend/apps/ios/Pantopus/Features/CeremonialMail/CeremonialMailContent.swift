@@ -43,7 +43,9 @@ public enum CeremonialMailIntent: String, CaseIterable, Sendable, Identifiable {
     case businessNote = "business_note"
     case justBecause = "just_because"
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var title: String {
         switch self {
@@ -82,7 +84,9 @@ public enum CeremonialMailStationery: String, CaseIterable, Sendable, Identifiab
     case linen
     case botanical
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var title: String {
         switch self {
@@ -100,7 +104,9 @@ public enum CeremonialMailInk: String, CaseIterable, Sendable, Identifiable {
     case sepia
     case forest
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var title: String {
         switch self {
@@ -118,7 +124,9 @@ public enum CeremonialMailSeal: String, CaseIterable, Sendable, Identifiable {
     case waxBlack = "wax_black"
     case none
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var title: String {
         switch self {
@@ -135,7 +143,9 @@ public enum CeremonialMailSendTiming: String, CaseIterable, Sendable, Identifiab
     case morning
     case tomorrow
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var title: String {
         switch self {

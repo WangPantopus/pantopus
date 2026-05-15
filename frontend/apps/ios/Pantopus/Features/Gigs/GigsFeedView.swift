@@ -62,7 +62,7 @@ public struct GigsFeedView: View {
 
     // MARK: - Top bar
 
-    @ViewBuilder private var topBar: some View {
+    private var topBar: some View {
         HStack(spacing: 4) {
             if let onBack {
                 Button(action: onBack) {

@@ -238,7 +238,7 @@ final class AudienceProfileViewModelTests: XCTestCase {
         XCTAssertEqual(vm.visibleFollowers.count, 2)
     }
 
-    func testActiveTabDefaultsToUpdates() async {
+    func testActiveTabDefaultsToUpdates() {
         let vm = AudienceProfileViewModel(api: makeAPI())
         XCTAssertEqual(vm.activeTab, .updates)
         vm.selectTab(.followers)

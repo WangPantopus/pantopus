@@ -282,6 +282,6 @@ private extension IdentityCenterResponse {
 
 /// PATCH response — we ignore the body, just need the success signal.
 /// Backend route emits `{ "bridge": {...} }` (singular).
-struct BridgesEchoResponse: Decodable, Sendable {
+struct BridgesEchoResponse: Decodable {
     let bridge: BridgesDTO?
 }

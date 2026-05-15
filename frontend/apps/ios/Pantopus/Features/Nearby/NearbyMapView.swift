@@ -55,7 +55,7 @@ public struct NearbyMapView: View {
 
     // MARK: - Map
 
-    @ViewBuilder private var mapLayer: some View {
+    private var mapLayer: some View {
         Map(position: $cameraPosition, interactionModes: [.pan, .zoom]) {
             if case let .loaded(loaded) = viewModel.state {
                 ForEach(loaded.markers) { marker in
@@ -131,7 +131,7 @@ public struct NearbyMapView: View {
 
     // MARK: - Floating pill
 
-    @ViewBuilder private var floatingPill: some View {
+    private var floatingPill: some View {
         HStack(spacing: 0) {
             Button {
                 onBack?()
@@ -169,7 +169,7 @@ public struct NearbyMapView: View {
 
     // MARK: - Category chips
 
-    @ViewBuilder private var categoryChips: some View {
+    private var categoryChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 ForEach(GigsCategory.allCases, id: \.self) { category in
@@ -207,7 +207,7 @@ public struct NearbyMapView: View {
 
     // MARK: - Map controls
 
-    @ViewBuilder private func mapControls(bottomInset: CGFloat) -> some View {
+    private func mapControls(bottomInset: CGFloat) -> some View {
         VStack(spacing: 8) {
             mapControlButton(icon: .mapPin, label: "Locate me") {
                 recenter(on: viewModel.userCoordinate)
@@ -238,7 +238,7 @@ public struct NearbyMapView: View {
 
     // MARK: - Bottom sheet
 
-    @ViewBuilder private func bottomSheet(height: CGFloat, screenHeight: CGFloat) -> some View {
+    private func bottomSheet(height: CGFloat, screenHeight: CGFloat) -> some View {
         VStack(spacing: 0) {
             Spacer(minLength: 0)
             VStack(spacing: 0) {
@@ -293,7 +293,7 @@ public struct NearbyMapView: View {
         return closest
     }
 
-    @ViewBuilder private var sheetHeader: some View {
+    private var sheetHeader: some View {
         HStack {
             Text(headerCountLabel)
                 .font(.system(size: 14, weight: .bold))
@@ -372,7 +372,7 @@ public struct NearbyMapView: View {
         }
     }
 
-    @ViewBuilder private var collapsedBody: some View {
+    private var collapsedBody: some View {
         HStack(spacing: 8) {
             Icon(.chevronUp, size: 13, strokeWidth: 2.4, color: Theme.Color.appTextSecondary)
             Text("Drag up to see the list")
@@ -396,7 +396,7 @@ public struct NearbyMapView: View {
         }
     }
 
-    @ViewBuilder private func standardBody(_ loaded: NearbyMapLoaded) -> some View {
+    private func standardBody(_ loaded: NearbyMapLoaded) -> some View {
         VStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
@@ -418,7 +418,7 @@ public struct NearbyMapView: View {
         }
     }
 
-    @ViewBuilder private func expandedBody(_ loaded: NearbyMapLoaded) -> some View {
+    private func expandedBody(_ loaded: NearbyMapLoaded) -> some View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(loaded.entities) { entity in

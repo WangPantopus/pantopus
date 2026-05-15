@@ -83,7 +83,9 @@ public enum GigsSort: String, CaseIterable, Sendable, Hashable, Identifiable {
     case highestPay = "highest_pay"
     case fewestBids = "fewest_bids"
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {

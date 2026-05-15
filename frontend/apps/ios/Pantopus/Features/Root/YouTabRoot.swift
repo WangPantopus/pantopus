@@ -277,7 +277,6 @@ public struct YouTabRoot: View {
     /// No-op overlay slot — we previously routed debug affordances via
     /// a 5-tap gesture, but the designed DEBUG section in `MeView` now
     /// surfaces them directly.
-    @ViewBuilder
     private var debugTapTarget: some View {
         EmptyView()
     }
