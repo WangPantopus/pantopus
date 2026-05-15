@@ -21,13 +21,17 @@ struct HomeDashboardView: View {
     /// isn't built yet (Log package, Add mail, etc). Receives the
     /// human-readable action label.
     private let onOpenPlaceholder: ((String) -> Void)?
+    /// Push onto the host stack when the user taps the Pets quick-action
+    /// tile. Receives this home's id so the destination can pre-fetch.
+    private let onOpenPets: ((String) -> Void)?
 
     init(
         homeId: String,
         onBack: (() -> Void)? = nil,
         onClaimOwnership: (() -> Void)? = nil,
         onOpenClaimsList: (() -> Void)? = nil,
-        onOpenPlaceholder: ((String) -> Void)? = nil
+        onOpenPlaceholder: ((String) -> Void)? = nil,
+        onOpenPets: ((String) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
         self.homeId = homeId
@@ -35,6 +39,7 @@ struct HomeDashboardView: View {
         self.onClaimOwnership = onClaimOwnership
         self.onOpenClaimsList = onOpenClaimsList
         self.onOpenPlaceholder = onOpenPlaceholder
+        self.onOpenPets = onOpenPets
     }
 
     /// Current signed-in user's email — used by the Invite Owner form
@@ -128,6 +133,8 @@ struct HomeDashboardView: View {
             onClaimOwnership?()
         case "add_member":
             showsInviteOwner = true
+        case "pets":
+            onOpenPets?(homeId)
         default:
             onOpenPlaceholder?(actionLabel(action))
         }
@@ -139,6 +146,7 @@ struct HomeDashboardView: View {
         case "add_member": "Add member"
         case "add_mail": "Add mail"
         case "verify": "Verify home"
+        case "pets": "Pets"
         default: id.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }

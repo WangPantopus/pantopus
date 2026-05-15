@@ -77,6 +77,15 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case shieldAlert = "shield-alert"
     case checkCheck = "check-check"
     case history
+    // T5.2.1 — Pets species iconography. Gradient-tinted backgrounds in
+    // `SpeciesPalette` carry the per-species hue; these icons render in
+    // white on top.
+    case dog
+    case cat
+    case bird
+    case fish
+    case turtle
+    case pawPrint = "paw-print"
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
@@ -143,6 +152,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .shieldAlert: "exclamationmark.shield"
         case .checkCheck: "checkmark.circle"
         case .history: "clock.arrow.circlepath"
+        case .dog: "dog"
+        case .cat: "cat"
+        case .bird: "bird"
+        case .fish: "fish"
+        case .turtle: "tortoise"
+        case .pawPrint: "pawprint"
         }
     }
 }

@@ -59,6 +59,7 @@ fun HomeDashboardScreen(
     onClaimOwnership: ((String) -> Unit)? = null,
     onOpenClaimsList: (() -> Unit)? = null,
     onOpenPlaceholder: ((String) -> Unit)? = null,
+    onOpenPets: ((String) -> Unit)? = null,
     viewModel: HomeDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -77,6 +78,7 @@ fun HomeDashboardScreen(
             "add_mail" -> "Add mail"
             "add_member" -> "Add member"
             "verify" -> "Verify home"
+            "pets" -> "Pets"
             else -> actionId.replace('_', ' ').replaceFirstChar(Char::uppercase)
         }
 
@@ -104,6 +106,10 @@ fun HomeDashboardScreen(
             "add_member" ->
                 viewModel.currentHomeId()?.let { homeId ->
                     onInviteOwner?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "pets" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenPets?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
             else -> openPlaceholder(actionId)
         }

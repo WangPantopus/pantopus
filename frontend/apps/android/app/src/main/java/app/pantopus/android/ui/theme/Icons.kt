@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Public
@@ -141,6 +142,19 @@ enum class PantopusIcon(
     ShieldAlert("shield-alert"),
     CheckCheck("check-check"),
     History("history"),
+
+    // T5.2.1 — Pets species iconography. Material doesn't ship dog / cat /
+    // bird / fish / turtle vectors, so every species falls back to
+    // [Icons.Filled.Pets] (paw print) on Android today. The per-species
+    // gradient background in [SpeciesPalette] carries the visual signal;
+    // upgrade to bespoke Lucide drawables when the design_system/ vector
+    // export lands.
+    Dog("dog"),
+    Cat("cat"),
+    Bird("bird"),
+    Fish("fish"),
+    Turtle("turtle"),
+    PawPrint("paw-print"),
     ;
 
     companion object {
@@ -238,6 +252,12 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.ShieldAlert -> IconSource.Material(Icons.Filled.Warning)
         PantopusIcon.CheckCheck -> IconSource.Material(Icons.Filled.DoneAll)
         PantopusIcon.History -> IconSource.Material(Icons.Filled.History)
+        PantopusIcon.Dog -> IconSource.Material(Icons.Filled.Pets)
+        PantopusIcon.Cat -> IconSource.Material(Icons.Filled.Pets)
+        PantopusIcon.Bird -> IconSource.Material(Icons.Filled.Pets)
+        PantopusIcon.Fish -> IconSource.Material(Icons.Filled.Pets)
+        PantopusIcon.Turtle -> IconSource.Material(Icons.Filled.Pets)
+        PantopusIcon.PawPrint -> IconSource.Material(Icons.Filled.Pets)
     }
 
 /**
