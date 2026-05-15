@@ -203,9 +203,9 @@ public struct TopBarAction: Sendable {
         handler: @escaping @Sendable () -> Void
     ) {
         self.icon = icon
-        self.label = nil
+        label = nil
         self.accessibilityLabel = accessibilityLabel
-        self.isEnabled = true
+        isEnabled = true
         self.handler = handler
     }
 

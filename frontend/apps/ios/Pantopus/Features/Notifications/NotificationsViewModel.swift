@@ -48,35 +48,52 @@ public enum NotificationCategory: Sendable, Hashable {
     case safety
     case system
 
+    private static let rawTypeMap: [String: NotificationCategory] = [
+        "reply": .reply,
+        "comment": .reply,
+        "chat": .reply,
+        "chat_message": .reply,
+        "dm": .reply,
+        "mention": .mention,
+        "follow": .mention,
+        "connection": .mention,
+        "connections": .mention,
+        "user": .mention,
+        "claim": .claim,
+        "home_member_request": .claim,
+        "home_claim": .claim,
+        "home_ownership": .claim,
+        "gig": .gig,
+        "gig_bid": .gig,
+        "gig_match": .gig,
+        "listing": .listing,
+        "listing_sale": .listing,
+        "marketplace": .listing,
+        "safety": .safety,
+        "alert": .safety,
+        "security": .safety,
+        "porch_alert": .safety,
+        "system": .system,
+        "info": .system,
+        "support_train": .system,
+        "support-train": .system,
+        "announcement": .system
+    ]
+
     /// Loose mapping from the backend's `type` strings into the seven
     /// design buckets. Unknown types fall back to `.system`.
     public static func from(rawType: String?) -> NotificationCategory {
         guard let raw = rawType?.lowercased(), !raw.isEmpty else { return .system }
-        switch raw {
-        case "reply", "comment", "chat", "chat_message", "dm":
-            return .reply
-        case "mention", "follow", "connection", "connections", "user":
-            return .mention
-        case "claim", "home_member_request", "home_claim", "home_ownership":
-            return .claim
-        case "gig", "gig_bid", "gig_match":
-            return .gig
-        case "listing", "listing_sale", "marketplace":
-            return .listing
-        case "safety", "alert", "security", "porch_alert":
-            return .safety
-        case "system", "info", "support_train", "support-train", "announcement":
-            return .system
-        default:
-            // Heuristic fallbacks for the noisier prefixes the backend
-            // emits today. Keeps the row's icon meaningful while we wait
-            // for the canonical 7-bucket migration.
-            if raw.contains("gig") { return .gig }
-            if raw.contains("listing") || raw.contains("mail") { return .listing }
-            if raw.contains("home") { return .claim }
-            if raw.contains("post") || raw.contains("reply") { return .reply }
-            return .system
-        }
+        return rawTypeMap[raw] ?? heuristicCategory(for: raw)
+    }
+
+    private static func heuristicCategory(for raw: String) -> NotificationCategory {
+        // Heuristic fallbacks for the noisier prefixes the backend emits today.
+        if raw.contains("gig") { return .gig }
+        if raw.contains("listing") || raw.contains("mail") { return .listing }
+        if raw.contains("home") { return .claim }
+        if raw.contains("post") || raw.contains("reply") { return .reply }
+        return .system
     }
 
     public var label: String {
@@ -143,6 +160,10 @@ public enum NotificationCategory: Sendable, Hashable {
     }
 }
 
+private let notificationsUnreadEmptySubcopy =
+    "No unread notifications. Replies, mentions, claim updates, " +
+    "and safety alerts from your neighborhood will land here."
+
 @Observable
 @MainActor
 public final class NotificationsViewModel: ListOfRowsDataSource {
@@ -164,7 +185,9 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
         }
     }
 
-    public var fab: FABAction? { nil }
+    public var fab: FABAction? {
+        nil
+    }
 
     public private(set) var state: ListOfRowsState = .loading
 
@@ -232,7 +255,7 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
     public func markRead(id: String) async {
         let previous = notifications
         let previousUnread = unreadCount
-        let target = notifications.first(where: { $0.id == id })
+        let target = notifications.first { $0.id == id }
         guard let target, target.isRead != true else { return }
         notifications = notifications.map { row in
             row.id == id ? row.markedRead() : row
@@ -343,17 +366,18 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
     private func emptyContent(for tab: String) -> ListOfRowsState.EmptyContent {
         switch tab {
         case NotificationsTab.unread:
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .checkCheck,
                 headline: "You\u{2019}re all caught up",
-                subcopy: "No unread notifications. Replies, mentions, claim updates, and safety alerts from your neighborhood will land here.",
-                ctaTitle: "View all notifications",
-                onCTA: { [weak self] in
-                    Task { @MainActor in self?.selectedTab = NotificationsTab.all }
+                subcopy: notificationsUnreadEmptySubcopy,
+                ctaTitle: "View all notifications"
+            ) { [weak self] in
+                Task { @MainActor in
+                    self?.selectedTab = NotificationsTab.all
                 }
-            )
+            }
         default:
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .bell,
                 headline: "All caught up",
                 subcopy: "When something needs your attention, it'll show up here."
@@ -492,7 +516,7 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
         let interval = now.timeIntervalSince(date)
         if interval < 60 { return "now" }
         if interval < 3600 { return "\(Int(interval / 60))m" }
-        if interval < 86_400 { return "\(Int(interval / 3600))h" }
+        if interval < 86400 { return "\(Int(interval / 3600))h" }
         var cal = calendar
         cal.timeZone = timeZone
         let startOfNow = cal.startOfDay(for: now)

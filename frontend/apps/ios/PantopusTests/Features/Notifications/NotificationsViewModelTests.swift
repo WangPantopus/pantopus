@@ -15,6 +15,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable file_length type_body_length
+
 @MainActor
 final class NotificationsViewModelTests: XCTestCase {
     override func setUp() {
@@ -31,6 +33,8 @@ final class NotificationsViewModelTests: XCTestCase {
         )
     }
 
+    private static let utc = TimeZone(secondsFromGMT: 0) ?? .current
+
     /// Fixed clock + calendar so date-bucketing tests are deterministic.
     /// 2026-05-15 12:00:00 UTC — Friday.
     private static let fixedNow: Date = {
@@ -41,17 +45,16 @@ final class NotificationsViewModelTests: XCTestCase {
         components.hour = 12
         components.minute = 0
         components.second = 0
-        components.timeZone = TimeZone(identifier: "UTC")
-        return Calendar(identifier: .gregorian).date(from: components)!
+        components.timeZone = Self.utc
+        return Calendar(identifier: .gregorian).date(from: components)
+            ?? Date(timeIntervalSince1970: 1_778_846_400)
     }()
 
     private static let utcCalendar: Calendar = {
         var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
+        cal.timeZone = Self.utc
         return cal
     }()
-
-    private static let utc = TimeZone(identifier: "UTC")!
 
     private func makeVM(api: APIClient? = nil) -> NotificationsViewModel {
         NotificationsViewModel(
@@ -429,11 +432,11 @@ final class NotificationsViewModelTests: XCTestCase {
         XCTAssertEqual(sections.first?.header, "Earlier")
     }
 
-    func testMakeSectionsRespectsLocalTimezone() {
+    func testMakeSectionsRespectsLocalTimezone() throws {
         // 2026-05-15T01:00:00Z is 17:00 May 14 in PST. Under PST it's
         // "Earlier"; under UTC it's "Today".
         let dtos = [makeDTO(id: "n", createdAt: "2026-05-15T01:00:00Z")]
-        let pst = TimeZone(identifier: "America/Los_Angeles")!
+        let pst = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
         var pstCal = Calendar(identifier: .gregorian)
         pstCal.timeZone = pst
         let pstSections = NotificationsViewModel.makeSections(
@@ -455,9 +458,8 @@ final class NotificationsViewModelTests: XCTestCase {
     // MARK: - Relative time
 
     func testRelativeTimeFormatting() {
-        let utc = TimeZone(identifier: "UTC")!
         var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = utc
+        cal.timeZone = Self.utc
         XCTAssertEqual(
             NotificationsViewModel.formatRelativeTime(
                 "2026-05-15T11:55:00Z",
