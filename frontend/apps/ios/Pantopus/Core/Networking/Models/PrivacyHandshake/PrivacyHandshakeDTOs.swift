@@ -22,8 +22,8 @@ public struct AudienceIdentityDTO: Decodable, Sendable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case id, handle
-        case displayName = "displayName"
-        case avatarUrl = "avatarUrl"
+        case displayName
+        case avatarUrl
     }
 }
 

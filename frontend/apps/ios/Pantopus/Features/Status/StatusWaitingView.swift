@@ -225,11 +225,11 @@ public struct StatusWaitingView: View {
     ) -> (icon: PantopusIcon, tint: Color, halo: Color) {
         switch state {
         case .success:
-            return (.checkCircle, Theme.Color.success, Theme.Color.successBg)
+            (.checkCircle, Theme.Color.success, Theme.Color.successBg)
         case .waiting:
-            return (.alertCircle, Theme.Color.warning, Theme.Color.warningBg)
+            (.alertCircle, Theme.Color.warning, Theme.Color.warningBg)
         case .email:
-            return (.mailbox, Theme.Color.primary600, Theme.Color.primary50)
+            (.mailbox, Theme.Color.primary600, Theme.Color.primary50)
         }
     }
 }

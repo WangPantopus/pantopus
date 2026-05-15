@@ -118,15 +118,15 @@ public extension StatusWaitingContent {
     static func claimSubmitted(
         homeName: String?,
         eta: String? = "2–3 days",
-        onOpenClaim: @escaping () -> Void = {},
-        onBackToHub: @escaping () -> Void = {}
+        onOpenClaim _: @escaping () -> Void = {},
+        onBackToHub _: @escaping () -> Void = {}
     ) -> StatusWaitingContent {
         let venue = (homeName?.isEmpty == false) ? homeName! : "this home"
         return StatusWaitingContent(
             illustration: .success,
             headline: "Claim submitted",
             subcopy:
-                "We'll review your evidence and email you when \(venue) is verified.",
+            "We'll review your evidence and email you when \(venue) is verified.",
             timeline: homesClaimTimeline,
             currentStageId: "submitted",
             etaChip: eta,
@@ -200,8 +200,8 @@ public extension StatusWaitingContent {
     /// `/api/users/me` (or the response from a /resend call).
     static func checkYourEmail(
         email: String?,
-        onResend: @escaping () -> Void = {},
-        onChangeEmail: @escaping () -> Void = {}
+        onResend _: @escaping () -> Void = {},
+        onChangeEmail _: @escaping () -> Void = {}
     ) -> StatusWaitingContent {
         let recipient = email.map { "We just sent a link to \($0)." }
             ?? "We just sent a verification link to your email."

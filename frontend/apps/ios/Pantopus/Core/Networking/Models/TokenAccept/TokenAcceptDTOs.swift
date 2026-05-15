@@ -113,7 +113,7 @@ public struct HomeAcceptResponse: Decodable, Sendable {
     public let acceptedRoleBase: String?
 
     enum CodingKeys: String, CodingKey {
-        case homeId = "homeId"
+        case homeId
         case occupancy, merged
         case acceptedRoleBase = "accepted_role_base"
     }

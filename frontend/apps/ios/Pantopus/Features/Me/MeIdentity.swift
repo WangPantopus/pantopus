@@ -17,35 +17,35 @@ public enum MeIdentity: String, CaseIterable, Sendable, Hashable {
 
     public var label: String {
         switch self {
-        case .personal: return "Personal"
-        case .home: return "Home"
-        case .business: return "Business"
+        case .personal: "Personal"
+        case .home: "Home"
+        case .business: "Business"
         }
     }
 
     public var icon: PantopusIcon {
         switch self {
-        case .personal: return .user
-        case .home: return .home
-        case .business: return .shoppingBag
+        case .personal: .user
+        case .home: .home
+        case .business: .shoppingBag
         }
     }
 
     /// Header gradient + action-grid accent token.
     public var accent: Color {
         switch self {
-        case .personal: return Theme.Color.primary600
-        case .home: return Theme.Color.home
-        case .business: return Theme.Color.business
+        case .personal: Theme.Color.primary600
+        case .home: Theme.Color.home
+        case .business: Theme.Color.business
         }
     }
 
     /// Soft tint used for the header gradient top + pill background.
     public var accentBg: Color {
         switch self {
-        case .personal: return Theme.Color.primary50
-        case .home: return Theme.Color.homeBg
-        case .business: return Theme.Color.businessBg
+        case .personal: Theme.Color.primary50
+        case .home: Theme.Color.homeBg
+        case .business: Theme.Color.businessBg
         }
     }
 }

@@ -53,6 +53,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -64,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.R
 import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.theme.PantopusColors
@@ -219,11 +221,12 @@ private fun MapLayer(
     onPinTap: (MapEntity) -> Unit,
     onClusterTap: (MapCluster) -> Unit,
 ) {
+    val context = LocalContext.current
     val mapProperties =
-        remember {
+        remember(context) {
             MapProperties(
                 isMyLocationEnabled = false,
-                mapStyleOptions = MapStyleOptions(NEARBY_MAP_STYLE_JSON),
+                mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, R.raw.nearby_map_style),
             )
         }
     val uiSettings =

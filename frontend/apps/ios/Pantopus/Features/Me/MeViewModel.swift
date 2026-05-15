@@ -101,11 +101,31 @@ public final class MeViewModel {
         MeSection(id: "debug", header: "Debug", rows: [
             MeSectionRow(id: "openProfile", icon: .search, label: "Open public profile by ID", routeKey: "me.debug.openProfile"),
             MeSectionRow(id: "openPost", icon: .search, label: "Open Pulse post by ID", routeKey: "me.debug.openPost"),
-            MeSectionRow(id: "openHandshake", icon: .userPlus, label: "Open Privacy Handshake by persona handle", routeKey: "me.debug.openHandshake"),
+            MeSectionRow(
+                id: "openHandshake",
+                icon: .userPlus,
+                label: "Open Privacy Handshake by persona handle",
+                routeKey: "me.debug.openHandshake"
+            ),
             MeSectionRow(id: "openInviteToken", icon: .mailbox, label: "Open invite by token", routeKey: "me.debug.openInviteToken"),
-            MeSectionRow(id: "openStatusWaiting", icon: .checkCircle, label: "Open Status / Waiting", routeKey: "me.debug.openStatusWaiting"),
-            MeSectionRow(id: "openCeremonialMail", icon: .send, label: "Open Ceremonial Mail Compose", routeKey: "me.debug.openCeremonialMail"),
-            MeSectionRow(id: "openCeremonialMailOpen", icon: .mailbox, label: "Open Ceremonial Mail by ID", routeKey: "me.debug.openCeremonialMailOpen"),
+            MeSectionRow(
+                id: "openStatusWaiting",
+                icon: .checkCircle,
+                label: "Open Status / Waiting",
+                routeKey: "me.debug.openStatusWaiting"
+            ),
+            MeSectionRow(
+                id: "openCeremonialMail",
+                icon: .send,
+                label: "Open Ceremonial Mail Compose",
+                routeKey: "me.debug.openCeremonialMail"
+            ),
+            MeSectionRow(
+                id: "openCeremonialMailOpen",
+                icon: .mailbox,
+                label: "Open Ceremonial Mail by ID",
+                routeKey: "me.debug.openCeremonialMailOpen"
+            ),
             MeSectionRow(id: "inviteOwner", icon: .userPlus, label: "Invite owner to home by ID", routeKey: "me.debug.inviteOwner"),
             MeSectionRow(id: "disambiguate", icon: .mailbox, label: "Disambiguate mail by ID", routeKey: "me.debug.disambiguate")
         ])
@@ -151,8 +171,13 @@ public final class MeViewModel {
                 MeSection(id: "account", header: "Account", rows: [
                     MeSectionRow(id: "edit", icon: .edit2, label: "Edit profile", routeKey: "me.editProfile"),
                     MeSectionRow(id: "settings", icon: .menu, label: "Settings", routeKey: "me.settings"),
-                    MeSectionRow(id: "privacy", icon: .shield, label: "Privacy",
-                                 value: privacyValue(profile.profileVisibility), routeKey: "me.privacy")
+                    MeSectionRow(
+                        id: "privacy",
+                        icon: .shield,
+                        label: "Privacy",
+                        value: privacyValue(profile.profileVisibility),
+                        routeKey: "me.privacy"
+                    )
                 ]),
                 MeSection(id: "activity", header: "Activity", rows: [
                     MeSectionRow(id: "posts", icon: .file, label: "My posts", routeKey: "me.posts"),
@@ -302,10 +327,10 @@ public final class MeViewModel {
 
     private static func privacyValue(_ visibility: String?) -> String? {
         switch visibility?.lowercased() {
-        case "public": return "Public"
-        case "registered": return "Neighbors"
-        case "private": return "Strict"
-        default: return nil
+        case "public": "Public"
+        case "registered": "Neighbors"
+        case "private": "Strict"
+        default: nil
         }
     }
 

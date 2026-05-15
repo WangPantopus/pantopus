@@ -210,8 +210,8 @@ public final class IdentityCenterViewModel {
         let chip = dto.status?.lowercased() == "live"
             ? IdentityChip(label: "Live", tone: .success)
             : nil
-        let rightLabel = followers >= 1_000
-            ? "\(followers / 1_000).\(followers % 1_000 / 100)k followers"
+        let rightLabel = followers >= 1000
+            ? "\(followers / 1000).\(followers % 1000 / 100)k followers"
             : "\(followers) followers"
         return IdentityCardContent(
             id: dto.id,
@@ -255,14 +255,13 @@ public final class IdentityCenterViewModel {
 private extension IdentityCenterResponse {
     func updatingBridges(isOn: Bool, rowId: String) -> IdentityCenterResponse {
         let current = bridges ?? BridgesDTO(showPersonaOnLocal: false, showLocalOnPersona: false)
-        let next: BridgesDTO
-        switch rowId {
+        let next: BridgesDTO = switch rowId {
         case "showPublicOnLocal":
-            next = BridgesDTO(showPersonaOnLocal: isOn, showLocalOnPersona: current.showLocalOnPersona)
+            BridgesDTO(showPersonaOnLocal: isOn, showLocalOnPersona: current.showLocalOnPersona)
         case "showLocalOnPublic":
-            next = BridgesDTO(showPersonaOnLocal: current.showPersonaOnLocal, showLocalOnPersona: isOn)
+            BridgesDTO(showPersonaOnLocal: current.showPersonaOnLocal, showLocalOnPersona: isOn)
         default:
-            next = current
+            current
         }
         return updatingBridges(snapshot: next)
     }

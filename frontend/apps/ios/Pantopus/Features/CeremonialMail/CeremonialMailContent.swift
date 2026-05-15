@@ -38,8 +38,8 @@ public enum CeremonialMailStep: Int, CaseIterable, Sendable {
 /// stationery on the compose step.
 public enum CeremonialMailIntent: String, CaseIterable, Sendable, Identifiable {
     case sayHello = "say_hello"
-    case congratulations = "congratulations"
-    case condolences = "condolences"
+    case congratulations
+    case condolences
     case businessNote = "business_note"
     case justBecause = "just_because"
 
@@ -79,8 +79,8 @@ public enum CeremonialMailIntent: String, CaseIterable, Sendable, Identifiable {
 public enum CeremonialMailStationery: String, CaseIterable, Sendable, Identifiable {
     case classicCream = "classic_cream"
     case midnightBlue = "midnight_blue"
-    case linen = "linen"
-    case botanical = "botanical"
+    case linen
+    case botanical
 
     public var id: String { rawValue }
 
@@ -95,10 +95,10 @@ public enum CeremonialMailStationery: String, CaseIterable, Sendable, Identifiab
 }
 
 public enum CeremonialMailInk: String, CaseIterable, Sendable, Identifiable {
-    case walnut = "walnut"
-    case navy = "navy"
-    case sepia = "sepia"
-    case forest = "forest"
+    case walnut
+    case navy
+    case sepia
+    case forest
 
     public var id: String { rawValue }
 
@@ -116,7 +116,7 @@ public enum CeremonialMailSeal: String, CaseIterable, Sendable, Identifiable {
     case waxRed = "wax_red"
     case waxBlue = "wax_blue"
     case waxBlack = "wax_black"
-    case none = "none"
+    case none
 
     public var id: String { rawValue }
 

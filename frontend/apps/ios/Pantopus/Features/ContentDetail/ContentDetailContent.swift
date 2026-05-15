@@ -191,15 +191,15 @@ public enum ContentDetailModule: Sendable, Hashable, Identifiable {
 
     public var id: String {
         switch self {
-        case let .description(m): return "description_\(m.title)"
-        case let .detailRow(m): return "detail_\(m.title)"
-        case let .captionedText(m): return "caption_\(m.title)"
-        case let .photoStrip(m): return "photos_\(m.title)"
-        case let .similarItems(m): return "similar_\(m.title)"
-        case let .bids(m): return "bids_\(m.title)"
-        case let .fromTo(m): return "fromto_\(m.from.name)"
-        case let .lineItems(m): return "lineitems_\(m.title)"
-        case .summary: return "summary"
+        case let .description(m): "description_\(m.title)"
+        case let .detailRow(m): "detail_\(m.title)"
+        case let .captionedText(m): "caption_\(m.title)"
+        case let .photoStrip(m): "photos_\(m.title)"
+        case let .similarItems(m): "similar_\(m.title)"
+        case let .bids(m): "bids_\(m.title)"
+        case let .fromTo(m): "fromto_\(m.from.name)"
+        case let .lineItems(m): "lineitems_\(m.title)"
+        case .summary: "summary"
         }
     }
 }

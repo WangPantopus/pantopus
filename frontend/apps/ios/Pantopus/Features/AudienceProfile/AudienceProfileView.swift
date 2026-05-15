@@ -318,9 +318,11 @@ public struct AudienceProfileView: View {
                     }
                     .padding(.horizontal, 16)
                     .frame(height: 38)
-                    .background(viewModel.composer.canSubmit && channelId != nil
-                        ? Theme.Color.primary600
-                        : Theme.Color.appBorderStrong)
+                    .background(
+                        viewModel.composer.canSubmit && channelId != nil
+                            ? Theme.Color.primary600
+                            : Theme.Color.appBorderStrong
+                    )
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -705,11 +707,11 @@ public struct AudienceProfileView: View {
 
     static func tierColor(rank: Int) -> Color {
         switch rank {
-        case 1: return Theme.Color.primary600
-        case 2: return Theme.Color.success
-        case 3: return Theme.Color.warning
-        case 4: return Theme.Color.business
-        default: return Theme.Color.appTextSecondary
+        case 1: Theme.Color.primary600
+        case 2: Theme.Color.success
+        case 3: Theme.Color.warning
+        case 4: Theme.Color.business
+        default: Theme.Color.appTextSecondary
         }
     }
 }

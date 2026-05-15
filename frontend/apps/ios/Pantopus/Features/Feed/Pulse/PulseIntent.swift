@@ -22,24 +22,24 @@ public enum PulseIntent: String, CaseIterable, Sendable, Hashable {
     /// Chip-row display label.
     public var label: String {
         switch self {
-        case .all: return "All"
-        case .ask: return "Ask"
-        case .recommend: return "Recommend"
-        case .event: return "Event"
-        case .lost: return "Lost & Found"
-        case .announce: return "Announce"
+        case .all: "All"
+        case .ask: "Ask"
+        case .recommend: "Recommend"
+        case .event: "Event"
+        case .lost: "Lost & Found"
+        case .announce: "Announce"
         }
     }
 
     /// Right-aligned per-card chip label (shorter than the chip-row label).
     public var cardChipLabel: String {
         switch self {
-        case .all: return ""
-        case .ask: return "Ask"
-        case .recommend: return "Rec"
-        case .event: return "Event"
-        case .lost: return "Lost"
-        case .announce: return "Announce"
+        case .all: ""
+        case .ask: "Ask"
+        case .recommend: "Rec"
+        case .event: "Event"
+        case .lost: "Lost"
+        case .announce: "Announce"
         }
     }
 
@@ -47,12 +47,12 @@ public enum PulseIntent: String, CaseIterable, Sendable, Hashable {
     /// returns `nil` so the backend skips the filter.
     public var postType: String? {
         switch self {
-        case .all: return nil
-        case .ask: return "ask_local"
-        case .recommend: return "recommendation"
-        case .event: return "event"
-        case .lost: return "lost_found"
-        case .announce: return "local_update"
+        case .all: nil
+        case .ask: "ask_local"
+        case .recommend: "recommendation"
+        case .event: "event"
+        case .lost: "lost_found"
+        case .announce: "local_update"
         }
     }
 
@@ -61,12 +61,12 @@ public enum PulseIntent: String, CaseIterable, Sendable, Hashable {
     /// the card still renders a meaningful intent indicator.
     public static func from(postType: String?) -> PulseIntent {
         switch postType ?? "" {
-        case "ask_local", "ask": return .ask
-        case "recommendation", "recommend": return .recommend
-        case "event": return .event
-        case "lost_found": return .lost
-        case "local_update", "announcement", "heads_up", "neighborhood_win": return .announce
-        default: return .announce
+        case "ask_local", "ask": .ask
+        case "recommendation", "recommend": .recommend
+        case "event": .event
+        case "lost_found": .lost
+        case "local_update", "announcement", "heads_up", "neighborhood_win": .announce
+        default: .announce
         }
     }
 }
@@ -75,12 +75,12 @@ public extension PulseIntent {
     /// Pantopus icon used inside the per-card intent chip.
     var icon: PantopusIcon {
         switch self {
-        case .all: return .info
-        case .ask: return .helpCircle
-        case .recommend: return .thumbsUp
-        case .event: return .calendar
-        case .lost: return .search
-        case .announce: return .megaphone
+        case .all: .info
+        case .ask: .helpCircle
+        case .recommend: .thumbsUp
+        case .event: .calendar
+        case .lost: .search
+        case .announce: .megaphone
         }
     }
 }
@@ -118,27 +118,27 @@ public extension PulseIntent {
     func reactionTemplate(helpfulCount: Int, secondaryCount: Int = 0) -> [PulseReaction] {
         switch self {
         case .ask:
-            return [
+            [
                 PulseReaction(kind: .helpful, icon: .lightbulb, label: "helpful", count: helpfulCount, isInteractive: true),
                 PulseReaction(kind: .heart, icon: .heart, label: "", count: secondaryCount, isInteractive: false)
             ]
         case .recommend:
-            return [
+            [
                 PulseReaction(kind: .helpful, icon: .heart, label: "", count: helpfulCount, isInteractive: true),
                 PulseReaction(kind: .heart, icon: .lightbulb, label: "helpful", count: secondaryCount, isInteractive: false)
             ]
         case .event:
-            return [
+            [
                 PulseReaction(kind: .going, icon: .check, label: "going", count: helpfulCount, isInteractive: true),
                 PulseReaction(kind: .heart, icon: .heart, label: "", count: secondaryCount, isInteractive: false)
             ]
         case .lost:
-            return [
+            [
                 PulseReaction(kind: .seen, icon: .eye, label: "seen", count: helpfulCount, isInteractive: true),
                 PulseReaction(kind: .shared, icon: .share, label: "shared", count: secondaryCount, isInteractive: false)
             ]
         case .announce, .all:
-            return [
+            [
                 PulseReaction(kind: .helpful, icon: .lightbulb, label: "helpful", count: helpfulCount, isInteractive: true),
                 PulseReaction(kind: .heart, icon: .heart, label: "", count: secondaryCount, isInteractive: false)
             ]

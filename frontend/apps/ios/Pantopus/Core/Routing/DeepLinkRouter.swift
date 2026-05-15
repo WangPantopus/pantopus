@@ -59,13 +59,12 @@ final class DeepLinkRouter {
     /// `link` on `NotificationDTO`). Routed through the same
     /// resolver as full URL deep links.
     func handle(path: String) {
-        let normalized: String
-        if path.hasPrefix("pantopus://") || path.hasPrefix("http") {
-            normalized = path
+        let normalized: String = if path.hasPrefix("pantopus://") || path.hasPrefix("http") {
+            path
         } else if path.hasPrefix("/") {
-            normalized = "pantopus://" + String(path.dropFirst())
+            "pantopus://" + String(path.dropFirst())
         } else {
-            normalized = "pantopus://" + path
+            "pantopus://" + path
         }
         guard let url = URL(string: normalized) else { return }
         handle(url: url)

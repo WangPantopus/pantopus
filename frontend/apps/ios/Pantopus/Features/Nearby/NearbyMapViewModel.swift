@@ -49,8 +49,8 @@ public final class NearbyMapViewModel {
     ) {
         self.api = api
         self.location = location
-        self.userCoordinate = location.cachedCoordinate()
-        self.activeCategory = initialCategory
+        userCoordinate = location.cachedCoordinate()
+        activeCategory = initialCategory
     }
 
     /// Initial load — resolves the user's coordinate (uses cache if
@@ -225,15 +225,15 @@ public final class NearbyMapViewModel {
     private func sorted(_ source: [MapEntity]) -> [MapEntity] {
         switch activeSort {
         case .newest, .fewestBids:
-            return source.sorted { a, b in a.bidCount < b.bidCount }
+            source.sorted { a, b in a.bidCount < b.bidCount }
         case .closest:
-            return source.sorted { a, b in
+            source.sorted { a, b in
                 let da = a.distanceLabel.flatMap { Double($0.replacingOccurrences(of: "mi", with: "")) } ?? .infinity
                 let db = b.distanceLabel.flatMap { Double($0.replacingOccurrences(of: "mi", with: "")) } ?? .infinity
                 return da < db
             }
         case .highestPay:
-            return source.sorted { a, b in
+            source.sorted { a, b in
                 let pa = Self.priceValue(a.price) ?? -.infinity
                 let pb = Self.priceValue(b.price) ?? -.infinity
                 return pa > pb
@@ -297,8 +297,8 @@ public final class NearbyMapViewModel {
 
     private static func stateForGig(_ gig: GigDTO) -> MapEntityState {
         switch gig.status {
-        case "pending", "draft": return .pending
-        default: return .confirmed
+        case "pending", "draft": .pending
+        default: .confirmed
         }
     }
 
@@ -343,11 +343,10 @@ public final class NearbyMapViewModel {
 
     private static func priceLabel(price: Double?, payType: String?) -> String? {
         guard let price else { return nil }
-        let formatted: String
-        if price.truncatingRemainder(dividingBy: 1) == 0 {
-            formatted = "$\(Int(price))"
+        let formatted = if price.truncatingRemainder(dividingBy: 1) == 0 {
+            "$\(Int(price))"
         } else {
-            formatted = String(format: "$%.2f", price)
+            String(format: "$%.2f", price)
         }
         switch payType {
         case "hourly": return "\(formatted) / hr"

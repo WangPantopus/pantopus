@@ -2,7 +2,7 @@
 //  ListingDetailView.swift
 //  Pantopus
 //
-//  T2.6 listing detail. Wraps `ContentDetailShell`. The primary dock
+//  T2.6 listing detail. Wraps `TransactionalDetailShell`. The primary dock
 //  action opens an offer sheet; the secondary opens a placeholder
 //  message thread to the seller.
 //
@@ -28,7 +28,7 @@ public struct ListingDetailView: View {
     }
 
     public var body: some View {
-        ContentDetailShell(
+        TransactionalDetailShell(
             state: viewModel.state,
             onBack: onBack,
             onPrimaryAction: { offerSheetVisible = true },

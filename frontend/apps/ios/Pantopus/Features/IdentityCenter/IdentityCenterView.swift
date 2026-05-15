@@ -350,11 +350,11 @@ public struct IdentityCenterView: View {
 
     private func tone(_ tone: ContentDetailPill.Tone) -> (bg: Color, fg: Color) {
         switch tone {
-        case .info: return (Theme.Color.primary50, Theme.Color.primary700)
-        case .success: return (Theme.Color.successBg, Theme.Color.success)
-        case .warning: return (Theme.Color.warningBg, Theme.Color.warning)
-        case .business: return (Theme.Color.businessBg, Theme.Color.business)
-        case .neutral: return (Theme.Color.appSurfaceSunken, Theme.Color.appTextStrong)
+        case .info: (Theme.Color.primary50, Theme.Color.primary700)
+        case .success: (Theme.Color.successBg, Theme.Color.success)
+        case .warning: (Theme.Color.warningBg, Theme.Color.warning)
+        case .business: (Theme.Color.businessBg, Theme.Color.business)
+        case .neutral: (Theme.Color.appSurfaceSunken, Theme.Color.appTextStrong)
         }
     }
 }

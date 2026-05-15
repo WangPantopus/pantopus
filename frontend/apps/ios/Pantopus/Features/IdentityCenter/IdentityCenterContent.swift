@@ -80,37 +80,37 @@ public extension IdentityKind {
     /// User-facing label per the firewall doc's terminology table.
     var label: String {
         switch self {
-        case .local: return "Local Profile"
-        case .personal: return "Personal"
-        case .publicProfile: return "Public profile"
-        case .professional: return "Professional"
+        case .local: "Local Profile"
+        case .personal: "Personal"
+        case .publicProfile: "Public profile"
+        case .professional: "Professional"
         }
     }
 
     var icon: PantopusIcon {
         switch self {
-        case .local: return .mapPin
-        case .personal: return .user
-        case .publicProfile: return .star
-        case .professional: return .briefcase
+        case .local: .mapPin
+        case .personal: .user
+        case .publicProfile: .star
+        case .professional: .briefcase
         }
     }
 
     var accent: Color {
         switch self {
-        case .local: return Theme.Color.success
-        case .personal: return Theme.Color.primary600
-        case .publicProfile: return Color(red: 219 / 255, green: 39 / 255, blue: 119 / 255)
-        case .professional: return Theme.Color.business
+        case .local: Theme.Color.success
+        case .personal: Theme.Color.primary600
+        case .publicProfile: Color(red: 219 / 255, green: 39 / 255, blue: 119 / 255)
+        case .professional: Theme.Color.business
         }
     }
 
     var accentBg: Color {
         switch self {
-        case .local: return Theme.Color.successBg
-        case .personal: return Theme.Color.primary50
-        case .publicProfile: return Color(red: 252 / 255, green: 231 / 255, blue: 243 / 255)
-        case .professional: return Theme.Color.businessBg
+        case .local: Theme.Color.successBg
+        case .personal: Theme.Color.primary50
+        case .publicProfile: Color(red: 252 / 255, green: 231 / 255, blue: 243 / 255)
+        case .professional: Theme.Color.businessBg
         }
     }
 

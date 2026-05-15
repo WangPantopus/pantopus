@@ -276,7 +276,7 @@ public final class ChatConversationViewModel {
         guard let target = await resolveRoomIdForReadMark() else { return }
         let endpoint =
             switch mode {
-            case .person(let otherUserId):
+            case let .person(otherUserId):
                 ChatEndpoints.markConversationRead(otherUserId: otherUserId)
             default:
                 ChatEndpoints.markRoomRead(roomId: target)
@@ -294,9 +294,9 @@ public final class ChatConversationViewModel {
 
     private func resolveRoomIdForReadMark() async -> String? {
         switch mode {
-        case let .room(id): return id
-        case let .person(otherUserId): return otherUserId
-        case .ai: return nil
+        case let .room(id): id
+        case let .person(otherUserId): otherUserId
+        case .ai: nil
         }
     }
 
@@ -319,26 +319,26 @@ public final class ChatConversationViewModel {
     private func subscribeToSockets() {
         socketTasks.append(Task { [weak self] in
             guard let self else { return }
-            for await event in self.socket.events(named: "message:new", as: ChatRealtimeMessage.self) {
-                self.handleIncoming(event)
+            for await event in socket.events(named: "message:new", as: ChatRealtimeMessage.self) {
+                handleIncoming(event)
             }
         })
         socketTasks.append(Task { [weak self] in
             guard let self else { return }
-            for await event in self.socket.events(named: "messageUpdated", as: ChatRealtimeMessageUpdate.self) {
-                self.handleUpdate(event)
+            for await event in socket.events(named: "messageUpdated", as: ChatRealtimeMessageUpdate.self) {
+                handleUpdate(event)
             }
         })
         socketTasks.append(Task { [weak self] in
             guard let self else { return }
-            for await event in self.socket.events(named: "messageDeleted", as: ChatRealtimeMessageDelete.self) {
-                self.handleDelete(event)
+            for await event in socket.events(named: "messageDeleted", as: ChatRealtimeMessageDelete.self) {
+                handleDelete(event)
             }
         })
         socketTasks.append(Task { [weak self] in
             guard let self else { return }
-            for await event in self.socket.events(named: "message:react", as: ChatRealtimeReaction.self) {
-                self.handleReaction(event)
+            for await event in socket.events(named: "message:react", as: ChatRealtimeReaction.self) {
+                handleReaction(event)
             }
         })
     }
@@ -448,10 +448,16 @@ public final class ChatConversationViewModel {
         }
         """
         let decoder = JSONDecoder()
-        return (try? decoder.decode(ChatMessageDTO.self, from: Data(json.utf8))) ?? Self.fallback(clientId: clientId, text: text, roomId: roomId, nowISO: nowISO, userId: currentUserId)
+        return (try? decoder.decode(ChatMessageDTO.self, from: Data(json.utf8))) ?? Self.fallback(
+            clientId: clientId,
+            text: text,
+            roomId: roomId,
+            nowISO: nowISO,
+            userId: currentUserId
+        )
     }
 
-    private static func fallback(clientId: String, text: String, roomId: String, nowISO: String, userId: String) -> ChatMessageDTO {
+    private static func fallback(clientId: String, text _: String, roomId: String, nowISO: String, userId: String) -> ChatMessageDTO {
         // Last-resort placeholder when JSON encoding the optimistic
         // payload fails (should be unreachable — payload is constant).
         let json = """

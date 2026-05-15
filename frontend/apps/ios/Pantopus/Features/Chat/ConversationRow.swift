@@ -229,22 +229,22 @@ private struct IdentityDisclosureChip: View {
 
     private var icon: PantopusIcon {
         switch chip {
-        case .business: return .shoppingBag
-        case .home: return .home
+        case .business: .shoppingBag
+        case .home: .home
         }
     }
 
     private var foreground: Color {
         switch chip {
-        case .business: return Theme.Color.business
-        case .home: return Theme.Color.home
+        case .business: Theme.Color.business
+        case .home: Theme.Color.home
         }
     }
 
     private var background: Color {
         switch chip {
-        case .business: return Theme.Color.businessBg
-        case .home: return Theme.Color.homeBg
+        case .business: Theme.Color.businessBg
+        case .home: Theme.Color.homeBg
         }
     }
 }

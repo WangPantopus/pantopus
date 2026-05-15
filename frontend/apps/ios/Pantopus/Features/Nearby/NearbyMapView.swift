@@ -276,7 +276,8 @@ public struct NearbyMapView: View {
     private func nextStop(from current: SheetStop, velocity: CGFloat, screenHeight: CGFloat) -> SheetStop {
         let displacedHeight = screenHeight * current.heightFraction + dragTranslation
         let displacedFraction = displacedHeight / screenHeight
-        let candidates = SheetStop.allCases.sorted { abs($0.heightFraction - displacedFraction) < abs($1.heightFraction - displacedFraction) }
+        let candidates = SheetStop.allCases
+            .sorted { abs($0.heightFraction - displacedFraction) < abs($1.heightFraction - displacedFraction) }
         var closest = candidates.first ?? current
         // Velocity nudge — flick up jumps one step, flick down drops one.
         let velocityThreshold: CGFloat = 600
@@ -340,7 +341,7 @@ public struct NearbyMapView: View {
         case .loading:
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .error(let message):
+        case let .error(message):
             VStack(spacing: 10) {
                 Icon(.alertCircle, size: 28, color: Theme.Color.error)
                 Text(message)

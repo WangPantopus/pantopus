@@ -229,7 +229,9 @@ public final class PrivacyHandshakeViewModel: WizardModel {
     }
 
     public func leadingTapped() {
-        guard let current = ready else { onDismiss(); return }
+        guard let current = ready else { onDismiss()
+            return
+        }
         switch current.step {
         case .tierSelection:
             transition(to: .handleEntry)
@@ -423,4 +425,3 @@ public final class PrivacyHandshakeViewModel: WizardModel {
         )
     }
 }
-

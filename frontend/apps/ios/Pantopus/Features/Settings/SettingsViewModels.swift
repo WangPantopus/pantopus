@@ -262,10 +262,10 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
 
     private func preferenceMap(channel: String) -> [String: Bool] {
         switch channel {
-        case "push": return settings?.pushPreferences ?? defaults(channel: "push")
-        case "email": return settings?.emailPreferences ?? defaults(channel: "email")
-        case "sms": return settings?.smsPreferences ?? defaults(channel: "sms")
-        default: return [:]
+        case "push": settings?.pushPreferences ?? defaults(channel: "push")
+        case "email": settings?.emailPreferences ?? defaults(channel: "email")
+        case "sms": settings?.smsPreferences ?? defaults(channel: "sms")
+        default: [:]
         }
     }
 
@@ -302,11 +302,10 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
                 control: .toggle(isOn: preferenceValue(channel: "sms", category: category))
             )
         }
-        let emailHelper: String
-        if let email = emailAddress, !email.isEmpty {
-            emailHelper = "Sent to \(email). Digest at 7:30 a.m. local."
+        let emailHelper = if let email = emailAddress, !email.isEmpty {
+            "Sent to \(email). Digest at 7:30 a.m. local."
         } else {
-            emailHelper = "Sent to your account email. Digest at 7:30 a.m. local."
+            "Sent to your account email. Digest at 7:30 a.m. local."
         }
         state = .loaded([
             GroupedListGroup(

@@ -308,7 +308,7 @@ final class UITestStubProtocol: URLProtocol {
     """
 
     /// Single-row `GigsListResponse` for the Gigs feed + the matching
-    /// detail row for the T2.6 ContentDetailShell capture.
+    /// detail row for the T2.6 TransactionalDetailShell capture.
     static let defaultGigsListJSON = """
     {"gigs":[{
       "id":"g_demo",

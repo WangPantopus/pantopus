@@ -31,22 +31,21 @@ public final class ChatListViewModel {
     private let logger = Logger(label: "app.pantopus.ios.ChatList")
     private var allRows: [ConversationRowContent] = []
     /// Always-pinned synthetic AI assistant row.
-    private let aiRow: ConversationRowContent = {
-        ConversationRowContent(
-            id: "ai_assistant",
-            variant: .aiAssistant,
-            displayName: "Ask Pantopus",
-            initials: "AP",
-            avatarURL: nil,
-            identityChip: nil,
-            verified: false,
-            preview: "Summaries, drafts, neighborhood help.",
-            timeLabel: "now",
-            unread: 0,
-            pinned: true,
-            topicKinds: []
-        )
-    }()
+    private let aiRow: ConversationRowContent = .init(
+        id: "ai_assistant",
+        variant: .aiAssistant,
+        displayName: "Ask Pantopus",
+        initials: "AP",
+        avatarURL: nil,
+        identityChip: nil,
+        verified: false,
+        preview: "Summaries, drafts, neighborhood help.",
+        timeLabel: "now",
+        unread: 0,
+        pinned: true,
+        topicKinds: []
+    )
+
     private var badgeTask: Task<Void, Never>?
     private var messageTask: Task<Void, Never>?
 
@@ -155,18 +154,18 @@ public final class ChatListViewModel {
         if badgeTask == nil {
             badgeTask = Task { [weak self] in
                 guard let self else { return }
-                let stream = self.socket.events(named: "badge:update", as: ChatBadgeUpdate.self)
+                let stream = socket.events(named: "badge:update", as: ChatBadgeUpdate.self)
                 for await update in stream {
-                    self.unreadByFilter[.unread] = update.totalUnread
+                    unreadByFilter[.unread] = update.totalUnread
                 }
             }
         }
         if messageTask == nil {
             messageTask = Task { [weak self] in
                 guard let self else { return }
-                let stream = self.socket.events(named: "message:new", as: ChatMessageEvent.self)
+                let stream = socket.events(named: "message:new", as: ChatMessageEvent.self)
                 for await event in stream {
-                    self.handleMessage(event)
+                    handleMessage(event)
                 }
             }
         }
@@ -232,32 +231,32 @@ public final class ChatListViewModel {
     private static func variant(for dto: UnifiedConversation) -> ConversationRowVariant {
         switch dto.kind {
         case .conversation:
-            return .dm
+            .dm
         case .room:
-            return .group(extraAvatars: [], extraCount: 0)
+            .group(extraAvatars: [], extraCount: 0)
         }
     }
 
     private static func identityChip(for dto: UnifiedConversation) -> ConversationIdentityChip? {
         switch (dto.kind, dto.identityKind, dto.roomType) {
-        case (.conversation, "business"?, _): return .business
-        case (.conversation, "home"?, _): return .home
-        case (.room, _, "home"?): return .home
-        default: return nil
+        case (.conversation, "business"?, _): .business
+        case (.conversation, "home"?, _): .home
+        case (.room, _, "home"?): .home
+        default: nil
         }
     }
 
     private static func defaultName(for dto: UnifiedConversation) -> String {
         switch dto.kind {
-        case .room: return dto.name ?? "Group"
-        case .conversation: return dto.name ?? "Pantopus user"
+        case .room: dto.name ?? "Group"
+        case .conversation: dto.name ?? "Pantopus user"
         }
     }
 
     private static func defaultPreview(for dto: UnifiedConversation) -> String {
         switch dto.kind {
-        case .conversation: return "Start the conversation"
-        case .room: return "No messages yet"
+        case .conversation: "Start the conversation"
+        case .room: "No messages yet"
         }
     }
 

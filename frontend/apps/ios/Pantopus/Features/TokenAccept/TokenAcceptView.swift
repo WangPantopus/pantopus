@@ -280,7 +280,7 @@ public struct TokenAcceptView: View {
         .accessibilityIdentifier("tokenAcceptLoading")
     }
 
-    private func acceptedFrame(offer: TokenAcceptOffer, message: String) -> some View {
+    private func acceptedFrame(offer _: TokenAcceptOffer, message: String) -> some View {
         VStack(spacing: 14) {
             Spacer()
             Icon(.check, size: 36, color: Theme.Color.success)

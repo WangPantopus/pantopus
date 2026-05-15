@@ -18,9 +18,9 @@ public enum ChatCounterparty: Sendable, Hashable {
 
     public var displayName: String {
         switch self {
-        case let .person(name, _, _, _, _): return name
-        case let .group(name, _): return name
-        case let .ai(name): return name
+        case let .person(name, _, _, _, _): name
+        case let .group(name, _): name
+        case let .ai(name): name
         }
     }
 }
@@ -94,8 +94,8 @@ public enum ChatTimelineRow: Identifiable, Sendable, Hashable {
 
     public var id: String {
         switch self {
-        case let .dayDivider(divider): return "divider_\(divider.id)"
-        case let .bubble(bubble): return "bubble_\(bubble.id)"
+        case let .dayDivider(divider): "divider_\(divider.id)"
+        case let .bubble(bubble): "bubble_\(bubble.id)"
         }
     }
 }

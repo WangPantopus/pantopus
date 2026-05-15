@@ -14,10 +14,10 @@ public enum ChatFilter: String, CaseIterable, Sendable, Hashable {
 
     public var label: String {
         switch self {
-        case .all: return "All"
-        case .unread: return "Unread"
-        case .gigs: return "Gigs"
-        case .market: return "Market"
+        case .all: "All"
+        case .unread: "Unread"
+        case .gigs: "Gigs"
+        case .market: "Market"
         }
     }
 }
@@ -35,8 +35,8 @@ public enum ConversationIdentityChip: String, Sendable, Hashable {
 
     public var label: String {
         switch self {
-        case .business: return "Business"
-        case .home: return "Home"
+        case .business: "Business"
+        case .home: "Home"
         }
     }
 }

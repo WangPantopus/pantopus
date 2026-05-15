@@ -269,14 +269,12 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
 
     @ViewBuilder
     private func chipView(label: String, tone: RowControl.ChipTone) -> some View {
-        let (bg, fg): (Color, Color) = {
-            switch tone {
-            case .success: return (Theme.Color.successBg, Theme.Color.success)
-            case .info: return (Theme.Color.primary50, Theme.Color.primary700)
-            case .neutral: return (Theme.Color.appSurfaceSunken, Theme.Color.appTextStrong)
-            case .warning: return (Theme.Color.warningBg, Theme.Color.warning)
-            }
-        }()
+        let (bg, fg): (Color, Color) = switch tone {
+        case .success: (Theme.Color.successBg, Theme.Color.success)
+        case .info: (Theme.Color.primary50, Theme.Color.primary700)
+        case .neutral: (Theme.Color.appSurfaceSunken, Theme.Color.appTextStrong)
+        case .warning: (Theme.Color.warningBg, Theme.Color.warning)
+        }
         Text(label.uppercased())
             .font(.system(size: 10.5, weight: .bold))
             .foregroundStyle(fg)
@@ -423,8 +421,8 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
 
     private func accessibilityTraits(control: RowControl) -> AccessibilityTraits {
         switch control {
-        case .toggle, .radio: return .isButton
-        case .chevron, .chipStatus, .slider: return .isButton
+        case .toggle, .radio: .isButton
+        case .chevron, .chipStatus, .slider: .isButton
         }
     }
 }

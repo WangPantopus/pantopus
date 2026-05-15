@@ -100,8 +100,10 @@ final class StatusWaitingContentTests: XCTestCase {
             .checkYourEmail(email: nil)
         ]
         for frame in frames {
-            XCTAssertFalse(frame.explainerBullets.isEmpty,
-                          "Frame \(frame.illustration) needs explainer bullets")
+            XCTAssertFalse(
+                frame.explainerBullets.isEmpty,
+                "Frame \(frame.illustration) needs explainer bullets"
+            )
         }
     }
 

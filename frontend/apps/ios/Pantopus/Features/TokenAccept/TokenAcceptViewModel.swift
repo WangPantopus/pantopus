@@ -217,7 +217,7 @@ public final class TokenAcceptViewModel {
     }
 
     private func tryDecode<T: Decodable>(
-        _ type: T.Type,
+        _: T.Type,
         endpoint: Endpoint
     ) async -> T? {
         try? await api.request(endpoint) as T

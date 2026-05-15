@@ -52,8 +52,7 @@ final class StoreScreenshots: XCTestCase {
             menuButton.tap()
             if app.descendants(matching: .any)
                 .matching(identifier: "groupedList").firstMatch
-                .waitForExistence(timeout: 5)
-            {
+                .waitForExistence(timeout: 5) {
                 snapshot("13_Settings")
                 // Settings → Profiles & Privacy row → Identity Center
                 // (T3.2). The "visibility" row in the Privacy group
@@ -64,8 +63,7 @@ final class StoreScreenshots: XCTestCase {
                     visibilityRow.tap()
                     if app.descendants(matching: .any)
                         .matching(identifier: "identityCenterContent").firstMatch
-                        .waitForExistence(timeout: 5)
-                    {
+                        .waitForExistence(timeout: 5) {
                         snapshot("14_IdentityCenter")
                         // Identity Center → Public profile card (T3.3
                         // Public Profile management dashboard).
@@ -75,8 +73,7 @@ final class StoreScreenshots: XCTestCase {
                             publicCard.tap()
                             if app.descendants(matching: .any)
                                 .matching(identifier: "audienceProfileContent").firstMatch
-                                .waitForExistence(timeout: 5)
-                            {
+                                .waitForExistence(timeout: 5) {
                                 snapshot("15_PublicProfile")
                             }
                             app.buttons["audienceProfileBackButton"].firstMatch.tap()
@@ -147,8 +144,7 @@ final class StoreScreenshots: XCTestCase {
         app.buttons["tab.nearby"].firstMatch.tap()
         if app.descendants(matching: .any)
             .matching(identifier: "nearbyMap").firstMatch
-            .waitForExistence(timeout: 5)
-        {
+            .waitForExistence(timeout: 5) {
             snapshot("10_NearbyMap")
         }
         app.buttons["tab.hub"].firstMatch.tap()
@@ -163,15 +159,14 @@ final class StoreScreenshots: XCTestCase {
                 .waitForExistence(timeout: 5)
             snapshot("09_GigsFeed")
 
-            // Drill into the first gig row → T2.6 ContentDetailShell.
+            // Drill into the first gig row → T2.6 TransactionalDetailShell.
             let firstGigRow = app.descendants(matching: .any)
                 .matching(identifier: "gigsRow_g_demo").firstMatch
             if firstGigRow.waitForExistence(timeout: 3) {
                 firstGigRow.tap()
                 if app.descendants(matching: .any)
                     .matching(identifier: "contentDetailShell").firstMatch
-                    .waitForExistence(timeout: 5)
-                {
+                    .waitForExistence(timeout: 5) {
                     snapshot("12_GigDetail")
                 }
                 app.buttons["contentDetailBackButton"].firstMatch.tap()
@@ -183,8 +178,7 @@ final class StoreScreenshots: XCTestCase {
         app.buttons["tab.inbox"].firstMatch.tap()
         if app.descendants(matching: .any)
             .matching(identifier: "chatList").firstMatch
-            .waitForExistence(timeout: 5)
-        {
+            .waitForExistence(timeout: 5) {
             snapshot("03_ChatList")
         }
         app.buttons["tab.hub"].firstMatch.tap()
@@ -217,8 +211,7 @@ final class StoreScreenshots: XCTestCase {
             ceremonialRow.tap()
             if app.descendants(matching: .any)
                 .matching(identifier: "ceremonialMail").firstMatch
-                .waitForExistence(timeout: 5)
-            {
+                .waitForExistence(timeout: 5) {
                 snapshot("19_CeremonialMail")
             }
             app.buttons["wizardLeadingButton"].firstMatch.tap()
@@ -240,8 +233,7 @@ final class StoreScreenshots: XCTestCase {
             }
             if app.descendants(matching: .any)
                 .matching(identifier: "ceremonialMailOpen").firstMatch
-                .waitForExistence(timeout: 5)
-            {
+                .waitForExistence(timeout: 5) {
                 snapshot("20_CeremonialMailOpen")
             }
             app.buttons["ceremonialMailOpenBackButton"].firstMatch.tap()
@@ -255,8 +247,7 @@ final class StoreScreenshots: XCTestCase {
             statusRow.tap()
             if app.descendants(matching: .any)
                 .matching(identifier: "statusWaiting").firstMatch
-                .waitForExistence(timeout: 5)
-            {
+                .waitForExistence(timeout: 5) {
                 snapshot("18_StatusWaiting")
             }
             app.buttons["statusPrimaryCta"].firstMatch.tap()
@@ -280,8 +271,7 @@ final class StoreScreenshots: XCTestCase {
             }
             if app.descendants(matching: .any)
                 .matching(identifier: "privacyHandshakePersona").firstMatch
-                .waitForExistence(timeout: 5)
-            {
+                .waitForExistence(timeout: 5) {
                 snapshot("16_PrivacyHandshake")
             }
             app.buttons["wizardLeadingButton"].firstMatch.tap()
@@ -304,8 +294,7 @@ final class StoreScreenshots: XCTestCase {
             }
             if app.descendants(matching: .any)
                 .matching(identifier: "tokenAcceptOffer").firstMatch
-                .waitForExistence(timeout: 5)
-            {
+                .waitForExistence(timeout: 5) {
                 snapshot("17_TokenAccept")
             }
             app.buttons["tokenAcceptDecline"].firstMatch.tap()
@@ -319,8 +308,7 @@ final class StoreScreenshots: XCTestCase {
             hubBell.tap()
             if app.descendants(matching: .any)
                 .matching(identifier: "notifications").firstMatch
-                .waitForExistence(timeout: 5)
-            {
+                .waitForExistence(timeout: 5) {
                 snapshot("21_Notifications")
             }
             app.buttons["notificationsBackButton"].firstMatch.tap()

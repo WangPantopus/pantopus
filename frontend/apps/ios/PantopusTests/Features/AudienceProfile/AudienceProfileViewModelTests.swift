@@ -249,7 +249,9 @@ final class AudienceProfileViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = loadedSequence()
         let vm = AudienceProfileViewModel(api: makeAPI())
         await vm.load()
-        guard case let .loaded(loaded) = vm.state else { XCTFail("Expected .loaded"); return }
+        guard case let .loaded(loaded) = vm.state else { XCTFail("Expected .loaded")
+            return
+        }
         let followersCard = loaded.updates.first { $0.id == "u1" }
         XCTAssertEqual(followersCard?.visibilityLabel, "Followers")
         let tierCard = loaded.updates.first { $0.id == "u2" }
@@ -260,7 +262,9 @@ final class AudienceProfileViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = loadedSequence()
         let vm = AudienceProfileViewModel(api: makeAPI())
         await vm.load()
-        guard case let .loaded(loaded) = vm.state else { XCTFail("Expected .loaded"); return }
+        guard case let .loaded(loaded) = vm.state else { XCTFail("Expected .loaded")
+            return
+        }
         let chip = loaded.tierChips.first { $0.id == "tier_1" }
         XCTAssertEqual(chip?.count, 8)
     }

@@ -90,17 +90,17 @@ public struct FanDTO: Decodable, Sendable, Hashable, Identifiable {
         // key to our `id` so the serializer evolution stays compatible.
         let mid = try container.decodeIfPresent(String.self, forKey: .membershipId)
         let raw = try container.decodeIfPresent(String.self, forKey: .id)
-        self.id = mid ?? raw ?? ""
-        self.membershipId = mid
-        self.fanHandle = try container.decodeIfPresent(String.self, forKey: .fanHandle)
-        self.fanDisplayName = try container.decodeIfPresent(String.self, forKey: .fanDisplayName)
-        self.fanAvatarUrl = try container.decodeIfPresent(String.self, forKey: .fanAvatarUrl)
-        self.status = try container.decodeIfPresent(String.self, forKey: .status)
-        self.tier = try container.decodeIfPresent(FanTierBadgeDTO.self, forKey: .tier)
-        self.verifiedLocal = try container.decodeIfPresent(Bool.self, forKey: .verifiedLocal)
-        self.joinedMonth = try container.decodeIfPresent(String.self, forKey: .joinedMonth)
-        self.tenureMonths = try container.decodeIfPresent(Int.self, forKey: .tenureMonths)
-        self.cancelAtPeriodEnd = try container.decodeIfPresent(Bool.self, forKey: .cancelAtPeriodEnd)
+        id = mid ?? raw ?? ""
+        membershipId = mid
+        fanHandle = try container.decodeIfPresent(String.self, forKey: .fanHandle)
+        fanDisplayName = try container.decodeIfPresent(String.self, forKey: .fanDisplayName)
+        fanAvatarUrl = try container.decodeIfPresent(String.self, forKey: .fanAvatarUrl)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
+        tier = try container.decodeIfPresent(FanTierBadgeDTO.self, forKey: .tier)
+        verifiedLocal = try container.decodeIfPresent(Bool.self, forKey: .verifiedLocal)
+        joinedMonth = try container.decodeIfPresent(String.self, forKey: .joinedMonth)
+        tenureMonths = try container.decodeIfPresent(Int.self, forKey: .tenureMonths)
+        cancelAtPeriodEnd = try container.decodeIfPresent(Bool.self, forKey: .cancelAtPeriodEnd)
     }
 
     enum CodingKeys: String, CodingKey {

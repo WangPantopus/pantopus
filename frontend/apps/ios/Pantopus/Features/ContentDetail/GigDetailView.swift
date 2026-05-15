@@ -2,7 +2,7 @@
 //  GigDetailView.swift
 //  Pantopus
 //
-//  T2.6 gig detail. Wraps `ContentDetailShell`. The primary dock
+//  T2.6 gig detail. Wraps `TransactionalDetailShell`. The primary dock
 //  action opens a place-bid sheet; the secondary opens a placeholder
 //  message thread.
 //
@@ -28,7 +28,7 @@ public struct GigDetailView: View {
     }
 
     public var body: some View {
-        ContentDetailShell(
+        TransactionalDetailShell(
             state: viewModel.state,
             onBack: onBack,
             onPrimaryAction: { bidSheetVisible = true },

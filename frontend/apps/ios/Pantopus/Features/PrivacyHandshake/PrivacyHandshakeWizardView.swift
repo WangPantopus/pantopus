@@ -295,7 +295,7 @@ public struct PrivacyHandshakeWizardView: View {
 
     // MARK: - Terminal states
 
-    private func opensCheckoutBody(_ content: HandshakeReadyContent) -> some View {
+    private func opensCheckoutBody(_: HandshakeReadyContent) -> some View {
         VStack(spacing: 16) {
             ProgressView().tint(Theme.Color.primary600).scaleEffect(1.4)
             Text("Opening Stripe Checkout…")

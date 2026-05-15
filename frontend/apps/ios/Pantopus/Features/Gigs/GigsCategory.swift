@@ -26,15 +26,15 @@ public enum GigsCategory: String, CaseIterable, Sendable, Hashable {
     /// Display label for the chip and the row pill.
     public var label: String {
         switch self {
-        case .all: return "All"
-        case .handyman: return "Handyman"
-        case .cleaning: return "Cleaning"
-        case .moving: return "Moving"
-        case .petcare: return "Pet care"
-        case .childcare: return "Child care"
-        case .tutoring: return "Tutoring"
-        case .tech: return "Tech"
-        case .delivery: return "Delivery"
+        case .all: "All"
+        case .handyman: "Handyman"
+        case .cleaning: "Cleaning"
+        case .moving: "Moving"
+        case .petcare: "Pet care"
+        case .childcare: "Child care"
+        case .tutoring: "Tutoring"
+        case .tech: "Tech"
+        case .delivery: "Delivery"
         }
     }
 
@@ -42,15 +42,15 @@ public enum GigsCategory: String, CaseIterable, Sendable, Hashable {
     /// Sourced from `gigs-frames.jsx` CATS.
     public var color: Color {
         switch self {
-        case .all: return Theme.Color.primary600
-        case .handyman: return Color(red: 234 / 255, green: 88 / 255, blue: 12 / 255)
-        case .cleaning: return Color(red: 14 / 255, green: 165 / 255, blue: 233 / 255)
-        case .moving: return Color(red: 124 / 255, green: 58 / 255, blue: 237 / 255)
-        case .petcare: return Color(red: 22 / 255, green: 163 / 255, blue: 74 / 255)
-        case .childcare: return Color(red: 219 / 255, green: 39 / 255, blue: 119 / 255)
-        case .tutoring: return Color(red: 202 / 255, green: 138 / 255, blue: 4 / 255)
-        case .tech: return Color(red: 71 / 255, green: 85 / 255, blue: 105 / 255)
-        case .delivery: return Color(red: 8 / 255, green: 145 / 255, blue: 178 / 255)
+        case .all: Theme.Color.primary600
+        case .handyman: Color(red: 234 / 255, green: 88 / 255, blue: 12 / 255)
+        case .cleaning: Color(red: 14 / 255, green: 165 / 255, blue: 233 / 255)
+        case .moving: Color(red: 124 / 255, green: 58 / 255, blue: 237 / 255)
+        case .petcare: Color(red: 22 / 255, green: 163 / 255, blue: 74 / 255)
+        case .childcare: Color(red: 219 / 255, green: 39 / 255, blue: 119 / 255)
+        case .tutoring: Color(red: 202 / 255, green: 138 / 255, blue: 4 / 255)
+        case .tech: Color(red: 71 / 255, green: 85 / 255, blue: 105 / 255)
+        case .delivery: Color(red: 8 / 255, green: 145 / 255, blue: 178 / 255)
         }
     }
 
@@ -87,10 +87,10 @@ public enum GigsSort: String, CaseIterable, Sendable, Hashable, Identifiable {
 
     public var label: String {
         switch self {
-        case .newest: return "Newest"
-        case .closest: return "Closest"
-        case .highestPay: return "Highest pay"
-        case .fewestBids: return "Fewest bids"
+        case .newest: "Newest"
+        case .closest: "Closest"
+        case .highestPay: "Highest pay"
+        case .fewestBids: "Fewest bids"
         }
     }
 }

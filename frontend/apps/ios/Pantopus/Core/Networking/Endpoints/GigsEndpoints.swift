@@ -47,7 +47,7 @@ public enum GigsEndpoints {
     public static func nearby(
         latitude: Double,
         longitude: Double,
-        radiusMeters: Int = 5_000,
+        radiusMeters: Int = 5000,
         status: String = "open",
         limit: Int = 20
     ) -> Endpoint {

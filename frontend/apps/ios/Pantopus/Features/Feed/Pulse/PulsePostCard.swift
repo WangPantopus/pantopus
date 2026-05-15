@@ -275,23 +275,23 @@ public struct PulseIntentChip: View {
 
     private var foreground: Color {
         switch intent {
-        case .all: return Theme.Color.appTextSecondary
-        case .ask: return Theme.Color.warning
-        case .recommend: return Theme.Color.success
-        case .event: return Theme.Color.business
-        case .lost: return Theme.Color.error
-        case .announce: return Theme.Color.appTextStrong
+        case .all: Theme.Color.appTextSecondary
+        case .ask: Theme.Color.warning
+        case .recommend: Theme.Color.success
+        case .event: Theme.Color.business
+        case .lost: Theme.Color.error
+        case .announce: Theme.Color.appTextStrong
         }
     }
 
     private var background: Color {
         switch intent {
-        case .all: return Theme.Color.appSurfaceSunken
-        case .ask: return Theme.Color.warningBg
-        case .recommend: return Theme.Color.successBg
-        case .event: return Theme.Color.businessBg
-        case .lost: return Theme.Color.errorBg
-        case .announce: return Theme.Color.appSurfaceSunken
+        case .all: Theme.Color.appSurfaceSunken
+        case .ask: Theme.Color.warningBg
+        case .recommend: Theme.Color.successBg
+        case .event: Theme.Color.businessBg
+        case .lost: Theme.Color.errorBg
+        case .announce: Theme.Color.appSurfaceSunken
         }
     }
 }

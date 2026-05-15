@@ -116,11 +116,10 @@ public final class MarketplaceViewModel {
     private static func priceLabel(price: Double?, isFree: Bool, layer: String?, listingType: String?) -> String {
         if isFree { return "Free" }
         guard let price else { return "—" }
-        let base: String
-        if price.truncatingRemainder(dividingBy: 1) == 0 {
-            base = "$\(Int(price))"
+        let base = if price.truncatingRemainder(dividingBy: 1) == 0 {
+            "$\(Int(price))"
         } else {
-            base = String(format: "$%.2f", price)
+            String(format: "$%.2f", price)
         }
         if layer == "rentals" || listingType == "rent_sublet" || listingType == "vehicle_rent" {
             return "\(base) / wk"
@@ -145,8 +144,8 @@ public final class MarketplaceViewModel {
         let interval = Date().timeIntervalSince(date)
         if interval < 60 { return "now" }
         if interval < 3600 { return "\(Int(interval / 60))m" }
-        if interval < 86_400 { return "\(Int(interval / 3600))h" }
-        if interval < 604_800 { return "\(Int(interval / 86_400))d" }
+        if interval < 86400 { return "\(Int(interval / 3600))h" }
+        if interval < 604_800 { return "\(Int(interval / 86400))d" }
         return "\(Int(interval / 604_800))w"
     }
 
@@ -166,7 +165,7 @@ public final class MarketplaceViewModel {
     private static func placeholderIcon(category: String?, layer: String?) -> PantopusIcon {
         if layer == "vehicles" { return .send } // closest stand-in for "car"
         if layer == "rentals" { return .calendar }
-        switch (category ?? "") {
+        switch category ?? "" {
         case "furniture": return .home
         case "electronics": return .lightbulb
         case "clothing": return .shoppingBag

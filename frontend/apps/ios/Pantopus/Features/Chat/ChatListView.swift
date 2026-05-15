@@ -164,7 +164,7 @@ public struct ChatListView: View {
 }
 
 private extension ChatListState {
-    var isLoading: Bool { if case .loading = self { return true } else { return false } }
+    var isLoading: Bool { if case .loading = self { true } else { false } }
 }
 
 // MARK: - Top bar

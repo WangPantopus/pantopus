@@ -57,15 +57,14 @@ public final class ListingDetailViewModel {
 
     static func project(_ listing: ListingDTO) -> ContentDetailContent {
         let isFree = listing.isFree ?? false
-        let priceLine: String
-        if isFree {
-            priceLine = "Free"
+        let priceLine: String = if isFree {
+            "Free"
         } else if let price = listing.price {
-            priceLine = price.truncatingRemainder(dividingBy: 1) == 0
+            price.truncatingRemainder(dividingBy: 1) == 0
                 ? "$\(Int(price))"
                 : String(format: "$%.2f", price)
         } else {
-            priceLine = "—"
+            "—"
         }
         let imageUrl = (listing.firstImage ?? listing.mediaUrls?.first).flatMap(URL.init(string:))
         let cover = ContentDetailCover(

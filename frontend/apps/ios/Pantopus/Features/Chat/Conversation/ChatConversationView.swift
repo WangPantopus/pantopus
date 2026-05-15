@@ -63,9 +63,9 @@ public struct ChatConversationView: View {
 
     private var composerPlaceholder: String {
         switch viewModel.counterparty {
-        case let .person(name, _, _, _, _): return "Message \(firstWord(name))…"
-        case let .group(name, _): return "Message \(firstWord(name))…"
-        case .ai: return "Ask anything…"
+        case let .person(name, _, _, _, _): "Message \(firstWord(name))…"
+        case let .group(name, _): "Message \(firstWord(name))…"
+        case .ai: "Ask anything…"
         }
     }
 
@@ -546,7 +546,7 @@ private struct ChatBubbleRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func bubbleContainer<Inner: View>(@ViewBuilder _ inner: () -> Inner) -> some View {
+    private func bubbleContainer(@ViewBuilder _ inner: () -> some View) -> some View {
         let isOut = content.side == .outgoing
         return inner()
             .padding(.horizontal, 13)
@@ -669,11 +669,11 @@ private struct ChatBubbleRow: View {
 
     private func stampString(_ raw: String) -> String {
         switch content.deliveryState {
-        case .read: return "\(raw) · Read"
-        case .delivered: return "\(raw) · Delivered"
-        case .sending: return "Sending…"
-        case .failed: return "Couldn't send"
-        case .none: return raw
+        case .read: "\(raw) · Read"
+        case .delivered: "\(raw) · Delivered"
+        case .sending: "Sending…"
+        case .failed: "Couldn't send"
+        case .none: raw
         }
     }
 
@@ -696,19 +696,19 @@ private struct ChatBubbleRow: View {
 
     private func accentForeground(_ accent: ChatBubbleContent.SystemLinkAccent) -> Color {
         switch accent {
-        case .primary: return Theme.Color.primary600
-        case .success: return Theme.Color.success
-        case .warning: return Theme.Color.warning
-        case .error: return Theme.Color.error
+        case .primary: Theme.Color.primary600
+        case .success: Theme.Color.success
+        case .warning: Theme.Color.warning
+        case .error: Theme.Color.error
         }
     }
 
     private func accentBackground(_ accent: ChatBubbleContent.SystemLinkAccent) -> Color {
         switch accent {
-        case .primary: return Theme.Color.primary50
-        case .success: return Theme.Color.successBg
-        case .warning: return Theme.Color.warningBg
-        case .error: return Theme.Color.errorBg
+        case .primary: Theme.Color.primary50
+        case .success: Theme.Color.successBg
+        case .warning: Theme.Color.warningBg
+        case .error: Theme.Color.errorBg
         }
     }
 }

@@ -189,13 +189,13 @@ final class ContentDetailProjectionTests: XCTestCase {
         XCTAssertEqual(content.hero.title, "Bathroom retile")
         XCTAssertTrue(content.hero.monoId?.contains("INV-00247") == true)
         XCTAssertTrue(content.modules.contains {
-            if case .fromTo = $0 { return true } else { return false }
+            if case .fromTo = $0 { true } else { false }
         })
         XCTAssertTrue(content.modules.contains {
-            if case .lineItems = $0 { return true } else { return false }
+            if case .lineItems = $0 { true } else { false }
         })
         XCTAssertTrue(content.modules.contains {
-            if case .summary = $0 { return true } else { return false }
+            if case .summary = $0 { true } else { false }
         })
         XCTAssertNil(content.dock.secondary, "invoice dock is full-width — no secondary button")
         XCTAssertTrue(content.dock.primary.label.contains("Pay"))

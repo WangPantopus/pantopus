@@ -92,118 +92,118 @@ public struct YouTabRoot: View {
             }
             .overlay(alignment: .topLeading) { debugTapTarget }
             #if DEBUG
-            .alert("Open profile", isPresented: $debugProfileSheet) {
-                TextField("User ID", text: $debugProfileId)
-                Button("Open") {
-                    let id = debugProfileId.trimmingCharacters(in: .whitespaces)
-                    if !id.isEmpty {
-                        path.append(.publicProfile(userId: id))
-                        debugProfileId = ""
+                .alert("Open profile", isPresented: $debugProfileSheet) {
+                    TextField("User ID", text: $debugProfileId)
+                    Button("Open") {
+                        let id = debugProfileId.trimmingCharacters(in: .whitespaces)
+                        if !id.isEmpty {
+                            path.append(.publicProfile(userId: id))
+                            debugProfileId = ""
+                        }
                     }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Paste a Pantopus user UUID")
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Paste a Pantopus user UUID")
-            }
-            .alert("Open post", isPresented: $debugPostSheet) {
-                TextField("Post ID", text: $debugPostId)
-                Button("Open") {
-                    let id = debugPostId.trimmingCharacters(in: .whitespaces)
-                    if !id.isEmpty {
-                        path.append(.pulsePost(postId: id))
-                        debugPostId = ""
+                .alert("Open post", isPresented: $debugPostSheet) {
+                    TextField("Post ID", text: $debugPostId)
+                    Button("Open") {
+                        let id = debugPostId.trimmingCharacters(in: .whitespaces)
+                        if !id.isEmpty {
+                            path.append(.pulsePost(postId: id))
+                            debugPostId = ""
+                        }
                     }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Paste a Pulse post UUID")
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Paste a Pulse post UUID")
-            }
-            .alert("Invite owner", isPresented: $debugInviteHomeSheet) {
-                TextField("Home ID", text: $debugInviteHomeId)
-                Button("Open") {
-                    let id = debugInviteHomeId.trimmingCharacters(in: .whitespaces)
-                    if !id.isEmpty {
-                        debugInviteFormHomeId = id
-                        debugInviteHomeId = ""
+                .alert("Invite owner", isPresented: $debugInviteHomeSheet) {
+                    TextField("Home ID", text: $debugInviteHomeId)
+                    Button("Open") {
+                        let id = debugInviteHomeId.trimmingCharacters(in: .whitespaces)
+                        if !id.isEmpty {
+                            debugInviteFormHomeId = id
+                            debugInviteHomeId = ""
+                        }
                     }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Paste a home UUID")
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Paste a home UUID")
-            }
-            .alert("Disambiguate mail", isPresented: $debugDisambiguateSheet) {
-                TextField("Mail ID", text: $debugDisambiguateMailId)
-                Button("Open") {
-                    let id = debugDisambiguateMailId.trimmingCharacters(in: .whitespaces)
-                    if !id.isEmpty {
-                        debugDisambiguateFormMailId = id
-                        debugDisambiguateMailId = ""
+                .alert("Disambiguate mail", isPresented: $debugDisambiguateSheet) {
+                    TextField("Mail ID", text: $debugDisambiguateMailId)
+                    Button("Open") {
+                        let id = debugDisambiguateMailId.trimmingCharacters(in: .whitespaces)
+                        if !id.isEmpty {
+                            debugDisambiguateFormMailId = id
+                            debugDisambiguateMailId = ""
+                        }
                     }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Paste a Mail UUID to route")
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Paste a Mail UUID to route")
-            }
-            .alert("Open Privacy Handshake", isPresented: $debugHandshakeSheet) {
-                TextField("Persona handle", text: $debugHandshakeHandle)
-                Button("Open") {
-                    let handle = debugHandshakeHandle.trimmingCharacters(in: .whitespaces)
-                    if !handle.isEmpty {
-                        path.append(.privacyHandshake(personaHandle: handle))
-                        debugHandshakeHandle = ""
+                .alert("Open Privacy Handshake", isPresented: $debugHandshakeSheet) {
+                    TextField("Persona handle", text: $debugHandshakeHandle)
+                    Button("Open") {
+                        let handle = debugHandshakeHandle.trimmingCharacters(in: .whitespaces)
+                        if !handle.isEmpty {
+                            path.append(.privacyHandshake(personaHandle: handle))
+                            debugHandshakeHandle = ""
+                        }
                     }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Type a persona handle to open the handshake")
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Type a persona handle to open the handshake")
-            }
-            .alert("Open Ceremonial Mail", isPresented: $debugCeremonialMailOpenSheet) {
-                TextField("Mail ID", text: $debugCeremonialMailOpenId)
-                Button("Open") {
-                    let id = debugCeremonialMailOpenId.trimmingCharacters(in: .whitespaces)
-                    if !id.isEmpty {
-                        path.append(.ceremonialMailOpen(mailId: id))
-                        debugCeremonialMailOpenId = ""
+                .alert("Open Ceremonial Mail", isPresented: $debugCeremonialMailOpenSheet) {
+                    TextField("Mail ID", text: $debugCeremonialMailOpenId)
+                    Button("Open") {
+                        let id = debugCeremonialMailOpenId.trimmingCharacters(in: .whitespaces)
+                        if !id.isEmpty {
+                            path.append(.ceremonialMailOpen(mailId: id))
+                            debugCeremonialMailOpenId = ""
+                        }
                     }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Paste a Mail UUID to open the ceremonial reader")
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Paste a Mail UUID to open the ceremonial reader")
-            }
-            .alert("Open invite by token", isPresented: $debugInviteTokenSheet) {
-                TextField("Invite token", text: $debugInviteToken)
-                Button("Open") {
-                    let token = debugInviteToken.trimmingCharacters(in: .whitespaces)
-                    if !token.isEmpty {
-                        DeepLinkRouter.shared.handle(url: URL(string: "pantopus://invite/\(token)")!)
-                        debugInviteToken = ""
+                .alert("Open invite by token", isPresented: $debugInviteTokenSheet) {
+                    TextField("Invite token", text: $debugInviteToken)
+                    Button("Open") {
+                        let token = debugInviteToken.trimmingCharacters(in: .whitespaces)
+                        if !token.isEmpty {
+                            DeepLinkRouter.shared.handle(url: URL(string: "pantopus://invite/\(token)")!)
+                            debugInviteToken = ""
+                        }
                     }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Type a token to fire pantopus://invite/<token>")
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Type a token to fire pantopus://invite/<token>")
-            }
-            .sheet(item: Binding<DebugInviteHomeItem?>(
-                get: { debugInviteFormHomeId.map { DebugInviteHomeItem(id: $0) } },
-                set: { debugInviteFormHomeId = $0?.id }
-            )) { item in
-                let email: String = {
-                    if case let .signedIn(user) = auth.state { return user.email }
-                    return ""
-                }()
-                InviteOwnerFormView(
-                    homeId: item.id,
-                    currentUserEmail: email
-                ) { debugInviteFormHomeId = nil }
-            }
-            .sheet(item: Binding<DebugDisambiguateItem?>(
-                get: { debugDisambiguateFormMailId.map { DebugDisambiguateItem(id: $0) } },
-                set: { debugDisambiguateFormMailId = $0?.id }
-            )) { item in
-                DisambiguateMailFormView(
-                    mailId: item.id
-                ) { debugDisambiguateFormMailId = nil }
-            }
+                .sheet(item: Binding<DebugInviteHomeItem?>(
+                    get: { debugInviteFormHomeId.map { DebugInviteHomeItem(id: $0) } },
+                    set: { debugInviteFormHomeId = $0?.id }
+                )) { item in
+                    let email: String = {
+                        if case let .signedIn(user) = auth.state { return user.email }
+                        return ""
+                    }()
+                    InviteOwnerFormView(
+                        homeId: item.id,
+                        currentUserEmail: email
+                    ) { debugInviteFormHomeId = nil }
+                }
+                .sheet(item: Binding<DebugDisambiguateItem?>(
+                    get: { debugDisambiguateFormMailId.map { DebugDisambiguateItem(id: $0) } },
+                    set: { debugDisambiguateFormMailId = $0?.id }
+                )) { item in
+                    DisambiguateMailFormView(
+                        mailId: item.id
+                    ) { debugDisambiguateFormMailId = nil }
+                }
             #endif
         }
     }

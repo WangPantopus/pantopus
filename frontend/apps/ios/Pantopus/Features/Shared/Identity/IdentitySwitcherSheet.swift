@@ -153,9 +153,22 @@ public struct IdentitySwitcherSheet: View {
 #Preview {
     IdentitySwitcherSheet(
         cards: [
-            IdentitySwitcherCard(id: "l", kind: .local, overline: "Local Profile", name: "Maria K.", stats: "47 posts · 23 connections", isActive: true),
+            IdentitySwitcherCard(
+                id: "l",
+                kind: .local,
+                overline: "Local Profile",
+                name: "Maria K.",
+                stats: "47 posts · 23 connections",
+                isActive: true
+            ),
             IdentitySwitcherCard(id: "p", kind: .personal, overline: "Personal", name: "maria.k@email.com", stats: "Account · verified"),
-            IdentitySwitcherCard(id: "pp", kind: .publicProfile, overline: "Public profile", name: "Maria the Mason", stats: "1,247 followers · weekly")
+            IdentitySwitcherCard(
+                id: "pp",
+                kind: .publicProfile,
+                overline: "Public profile",
+                name: "Maria the Mason",
+                stats: "1,247 followers · weekly"
+            )
         ],
         onSelect: { _ in }
     )

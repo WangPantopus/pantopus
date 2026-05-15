@@ -43,7 +43,7 @@ public final class PulseFeedViewModel {
 
     /// Locality name surfaced on the empty state. Set from the loaded
     /// first post or a backend hint.
-    public private(set) var scopeLabel: String? = nil
+    public private(set) var scopeLabel: String?
 
     private let api: APIClient
     /// Coordinates from the active location source. `nil` skips
@@ -156,7 +156,8 @@ public final class PulseFeedViewModel {
             id: post.id,
             authorName: post.creator?.displayName ?? "Pantopus user",
             authorInitials: initials,
-            authorVerified: post.creator?.accountType == "business" || post.userHasLiked, // placeholder until backend surfaces creator.verified
+            authorVerified: post.creator?.accountType == "business" || post.userHasLiked,
+            // placeholder until backend surfaces creator.verified
             meta: Self.metaString(post: post, intent: intent),
             intent: intent,
             title: intent == .event ? post.title : nil,

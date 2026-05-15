@@ -340,25 +340,36 @@ public struct CeremonialMailOpenView: View {
                     onOutcome(cta)
                 } label: {
                     HStack(spacing: 8) {
-                        Icon(cta.icon, size: 14, color: cta.style == .primary
-                            ? Theme.Color.appTextInverse
-                            : Theme.Color.primary600)
+                        Icon(
+                            cta.icon,
+                            size: 14,
+                            color: cta.style == .primary
+                                ? Theme.Color.appTextInverse
+                                : Theme.Color.primary600
+                        )
                         Text(cta.label)
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(cta.style == .primary
-                                ? Theme.Color.appTextInverse
-                                : Theme.Color.appTextStrong)
+                            .foregroundStyle(
+                                cta.style == .primary
+                                    ? Theme.Color.appTextInverse
+                                    : Theme.Color.appTextStrong
+                            )
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
-                    .background(cta.style == .primary
-                        ? Theme.Color.primary600
-                        : Theme.Color.appSurface)
+                    .background(
+                        cta.style == .primary
+                            ? Theme.Color.primary600
+                            : Theme.Color.appSurface
+                    )
                     .overlay(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(cta.style == .primary
-                                ? Theme.Color.primary600
-                                : Theme.Color.appBorder, lineWidth: 1)
+                            .stroke(
+                                cta.style == .primary
+                                    ? Theme.Color.primary600
+                                    : Theme.Color.appBorder,
+                                lineWidth: 1
+                            )
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }

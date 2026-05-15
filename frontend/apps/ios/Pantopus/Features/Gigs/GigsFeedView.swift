@@ -273,10 +273,10 @@ public struct GigsFeedView: View {
                 Text("Within ")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.Color.appTextSecondary)
-                + Text(Self.radiusLabel(miles))
+                    + Text(Self.radiusLabel(miles))
                     .font(.system(size: 11.5, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextStrong)
-                + Text(" · widen in filter")
+                    + Text(" · widen in filter")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }

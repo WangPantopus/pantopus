@@ -1,14 +1,3 @@
-@file:Suppress("MaxLineLength", "PackageNaming")
-
-package app.pantopus.android.ui.screens.nearby.map
-
-/**
- * Custom Google Maps style — muted gray-blue base (#e8edf2-equivalent)
- * with white streets, soft green parks, dust-blue water. Keeps the
- * category-colored pins as the only saturated thing on the canvas
- * (per design spec).
- */
-internal const val NEARBY_MAP_STYLE_JSON: String = """
 [
   {"elementType":"geometry","stylers":[{"color":"#e8edf2"}]},
   {"elementType":"labels.icon","stylers":[{"visibility":"off"}]},
@@ -25,4 +14,3 @@ internal const val NEARBY_MAP_STYLE_JSON: String = """
   {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#9ca3af"}]},
   {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#ffffff"}]}
 ]
-"""

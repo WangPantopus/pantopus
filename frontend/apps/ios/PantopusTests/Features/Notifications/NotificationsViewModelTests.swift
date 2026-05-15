@@ -3,7 +3,9 @@
 //  PantopusTests
 //
 //  Covers the Notifications center VM: load → loaded/empty/error,
-//  mark-read optimistic + rollback, read-all sweep, row projection
+
+//  MARK: - read optimistic + rollback, read-all sweep, row projection
+
 //  flips on `is_read`, and tap-through routes through DeepLinkRouter.
 //
 

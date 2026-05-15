@@ -100,7 +100,7 @@ public struct GigsListResponse: Decodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case gigs
         case total
-        case radiusMeters = "radiusMeters"
+        case radiusMeters
     }
 }
 

@@ -2,7 +2,7 @@
 //  InvoiceDetailView.swift
 //  Pantopus
 //
-//  T2.6 invoice detail. Wraps `ContentDetailShell` with the same
+//  T2.6 invoice detail. Wraps `TransactionalDetailShell` with the same
 //  vocabulary as gig + listing. The "Pay" CTA hands off to a Stripe
 //  payment sheet once the backend integration lands; until then it
 //  surfaces a placeholder.
@@ -24,7 +24,7 @@ public struct InvoiceDetailView: View {
     }
 
     public var body: some View {
-        ContentDetailShell(
+        TransactionalDetailShell(
             state: viewModel.state,
             onBack: onBack,
             onPrimaryAction: { paySheetVisible = true },

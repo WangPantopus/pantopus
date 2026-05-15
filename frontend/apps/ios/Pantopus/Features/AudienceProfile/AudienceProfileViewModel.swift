@@ -19,7 +19,7 @@ public final class AudienceProfileViewModel {
     public private(set) var state: AudienceProfileState = .loading
     public var activeTab: AudienceProfileTab = .updates
     public var selectedTierRank: Int?
-    public var composer: UpdateComposerState = UpdateComposerState()
+    public var composer: UpdateComposerState = .init()
 
     private let api: APIClient
     private var personaId: String?
@@ -39,9 +39,9 @@ public final class AudienceProfileViewModel {
                 state = .empty(message: "Create a Public Profile to send updates and manage followers.")
                 return
             }
-            self.personaId = persona.id
-            self.personaHandle = handle
-            self.channelId = me.channel?.id
+            personaId = persona.id
+            personaHandle = handle
+            channelId = me.channel?.id
 
             // Sequential GETs — the per-screen latency hit is small
             // and the deterministic order keeps the

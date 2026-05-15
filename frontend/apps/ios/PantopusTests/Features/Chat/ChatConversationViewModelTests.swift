@@ -99,7 +99,7 @@ final class ChatConversationViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.messagesJSON()),
             .status(200, body: "{}"), // markRead
-            .status(500, body: "{}")  // POST /messages
+            .status(500, body: "{}") // POST /messages
         ]
         let vm = ChatConversationViewModel(
             mode: .person(otherUserId: "u_other"),
@@ -117,7 +117,7 @@ final class ChatConversationViewModelTests: XCTestCase {
         // Should contain at least one bubble (the optimistic one) with
         // a failed delivery state.
         let bubble = rows.compactMap {
-            if case let .bubble(content) = $0 { return content } else { return nil }
+            if case let .bubble(content) = $0 { content } else { nil }
         }.first { $0.side == .outgoing }
         XCTAssertNotNil(bubble)
         XCTAssertEqual(bubble?.deliveryState, .failed)

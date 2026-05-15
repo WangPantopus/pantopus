@@ -90,7 +90,9 @@ final class PrivacyHandshakeViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = loadedSequence(suggestion: Self.suggestionLockedJSON)
         let vm = PrivacyHandshakeViewModel(personaHandle: "mayabuilds", api: makeAPI())
         await vm.load()
-        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready"); return }
+        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready")
+            return
+        }
         XCTAssertEqual(content.handle.value, "alreadybound")
         XCTAssertTrue(content.handle.locked)
     }
@@ -99,7 +101,9 @@ final class PrivacyHandshakeViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = loadedSequence(followStatus: Self.followStatusActiveJSON)
         let vm = PrivacyHandshakeViewModel(personaHandle: "mayabuilds", api: makeAPI())
         await vm.load()
-        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready"); return }
+        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready")
+            return
+        }
         XCTAssertEqual(content.step, .alreadyMember)
     }
 
@@ -107,7 +111,9 @@ final class PrivacyHandshakeViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [.status(404, body: "{\"error\":\"Beacon not found\"}")]
         let vm = PrivacyHandshakeViewModel(personaHandle: "mayabuilds", api: makeAPI())
         await vm.load()
-        guard case .error = vm.state else { XCTFail("Expected .error"); return }
+        guard case .error = vm.state else { XCTFail("Expected .error")
+            return
+        }
     }
 
     func testHandleValidationGatesPrimaryCTA() async {
@@ -128,7 +134,9 @@ final class PrivacyHandshakeViewModelTests: XCTestCase {
         let vm = PrivacyHandshakeViewModel(personaHandle: "mayabuilds", api: makeAPI())
         await vm.load()
         vm.primaryTapped() // step 1 → 2
-        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready"); return }
+        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready")
+            return
+        }
         XCTAssertEqual(content.step, .tierSelection)
         XCTAssertEqual(vm.chrome.progressLabel, .stepOf(current: 2, total: 2))
     }
@@ -158,7 +166,9 @@ final class PrivacyHandshakeViewModelTests: XCTestCase {
             if case let .ready(c) = $0, c.step == .completedFree { return true }
             return false
         }
-        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready"); return }
+        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready")
+            return
+        }
         XCTAssertEqual(content.step, .completedFree)
     }
 
@@ -178,7 +188,9 @@ final class PrivacyHandshakeViewModelTests: XCTestCase {
             if case let .ready(c) = $0, case .opensCheckout = c.step { return true }
             return false
         }
-        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready"); return }
+        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready")
+            return
+        }
         guard case let .opensCheckout(url) = content.step else {
             XCTFail("Expected .opensCheckout step")
             return
@@ -200,7 +212,9 @@ final class PrivacyHandshakeViewModelTests: XCTestCase {
             if case let .ready(c) = $0, c.handle.error != nil { return true }
             return false
         }
-        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready"); return }
+        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready")
+            return
+        }
         XCTAssertEqual(content.step, .handleEntry)
         XCTAssertEqual(content.handle.error, "That handle is already taken. Try another.")
     }
@@ -219,7 +233,9 @@ final class PrivacyHandshakeViewModelTests: XCTestCase {
             if case let .ready(c) = $0, c.handle.matchesUsername { return true }
             return false
         }
-        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready"); return }
+        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready")
+            return
+        }
         XCTAssertTrue(content.handle.matchesUsername)
         XCTAssertEqual(content.step, .handleEntry)
     }
@@ -241,7 +257,9 @@ final class PrivacyHandshakeViewModelTests: XCTestCase {
         await vm.load()
         vm.primaryTapped() // → step 2
         vm.leadingTapped() // back → step 1
-        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready"); return }
+        guard case let .ready(content) = vm.state else { XCTFail("Expected .ready")
+            return
+        }
         XCTAssertEqual(content.step, .handleEntry)
     }
 

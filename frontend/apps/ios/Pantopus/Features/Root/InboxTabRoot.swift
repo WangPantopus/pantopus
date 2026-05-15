@@ -71,11 +71,10 @@ public struct InboxTabRoot: View {
     }
 
     private func destination(from row: ConversationRowContent) -> InboxConversationDestination {
-        let mode: InboxConversationDestination.Mode
-        switch row.variant {
-        case .aiAssistant: mode = .ai
-        case .group: mode = .room(id: row.id)
-        case .dm: mode = .person(otherUserId: row.id)
+        let mode: InboxConversationDestination.Mode = switch row.variant {
+        case .aiAssistant: .ai
+        case .group: .room(id: row.id)
+        case .dm: .person(otherUserId: row.id)
         }
         return InboxConversationDestination(
             mode: mode,
@@ -107,20 +106,20 @@ public struct InboxTabRoot: View {
 
     private static func viewModelMode(for mode: InboxConversationDestination.Mode) -> ChatThreadMode {
         switch mode {
-        case .ai: return .ai
-        case let .room(id): return .room(id: id)
-        case let .person(otherUserId): return .person(otherUserId: otherUserId)
+        case .ai: .ai
+        case let .room(id): .room(id: id)
+        case let .person(otherUserId): .person(otherUserId: otherUserId)
         }
     }
 
     private static func counterparty(for dest: InboxConversationDestination) -> ChatCounterparty {
         switch dest.mode {
         case .ai:
-            return .ai(name: dest.displayName)
+            .ai(name: dest.displayName)
         case .room:
-            return .group(name: dest.displayName, memberCount: nil)
+            .group(name: dest.displayName, memberCount: nil)
         case .person:
-            return .person(
+            .person(
                 name: dest.displayName,
                 initials: dest.initials,
                 locality: nil,

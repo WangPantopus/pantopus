@@ -61,9 +61,9 @@ public struct MeView: View {
     private func current(personal: MeIdentityContent, home: MeIdentityContent, business: MeIdentityContent)
         -> MeIdentityContent {
         switch viewModel.activeIdentity {
-        case .personal: return personal
-        case .home: return home
-        case .business: return business
+        case .personal: personal
+        case .home: home
+        case .business: business
         }
     }
 
@@ -443,16 +443,16 @@ private struct MeDestructiveCard: View {
 
     private var icon: PantopusIcon {
         switch identity {
-        case .personal: return .arrowLeft
-        case .home, .business: return .user
+        case .personal: .arrowLeft
+        case .home, .business: .user
         }
     }
 
     private var label: String {
         switch identity {
-        case .personal: return "Log out"
-        case .home: return "Switch identity → Personal"
-        case .business: return "Switch identity → Personal"
+        case .personal: "Log out"
+        case .home: "Switch identity → Personal"
+        case .business: "Switch identity → Personal"
         }
     }
 }

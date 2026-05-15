@@ -68,7 +68,7 @@ public struct ListingsPagination: Decodable, Sendable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case limit, offset
-        case hasMore = "hasMore"
+        case hasMore
         case nextCursor = "next_cursor"
     }
 }

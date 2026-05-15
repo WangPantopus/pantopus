@@ -19,9 +19,9 @@ public enum AudienceProfileTab: String, Sendable, Hashable, CaseIterable {
 
     public var title: String {
         switch self {
-        case .updates: return "Updates"
-        case .followers: return "Followers"
-        case .threads: return "Threads"
+        case .updates: "Updates"
+        case .followers: "Followers"
+        case .threads: "Threads"
         }
     }
 }
@@ -35,9 +35,9 @@ public enum UpdateVisibility: String, Sendable, Hashable, CaseIterable {
 
     public var title: String {
         switch self {
-        case .publicVisible: return "Public"
-        case .followers: return "Followers"
-        case .tierOrAbove: return "Tier and above"
+        case .publicVisible: "Public"
+        case .followers: "Followers"
+        case .tierOrAbove: "Tier and above"
         }
     }
 }

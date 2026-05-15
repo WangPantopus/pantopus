@@ -1,5 +1,5 @@
 //
-//  ContentDetailShell.swift
+//  TransactionalDetailShell.swift
 //  Pantopus
 //
 //  Bespoke shell for the T2.6 Transactional Detail archetype. Three
@@ -7,11 +7,16 @@
 //  per-entity view-model projects its payload into
 //  `ContentDetailContent` and the shell renders the slots.
 //
+//  Distinct from the read-only `ContentDetailShell` under
+//  `Features/Shared/ContentDetail/` — that shell is a generic slot-based
+//  scaffold for non-transactional detail surfaces (public profile,
+//  pulse post, home dashboard).
+//
 
 import SwiftUI
 
-/// Sticky-dock content-detail shell.
-public struct ContentDetailShell: View {
+/// Sticky-dock transactional-detail shell.
+public struct TransactionalDetailShell: View {
     private let state: ContentDetailState
     private let onBack: @MainActor () -> Void
     private let onPrimaryAction: @MainActor () -> Void
@@ -282,21 +287,21 @@ public struct ContentDetailShell: View {
 
     private func pillForeground(_ tone: ContentDetailPill.Tone) -> Color {
         switch tone {
-        case .info: return Theme.Color.primary700
-        case .success: return Theme.Color.success
-        case .warning: return Theme.Color.warning
-        case .business: return Theme.Color.business
-        case .neutral: return Theme.Color.appTextSecondary
+        case .info: Theme.Color.primary700
+        case .success: Theme.Color.success
+        case .warning: Theme.Color.warning
+        case .business: Theme.Color.business
+        case .neutral: Theme.Color.appTextSecondary
         }
     }
 
     private func pillBackground(_ tone: ContentDetailPill.Tone) -> Color {
         switch tone {
-        case .info: return Theme.Color.primary50
-        case .success: return Theme.Color.successBg
-        case .warning: return Theme.Color.warningBg
-        case .business: return Theme.Color.businessBg
-        case .neutral: return Theme.Color.appSurfaceSunken
+        case .info: Theme.Color.primary50
+        case .success: Theme.Color.successBg
+        case .warning: Theme.Color.warningBg
+        case .business: Theme.Color.businessBg
+        case .neutral: Theme.Color.appSurfaceSunken
         }
     }
 
@@ -501,11 +506,11 @@ public struct ContentDetailShell: View {
         }
     }
 
-    private func sectionCard<Content: View>(
+    private func sectionCard(
         title: String,
         icon: PantopusIcon?,
         sub: String? = nil,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
@@ -562,13 +567,11 @@ public struct ContentDetailShell: View {
     }
 
     private func partyCard(_ party: ContentDetailParty) -> some View {
-        let accentColor: Color = {
-            switch party.accent {
-            case .business: return Theme.Color.business
-            case .personal: return Theme.Color.primary600
-            case .neutral: return Theme.Color.appTextSecondary
-            }
-        }()
+        let accentColor: Color = switch party.accent {
+        case .business: Theme.Color.business
+        case .personal: Theme.Color.primary600
+        case .neutral: Theme.Color.appTextSecondary
+        }
         return VStack(alignment: .leading, spacing: 6) {
             Text(party.label.uppercased())
                 .font(.system(size: 9, weight: .bold))

@@ -177,7 +177,9 @@ public final class CeremonialMailViewModel: WizardModel {
     }
 
     public func leadingTapped() {
-        guard step != .decide else { pendingEvent = .dismiss; return }
+        guard step != .decide else { pendingEvent = .dismiss
+            return
+        }
         switch step {
         case .verify: step = .decide
         case .compose: step = .verify

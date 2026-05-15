@@ -106,7 +106,7 @@ public struct RootTabView: View {
         // pass we just land the user on the matching tab and let the
         // user finish the drill).
         switch pending {
-        case .invite(let token):
+        case let .invite(token):
             pendingInviteToken = token
             _ = router.consume()
         case .feed, .post, .supportTrain, .user, .connections:

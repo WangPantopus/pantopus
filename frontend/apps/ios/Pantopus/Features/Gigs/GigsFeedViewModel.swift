@@ -128,11 +128,10 @@ public final class GigsFeedViewModel {
 
     private static func priceLabel(price: Double?, payType: String?) -> String {
         guard let price else { return "—" }
-        let formatted: String
-        if price.truncatingRemainder(dividingBy: 1) == 0 {
-            formatted = "$\(Int(price))"
+        let formatted = if price.truncatingRemainder(dividingBy: 1) == 0 {
+            "$\(Int(price))"
         } else {
-            formatted = String(format: "$%.2f", price)
+            String(format: "$%.2f", price)
         }
         switch payType {
         case "hourly": return "\(formatted) / hr"
@@ -160,8 +159,8 @@ public final class GigsFeedViewModel {
         let interval = Date().timeIntervalSince(date)
         if interval < 60 { return "now" }
         if interval < 3600 { return "\(Int(interval / 60))m" }
-        if interval < 86_400 { return "\(Int(interval / 3600))h" }
-        if interval < 604_800 { return "\(Int(interval / 86_400))d" }
+        if interval < 86400 { return "\(Int(interval / 3600))h" }
+        if interval < 604_800 { return "\(Int(interval / 86400))d" }
         return "\(Int(interval / 604_800))w"
     }
 }

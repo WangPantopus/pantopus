@@ -143,7 +143,7 @@ public struct FeedView: View {
                         Text("Showing posts within ")
                             .font(.system(size: 11.5))
                             .foregroundStyle(Theme.Color.appTextSecondary)
-                        + Text(scope)
+                            + Text(scope)
                             .font(.system(size: 11.5, weight: .bold))
                             .foregroundStyle(Theme.Color.appTextStrong)
                     }

@@ -36,11 +36,11 @@ public enum HubRoute: Hashable {
     case composeGig(category: String)
     /// Marketplace tab (T2.5). Reached from Hub → pillar(.marketplace).
     case marketplace
-    /// Listing detail (T2.6 ContentDetailShell · listing variant).
+    /// Listing detail (T2.6 TransactionalDetailShell · listing variant).
     case listingDetail(listingId: String)
     /// Snap & sell — placeholder until the marketplace compose flow ships.
     case composeListing
-    /// Invoice detail (T2.6 ContentDetailShell · invoice variant).
+    /// Invoice detail (T2.6 TransactionalDetailShell · invoice variant).
     /// Reached from wallet / payments surfaces when those land.
     case invoiceDetail(invoiceId: String)
     /// Bell icon target. Replaced by the real notifications screen in T4.1.
@@ -108,11 +108,11 @@ public struct HubTabRoot: View {
     /// Dispatch a discovery card tap to the matching detail route.
     private static func route(forDiscovery item: DiscoveryCardContent) -> HubRoute {
         switch item.kind {
-        case .post: return .pulsePost(postId: item.id)
-        case .person: return .publicProfile(userId: item.id)
-        case .gig: return .placeholder(label: "Gig detail")
-        case .business: return .placeholder(label: "Business")
-        case .unknown: return .placeholder(label: item.title)
+        case .post: .pulsePost(postId: item.id)
+        case .person: .publicProfile(userId: item.id)
+        case .gig: .placeholder(label: "Gig detail")
+        case .business: .placeholder(label: "Business")
+        case .unknown: .placeholder(label: item.title)
         }
     }
 

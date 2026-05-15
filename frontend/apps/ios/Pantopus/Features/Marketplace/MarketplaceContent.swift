@@ -22,11 +22,11 @@ public enum MarketplaceCategory: String, CaseIterable, Sendable, Hashable {
 
     public var label: String {
         switch self {
-        case .all: return "All"
-        case .goods: return "Goods"
-        case .rentals: return "Rentals"
-        case .free: return "Free"
-        case .vehicles: return "Vehicles"
+        case .all: "All"
+        case .goods: "Goods"
+        case .rentals: "Rentals"
+        case .free: "Free"
+        case .vehicles: "Vehicles"
         }
     }
 
@@ -34,10 +34,10 @@ public enum MarketplaceCategory: String, CaseIterable, Sendable, Hashable {
     /// layer; `.free` instead toggles the `isFree=true` query.
     public var layerParam: String? {
         switch self {
-        case .goods: return "goods"
-        case .rentals: return "rentals"
-        case .vehicles: return "vehicles"
-        case .all, .free: return nil
+        case .goods: "goods"
+        case .rentals: "rentals"
+        case .vehicles: "vehicles"
+        case .all, .free: nil
         }
     }
 
@@ -46,8 +46,8 @@ public enum MarketplaceCategory: String, CaseIterable, Sendable, Hashable {
     /// the design's spec).
     public var suppressesConditionBadge: Bool {
         switch self {
-        case .rentals, .free: return true
-        default: return false
+        case .rentals, .free: true
+        default: false
         }
     }
 }

@@ -78,9 +78,11 @@ final class EditProfileUITests: XCTestCase {
         )
         // Bail out via "Keep editing" so the sheet stays open.
         app.buttons["Keep editing"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)
-            .matching(identifier: "editProfileShell")
-            .firstMatch.exists)
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .matching(identifier: "editProfileShell")
+                .firstMatch.exists
+        )
     }
 
     func testFillAndSavePopsWithSuccessToast() throws {

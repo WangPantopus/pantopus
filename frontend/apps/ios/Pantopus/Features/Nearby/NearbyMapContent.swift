@@ -84,9 +84,9 @@ public enum SheetStop: CaseIterable, Sendable, Hashable {
     /// Fraction of the screen height the sheet occupies at this stop.
     public var heightFraction: CGFloat {
         switch self {
-        case .collapsed: return 0.20
-        case .standard: return 0.40
-        case .expanded: return 0.70
+        case .collapsed: 0.20
+        case .standard: 0.40
+        case .expanded: 0.70
         }
     }
 }
@@ -107,22 +107,22 @@ public enum MapMarker: Identifiable, Sendable, Hashable {
 
     public var id: String {
         switch self {
-        case let .entity(entity): return "entity_\(entity.id)"
-        case let .cluster(cluster): return "cluster_\(cluster.id)"
+        case let .entity(entity): "entity_\(entity.id)"
+        case let .cluster(cluster): "cluster_\(cluster.id)"
         }
     }
 
     public var latitude: Double {
         switch self {
-        case let .entity(entity): return entity.latitude
-        case let .cluster(cluster): return cluster.latitude
+        case let .entity(entity): entity.latitude
+        case let .cluster(cluster): cluster.latitude
         }
     }
 
     public var longitude: Double {
         switch self {
-        case let .entity(entity): return entity.longitude
-        case let .cluster(cluster): return cluster.longitude
+        case let .entity(entity): entity.longitude
+        case let .cluster(cluster): cluster.longitude
         }
     }
 

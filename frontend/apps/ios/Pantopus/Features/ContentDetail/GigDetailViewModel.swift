@@ -219,8 +219,8 @@ public final class GigDetailViewModel {
         let interval = Date().timeIntervalSince(date)
         if interval < 60 { return "now" }
         if interval < 3600 { return "\(Int(interval / 60))m" }
-        if interval < 86_400 { return "\(Int(interval / 3600))h" }
-        if interval < 604_800 { return "\(Int(interval / 86_400))d" }
+        if interval < 86400 { return "\(Int(interval / 3600))h" }
+        if interval < 604_800 { return "\(Int(interval / 86400))d" }
         return "\(Int(interval / 604_800))w"
     }
 
