@@ -6,6 +6,10 @@
 export const colors = {
   // ─── Primary (Sky-blue, slightly warm) ───────────────────
   primary: {
+    // Off-white tinted background — sits between pure surface and primary-50.
+    // Used for the unread-row tint in notifications and any "barely there"
+    // primary surface that needs to read as inert against a clean white tab.
+    25: '#f8fbff',
     50: '#f0f9ff',
     100: '#e0f2fe',
     200: '#bae6fd',
