@@ -1,67 +1,277 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+// T5.1 — Notifications V2 (web).
+//
+// Single source of truth = `<ListOfRowsShell />`. The page builds two
+// tabs (All / Unread), buckets the loaded notifications into Today /
+// Earlier sections, and projects each `Notification` DTO into the same
+// `RowModel` shape iOS and Android use. The mark-all-read text-button
+// lives in the shell's top-bar trailing slot.
+//
+// Per the T5 plan:
+//   - `read` filter is dropped (design has 2 tabs, not 3).
+//   - Personal/business context filter is dropped (design has none).
+//   - Per-row hover delete affordance is dropped.
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import {
+  useInfiniteQuery,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query';
+import {
+  AtSign,
+  BadgeCheck,
+  Bell,
+  Briefcase,
+  CheckCheck,
+  Info as InfoIcon,
+  MessageCircle,
+  ShieldAlert,
+  Tag as TagIcon,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import * as api from '@pantopus/api';
 import { getAuthToken } from '@pantopus/api';
-import { formatTimeAgo as timeAgo } from '@pantopus/ui-utils';
+import type { Notification } from '@pantopus/types';
 import { useSocket } from '@/contexts/SocketContext';
 import { queryKeys } from '@/lib/query-keys';
-import type { Notification } from '@pantopus/types';
-import NotificationRow from './NotificationRow';
+import ListOfRowsShell from '@/components/list-of-rows/ListOfRowsShell';
+import type {
+  ListOfRowsState,
+  RowModel,
+  RowSection,
+  StatusChipVariant,
+} from '@/components/list-of-rows/types';
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-type Filter = 'all' | 'unread' | 'read';
-type ContextFilter = 'all' | 'personal' | 'business';
+type Tab = 'all' | 'unread';
 
 type NotificationsPage = Awaited<ReturnType<typeof api.notifications.getNotifications>>;
 
 const LIMIT = 30;
 
+type Category =
+  | 'reply'
+  | 'mention'
+  | 'claim'
+  | 'gig'
+  | 'listing'
+  | 'safety'
+  | 'system';
+
+interface CategoryStyle {
+  label: string;
+  icon: LucideIcon;
+  chipVariant: StatusChipVariant;
+  tileBackground: string;
+  tileForeground: string;
+}
+
+const CATEGORY_STYLES: Record<Category, CategoryStyle> = {
+  reply: {
+    label: 'Reply',
+    icon: MessageCircle,
+    chipVariant: 'personal',
+    tileBackground: '#dbeafe',
+    tileForeground: '#1d4ed8',
+  },
+  mention: {
+    label: 'Mention',
+    icon: AtSign,
+    chipVariant: 'business',
+    tileBackground: '#f3e8ff',
+    tileForeground: '#7c3aed',
+  },
+  claim: {
+    label: 'Claim',
+    icon: BadgeCheck,
+    chipVariant: 'success',
+    tileBackground: '#d1fae5',
+    tileForeground: '#047857',
+  },
+  gig: {
+    label: 'Gig',
+    icon: Briefcase,
+    chipVariant: 'warning',
+    tileBackground: '#fef3c7',
+    tileForeground: '#92400e',
+  },
+  listing: {
+    label: 'Listing',
+    icon: TagIcon,
+    chipVariant: 'home',
+    tileBackground: '#dcfce7',
+    tileForeground: '#16a34a',
+  },
+  safety: {
+    label: 'Safety',
+    icon: ShieldAlert,
+    chipVariant: 'error',
+    tileBackground: '#fee2e2',
+    tileForeground: '#b91c1c',
+  },
+  system: {
+    label: 'System',
+    icon: InfoIcon,
+    chipVariant: 'neutral',
+    tileBackground: '#f3f4f6',
+    tileForeground: '#374151',
+  },
+};
+
+function categoryFromType(raw: string | null | undefined): Category {
+  const lower = (raw ?? '').toLowerCase();
+  switch (lower) {
+    case 'reply':
+    case 'comment':
+    case 'chat':
+    case 'chat_message':
+    case 'dm':
+      return 'reply';
+    case 'mention':
+    case 'follow':
+    case 'connection':
+    case 'connections':
+    case 'user':
+      return 'mention';
+    case 'claim':
+    case 'home_member_request':
+    case 'home_claim':
+    case 'home_ownership':
+      return 'claim';
+    case 'gig':
+    case 'gig_bid':
+    case 'gig_match':
+      return 'gig';
+    case 'listing':
+    case 'listing_sale':
+    case 'marketplace':
+      return 'listing';
+    case 'safety':
+    case 'alert':
+    case 'security':
+    case 'porch_alert':
+      return 'safety';
+    case 'system':
+    case 'info':
+    case 'support_train':
+    case 'support-train':
+    case 'announcement':
+      return 'system';
+    default:
+      if (!lower) return 'system';
+      if (lower.includes('gig')) return 'gig';
+      if (lower.includes('listing') || lower.includes('mail')) return 'listing';
+      if (lower.includes('home')) return 'claim';
+      if (lower.includes('post') || lower.includes('reply')) return 'reply';
+      return 'system';
+  }
+}
+
+function formatRelative(createdAt: string, now: Date): string {
+  const date = new Date(createdAt);
+  const ms = now.getTime() - date.getTime();
+  if (ms < 60_000) return 'now';
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m`;
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h`;
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfDate = new Date(date);
+  startOfDate.setHours(0, 0, 0, 0);
+  const days = Math.round((startOfToday.getTime() - startOfDate.getTime()) / 86_400_000);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) {
+    return date.toLocaleDateString('en-US', { weekday: 'short' });
+  }
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function makeRow(
+  notif: Notification,
+  now: Date,
+  onTap: (notif: Notification) => void,
+): RowModel {
+  const category = categoryFromType(notif.type);
+  const style = CATEGORY_STYLES[category];
+  const unread = !notif.is_read;
+  return {
+    id: notif.id,
+    title: notif.title || 'Notification',
+    template: 'statusChip',
+    leading: {
+      kind: 'typeIcon',
+      icon: style.icon,
+      background: style.tileBackground,
+      foreground: style.tileForeground,
+    },
+    trailing: { kind: 'none' },
+    onTap: () => onTap(notif),
+    body: notif.body ?? null,
+    chips: [
+      {
+        text: style.label,
+        icon: style.icon,
+        tint: { kind: 'status', variant: style.chipVariant },
+      },
+    ],
+    timeMeta: formatRelative(notif.created_at, now),
+    highlight: unread ? 'unread' : undefined,
+  };
+}
+
+function bucketSections(
+  notifications: Notification[],
+  now: Date,
+  onTap: (notif: Notification) => void,
+): RowSection[] {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const todayRows: RowModel[] = [];
+  const earlierRows: RowModel[] = [];
+  for (const notif of notifications) {
+    const created = new Date(notif.created_at);
+    const row = makeRow(notif, now, onTap);
+    if (created.getTime() >= startOfToday.getTime()) {
+      todayRows.push(row);
+    } else {
+      earlierRows.push(row);
+    }
+  }
+  const sections: RowSection[] = [];
+  if (todayRows.length > 0) {
+    sections.push({ id: 'today', header: 'Today', rows: todayRows });
+  }
+  if (earlierRows.length > 0) {
+    sections.push({ id: 'earlier', header: 'Earlier', rows: earlierRows });
+  }
+  return sections;
+}
+
 export default function NotificationsPage() {
   const router = useRouter();
   const socket = useSocket();
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<Filter>('all');
-  const [contextFilter, setContextFilter] = useState<ContextFilter>('all');
-  const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null);
+  const [tab, setTab] = useState<Tab>('all');
 
-  // Auth guard
   useEffect(() => {
     if (!getAuthToken()) router.push('/login');
   }, [router]);
 
-  // Query key for this filter combo — filter + contextFilter segment the cache
-  const notifKey = useMemo(
-    () => [...queryKeys.notifications(), filter, contextFilter] as const,
-    [filter, contextFilter],
-  );
+  const notifKey = useMemo(() => [...queryKeys.notifications(), tab] as const, [tab]);
 
-  // ── Notifications list: useInfiniteQuery (30 per page) ──────
-  const notifQuery = useInfiniteQuery<NotificationsPage, Error, InfiniteData<NotificationsPage>, typeof notifKey, number>({
+  const notifQuery = useInfiniteQuery<
+    NotificationsPage,
+    Error,
+    InfiniteData<NotificationsPage>,
+    typeof notifKey,
+    number
+  >({
     queryKey: notifKey,
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
-      const params: Record<string, unknown> = {
-        limit: LIMIT,
-        offset: pageParam,
-        ...(filter === 'unread' ? { unread: true } : {}),
-      };
-      if (contextFilter !== 'all') {
-        params.context = contextFilter;
-      }
+      const params: Record<string, unknown> = { limit: LIMIT, offset: pageParam };
+      if (tab === 'unread') params.unread = true;
       return api.notifications.getNotifications(params);
     },
     getNextPageParam: (lastPage, allPages) => {
@@ -71,7 +281,6 @@ export default function NotificationsPage() {
     staleTime: 30_000,
   });
 
-  // Derived state (preserves the useState shape consumed by the JSX below)
   const notifications = useMemo<Notification[]>(() => {
     const pages = notifQuery.data?.pages ?? [];
     const seen = new Set<string>();
@@ -86,11 +295,16 @@ export default function NotificationsPage() {
     return out;
   }, [notifQuery.data]);
 
-  const loading = notifQuery.isPending;
-  const loadingMore = notifQuery.isFetchingNextPage;
-  const hasMore = notifQuery.hasNextPage ?? false;
+  const unreadCount = useMemo(() => {
+    const pages = notifQuery.data?.pages ?? [];
+    // Prefer the server-emitted count from the first page (matches the
+    // mobile feeds). Fall back to a client-side count.
+    return (
+      pages[0]?.unreadCount ??
+      notifications.filter((n) => !n.is_read).length
+    );
+  }, [notifQuery.data, notifications]);
 
-  // Cache mutation helpers
   const mutateNotifications = useCallback(
     (updater: (n: Notification) => Notification) => {
       queryClient.setQueryData<InfiniteData<NotificationsPage>>(notifKey, (old) => {
@@ -107,27 +321,10 @@ export default function NotificationsPage() {
     [queryClient, notifKey],
   );
 
-  const removeNotification = useCallback(
-    (predicate: (n: Notification) => boolean) => {
-      queryClient.setQueryData<InfiniteData<NotificationsPage>>(notifKey, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            notifications: (page.notifications || []).filter((n) => !predicate(n)),
-          })),
-        };
-      });
-    },
-    [queryClient, notifKey],
-  );
-
   const prependNotification = useCallback(
     (notif: Notification) => {
       queryClient.setQueryData<InfiniteData<NotificationsPage>>(notifKey, (old) => {
         if (!old) return old;
-        // Dedupe — check all pages to avoid duplicate entries from socket + refetch races
         for (const page of old.pages) {
           if ((page.notifications || []).some((n) => n.id === notif.id)) return old;
         }
@@ -145,346 +342,119 @@ export default function NotificationsPage() {
     [queryClient, notifKey],
   );
 
-  // Listen for real-time notification:new from socket
+  // Real-time socket
   useEffect(() => {
     if (!socket) return;
-    const handleNewNotification = (notif: Notification) => {
-      prependNotification(notif);
-    };
-    socket.on('notification:new', handleNewNotification);
+    const onNew = (notif: Notification) => prependNotification(notif);
+    socket.on('notification:new', onNew);
     return () => {
-      socket.off('notification:new', handleNewNotification);
+      socket.off('notification:new', onNew);
     };
   }, [socket, prependNotification]);
 
-  const handleNotificationClick = useCallback(async (notif: Notification) => {
-    // Mark as read
-    if (!notif.is_read) {
-      try {
-        await api.notifications.markAsRead(notif.id);
+  const handleNotificationClick = useCallback(
+    async (notif: Notification) => {
+      if (!notif.is_read) {
+        // Optimistic: flip local state first, roll back on failure to
+        // match the iOS / Android markRead pattern.
+        const previous = queryClient.getQueryData(notifKey);
         mutateNotifications((n) => (n.id === notif.id ? { ...n, is_read: true } : n));
-      } catch {}
-    }
+        try {
+          await api.notifications.markAsRead(notif.id);
+        } catch {
+          queryClient.setQueryData(notifKey, previous);
+        }
+      }
+      if (notif.link) {
+        const path =
+          notif.link.startsWith('/homes/') && !notif.link.startsWith('/app/')
+            ? `/app${notif.link}`
+            : notif.link;
+        router.push(path);
+      }
+    },
+    [router, mutateNotifications, queryClient, notifKey],
+  );
 
-    // If has a link, navigate directly (normalize /homes/... to /app/homes/... for web routes)
-    if (notif.link) {
-      const path = notif.link.startsWith('/homes/') && !notif.link.startsWith('/app/')
-        ? `/app${notif.link}`
-        : notif.link;
-      router.push(path);
-    } else {
-      setSelectedNotif(notif);
-    }
-  }, [router, mutateNotifications]);
-
-  const handleMarkAllRead = async () => {
+  const handleMarkAllRead = useCallback(async () => {
+    if (unreadCount === 0) return;
+    const previous = queryClient.getQueryData(notifKey);
+    mutateNotifications((n) => ({ ...n, is_read: true }));
     try {
       await api.notifications.markAllAsRead();
-      mutateNotifications((n) => ({ ...n, is_read: true }));
-    } catch {}
-  };
-
-  const handleDelete = useCallback(async (notifId: string) => {
-    try {
-      await api.notifications.deleteNotification(notifId);
-      removeNotification((n) => n.id === notifId);
-      setSelectedNotif((prev) => prev?.id === notifId ? null : prev);
-    } catch {}
-  }, [removeNotification]);
-
-  const unreadCount = useMemo(
-    () => notifications.filter((n) => !n.is_read).length,
-    [notifications],
-  );
-
-  // Filter locally for "read" since API only supports "unread" filter
-  const displayedNotifications = useMemo(
-    () => (filter === 'read' ? notifications.filter((n) => n.is_read) : notifications),
-    [filter, notifications],
-  );
-
-  // Group by date (memoized — was being recomputed every render)
-  const grouped = useMemo(() => groupByDate(displayedNotifications), [displayedNotifications]);
-
-  // Flatten groups into a single (Header | Notification)[] array for virtualization.
-  // Each date-group header becomes a single "header" virtual item that sits above
-  // its group's notifications.
-  type FlatItem =
-    | { type: 'header'; label: string; key: string }
-    | { type: 'notification'; notif: Notification; groupLabel: string; isFirst: boolean; isLast: boolean };
-
-  const flatItems = useMemo<FlatItem[]>(() => {
-    const out: FlatItem[] = [];
-    for (const group of grouped) {
-      out.push({ type: 'header', label: group.label, key: `header:${group.label}` });
-      group.items.forEach((notif, i) => {
-        out.push({
-          type: 'notification',
-          notif,
-          groupLabel: group.label,
-          isFirst: i === 0,
-          isLast: i === group.items.length - 1,
-        });
-      });
+    } catch {
+      queryClient.setQueryData(notifKey, previous);
     }
-    return out;
-  }, [grouped]);
+  }, [mutateNotifications, unreadCount, queryClient, notifKey]);
 
-  // ── Virtualize flat list ──────────────────────────────────
-  const listScrollRef = useRef<HTMLDivElement>(null);
-  const virtualizer = useVirtualizer({
-    count: flatItems.length,
-    getScrollElement: () => listScrollRef.current,
-    estimateSize: (index) => (flatItems[index]?.type === 'header' ? 36 : 84),
-    overscan: 8,
-  });
+  const now = useMemo(() => new Date(), [notifications]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Shim for load-more button onClick
-  const loadNotifications = useCallback(
-    (_reset = false) => {
-      if (_reset) void notifQuery.refetch();
-      else void notifQuery.fetchNextPage();
-    },
-    [notifQuery],
-  );
+  const state = useMemo<ListOfRowsState>(() => {
+    if (notifQuery.isPending) return { kind: 'loading' };
+    if (notifQuery.isError) {
+      return {
+        kind: 'error',
+        message: notifQuery.error?.message ?? "Couldn't load notifications.",
+      };
+    }
+    if (notifications.length === 0) {
+      if (tab === 'unread') {
+        return {
+          kind: 'empty',
+          config: {
+            icon: CheckCheck,
+            headline: "You're all caught up",
+            subcopy:
+              'No unread notifications. Replies, mentions, claim updates, and safety alerts from your neighborhood will land here.',
+            ctaTitle: 'View all notifications',
+            onCta: () => setTab('all'),
+          },
+        };
+      }
+      return {
+        kind: 'empty',
+        config: {
+          icon: Bell,
+          headline: 'All caught up',
+          subcopy: "When something needs your attention, it'll show up here.",
+        },
+      };
+    }
+    return {
+      kind: 'loaded',
+      sections: bucketSections(notifications, now, handleNotificationClick),
+      hasMore: notifQuery.hasNextPage ?? false,
+    };
+  }, [
+    notifQuery.isPending,
+    notifQuery.isError,
+    notifQuery.error,
+    notifQuery.hasNextPage,
+    notifications,
+    now,
+    handleNotificationClick,
+    tab,
+  ]);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-app-text">Notifications</h1>
-          <p className="text-sm text-app-text-secondary mt-0.5">
-            {unreadCount > 0
-              ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}`
-              : 'All caught up!'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {unreadCount > 0 && (
-            <button
-              onClick={handleMarkAllRead}
-              className="px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition"
-            >
-              Mark all read
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Filter tabs */}
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <div className="flex gap-1">
-          {(['all', 'unread', 'read'] as Filter[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition capitalize ${
-                filter === f
-                  ? 'bg-gray-900 text-white'
-                  : 'text-app-text-secondary hover:bg-app-hover'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-1">
-          {(['all', 'personal', 'business'] as ContextFilter[]).map((ctx) => (
-            <button
-              key={ctx}
-              onClick={() => setContextFilter(ctx)}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
-                contextFilter === ctx
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-app-surface-sunken text-app-text-secondary hover:text-app-text'
-              }`}
-            >
-              {ctx === 'all' ? 'All' : ctx === 'personal' ? 'Personal' : 'Business'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Detail panel (right side overlay on mobile, inline on desktop) */}
-      {selectedNotif && (
-        <div className="mb-4 bg-app-surface rounded-xl border border-app-border p-5">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl flex-shrink-0">{selectedNotif.icon || '🔔'}</span>
-              <div>
-                <h2 className="text-base font-semibold text-app-text">
-                  {selectedNotif.title}
-                </h2>
-                <p className="text-xs text-app-text-muted mt-0.5">
-                  {formatDate(selectedNotif.created_at)}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setSelectedNotif(null)}
-              className="p-1.5 hover:bg-app-hover rounded-lg transition text-app-text-muted hover:text-app-text-secondary"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {selectedNotif.body && (
-            <p className="text-sm text-app-text-strong leading-relaxed whitespace-pre-wrap">
-              {selectedNotif.body}
-            </p>
-          )}
-
-          {selectedNotif.link && (
-            <button
-              onClick={() => router.push(selectedNotif.link!)}
-              className="mt-4 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition"
-            >
-              View Details →
-            </button>
-          )}
-
-          <div className="mt-4 pt-3 border-t border-app-border-subtle flex items-center gap-3">
-            <span className="text-xs text-app-text-muted capitalize">
-              Type: {selectedNotif.type?.replace(/_/g, ' ')}
-            </span>
-            <button
-              onClick={() => handleDelete(selectedNotif.id)}
-              className="text-xs text-red-500 hover:text-red-700 font-medium ml-auto"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Notification list */}
-      {loading ? (
-        <div className="text-center py-16">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-600 mx-auto" />
-          <p className="mt-4 text-sm text-app-text-secondary">Loading notifications...</p>
-        </div>
-      ) : displayedNotifications.length === 0 ? (
-        <div className="text-center py-16 bg-app-surface rounded-xl border border-app-border">
-          <div className="text-5xl mb-3">🔔</div>
-          <h3 className="text-lg font-semibold text-app-text mb-1">
-            {filter === 'unread' ? 'No unread notifications' : filter === 'read' ? 'No read notifications' : 'No notifications yet'}
-          </h3>
-          <p className="text-sm text-app-text-secondary">
-            {filter === 'all'
-              ? "We'll notify you when something happens."
-              : 'Try a different filter.'}
-          </p>
-        </div>
-      ) : (
-        <div>
-          <div
-            ref={listScrollRef}
-            className="overflow-y-auto"
-            style={{ maxHeight: 'calc(100vh - 260px)' }}
-          >
-            <div
-              style={{
-                height: `${virtualizer.getTotalSize()}px`,
-                width: '100%',
-                position: 'relative',
-              }}
-            >
-              {virtualizer.getVirtualItems().map((virtualRow) => {
-                const item = flatItems[virtualRow.index];
-                return (
-                  <div
-                    key={item.type === 'header' ? item.key : item.notif.id}
-                    data-index={virtualRow.index}
-                    ref={virtualizer.measureElement}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
-                  >
-                    {item.type === 'header' ? (
-                      <h3 className="text-xs font-semibold text-app-text-muted uppercase tracking-wider mb-2 px-1 pt-4 first:pt-0">
-                        {item.label}
-                      </h3>
-                    ) : (
-                      <div
-                        className={`bg-app-surface border-l border-r border-app-border ${
-                          item.isFirst ? 'rounded-t-xl border-t' : ''
-                        } ${
-                          item.isLast ? 'rounded-b-xl border-b mb-4' : 'border-b border-b-app-border-subtle'
-                        } overflow-hidden`}
-                      >
-                        <NotificationRow
-                          notif={item.notif}
-                          isSelected={selectedNotif?.id === item.notif.id}
-                          onClick={handleNotificationClick}
-                          onDelete={handleDelete}
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Load more */}
-          {hasMore && (
-            <div className="text-center py-3">
-              <button
-                onClick={() => loadNotifications(false)}
-                disabled={loadingMore}
-                className="px-4 py-2 text-sm font-medium text-app-text-secondary hover:text-app-text hover:bg-app-hover rounded-lg transition disabled:opacity-50"
-              >
-                {loadingMore ? 'Loading...' : 'Load more'}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    <ListOfRowsShell
+      title="Notifications"
+      state={state}
+      onRefresh={() => notifQuery.refetch()}
+      onLoadMore={() => notifQuery.fetchNextPage()}
+      tabs={[
+        { id: 'all', label: 'All', count: notifications.length },
+        { id: 'unread', label: 'Unread', count: unreadCount },
+      ]}
+      selectedTab={tab}
+      onTabChange={(id) => setTab(id as Tab)}
+      topBarAction={{
+        icon: CheckCheck,
+        label: 'Mark all read',
+        accessibilityLabel: 'Mark all read',
+        isEnabled: unreadCount > 0,
+        onClick: handleMarkAllRead,
+      }}
+    />
   );
-}
-
-// Group notifications by date
-function groupByDate(notifications: Notification[]) {
-  const groups: { label: string; items: Notification[] }[] = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const weekAgo = new Date(today);
-  weekAgo.setDate(weekAgo.getDate() - 7);
-
-  const buckets: Record<string, Notification[]> = {};
-
-  for (const notif of notifications) {
-    const d = new Date(notif.created_at);
-    d.setHours(0, 0, 0, 0);
-    let label: string;
-
-    if (d >= today) {
-      label = 'Today';
-    } else if (d >= yesterday) {
-      label = 'Yesterday';
-    } else if (d >= weekAgo) {
-      label = 'This Week';
-    } else {
-      label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    }
-
-    if (!buckets[label]) buckets[label] = [];
-    buckets[label].push(notif);
-  }
-
-  for (const [label, items] of Object.entries(buckets)) {
-    groups.push({ label, items });
-  }
-
-  return groups;
 }

@@ -183,14 +183,45 @@ public extension ListOfRowsDataSource {
 }
 
 /// Top-bar trailing action payload.
+///
+/// T5.0 additive: `label` and `isEnabled` are new optional fields with
+/// backwards-compatible defaults. Existing call sites pass
+/// `(icon:, accessibilityLabel:, handler:)` and render as an icon-only
+/// button. Notifications V2 passes a text `label` instead — the shell
+/// renders the text in primary tint and respects `isEnabled` for the
+/// disabled state in the design's empty-unread frame.
 public struct TopBarAction: Sendable {
     public let icon: PantopusIcon
+    public let label: String?
     public let accessibilityLabel: String
+    public let isEnabled: Bool
     public let handler: @Sendable () -> Void
 
-    public init(icon: PantopusIcon, accessibilityLabel: String, handler: @escaping @Sendable () -> Void) {
+    public init(
+        icon: PantopusIcon,
+        accessibilityLabel: String,
+        handler: @escaping @Sendable () -> Void
+    ) {
         self.icon = icon
+        label = nil
         self.accessibilityLabel = accessibilityLabel
+        isEnabled = true
+        self.handler = handler
+    }
+
+    /// Text-button variant — renders `label` instead of the icon. Used by
+    /// Notifications "Mark all read".
+    public init(
+        label: String,
+        accessibilityLabel: String,
+        isEnabled: Bool = true,
+        icon: PantopusIcon = .check,
+        handler: @escaping @Sendable () -> Void
+    ) {
+        self.icon = icon
+        self.label = label
+        self.accessibilityLabel = accessibilityLabel
+        self.isEnabled = isEnabled
         self.handler = handler
     }
 }

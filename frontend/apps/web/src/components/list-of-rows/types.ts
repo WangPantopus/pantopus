@@ -187,6 +187,11 @@ export interface TopBarAction {
   icon: LucideIcon;
   accessibilityLabel: string;
   onClick: () => void;
+  /** Text-button label. When set, the shell renders the text in primary
+   *  tint instead of the icon. Used by Notifications V2 "Mark all read". */
+  label?: string;
+  /** When false, renders the action greyed-out and ignores taps. */
+  isEnabled?: boolean;
 }
 
 export type FabVariant =

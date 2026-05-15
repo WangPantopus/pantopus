@@ -18,6 +18,7 @@ playwright-report/
 # Test/build output
 coverage/
 dist/
+tsconfig.tsbuildinfo
 
 # Logs
 *.log

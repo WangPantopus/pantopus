@@ -140,13 +140,7 @@ fun ListOfRowsScreen(
                 },
                 actions = {
                     if (topBarAction != null) {
-                        IconButton(onClick = topBarAction.onClick) {
-                            PantopusIconImage(
-                                icon = topBarAction.icon,
-                                contentDescription = topBarAction.contentDescription,
-                                tint = PantopusColors.appText,
-                            )
-                        }
+                        TopBarActionButton(action = topBarAction)
                     }
                 },
                 colors =
@@ -1192,6 +1186,48 @@ private fun LeadingBadge() {
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appTextInverse,
         )
+    }
+}
+
+// ─── Top-bar action ────────────────────────────────────────────
+
+@Composable
+private fun TopBarActionButton(action: TopBarAction) {
+    val tint =
+        if (action.isEnabled) PantopusColors.primary600 else PantopusColors.appTextMuted
+    val iconTint =
+        if (action.isEnabled) PantopusColors.appText else PantopusColors.appTextMuted
+    if (action.label != null) {
+        Box(
+            modifier =
+                Modifier
+                    .heightIn(min = 36.dp)
+                    .clip(RoundedCornerShape(Radii.sm))
+                    .clickable(enabled = action.isEnabled, onClick = action.onClick)
+                    .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
+                    .semantics { contentDescription = action.contentDescription }
+                    .testTag("listOfRowsTopBarAction"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = action.label,
+                style = PantopusTextStyle.small,
+                fontWeight = FontWeight.SemiBold,
+                color = tint,
+            )
+        }
+    } else {
+        IconButton(
+            onClick = action.onClick,
+            enabled = action.isEnabled,
+            modifier = Modifier.testTag("listOfRowsTopBarAction"),
+        ) {
+            PantopusIconImage(
+                icon = action.icon,
+                contentDescription = action.contentDescription,
+                tint = iconTint,
+            )
+        }
     }
 }
 

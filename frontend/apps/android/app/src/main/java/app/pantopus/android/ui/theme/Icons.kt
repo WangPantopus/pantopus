@@ -6,10 +6,12 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -21,6 +23,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.GppGood
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InsertDriveFile
@@ -44,6 +48,7 @@ import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ShoppingBag
@@ -51,7 +56,9 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.Work
@@ -127,6 +134,13 @@ enum class PantopusIcon(
     Briefcase("briefcase"),
     Gavel("gavel"),
     SlidersHorizontal("sliders-horizontal"),
+    MessageCircle("message-circle"),
+    AtSign("at-sign"),
+    BadgeCheck("badge-check"),
+    Tag("tag"),
+    ShieldAlert("shield-alert"),
+    CheckCheck("check-check"),
+    History("history"),
     ;
 
     companion object {
@@ -217,6 +231,13 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Briefcase -> IconSource.Material(Icons.Filled.Work)
         PantopusIcon.Gavel -> IconSource.Material(Icons.Filled.Gavel)
         PantopusIcon.SlidersHorizontal -> IconSource.Material(Icons.Filled.Tune)
+        PantopusIcon.MessageCircle -> IconSource.Material(Icons.AutoMirrored.Filled.Chat)
+        PantopusIcon.AtSign -> IconSource.Material(Icons.Filled.AlternateEmail)
+        PantopusIcon.BadgeCheck -> IconSource.Material(Icons.Filled.VerifiedUser)
+        PantopusIcon.Tag -> IconSource.Material(Icons.Filled.Sell)
+        PantopusIcon.ShieldAlert -> IconSource.Material(Icons.Filled.Warning)
+        PantopusIcon.CheckCheck -> IconSource.Material(Icons.Filled.DoneAll)
+        PantopusIcon.History -> IconSource.Material(Icons.Filled.History)
     }
 
 /**

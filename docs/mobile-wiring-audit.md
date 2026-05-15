@@ -32,7 +32,7 @@ States: loading (button progress), populated, error (inline). No stubs.
 | Element | Action | Wiring |
 |---|---|---|
 | Pull-to-refresh | `viewModel.refresh()` | Endpoints: `GET /api/hub` (hub.js:24), `GET /api/hub/today` (hub.js:596), `GET /api/hub/discovery` (hub.js:757) |
-| Bell (`onBellTap`) | `.openNotifications` | Intent → `HubRoute.notifications` → `NotYetAvailableView("Notifications")`. **Deferred:** T4.1 replaces with real notifications center. |
+| Bell (`onBellTap`) | `.openNotifications` | Intent → `HubRoute.notifications` → real `NotificationsView` / `NotificationsScreen` (T5.1 Notifications V2). Endpoints: `GET /api/notifications` · `PATCH /api/notifications/:id/read` · `POST /api/notifications/read-all`. |
 | Menu (`onMenuTap`) | `.openMenu` | Intent → `HubRoute.menu` → `NotYetAvailableView("Menu")`. **Deferred:** T3.1 (Settings). |
 | Action chip — Post Task | `.action(.postTask)` | Intent → `NotYetAvailableView("Post a gig")`. **Deferred:** T2.3 (Gigs). |
 | Action chip — Snap & Sell | `.action(.snapAndSell)` | Intent → `NotYetAvailableView("Snap & sell")`. **Deferred:** T2.5 (Marketplace). |

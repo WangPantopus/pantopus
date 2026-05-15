@@ -57,9 +57,27 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource>: View {
             if let action = dataSource.topBarAction {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: action.handler) {
-                        Icon(action.icon, size: 22)
+                        if let label = action.label {
+                            Text(label)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(
+                                    action.isEnabled
+                                        ? Theme.Color.primary600
+                                        : Theme.Color.appTextMuted
+                                )
+                        } else {
+                            Icon(
+                                action.icon,
+                                size: 22,
+                                color: action.isEnabled
+                                    ? Theme.Color.appText
+                                    : Theme.Color.appTextMuted
+                            )
+                        }
                     }
+                    .disabled(!action.isEnabled)
                     .accessibilityLabel(action.accessibilityLabel)
+                    .accessibilityIdentifier("listOfRowsTopBarAction")
                 }
             }
         }
