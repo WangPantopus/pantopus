@@ -8,14 +8,14 @@ import com.squareup.moshi.JsonClass
 /** Envelope from `GET /api/identity-center`. */
 @JsonClass(generateAdapter = true)
 data class IdentityCenterResponse(
-    val privateAccount: PrivateAccountDto? = null,
-    val localProfile: LocalProfileDto? = null,
-    val audienceProfile: AudienceProfileDto? = null,
+    @Json(name = "private_account") val privateAccount: PrivateAccountDto? = null,
+    @Json(name = "local_profile") val localProfile: LocalProfileDto? = null,
+    @Json(name = "audience_profile") val audienceProfile: AudienceProfileDto? = null,
     val bridges: BridgesDto? = null,
     val homes: List<HomeIdentityDto>? = null,
-    val businessProfiles: List<BusinessIdentityDto>? = null,
-    val personaCount: Int? = null,
-    val blockCounts: BlockCountsDto? = null,
+    @Json(name = "business_profiles") val businessProfiles: List<BusinessIdentityDto>? = null,
+    @Json(name = "persona_count") val personaCount: Int? = null,
+    @Json(name = "block_counts") val blockCounts: BlockCountsDto? = null,
 )
 
 @JsonClass(generateAdapter = true)
