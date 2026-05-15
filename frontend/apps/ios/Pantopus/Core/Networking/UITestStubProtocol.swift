@@ -163,6 +163,15 @@ final class UITestStubProtocol: URLProtocol {
             && path.hasSuffix("/accept"):
             finishWith(status: 200, body: Data(Self.defaultHomeAcceptJSON.utf8))
 
+        case ("GET", "/api/mailbox/compose/recipients"):
+            finishWith(status: 200, body: Data(Self.defaultMailComposeRecipientsJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/mailbox/compose/home-context/"):
+            finishWith(status: 200, body: Data(Self.defaultMailComposeHomeContextJSON.utf8))
+
+        case ("POST", "/api/mailbox/send"):
+            finishWith(status: 200, body: Data(Self.defaultMailSendJSON.utf8))
+
         // The handshake screen calls GET /api/personas/:handle ahead
         // of its tiers / suggestion / status fetches. Match exactly 3
         // path segments (`/api`, `/personas`, `/<handle>`) so the
@@ -448,6 +457,37 @@ final class UITestStubProtocol: URLProtocol {
       "merged": false,
       "accepted_role_base": "co_owner"
     }
+    """
+
+    /// Ceremonial Mail Compose recipients list — used by the
+    /// 19_CeremonialMail screenshot.
+    static let defaultMailComposeRecipientsJSON = """
+    {"recipients":[
+      {"userId":"u_maya","name":"Maya K.","username":"mayak",
+       "homeId":"home_demo","homeAddress":"412 Elm St, Portland, OR",
+       "isVerified":true,"homeMediaUrl":null,"isOnPantopus":true},
+      {"userId":"u_omar","name":"Omar B.","username":"omarb",
+       "homeId":"home_omar","homeAddress":"77 Birch Ln, Portland, OR",
+       "isVerified":false,"homeMediaUrl":null,"isOnPantopus":true}
+    ]}
+    """
+
+    static let defaultMailComposeHomeContextJSON = """
+    {
+      "homeId":"home_demo",
+      "addressDisplay":"412 Elm St, Portland, OR",
+      "memberCount":2,
+      "homeMediaUrl":null,
+      "privateDeliveryAvailable":true,
+      "members":[
+        {"userId":"u_maya","name":"Maya K.","role":"co_owner"},
+        {"userId":"u_alice","name":"Alice D.","role":"co_owner"}
+      ]
+    }
+    """
+
+    static let defaultMailSendJSON = """
+    {"message":"Letter sent","mail":{"id":"mail_demo","subject":"A note from a friend","created_at":"2026-05-15T12:00:00Z"}}
     """
 
     /// Identity Center overview — all four identities populated so the

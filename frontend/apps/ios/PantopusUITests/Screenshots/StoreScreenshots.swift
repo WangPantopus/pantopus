@@ -210,6 +210,20 @@ final class StoreScreenshots: XCTestCase {
                 .matching(identifier: "meIdentityPill_personal").firstMatch.tap()
         }
 
+        // You tab → debug menu → Ceremonial Mail Compose (T3.7).
+        let ceremonialRow = app.descendants(matching: .any)
+            .matching(identifier: "meSectionRow_debug_openCeremonialMail").firstMatch
+        if ceremonialRow.waitForExistence(timeout: 3) {
+            ceremonialRow.tap()
+            if app.descendants(matching: .any)
+                .matching(identifier: "ceremonialMail").firstMatch
+                .waitForExistence(timeout: 5)
+            {
+                snapshot("19_CeremonialMail")
+            }
+            app.buttons["wizardLeadingButton"].firstMatch.tap()
+        }
+
         // You tab → debug menu → Status / Waiting (T3.6) so the
         // marketing matrix has a visual of the claim-submitted frame.
         let statusRow = app.descendants(matching: .any)

@@ -69,6 +69,7 @@ fun YouScreen(
     onDisambiguateMail: (String) -> Unit = {},
     onOpenPrivacyHandshake: (String) -> Unit = {},
     onOpenInviteToken: (String) -> Unit = {},
+    onOpenCeremonialMail: () -> Unit = {},
     onOpenPlaceholder: (String) -> Unit = {},
     onOpenMailbox: () -> Unit = {},
     onOpenEditProfile: () -> Unit = {},
@@ -107,6 +108,7 @@ fun YouScreen(
                 "me.debug.disambiguate" -> if (BuildConfig.DEBUG) debugDisambiguateDialog = true
                 "me.debug.openHandshake" -> if (BuildConfig.DEBUG) debugHandshakeDialog = true
                 "me.debug.openInviteToken" -> if (BuildConfig.DEBUG) debugInviteTokenDialog = true
+                "me.debug.openCeremonialMail" -> if (BuildConfig.DEBUG) onOpenCeremonialMail()
                 else -> onOpenPlaceholder(row.label)
             }
         },

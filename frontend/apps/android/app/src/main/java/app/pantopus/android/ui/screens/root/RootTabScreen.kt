@@ -76,6 +76,7 @@ import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
+import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.identity_center.IdentityCenterScreen
@@ -123,6 +124,9 @@ private object ChildRoutes {
 
     /** Public Profile management / Creator audience dashboard (T3.3). */
     const val AUDIENCE_PROFILE = "audience-profile"
+
+    /** Ceremonial Mail Compose wizard (T3.7). */
+    const val CEREMONIAL_MAIL = "mailbox/compose-letter"
 
     /** Privacy Handshake wizard (T3.4). `:handle` is the persona being followed. */
     const val PRIVACY_HANDSHAKE_HANDLE_KEY = "personaHandle"
@@ -414,6 +418,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenInviteToken = { token ->
                         navController.navigate(ChildRoutes.tokenAccept(token))
+                    },
+                    onOpenCeremonialMail = {
+                        navController.navigate(ChildRoutes.CEREMONIAL_MAIL)
                     },
                     onOpenMailbox = { navController.navigate(ChildRoutes.MAILBOX_LIST) },
                     onOpenEditProfile = {
@@ -746,6 +753,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             ) {
                 TokenAcceptScreen(
                     onDismiss = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.CEREMONIAL_MAIL) {
+                CeremonialMailWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenMail = { mailId ->
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                    },
                 )
             }
             composable(ChildRoutes.AUDIENCE_PROFILE) {

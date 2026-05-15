@@ -22,6 +22,7 @@ public enum YouRoute: Hashable {
     case pulsePost(postId: String)
     case privacyHandshake(personaHandle: String)
     case statusWaiting
+    case ceremonialMail
     #endif
 }
 
@@ -233,6 +234,9 @@ public struct YouTabRoot: View {
         case "me.debug.openStatusWaiting":
             path.append(.statusWaiting)
             return
+        case "me.debug.openCeremonialMail":
+            path.append(.ceremonialMail)
+            return
         default:
             break
         }
@@ -315,6 +319,11 @@ public struct YouTabRoot: View {
                 content: .claimSubmitted(homeName: "412 Elm St"),
                 onPrimary: { _ in if !path.isEmpty { path.removeLast() } },
                 onSecondary: { _ in if !path.isEmpty { path.removeLast() } }
+            )
+        case .ceremonialMail:
+            CeremonialMailWizardView(
+                onDismiss: { if !path.isEmpty { path.removeLast() } },
+                onOpenMail: { _ in if !path.isEmpty { path.removeLast() } }
             )
         #endif
         }
