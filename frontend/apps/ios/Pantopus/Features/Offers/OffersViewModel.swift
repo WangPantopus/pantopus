@@ -26,7 +26,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length
 
 /// Stable tab ids — public so the screen + tests address them without
 /// stringly-typed call sites.
@@ -215,7 +215,7 @@ public final class OffersViewModel: ListOfRowsDataSource {
     private var sent: [BidDTO] = []
     private var loadedAtLeastOnce = false
 
-    public init(
+    init(
         api: APIClient = .shared,
         onOpenOfferDetail: @escaping @MainActor (BidDTO) -> Void = { _ in },
         onOpenFilters: @escaping @MainActor () -> Void = {},
@@ -502,7 +502,7 @@ public final class OffersViewModel: ListOfRowsDataSource {
         let interval = now.timeIntervalSince(date)
         if interval < 60 { return "now" }
         if interval < 3600 { return "\(Int(interval / 60))m" }
-        if interval < 86_400 { return "\(Int(interval / 3600))h" }
+        if interval < 86400 { return "\(Int(interval / 3600))h" }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .current
         let startOfNow = calendar.startOfDay(for: now)

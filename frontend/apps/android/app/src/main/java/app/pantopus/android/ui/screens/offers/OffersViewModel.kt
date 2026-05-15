@@ -6,6 +6,7 @@
     "ComplexMethod",
     "CyclomaticComplexMethod",
     "LongParameterList",
+    "ReturnCount",
 )
 
 package app.pantopus.android.ui.screens.offers
@@ -536,6 +537,5 @@ class OffersViewModel
                     }
                 }
             }
-
         }
     }

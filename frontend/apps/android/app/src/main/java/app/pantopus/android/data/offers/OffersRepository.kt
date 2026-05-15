@@ -21,6 +21,5 @@ class OffersRepository
     ) {
         suspend fun myBids(limit: Int = 100): NetworkResult<MyBidsResponse> = safeApiCall { api.myBids(limit) }
 
-        suspend fun receivedOffers(limit: Int = 100): NetworkResult<ReceivedOffersResponse> =
-            safeApiCall { api.receivedOffers(limit) }
+        suspend fun receivedOffers(limit: Int = 100): NetworkResult<ReceivedOffersResponse> = safeApiCall { api.receivedOffers(limit) }
     }

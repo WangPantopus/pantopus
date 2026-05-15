@@ -1,4 +1,11 @@
-@file:Suppress("UnusedPrivateMember", "LongMethod", "PackageNaming", "MagicNumber")
+@file:Suppress(
+    "UnusedPrivateMember",
+    "LongMethod",
+    "PackageNaming",
+    "MagicNumber",
+    "LongParameterList",
+    "CyclomaticComplexMethod",
+)
 
 package app.pantopus.android.ui.screens.you
 

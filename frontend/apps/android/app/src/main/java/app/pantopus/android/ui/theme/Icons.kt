@@ -13,7 +13,7 @@ import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.AutoRenew
+import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -256,7 +256,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.History -> IconSource.Material(Icons.Filled.History)
         PantopusIcon.Sparkles -> IconSource.Material(Icons.Filled.AutoAwesome)
         PantopusIcon.Timer -> IconSource.Material(Icons.Filled.Timer)
-        PantopusIcon.ArrowsRepeat -> IconSource.Material(Icons.Filled.AutoRenew)
+        PantopusIcon.ArrowsRepeat -> IconSource.Material(Icons.Filled.Autorenew)
         PantopusIcon.Hourglass -> IconSource.Material(Icons.Filled.HourglassEmpty)
         PantopusIcon.HandCoins -> IconSource.Material(Icons.Filled.Payments)
         PantopusIcon.Package -> IconSource.Material(Icons.Filled.Inventory2)

@@ -19,6 +19,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable type_body_length
+
 @MainActor
 final class OffersViewModelTests: XCTestCase {
     override func setUp() {
@@ -51,9 +53,8 @@ final class OffersViewModelTests: XCTestCase {
 
     private func makeVM(api: APIClient? = nil) -> OffersViewModel {
         OffersViewModel(
-            api: api ?? makeAPI(),
-            now: { Self.fixedNow }
-        )
+            api: api ?? makeAPI()
+        ) { Self.fixedNow }
     }
 
     private static let oneReceivedOneSentJSON = (received: """

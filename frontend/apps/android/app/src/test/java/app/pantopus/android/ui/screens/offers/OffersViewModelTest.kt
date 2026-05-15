@@ -1,4 +1,4 @@
-@file:Suppress("LongMethod", "PackageNaming")
+@file:Suppress("LongMethod", "PackageNaming", "LongParameterList")
 
 package app.pantopus.android.ui.screens.offers
 
