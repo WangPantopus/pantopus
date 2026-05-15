@@ -84,7 +84,7 @@ public struct FanDTO: Decodable, Sendable, Hashable, Identifiable {
     public let tenureMonths: Int?
     public let cancelAtPeriodEnd: Bool?
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         // Server emits `membershipId` (no separate `id`); map either
         // key to our `id` so the serializer evolution stays compatible.

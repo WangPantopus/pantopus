@@ -31,7 +31,7 @@ public enum APIError: Error, LocalizedError, Sendable {
     /// underlying `URLError` for diagnostics.
     case transport(underlying: URLError)
     /// Response decoded into an unexpected shape. Carries the decoder error.
-    case decoding(underlying: Error)
+    case decoding(underlying: any Error)
     /// All retries exhausted without success.
     case retriesExhausted
 

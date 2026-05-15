@@ -311,7 +311,7 @@ public final class PrivacyHandshakeViewModel: WizardModel {
         }
     }
 
-    private func handleSubmitError(_ error: Error) {
+    private func handleSubmitError(_ error: any Error) {
         guard var current = ready else { return }
         var handle = current.handle
         let parsed = Self.parseHandshakeError(error)
@@ -346,7 +346,7 @@ public final class PrivacyHandshakeViewModel: WizardModel {
 
     /// Public for VM tests — maps an APIError into the user-facing
     /// branch the handle row should render.
-    static func parseHandshakeError(_ error: Error) -> HandshakeErrorKind {
+    static func parseHandshakeError(_ error: any Error) -> HandshakeErrorKind {
         guard let apiError = error as? APIError,
               case let .clientError(status, message) = apiError
         else { return .other }

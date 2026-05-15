@@ -67,7 +67,7 @@ public struct UploadEvidenceRequest: Encodable, Sendable, Hashable {
         self.metadata = metadata
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(evidenceType, forKey: .evidenceType)
         try c.encode(provider, forKey: .provider)

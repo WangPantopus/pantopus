@@ -59,7 +59,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(
         _: UIApplication,
-        didFailToRegisterForRemoteNotificationsWithError error: Error
+        didFailToRegisterForRemoteNotificationsWithError error: any Error
     ) {
         logger.error("APNs registration failed", metadata: ["error": .string(error.localizedDescription)])
         Task { @MainActor in Observability.shared.capture(error) }

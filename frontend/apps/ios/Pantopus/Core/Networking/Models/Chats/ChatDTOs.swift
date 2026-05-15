@@ -83,7 +83,7 @@ public struct UnifiedConversation: Decodable, Sendable, Hashable, Identifiable {
         case verified
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: RootKeys.self)
         let rawType = try c.decodeIfPresent(String.self, forKey: .type) ?? "conversation"
         kind = Kind(rawValue: rawType) ?? .conversation
@@ -243,7 +243,7 @@ public struct ChatMessageDTO: Decodable, Sendable, Hashable, Identifiable {
         case sender
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         roomId = try c.decode(String.self, forKey: .roomId)

@@ -383,7 +383,7 @@ struct AnyEncodable: Encodable, @unchecked Sendable {
         encodeClosure = wrapped.encode
     }
 
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         try encodeClosure(encoder)
     }
 }

@@ -67,8 +67,11 @@ public final class ChatConversationViewModel {
     private var failedClientIds: Set<String> = []
     private var hasMore: Bool = false
     private var oldestCursor: String?
-    private var markReadTask: Task<Void, Never>?
-    private var socketTasks: [Task<Void, Never>] = []
+    // `nonisolated(unsafe)` lets `deinit` (which is nonisolated for a
+    // `@MainActor` class) tear these tasks down without warnings under
+    // Swift 6 strict concurrency. `Task` is `Sendable`.
+    private nonisolated(unsafe) var markReadTask: Task<Void, Never>?
+    private nonisolated(unsafe) var socketTasks: [Task<Void, Never>] = []
 
     init(
         mode: ChatThreadMode,
@@ -541,7 +544,7 @@ public final class ChatConversationViewModel {
         return f1.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
     }
 
-    private func friendlyMessage(_ error: Error) -> String {
+    private func friendlyMessage(_ error: any Error) -> String {
         (error as? APIError)?.errorDescription ?? "Couldn't load this conversation."
     }
 }

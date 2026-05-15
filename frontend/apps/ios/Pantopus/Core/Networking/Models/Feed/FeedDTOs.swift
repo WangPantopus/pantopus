@@ -43,7 +43,7 @@ public struct FeedPostDTO: Decodable, Sendable, Hashable, Identifiable {
         case creator
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         userId = try c.decode(String.self, forKey: .userId)

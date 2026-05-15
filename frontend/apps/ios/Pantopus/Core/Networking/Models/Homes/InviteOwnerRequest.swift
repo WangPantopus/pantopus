@@ -36,7 +36,7 @@ public struct InviteOwnerRequest: Encodable, Sendable, Hashable {
     /// instead of emitted as `null`. Backend's `inviteOwnerSchema`
     /// accepts both, but absent keys keep the request small and
     /// surface intent more cleanly to log readers.
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(email, forKey: .email)
         try c.encodeIfPresent(phone, forKey: .phone)
