@@ -77,7 +77,6 @@ import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.components.StatusChip
-import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.components.VerifiedBadge
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -586,7 +585,7 @@ private fun ErrorBanner(
 
 // ─── Row ───────────────────────────────────────────────────────
 
-private enum class RowCardContext { Standalone, Grouped }
+internal enum class RowCardContext { Standalone, Grouped }
 
 @Composable
 internal fun RowView(

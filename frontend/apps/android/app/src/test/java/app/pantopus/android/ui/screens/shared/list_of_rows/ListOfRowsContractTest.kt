@@ -7,7 +7,6 @@ import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -297,7 +296,7 @@ class ListOfRowsContractTest {
         val leading = RowModel(id = "o", title = "Offer", template = RowTemplate.StatusChip, highlight = RowHighlight.Leading)
         assertEquals(RowHighlight.Leading, leading.highlight)
         // Distinct types — guards against future enum collapse.
-        assertNotEquals<RowHighlight>(RowHighlight.Archived, RowHighlight.Leading)
+        assertTrue(RowHighlight.Archived != RowHighlight.Leading)
     }
 
     // ─── RowSection extensions ──────────────────────────────────
@@ -411,6 +410,6 @@ class ListOfRowsContractTest {
         val skyBg: Color = PantopusColors.primary200
         val violetBg: Color = PantopusColors.businessBg
         // Constructed colors are stable theme references (not arbitrary):
-        assertNotEquals(skyBg, violetBg)
+        assertTrue(skyBg != violetBg)
     }
 }

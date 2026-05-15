@@ -167,11 +167,19 @@ public protocol ListOfRowsDataSource: AnyObject, Observable {
 /// from these defaults.
 public extension ListOfRowsDataSource {
     /// Optional search bar above the tabs.
-    var searchBar: SearchBarConfig? { nil }
+    var searchBar: SearchBarConfig? {
+        nil
+    }
+
     /// Optional chip-filter strip (mutually exclusive with `tabs`).
-    var chipStrip: ChipStripConfig? { nil }
+    var chipStrip: ChipStripConfig? {
+        nil
+    }
+
     /// Optional summary banner above the first row.
-    var banner: BannerConfig? { nil }
+    var banner: BannerConfig? {
+        nil
+    }
 }
 
 /// Top-bar trailing action payload.

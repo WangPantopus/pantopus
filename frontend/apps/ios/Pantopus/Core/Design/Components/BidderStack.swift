@@ -106,7 +106,7 @@ public struct BidderStack: View {
         bidders: [
             Bidder(id: "1", initials: "AR", tone: .violet),
             Bidder(id: "2", initials: "MT", tone: .amber),
-            Bidder(id: "3", initials: "JP", tone: .teal),
+            Bidder(id: "3", initials: "JP", tone: .teal)
         ],
         overflow: 9
     )

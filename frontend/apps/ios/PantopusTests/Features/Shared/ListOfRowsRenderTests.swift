@@ -19,6 +19,8 @@ import SwiftUI
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable multiline_arguments trailing_closure type_body_length
+
 final class ListOfRowsRenderTests: XCTestCase {
     // MARK: - Backwards-compatible construction
 
@@ -57,7 +59,7 @@ final class ListOfRowsRenderTests: XCTestCase {
     }
 
     func testLegacyFabActionDefaultsToCanonicalCreate() {
-        let fab = FABAction(icon: .plus, accessibilityLabel: "Create") {}
+        let fab = FABAction(icon: .plusCircle, accessibilityLabel: "Create") {}
         if case .canonicalCreate = fab.variant {
             // ok — 56pt, matches T1–T4.1 geometry
         } else {
@@ -139,7 +141,7 @@ final class ListOfRowsRenderTests: XCTestCase {
     func testRowLeadingBidderStack() {
         let bidders = [
             Bidder(id: "b1", initials: "AR", tone: .violet),
-            Bidder(id: "b2", initials: "MT", tone: .amber),
+            Bidder(id: "b2", initials: "MT", tone: .amber)
         ]
         let leading: RowLeading = .bidderStack(bidders: bidders, overflow: 9)
         guard case let .bidderStack(got, overflow) = leading else {
@@ -233,14 +235,14 @@ final class ListOfRowsRenderTests: XCTestCase {
             trailing: .priceStack(amount: "$95", sublabel: "budget $120"),
             onTap: {},
             chips: [
-                RowChip(text: "Top bid", icon: .check, tint: .status(.success)),
+                RowChip(text: "Top bid", icon: .check, tint: .status(.success))
             ],
             metaTail: "· 3 others bid · 1d left to reply",
             footer: RowFooter(actions: [
                 RowFooterAction(title: "Withdraw", icon: .x, variant: .destructive) {},
                 RowFooterAction(title: "Edit bid", icon: .check, variant: .primary) {
                     primaryFired = true
-                },
+                }
             ])
         )
         XCTAssertEqual(row.chips?.count, 1)
@@ -383,7 +385,7 @@ final class ListOfRowsRenderTests: XCTestCase {
         let config = ChipStripConfig(
             chips: [
                 ChipStripConfig.Chip(id: "nearby", label: "Nearby", icon: .mapPin),
-                ChipStripConfig.Chip(id: "new", label: "New today"),
+                ChipStripConfig.Chip(id: "new", label: "New today")
             ],
             selectedId: "nearby",
             onSelect: { selected = $0 }
@@ -431,7 +433,7 @@ final class ListOfRowsRenderTests: XCTestCase {
             timeMeta: "1d",
             footer: RowFooter(actions: [
                 RowFooterAction(title: "Withdraw", icon: .x, variant: .destructive) {},
-                RowFooterAction(title: "Edit bid", icon: .check, variant: .primary) {},
+                RowFooterAction(title: "Edit bid", icon: .check, variant: .primary) {}
             ])
         )
         // The instances exist; SwiftUI's diff is exercised by the

@@ -13,6 +13,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 // MARK: - Shell
 
 /// List-of-rows shell.
@@ -147,7 +149,7 @@ private struct SearchBarRow: View {
 
     var body: some View {
         HStack(spacing: Spacing.s2) {
-            Icon(.search, size: 16, color: Theme.Color.appTextSecondary)
+            Icon(PantopusIcon.search, size: 16, color: Theme.Color.appTextSecondary)
             TextField(config.placeholder, text: Binding(
                 get: { localText.isEmpty ? config.text : localText },
                 set: { value in
@@ -155,9 +157,10 @@ private struct SearchBarRow: View {
                     config.onChange(value)
                 }
             ))
-            .pantopusTextStyle(.small)
+            .font(Theme.Font.role(PantopusTextStyle.small))
+            .tracking(PantopusTextStyle.small.tracking)
             .foregroundStyle(Theme.Color.appText)
-            .submitLabel(.search)
+            .submitLabel(SubmitLabel.search)
             .onSubmit { config.onSubmit?() }
         }
         .padding(.horizontal, Spacing.s3)
@@ -211,7 +214,9 @@ private struct ChipStripRow: View {
         .background(Theme.Color.appSurface)
     }
 
-    private func isOn(_ id: String) -> Bool { config.selectedId == id }
+    private func isOn(_ id: String) -> Bool {
+        config.selectedId == id
+    }
 
     private func background(for id: String) -> Color {
         isOn(id) ? Theme.Color.primary600 : Theme.Color.appSurface
@@ -346,8 +351,6 @@ private struct LoadedList: View {
                     .accessibilityLabel("See all \(header)")
                 }
             }
-        } else {
-            EmptyView()
         }
     }
 }
@@ -502,7 +505,7 @@ private struct RowView: View {
         }
     }
 
-    @ViewBuilder private var cardBody: some View {
+    private var cardBody: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             if row.highlight == .leading {
                 LeadingBadge()
@@ -523,7 +526,7 @@ private struct RowView: View {
         }
     }
 
-    @ViewBuilder private var contentColumn: some View {
+    private var contentColumn: some View {
         VStack(alignment: .leading, spacing: 2) {
             titleLine
             if let subtitle = row.subtitle {
@@ -550,7 +553,7 @@ private struct RowView: View {
         }
     }
 
-    @ViewBuilder private var titleLine: some View {
+    private var titleLine: some View {
         HStack(alignment: .center, spacing: Spacing.s1) {
             Text(row.title)
                 .pantopusTextStyle(.body)
@@ -598,9 +601,9 @@ private struct LeadingView: View {
         case let .avatar(name, imageURL, identity, ringProgress):
             AvatarWithIdentityRing(
                 name: name,
+                imageURL: imageURL,
                 identity: identity,
-                ringProgress: ringProgress,
-                imageURL: imageURL
+                ringProgress: ringProgress
             )
         case .none:
             EmptyView()

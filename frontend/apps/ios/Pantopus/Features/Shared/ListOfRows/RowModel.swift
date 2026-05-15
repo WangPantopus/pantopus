@@ -22,6 +22,8 @@
 
 import SwiftUI
 
+// swiftlint:disable enum_case_associated_values_count
+
 /// Visual template for a list row.
 public enum RowTemplate: Sendable {
     /// Title + optional subtitle + trailing status chip.

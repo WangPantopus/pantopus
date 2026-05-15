@@ -33,7 +33,9 @@ public enum CompactButtonSize: Sendable, Hashable {
         }
     }
 
-    public var inlineSecondaryHeight: CGFloat { 28 }
+    public var inlineSecondaryHeight: CGFloat {
+        28
+    }
 }
 
 /// Compact in-row action button.
