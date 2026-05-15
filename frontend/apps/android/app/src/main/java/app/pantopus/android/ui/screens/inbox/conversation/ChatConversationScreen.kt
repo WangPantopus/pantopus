@@ -133,7 +133,7 @@ private fun String.firstWord(): String = split(" ").firstOrNull() ?: this
 // MARK: - Header
 
 @Composable
-private fun ChatHeader(
+internal fun ChatHeader(
     counterparty: ChatCounterparty,
     onBack: () -> Unit,
 ) {
@@ -358,7 +358,7 @@ private fun LoadingFrame() {
 }
 
 @Composable
-private fun EmptyFrame(
+internal fun EmptyFrame(
     counterparty: ChatCounterparty,
     aiPrompts: List<ChatPromptChip>,
     emptyChips: List<ChatPromptChip>,
@@ -558,7 +558,7 @@ private fun AiWelcomeFrame(
 }
 
 @Composable
-private fun PopulatedFrame(
+internal fun PopulatedFrame(
     rows: List<ChatTimelineRow>,
     onRetry: (String) -> Unit,
     onLoadOlder: () -> Unit,
@@ -880,7 +880,7 @@ private fun TypingIndicator(name: String) {
 }
 
 @Composable
-private fun Composer(
+internal fun Composer(
     text: String,
     placeholder: String,
     canSend: Boolean,

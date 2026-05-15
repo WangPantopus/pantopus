@@ -335,6 +335,22 @@ public final class ChatConversationViewModel {
                 self.handleDelete(event)
             }
         })
+        socketTasks.append(Task { [weak self] in
+            guard let self else { return }
+            for await event in self.socket.events(named: "message:react", as: ChatRealtimeReaction.self) {
+                self.handleReaction(event)
+            }
+        })
+    }
+
+    /// Merge a reaction count update into the matching message. The
+    /// minimal patch is the count — the projection re-derives the
+    /// delivery state + stamp from the existing message fields.
+    private func handleReaction(_ event: ChatRealtimeReaction) {
+        guard messages.contains(where: { $0.id == event.messageId }) else { return }
+        // Reactions don't change the message body — just trigger a
+        // re-fetch so the server count is canonical.
+        Task { await self.refresh() }
     }
 
     private func handleIncoming(_ event: ChatRealtimeMessage) {

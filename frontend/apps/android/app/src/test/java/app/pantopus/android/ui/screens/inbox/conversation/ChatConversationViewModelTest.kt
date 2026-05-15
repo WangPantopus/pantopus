@@ -152,4 +152,76 @@ class ChatConversationViewModelTest {
             vm.load()
             assertTrue(vm.state.value is ChatConversationUiState.Error)
         }
+
+    @Test fun load_older_paginates_backward() =
+        runTest {
+            val initial =
+                ChatMessagesResponse(
+                    messages = listOf(message(id = "m2", userId = "u_other", text = "hi")),
+                    hasMore = true,
+                )
+            val older =
+                ChatMessagesResponse(
+                    messages =
+                        listOf(
+                            message(id = "m1", userId = "u_other", text = "earlier", createdAt = "2026-04-20T09:59:00.000Z"),
+                        ),
+                    hasMore = false,
+                )
+            coEvery {
+                repo.conversationMessages(any(), any(), any(), any())
+            } returnsMany listOf(NetworkResult.Success(initial), NetworkResult.Success(older))
+            val vm = ChatConversationViewModel(repo, socket)
+            vm.configure(
+                mode = ChatThreadMode.Person(otherUserId = "u_other"),
+                counterparty = counterpartyPerson,
+                currentUserId = "u_me",
+            )
+            vm.load()
+            vm.loadOlder()
+            val loaded = vm.state.value as ChatConversationUiState.Loaded
+            val bubbleIds =
+                loaded.rows
+                    .filterIsInstance<ChatTimelineRow.Bubble>()
+                    .map { it.content.id }
+            assertTrue("expected both pages merged, got $bubbleIds", bubbleIds.containsAll(listOf("m1", "m2")))
+        }
+
+    @Test fun refresh_merges_new_message_into_loaded_thread() =
+        runTest {
+            val first =
+                ChatMessagesResponse(
+                    messages = listOf(message(id = "m1", userId = "u_other", text = "hi")),
+                    hasMore = false,
+                )
+            val second =
+                ChatMessagesResponse(
+                    messages =
+                        listOf(
+                            message(id = "m1", userId = "u_other", text = "hi"),
+                            message(id = "m2", userId = "u_other", text = "follow-up", createdAt = "2026-04-20T10:01:00.000Z"),
+                        ),
+                    hasMore = false,
+                )
+            coEvery {
+                repo.conversationMessages(any(), any(), any(), any())
+            } returnsMany listOf(NetworkResult.Success(first), NetworkResult.Success(second))
+            val vm = ChatConversationViewModel(repo, socket)
+            vm.configure(
+                mode = ChatThreadMode.Person(otherUserId = "u_other"),
+                counterparty = counterpartyPerson,
+                currentUserId = "u_me",
+            )
+            vm.load()
+            // Simulate realtime: server-side echo → refresh() reads
+            // the merged list. handleIncoming + handleReaction both
+            // call fetch(initial = true) under the hood.
+            vm.refresh()
+            val loaded = vm.state.value as ChatConversationUiState.Loaded
+            val bubbleIds =
+                loaded.rows
+                    .filterIsInstance<ChatTimelineRow.Bubble>()
+                    .map { it.content.id }
+            assertTrue("expected new message merged in, got $bubbleIds", bubbleIds.contains("m2"))
+        }
 }

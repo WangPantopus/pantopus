@@ -75,6 +75,7 @@ class ChatConversationViewModel
         private var messageJob: Job? = null
         private var updateJob: Job? = null
         private var deleteJob: Job? = null
+        private var reactJob: Job? = null
 
         fun configure(
             mode: ChatThreadMode,
@@ -198,10 +199,12 @@ class ChatConversationViewModel
             messageJob?.cancel()
             updateJob?.cancel()
             deleteJob?.cancel()
+            reactJob?.cancel()
             markReadJob = null
             messageJob = null
             updateJob = null
             deleteJob = null
+            reactJob = null
         }
 
         override fun onCleared() {
@@ -278,6 +281,23 @@ class ChatConversationViewModel
                         socket.eventsOf("messageDeleted").collect { handleDelete(it) }
                     }
             }
+            if (reactJob == null) {
+                reactJob =
+                    viewModelScope.launch {
+                        socket.eventsOf("message:react").collect { handleReaction(it) }
+                    }
+            }
+        }
+
+        /**
+         * Reactions don't change the message body — trigger a re-fetch
+         * so the server-canonical count lands in the projection.
+         */
+        private fun handleReaction(json: JSONObject) {
+            val id = json.optString("message_id").takeIf { it.isNotEmpty() }
+                ?: json.optString("messageId").takeIf { it.isNotEmpty() } ?: return
+            if (messages.none { it.id == id }) return
+            fetch(initial = true)
         }
 
         private fun handleIncoming(json: JSONObject) {
