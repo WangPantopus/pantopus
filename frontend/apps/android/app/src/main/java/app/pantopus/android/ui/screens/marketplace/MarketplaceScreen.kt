@@ -229,7 +229,7 @@ private fun MarketSearchBar(
 }
 
 @Composable
-private fun MarketCategoryChips(
+internal fun MarketCategoryChips(
     active: MarketplaceCategory,
     onSelect: (MarketplaceCategory) -> Unit,
 ) {
@@ -302,7 +302,7 @@ private fun ComposeFab(
 // MARK: - Frames
 
 @Composable
-private fun LoadingFrame() {
+internal fun LoadingFrame() {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = Modifier.fillMaxSize().testTag("marketplaceLoading"),
@@ -315,7 +315,7 @@ private fun LoadingFrame() {
 }
 
 @Composable
-private fun EmptyFrame(
+internal fun EmptyFrame(
     radiusMiles: Double,
     onCompose: () -> Unit,
 ) {
@@ -438,7 +438,7 @@ private fun RadiusHintPill(radiusMiles: Double) {
 }
 
 @Composable
-private fun PopulatedFrame(
+internal fun PopulatedFrame(
     rows: List<MarketplaceCardContent>,
     onOpen: (String) -> Unit,
 ) {

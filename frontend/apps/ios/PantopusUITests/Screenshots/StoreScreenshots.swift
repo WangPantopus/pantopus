@@ -88,6 +88,18 @@ final class StoreScreenshots: XCTestCase {
         // Back to Hub.
         app.buttons["tab.hub"].firstMatch.tap()
 
+        // Hub → Marketplace pillar → Marketplace grid.
+        let marketplacePillar = app.descendants(matching: .any)
+            .matching(identifier: "hub.pillar.marketplace").firstMatch
+        if marketplacePillar.waitForExistence(timeout: 3) {
+            marketplacePillar.tap()
+            _ = app.descendants(matching: .any)
+                .matching(identifier: "marketplace").firstMatch
+                .waitForExistence(timeout: 5)
+            snapshot("11_Marketplace")
+            app.buttons["marketplaceBackButton"].firstMatch.tap()
+        }
+
         // Nearby tab → Map+List Hybrid.
         app.buttons["tab.nearby"].firstMatch.tap()
         if app.descendants(matching: .any)
