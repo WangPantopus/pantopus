@@ -203,7 +203,9 @@ final class StoreScreenshots: XCTestCase {
             snapshot("07_Me_Home")
             // Restore Personal before continuing.
             app.descendants(matching: .any)
-                .matching(identifier: "meIdentityPill_personal").firstMatch.tap()
+                .matching(identifier: "meIdentityPill_personal")
+                .firstMatch
+                .tap()
         }
 
         // You tab → debug menu → Ceremonial Mail Compose (T3.7).

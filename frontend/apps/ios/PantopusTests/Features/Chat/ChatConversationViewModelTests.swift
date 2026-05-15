@@ -116,9 +116,10 @@ final class ChatConversationViewModelTests: XCTestCase {
         }
         // Should contain at least one bubble (the optimistic one) with
         // a failed delivery state.
-        let bubble = rows.compactMap {
+        let bubbles = rows.compactMap {
             if case let .bubble(content) = $0 { content } else { nil }
-        }.first { $0.side == .outgoing }
+        }
+        let bubble = bubbles.first { $0.side == .outgoing }
         XCTAssertNotNil(bubble)
         XCTAssertEqual(bubble?.deliveryState, .failed)
     }

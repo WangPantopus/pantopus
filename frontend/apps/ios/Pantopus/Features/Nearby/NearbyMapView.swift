@@ -284,11 +284,17 @@ public struct NearbyMapView: View {
         // Velocity nudge — flick up jumps one step, flick down drops one.
         let velocityThreshold: CGFloat = 600
         if velocity > velocityThreshold {
-            if current == .collapsed { closest = .standard }
-            else if current == .standard { closest = .expanded }
+            if current == .collapsed {
+                closest = .standard
+            } else if current == .standard {
+                closest = .expanded
+            }
         } else if velocity < -velocityThreshold {
-            if current == .expanded { closest = .standard }
-            else if current == .standard { closest = .collapsed }
+            if current == .expanded {
+                closest = .standard
+            } else if current == .standard {
+                closest = .collapsed
+            }
         }
         return closest
     }
