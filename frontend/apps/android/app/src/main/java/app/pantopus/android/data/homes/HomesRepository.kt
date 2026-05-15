@@ -1,14 +1,19 @@
 package app.pantopus.android.data.homes
 
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
+import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.FileUploadResponse
+import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
+import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
+import app.pantopus.android.data.api.models.homes.UpdateBillRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import app.pantopus.android.data.api.net.NetworkResult
@@ -72,6 +77,31 @@ open class HomesRepository
 
         /** `GET /api/homes/my-ownership-claims`. */
         open suspend fun myOwnershipClaims(): NetworkResult<MyOwnershipClaimsResponse> = safeApiCall { api.myOwnershipClaims() }
+
+        /** `GET /api/homes/:id/bills`. */
+        open suspend fun getHomeBills(
+            homeId: String,
+            status: String? = null,
+        ): NetworkResult<GetHomeBillsResponse> = safeApiCall { api.getHomeBills(homeId, status) }
+
+        /** `POST /api/homes/:id/bills`. */
+        open suspend fun createHomeBill(
+            homeId: String,
+            request: CreateBillRequest,
+        ): NetworkResult<HomeBillResponse> = safeApiCall { api.createHomeBill(homeId, request) }
+
+        /** `PUT /api/homes/:id/bills/:billId`. */
+        open suspend fun updateHomeBill(
+            homeId: String,
+            billId: String,
+            request: UpdateBillRequest,
+        ): NetworkResult<HomeBillResponse> = safeApiCall { api.updateHomeBill(homeId, billId, request) }
+
+        /** `GET /api/homes/:id/bills/:billId/splits`. */
+        open suspend fun getHomeBillSplits(
+            homeId: String,
+            billId: String,
+        ): NetworkResult<GetBillSplitsResponse> = safeApiCall { api.getHomeBillSplits(homeId, billId) }
 
         /**
          * Upload one binary file to `POST /api/files/upload` and return

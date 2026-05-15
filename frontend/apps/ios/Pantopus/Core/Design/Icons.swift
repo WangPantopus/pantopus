@@ -77,6 +77,11 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case shieldAlert = "shield-alert"
     case checkCheck = "check-check"
     case history
+    case receipt
+    case clock
+    case repeatIcon = "repeat"
+    case users
+    case dollarSign = "dollar-sign"
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
@@ -143,6 +148,11 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .shieldAlert: "exclamationmark.shield"
         case .checkCheck: "checkmark.circle"
         case .history: "clock.arrow.circlepath"
+        case .receipt: "doc.text"
+        case .clock: "clock"
+        case .repeatIcon: "arrow.triangle.2.circlepath"
+        case .users: "person.2"
+        case .dollarSign: "dollarsign"
         }
     }
 }

@@ -44,6 +44,13 @@ import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
+import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.bills.AddBillWizardScreen
+import app.pantopus.android.ui.screens.homes.bills.BILLS_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_BILL_ID_KEY
+import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.bills.BillDetailScreen
+import app.pantopus.android.ui.screens.homes.bills.BillsListScreen
 import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
@@ -100,6 +107,16 @@ private object ChildRoutes {
     const val MAILBOX_SEARCH = "mailbox/search"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
     const val HOME_DASHBOARD = "homes/{$HOME_DASHBOARD_HOME_ID_KEY}"
+
+    /** Bills list (T5.2.2 / P13). */
+    const val HOME_BILLS = "homes/{$BILLS_HOME_ID_KEY}/bills"
+
+    /** Bill detail (read-mostly summary, mark-paid / remove). */
+    const val BILL_DETAIL =
+        "homes/{$BILL_DETAIL_HOME_ID_KEY}/bills/{$BILL_DETAIL_BILL_ID_KEY}"
+
+    /** Add Bill wizard. */
+    const val ADD_BILL = "homes/{$ADD_BILL_HOME_ID_KEY}/bills/new"
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
     const val INVITE_OWNER =
@@ -216,6 +233,16 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home dashboard. */
     fun homeDashboard(id: String): String = "homes/$id"
+
+    /** Build the concrete path for the Bills list. */
+    fun homeBills(homeId: String): String = "homes/$homeId/bills"
+
+    /** Build the concrete path for a Bill detail. */
+    fun billDetail(homeId: String, billId: String): String =
+        "homes/$homeId/bills/$billId"
+
+    /** Build the concrete path for the Add Bill wizard. */
+    fun addBill(homeId: String): String = "homes/$homeId/bills/new"
 
     /** Build the concrete path for a mailbox item detail. */
     fun mailboxItemDetail(id: String): String = "mailbox/item/$id"
@@ -516,8 +543,51 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.claimOwnership(homeId))
                     },
                     onOpenClaimsList = { navController.navigate(ChildRoutes.MY_CLAIMS) },
+                    onOpenBills = { homeId ->
+                        navController.navigate(ChildRoutes.homeBills(homeId))
+                    },
                     onOpenPlaceholder = { label ->
                         navController.navigate(ChildRoutes.placeholder(label))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.HOME_BILLS,
+                arguments = listOf(navArgument(BILLS_HOME_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(BILLS_HOME_ID_KEY).orEmpty()
+                BillsListScreen(
+                    onOpenBill = { billId ->
+                        navController.navigate(ChildRoutes.billDetail(homeId, billId))
+                    },
+                    onAddBill = { navController.navigate(ChildRoutes.addBill(homeId)) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.BILL_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(BILL_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(BILL_DETAIL_BILL_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                BillDetailScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.ADD_BILL,
+                arguments = listOf(navArgument(ADD_BILL_HOME_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(ADD_BILL_HOME_ID_KEY).orEmpty()
+                AddBillWizardScreen(
+                    onClose = { navController.popBackStack() },
+                    onCreated = { billId ->
+                        // Replace the wizard with the bill detail so Back
+                        // returns to the Bills list, not the success step.
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.billDetail(homeId, billId))
                     },
                 )
             }

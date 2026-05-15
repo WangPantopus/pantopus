@@ -27,6 +27,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenAddHomeWizardStepViewed(stepNumber: Int, stepName: String)
     case screenClaimOwnershipStepViewed(stepName: String)
     case screenMyClaimsViewed
+    case screenBillsViewed
+    case screenBillDetailViewed
+    case screenAddBillWizardStepViewed(stepNumber: Int, stepName: String)
+    case ctaAddBillSubmit(result: AnalyticsResult)
     case screenPulseFeedViewed(intent: String)
     case ctaHubActionStripTapped(label: String)
     case ctaHubPillarTapped(pillar: String)
@@ -50,6 +54,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenAddHomeWizardStepViewed: "screen.add_home_wizard.step_viewed"
         case .screenClaimOwnershipStepViewed: "screen.claim_ownership_wizard.step_viewed"
         case .screenMyClaimsViewed: "screen.my_claims.viewed"
+        case .screenBillsViewed: "screen.bills.viewed"
+        case .screenBillDetailViewed: "screen.bill_detail.viewed"
+        case .screenAddBillWizardStepViewed: "screen.add_bill_wizard.step_viewed"
+        case .ctaAddBillSubmit: "cta.add_bill.submit"
         case .screenPulseFeedViewed: "screen.pulse_feed.viewed"
         case .ctaHubActionStripTapped: "cta.hub.action_strip_tapped"
         case .ctaHubPillarTapped: "cta.hub.pillar_tapped"
@@ -83,12 +91,18 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["result": result.rawValue]
         case let .formEditProfileValidationError(field):
             ["field": field]
+        case let .screenAddBillWizardStepViewed(stepNumber, stepName):
+            ["step_number": "\(stepNumber)", "step_name": stepName]
+        case let .ctaAddBillSubmit(result):
+            ["result": result.rawValue]
         case .screenHubViewed,
              .screenMailboxListViewed,
              .screenMailboxDrawersViewed,
              .screenMyHomesViewed,
              .screenHomeDashboardViewed,
              .screenMyClaimsViewed,
+             .screenBillsViewed,
+             .screenBillDetailViewed,
              .screenEditProfileViewed,
              .ctaMailboxItemLogReceived,
              .ctaAddHomeSubmit:

@@ -46,7 +46,12 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Share
@@ -141,6 +146,11 @@ enum class PantopusIcon(
     ShieldAlert("shield-alert"),
     CheckCheck("check-check"),
     History("history"),
+    Receipt("receipt"),
+    Clock("clock"),
+    Repeat("repeat"),
+    Users("users"),
+    DollarSign("dollar-sign"),
     ;
 
     companion object {
@@ -238,6 +248,11 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.ShieldAlert -> IconSource.Material(Icons.Filled.Warning)
         PantopusIcon.CheckCheck -> IconSource.Material(Icons.Filled.DoneAll)
         PantopusIcon.History -> IconSource.Material(Icons.Filled.History)
+        PantopusIcon.Receipt -> IconSource.Material(Icons.Filled.Receipt)
+        PantopusIcon.Clock -> IconSource.Material(Icons.Filled.Schedule)
+        PantopusIcon.Repeat -> IconSource.Material(Icons.Filled.Refresh)
+        PantopusIcon.Users -> IconSource.Material(Icons.Filled.Group)
+        PantopusIcon.DollarSign -> IconSource.Material(Icons.Filled.AttachMoney)
     }
 
 /**

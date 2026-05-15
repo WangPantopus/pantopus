@@ -144,10 +144,10 @@ final class HomeDashboardViewModel {
             isVerifiedOwner: isVerifiedOwner,
             stats: stats,
             quickActions: [
+                QuickActionTile(id: "view_bills", label: "Bills", icon: .receipt, tint: .home),
                 QuickActionTile(id: "add_mail", label: "Add mail", icon: .mailbox, tint: .home),
                 QuickActionTile(id: "log_package", label: "Log package", icon: .shoppingBag, tint: .business),
-                QuickActionTile(id: "add_member", label: "Add member", icon: .userPlus, tint: .personal),
-                QuickActionTile(id: "verify", label: "Verify", icon: .shieldCheck, tint: .home)
+                QuickActionTile(id: "add_member", label: "Add member", icon: .userPlus, tint: .personal)
             ],
             tabs: [
                 GridTabsTab(id: "overview", label: "Overview"),

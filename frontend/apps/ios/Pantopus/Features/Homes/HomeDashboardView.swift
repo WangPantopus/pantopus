@@ -17,6 +17,8 @@ struct HomeDashboardView: View {
     private let onBack: (() -> Void)?
     private let onClaimOwnership: (() -> Void)?
     private let onOpenClaimsList: (() -> Void)?
+    /// Route to the Bills list for this home (T5.2.2).
+    private let onOpenBills: (() -> Void)?
     /// Host-supplied navigation for actions whose dedicated screen
     /// isn't built yet (Log package, Add mail, etc). Receives the
     /// human-readable action label.
@@ -27,6 +29,7 @@ struct HomeDashboardView: View {
         onBack: (() -> Void)? = nil,
         onClaimOwnership: (() -> Void)? = nil,
         onOpenClaimsList: (() -> Void)? = nil,
+        onOpenBills: (() -> Void)? = nil,
         onOpenPlaceholder: ((String) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
@@ -34,6 +37,7 @@ struct HomeDashboardView: View {
         self.onBack = onBack
         self.onClaimOwnership = onClaimOwnership
         self.onOpenClaimsList = onOpenClaimsList
+        self.onOpenBills = onOpenBills
         self.onOpenPlaceholder = onOpenPlaceholder
     }
 
@@ -128,6 +132,8 @@ struct HomeDashboardView: View {
             onClaimOwnership?()
         case "add_member":
             showsInviteOwner = true
+        case "view_bills":
+            onOpenBills?()
         default:
             onOpenPlaceholder?(actionLabel(action))
         }
@@ -139,6 +145,7 @@ struct HomeDashboardView: View {
         case "add_member": "Add member"
         case "add_mail": "Add mail"
         case "verify": "Verify home"
+        case "view_bills": "Bills"
         default: id.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }

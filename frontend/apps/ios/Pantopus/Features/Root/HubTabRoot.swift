@@ -21,6 +21,12 @@ public enum HubRoute: Hashable {
     case homeDashboard(homeId: String)
     case publicProfile(userId: String)
     case pulsePost(postId: String)
+    /// Bills list for a home (T5.2.2 / P13).
+    case homeBills(homeId: String)
+    /// Bill detail (read-mostly summary with mark-paid / remove).
+    case billDetail(homeId: String, billId: String)
+    /// Add Bill wizard.
+    case addBill(homeId: String)
     /// Pulse tab (T1.2). Reached from Hub → pillar(.pulse).
     case pulseFeed
     /// Compose post target — placeholder until the compose flow ships.
@@ -194,8 +200,40 @@ public struct HubTabRoot: View {
                 homeId: homeId,
                 onClaimOwnership: { Task { @MainActor in push(.claimOwnership(homeId: homeId)) } },
                 onOpenClaimsList: { Task { @MainActor in push(.myClaims) } },
+                onOpenBills: { Task { @MainActor in push(.homeBills(homeId: homeId)) } },
                 onOpenPlaceholder: { label in
                     Task { @MainActor in push(.placeholder(label: label)) }
+                }
+            )
+        case let .homeBills(homeId):
+            BillsListView(
+                viewModel: BillsListViewModel(
+                    homeId: homeId,
+                    onOpenBill: { billId in
+                        Task { @MainActor in push(.billDetail(homeId: homeId, billId: billId)) }
+                    },
+                    onAddBill: { Task { @MainActor in push(.addBill(homeId: homeId)) } }
+                )
+            )
+        case let .billDetail(homeId, billId):
+            BillDetailView(
+                homeId: homeId,
+                billId: billId,
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
+        case let .addBill(homeId):
+            AddBillWizardView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCreated: { billId in
+                    // Replace the wizard with the new bill's detail so
+                    // Back returns to the Bills list, not the success
+                    // step.
+                    path.removeAll { route in
+                        if case .addBill = route { return true }
+                        return false
+                    }
+                    path.append(.billDetail(homeId: homeId, billId: billId))
                 }
             )
         case let .claimOwnership(homeId):
