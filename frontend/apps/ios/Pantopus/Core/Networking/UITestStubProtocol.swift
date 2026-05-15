@@ -137,6 +137,27 @@ final class UITestStubProtocol: URLProtocol {
             && path.contains("/dms/threads"):
             finishWith(status: 200, body: Data(Self.defaultPersonaThreadsJSON.utf8))
 
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.hasSuffix("/fan-handle-suggestion"):
+            finishWith(status: 200, body: Data(Self.defaultFanHandleSuggestionJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.hasSuffix("/follow/status"):
+            finishWith(status: 200, body: Data(Self.defaultFollowStatusJSON.utf8))
+
+        case let ("POST", path) where path.hasPrefix("/api/personas/")
+            && path.hasSuffix("/follow"):
+            // Tier-1 success — returns the active follower membership.
+            finishWith(status: 201, body: Data(Self.defaultHandshakeSuccessJSON.utf8))
+
+        // The handshake screen calls GET /api/personas/:handle ahead
+        // of its tiers / suggestion / status fetches. Match exactly 3
+        // path segments (`/api`, `/personas`, `/<handle>`) so the
+        // earlier case branches (which include suffixes) win first.
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.split(separator: "/").count == 3:
+            finishWith(status: 200, body: Data(Self.defaultHandshakePersonaJSON.utf8))
+
         default:
             // Unknown endpoint under test — surface a recognizable 599
             // so test failures point clearly at a missing stub.
@@ -356,6 +377,35 @@ final class UITestStubProtocol: URLProtocol {
        "lastMessagePreview":"Loved the workshop! Any plans for July?",
        "lastMessageAt":"2026-05-15T10:00:00Z","unreadCount":2}
     ]}
+    """
+
+    /// The visitor-side persona returned by GET /api/personas/:handle
+    /// — paired with the stubs below so the T3.4 Privacy Handshake
+    /// wizard renders cleanly for `16_PrivacyHandshake`.
+    static let defaultHandshakePersonaJSON = """
+    {
+      "persona": {
+        "id": "p_demo", "handle": "mayabuilds",
+        "displayName": "Maya Builds", "bio": "Building things in the Mission.",
+        "category": "creator", "audienceLabel": "followers",
+        "followerCount": 12, "postCount": 7
+      },
+      "channel": null
+    }
+    """
+
+    static let defaultFanHandleSuggestionJSON = """
+    {"suggestion":"fan_8a2c41","locked":false,"identity":null}
+    """
+
+    static let defaultFollowStatusJSON = """
+    {"following":false,"status":"none","relationshipType":null,"notificationLevel":"none"}
+    """
+
+    static let defaultHandshakeSuccessJSON = """
+    {"follow":{"id":"f_demo","status":"active","relationshipType":"follower"},
+     "status":"active",
+     "membership":{"id":"m_demo","fan_handle":"fan_8a2c41","tier_id":"t1","status":"active"}}
     """
 
     /// Identity Center overview — all four identities populated so the

@@ -67,6 +67,7 @@ fun YouScreen(
     onOpenPulsePost: (String) -> Unit = {},
     onInviteOwner: (String, String) -> Unit = { _, _ -> },
     onDisambiguateMail: (String) -> Unit = {},
+    onOpenPrivacyHandshake: (String) -> Unit = {},
     onOpenPlaceholder: (String) -> Unit = {},
     onOpenMailbox: () -> Unit = {},
     onOpenEditProfile: () -> Unit = {},
@@ -79,10 +80,12 @@ fun YouScreen(
     var debugPostDialog by remember { mutableStateOf(false) }
     var debugInviteDialog by remember { mutableStateOf(false) }
     var debugDisambiguateDialog by remember { mutableStateOf(false) }
+    var debugHandshakeDialog by remember { mutableStateOf(false) }
     var debugProfileId by remember { mutableStateOf("") }
     var debugPostId by remember { mutableStateOf("") }
     var debugInviteHomeId by remember { mutableStateOf("") }
     var debugDisambiguateMailId by remember { mutableStateOf("") }
+    var debugHandshakeHandle by remember { mutableStateOf("") }
 
     MeView(
         onAction = { tile ->
@@ -99,6 +102,7 @@ fun YouScreen(
                 "me.debug.openPost" -> if (BuildConfig.DEBUG) debugPostDialog = true
                 "me.debug.inviteOwner" -> if (BuildConfig.DEBUG) debugInviteDialog = true
                 "me.debug.disambiguate" -> if (BuildConfig.DEBUG) debugDisambiguateDialog = true
+                "me.debug.openHandshake" -> if (BuildConfig.DEBUG) debugHandshakeDialog = true
                 else -> onOpenPlaceholder(row.label)
             }
         },
@@ -234,6 +238,34 @@ fun YouScreen(
             },
             dismissButton = {
                 TextButton(onClick = { debugDisambiguateDialog = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (BuildConfig.DEBUG && debugHandshakeDialog) {
+        AlertDialog(
+            onDismissRequest = { debugHandshakeDialog = false },
+            title = { Text("Open Privacy Handshake") },
+            text = {
+                OutlinedTextField(
+                    value = debugHandshakeHandle,
+                    onValueChange = { debugHandshakeHandle = it },
+                    label = { Text("Persona handle") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val handle = debugHandshakeHandle.trim()
+                    debugHandshakeDialog = false
+                    if (handle.isNotEmpty()) {
+                        debugHandshakeHandle = ""
+                        onOpenPrivacyHandshake(handle)
+                    }
+                }) { Text("Open") }
+            },
+            dismissButton = {
+                TextButton(onClick = { debugHandshakeDialog = false }) { Text("Cancel") }
             },
         )
     }

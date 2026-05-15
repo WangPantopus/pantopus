@@ -331,6 +331,7 @@ class MeViewModel
                         listOf(
                             MeSectionRow("openProfile", PantopusIcon.Search, "Open public profile by ID", routeKey = "me.debug.openProfile"),
                             MeSectionRow("openPost", PantopusIcon.Search, "Open Pulse post by ID", routeKey = "me.debug.openPost"),
+                            MeSectionRow("openHandshake", PantopusIcon.UserPlus, "Open Privacy Handshake by persona handle", routeKey = "me.debug.openHandshake"),
                             MeSectionRow("inviteOwner", PantopusIcon.UserPlus, "Invite owner to home by ID", routeKey = "me.debug.inviteOwner"),
                             MeSectionRow("disambiguate", PantopusIcon.Mailbox, "Disambiguate mail by ID", routeKey = "me.debug.disambiguate"),
                         ),

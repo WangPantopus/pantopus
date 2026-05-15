@@ -20,6 +20,7 @@ public enum YouRoute: Hashable {
     #if DEBUG
     case publicProfile(userId: String)
     case pulsePost(postId: String)
+    case privacyHandshake(personaHandle: String)
     #endif
 }
 
@@ -44,10 +45,12 @@ public struct YouTabRoot: View {
     @State private var debugPostSheet = false
     @State private var debugInviteHomeSheet = false
     @State private var debugDisambiguateSheet = false
+    @State private var debugHandshakeSheet = false
     @State private var debugProfileId = ""
     @State private var debugPostId = ""
     @State private var debugInviteHomeId = ""
     @State private var debugDisambiguateMailId = ""
+    @State private var debugHandshakeHandle = ""
     @State private var debugInviteFormHomeId: String?
     @State private var debugDisambiguateFormMailId: String?
     #endif
@@ -134,6 +137,19 @@ public struct YouTabRoot: View {
             } message: {
                 Text("Paste a Mail UUID to route")
             }
+            .alert("Open Privacy Handshake", isPresented: $debugHandshakeSheet) {
+                TextField("Persona handle", text: $debugHandshakeHandle)
+                Button("Open") {
+                    let handle = debugHandshakeHandle.trimmingCharacters(in: .whitespaces)
+                    if !handle.isEmpty {
+                        path.append(.privacyHandshake(personaHandle: handle))
+                        debugHandshakeHandle = ""
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Type a persona handle to open the handshake")
+            }
             .sheet(item: Binding<DebugInviteHomeItem?>(
                 get: { debugInviteFormHomeId.map { DebugInviteHomeItem(id: $0) } },
                 set: { debugInviteFormHomeId = $0?.id }
@@ -191,6 +207,9 @@ public struct YouTabRoot: View {
             return
         case "me.debug.disambiguate":
             debugDisambiguateSheet = true
+            return
+        case "me.debug.openHandshake":
+            debugHandshakeSheet = true
             return
         default:
             break
@@ -261,6 +280,13 @@ public struct YouTabRoot: View {
                 onOpenProfile: { userId in
                     Task { @MainActor in path.append(.publicProfile(userId: userId)) }
                 }
+            )
+        case let .privacyHandshake(personaHandle):
+            PrivacyHandshakeWizardView(
+                viewModel: PrivacyHandshakeViewModel(
+                    personaHandle: personaHandle,
+                    onDismiss: { if !path.isEmpty { path.removeLast() } }
+                )
             )
         #endif
         }

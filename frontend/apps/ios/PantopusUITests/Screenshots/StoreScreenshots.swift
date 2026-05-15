@@ -210,6 +210,31 @@ final class StoreScreenshots: XCTestCase {
                 .matching(identifier: "meIdentityPill_personal").firstMatch.tap()
         }
 
+        // You tab → debug menu → Privacy Handshake (T3.4) so the
+        // marketing matrix has a visual of the wizard archetype +
+        // persona preview card.
+        let handshakeRow = app.descendants(matching: .any)
+            .matching(identifier: "meSectionRow_debug_openHandshake").firstMatch
+        if handshakeRow.waitForExistence(timeout: 3) {
+            handshakeRow.tap()
+            let alert = app.alerts.firstMatch
+            if alert.waitForExistence(timeout: 3) {
+                let field = alert.textFields.firstMatch
+                if field.waitForExistence(timeout: 1) {
+                    field.tap()
+                    field.typeText("mayabuilds")
+                }
+                alert.buttons["Open"].firstMatch.tap()
+            }
+            if app.descendants(matching: .any)
+                .matching(identifier: "privacyHandshakePersona").firstMatch
+                .waitForExistence(timeout: 5)
+            {
+                snapshot("16_PrivacyHandshake")
+            }
+            app.buttons["wizardLeadingButton"].firstMatch.tap()
+        }
+
         // You tab → Edit Profile sheet.
         let editProfile = app.buttons["youEditProfileButton"]
         if editProfile.waitForExistence(timeout: 3) {

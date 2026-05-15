@@ -73,6 +73,7 @@ import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
+import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.identity_center.IdentityCenterScreen
 import app.pantopus.android.ui.screens.identity_center.IdentityKind
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
@@ -118,6 +119,13 @@ private object ChildRoutes {
 
     /** Public Profile management / Creator audience dashboard (T3.3). */
     const val AUDIENCE_PROFILE = "audience-profile"
+
+    /** Privacy Handshake wizard (T3.4). `:handle` is the persona being followed. */
+    const val PRIVACY_HANDSHAKE_HANDLE_KEY = "personaHandle"
+    const val PRIVACY_HANDSHAKE = "handshake/{$PRIVACY_HANDSHAKE_HANDLE_KEY}"
+
+    fun privacyHandshake(handle: String): String =
+        "handshake/${java.net.URLEncoder.encode(handle, "UTF-8")}"
 
     /**
      * Generic placeholder for intents whose destination hasn't been
@@ -373,6 +381,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onDisambiguateMail = { mailId ->
                         navController.navigate(ChildRoutes.disambiguateMail(mailId))
+                    },
+                    onOpenPrivacyHandshake = { handle ->
+                        navController.navigate(ChildRoutes.privacyHandshake(handle))
                     },
                     onOpenMailbox = { navController.navigate(ChildRoutes.MAILBOX_LIST) },
                     onOpenEditProfile = {
@@ -680,6 +691,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(ChildRoutes.SETTINGS_PRIVACY) {
                 PrivacySettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.PRIVACY_HANDSHAKE,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.PRIVACY_HANDSHAKE_HANDLE_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                PrivacyHandshakeScreen(
+                    onDismiss = { navController.popBackStack() },
+                )
             }
             composable(ChildRoutes.AUDIENCE_PROFILE) {
                 AudienceProfileScreen(
