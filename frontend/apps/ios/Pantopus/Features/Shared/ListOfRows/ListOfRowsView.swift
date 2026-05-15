@@ -564,7 +564,6 @@ private struct RowView: View {
         }
     }
 
-    @ViewBuilder
     private func metaLine(
         text: String,
         icon: PantopusIcon?,

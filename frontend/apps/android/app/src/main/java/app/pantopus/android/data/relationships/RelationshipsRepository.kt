@@ -36,8 +36,7 @@ class RelationshipsRepository
          * connection requests received by me. Route
          * `backend/routes/relationships.js:669`.
          */
-        suspend fun pendingRequests(): NetworkResult<PendingRequestsResponse> =
-            safeApiCall { api.pendingRequests() }
+        suspend fun pendingRequests(): NetworkResult<PendingRequestsResponse> = safeApiCall { api.pendingRequests() }
 
         /**
          * `POST /api/relationships/requests` — send a connection request.
@@ -55,13 +54,11 @@ class RelationshipsRepository
          * `POST /api/relationships/:id/accept` — accept an inbound
          * connection request. Route `backend/routes/relationships.js:217`.
          */
-        suspend fun accept(id: String): NetworkResult<RelationshipActionEcho> =
-            safeApiCall { api.accept(id) }
+        suspend fun accept(id: String): NetworkResult<RelationshipActionEcho> = safeApiCall { api.accept(id) }
 
         /**
          * `POST /api/relationships/:id/reject` — reject (decline) an
          * inbound request. Route `backend/routes/relationships.js:295`.
          */
-        suspend fun reject(id: String): NetworkResult<RelationshipActionEcho> =
-            safeApiCall { api.reject(id) }
+        suspend fun reject(id: String): NetworkResult<RelationshipActionEcho> = safeApiCall { api.reject(id) }
     }

@@ -73,6 +73,20 @@ final class ConnectionsViewModelTests: XCTestCase {
         )
     }
 
+    private typealias StubResponse = SequencedURLProtocol.Response
+
+    private func stubConnections(
+        accepted: StubResponse,
+        pending: StubResponse,
+        actions: [StubResponse] = []
+    ) {
+        SequencedURLProtocol.routeResponses = [
+            "/api/relationships": [accepted],
+            "/api/relationships/requests/pending": [pending]
+        ]
+        SequencedURLProtocol.sequence = actions
+    }
+
     private static let acceptedJSON = """
     {"relationships":[
       {"id":"r1","status":"accepted",
@@ -112,10 +126,10 @@ final class ConnectionsViewModelTests: XCTestCase {
     // MARK: - Lifecycle
 
     func testLoadEmptyTransitionsToEmptyAllTab() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.emptyAcceptedJSON),
-            .status(200, body: Self.emptyPendingJSON)
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.emptyAcceptedJSON),
+            pending: .status(200, body: Self.emptyPendingJSON)
+        )
         let vm = makeVM()
         await vm.load()
         guard case let .empty(content) = vm.state else {
@@ -127,10 +141,10 @@ final class ConnectionsViewModelTests: XCTestCase {
     }
 
     func testLoadPopulatedTransitionsToLoaded() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.acceptedJSON),
-            .status(200, body: Self.pendingJSON)
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.acceptedJSON),
+            pending: .status(200, body: Self.pendingJSON)
+        )
         let vm = makeVM()
         await vm.load()
         guard case let .loaded(sections, _) = vm.state else {
@@ -141,10 +155,10 @@ final class ConnectionsViewModelTests: XCTestCase {
     }
 
     func testBothFetchesFailingTransitionsToError() async {
-        SequencedURLProtocol.sequence = [
-            .status(500, body: "{}"),
-            .status(500, body: "{}")
-        ]
+        stubConnections(
+            accepted: .status(500, body: "{}"),
+            pending: .status(500, body: "{}")
+        )
         let vm = makeVM()
         await vm.load()
         guard case .error = vm.state else {
@@ -154,10 +168,10 @@ final class ConnectionsViewModelTests: XCTestCase {
     }
 
     func testOneFetchFailingStillTransitionsToLoadedFromTheOther() async {
-        SequencedURLProtocol.sequence = [
-            .status(500, body: "{}"),
-            .status(200, body: Self.pendingJSON)
-        ]
+        stubConnections(
+            accepted: .status(500, body: "{}"),
+            pending: .status(200, body: Self.pendingJSON)
+        )
         let vm = makeVM()
         await vm.load()
         // Default tab is All → Accepted is empty → empty state with the
@@ -179,10 +193,10 @@ final class ConnectionsViewModelTests: XCTestCase {
     // MARK: - Tabs
 
     func testTabsExposeAllNeighborsPendingWithCounts() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.acceptedJSON),
-            .status(200, body: Self.pendingJSON)
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.acceptedJSON),
+            pending: .status(200, body: Self.pendingJSON)
+        )
         let vm = makeVM()
         await vm.load()
         XCTAssertEqual(vm.tabs.count, 3)
@@ -196,10 +210,10 @@ final class ConnectionsViewModelTests: XCTestCase {
     }
 
     func testNeighborsTabFiltersOutConnectionsWithoutCity() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.acceptedJSON),
-            .status(200, body: Self.pendingJSON)
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.acceptedJSON),
+            pending: .status(200, body: Self.pendingJSON)
+        )
         let vm = makeVM()
         await vm.load()
         vm.selectedTab = ConnectionsTab.neighbors
@@ -212,10 +226,10 @@ final class ConnectionsViewModelTests: XCTestCase {
     }
 
     func testPendingTabRendersPendingRequests() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.acceptedJSON),
-            .status(200, body: Self.pendingJSON)
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.acceptedJSON),
+            pending: .status(200, body: Self.pendingJSON)
+        )
         let vm = makeVM()
         await vm.load()
         vm.selectedTab = ConnectionsTab.pending
@@ -227,10 +241,10 @@ final class ConnectionsViewModelTests: XCTestCase {
     }
 
     func testEmptyPendingShowsMailboxEmptyCopy() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.acceptedJSON),
-            .status(200, body: Self.emptyPendingJSON)
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.acceptedJSON),
+            pending: .status(200, body: Self.emptyPendingJSON)
+        )
         let vm = makeVM()
         await vm.load()
         vm.selectedTab = ConnectionsTab.pending
@@ -244,10 +258,10 @@ final class ConnectionsViewModelTests: XCTestCase {
     // MARK: - Search
 
     func testSearchFiltersAcceptedByName() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.acceptedJSON),
-            .status(200, body: Self.pendingJSON)
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.acceptedJSON),
+            pending: .status(200, body: Self.pendingJSON)
+        )
         let vm = makeVM()
         await vm.load()
         vm.updateSearch("david")
@@ -260,10 +274,10 @@ final class ConnectionsViewModelTests: XCTestCase {
     }
 
     func testSearchFiltersByCity() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.acceptedJSON),
-            .status(200, body: Self.pendingJSON)
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.acceptedJSON),
+            pending: .status(200, body: Self.pendingJSON)
+        )
         let vm = makeVM()
         await vm.load()
         vm.updateSearch("burnside")
@@ -279,11 +293,13 @@ final class ConnectionsViewModelTests: XCTestCase {
     // MARK: - Accept (optimistic)
 
     func testAcceptOptimisticallyRemovesPendingAndBumpsAll() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.acceptedJSON),
-            .status(200, body: Self.pendingJSON),
-            .status(200, body: "{\"message\":\"Connection accepted\"}")
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.acceptedJSON),
+            pending: .status(200, body: Self.pendingJSON),
+            actions: [
+                .status(200, body: "{\"message\":\"Connection accepted\"}")
+            ]
+        )
         let vm = makeVM()
         await vm.load()
         XCTAssertEqual(vm.tabs[0].count, 2) // All
@@ -294,11 +310,11 @@ final class ConnectionsViewModelTests: XCTestCase {
     }
 
     func testAcceptRollsBackOnFailure() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.acceptedJSON),
-            .status(200, body: Self.pendingJSON),
-            .status(500, body: "{}")
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.acceptedJSON),
+            pending: .status(200, body: Self.pendingJSON),
+            actions: [.status(500, body: "{}")]
+        )
         let vm = makeVM()
         await vm.load()
         await vm.accept(requestId: "req1")
@@ -309,11 +325,13 @@ final class ConnectionsViewModelTests: XCTestCase {
     // MARK: - Reject (optimistic)
 
     func testRejectOptimisticallyRemovesPending() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.acceptedJSON),
-            .status(200, body: Self.pendingJSON),
-            .status(200, body: "{\"message\":\"Connection request rejected\"}")
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.acceptedJSON),
+            pending: .status(200, body: Self.pendingJSON),
+            actions: [
+                .status(200, body: "{\"message\":\"Connection request rejected\"}")
+            ]
+        )
         let vm = makeVM()
         await vm.load()
         await vm.reject(requestId: "req1")
@@ -322,11 +340,11 @@ final class ConnectionsViewModelTests: XCTestCase {
     }
 
     func testRejectRollsBackOnFailure() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.acceptedJSON),
-            .status(200, body: Self.pendingJSON),
-            .status(500, body: "{}")
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.acceptedJSON),
+            pending: .status(200, body: Self.pendingJSON),
+            actions: [.status(500, body: "{}")]
+        )
         let vm = makeVM()
         await vm.load()
         await vm.reject(requestId: "req1")
@@ -410,18 +428,18 @@ final class ConnectionsViewModelTests: XCTestCase {
     }
 
     func testMessageCTAFiresOnMessageCallback() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.acceptedJSON),
-            .status(200, body: Self.pendingJSON)
-        ]
+        stubConnections(
+            accepted: .status(200, body: Self.acceptedJSON),
+            pending: .status(200, body: Self.pendingJSON)
+        )
         let captured = MessageCapture()
-        let vm = makeVM(onMessage: { target in captured.target = target })
+        let vm = makeVM { target in captured.target = target }
         await vm.load()
         guard case let .loaded(sections, _) = vm.state else {
             XCTFail("Expected .loaded")
             return
         }
-        let row = sections.first?.rows.first(where: { $0.id == "r1" })
+        let row = sections.first?.rows.first { $0.id == "r1" }
         guard case let .circularAction(_, _, _, _, handler) = row?.trailing else {
             XCTFail("Expected circularAction trailing")
             return

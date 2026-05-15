@@ -168,7 +168,7 @@ public final class ConnectionsViewModel: ListOfRowsDataSource {
     private var pending: [PendingRequestDTO] = []
     private var loadedOnce: Bool = false
 
-    public init(
+    init(
         api: APIClient = .shared,
         onMessage: @escaping @MainActor (ConnectionsChatTarget) -> Void = { _ in },
         onFindPeople: @escaping @MainActor () -> Void = {},
@@ -335,14 +335,13 @@ public final class ConnectionsViewModel: ListOfRowsDataSource {
     }
 
     private func rebuild() {
-        let rows: [RowModel]
-        switch selectedTab {
+        let rows: [RowModel] = switch selectedTab {
         case ConnectionsTab.pending:
-            rows = filteredPending.map { rowForPending($0) }
+            filteredPending.map { rowForPending($0) }
         case ConnectionsTab.neighbors:
-            rows = filteredNeighbors.map { rowForAccepted($0) }
+            filteredNeighbors.map { rowForAccepted($0) }
         default:
-            rows = filteredAccepted.map { rowForAccepted($0) }
+            filteredAccepted.map { rowForAccepted($0) }
         }
         if rows.isEmpty {
             state = .empty(emptyContent(for: selectedTab))
@@ -365,7 +364,7 @@ public final class ConnectionsViewModel: ListOfRowsDataSource {
                 icon: .mapPin,
                 headline: "No neighbors yet",
                 subcopy:
-                    "Connections who share their locality show up here. " +
+                "Connections who share their locality show up here. " +
                     "Invite a neighbor or accept a nearby request to get started."
             )
         default:
@@ -373,7 +372,7 @@ public final class ConnectionsViewModel: ListOfRowsDataSource {
                 icon: .userPlus,
                 headline: "No connections yet",
                 subcopy:
-                    "Meet verified neighbors. Browse the Pulse, reply to a post, " +
+                "Meet verified neighbors. Browse the Pulse, reply to a post, " +
                     "or invite someone you know on the block.",
                 ctaTitle: "Find people"
             ) { [weak self] in

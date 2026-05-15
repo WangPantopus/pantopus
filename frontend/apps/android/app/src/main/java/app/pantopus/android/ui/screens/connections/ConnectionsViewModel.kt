@@ -474,14 +474,16 @@ class ConnectionsViewModel
 
         companion object {
             internal fun displayNameFor(user: RelationshipUserDto?): String? {
-                if (user == null) return null
-                user.name?.takeIf { it.isNotEmpty() }?.let { return it }
+                user ?: return null
+                val name = user.name?.takeIf { it.isNotEmpty() }
                 val first = user.firstName?.takeIf { it.isNotEmpty() }
                 val last = user.lastName?.takeIf { it.isNotEmpty() }
-                if (first != null && last != null) return "$first $last"
-                if (first != null) return first
-                user.username?.takeIf { it.isNotEmpty() }?.let { return it }
-                return null
+                return listOfNotNull(
+                    name,
+                    if (first != null && last != null) "$first $last" else null,
+                    first,
+                    user.username?.takeIf { it.isNotEmpty() },
+                ).firstOrNull()
             }
 
             internal fun initialsFor(
@@ -517,8 +519,7 @@ class ConnectionsViewModel
                     user?.state,
                 ).joinToString(" ").lowercase(Locale.ROOT)
 
-            internal fun isoString(instant: Instant): String =
-                DateTimeFormatter.ISO_INSTANT.format(instant.truncatedTo(ChronoUnit.SECONDS))
+            internal fun isoString(instant: Instant): String = DateTimeFormatter.ISO_INSTANT.format(instant.truncatedTo(ChronoUnit.SECONDS))
 
             internal fun parseInstant(raw: String?): Instant? {
                 if (raw.isNullOrEmpty()) return null
