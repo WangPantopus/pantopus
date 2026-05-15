@@ -77,6 +77,7 @@ import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
+import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.identity_center.IdentityCenterScreen
@@ -127,6 +128,13 @@ private object ChildRoutes {
 
     /** Ceremonial Mail Compose wizard (T3.7). */
     const val CEREMONIAL_MAIL = "mailbox/compose-letter"
+
+    /** Ceremonial Mail Open reader (T3.8). `:id` is the Mail UUID. */
+    const val CEREMONIAL_MAIL_OPEN_ID_KEY = "mailId"
+    const val CEREMONIAL_MAIL_OPEN = "mailbox/letter/{$CEREMONIAL_MAIL_OPEN_ID_KEY}"
+
+    fun ceremonialMailOpen(mailId: String): String =
+        "mailbox/letter/${java.net.URLEncoder.encode(mailId, "UTF-8")}"
 
     /** Privacy Handshake wizard (T3.4). `:handle` is the persona being followed. */
     const val PRIVACY_HANDSHAKE_HANDLE_KEY = "personaHandle"
@@ -421,6 +429,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenCeremonialMail = {
                         navController.navigate(ChildRoutes.CEREMONIAL_MAIL)
+                    },
+                    onOpenCeremonialMailOpen = { mailId ->
+                        navController.navigate(ChildRoutes.ceremonialMailOpen(mailId))
                     },
                     onOpenMailbox = { navController.navigate(ChildRoutes.MAILBOX_LIST) },
                     onOpenEditProfile = {
@@ -761,6 +772,22 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenMail = { mailId ->
                         navController.popBackStack()
                         navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.CEREMONIAL_MAIL_OPEN,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.CEREMONIAL_MAIL_OPEN_ID_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                CeremonialMailOpenScreen(
+                    onBack = { navController.popBackStack() },
+                    onWriteBack = {
+                        navController.navigate(ChildRoutes.CEREMONIAL_MAIL)
                     },
                 )
             }

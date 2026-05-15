@@ -23,6 +23,7 @@ public enum YouRoute: Hashable {
     case privacyHandshake(personaHandle: String)
     case statusWaiting
     case ceremonialMail
+    case ceremonialMailOpen(mailId: String)
     #endif
 }
 
@@ -55,6 +56,8 @@ public struct YouTabRoot: View {
     @State private var debugDisambiguateMailId = ""
     @State private var debugHandshakeHandle = ""
     @State private var debugInviteToken = ""
+    @State private var debugCeremonialMailOpenSheet = false
+    @State private var debugCeremonialMailOpenId = ""
     @State private var debugInviteFormHomeId: String?
     @State private var debugDisambiguateFormMailId: String?
     #endif
@@ -154,6 +157,19 @@ public struct YouTabRoot: View {
             } message: {
                 Text("Type a persona handle to open the handshake")
             }
+            .alert("Open Ceremonial Mail", isPresented: $debugCeremonialMailOpenSheet) {
+                TextField("Mail ID", text: $debugCeremonialMailOpenId)
+                Button("Open") {
+                    let id = debugCeremonialMailOpenId.trimmingCharacters(in: .whitespaces)
+                    if !id.isEmpty {
+                        path.append(.ceremonialMailOpen(mailId: id))
+                        debugCeremonialMailOpenId = ""
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Paste a Mail UUID to open the ceremonial reader")
+            }
             .alert("Open invite by token", isPresented: $debugInviteTokenSheet) {
                 TextField("Invite token", text: $debugInviteToken)
                 Button("Open") {
@@ -236,6 +252,9 @@ public struct YouTabRoot: View {
             return
         case "me.debug.openCeremonialMail":
             path.append(.ceremonialMail)
+            return
+        case "me.debug.openCeremonialMailOpen":
+            debugCeremonialMailOpenSheet = true
             return
         default:
             break
@@ -324,6 +343,12 @@ public struct YouTabRoot: View {
             CeremonialMailWizardView(
                 onDismiss: { if !path.isEmpty { path.removeLast() } },
                 onOpenMail: { _ in if !path.isEmpty { path.removeLast() } }
+            )
+        case let .ceremonialMailOpen(mailId):
+            CeremonialMailOpenView(
+                viewModel: CeremonialMailOpenViewModel(mailId: mailId),
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onWriteBack: { _ in path.append(.ceremonialMail) }
             )
         #endif
         }

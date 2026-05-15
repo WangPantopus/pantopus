@@ -334,6 +334,7 @@ class MeViewModel
                             MeSectionRow("openHandshake", PantopusIcon.UserPlus, "Open Privacy Handshake by persona handle", routeKey = "me.debug.openHandshake"),
                             MeSectionRow("openInviteToken", PantopusIcon.Mailbox, "Open invite by token", routeKey = "me.debug.openInviteToken"),
                             MeSectionRow("openCeremonialMail", PantopusIcon.Send, "Open Ceremonial Mail Compose", routeKey = "me.debug.openCeremonialMail"),
+                            MeSectionRow("openCeremonialMailOpen", PantopusIcon.Mailbox, "Open Ceremonial Mail by ID", routeKey = "me.debug.openCeremonialMailOpen"),
                             MeSectionRow("inviteOwner", PantopusIcon.UserPlus, "Invite owner to home by ID", routeKey = "me.debug.inviteOwner"),
                             MeSectionRow("disambiguate", PantopusIcon.Mailbox, "Disambiguate mail by ID", routeKey = "me.debug.disambiguate"),
                         ),

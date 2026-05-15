@@ -172,6 +172,9 @@ final class UITestStubProtocol: URLProtocol {
         case ("POST", "/api/mailbox/send"):
             finishWith(status: 200, body: Data(Self.defaultMailSendJSON.utf8))
 
+        case let ("GET", path) where path.hasPrefix("/api/mailbox/v2/item/"):
+            finishWith(status: 200, body: Data(Self.defaultCeremonialMailItemJSON.utf8))
+
         // The handshake screen calls GET /api/personas/:handle ahead
         // of its tiers / suggestion / status fetches. Match exactly 3
         // path segments (`/api`, `/personas`, `/<handle>`) so the
@@ -488,6 +491,41 @@ final class UITestStubProtocol: URLProtocol {
 
     static let defaultMailSendJSON = """
     {"message":"Letter sent","mail":{"id":"mail_demo","subject":"A note from a friend","created_at":"2026-05-15T12:00:00Z"}}
+    """
+
+    /// Ceremonial mail item — used by the 20_CeremonialMailOpen
+    /// screenshot. Includes the object_payload that decides the
+    /// stationery / ink / seal / voice postscript tones.
+    static let defaultCeremonialMailItemJSON = """
+    {
+      "mail": {
+        "id":"mail_demo",
+        "subject":"A note from a friend",
+        "content":"Dear Alice,\\n\\nI was thinking about the afternoon we spent at the old library — the smell of paper, the dust drifting in the light.\\n\\nI hope this letter finds you well.\\n\\nWith warmth,\\nMaya",
+        "type":"letter",
+        "mail_type":"letter",
+        "drawer":"inbox",
+        "lifecycle":"delivered",
+        "viewed":false,
+        "ack_required":false,
+        "payout_amount":0,
+        "trust_level":"verified",
+        "created_at":"2026-05-15T12:00:00Z",
+        "sender":{"name":"Maya K.","username":"mayak"},
+        "sender_display":"Maya K.",
+        "sender_trust":"pantopus_user",
+        "package":null,
+        "timeline":[],
+        "object_payload":{
+          "stationeryTheme":"midnight_blue",
+          "inkSelection":"navy",
+          "sealChoice":"wax_red",
+          "intent":"say_hello",
+          "returnAddressShared":false,
+          "voicePostscriptUri":"https://uploads.test/voice/v1.m4a"
+        }
+      }
+    }
     """
 
     /// Identity Center overview — all four identities populated so the

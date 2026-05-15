@@ -70,6 +70,7 @@ fun YouScreen(
     onOpenPrivacyHandshake: (String) -> Unit = {},
     onOpenInviteToken: (String) -> Unit = {},
     onOpenCeremonialMail: () -> Unit = {},
+    onOpenCeremonialMailOpen: (String) -> Unit = {},
     onOpenPlaceholder: (String) -> Unit = {},
     onOpenMailbox: () -> Unit = {},
     onOpenEditProfile: () -> Unit = {},
@@ -84,6 +85,8 @@ fun YouScreen(
     var debugDisambiguateDialog by remember { mutableStateOf(false) }
     var debugHandshakeDialog by remember { mutableStateOf(false) }
     var debugInviteTokenDialog by remember { mutableStateOf(false) }
+    var debugCeremonialMailOpenDialog by remember { mutableStateOf(false) }
+    var debugCeremonialMailOpenId by remember { mutableStateOf("") }
     var debugProfileId by remember { mutableStateOf("") }
     var debugPostId by remember { mutableStateOf("") }
     var debugInviteHomeId by remember { mutableStateOf("") }
@@ -109,6 +112,7 @@ fun YouScreen(
                 "me.debug.openHandshake" -> if (BuildConfig.DEBUG) debugHandshakeDialog = true
                 "me.debug.openInviteToken" -> if (BuildConfig.DEBUG) debugInviteTokenDialog = true
                 "me.debug.openCeremonialMail" -> if (BuildConfig.DEBUG) onOpenCeremonialMail()
+                "me.debug.openCeremonialMailOpen" -> if (BuildConfig.DEBUG) debugCeremonialMailOpenDialog = true
                 else -> onOpenPlaceholder(row.label)
             }
         },
@@ -300,6 +304,34 @@ fun YouScreen(
             },
             dismissButton = {
                 TextButton(onClick = { debugInviteTokenDialog = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (BuildConfig.DEBUG && debugCeremonialMailOpenDialog) {
+        AlertDialog(
+            onDismissRequest = { debugCeremonialMailOpenDialog = false },
+            title = { Text("Open Ceremonial Mail") },
+            text = {
+                OutlinedTextField(
+                    value = debugCeremonialMailOpenId,
+                    onValueChange = { debugCeremonialMailOpenId = it },
+                    label = { Text("Mail ID") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val id = debugCeremonialMailOpenId.trim()
+                    debugCeremonialMailOpenDialog = false
+                    if (id.isNotEmpty()) {
+                        debugCeremonialMailOpenId = ""
+                        onOpenCeremonialMailOpen(id)
+                    }
+                }) { Text("Open") }
+            },
+            dismissButton = {
+                TextButton(onClick = { debugCeremonialMailOpenDialog = false }) { Text("Cancel") }
             },
         )
     }

@@ -224,6 +224,29 @@ final class StoreScreenshots: XCTestCase {
             app.buttons["wizardLeadingButton"].firstMatch.tap()
         }
 
+        // You tab → debug menu → Ceremonial Mail Open (T3.8).
+        let ceremonialOpenRow = app.descendants(matching: .any)
+            .matching(identifier: "meSectionRow_debug_openCeremonialMailOpen").firstMatch
+        if ceremonialOpenRow.waitForExistence(timeout: 3) {
+            ceremonialOpenRow.tap()
+            let alert = app.alerts.firstMatch
+            if alert.waitForExistence(timeout: 3) {
+                let field = alert.textFields.firstMatch
+                if field.waitForExistence(timeout: 1) {
+                    field.tap()
+                    field.typeText("mail_demo")
+                }
+                alert.buttons["Open"].firstMatch.tap()
+            }
+            if app.descendants(matching: .any)
+                .matching(identifier: "ceremonialMailOpen").firstMatch
+                .waitForExistence(timeout: 5)
+            {
+                snapshot("20_CeremonialMailOpen")
+            }
+            app.buttons["ceremonialMailOpenBackButton"].firstMatch.tap()
+        }
+
         // You tab → debug menu → Status / Waiting (T3.6) so the
         // marketing matrix has a visual of the claim-submitted frame.
         let statusRow = app.descendants(matching: .any)

@@ -105,6 +105,7 @@ public final class MeViewModel {
             MeSectionRow(id: "openInviteToken", icon: .mailbox, label: "Open invite by token", routeKey: "me.debug.openInviteToken"),
             MeSectionRow(id: "openStatusWaiting", icon: .checkCircle, label: "Open Status / Waiting", routeKey: "me.debug.openStatusWaiting"),
             MeSectionRow(id: "openCeremonialMail", icon: .send, label: "Open Ceremonial Mail Compose", routeKey: "me.debug.openCeremonialMail"),
+            MeSectionRow(id: "openCeremonialMailOpen", icon: .mailbox, label: "Open Ceremonial Mail by ID", routeKey: "me.debug.openCeremonialMailOpen"),
             MeSectionRow(id: "inviteOwner", icon: .userPlus, label: "Invite owner to home by ID", routeKey: "me.debug.inviteOwner"),
             MeSectionRow(id: "disambiguate", icon: .mailbox, label: "Disambiguate mail by ID", routeKey: "me.debug.disambiguate")
         ])
