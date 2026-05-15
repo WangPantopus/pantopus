@@ -9,6 +9,8 @@
 //  swap, debounces markRead, and reacts to socket events.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import Foundation
 import Logging
 import Observation
@@ -68,7 +70,7 @@ public final class ChatConversationViewModel {
     private var markReadTask: Task<Void, Never>?
     private var socketTasks: [Task<Void, Never>] = []
 
-    public init(
+    init(
         mode: ChatThreadMode,
         counterparty: ChatCounterparty,
         currentUserId: String,
@@ -467,7 +469,8 @@ public final class ChatConversationViewModel {
           "client_message_id":"\(clientId)","created_at":"\(nowISO)"
         }
         """
-        return (try? JSONDecoder().decode(ChatMessageDTO.self, from: Data(json.utf8)))!
+        // swiftlint:disable:next force_try
+        return try! JSONDecoder().decode(ChatMessageDTO.self, from: Data(json.utf8))
     }
 
     private static func jsonString(_ raw: String) -> String {

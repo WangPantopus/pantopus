@@ -7,6 +7,8 @@
 //  envelope animates the seal cracking, then unfurls the letter.
 //
 
+// swiftlint:disable type_body_length
+
 import SwiftUI
 
 public struct CeremonialMailOpenView: View {
@@ -283,7 +285,7 @@ public struct CeremonialMailOpenView: View {
 
     @ViewBuilder
     private func voicePostscriptCard(letter: CeremonialMailLetter) -> some View {
-        if let _ = letter.voicePostscriptUri {
+        if letter.voicePostscriptUri != nil {
             Button {
                 viewModel.toggleVoicePlayback()
             } label: {

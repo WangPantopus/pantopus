@@ -21,7 +21,7 @@ public final class IdentityCenterViewModel {
     private let api: APIClient
     private var raw: IdentityCenterResponse?
 
-    public init(api: APIClient = .shared) {
+    init(api: APIClient = .shared) {
         self.api = api
     }
 

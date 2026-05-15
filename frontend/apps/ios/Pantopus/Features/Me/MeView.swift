@@ -94,9 +94,8 @@ public struct MeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 MeHeader(
-                    content: active,
-                    onSwitch: { viewModel.selectIdentity($0) }
-                )
+                    content: active
+                ) { viewModel.selectIdentity($0) }
                 if !active.isUnbound {
                     MeStatsRow(stats: active.stats)
                         .padding(.horizontal, Spacing.s4)
@@ -261,13 +260,12 @@ private struct MeHeader: View {
                 )
             },
             activeId: content.identity.rawValue,
-            identifierPrefix: "meIdentityPill",
-            onSelect: { rawValue in
-                if let identity = MeIdentity(rawValue: rawValue) {
-                    onSwitch(identity)
-                }
+            identifierPrefix: "meIdentityPill"
+        ) { rawValue in
+            if let identity = MeIdentity(rawValue: rawValue) {
+                onSwitch(identity)
             }
-        )
+        }
     }
 }
 

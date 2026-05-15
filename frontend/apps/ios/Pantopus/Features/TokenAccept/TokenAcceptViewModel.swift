@@ -210,7 +210,8 @@ public final class TokenAcceptViewModel {
 
     private func identityChip() -> IdentityChipContent {
         if case let .signedIn(user) = auth.state {
-            let label = user.displayName?.isEmpty == false ? user.displayName! : user.email
+            let displayName = user.displayName ?? ""
+            let label = displayName.isEmpty ? user.email : displayName
             return IdentityChipContent(label: label, handle: nil)
         }
         return IdentityChipContent(label: "Accepting as guest")

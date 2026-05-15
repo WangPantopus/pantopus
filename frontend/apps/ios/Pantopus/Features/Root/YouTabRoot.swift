@@ -8,6 +8,8 @@
 //  with three identity bindings (Personal / Home / Business).
 //
 
+// swiftlint:disable cyclomatic_complexity
+
 import SwiftUI
 
 /// Typed routes within the You tab's NavigationStack.
@@ -174,8 +176,8 @@ public struct YouTabRoot: View {
                     TextField("Invite token", text: $debugInviteToken)
                     Button("Open") {
                         let token = debugInviteToken.trimmingCharacters(in: .whitespaces)
-                        if !token.isEmpty {
-                            DeepLinkRouter.shared.handle(url: URL(string: "pantopus://invite/\(token)")!)
+                        if !token.isEmpty, let url = URL(string: "pantopus://invite/\(token)") {
+                            DeepLinkRouter.shared.handle(url: url)
                             debugInviteToken = ""
                         }
                     }
@@ -315,9 +317,8 @@ public struct YouTabRoot: View {
         #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(
-                userId: userId,
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+                userId: userId
+            ) { if !path.isEmpty { path.removeLast() } }
         case let .pulsePost(postId):
             PulsePostDetailView(
                 postId: postId,
@@ -329,9 +330,8 @@ public struct YouTabRoot: View {
         case let .privacyHandshake(personaHandle):
             PrivacyHandshakeWizardView(
                 viewModel: PrivacyHandshakeViewModel(
-                    personaHandle: personaHandle,
-                    onDismiss: { if !path.isEmpty { path.removeLast() } }
-                )
+                    personaHandle: personaHandle
+                ) { if !path.isEmpty { path.removeLast() } }
             )
         case .statusWaiting:
             StatusWaitingView(

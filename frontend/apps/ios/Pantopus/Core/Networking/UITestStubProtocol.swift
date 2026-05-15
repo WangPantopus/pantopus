@@ -8,6 +8,8 @@
 //  can dictate what the network looks like without a real backend.
 //
 
+// swiftlint:disable cyclomatic_complexity file_length function_body_length line_length type_body_length
+
 #if DEBUG
 import Foundation
 

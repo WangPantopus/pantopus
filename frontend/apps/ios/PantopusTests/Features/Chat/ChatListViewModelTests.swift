@@ -107,13 +107,13 @@ final class ChatListViewModelTests: XCTestCase {
         }
         XCTAssertEqual(rows.first?.id, "ai_assistant", "AI row pins first")
         XCTAssertEqual(rows.count, 4, "AI row + 3 conversations")
-        let marcus = rows.first(where: { $0.id == "u1" })
+        let marcus = rows.first { $0.id == "u1" }
         XCTAssertEqual(marcus?.displayName, "Marcus R.")
         XCTAssertEqual(marcus?.unread, 2)
         XCTAssertTrue(marcus?.verified ?? false)
         XCTAssertNil(marcus?.identityChip)
         XCTAssertTrue(marcus?.topicKinds.contains("gig") ?? false)
-        let business = rows.first(where: { $0.id == "b1" })
+        let business = rows.first { $0.id == "b1" }
         XCTAssertEqual(business?.identityChip, .business)
     }
 

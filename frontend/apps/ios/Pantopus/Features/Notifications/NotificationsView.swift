@@ -8,6 +8,8 @@
 //  source's `topBarAction`).
 //
 
+// swiftlint:disable multiple_closures_with_trailing_closure
+
 import SwiftUI
 
 public struct NotificationsView: View {

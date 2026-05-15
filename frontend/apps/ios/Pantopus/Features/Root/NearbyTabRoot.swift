@@ -46,14 +46,12 @@ public struct NearbyTabRoot: View {
             switch kind {
             case .gig:
                 GigDetailView(
-                    viewModel: GigDetailViewModel(gigId: id),
-                    onBack: { if !path.isEmpty { path.removeLast() } }
-                )
+                    viewModel: GigDetailViewModel(gigId: id)
+                ) { if !path.isEmpty { path.removeLast() } }
             case .listing:
                 ListingDetailView(
-                    viewModel: ListingDetailViewModel(listingId: id),
-                    onBack: { if !path.isEmpty { path.removeLast() } }
-                )
+                    viewModel: ListingDetailViewModel(listingId: id)
+                ) { if !path.isEmpty { path.removeLast() } }
             }
         case .filters:
             NotYetAvailableView(tabName: "Map filters", icon: .slidersHorizontal)

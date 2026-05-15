@@ -39,9 +39,8 @@ public struct ChatListView: View {
             ChatListFilterTabs(
                 active: viewModel.activeFilter,
                 unreadByFilter: viewModel.unreadByFilter,
-                skeleton: viewModel.state.isLoading,
-                onSelect: { viewModel.selectFilter($0) }
-            )
+                skeleton: viewModel.state.isLoading
+            ) { viewModel.selectFilter($0) }
             content
         }
         .background(Theme.Color.appSurface)

@@ -169,7 +169,6 @@ public struct IdentitySwitcherSheet: View {
                 name: "Maria the Mason",
                 stats: "1,247 followers · weekly"
             )
-        ],
-        onSelect: { _ in }
-    )
+        ]
+    ) { _ in }
 }

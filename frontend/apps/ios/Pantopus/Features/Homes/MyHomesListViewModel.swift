@@ -91,11 +91,10 @@ final class MyHomesListViewModel: ListOfRowsDataSource {
                 identity: .home,
                 ringProgress: home.ownershipStatus == "verified" ? 1.0 : 0.3
             ),
-            trailing: .chevron,
-            onTap: { @Sendable in
-                Task { @MainActor in self.onOpenHome(home.id) }
-            }
-        )
+            trailing: .chevron
+        ) { @Sendable in
+            Task { @MainActor in self.onOpenHome(home.id) }
+        }
     }
 }
 

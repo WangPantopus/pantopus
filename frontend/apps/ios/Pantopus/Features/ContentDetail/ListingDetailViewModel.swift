@@ -19,7 +19,7 @@ public final class ListingDetailViewModel {
     private let listingId: String
     private let api: APIClient
 
-    public init(listingId: String, api: APIClient = .shared) {
+    init(listingId: String, api: APIClient = .shared) {
         self.listingId = listingId
         self.api = api
     }

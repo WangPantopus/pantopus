@@ -35,12 +35,11 @@ public struct FeedView: View {
                 topBar
                 FeedChipRow(
                     chips: PulseIntent.allCases.map { FeedChipItem(id: $0.rawValue, label: $0.label) },
-                    activeId: viewModel.activeIntent.rawValue,
-                    onSelect: { id in
-                        let intent = PulseIntent(rawValue: id) ?? .all
-                        Task { await viewModel.selectIntent(intent) }
-                    }
-                )
+                    activeId: viewModel.activeIntent.rawValue
+                ) { id in
+                    let intent = PulseIntent(rawValue: id) ?? .all
+                    Task { await viewModel.selectIntent(intent) }
+                }
                 content
             }
             .background(Theme.Color.appBg)

@@ -20,7 +20,7 @@ public final class CeremonialMailOpenViewModel {
     private let mailId: String
     private let api: APIClient
 
-    public init(mailId: String, api: APIClient = .shared) {
+    init(mailId: String, api: APIClient = .shared) {
         self.mailId = mailId
         self.api = api
     }
@@ -90,7 +90,7 @@ public final class CeremonialMailOpenViewModel {
         mailId: String
     ) -> CeremonialMailLetter {
         let item = response.mail
-        let payload = item.objectPayload?.objectValue ?? [:]
+        let payload = item.objectPayload?.dictValue ?? [:]
         let stationery = CeremonialMailStationeryTone(
             wire: payload["stationeryTheme"]?.stringValue
         )
@@ -132,19 +132,5 @@ public final class CeremonialMailOpenViewModel {
         case "none", nil: nil
         default: nil
         }
-    }
-}
-
-// MARK: - JSONValue accessors
-
-private extension JSONValue {
-    var objectValue: [String: JSONValue]? {
-        if case let .object(value) = self { return value }
-        return nil
-    }
-
-    var stringValue: String? {
-        if case let .string(value) = self { return value }
-        return nil
     }
 }

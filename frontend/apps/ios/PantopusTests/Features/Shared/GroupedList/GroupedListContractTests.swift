@@ -45,9 +45,15 @@ final class GroupedListContractTests: XCTestCase {
     }
 
     func testStateTransitions() {
-        let groups = [GroupedListGroup(id: "g", overline: nil, rows: [
-            GroupedListRow(id: "r", label: "Row", control: .chevron)
-        ])]
+        let groups = [
+            GroupedListGroup(
+                id: "g",
+                overline: nil,
+                rows: [
+                    GroupedListRow(id: "r", label: "Row", control: .chevron)
+                ]
+            )
+        ]
         let loading: GroupedListState = .loading
         let loaded: GroupedListState = .loaded(groups)
         let error: GroupedListState = .error(message: "boom")

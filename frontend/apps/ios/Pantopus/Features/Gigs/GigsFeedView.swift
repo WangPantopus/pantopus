@@ -7,6 +7,8 @@
 //  rows). Category chips are per-category brand-colored when active.
 //
 
+// swiftlint:disable type_body_length
+
 import SwiftUI
 
 /// Gigs feed entry point. Reached from Hub → Gigs pillar.

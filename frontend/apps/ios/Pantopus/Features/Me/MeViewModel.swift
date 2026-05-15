@@ -31,7 +31,7 @@ public final class MeViewModel {
     private let api: APIClient
     private let logger = Logger(label: "app.pantopus.ios.Me")
 
-    public init(api: APIClient = .shared) {
+    init(api: APIClient = .shared) {
         self.api = api
     }
 

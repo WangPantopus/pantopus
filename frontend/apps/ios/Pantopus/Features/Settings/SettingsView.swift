@@ -59,14 +59,12 @@ public struct SettingsView: View {
         switch route {
         case .notifications:
             GroupedListView(
-                dataSource: NotificationSettingsViewModel(),
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+                dataSource: NotificationSettingsViewModel()
+            ) { if !path.isEmpty { path.removeLast() } }
         case .privacy:
             GroupedListView(
-                dataSource: PrivacySettingsViewModel(),
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+                dataSource: PrivacySettingsViewModel()
+            ) { if !path.isEmpty { path.removeLast() } }
         case .identityCenter:
             IdentityCenterView(
                 onBack: { if !path.isEmpty { path.removeLast() } },
@@ -77,9 +75,7 @@ public struct SettingsView: View {
                 }
             )
         case .audienceProfile:
-            AudienceProfileView(
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+            AudienceProfileView { if !path.isEmpty { path.removeLast() } }
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
         }

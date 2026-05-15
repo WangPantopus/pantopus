@@ -94,9 +94,8 @@ public struct InboxTabRoot: View {
                     mode: Self.viewModelMode(for: dest.mode),
                     counterparty: Self.counterparty(for: dest),
                     currentUserId: currentUserId
-                ),
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+                )
+            ) { if !path.isEmpty { path.removeLast() } }
         case .compose:
             NotYetAvailableView(tabName: "New message", icon: .edit2)
         case .search:

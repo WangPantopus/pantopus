@@ -9,6 +9,8 @@
 //  Threads (DM inbox).
 //
 
+// swiftlint:disable file_length type_body_length
+
 import SwiftUI
 
 public struct AudienceProfileView: View {
@@ -491,7 +493,7 @@ public struct AudienceProfileView: View {
                             : 0
                         Rectangle()
                             .fill(Self.tierColor(rank: segment.rank))
-                            .frame(width: max(width, segment.count > 0 ? 4 : 0), height: 14)
+                            .frame(width: max(width, !segment.isEmpty ? 4 : 0), height: 14)
                     }
                 }
                 .frame(height: 14)

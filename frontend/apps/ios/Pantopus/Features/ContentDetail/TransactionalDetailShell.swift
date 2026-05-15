@@ -13,6 +13,8 @@
 //  pulse post, home dashboard).
 //
 
+// swiftlint:disable file_length function_body_length multiple_closures_with_trailing_closure type_body_length
+
 import SwiftUI
 
 /// Sticky-dock transactional-detail shell.

@@ -7,6 +7,8 @@
 //  sheet, category-colored pins, and a pin↔card selection link.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import CoreLocation
 import MapKit
 import SwiftUI

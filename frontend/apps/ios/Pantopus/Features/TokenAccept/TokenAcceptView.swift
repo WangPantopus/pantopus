@@ -7,6 +7,8 @@
 //  Reached from the `pantopus://invite/:token` deep link.
 //
 
+// swiftlint:disable large_tuple type_body_length
+
 import SwiftUI
 
 public struct TokenAcceptView: View {

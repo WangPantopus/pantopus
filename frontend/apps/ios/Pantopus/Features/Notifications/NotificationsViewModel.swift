@@ -139,9 +139,10 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
             )
             return
         }
-        let rows = notifications.map { dto in Self.row(dto: dto, onSelect: { [weak self] in
+        let rows = notifications.map { dto in Self.row(dto: dto) { [weak self] in
             self?.handleTap(dto: dto)
-        }) }
+        }
+        }
         state = .loaded(
             sections: [RowSection(rows: rows)],
             hasMore: hasMore
@@ -201,16 +202,32 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
 private extension NotificationDTO {
     func markedRead() -> NotificationDTO {
         NotificationDTO(
-            id: id, userId: userId, type: type, title: title, body: body,
-            icon: icon, link: link, isRead: true, createdAt: createdAt, context: context
+            id: id,
+            userId: userId,
+            type: type,
+            title: title,
+            body: body,
+            icon: icon,
+            link: link,
+            isRead: true,
+            createdAt: createdAt,
+            context: context
         )
     }
 }
 
 public extension NotificationDTO {
     init(
-        id: String, userId: String?, type: String?, title: String?, body: String?,
-        icon: String?, link: String?, isRead: Bool?, createdAt: String?, context: String?
+        id: String,
+        userId: String?,
+        type: String?,
+        title: String?,
+        body: String?,
+        icon: String?,
+        link: String?,
+        isRead: Bool?,
+        createdAt: String?,
+        context: String?
     ) {
         self.id = id
         self.userId = userId

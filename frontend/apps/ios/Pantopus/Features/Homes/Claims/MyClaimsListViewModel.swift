@@ -109,9 +109,8 @@ final class MyClaimsListViewModel: ListOfRowsDataSource {
             trailing: .statusChip(
                 text: statusText(for: claim.status),
                 variant: statusVariant(for: claim.status)
-            ),
-            onTap: { [onOpenClaim] in onOpenClaim(claimId) }
-        )
+            )
+        ) { [onOpenClaim] in onOpenClaim(claimId) }
     }
 
     private func subtitle(for claim: OwnershipClaimDTO) -> String? {

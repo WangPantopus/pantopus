@@ -111,9 +111,9 @@ final class MeViewModelTests: XCTestCase {
         XCTAssertEqual(personal.displayName, "Alice Doe")
         XCTAssertTrue(personal.verified)
         XCTAssertEqual(personal.stats.count, 4)
-        XCTAssertEqual(personal.stats.first(where: { $0.id == "rating" })?.value, "4.9")
+        XCTAssertEqual(personal.stats.first { $0.id == "rating" }?.value, "4.9")
         XCTAssertEqual(personal.actionTiles.count, 6)
-        XCTAssertEqual(personal.actionTiles.first(where: { $0.id == "mail" })?.routeKey, "me.mail")
+        XCTAssertEqual(personal.actionTiles.first { $0.id == "mail" }?.routeKey, "me.mail")
 
         XCTAssertEqual(home.identity, .home)
         XCTAssertEqual(home.displayName, "412 Birch Ln")

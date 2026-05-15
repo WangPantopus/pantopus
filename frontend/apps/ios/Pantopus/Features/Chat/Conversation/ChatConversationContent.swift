@@ -7,6 +7,8 @@
 //  / `ChatSystemPillContent` live in the view-model.
 //
 
+// swiftlint:disable enum_case_associated_values_count
+
 import Foundation
 
 /// Counterparty type. Drives the header swap, empty-state copy, and

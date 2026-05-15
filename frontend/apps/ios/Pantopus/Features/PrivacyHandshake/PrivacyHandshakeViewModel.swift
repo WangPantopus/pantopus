@@ -9,6 +9,8 @@
 //  member).
 //
 
+// swiftlint:disable type_body_length
+
 import Foundation
 import Observation
 
@@ -58,7 +60,7 @@ public final class PrivacyHandshakeViewModel: WizardModel {
                 value: suggestion.suggestion ?? "",
                 locked: suggestion.locked ?? false
             )
-            let defaultRank = tierOptions.first(where: { $0.rank == 1 })?.rank
+            let defaultRank = tierOptions.first { $0.rank == 1 }?.rank
                 ?? tierOptions.first?.rank ?? 1
             let content = HandshakeReadyContent(
                 persona: preview,

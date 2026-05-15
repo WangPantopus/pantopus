@@ -8,6 +8,8 @@
 //  pagination on scroll-up, socket subscriptions in the VM.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 /// Chat conversation screen.

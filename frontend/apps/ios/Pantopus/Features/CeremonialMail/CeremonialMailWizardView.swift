@@ -6,6 +6,8 @@
 //  with step bodies that mirror the design's pages.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import SwiftUI
 
 public struct CeremonialMailWizardView: View {

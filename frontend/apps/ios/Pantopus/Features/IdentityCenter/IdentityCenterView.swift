@@ -8,6 +8,8 @@
 //  surfaces via the trailing "Switch" button.
 //
 
+// swiftlint:disable type_body_length
+
 import SwiftUI
 
 public struct IdentityCenterView: View {

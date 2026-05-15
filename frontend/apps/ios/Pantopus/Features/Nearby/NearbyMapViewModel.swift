@@ -188,8 +188,8 @@ public final class NearbyMapViewModel {
             let key = bucketKey(latitude: entity.latitude, longitude: entity.longitude, radius: radiusDegrees)
             buckets[key, default: []].append(entity)
         }
-        return buckets.keys.sorted().map { key in
-            let group = buckets[key]!
+        return buckets.keys.sorted().compactMap { key -> MapMarker? in
+            guard let group = buckets[key] else { return nil }
             if group.count == 1 { return .entity(group[0]) }
             let lats = group.map(\.latitude)
             let lons = group.map(\.longitude)

@@ -49,7 +49,7 @@ public final class ChatListViewModel {
     private var badgeTask: Task<Void, Never>?
     private var messageTask: Task<Void, Never>?
 
-    public init(api: APIClient = .shared, socket: SocketClient = .shared) {
+    init(api: APIClient = .shared, socket: SocketClient = .shared) {
         self.api = api
         self.socket = socket
     }

@@ -4,7 +4,7 @@
 //
 //  Covers the Notifications center VM: load → loaded/empty/error,
 
-//  MARK: - read optimistic + rollback, read-all sweep, row projection
+// MARK: - read optimistic + rollback, read-all sweep, row projection
 
 //  flips on `is_read`, and tap-through routes through DeepLinkRouter.
 //
@@ -144,11 +144,18 @@ final class NotificationsViewModelTests: XCTestCase {
     func testRowMappingRendersUnreadAsInfoChip() {
         let dto =
             NotificationDTO(
-                id: "n1", userId: nil, type: "post", title: "Title", body: "Body",
-                icon: nil, link: "/post/p_1", isRead: false,
-                createdAt: "2026-05-15T10:00:00Z", context: nil
+                id: "n1",
+                userId: nil,
+                type: "post",
+                title: "Title",
+                body: "Body",
+                icon: nil,
+                link: "/post/p_1",
+                isRead: false,
+                createdAt: "2026-05-15T10:00:00Z",
+                context: nil
             )
-        let row = NotificationsViewModel.row(dto: dto, onSelect: {})
+        let row = NotificationsViewModel.row(dto: dto) {}
         if case let .statusChip(text, variant) = row.trailing {
             XCTAssertEqual(text, "NEW")
             XCTAssertEqual(variant, .info)
@@ -160,11 +167,18 @@ final class NotificationsViewModelTests: XCTestCase {
     func testRowMappingRendersReadAsChevron() {
         let dto =
             NotificationDTO(
-                id: "n2", userId: nil, type: "post", title: "Title", body: "Body",
-                icon: nil, link: "/post/p_1", isRead: true,
-                createdAt: "2026-05-15T10:00:00Z", context: nil
+                id: "n2",
+                userId: nil,
+                type: "post",
+                title: "Title",
+                body: "Body",
+                icon: nil,
+                link: "/post/p_1",
+                isRead: true,
+                createdAt: "2026-05-15T10:00:00Z",
+                context: nil
             )
-        let row = NotificationsViewModel.row(dto: dto, onSelect: {})
+        let row = NotificationsViewModel.row(dto: dto) {}
         if case .chevron = row.trailing {
             // ok
         } else {

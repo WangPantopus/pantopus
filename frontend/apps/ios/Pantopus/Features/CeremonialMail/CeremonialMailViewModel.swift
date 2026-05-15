@@ -49,7 +49,7 @@ public final class CeremonialMailViewModel: WizardModel {
     private var lastSearchTask: Task<Void, Never>?
     private var isSubmitting: Bool = false
 
-    public init(
+    init(
         api: APIClient = .shared,
         multipart: MultipartUploader = .shared
     ) {

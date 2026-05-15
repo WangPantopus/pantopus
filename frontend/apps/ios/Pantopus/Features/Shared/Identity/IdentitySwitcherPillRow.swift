@@ -93,9 +93,8 @@ public struct IdentitySwitcherPillRow: View {
             IdentityOption(id: "home", label: "Home", icon: .home, accent: Theme.Color.home),
             IdentityOption(id: "business", label: "Business", icon: .shieldCheck, accent: Theme.Color.business)
         ],
-        activeId: "personal",
-        onSelect: { _ in }
-    )
-    .padding()
-    .background(Theme.Color.appBg)
+        activeId: "personal"
+    ) { _ in }
+        .padding()
+        .background(Theme.Color.appBg)
 }

@@ -8,6 +8,8 @@
 //  via `POST /api/gigs/:gigId/bids`.
 //
 
+// swiftlint:disable function_body_length
+
 import Foundation
 import Observation
 
@@ -27,7 +29,7 @@ public final class GigDetailViewModel {
     private let api: APIClient
     private let currentUserId: String?
 
-    public init(gigId: String, api: APIClient = .shared, currentUserId: String? = nil) {
+    init(gigId: String, api: APIClient = .shared, currentUserId: String? = nil) {
         self.gigId = gigId
         self.api = api
         self.currentUserId = currentUserId

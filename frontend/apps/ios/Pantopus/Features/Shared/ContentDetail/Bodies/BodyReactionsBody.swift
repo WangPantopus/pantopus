@@ -232,9 +232,8 @@ private struct ReactionsBar: View {
                 kind: .helpful,
                 icon: .thumbsUp,
                 count: counts.helpful,
-                isSelected: counts.userReaction == .helpful,
-                onTap: { onTap(.helpful) }
-            )
+                isSelected: counts.userReaction == .helpful
+            ) { onTap(.helpful) }
             // Heart and Going are display-only until the backend supports
             // reactions beyond `like`. They show the count but don't
             // announce as buttons or accept taps.

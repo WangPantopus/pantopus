@@ -12,6 +12,8 @@
 //  `fastlane/screenshots/<lang>/<device>/<NN_Name>_<lang>.png`.
 //
 
+// swiftlint:disable cyclomatic_complexity function_body_length
+
 import XCTest
 
 final class StoreScreenshots: XCTestCase {

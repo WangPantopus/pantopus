@@ -10,6 +10,8 @@
 //  failure by emitting a new state.
 //
 
+// swiftlint:disable type_body_length
+
 import SwiftUI
 
 public struct GroupedListView<DataSource: GroupedListDataSource>: View {

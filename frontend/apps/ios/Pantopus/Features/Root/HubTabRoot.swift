@@ -4,7 +4,7 @@
 //
 //  Navigation stack for the Hub tab.
 //
-// swiftlint:disable cyclomatic_complexity
+// swiftlint:disable cyclomatic_complexity function_body_length
 
 import SwiftUI
 
@@ -325,14 +325,12 @@ public struct HubTabRoot: View {
             NotYetAvailableView(tabName: "Snap & sell", icon: .camera)
         case let .invoiceDetail(invoiceId):
             InvoiceDetailView(
-                viewModel: InvoiceDetailViewModel(invoiceId: invoiceId),
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+                viewModel: InvoiceDetailViewModel(invoiceId: invoiceId)
+            ) { if !path.isEmpty { path.removeLast() } }
         case .notifications:
             NotificationsView(
-                viewModel: NotificationsViewModel(),
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+                viewModel: NotificationsViewModel()
+            ) { if !path.isEmpty { path.removeLast() } }
         case .menu:
             SettingsView(
                 onClose: { if !path.isEmpty { path.removeLast() } },

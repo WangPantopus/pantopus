@@ -55,8 +55,11 @@ final class ContentDetailProjectionTests: XCTestCase {
                 message: nil,
                 createdAt: nil,
                 bidder: GigCreator(
-                    id: "u\(i)", username: "u\(i)", name: "Bidder \(i)",
-                    profilePictureUrl: nil, verified: true
+                    id: "u\(i)",
+                    username: "u\(i)",
+                    name: "Bidder \(i)",
+                    profilePictureUrl: nil,
+                    verified: true
                 )
             )
         }

@@ -10,6 +10,8 @@
 //  setup CTA from the firewall doc §6.2.
 //
 
+// swiftlint:disable function_parameter_count
+
 import Foundation
 import Observation
 
@@ -26,7 +28,7 @@ public final class AudienceProfileViewModel {
     private var personaHandle: String?
     private var channelId: String?
 
-    public init(api: APIClient = .shared) {
+    init(api: APIClient = .shared) {
         self.api = api
     }
 

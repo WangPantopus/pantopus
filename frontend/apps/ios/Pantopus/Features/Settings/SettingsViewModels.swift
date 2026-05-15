@@ -13,6 +13,8 @@
 //  back if the PATCH fails.
 //
 
+// swiftlint:disable cyclomatic_complexity file_length large_tuple
+
 import Foundation
 import Observation
 
@@ -31,11 +33,11 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
     private let auth: AuthManager
     private let onNavigate: @MainActor (SettingsRoute) -> Void
     private var footer: String?
-    private var stripeConnected: Bool? = nil
+    private var stripeConnected: Bool?
     private var verified: Bool = false
     private var blockCount: Int = 0
 
-    public init(
+    init(
         api: APIClient = .shared,
         auth: AuthManager = .shared,
         onNavigate: @escaping @MainActor (SettingsRoute) -> Void = { _ in }
@@ -199,7 +201,7 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
     private var settings: PrivacySettings?
     private var emailAddress: String?
 
-    public init(api: APIClient = .shared, auth: AuthManager = .shared) {
+    init(api: APIClient = .shared, auth: AuthManager = .shared) {
         self.api = api
         if case let .signedIn(user) = auth.state { emailAddress = user.email }
     }
@@ -351,7 +353,7 @@ public final class PrivacySettingsViewModel: GroupedListDataSource {
     private let api: APIClient
     private var settings: PrivacySettings?
 
-    public init(api: APIClient = .shared) {
+    init(api: APIClient = .shared) {
         self.api = api
     }
 
@@ -511,77 +513,119 @@ extension PrivacySettings {
 
     func updating(searchVisibility newValue: String) -> PrivacySettings {
         PrivacySettings(
-            userId: userId, searchVisibility: newValue, addressPrecision: addressPrecision,
-            hideFromSearch: hideFromSearch, showOnlineStatus: showOnlineStatus,
-            showLastActive: showLastActive, showReadReceipts: showReadReceipts,
-            shareHomeCheckIns: shareHomeCheckIns, pushPreferences: pushPreferences,
-            emailPreferences: emailPreferences, smsPreferences: smsPreferences,
+            userId: userId,
+            searchVisibility: newValue,
+            addressPrecision: addressPrecision,
+            hideFromSearch: hideFromSearch,
+            showOnlineStatus: showOnlineStatus,
+            showLastActive: showLastActive,
+            showReadReceipts: showReadReceipts,
+            shareHomeCheckIns: shareHomeCheckIns,
+            pushPreferences: pushPreferences,
+            emailPreferences: emailPreferences,
+            smsPreferences: smsPreferences,
             updatedAt: updatedAt
         )
     }
 
     func updating(addressPrecision newValue: String) -> PrivacySettings {
         PrivacySettings(
-            userId: userId, searchVisibility: searchVisibility, addressPrecision: newValue,
-            hideFromSearch: hideFromSearch, showOnlineStatus: showOnlineStatus,
-            showLastActive: showLastActive, showReadReceipts: showReadReceipts,
-            shareHomeCheckIns: shareHomeCheckIns, pushPreferences: pushPreferences,
-            emailPreferences: emailPreferences, smsPreferences: smsPreferences,
+            userId: userId,
+            searchVisibility: searchVisibility,
+            addressPrecision: newValue,
+            hideFromSearch: hideFromSearch,
+            showOnlineStatus: showOnlineStatus,
+            showLastActive: showLastActive,
+            showReadReceipts: showReadReceipts,
+            shareHomeCheckIns: shareHomeCheckIns,
+            pushPreferences: pushPreferences,
+            emailPreferences: emailPreferences,
+            smsPreferences: smsPreferences,
             updatedAt: updatedAt
         )
     }
 
     func updating(hideFromSearch newValue: Bool) -> PrivacySettings {
         PrivacySettings(
-            userId: userId, searchVisibility: searchVisibility, addressPrecision: addressPrecision,
-            hideFromSearch: newValue, showOnlineStatus: showOnlineStatus,
-            showLastActive: showLastActive, showReadReceipts: showReadReceipts,
-            shareHomeCheckIns: shareHomeCheckIns, pushPreferences: pushPreferences,
-            emailPreferences: emailPreferences, smsPreferences: smsPreferences,
+            userId: userId,
+            searchVisibility: searchVisibility,
+            addressPrecision: addressPrecision,
+            hideFromSearch: newValue,
+            showOnlineStatus: showOnlineStatus,
+            showLastActive: showLastActive,
+            showReadReceipts: showReadReceipts,
+            shareHomeCheckIns: shareHomeCheckIns,
+            pushPreferences: pushPreferences,
+            emailPreferences: emailPreferences,
+            smsPreferences: smsPreferences,
             updatedAt: updatedAt
         )
     }
 
     func updating(showOnlineStatus newValue: Bool) -> PrivacySettings {
         PrivacySettings(
-            userId: userId, searchVisibility: searchVisibility, addressPrecision: addressPrecision,
-            hideFromSearch: hideFromSearch, showOnlineStatus: newValue,
-            showLastActive: showLastActive, showReadReceipts: showReadReceipts,
-            shareHomeCheckIns: shareHomeCheckIns, pushPreferences: pushPreferences,
-            emailPreferences: emailPreferences, smsPreferences: smsPreferences,
+            userId: userId,
+            searchVisibility: searchVisibility,
+            addressPrecision: addressPrecision,
+            hideFromSearch: hideFromSearch,
+            showOnlineStatus: newValue,
+            showLastActive: showLastActive,
+            showReadReceipts: showReadReceipts,
+            shareHomeCheckIns: shareHomeCheckIns,
+            pushPreferences: pushPreferences,
+            emailPreferences: emailPreferences,
+            smsPreferences: smsPreferences,
             updatedAt: updatedAt
         )
     }
 
     func updating(showLastActive newValue: Bool) -> PrivacySettings {
         PrivacySettings(
-            userId: userId, searchVisibility: searchVisibility, addressPrecision: addressPrecision,
-            hideFromSearch: hideFromSearch, showOnlineStatus: showOnlineStatus,
-            showLastActive: newValue, showReadReceipts: showReadReceipts,
-            shareHomeCheckIns: shareHomeCheckIns, pushPreferences: pushPreferences,
-            emailPreferences: emailPreferences, smsPreferences: smsPreferences,
+            userId: userId,
+            searchVisibility: searchVisibility,
+            addressPrecision: addressPrecision,
+            hideFromSearch: hideFromSearch,
+            showOnlineStatus: showOnlineStatus,
+            showLastActive: newValue,
+            showReadReceipts: showReadReceipts,
+            shareHomeCheckIns: shareHomeCheckIns,
+            pushPreferences: pushPreferences,
+            emailPreferences: emailPreferences,
+            smsPreferences: smsPreferences,
             updatedAt: updatedAt
         )
     }
 
     func updating(showReadReceipts newValue: Bool) -> PrivacySettings {
         PrivacySettings(
-            userId: userId, searchVisibility: searchVisibility, addressPrecision: addressPrecision,
-            hideFromSearch: hideFromSearch, showOnlineStatus: showOnlineStatus,
-            showLastActive: showLastActive, showReadReceipts: newValue,
-            shareHomeCheckIns: shareHomeCheckIns, pushPreferences: pushPreferences,
-            emailPreferences: emailPreferences, smsPreferences: smsPreferences,
+            userId: userId,
+            searchVisibility: searchVisibility,
+            addressPrecision: addressPrecision,
+            hideFromSearch: hideFromSearch,
+            showOnlineStatus: showOnlineStatus,
+            showLastActive: showLastActive,
+            showReadReceipts: newValue,
+            shareHomeCheckIns: shareHomeCheckIns,
+            pushPreferences: pushPreferences,
+            emailPreferences: emailPreferences,
+            smsPreferences: smsPreferences,
             updatedAt: updatedAt
         )
     }
 
     func updating(shareHomeCheckIns newValue: Bool) -> PrivacySettings {
         PrivacySettings(
-            userId: userId, searchVisibility: searchVisibility, addressPrecision: addressPrecision,
-            hideFromSearch: hideFromSearch, showOnlineStatus: showOnlineStatus,
-            showLastActive: showLastActive, showReadReceipts: showReadReceipts,
-            shareHomeCheckIns: newValue, pushPreferences: pushPreferences,
-            emailPreferences: emailPreferences, smsPreferences: smsPreferences,
+            userId: userId,
+            searchVisibility: searchVisibility,
+            addressPrecision: addressPrecision,
+            hideFromSearch: hideFromSearch,
+            showOnlineStatus: showOnlineStatus,
+            showLastActive: showLastActive,
+            showReadReceipts: showReadReceipts,
+            shareHomeCheckIns: newValue,
+            pushPreferences: pushPreferences,
+            emailPreferences: emailPreferences,
+            smsPreferences: smsPreferences,
             updatedAt: updatedAt
         )
     }

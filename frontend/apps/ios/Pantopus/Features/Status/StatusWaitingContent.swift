@@ -121,7 +121,7 @@ public extension StatusWaitingContent {
         onOpenClaim _: @escaping () -> Void = {},
         onBackToHub _: @escaping () -> Void = {}
     ) -> StatusWaitingContent {
-        let venue = (homeName?.isEmpty == false) ? homeName! : "this home"
+        let venue = (homeName?.isEmpty == false) ? (homeName ?? "this home") : "this home"
         return StatusWaitingContent(
             illustration: .success,
             headline: "Claim submitted",
@@ -160,7 +160,7 @@ public extension StatusWaitingContent {
         homeName: String?,
         submittedAgo: String? = nil
     ) -> StatusWaitingContent {
-        let venue = (homeName?.isEmpty == false) ? homeName! : "your claim"
+        let venue = (homeName?.isEmpty == false) ? (homeName ?? "your claim") : "your claim"
         var subcopy = "We're reviewing your evidence. We'll email you when \(venue) is verified."
         if let submittedAgo, !submittedAgo.isEmpty {
             subcopy += " Submitted \(submittedAgo)."

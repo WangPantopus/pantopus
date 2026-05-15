@@ -9,6 +9,8 @@
 //  action cards → explainer bullets → sticky CTAs).
 //
 
+// swiftlint:disable large_tuple
+
 import SwiftUI
 
 public struct StatusWaitingView: View {

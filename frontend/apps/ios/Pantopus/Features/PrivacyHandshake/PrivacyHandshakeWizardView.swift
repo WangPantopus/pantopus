@@ -7,6 +7,8 @@
 //  Follow on a Public Profile they don't yet follow.
 //
 
+// swiftlint:disable type_body_length
+
 import SwiftUI
 
 public struct PrivacyHandshakeWizardView: View {

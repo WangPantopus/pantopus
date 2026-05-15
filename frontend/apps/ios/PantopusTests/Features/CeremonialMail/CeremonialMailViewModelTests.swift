@@ -241,9 +241,14 @@ final class CeremonialMailViewModelTests: XCTestCase {
         // Simulate a recipient already selected without waiting for
         // the search debounce.
         let recipient = MailRecipientDTO(
-            userId: "u_maya", name: "Maya K.", username: "mayak",
-            homeId: "home_demo", homeAddress: "412 Elm St", isVerified: true,
-            homeMediaUrl: nil, isOnPantopus: true
+            userId: "u_maya",
+            name: "Maya K.",
+            username: "mayak",
+            homeId: "home_demo",
+            homeAddress: "412 Elm St",
+            isVerified: true,
+            homeMediaUrl: nil,
+            isOnPantopus: true
         )
         vm.selectRecipient(recipient)
         vm.primaryTapped() // → verify

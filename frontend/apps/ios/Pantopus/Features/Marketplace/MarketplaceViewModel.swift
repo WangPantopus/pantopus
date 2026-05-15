@@ -7,6 +7,8 @@
 //  projects each row into `MarketplaceCardContent`.
 //
 
+// swiftlint:disable cyclomatic_complexity
+
 import Foundation
 import Observation
 
