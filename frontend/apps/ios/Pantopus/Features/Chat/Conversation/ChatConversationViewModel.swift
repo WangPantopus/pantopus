@@ -67,11 +67,8 @@ public final class ChatConversationViewModel {
     private var failedClientIds: Set<String> = []
     private var hasMore: Bool = false
     private var oldestCursor: String?
-    // `nonisolated` lets `deinit` (which is nonisolated for a
-    // `@MainActor` class) tear these tasks down without warnings under
-    // Swift 6 strict concurrency. `Task` is `Sendable`.
-    private nonisolated var markReadTask: Task<Void, Never>?
-    private nonisolated var socketTasks: [Task<Void, Never>] = []
+    private var markReadTask: Task<Void, Never>?
+    private var socketTasks: [Task<Void, Never>] = []
 
     init(
         mode: ChatThreadMode,
@@ -97,10 +94,11 @@ public final class ChatConversationViewModel {
         ]
     }
 
-    deinit {
-        markReadTask?.cancel()
-        socketTasks.forEach { $0.cancel() }
-    }
+    // No `deinit { cancel }` — Swift 6's strict concurrency disallows
+    // touching `@MainActor`-isolated stored properties from the
+    // nonisolated `deinit`. The view calls `teardown()` from
+    // `.onDisappear`, and each task captures `[weak self]` so it
+    // exits cleanly once the VM is deallocated.
 
     // MARK: - Public API
 

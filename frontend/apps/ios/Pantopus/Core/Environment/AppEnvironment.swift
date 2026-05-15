@@ -9,7 +9,7 @@
 import Foundation
 
 @Observable
-final class AppEnvironment {
+final class AppEnvironment: @unchecked Sendable {
     enum Target: String, CaseIterable {
         case local
         case staging

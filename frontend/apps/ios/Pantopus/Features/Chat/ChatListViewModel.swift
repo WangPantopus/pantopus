@@ -46,21 +46,19 @@ public final class ChatListViewModel {
         topicKinds: []
     )
 
-    // `nonisolated` lets `deinit` (which is nonisolated for a
-    // `@MainActor` class) tear these tasks down without warnings under
-    // Swift 6 strict concurrency. `Task` is `Sendable`.
-    private nonisolated var badgeTask: Task<Void, Never>?
-    private nonisolated var messageTask: Task<Void, Never>?
+    private var badgeTask: Task<Void, Never>?
+    private var messageTask: Task<Void, Never>?
 
     init(api: APIClient = .shared, socket: SocketClient = .shared) {
         self.api = api
         self.socket = socket
     }
 
-    deinit {
-        badgeTask?.cancel()
-        messageTask?.cancel()
-    }
+    // No `deinit { cancel }` — Swift 6's strict concurrency disallows
+    // touching `@MainActor`-isolated stored properties from the
+    // nonisolated `deinit`. The view calls `teardown()` from
+    // `.onDisappear`, and each task captures `[weak self]` so it
+    // exits cleanly once the VM is deallocated.
 
     // MARK: - Public API
 

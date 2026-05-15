@@ -33,10 +33,10 @@ final class AuthManager {
     private(set) var state: State = .unknown
     private(set) var accessToken: String?
 
-    private let store: SecureStore
+    private let store: any SecureStore
     private let logger = Logger(label: "app.pantopus.ios.AuthManager")
 
-    init(store: SecureStore = KeychainStore()) {
+    init(store: any SecureStore = KeychainStore()) {
         self.store = store
     }
 

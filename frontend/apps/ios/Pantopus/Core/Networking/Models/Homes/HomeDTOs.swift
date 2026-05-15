@@ -415,7 +415,7 @@ public struct CheckAddressResponse: Decodable, Sendable, Hashable {
 /// Type-erased `Encodable` wrapper for request bodies whose schema is
 /// defined server-side (e.g. ATTOM property details).
 public struct JSONEncodable: Encodable, Sendable {
-    private let encodeClosure: @Sendable (Encoder) throws -> Void
+    private let encodeClosure: @Sendable (any Encoder) throws -> Void
     public init(_ wrapped: some Encodable & Sendable) {
         encodeClosure = wrapped.encode
     }
