@@ -52,6 +52,18 @@ final class StoreScreenshots: XCTestCase {
         // For reliability we drive each screen via its accessibility
         // identifier, falling back to the tab bar where needed.
 
+        // Hub → Pulse pillar → Pulse feed
+        let pulsePillar = app.descendants(matching: .any)
+            .matching(identifier: "hub.pillar.pulse").firstMatch
+        if pulsePillar.waitForExistence(timeout: 3) {
+            pulsePillar.tap()
+            _ = app.descendants(matching: .any)
+                .matching(identifier: "pulseFeed").firstMatch
+                .waitForExistence(timeout: 5)
+            snapshot("02_PulseFeed")
+            app.buttons["pulseBackButton"].firstMatch.tap()
+        }
+
         // Hub → Mail pillar → MailboxList
         let mailPillar = app.descendants(matching: .any)
             .matching(identifier: "hub.pillar.mail").firstMatch

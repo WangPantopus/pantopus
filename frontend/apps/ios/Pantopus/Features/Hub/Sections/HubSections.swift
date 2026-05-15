@@ -267,6 +267,7 @@ struct HubPillarGrid: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(tile.label)\(tile.chip.map { ", \($0)" } ?? "")")
+                .accessibilityIdentifier("hub.pillar.\(tile.pillar.rawValue)")
             }
         }
         .padding(.horizontal, Spacing.s4)
