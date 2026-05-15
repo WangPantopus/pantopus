@@ -76,20 +76,6 @@ final class NotificationsViewModelTests: XCTestCase {
     ],"unreadCount":2,"hasMore":false}
     """
 
-    private static let mixedTodayAndEarlierJSON = """
-    {"notifications":[
-      {"id":"n1","type":"reply","title":"Today reply",
-       "body":"hi","icon":null,"link":null,"is_read":false,
-       "created_at":"2026-05-15T10:00:00Z","user_id":"u_me"},
-      {"id":"n2","type":"listing","title":"Yesterday listing",
-       "body":"price drop","icon":null,"link":null,"is_read":true,
-       "created_at":"2026-05-14T15:00:00Z","user_id":"u_me"},
-      {"id":"n3","type":"safety","title":"Tuesday alert",
-       "body":"alert","icon":null,"link":null,"is_read":true,
-       "created_at":"2026-05-12T18:00:00Z","user_id":"u_me"}
-    ],"unreadCount":1,"hasMore":false}
-    """
-
     private static let emptyJSON = """
     {"notifications":[],"unreadCount":0,"hasMore":false}
     """
@@ -266,99 +252,68 @@ final class NotificationsViewModelTests: XCTestCase {
     }
 
     func testRowMappingForMentionUsesBusinessAndAtSign() {
-        let dto = makeDTO(id: "n", type: "mention")
-        let row = NotificationsViewModel.row(
-            dto: dto,
-            now: Self.fixedNow,
-            calendar: Self.utcCalendar,
-            timeZone: Self.utc
-        ) {}
-        if case let .typeIcon(icon, _, _) = row.leading {
-            XCTAssertEqual(icon, .atSign)
-        }
-        if case let .status(variant) = row.chips?.first?.tint {
-            XCTAssertEqual(variant, .business)
-        }
+        assertRowTypeMapping(rawType: "mention", expectedIcon: .atSign, expectedVariant: .business)
     }
 
     func testRowMappingForClaimUsesSuccessAndBadgeCheck() {
-        let dto = makeDTO(id: "n", type: "claim")
-        let row = NotificationsViewModel.row(
-            dto: dto,
-            now: Self.fixedNow,
-            calendar: Self.utcCalendar,
-            timeZone: Self.utc
-        ) {}
-        if case let .typeIcon(icon, _, _) = row.leading {
-            XCTAssertEqual(icon, .badgeCheck)
-        }
-        if case let .status(variant) = row.chips?.first?.tint {
-            XCTAssertEqual(variant, .success)
-        }
+        assertRowTypeMapping(rawType: "claim", expectedIcon: .badgeCheck, expectedVariant: .success)
     }
 
     func testRowMappingForGigUsesWarningAndBriefcase() {
-        let dto = makeDTO(id: "n", type: "gig")
-        let row = NotificationsViewModel.row(
-            dto: dto,
-            now: Self.fixedNow,
-            calendar: Self.utcCalendar,
-            timeZone: Self.utc
-        ) {}
-        if case let .typeIcon(icon, _, _) = row.leading {
-            XCTAssertEqual(icon, .briefcase)
-        }
-        if case let .status(variant) = row.chips?.first?.tint {
-            XCTAssertEqual(variant, .warning)
-        }
+        assertRowTypeMapping(rawType: "gig", expectedIcon: .briefcase, expectedVariant: .warning)
     }
 
     func testRowMappingForListingUsesHomeAndTag() {
-        let dto = makeDTO(id: "n", type: "listing")
-        let row = NotificationsViewModel.row(
-            dto: dto,
-            now: Self.fixedNow,
-            calendar: Self.utcCalendar,
-            timeZone: Self.utc
-        ) {}
-        if case let .typeIcon(icon, _, _) = row.leading {
-            XCTAssertEqual(icon, .tag)
-        }
-        if case let .status(variant) = row.chips?.first?.tint {
-            XCTAssertEqual(variant, .home)
-        }
+        assertRowTypeMapping(rawType: "listing", expectedIcon: .tag, expectedVariant: .home)
     }
 
     func testRowMappingForSafetyUsesErrorAndShieldAlert() {
-        let dto = makeDTO(id: "n", type: "safety")
-        let row = NotificationsViewModel.row(
-            dto: dto,
-            now: Self.fixedNow,
-            calendar: Self.utcCalendar,
-            timeZone: Self.utc
-        ) {}
-        if case let .typeIcon(icon, _, _) = row.leading {
-            XCTAssertEqual(icon, .shieldAlert)
-        }
-        if case let .status(variant) = row.chips?.first?.tint {
-            XCTAssertEqual(variant, .error)
-        }
+        assertRowTypeMapping(rawType: "safety", expectedIcon: .shieldAlert, expectedVariant: .error)
     }
 
     func testRowMappingForSystemUsesNeutralAndInfo() {
-        let dto = makeDTO(id: "n", type: "system")
+        assertRowTypeMapping(rawType: "system", expectedIcon: .info, expectedVariant: .neutral)
+    }
+
+    func testRowMappingForUnknownTypeFallsBackToSystem() {
+        assertRowTypeMapping(
+            rawType: "definitely_not_a_known_type",
+            expectedIcon: .info,
+            expectedVariant: .neutral
+        )
+    }
+
+    /// Strict per-type assertion — fails loudly if the row's `leading` is
+    /// not a `.typeIcon` or the chip tint is not a `.status` variant.
+    private func assertRowTypeMapping(
+        rawType: String,
+        expectedIcon: PantopusIcon,
+        expectedVariant: StatusChipVariant,
+        file: StaticString = #file,
+        line: UInt = #line
+    ) {
+        let dto = makeDTO(id: "n", type: rawType)
         let row = NotificationsViewModel.row(
             dto: dto,
             now: Self.fixedNow,
             calendar: Self.utcCalendar,
             timeZone: Self.utc
         ) {}
-        if case let .typeIcon(icon, _, _) = row.leading {
-            XCTAssertEqual(icon, .info)
+        guard case let .typeIcon(icon, _, _) = row.leading else {
+            XCTFail("Expected .typeIcon leading for \(rawType)", file: file, line: line)
+            return
         }
-        if case let .status(variant) = row.chips?.first?.tint {
-            XCTAssertEqual(variant, .neutral)
+        XCTAssertEqual(icon, expectedIcon, file: file, line: line)
+        guard let chip = row.chips?.first else {
+            XCTFail("Expected at least one chip for \(rawType)", file: file, line: line)
+            return
         }
+        XCTAssertEqual(chip.icon, expectedIcon, file: file, line: line)
+        guard case let .status(variant) = chip.tint else {
+            XCTFail("Expected status-tinted chip for \(rawType)", file: file, line: line)
+            return
+        }
+        XCTAssertEqual(variant, expectedVariant, file: file, line: line)
     }
 
     func testUnreadRowGetsUnreadHighlight() {
