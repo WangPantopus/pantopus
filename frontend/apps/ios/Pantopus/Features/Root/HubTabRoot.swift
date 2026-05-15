@@ -33,10 +33,13 @@ public enum HubRoute: Hashable {
     case composeGig(category: String)
     /// Marketplace tab (T2.5). Reached from Hub → pillar(.marketplace).
     case marketplace
-    /// Listing detail target — placeholder until Transactional Detail (T2.6).
+    /// Listing detail (T2.6 ContentDetailShell · listing variant).
     case listingDetail(listingId: String)
     /// Snap & sell — placeholder until the marketplace compose flow ships.
     case composeListing
+    /// Invoice detail (T2.6 ContentDetailShell · invoice variant).
+    /// Reached from wallet / payments surfaces when those land.
+    case invoiceDetail(invoiceId: String)
     /// Bell icon target. Replaced by the real notifications screen in T4.1.
     case notifications
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
@@ -276,7 +279,11 @@ public struct HubTabRoot: View {
                 onBack: { if !path.isEmpty { path.removeLast() } }
             )
         case let .gigDetail(gigId):
-            NotYetAvailableView(tabName: "Gig · \(gigId)", icon: .briefcase)
+            GigDetailView(
+                viewModel: GigDetailViewModel(gigId: gigId),
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onMessage: { _ in Task { @MainActor in push(.placeholder(label: "Messages")) } }
+            )
         case let .composeGig(category):
             NotYetAvailableView(tabName: "Post a task · \(category.capitalized)", icon: .pencil)
         case .marketplace:
@@ -288,9 +295,18 @@ public struct HubTabRoot: View {
                 onBack: { if !path.isEmpty { path.removeLast() } }
             )
         case let .listingDetail(listingId):
-            NotYetAvailableView(tabName: "Listing · \(listingId)", icon: .shoppingBag)
+            ListingDetailView(
+                viewModel: ListingDetailViewModel(listingId: listingId),
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onMessage: { _ in Task { @MainActor in push(.placeholder(label: "Messages")) } }
+            )
         case .composeListing:
             NotYetAvailableView(tabName: "Snap & sell", icon: .camera)
+        case let .invoiceDetail(invoiceId):
+            InvoiceDetailView(
+                viewModel: InvoiceDetailViewModel(invoiceId: invoiceId),
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
         case .notifications:
             NotYetAvailableView(tabName: "Notifications", icon: .bell)
         case .menu:

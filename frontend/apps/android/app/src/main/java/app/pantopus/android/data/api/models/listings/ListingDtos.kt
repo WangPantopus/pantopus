@@ -92,3 +92,36 @@ data class ListingSaveResponse(
     val message: String? = null,
     val saved: Boolean? = null,
 )
+
+/** Envelope from `GET /api/listings/:id`. */
+@JsonClass(generateAdapter = true)
+data class ListingDetailResponse(
+    val listing: ListingDto,
+)
+
+/** `POST /api/listings/:id/message` body. */
+@JsonClass(generateAdapter = true)
+data class MessageListingBody(
+    val message: String? = null,
+    val offerAmount: Double? = null,
+)
+
+/** `POST /api/listings/:id/message` envelope. */
+@JsonClass(generateAdapter = true)
+data class MessageListingResponse(
+    val message: String? = null,
+    @Json(name = "listing_message") val listingMessage: ListingMessageDto? = null,
+)
+
+/** One listing-message row. */
+@JsonClass(generateAdapter = true)
+data class ListingMessageDto(
+    val id: String,
+    @Json(name = "listing_id") val listingId: String? = null,
+    @Json(name = "buyer_id") val buyerId: String? = null,
+    @Json(name = "seller_id") val sellerId: String? = null,
+    @Json(name = "offer_amount") val offerAmount: Double? = null,
+    @Json(name = "message") val messageText: String? = null,
+    val status: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+)

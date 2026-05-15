@@ -117,6 +117,17 @@ public enum ListingsEndpoints {
     /// + conditions enums. Route `backend/routes/listings.js:1176`.
     public static let categories = Endpoint(method: .get, path: "/api/listings/categories")
 
+    /// `GET /api/listings/:id` — single-listing detail wrapper.
+    public static func detail(id: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/listings/\(id)")
+    }
+
+    /// `POST /api/listings/:id/message` — send the seller a message /
+    /// offer. Route `backend/routes/listings.js:1686`.
+    public static func messageListing(id: String, body: MessageListingBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/listings/\(id)/message", body: body)
+    }
+
     /// `POST /api/listings/:id/save` — bookmark. Route
     /// `backend/routes/listings.js:1611`.
     public static func save(id: String) -> Endpoint {
@@ -126,5 +137,18 @@ public enum ListingsEndpoints {
     /// `DELETE /api/listings/:id/save` — un-bookmark.
     public static func unsave(id: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/listings/\(id)/save")
+    }
+}
+
+/// Body for `POST /api/listings/:id/message`. Either field can be nil
+/// but at least one should be provided to match the backend's
+/// validator.
+public struct MessageListingBody: Encodable, Sendable {
+    public let message: String?
+    public let offerAmount: Double?
+
+    public init(message: String?, offerAmount: Double? = nil) {
+        self.message = message
+        self.offerAmount = offerAmount
     }
 }

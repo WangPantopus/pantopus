@@ -87,3 +87,43 @@ data class GigsInBoundsResponse(
     val gigs: List<GigDto>,
     @Json(name = "nearest_activity_center") val nearestActivityCenter: GigsNearestActivityCenter? = null,
 )
+
+/** Envelope from `GET /api/gigs/:id`. */
+@JsonClass(generateAdapter = true)
+data class GigDetailResponse(
+    val gig: GigDto,
+)
+
+/** One bid on a gig. */
+@JsonClass(generateAdapter = true)
+data class GigBidDto(
+    val id: String,
+    @Json(name = "user_id") val userId: String? = null,
+    @Json(name = "bid_amount") val bidAmount: Double? = null,
+    val amount: Double? = null,
+    val status: String? = null,
+    val message: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+    @Json(name = "User") val bidder: GigCreator? = null,
+)
+
+/** Envelope from `GET /api/gigs/:gigId/bids`. */
+@JsonClass(generateAdapter = true)
+data class GigBidsResponse(
+    val bids: List<GigBidDto>,
+)
+
+/** `POST /api/gigs/:gigId/bids` body. */
+@JsonClass(generateAdapter = true)
+data class PlaceBidBody(
+    @Json(name = "bid_amount") val bidAmount: Double,
+    val message: String? = null,
+    @Json(name = "proposed_time") val proposedTime: String? = null,
+)
+
+/** `POST /api/gigs/:gigId/bids` envelope. */
+@JsonClass(generateAdapter = true)
+data class PlaceBidResponse(
+    val bid: GigBidDto? = null,
+    val message: String? = null,
+)

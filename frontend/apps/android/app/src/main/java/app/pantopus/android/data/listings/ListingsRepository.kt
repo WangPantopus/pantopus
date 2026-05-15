@@ -1,10 +1,13 @@
 package app.pantopus.android.data.listings
 
+import app.pantopus.android.data.api.models.listings.ListingDetailResponse
 import app.pantopus.android.data.api.models.listings.ListingSaveResponse
 import app.pantopus.android.data.api.models.listings.ListingsBrowseResponse
 import app.pantopus.android.data.api.models.listings.ListingsCategoriesResponse
 import app.pantopus.android.data.api.models.listings.ListingsInBoundsResponse
 import app.pantopus.android.data.api.models.listings.ListingsNearbyResponse
+import app.pantopus.android.data.api.models.listings.MessageListingBody
+import app.pantopus.android.data.api.models.listings.MessageListingResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.ListingsApi
@@ -83,4 +86,11 @@ class ListingsRepository
         suspend fun save(id: String): NetworkResult<ListingSaveResponse> = safeApiCall { api.save(id) }
 
         suspend fun unsave(id: String): NetworkResult<ListingSaveResponse> = safeApiCall { api.unsave(id) }
+
+        suspend fun detail(id: String): NetworkResult<ListingDetailResponse> = safeApiCall { api.detail(id) }
+
+        suspend fun messageListing(
+            id: String,
+            body: MessageListingBody,
+        ): NetworkResult<MessageListingResponse> = safeApiCall { api.messageListing(id, body) }
     }

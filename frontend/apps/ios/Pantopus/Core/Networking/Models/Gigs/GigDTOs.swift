@@ -121,3 +121,42 @@ public struct GigsInBoundsResponse: Decodable, Sendable {
         case nearestActivityCenter = "nearest_activity_center"
     }
 }
+
+/// Envelope from `GET /api/gigs/:id`.
+public struct GigDetailResponse: Decodable, Sendable {
+    public let gig: GigDTO
+}
+
+/// One bid on a gig.
+public struct GigBidDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let userId: String?
+    public let bidAmount: Double?
+    public let amount: Double?
+    public let status: String?
+    public let message: String?
+    public let createdAt: String?
+    public let bidder: GigCreator?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case bidAmount = "bid_amount"
+        case amount
+        case status
+        case message
+        case createdAt = "created_at"
+        case bidder = "User"
+    }
+}
+
+/// Envelope from `GET /api/gigs/:gigId/bids`.
+public struct GigBidsResponse: Decodable, Sendable {
+    public let bids: [GigBidDTO]
+}
+
+/// Envelope from `POST /api/gigs/:gigId/bids`.
+public struct PlaceBidResponse: Decodable, Sendable {
+    public let bid: GigBidDTO?
+    public let message: String?
+}

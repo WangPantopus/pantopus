@@ -1,8 +1,13 @@
 package app.pantopus.android.data.api.services
 
+import app.pantopus.android.data.api.models.gigs.GigBidsResponse
+import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
+import app.pantopus.android.data.api.models.gigs.PlaceBidBody
+import app.pantopus.android.data.api.models.gigs.PlaceBidResponse
+import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -54,6 +59,25 @@ interface GigsApi {
         @Query("category") category: String? = null,
         @Query("includeRemote") includeRemote: Boolean? = null,
     ): GigsInBoundsResponse
+
+    /** `GET /api/gigs/:id` — single-gig detail wrapper. */
+    @GET("api/gigs/{id}")
+    suspend fun detail(
+        @Path("id") id: String,
+    ): GigDetailResponse
+
+    /** `GET /api/gigs/:gigId/bids` — owner-only. */
+    @GET("api/gigs/{gigId}/bids")
+    suspend fun bids(
+        @Path("gigId") gigId: String,
+    ): GigBidsResponse
+
+    /** `POST /api/gigs/:gigId/bids` — place a bid. */
+    @POST("api/gigs/{gigId}/bids")
+    suspend fun placeBid(
+        @Path("gigId") gigId: String,
+        @Body body: PlaceBidBody,
+    ): PlaceBidResponse
 
     /** `POST /api/gigs/:id/save` — bookmark. */
     @POST("api/gigs/{id}/save")

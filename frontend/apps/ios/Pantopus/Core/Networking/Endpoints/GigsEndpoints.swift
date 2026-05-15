@@ -91,6 +91,17 @@ public enum GigsEndpoints {
         Endpoint(method: .get, path: "/api/gigs/\(id)")
     }
 
+    /// `GET /api/gigs/:gigId/bids` — list bids on a gig. Owner-only —
+    /// other callers get 403 and the detail view hides the section.
+    public static func bids(gigId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/gigs/\(gigId)/bids")
+    }
+
+    /// `POST /api/gigs/:gigId/bids` — place a bid.
+    public static func placeBid(gigId: String, body: PlaceBidBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/bids", body: body)
+    }
+
     /// `POST /api/gigs/:id/save` — bookmark.
     public static func save(id: String) -> Endpoint {
         Endpoint(method: .post, path: "/api/gigs/\(id)/save")
@@ -99,5 +110,25 @@ public enum GigsEndpoints {
     /// `DELETE /api/gigs/:id/save` — un-bookmark.
     public static func unsave(id: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/gigs/\(id)/save")
+    }
+}
+
+/// Body for `POST /api/gigs/:gigId/bids`. The backend reads
+/// `bid_amount` or `amount` — we send the canonical key.
+public struct PlaceBidBody: Encodable, Sendable {
+    public let bidAmount: Double
+    public let message: String?
+    public let proposedTime: String?
+
+    public init(bidAmount: Double, message: String? = nil, proposedTime: String? = nil) {
+        self.bidAmount = bidAmount
+        self.message = message
+        self.proposedTime = proposedTime
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case bidAmount = "bid_amount"
+        case message
+        case proposedTime = "proposed_time"
     }
 }

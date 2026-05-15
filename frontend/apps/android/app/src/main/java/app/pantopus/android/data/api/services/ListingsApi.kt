@@ -1,10 +1,14 @@
 package app.pantopus.android.data.api.services
 
+import app.pantopus.android.data.api.models.listings.ListingDetailResponse
 import app.pantopus.android.data.api.models.listings.ListingSaveResponse
 import app.pantopus.android.data.api.models.listings.ListingsBrowseResponse
 import app.pantopus.android.data.api.models.listings.ListingsCategoriesResponse
 import app.pantopus.android.data.api.models.listings.ListingsInBoundsResponse
 import app.pantopus.android.data.api.models.listings.ListingsNearbyResponse
+import app.pantopus.android.data.api.models.listings.MessageListingBody
+import app.pantopus.android.data.api.models.listings.MessageListingResponse
+import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -84,4 +88,17 @@ interface ListingsApi {
     suspend fun unsave(
         @Path("id") id: String,
     ): ListingSaveResponse
+
+    /** `GET /api/listings/:id` — single-listing detail wrapper. */
+    @GET("api/listings/{id}")
+    suspend fun detail(
+        @Path("id") id: String,
+    ): ListingDetailResponse
+
+    /** `POST /api/listings/:id/message` — buyer → seller message / offer. */
+    @POST("api/listings/{id}/message")
+    suspend fun messageListing(
+        @Path("id") id: String,
+        @Body body: MessageListingBody,
+    ): MessageListingResponse
 }

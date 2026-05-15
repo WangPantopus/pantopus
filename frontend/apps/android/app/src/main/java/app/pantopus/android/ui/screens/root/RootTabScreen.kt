@@ -38,6 +38,12 @@ import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_K
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
 import app.pantopus.android.ui.screens.feed.FeedScreen
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
+import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
+import app.pantopus.android.ui.screens.contentdetail.GigDetailViewModel
+import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
+import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailViewModel
+import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
+import app.pantopus.android.ui.screens.contentdetail.ListingDetailViewModel
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
@@ -126,6 +132,10 @@ private object ChildRoutes {
     /** Snap & sell — placeholder until the marketplace compose flow ships. */
     const val COMPOSE_LISTING = "listings/compose"
 
+    /** Invoice detail (T2.6 ContentDetailShell · invoice variant). */
+    const val INVOICE_DETAIL_ID_KEY = "invoiceId"
+    const val INVOICE_DETAIL = "invoices/{$INVOICE_DETAIL_ID_KEY}"
+
     /** Chat conversation (T2.2). Reached from Inbox → row tap. */
     const val CHAT_KIND_KEY = "kind"
     const val CHAT_ID_KEY = "id"
@@ -195,6 +205,9 @@ private object ChildRoutes {
 
     /** Build the listing-detail path. */
     fun listingDetail(listingId: String): String = "listings/$listingId"
+
+    /** Build the invoice-detail path. */
+    fun invoiceDetail(invoiceId: String): String = "invoices/$invoiceId"
 
     /** Build the chat-conversation path with all header context encoded. */
     fun chatConversation(row: ConversationRowContent): String {
@@ -303,7 +316,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenEntity = { entity: MapEntity ->
                         when (entity.kind) {
                             MapEntityKind.Gig -> navController.navigate(ChildRoutes.gigDetail(entity.id))
-                            MapEntityKind.Listing -> navController.navigate(ChildRoutes.placeholder("Listing · ${entity.id}"))
+                            MapEntityKind.Listing -> navController.navigate(ChildRoutes.listingDetail(entity.id))
                         }
                     },
                     onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Map filters")) },
@@ -517,9 +530,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(
                 route = ChildRoutes.LISTING_DETAIL,
                 arguments = listOf(navArgument(ChildRoutes.LISTING_DETAIL_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val listingId = entry.arguments?.getString(ChildRoutes.LISTING_DETAIL_ID_KEY) ?: ""
-                NotYetAvailableView(tabName = "Listing · $listingId", icon = PantopusIcon.ShoppingBag)
+            ) {
+                ListingDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                )
+            }
+            composable(
+                route = ChildRoutes.INVOICE_DETAIL,
+                arguments = listOf(navArgument(ChildRoutes.INVOICE_DETAIL_ID_KEY) { type = NavType.StringType }),
+            ) {
+                InvoiceDetailScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.COMPOSE_LISTING) {
                 NotYetAvailableView(tabName = "Snap & sell", icon = PantopusIcon.Camera)
@@ -537,9 +558,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(
                 route = ChildRoutes.GIG_DETAIL,
                 arguments = listOf(navArgument(ChildRoutes.GIG_DETAIL_ID_KEY) { type = NavType.StringType }),
-            ) { entry ->
-                val gigId = entry.arguments?.getString(ChildRoutes.GIG_DETAIL_ID_KEY) ?: ""
-                NotYetAvailableView(tabName = "Gig · $gigId", icon = PantopusIcon.Briefcase)
+            ) {
+                GigDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                )
             }
             composable(
                 route = ChildRoutes.COMPOSE_GIG,

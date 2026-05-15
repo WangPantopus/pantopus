@@ -120,3 +120,42 @@ public struct ListingSaveResponse: Decodable, Sendable {
     public let message: String?
     public let saved: Bool?
 }
+
+/// Envelope from `GET /api/listings/:id`.
+public struct ListingDetailResponse: Decodable, Sendable {
+    public let listing: ListingDTO
+}
+
+/// Envelope from `POST /api/listings/:id/message`.
+public struct MessageListingResponse: Decodable, Sendable {
+    public let message: String?
+    public let listingMessage: ListingMessageDTO?
+
+    enum CodingKeys: String, CodingKey {
+        case message
+        case listingMessage = "listing_message"
+    }
+}
+
+/// One listing-message row.
+public struct ListingMessageDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let listingId: String?
+    public let buyerId: String?
+    public let sellerId: String?
+    public let offerAmount: Double?
+    public let messageText: String?
+    public let status: String?
+    public let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case listingId = "listing_id"
+        case buyerId = "buyer_id"
+        case sellerId = "seller_id"
+        case offerAmount = "offer_amount"
+        case messageText = "message"
+        case status
+        case createdAt = "created_at"
+    }
+}

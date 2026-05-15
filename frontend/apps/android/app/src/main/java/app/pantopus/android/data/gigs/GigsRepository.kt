@@ -1,8 +1,12 @@
 package app.pantopus.android.data.gigs
 
+import app.pantopus.android.data.api.models.gigs.GigBidsResponse
+import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
+import app.pantopus.android.data.api.models.gigs.PlaceBidBody
+import app.pantopus.android.data.api.models.gigs.PlaceBidResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.GigsApi
@@ -56,4 +60,13 @@ class GigsRepository
         suspend fun save(id: String): NetworkResult<GigSaveResponse> = safeApiCall { api.save(id) }
 
         suspend fun unsave(id: String): NetworkResult<GigSaveResponse> = safeApiCall { api.unsave(id) }
+
+        suspend fun detail(id: String): NetworkResult<GigDetailResponse> = safeApiCall { api.detail(id) }
+
+        suspend fun bids(gigId: String): NetworkResult<GigBidsResponse> = safeApiCall { api.bids(gigId) }
+
+        suspend fun placeBid(
+            gigId: String,
+            body: PlaceBidBody,
+        ): NetworkResult<PlaceBidResponse> = safeApiCall { api.placeBid(gigId, body) }
     }

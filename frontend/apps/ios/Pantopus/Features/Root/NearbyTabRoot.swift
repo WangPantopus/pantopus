@@ -43,10 +43,18 @@ public struct NearbyTabRoot: View {
     private func destination(for route: NearbyRoute) -> some View {
         switch route {
         case let .entityDetail(kind, id):
-            NotYetAvailableView(
-                tabName: kind == .gig ? "Gig · \(id)" : "Listing · \(id)",
-                icon: kind == .gig ? .briefcase : .shoppingBag
-            )
+            switch kind {
+            case .gig:
+                GigDetailView(
+                    viewModel: GigDetailViewModel(gigId: id),
+                    onBack: { if !path.isEmpty { path.removeLast() } }
+                )
+            case .listing:
+                ListingDetailView(
+                    viewModel: ListingDetailViewModel(listingId: id),
+                    onBack: { if !path.isEmpty { path.removeLast() } }
+                )
+            }
         case .filters:
             NotYetAvailableView(tabName: "Map filters", icon: .slidersHorizontal)
         case let .placeholder(label):
