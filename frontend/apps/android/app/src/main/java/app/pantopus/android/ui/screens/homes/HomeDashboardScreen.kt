@@ -20,10 +20,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,14 +43,14 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * Hub → MyHomes → Home Dashboard screen. The ViewModel reads the home id
  * from the nav-backstack [androidx.lifecycle.SavedStateHandle].
  *
- * @param onBack Back handler wired to the NavController.
+ * `onOpenPlaceholder` is invoked for FAB/quick actions whose dedicated
+ * screen isn't built yet (Log package, Add mail, …) — receives the
+ * human-readable action label.
  */
 @Composable
 fun HomeDashboardScreen(
@@ -62,12 +58,11 @@ fun HomeDashboardScreen(
     onInviteOwner: ((String) -> Unit)? = null,
     onClaimOwnership: ((String) -> Unit)? = null,
     onOpenClaimsList: (() -> Unit)? = null,
+    onOpenPlaceholder: ((String) -> Unit)? = null,
     viewModel: HomeDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
-    var toast by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         viewModel.load()
@@ -76,28 +71,27 @@ fun HomeDashboardScreen(
         )
     }
 
-    fun showToast(actionId: String) {
-        toast =
-            when (actionId) {
-                "log_package" -> "Log a package isn't available yet"
-                "add_mail" -> "Add mail isn't available yet"
-                "verify" -> "Verify home isn't available yet"
-                else -> "That isn't available yet"
-            }
-        scope.launch {
-            delay(1_800)
-            toast = null
+    fun actionLabel(actionId: String): String =
+        when (actionId) {
+            "log_package" -> "Log a package"
+            "add_mail" -> "Add mail"
+            "add_member" -> "Add member"
+            "verify" -> "Verify home"
+            else -> actionId.replace('_', ' ').replaceFirstChar(Char::uppercase)
         }
+
+    fun openPlaceholder(actionId: String) {
+        onOpenPlaceholder?.invoke(actionLabel(actionId))
     }
 
     fun handleFab(actionId: String) {
         when (actionId) {
             "add_member" -> {
                 viewModel.currentHomeId()?.let { homeId ->
-                    onInviteOwner?.invoke(homeId) ?: showToast(actionId)
+                    onInviteOwner?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
             }
-            else -> showToast(actionId)
+            else -> openPlaceholder(actionId)
         }
     }
 
@@ -105,13 +99,13 @@ fun HomeDashboardScreen(
         when (actionId) {
             "verify" ->
                 viewModel.currentHomeId()?.let { homeId ->
-                    onClaimOwnership?.invoke(homeId) ?: showToast(actionId)
+                    onClaimOwnership?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
             "add_member" ->
                 viewModel.currentHomeId()?.let { homeId ->
-                    onInviteOwner?.invoke(homeId) ?: showToast(actionId)
+                    onInviteOwner?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
-            else -> showToast(actionId)
+            else -> openPlaceholder(actionId)
         }
     }
 
@@ -128,32 +122,13 @@ fun HomeDashboardScreen(
                     onFabAction = ::handleFab,
                     onClaim = {
                         viewModel.currentHomeId()?.let { homeId ->
-                            onClaimOwnership?.invoke(homeId) ?: showToast("verify")
+                            onClaimOwnership?.invoke(homeId) ?: openPlaceholder("verify")
                         }
                     },
-                    onViewClaims = { onOpenClaimsList?.invoke() ?: showToast("verify") },
+                    onViewClaims = { onOpenClaimsList?.invoke() ?: openPlaceholder("verify") },
                 )
             is HomeDashboardUiState.Error ->
                 ErrorLayout(message = current.message, onBack = onBack, onRetry = viewModel::refresh)
-        }
-        if (toast != null) {
-            Box(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = Spacing.s10),
-            ) {
-                Text(
-                    text = toast.orEmpty(),
-                    style = PantopusTextStyle.small,
-                    color = PantopusColors.appTextInverse,
-                    modifier =
-                        Modifier
-                            .clip(RoundedCornerShape(Radii.pill))
-                            .background(PantopusColors.appText.copy(alpha = 0.9f))
-                            .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
-                )
-            }
         }
     }
 }

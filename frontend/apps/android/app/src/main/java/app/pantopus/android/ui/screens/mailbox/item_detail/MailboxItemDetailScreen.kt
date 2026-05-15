@@ -88,6 +88,19 @@ fun MailboxItemDetailScreen(
                     timeline = content.timeline,
                     cta = ctaContent(content, ctaFlags, ackChecked),
                     onBack = onBack,
+                    onAIChip = { kind ->
+                        // AI suggestion chips are shortcuts for the bottom CTAs.
+                        when (kind) {
+                            MailboxItemDetailAIChipKind.Primary ->
+                                viewModel.performPrimaryAction()
+                            MailboxItemDetailAIChipKind.Secondary ->
+                                if (content.category == MailItemCategory.Certified) {
+                                    showTerms()
+                                } else {
+                                    viewModel.performGhostAction()
+                                }
+                        }
+                    },
                     onPrimary = { viewModel.performPrimaryAction() },
                     onGhost = {
                         if (content.category == MailItemCategory.Certified) {

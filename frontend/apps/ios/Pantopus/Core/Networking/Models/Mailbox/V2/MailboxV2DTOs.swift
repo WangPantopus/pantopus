@@ -51,7 +51,7 @@ public struct DrawerItemsResponse: Decodable, Sendable, Hashable {
             item.id
         }
 
-        public init(from decoder: Decoder) throws {
+        public init(from decoder: any Decoder) throws {
             item = try MailItem(from: decoder)
             let c = try decoder.container(keyedBy: Keys.self)
             sender = try c.decodeIfPresent(SenderRef.self, forKey: .sender)
@@ -92,7 +92,7 @@ public struct MailboxV2ItemResponse: Decodable, Sendable, Hashable {
             base.id
         }
 
-        public init(from decoder: Decoder) throws {
+        public init(from decoder: any Decoder) throws {
             base = try MailItem(from: decoder)
             let c = try decoder.container(keyedBy: Keys.self)
             sender = try c.decodeIfPresent(DrawerItemsResponse.DrawerMail.SenderRef.self, forKey: .sender)

@@ -58,19 +58,34 @@ enum Fixtures {
         """
     }
 
+    /// Sample response from `GET /api/posts/feed` — one Ask post.
     static let feedJSON = """
     {
       "posts": [
         {
           "id": "p_1",
-          "author_id": "u_123",
-          "author_name": "Alice",
+          "user_id": "u_123",
           "content": "Hello, neighborhood!",
           "created_at": "2026-04-20T10:00:00Z",
-          "like_count": 3
+          "post_type": "ask_local",
+          "like_count": 3,
+          "comment_count": 1,
+          "userHasLiked": false,
+          "location_name": "Elm Park",
+          "creator": {
+            "id": "u_123",
+            "username": "alice",
+            "name": "Alice Doe",
+            "first_name": "Alice",
+            "last_name": "Doe",
+            "profile_picture_url": null,
+            "city": "Cambridge",
+            "state": "MA",
+            "account_type": "personal"
+          }
         }
       ],
-      "next_cursor": null
+      "pagination": { "nextCursor": null, "hasMore": false }
     }
     """
 

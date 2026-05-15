@@ -348,11 +348,13 @@ private fun ReviewsTabContent(reviews: List<ProfileReviewCard>) {
 
 @Composable
 private fun GigsTabContent() {
+    // The public gigs feed is not surfaced on profile yet; this empty
+    // state stands in until the Gigs feature lands (T2.3).
     Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
         EmptyState(
             icon = PantopusIcon.Hammer,
-            headline = "Gigs coming soon",
-            subcopy = "Recent gigs from this user will show up here.",
+            headline = "No recent gigs",
+            subcopy = "Recent gigs from this user will appear here.",
         )
     }
 }

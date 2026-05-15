@@ -72,7 +72,7 @@ public struct MyHome: Decodable, Sendable, Hashable, Identifiable {
     /// Backend returns these as siblings on the home row, not a nested
     /// object; we decode the Home fields via a custom init so the outer
     /// response shape stays flat.
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         home = try HomeDTO(from: decoder)
         let container = try decoder.container(keyedBy: FlatKeys.self)
         occupancy = try container.decodeIfPresent(HomeOccupancy.self, forKey: .occupancy)
@@ -115,7 +115,7 @@ public struct HomeDetail: Decodable, Sendable, Hashable {
     public let owners: [HomeOwnershipRef]
     public let canDeleteHome: Bool
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         base = try HomeDTO(from: decoder)
         let c = try decoder.container(keyedBy: FlatKeys.self)
         owner = try c.decodeIfPresent(HomeUserRef.self, forKey: .owner)
@@ -415,12 +415,12 @@ public struct CheckAddressResponse: Decodable, Sendable, Hashable {
 /// Type-erased `Encodable` wrapper for request bodies whose schema is
 /// defined server-side (e.g. ATTOM property details).
 public struct JSONEncodable: Encodable, Sendable {
-    private let encodeClosure: @Sendable (Encoder) throws -> Void
+    private let encodeClosure: @Sendable (any Encoder) throws -> Void
     public init(_ wrapped: some Encodable & Sendable) {
         encodeClosure = wrapped.encode
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         try encodeClosure(encoder)
     }
 }

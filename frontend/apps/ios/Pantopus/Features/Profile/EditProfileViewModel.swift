@@ -7,11 +7,11 @@
 //  Every editable field is defined in `updateProfileSchema`
 //  (`backend/routes/users.js:324-351`) and is mirrored 1:1 below.
 //
-//  TODO(backend): the Edit Profile design also calls for an avatar
-//  upload, an editable email when unverified, and boolean toggles
-//  `profile_visibility_public` + `show_in_neighbor_discovery`. None of
-//  those exist in `updateProfileSchema`, so per the P10 rules we omit
-//  them here and leave this comment for future backend work.
+//  Note: the design also calls for an avatar upload, an editable email
+//  when unverified, and boolean visibility toggles
+//  (`profile_visibility_public` + `show_in_neighbor_discovery`). None
+//  exist in `updateProfileSchema` today, so those affordances are
+//  intentionally omitted until the backend adds the keys.
 //
 
 import Foundation

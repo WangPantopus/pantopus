@@ -60,19 +60,19 @@ class MailboxListViewModel
         /** Selected tab id. */
         val selectedTab: StateFlow<String> = _selectedTab.asStateFlow()
 
-        private val _toast = MutableStateFlow<String?>(null)
-
-        /** Transient toast (search stub). */
-        val toast: StateFlow<String?> = _toast.asStateFlow()
-
         /** Tab entries for the shell. */
         val tabs: List<ListOfRowsTab> = MailboxTab.entries.map { ListOfRowsTab(it.id, it.label) }
 
         private var onOpenMail: (String) -> Unit = {}
+        private var onOpenSearch: () -> Unit = {}
 
-        /** Wire nav callback before first load. */
-        fun configureNavigation(onOpenMail: (String) -> Unit) {
+        /** Wire nav callbacks before first load. */
+        fun configureNavigation(
+            onOpenMail: (String) -> Unit,
+            onOpenSearch: () -> Unit = {},
+        ) {
             this.onOpenMail = onOpenMail
+            this.onOpenSearch = onOpenSearch
         }
 
         /** Initial load. */
@@ -91,13 +91,12 @@ class MailboxListViewModel
             reload()
         }
 
-        /** Show a transient toast; called when the search icon is tapped. */
+        /**
+         * Top-bar search action. Routes to the search placeholder until
+         * `/api/mailbox` supports a query parameter.
+         */
         fun onSearchTapped() {
-            _toast.value = "Search coming soon"
-            viewModelScope.launch {
-                kotlinx.coroutines.delay(1_800)
-                _toast.value = null
-            }
+            onOpenSearch()
         }
 
         /** Called when the list nears the bottom — fetches the next page. */

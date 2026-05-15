@@ -136,13 +136,17 @@ class PulsePostDetailViewModelTest {
             assertNotNull(vm.toastMessage.value)
         }
 
-    @Test fun heart_shows_coming_soon_toast() =
+    @Test fun heart_reaction_is_display_only() =
         runTest {
+            // The view renders Heart and Going as non-tappable display
+            // chips, so tapReaction should only ever be invoked for
+            // `.Helpful`. The safety guard in the VM returns silently
+            // for the others — no toast, no state change.
             coEvery { repo.detail("p1") } returns NetworkResult.Success(sampleResponse())
             val vm = makeVm()
             vm.load()
             vm.tapReaction(PostReactionKind.Heart)
-            assertEquals("Loved reactions coming soon", vm.toastMessage.value)
+            assertNull(vm.toastMessage.value)
         }
 
     @Test fun send_comment_refetches_and_clears_composer() =

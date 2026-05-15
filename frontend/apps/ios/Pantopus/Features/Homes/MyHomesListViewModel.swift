@@ -91,15 +91,10 @@ final class MyHomesListViewModel: ListOfRowsDataSource {
                 identity: .home,
                 ringProgress: home.ownershipStatus == "verified" ? 1.0 : 0.3
             ),
-            trailing: .kebab,
-            onTap: { @Sendable in
-                Task { @MainActor in self.onOpenHome(home.id) }
-            },
-            onSecondary: { @Sendable in
-                // Kebab menu: wired to a bottom sheet when P9 lands. For now
-                // no-op so the row retains its affordance.
-            }
-        )
+            trailing: .chevron
+        ) { @Sendable in
+            Task { @MainActor in self.onOpenHome(home.id) }
+        }
     }
 }
 

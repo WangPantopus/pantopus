@@ -159,15 +159,52 @@ final class PublicProfileViewModelTests: XCTestCase {
         XCTAssertTrue(message.contains("profile"))
     }
 
-    // MARK: - Placeholders
+    // MARK: - Action wiring
 
-    func testMessageButtonShowsToast() async {
+    func testConnectSendsRequestAndMarksSucceeded() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.profileWithReviews),
+            .status(201, body: "{\"message\":\"Connection request sent\"}")
+        ]
+        let vm = PublicProfileViewModel(userId: "u1", client: makeAPI())
+        await vm.load()
+        await vm.connect()
+        XCTAssertEqual(vm.connectState, .succeeded)
+        XCTAssertEqual(vm.toastMessage, "Connection request sent")
+    }
+
+    func testConnectShowsErrorToastOnFailure() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.profileWithReviews),
+            .status(400, body: "{\"error\":\"Connection request already exists\"}")
+        ]
+        let vm = PublicProfileViewModel(userId: "u1", client: makeAPI())
+        await vm.load()
+        await vm.connect()
+        if case .failed = vm.connectState { /* ok */ } else {
+            XCTFail("Expected .failed connect state")
+        }
+        XCTAssertNotNil(vm.toastMessage)
+    }
+
+    func testBlockSendsRequestAndMarksSucceeded() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.profileWithReviews),
+            .status(200, body: "{}")
+        ]
+        let vm = PublicProfileViewModel(userId: "u1", client: makeAPI())
+        await vm.load()
+        await vm.block()
+        XCTAssertEqual(vm.blockState, .succeeded)
+        XCTAssertEqual(vm.toastMessage, "User blocked")
+    }
+
+    func testOverflowFlagToggles() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.profileWithReviews)]
         let vm = PublicProfileViewModel(userId: "u1", client: makeAPI())
         await vm.load()
-        vm.tapMessage()
-        XCTAssertEqual(vm.toastMessage, "Messaging coming soon")
-        vm.tapConnect()
-        XCTAssertEqual(vm.toastMessage, "Connect coming soon")
+        XCTAssertFalse(vm.showOverflow)
+        vm.showOverflow = true
+        XCTAssertTrue(vm.showOverflow)
     }
 }

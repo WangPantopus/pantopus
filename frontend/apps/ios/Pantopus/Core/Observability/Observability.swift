@@ -136,7 +136,7 @@ final class Observability {
 
     // MARK: - Error capture
 
-    func capture(_ error: Error, file: StaticString = #fileID, line: UInt = #line) {
+    func capture(_ error: any Error, file: StaticString = #fileID, line: UInt = #line) {
         logger.error("\(error)", metadata: ["file": .string("\(file):\(line)")])
         guard isStarted else { return }
         SentrySDK.capture(error: error)

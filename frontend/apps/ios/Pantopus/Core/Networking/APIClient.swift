@@ -378,12 +378,12 @@ public struct EmptyResponse: Decodable, Sendable {
 /// Erases any `Encodable` into something JSONEncoder can handle when we
 /// only know the concrete type at the call site.
 struct AnyEncodable: Encodable, @unchecked Sendable {
-    private let encodeClosure: (Encoder) throws -> Void
+    private let encodeClosure: (any Encoder) throws -> Void
     init(_ wrapped: some Encodable) {
         encodeClosure = wrapped.encode
     }
 
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         try encodeClosure(encoder)
     }
 }

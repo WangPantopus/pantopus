@@ -59,6 +59,17 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case heart
     case thumbsUp = "thumbs-up"
     case star
+    case helpCircle = "help-circle"
+    case calendar
+    case lightbulb
+    case eye
+    case share
+    case radio
+    case mapPin = "map-pin"
+    case pencil
+    case briefcase
+    case gavel
+    case slidersHorizontal = "sliders-horizontal"
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
@@ -107,6 +118,17 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .heart: "heart"
         case .thumbsUp: "hand.thumbsup"
         case .star: "star"
+        case .helpCircle: "questionmark.circle"
+        case .calendar: "calendar"
+        case .lightbulb: "lightbulb"
+        case .eye: "eye"
+        case .share: "square.and.arrow.up"
+        case .radio: "antenna.radiowaves.left.and.right"
+        case .mapPin: "mappin"
+        case .pencil: "pencil"
+        case .briefcase: "briefcase"
+        case .gavel: "hammer.fill"
+        case .slidersHorizontal: "slider.horizontal.3"
         }
     }
 }

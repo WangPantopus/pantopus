@@ -114,6 +114,30 @@ data class PillarTile(
     enum class Pillar { Pulse, Marketplace, Gigs, Mail }
 }
 
+/**
+ * Kind of entity surfaced by a Hub discovery card. Used by the
+ * navigation host to dispatch a tap to the matching detail screen.
+ */
+enum class DiscoveryKind {
+    Gig,
+    Person,
+    Business,
+    Post,
+    Unknown,
+    ;
+
+    companion object {
+        fun fromRawType(raw: String): DiscoveryKind =
+            when (raw.lowercase()) {
+                "gig" -> Gig
+                "person" -> Person
+                "business" -> Business
+                "post" -> Post
+                else -> Unknown
+            }
+    }
+}
+
 /** Discovery rail card. */
 @Immutable
 data class DiscoveryCardContent(
@@ -122,14 +146,20 @@ data class DiscoveryCardContent(
     val meta: String,
     val category: String,
     val avatarInitials: String,
+    val kind: DiscoveryKind,
 )
 
-/** Jump-back-in rail card. */
+/**
+ * Jump-back-in rail card. `route` is the canonical web path returned by
+ * `GET /api/hub` (e.g. `/app/mailbox?scope=home&homeId=…`); the
+ * navigation host parses it to pick the native destination.
+ */
 @Immutable
 data class JumpBackItem(
     val id: String,
     val title: String,
     val icon: PantopusIcon,
+    val route: String,
 )
 
 /** Recent-activity row. */
@@ -159,10 +189,10 @@ sealed interface HubNavigationIntent {
     ) : HubNavigationIntent
 
     data class DiscoveryTapped(
-        val id: String,
+        val item: DiscoveryCardContent,
     ) : HubNavigationIntent
 
     data class JumpBackTapped(
-        val id: String,
+        val item: JumpBackItem,
     ) : HubNavigationIntent
 }

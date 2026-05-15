@@ -15,7 +15,11 @@ protocol SecureStore: Sendable {
     func delete(_ key: String) throws
 }
 
-struct KeychainStore: SecureStore {
+/// `@unchecked Sendable` because the underlying `KeychainAccess.Keychain`
+/// type isn't `Sendable`-annotated upstream, but all of its mutating
+/// operations are gated by the OS keychain (system-locked) — no
+/// in-process shared mutable state.
+struct KeychainStore: SecureStore, @unchecked Sendable {
     private let keychain: Keychain
 
     init(service: String = "app.pantopus.ios") {

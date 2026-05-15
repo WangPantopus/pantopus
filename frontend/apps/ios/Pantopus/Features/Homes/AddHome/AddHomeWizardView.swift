@@ -266,9 +266,46 @@ private struct ReviewStep: View {
 
 private struct SuccessStep: View {
     var body: some View {
-        SuccessHeroBlock(
-            headline: "Home added",
-            subcopy: "We'll email you when verification completes."
+        // Re-use the T3.6 Status / Waiting screen so the home-added
+        // terminal shares its chrome with the claim-submitted and
+        // check-your-email frames.
+        StatusWaitingView(
+            content: .claimSubmitted(homeName: nil)
+                .withHeadline("Home added")
+                .withSubcopy("We'll email you when verification completes.")
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private extension StatusWaitingContent {
+    func withHeadline(_ headline: String) -> StatusWaitingContent {
+        StatusWaitingContent(
+            illustration: illustration,
+            headline: headline,
+            subcopy: subcopy,
+            timeline: timeline,
+            currentStageId: currentStageId,
+            etaChip: etaChip,
+            actionCards: actionCards,
+            explainerBullets: explainerBullets,
+            primaryCta: primaryCta,
+            secondaryCta: secondaryCta
+        )
+    }
+
+    func withSubcopy(_ subcopy: String) -> StatusWaitingContent {
+        StatusWaitingContent(
+            illustration: illustration,
+            headline: headline,
+            subcopy: subcopy,
+            timeline: timeline,
+            currentStageId: currentStageId,
+            etaChip: etaChip,
+            actionCards: actionCards,
+            explainerBullets: explainerBullets,
+            primaryCta: primaryCta,
+            secondaryCta: secondaryCta
         )
     }
 }

@@ -76,7 +76,8 @@ fun ProfileHeader(
     avatarUrl: String?,
     isVerified: Boolean,
     identityBadges: List<IdentityPillarBadge>,
-    onBadgeTap: (IdentityPillar) -> Unit = {},
+    /** `null` renders the badges as non-tappable status chips. */
+    onBadgeTap: ((IdentityPillar) -> Unit)? = null,
 ) {
     Column(
         modifier =
@@ -126,22 +127,21 @@ fun ProfileHeader(
         if (identityBadges.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 identityBadges.forEach { badge ->
-                    Box(
-                        modifier =
-                            Modifier
-                                .clickable {
-                                    // TODO(routing): identity-detail screens not designed yet
-                                    onBadgeTap(badge.pillar)
-                                }
-                                .semantics {
-                                    contentDescription = "${badge.label} identity, " +
-                                        if (badge.state == IdentityPillarVerificationState.Verified) {
-                                            "verified"
-                                        } else {
-                                            "not verified"
-                                        }
-                                },
-                    ) {
+                    val accessibility =
+                        "${badge.label} identity, " +
+                            if (badge.state == IdentityPillarVerificationState.Verified) {
+                                "verified"
+                            } else {
+                                "not verified"
+                            }
+                    val baseModifier = Modifier.semantics { contentDescription = accessibility }
+                    val withClick =
+                        if (onBadgeTap != null) {
+                            baseModifier.clickable { onBadgeTap(badge.pillar) }
+                        } else {
+                            baseModifier
+                        }
+                    Box(modifier = withClick) {
                         StatusChip(text = badge.label, variant = badge.chipVariant, icon = badge.leadingIcon)
                     }
                 }

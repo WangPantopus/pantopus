@@ -12,24 +12,29 @@ import SwiftUI
 struct HomeDashboardView: View {
     @Environment(AuthManager.self) private var auth
     @State private var viewModel: HomeDashboardViewModel
-    @State private var toast: String?
     @State private var showsInviteOwner = false
     private let homeId: String
     private let onBack: (() -> Void)?
     private let onClaimOwnership: (() -> Void)?
     private let onOpenClaimsList: (() -> Void)?
+    /// Host-supplied navigation for actions whose dedicated screen
+    /// isn't built yet (Log package, Add mail, etc). Receives the
+    /// human-readable action label.
+    private let onOpenPlaceholder: ((String) -> Void)?
 
     init(
         homeId: String,
         onBack: (() -> Void)? = nil,
         onClaimOwnership: (() -> Void)? = nil,
-        onOpenClaimsList: (() -> Void)? = nil
+        onOpenClaimsList: (() -> Void)? = nil,
+        onOpenPlaceholder: ((String) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
         self.homeId = homeId
         self.onBack = onBack
         self.onClaimOwnership = onClaimOwnership
         self.onOpenClaimsList = onOpenClaimsList
+        self.onOpenPlaceholder = onOpenPlaceholder
     }
 
     /// Current signed-in user's email — used by the Invite Owner form
@@ -51,22 +56,9 @@ struct HomeDashboardView: View {
             }
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+        .accessibilityIdentifier("homeDashboard")
         .onAppear { Analytics.track(.screenHomeDashboardViewed) }
         .task { await viewModel.load() }
-        .overlay(alignment: .bottom) {
-            if let toast {
-                Text(toast)
-                    .pantopusTextStyle(.small)
-                    .foregroundStyle(Theme.Color.appTextInverse)
-                    .padding(.horizontal, Spacing.s4)
-                    .padding(.vertical, Spacing.s2)
-                    .background(Theme.Color.appText.opacity(0.9))
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
-                    .padding(.bottom, Spacing.s10)
-                    .transition(.opacity)
-            }
-        }
-        .animation(.easeInOut(duration: 0.2), value: toast)
     }
 
     private func loadedBody(for content: HomeDashboardContent) -> some View {
@@ -126,7 +118,7 @@ struct HomeDashboardView: View {
         case "add_member":
             showsInviteOwner = true
         default:
-            showPlaceholderToast(for: action)
+            onOpenPlaceholder?(actionLabel(action))
         }
     }
 
@@ -137,15 +129,7 @@ struct HomeDashboardView: View {
         case "add_member":
             showsInviteOwner = true
         default:
-            showPlaceholderToast(for: action)
-        }
-    }
-
-    private func showPlaceholderToast(for action: String) {
-        toast = "\(actionLabel(action)) isn't available yet"
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_800_000_000)
-            toast = nil
+            onOpenPlaceholder?(actionLabel(action))
         }
     }
 
@@ -155,7 +139,7 @@ struct HomeDashboardView: View {
         case "add_member": "Add member"
         case "add_mail": "Add mail"
         case "verify": "Verify home"
-        default: "That"
+        default: id.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
 }

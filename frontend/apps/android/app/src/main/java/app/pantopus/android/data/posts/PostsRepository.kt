@@ -1,5 +1,6 @@
 package app.pantopus.android.data.posts
 
+import app.pantopus.android.data.api.models.feed.FeedResponse
 import app.pantopus.android.data.api.models.posts.PostCommentCreateResponse
 import app.pantopus.android.data.api.models.posts.PostCommentRequest
 import app.pantopus.android.data.api.models.posts.PostCommentsResponse
@@ -18,6 +19,24 @@ class PostsRepository
     constructor(
         private val api: PostsApi,
     ) {
+        /** `GET /api/posts/feed`. */
+        suspend fun feed(
+            surface: String = "place",
+            latitude: Double? = null,
+            longitude: Double? = null,
+            postType: String? = null,
+            limit: Int = 20,
+        ): NetworkResult<FeedResponse> =
+            safeApiCall {
+                api.feed(
+                    surface = surface,
+                    latitude = latitude,
+                    longitude = longitude,
+                    postType = postType,
+                    limit = limit,
+                )
+            }
+
         /** `GET /api/posts/:id`. */
         suspend fun detail(id: String): NetworkResult<PostDetailResponse> = safeApiCall { api.detail(id) }
 

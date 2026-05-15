@@ -1,0 +1,463 @@
+//
+//  GigsFeedView.swift
+//  Pantopus
+//
+//  Designed Gigs feed (T2.3). Three frames — populated (4-row category
+//  mix), empty (briefcase circle + radius pill), loading (4 shimmer
+//  rows). Category chips are per-category brand-colored when active.
+//
+
+// swiftlint:disable type_body_length
+
+import SwiftUI
+
+/// Gigs feed entry point. Reached from Hub → Gigs pillar.
+public struct GigsFeedView: View {
+    @State private var viewModel: GigsFeedViewModel
+    private let onOpenGig: @MainActor (String) -> Void
+    private let onCompose: @MainActor (GigsCategory) -> Void
+    private let onOpenMap: @MainActor (GigsCategory) -> Void
+    private let onOpenSearch: @MainActor () -> Void
+    private let onOpenFilters: @MainActor () -> Void
+    private let onBack: (@MainActor () -> Void)?
+
+    init(
+        viewModel: GigsFeedViewModel = GigsFeedViewModel(),
+        onOpenGig: @escaping @MainActor (String) -> Void = { _ in },
+        onCompose: @escaping @MainActor (GigsCategory) -> Void = { _ in },
+        onOpenMap: @escaping @MainActor (GigsCategory) -> Void = { _ in },
+        onOpenSearch: @escaping @MainActor () -> Void = {},
+        onOpenFilters: @escaping @MainActor () -> Void = {},
+        onBack: (@MainActor () -> Void)? = nil
+    ) {
+        _viewModel = State(initialValue: viewModel)
+        self.onOpenGig = onOpenGig
+        self.onCompose = onCompose
+        self.onOpenMap = onOpenMap
+        self.onOpenSearch = onOpenSearch
+        self.onOpenFilters = onOpenFilters
+        self.onBack = onBack
+    }
+
+    public var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
+                topBar
+                searchBar
+                categoryChipRow
+                sortFilterRow
+                content
+            }
+            .background(Theme.Color.appBg)
+            FeedComposeFAB(accessibilityLabel: "Post a task") {
+                onCompose(viewModel.activeCategory)
+            }
+            .padding(.trailing, Spacing.s4)
+            .padding(.bottom, Spacing.s10)
+        }
+        .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+        .task { await viewModel.load() }
+        .accessibilityIdentifier("gigsFeed")
+    }
+
+    // MARK: - Top bar
+
+    private var topBar: some View {
+        HStack(spacing: 4) {
+            if let onBack {
+                Button(action: onBack) {
+                    Icon(.chevronLeft, size: 22, color: Theme.Color.appText)
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+                .accessibilityIdentifier("gigsBackButton")
+            }
+            Text("Gigs")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            Button {
+                onOpenMap(viewModel.activeCategory)
+            } label: {
+                Icon(.map, size: 19, color: Theme.Color.appText)
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open map")
+            .accessibilityIdentifier("gigsMapToggle")
+        }
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, Spacing.s2)
+        .background(Theme.Color.appBg)
+    }
+
+    // MARK: - Search
+
+    private var searchBar: some View {
+        Button(action: onOpenSearch) {
+            HStack(spacing: 10) {
+                Icon(.search, size: 17, color: Theme.Color.appTextSecondary)
+                Text("Search gigs, skills, neighborhoods…")
+                    .font(.system(size: 13.5, weight: .medium))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .background(Theme.Color.appSurfaceSunken)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, Spacing.s1)
+        .accessibilityIdentifier("gigsSearchBar")
+    }
+
+    // MARK: - Category chip row
+
+    private var categoryChipRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Spacing.s2) {
+                ForEach(GigsCategory.allCases, id: \.self) { category in
+                    let active = category == viewModel.activeCategory
+                    Button {
+                        Task { await viewModel.selectCategory(category) }
+                    } label: {
+                        Text(category.label)
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
+                            .padding(.horizontal, 14)
+                            .frame(height: 28)
+                            .background(active ? category.color : Theme.Color.appSurface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                                    .stroke(active ? .clear : Theme.Color.appBorder, lineWidth: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(category.label)
+                    .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
+                    .accessibilityIdentifier("gigsChip_\(category.rawValue)")
+                }
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s3)
+        }
+        .accessibilityIdentifier("gigsChipRow")
+    }
+
+    // MARK: - Sort + filter
+
+    private var sortFilterRow: some View {
+        HStack {
+            Menu {
+                ForEach(GigsSort.allCases) { sort in
+                    Button {
+                        Task { await viewModel.selectSort(sort) }
+                    } label: {
+                        if sort == viewModel.activeSort {
+                            Label(sort.label, systemImage: "checkmark")
+                        } else {
+                            Text(sort.label)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Text("Sort:")
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    Text(viewModel.activeSort.label)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                    Icon(.chevronDown, size: 13, strokeWidth: 2.4, color: Theme.Color.appTextStrong)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("gigsSortMenu")
+            Spacer()
+            if viewModel.activeFilterCount > 0 {
+                Button(action: onOpenFilters) {
+                    HStack(spacing: 5) {
+                        Icon(.slidersHorizontal, size: 11, strokeWidth: 2.4, color: Theme.Color.primary700)
+                        Text("\(viewModel.activeFilterCount) filters")
+                            .font(.system(size: 11.5, weight: .bold))
+                            .foregroundStyle(Theme.Color.primary700)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Theme.Color.primary50)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                            .stroke(Theme.Color.primary100, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("gigsFiltersPill")
+            }
+        }
+        .padding(.horizontal, Spacing.s4)
+        .padding(.bottom, Spacing.s2)
+    }
+
+    // MARK: - Content frames
+
+    @ViewBuilder private var content: some View {
+        switch viewModel.state {
+        case .loading: loadingFrame
+        case let .empty(empty): emptyFrame(empty)
+        case let .loaded(rows): populatedFrame(rows)
+        case let .error(message): errorFrame(message: message)
+        }
+    }
+
+    private var loadingFrame: some View {
+        ScrollView {
+            VStack(spacing: Spacing.s2) {
+                FeedSkeletonCard()
+                FeedSkeletonCard(withTitle: true)
+                FeedSkeletonCard()
+                FeedSkeletonCard()
+            }
+            .padding(Spacing.s3)
+        }
+        .accessibilityIdentifier("gigsFeedLoading")
+    }
+
+    private func emptyFrame(_ empty: GigsFeedEmpty) -> some View {
+        VStack(spacing: Spacing.s3) {
+            Spacer()
+            Icon(.briefcase, size: 32, strokeWidth: 1.8, color: Theme.Color.primary600)
+                .frame(width: 72, height: 72)
+                .background(Theme.Color.primary50)
+                .clipShape(Circle())
+            Text("No gigs nearby")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+            Text("Be the first to post one.")
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 260)
+            Button {
+                onCompose(viewModel.activeCategory)
+            } label: {
+                HStack(spacing: 8) {
+                    Icon(.pencil, size: 15, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
+                    Text("Post a task")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                }
+                .padding(.horizontal, 22)
+                .frame(height: 44)
+                .background(Theme.Color.primary600)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("gigsEmptyPostTask")
+            radiusHint(empty.radiusMiles)
+                .padding(.top, Spacing.s4)
+            Spacer()
+        }
+        .padding(Spacing.s5)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("gigsFeedEmpty")
+    }
+
+    private func radiusHint(_ miles: Double) -> some View {
+        HStack(spacing: 8) {
+            Icon(.mapPin, size: 13, color: Theme.Color.appTextMuted)
+            Group {
+                Text("Within ")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    + Text(Self.radiusLabel(miles))
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    + Text(" · widen in filter")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+    }
+
+    private static func radiusLabel(_ miles: Double) -> String {
+        if miles.truncatingRemainder(dividingBy: 1) == 0 {
+            return "\(Int(miles)) mi"
+        }
+        return String(format: "%.1f mi", miles)
+    }
+
+    private func populatedFrame(_ rows: [GigCardContent]) -> some View {
+        ScrollView {
+            LazyVStack(spacing: Spacing.s2) {
+                ForEach(rows) { row in
+                    Button {
+                        onOpenGig(row.id)
+                    } label: {
+                        GigRow(content: row)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("gigsRow_\(row.id)")
+                }
+                Spacer(minLength: 110)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.top, Spacing.s1)
+        }
+        .refreshable { await viewModel.refresh() }
+        .accessibilityIdentifier("gigsFeedList")
+    }
+
+    private func errorFrame(message: String) -> some View {
+        VStack(spacing: Spacing.s3) {
+            Spacer()
+            Icon(.alertCircle, size: 40, color: Theme.Color.error)
+            Text("Couldn't load Gigs")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+            Text(message)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+            Button {
+                Task { await viewModel.refresh() }
+            } label: {
+                Text("Try again")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextInverse)
+                    .padding(.horizontal, 22)
+                    .frame(height: 44)
+                    .background(Theme.Color.primary600)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("gigsFeedRetry")
+            Spacer()
+        }
+        .padding(Spacing.s5)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("gigsFeedError")
+    }
+}
+
+/// One gig row — category chip + meta line, 2-line title, 2-line body,
+/// price, amber bid pill (hidden at 0 with "Be the first" affordance),
+/// right-aligned distance.
+private struct GigRow: View {
+    let content: GigCardContent
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                CategoryChip(category: content.category)
+                if !content.metaLine.isEmpty {
+                    Text(content.metaLine)
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+            }
+            Text(content.title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            Text(content.body)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            HStack(spacing: 10) {
+                Text(content.price)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.Color.primary600)
+                if content.bidCount > 0 {
+                    BidPill(count: content.bidCount)
+                } else {
+                    BeTheFirstPill()
+                }
+                Spacer()
+                if let distance = content.distanceLabel {
+                    HStack(spacing: 3) {
+                        Icon(.mapPin, size: 11, strokeWidth: 2, color: Theme.Color.appTextSecondary)
+                        Text(distance)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                    }
+                }
+            }
+            .padding(.top, 6)
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+}
+
+private struct CategoryChip: View {
+    let category: GigsCategory
+
+    var body: some View {
+        Text(category.label.uppercased())
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(category.color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(category.color.opacity(0.12))
+            .clipShape(Capsule())
+    }
+}
+
+private struct BidPill: View {
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Icon(.gavel, size: 9, strokeWidth: 2.5, color: Theme.Color.warning)
+            Text("\(count) bids")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Theme.Color.warning)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
+        .background(Theme.Color.warningBg)
+        .clipShape(Capsule())
+    }
+}
+
+/// Zero-bid affordance — design spec calls for a "Be the first" pill in
+/// place of the amber bid pill when the gig has no bids yet.
+private struct BeTheFirstPill: View {
+    var body: some View {
+        Text("Be the first")
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(Theme.Color.primary700)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(Theme.Color.primary50)
+            .clipShape(Capsule())
+    }
+}
+
+#Preview {
+    GigsFeedView()
+}

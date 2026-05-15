@@ -5,13 +5,25 @@ import app.pantopus.android.BuildConfig
 import app.pantopus.android.data.api.ApiService
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequestJsonAdapter
 import app.pantopus.android.data.api.net.RetryInterceptor
+import app.pantopus.android.data.api.services.AudienceProfileApi
 import app.pantopus.android.data.api.services.AuthApi
+import app.pantopus.android.data.api.services.BlocksApi
+import app.pantopus.android.data.api.services.ChatApi
 import app.pantopus.android.data.api.services.FilesApi
+import app.pantopus.android.data.api.services.GigsApi
 import app.pantopus.android.data.api.services.HomesApi
 import app.pantopus.android.data.api.services.HubApi
+import app.pantopus.android.data.api.services.IdentityCenterApi
+import app.pantopus.android.data.api.services.ListingsApi
+import app.pantopus.android.data.api.services.MailComposeApi
 import app.pantopus.android.data.api.services.MailboxApi
 import app.pantopus.android.data.api.services.MailboxV2Api
+import app.pantopus.android.data.api.services.NotificationsApi
 import app.pantopus.android.data.api.services.PostsApi
+import app.pantopus.android.data.api.services.PrivacyApi
+import app.pantopus.android.data.api.services.PrivacyHandshakeApi
+import app.pantopus.android.data.api.services.RelationshipsApi
+import app.pantopus.android.data.api.services.TokenAcceptApi
 import app.pantopus.android.data.api.services.UsersApi
 import app.pantopus.android.data.auth.AuthInterceptor
 import com.squareup.moshi.Moshi
@@ -138,6 +150,51 @@ object NetworkModule {
 
     @Provides @Singleton
     fun providePostsApi(retrofit: Retrofit): PostsApi = retrofit.create(PostsApi::class.java)
+
+    @Provides @Singleton
+    fun provideRelationshipsApi(retrofit: Retrofit): RelationshipsApi = retrofit.create(RelationshipsApi::class.java)
+
+    @Provides @Singleton
+    fun provideBlocksApi(retrofit: Retrofit): BlocksApi = retrofit.create(BlocksApi::class.java)
+
+    @Provides @Singleton
+    fun provideChatApi(retrofit: Retrofit): ChatApi = retrofit.create(ChatApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideGigsApi(retrofit: Retrofit): GigsApi = retrofit.create(GigsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideListingsApi(retrofit: Retrofit): ListingsApi = retrofit.create(ListingsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun providePrivacyApi(retrofit: Retrofit): PrivacyApi = retrofit.create(PrivacyApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideIdentityCenterApi(retrofit: Retrofit): IdentityCenterApi = retrofit.create(IdentityCenterApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideAudienceProfileApi(retrofit: Retrofit): AudienceProfileApi = retrofit.create(AudienceProfileApi::class.java)
+
+    @Provides
+    @Singleton
+    fun providePrivacyHandshakeApi(retrofit: Retrofit): PrivacyHandshakeApi = retrofit.create(PrivacyHandshakeApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideTokenAcceptApi(retrofit: Retrofit): TokenAcceptApi = retrofit.create(TokenAcceptApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideMailComposeApi(retrofit: Retrofit): MailComposeApi = retrofit.create(MailComposeApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideNotificationsApi(retrofit: Retrofit): NotificationsApi = retrofit.create(NotificationsApi::class.java)
 
     // Legacy aggregate — retained for existing AuthRepository / FeedScreen.
     @Provides @Singleton

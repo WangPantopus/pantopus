@@ -39,6 +39,7 @@ struct HubTopBar: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Notifications")
+                .accessibilityIdentifier("hubBellButton")
                 if content.unreadCount > 0 {
                     Circle()
                         .fill(Theme.Color.error)
@@ -53,6 +54,7 @@ struct HubTopBar: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Menu")
+            .accessibilityIdentifier("hubMenuButton")
         }
         .padding(.horizontal, Spacing.s4)
         .frame(height: 56)
@@ -267,6 +269,7 @@ struct HubPillarGrid: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(tile.label)\(tile.chip.map { ", \($0)" } ?? "")")
+                .accessibilityIdentifier("hub.pillar.\(tile.pillar.rawValue)")
             }
         }
         .padding(.horizontal, Spacing.s4)
@@ -277,7 +280,7 @@ struct HubPillarGrid: View {
 
 struct HubDiscoveryRail: View {
     let items: [DiscoveryCardContent]
-    let onTap: (String) -> Void
+    let onTap: (DiscoveryCardContent) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
@@ -286,7 +289,7 @@ struct HubDiscoveryRail: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Spacing.s3) {
                     ForEach(items) { item in
-                        Button { onTap(item.id) } label: {
+                        Button { onTap(item) } label: {
                             VStack(alignment: .leading, spacing: Spacing.s2) {
                                 AvatarWithIdentityRing(
                                     name: item.avatarInitials,
@@ -324,7 +327,7 @@ struct HubDiscoveryRail: View {
 
 struct HubJumpBackIn: View {
     let items: [JumpBackItem]
-    let onTap: (String) -> Void
+    let onTap: (JumpBackItem) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
@@ -332,7 +335,7 @@ struct HubJumpBackIn: View {
                 .padding(.horizontal, Spacing.s4)
             HStack(spacing: Spacing.s3) {
                 ForEach(items) { item in
-                    Button { onTap(item.id) } label: {
+                    Button { onTap(item) } label: {
                         VStack(alignment: .leading, spacing: Spacing.s2) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: Radii.md)

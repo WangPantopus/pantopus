@@ -79,6 +79,12 @@ data class MailboxV2Item(
     val packageInfo: JsonValue? = null,
     @Json(name = "timeline") val packageTimeline: JsonArrayValue = emptyList(),
     @Json(name = "object_payload") val objectPayload: JsonValue? = null,
+    /** Raw `Mail.subject` column. Surfaced so T3.8 Ceremonial Mail
+     *  Open can render the letter heading; v1 mail-detail clients
+     *  already had this. */
+    val subject: String? = null,
+    /** Raw `Mail.content` column for the letter body. */
+    val content: String? = null,
 )
 
 /** `POST /api/mailbox/v2/item/:id/action` — route `backend/routes/mailboxV2.js:459`. */

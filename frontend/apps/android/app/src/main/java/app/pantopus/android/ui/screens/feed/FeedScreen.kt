@@ -1,140 +1,340 @@
+@file:Suppress("MagicNumber", "LongMethod", "PackageNaming")
+
 package app.pantopus.android.ui.screens.feed
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
-import app.pantopus.android.data.api.ApiService
-import app.pantopus.android.data.api.models.feed.FeedPost
-import app.pantopus.android.data.observability.Observability
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import javax.inject.Inject
+import app.pantopus.android.data.analytics.Analytics
+import app.pantopus.android.data.analytics.AnalyticsEvent
+import app.pantopus.android.ui.screens.feed.pulse.PulseFeedUiState
+import app.pantopus.android.ui.screens.feed.pulse.PulseFeedViewModel
+import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
+import app.pantopus.android.ui.screens.feed.pulse.PulsePostCard
+import app.pantopus.android.ui.screens.shared.feed.FeedChipItem
+import app.pantopus.android.ui.screens.shared.feed.FeedChipRow
+import app.pantopus.android.ui.screens.shared.feed.FeedComposeFAB
+import app.pantopus.android.ui.screens.shared.feed.FeedSkeletonCard
+import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
-object FeedScreenTags {
-    const val LOADING = "feedLoading"
-    const val ERROR = "feedError"
-    const val LIST = "feedList"
+/**
+ * Pulse tab — the public neighborhood feed reached from
+ * Hub → pillar(.pulse). Replaces the legacy List-of-strings stub.
+ */
+@Composable
+fun FeedScreen(
+    onOpenPost: (String) -> Unit = {},
+    onCompose: (PulseIntent) -> Unit = {},
+    onBack: (() -> Unit)? = null,
+    viewModel: PulseFeedViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val activeIntent by viewModel.activeIntent.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.load()
+        Analytics.track(AnalyticsEvent.ScreenPulseFeedViewed(intent = activeIntent.key))
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg).testTag("pulseFeed")) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            TopBar(onBack = onBack)
+            FeedChipRow(
+                chips = PulseIntent.entries.map { FeedChipItem(id = it.key, label = it.label) },
+                activeId = activeIntent.key,
+                onSelect = { id -> viewModel.selectIntent(PulseIntent.fromKey(id)) },
+            )
+            when (val s = state) {
+                is PulseFeedUiState.Loading -> LoadingFrame()
+                is PulseFeedUiState.Empty -> EmptyFrame(scopeLabel = s.scopeLabel) { onCompose(activeIntent) }
+                is PulseFeedUiState.Loaded ->
+                    PopulatedFrame(
+                        state = s,
+                        onTapPost = onOpenPost,
+                        onTapReaction = viewModel::tapReaction,
+                    )
+                is PulseFeedUiState.Error ->
+                    ErrorFrame(message = s.message, onRetry = { viewModel.refresh() })
+            }
+        }
+        FeedComposeFAB(
+            onClick = { onCompose(activeIntent) },
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = Spacing.s4, bottom = Spacing.s10),
+        )
+    }
 }
 
-@HiltViewModel
-class FeedViewModel
-    @Inject
-    constructor(
-        private val api: ApiService,
-        private val observability: Observability,
-    ) : ViewModel() {
-        sealed interface UiState {
-            data object Loading : UiState
-
-            data class Loaded(
-                val posts: List<FeedPost>,
-            ) : UiState
-
-            data class Error(
-                val message: String,
-            ) : UiState
-        }
-
-        private val _state = MutableStateFlow<UiState>(UiState.Loading)
-        val state: StateFlow<UiState> = _state.asStateFlow()
-
-        init {
-            load()
-        }
-
-        fun load() {
-            _state.value = UiState.Loading
-            viewModelScope.launch {
-                try {
-                    val response = api.feed()
-                    _state.value = UiState.Loaded(response.posts)
-                } catch (t: Throwable) {
-                    if (t is kotlin.coroutines.cancellation.CancellationException) throw t
-                    observability.capture(t)
-                    _state.value = UiState.Error(t.message ?: "Unknown error")
+@Composable
+private fun TopBar(onBack: (() -> Unit)?) {
+    Box(modifier = Modifier.fillMaxWidth().background(PantopusColors.appBg)) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onBack != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(36.dp)
+                            .clickable(onClick = onBack)
+                            .testTag("pulseBackButton"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.ChevronLeft,
+                        contentDescription = "Back",
+                        size = 22.dp,
+                        tint = PantopusColors.appText,
+                    )
                 }
+                Spacer(modifier = Modifier.size(8.dp))
+            }
+            Text(
+                text = "Pulse",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+                modifier = Modifier.semantics { heading() },
+            )
+        }
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(PantopusColors.appBorder),
+        )
+    }
+}
+
+@Composable
+private fun LoadingFrame() {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(Spacing.s3).testTag("pulseFeedLoading"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        FeedSkeletonCard()
+        FeedSkeletonCard(withTitle = true)
+        FeedSkeletonCard()
+        FeedSkeletonCard()
+    }
+}
+
+@Composable
+private fun EmptyFrame(
+    scopeLabel: String?,
+    onCreatePost: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(Spacing.s5)
+                .testTag("pulseFeedEmpty"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.primary50),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Radio,
+                contentDescription = null,
+                size = 32.dp,
+                tint = PantopusColors.primary600,
+            )
+        }
+        Spacer(modifier = Modifier.size(Spacing.s3))
+        Text(
+            text = "Nothing here yet",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+        )
+        Spacer(modifier = Modifier.size(Spacing.s2))
+        Text(
+            text = "Be the first to post. Ask, recommend, or announce something local.",
+            fontSize = 13.5.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+        Spacer(modifier = Modifier.size(Spacing.s4))
+        Box(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(PantopusColors.primary600)
+                    .clickable(onClick = onCreatePost)
+                    .padding(horizontal = 22.dp)
+                    .height(44.dp)
+                    .testTag("pulseEmptyCreatePost"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Pencil,
+                    contentDescription = null,
+                    size = 15.dp,
+                    tint = PantopusColors.appTextInverse,
+                )
+                Text(
+                    text = "Create post",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appTextInverse,
+                )
+            }
+        }
+        if (!scopeLabel.isNullOrEmpty()) {
+            Spacer(modifier = Modifier.size(Spacing.s4))
+            Row(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.MapPin,
+                    contentDescription = null,
+                    size = 13.dp,
+                    tint = PantopusColors.appTextMuted,
+                )
+                Text(
+                    text = "Showing posts within $scopeLabel",
+                    fontSize = 11.5.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
             }
         }
     }
+}
 
 @Composable
-fun FeedScreen(viewModel: FeedViewModel = hiltViewModel()) {
-    val uiState by viewModel.state.collectAsStateWithLifecycle()
-    when (val s = uiState) {
-        FeedViewModel.UiState.Loading ->
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .testTag(FeedScreenTags.LOADING)
-                    .semantics { contentDescription = "Loading feed" },
-                contentAlignment = Alignment.Center,
-            ) { CircularProgressIndicator() }
+private fun PopulatedFrame(
+    state: PulseFeedUiState.Loaded,
+    onTapPost: (String) -> Unit,
+    onTapReaction: (String) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().testTag("pulseFeedList"),
+        contentPadding = PaddingValues(Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        items(items = state.rows, key = { it.id }) { row ->
+            PulsePostCard(
+                content = row,
+                onTap = { onTapPost(row.id) },
+                onPrimaryReaction = { onTapReaction(row.id) },
+                onRSVP = if (row.attendees == null) null else ({ onTapReaction(row.id) }),
+            )
+        }
+        item { Spacer(modifier = Modifier.height(80.dp)) }
+    }
+}
 
-        is FeedViewModel.UiState.Error ->
-            Box(
+@Composable
+private fun ErrorFrame(
+    message: String,
+    onRetry: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(Spacing.s5)
+                .testTag("pulseFeedError"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.AlertCircle,
+            contentDescription = null,
+            size = 40.dp,
+            tint = PantopusColors.error,
+        )
+        Spacer(modifier = Modifier.size(Spacing.s3))
+        Text(
+            text = "Couldn't load Pulse",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+        )
+        Spacer(modifier = Modifier.size(Spacing.s2))
+        Text(
+            text = message,
+            fontSize = 13.5.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+        Spacer(modifier = Modifier.size(Spacing.s4))
+        Box(
+            modifier =
                 Modifier
-                    .fillMaxSize()
-                    .padding(24.dp)
-                    .testTag(FeedScreenTags.ERROR)
-                    .semantics { liveRegion = LiveRegionMode.Polite },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "Couldn't load feed: ${s.message}",
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-
-        is FeedViewModel.UiState.Loaded ->
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.testTag(FeedScreenTags.LIST),
-            ) {
-                items(s.posts, key = { it.id }) { post ->
-                    Column(
-                        modifier =
-                            Modifier.semantics(mergeDescendants = true) {
-                                contentDescription = "${post.authorName ?: "Anonymous"} posted: ${post.content}"
-                            },
-                    ) {
-                        Text(
-                            post.authorName ?: "Anonymous",
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.semantics { heading() },
-                        )
-                        Text(post.content, style = MaterialTheme.typography.bodyLarge)
-                        Text(post.createdAt.toString(), style = MaterialTheme.typography.bodyMedium)
-                        HorizontalDivider(Modifier.padding(top = 12.dp))
-                    }
-                }
-            }
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(PantopusColors.primary600)
+                    .clickable(onClick = onRetry)
+                    .padding(horizontal = 22.dp)
+                    .height(44.dp)
+                    .testTag("pulseFeedRetry"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "Try again",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
     }
 }

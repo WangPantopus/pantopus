@@ -77,7 +77,7 @@ public struct MailItem: Decodable, Sendable, Hashable, Identifiable {
         case createdAt = "created_at"
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         recipientUserId = try c.decodeIfPresent(String.self, forKey: .recipientUserId)
@@ -137,7 +137,7 @@ public struct MailDetailResponse: Decodable, Sendable, Hashable {
             item.id
         }
 
-        public init(from decoder: Decoder) throws {
+        public init(from decoder: any Decoder) throws {
             item = try MailItem(from: decoder)
             let c = try decoder.container(keyedBy: Keys.self)
             sender = try c.decodeIfPresent(Sender.self, forKey: .sender)

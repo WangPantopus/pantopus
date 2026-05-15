@@ -39,6 +39,7 @@ public struct PulsePostDetailView: View {
             }
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+        .accessibilityIdentifier("pulsePostDetail")
         .task { await viewModel.load() }
     }
 

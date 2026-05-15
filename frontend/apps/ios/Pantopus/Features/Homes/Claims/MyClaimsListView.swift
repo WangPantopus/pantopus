@@ -3,8 +3,9 @@
 //  Pantopus
 //
 //  Concrete List-of-Rows screen backed by `MyClaimsListViewModel`.
-//  TODO(design): detail tap currently no-ops because the claim-status
-//  detail view is not drawn yet — see VM for context.
+//  Row taps route via the VM's `onOpenClaim` callback; the host
+//  (HubTabRoot) currently pushes a placeholder for claim-detail until
+//  the dedicated status screen is designed.
 //
 
 import SwiftUI

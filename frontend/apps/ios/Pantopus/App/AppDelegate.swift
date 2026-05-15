@@ -59,7 +59,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(
         _: UIApplication,
-        didFailToRegisterForRemoteNotificationsWithError error: Error
+        didFailToRegisterForRemoteNotificationsWithError error: any Error
     ) {
         logger.error("APNs registration failed", metadata: ["error": .string(error.localizedDescription)])
         Task { @MainActor in Observability.shared.capture(error) }
@@ -68,7 +68,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
 extension AppDelegate: UNUserNotificationCenterDelegate {
     /// Show banner + play sound even when app is in foreground.
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _: UNUserNotificationCenter,
         willPresent _: UNNotification
     ) async -> UNNotificationPresentationOptions {
@@ -76,13 +76,16 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     }
 
     /// Handle taps on notifications — route to the relevant deep link.
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        let userInfo = response.notification.request.content.userInfo
-        logger.info("Notification tapped", metadata: ["payload": .string("\(userInfo)")])
-        if let deepLink = userInfo["deepLink"] as? String, let url = URL(string: deepLink) {
+        // Extract the userInfo dictionary into a Sendable `[String: Any]`
+        // snapshot before hopping to the main actor — `UNNotification`
+        // isn't `Sendable` so we can't capture `response` directly.
+        let deepLink = response.notification.request.content.userInfo["deepLink"] as? String
+        logger.info("Notification tapped", metadata: ["deepLink": .string(deepLink ?? "")])
+        if let deepLink, let url = URL(string: deepLink) {
             await MainActor.run { DeepLinkRouter.shared.handle(url: url) }
         }
     }

@@ -14,32 +14,45 @@ final class PantopusUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testLaunchLandsOnLogin() {
+    @MainActor
+    private func launchSignedOut() -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchEnvironment["UI_TESTS_SIGNED_OUT"] = "1"
         app.launch()
+        return app
+    }
+
+    @MainActor
+    private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    @MainActor
+    func testLaunchLandsOnLogin() {
+        let app = launchSignedOut()
         XCTAssertTrue(app.waitForExistence(timeout: 10))
 
         // We should see the Pantopus brand headline.
         XCTAssertTrue(app.staticTexts["Pantopus"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.textFields["loginEmailField"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.secureTextFields["loginPasswordField"].exists)
+        XCTAssertTrue(element("loginEmailField", in: app).waitForExistence(timeout: 2))
+        XCTAssertTrue(element("loginPasswordField", in: app).exists)
     }
 
+    @MainActor
     func testSignInButtonDisabledWithEmptyFields() {
-        let app = XCUIApplication()
-        app.launch()
-        let button = app.buttons["loginSubmitButton"]
+        let app = launchSignedOut()
+        let button = element("loginSubmitButton", in: app)
         XCTAssertTrue(button.waitForExistence(timeout: 5))
         XCTAssertFalse(button.isEnabled)
     }
 
+    @MainActor
     func testSignInButtonEnablesOnceFormIsValid() {
-        let app = XCUIApplication()
-        app.launch()
+        let app = launchSignedOut()
 
-        let email = app.textFields["loginEmailField"]
-        let password = app.secureTextFields["loginPasswordField"]
-        let button = app.buttons["loginSubmitButton"]
+        let email = element("loginEmailField", in: app)
+        let password = element("loginPasswordField", in: app)
+        let button = element("loginSubmitButton", in: app)
 
         XCTAssertTrue(email.waitForExistence(timeout: 5))
         email.tap()

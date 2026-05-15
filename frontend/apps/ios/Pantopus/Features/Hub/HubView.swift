@@ -36,6 +36,7 @@ struct HubView: View {
         }
         .background(Theme.Color.appBg)
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+        .accessibilityIdentifier("hubScreen")
         .task { await viewModel.load() }
         .refreshable { await viewModel.refresh() }
         .onAppear { Analytics.track(.screenHubViewed) }
@@ -108,8 +109,8 @@ enum HubNavigationIntent {
     case action(ActionChipContent.Kind)
     case startVerification
     case pillar(PillarTile.Pillar)
-    case openDiscovery(String)
-    case jumpBackIn(String)
+    case openDiscovery(DiscoveryCardContent)
+    case jumpBackIn(JumpBackItem)
 }
 
 private struct ErrorView: View {

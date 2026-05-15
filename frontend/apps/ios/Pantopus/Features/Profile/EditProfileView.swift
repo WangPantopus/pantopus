@@ -87,9 +87,10 @@ public struct EditProfileView: View {
     // MARK: - Sections
 
     private var aboutSection: some View {
-        // TODO(backend): Edit Profile design also calls for an avatar
-        // upload (tap to replace). `updateProfileSchema` has no avatar
-        // field, so omit per P10 rules.
+        // Note: the design also calls for an avatar upload (tap to
+        // replace). `updateProfileSchema` exposes no avatar field, so
+        // the affordance is intentionally omitted until the backend
+        // accepts an avatar key on PATCH /api/users/profile.
         FormFieldGroup("About") {
             textField(.firstName, label: "First name")
             textField(.middleName, label: "Middle name (optional)")
@@ -101,9 +102,9 @@ public struct EditProfileView: View {
 
     private var contactSection: some View {
         FormFieldGroup("Contact") {
-            // TODO(backend): the Edit Profile design says email should be
-            // editable when `verified == false`. `updateProfileSchema`
-            // exposes no `email` key, so we render it read-only for now.
+            // Note: the design allows editing email when `verified ==
+            // false`. `updateProfileSchema` exposes no `email` key, so
+            // the field is read-only until the backend adds it.
             readOnlyEmail
             textField(
                 .phoneNumber,
@@ -153,12 +154,12 @@ public struct EditProfileView: View {
     }
 
     private var visibilitySection: some View {
-        // TODO(backend): the Edit Profile design specifies boolean
-        // toggles `profile_visibility_public` and
-        // `show_in_neighbor_discovery`. The schema only has the 3-way
-        // `profileVisibility` enum (public / registered / private) and
-        // no neighbor-discovery key, so we render the enum picker and
-        // omit the discovery toggle per P10 rules.
+        // Note: the design splits visibility into a
+        // `profile_visibility_public` boolean and a
+        // `show_in_neighbor_discovery` toggle. The schema only has the
+        // 3-way `profileVisibility` enum today (public / registered /
+        // private) and no neighbor-discovery key, so we render the
+        // enum picker and omit the toggle until the backend adds it.
         FormFieldGroup("Visibility") {
             visibilityPicker
         }

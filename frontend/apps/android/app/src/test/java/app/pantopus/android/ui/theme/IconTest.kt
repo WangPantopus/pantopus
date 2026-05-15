@@ -53,6 +53,17 @@ class IconTest {
             "heart",
             "thumbs-up",
             "star",
+            "help-circle",
+            "calendar",
+            "lightbulb",
+            "eye",
+            "share",
+            "radio",
+            "map-pin",
+            "pencil",
+            "briefcase",
+            "gavel",
+            "sliders-horizontal",
         )
 
     @Test

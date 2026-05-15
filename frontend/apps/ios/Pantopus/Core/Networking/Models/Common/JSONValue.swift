@@ -19,7 +19,7 @@ public indirect enum JSONValue: Decodable, Sendable, Hashable {
     case array([JSONValue])
     case null
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
         if container.decodeNil() {
             self = .null

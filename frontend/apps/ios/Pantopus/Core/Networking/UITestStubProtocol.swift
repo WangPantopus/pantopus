@@ -8,6 +8,8 @@
 //  can dictate what the network looks like without a real backend.
 //
 
+// swiftlint:disable cyclomatic_complexity file_length function_body_length line_length type_body_length
+
 #if DEBUG
 import Foundation
 
@@ -87,6 +89,114 @@ final class UITestStubProtocol: URLProtocol {
         case ("GET", "/api/homes/my-homes"):
             let body = env["UI_TESTS_HOMES_MYHOMES_BODY"] ?? Self.defaultMyHomesJSON
             finishWith(status: 200, body: Data(body.utf8))
+
+        case ("GET", "/api/gigs"):
+            let body = env["UI_TESTS_GIGS_LIST_BODY"] ?? Self.defaultGigsListJSON
+            finishWith(status: 200, body: Data(body.utf8))
+
+        case let ("GET", path)
+            where path.hasPrefix("/api/gigs/")
+            && !path.hasSuffix("/bids")
+            && !path.contains("/in-bounds")
+            && !path.contains("/nearby")
+            && !path.contains("/browse")
+            && !path.contains("/categories"):
+            let body = env["UI_TESTS_GIG_DETAIL_BODY"] ?? Self.defaultGigDetailJSON
+            finishWith(status: 200, body: Data(body.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/gigs/") && path.hasSuffix("/bids"):
+            // Owner-only on real backend; the stub returns an empty
+            // list so the detail screen renders the trust capsules
+            // without a bids module under the UI test.
+            finishWith(status: 200, body: Data("{\"bids\":[]}".utf8))
+
+        case ("GET", "/api/identity-center"):
+            let body = env["UI_TESTS_IDENTITY_CENTER_BODY"] ?? Self.defaultIdentityCenterJSON
+            finishWith(status: 200, body: Data(body.utf8))
+
+        case ("GET", "/api/privacy/blocks"):
+            finishWith(status: 200, body: Data("{\"blocks\":[]}".utf8))
+
+        case ("GET", "/api/personas/me"):
+            finishWith(status: 200, body: Data(Self.defaultPersonaMeJSON.utf8))
+
+        case ("GET", "/api/personas/me/audience"):
+            finishWith(status: 200, body: Data(Self.defaultAudienceJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.hasSuffix("/posts"):
+            finishWith(status: 200, body: Data(Self.defaultPersonaPostsJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.hasSuffix("/tiers"):
+            finishWith(status: 200, body: Data(Self.defaultPersonaTiersJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.hasSuffix("/membership-stats"):
+            finishWith(status: 200, body: Data(Self.defaultMembershipStatsJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.contains("/dms/threads"):
+            finishWith(status: 200, body: Data(Self.defaultPersonaThreadsJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.hasSuffix("/fan-handle-suggestion"):
+            finishWith(status: 200, body: Data(Self.defaultFanHandleSuggestionJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.hasSuffix("/follow/status"):
+            finishWith(status: 200, body: Data(Self.defaultFollowStatusJSON.utf8))
+
+        case let ("POST", path) where path.hasPrefix("/api/personas/")
+            && path.hasSuffix("/follow"):
+            // Tier-1 success — returns the active follower membership.
+            finishWith(status: 201, body: Data(Self.defaultHandshakeSuccessJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/homes/invitations/token/"):
+            finishWith(status: 200, body: Data(Self.defaultHomeInviteJSON.utf8))
+
+        case ("GET", "/api/businesses/seats/invite-details"):
+            finishWith(status: 404, body: Data("{\"error\":\"Invite not found\"}".utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/homes/guest/"):
+            finishWith(status: 404, body: Data("{\"error\":\"Guest pass not found\"}".utf8))
+
+        case let ("POST", path) where path.hasPrefix("/api/homes/invitations/token/")
+            && path.hasSuffix("/accept"):
+            finishWith(status: 200, body: Data(Self.defaultHomeAcceptJSON.utf8))
+
+        case ("GET", "/api/mailbox/compose/recipients"):
+            finishWith(status: 200, body: Data(Self.defaultMailComposeRecipientsJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/mailbox/compose/home-context/"):
+            finishWith(status: 200, body: Data(Self.defaultMailComposeHomeContextJSON.utf8))
+
+        case ("POST", "/api/mailbox/send"):
+            finishWith(status: 200, body: Data(Self.defaultMailSendJSON.utf8))
+
+        case let ("GET", path) where path.hasPrefix("/api/mailbox/v2/item/"):
+            finishWith(status: 200, body: Data(Self.defaultCeremonialMailItemJSON.utf8))
+
+        case ("GET", "/api/notifications"):
+            let body = env["UI_TESTS_NOTIFICATIONS_LIST_BODY"] ?? Self.defaultNotificationsListJSON
+            finishWith(status: 200, body: Data(body.utf8))
+
+        case ("GET", "/api/notifications/unread-count"):
+            finishWith(status: 200, body: Data("{\"count\":2}".utf8))
+
+        case let ("PATCH", path) where path.hasPrefix("/api/notifications/") && path.hasSuffix("/read"):
+            finishWith(status: 200, body: Data("{\"ok\":true}".utf8))
+
+        case ("POST", "/api/notifications/read-all"):
+            finishWith(status: 200, body: Data("{\"count\":0}".utf8))
+
+        // The handshake screen calls GET /api/personas/:handle ahead
+        // of its tiers / suggestion / status fetches. Match exactly 3
+        // path segments (`/api`, `/personas`, `/<handle>`) so the
+        // earlier case branches (which include suffixes) win first.
+        case let ("GET", path) where path.hasPrefix("/api/personas/")
+            && path.split(separator: "/").count == 3:
+            finishWith(status: 200, body: Data(Self.defaultHandshakePersonaJSON.utf8))
 
         default:
             // Unknown endpoint under test — surface a recognizable 599
@@ -197,6 +307,289 @@ final class UITestStubProtocol: URLProtocol {
       "userMembershipStatus":"member","userResidencyClaim":null,
       "memberCount":1,"nearbyGigs":0
     }}
+    """
+
+    /// Single-row `GigsListResponse` for the Gigs feed + the matching
+    /// detail row for the T2.6 TransactionalDetailShell capture.
+    static let defaultGigsListJSON = """
+    {"gigs":[{
+      "id":"g_demo",
+      "title":"Hang 3 shelves",
+      "description":"Three IKEA Lack shelves on drywall — studs already located.",
+      "price":60,
+      "category":"handyman",
+      "status":"open",
+      "created_at":"2025-01-01T00:00:00Z",
+      "user_id":"u_demo",
+      "bid_count":4,
+      "distance_miles":0.2,
+      "pickup_address":"Rose Court, Unit 4B"
+    }],"total":1}
+    """
+
+    static let defaultGigDetailJSON = """
+    {"gig":{
+      "id":"g_demo",
+      "title":"Hang 3 shelves",
+      "description":"Three IKEA Lack shelves on drywall — studs already located.",
+      "price":60,
+      "category":"handyman",
+      "status":"open",
+      "created_at":"2025-01-01T00:00:00Z",
+      "user_id":"u_demo",
+      "bid_count":4,
+      "distance_miles":0.2,
+      "pickup_address":"Rose Court, Unit 4B"
+    }}
+    """
+
+    /// Persona overview for `/api/personas/me` — paired with the
+    /// audience / posts / tiers / stats / threads stubs below to keep
+    /// the T3.3 Public Profile screen stable for the 15_PublicProfile
+    /// screenshot.
+    static let defaultPersonaMeJSON = """
+    {
+      "persona": {
+        "id": "p_demo",
+        "handle": "mayabuilds",
+        "displayName": "Maya Builds",
+        "avatarUrl": null,
+        "bio": "Building things in the Mission.",
+        "category": "creator",
+        "audienceLabel": "followers",
+        "followerCount": 12,
+        "postCount": 7
+      },
+      "channel": {
+        "id": "ch_demo", "title": "Maya Broadcast", "status": "active"
+      }
+    }
+    """
+
+    static let defaultAudienceJSON = """
+    {
+      "persona": null,
+      "items": [
+        {"membershipId":"m1","fanHandle":"alex","fanDisplayName":"Alex M.",
+         "status":"active","tier":{"rank":1,"name":"Followers"},
+         "verifiedLocal":true,"tenureMonths":3,"joinedMonth":"2026-02"},
+        {"membershipId":"m2","fanHandle":"billie","fanDisplayName":"Billie B.",
+         "status":"active","tier":{"rank":2,"name":"Members"},
+         "tenureMonths":12,"joinedMonth":"2025-05"},
+        {"membershipId":"m3","fanHandle":"casey","fanDisplayName":"Casey K.",
+         "status":"active","tier":{"rank":3,"name":"Insiders"},
+         "tenureMonths":6,"joinedMonth":"2025-11"}
+      ],
+      "counts": {
+        "totalActive": 12, "pending": 3,
+        "byTier": {"1": 8, "2": 3, "3": 1, "4": 0}
+      }
+    }
+    """
+
+    static let defaultPersonaPostsJSON = """
+    {"posts":[
+      {"id":"u1","body":"New mural going up next week.",
+       "created_at":"2026-05-14T18:00:00Z","visibility":"followers",
+       "delivered_count":40,"read_count":31},
+      {"id":"u2","body":"Workshop seats just opened — Members get first pick.",
+       "created_at":"2026-05-13T09:00:00Z","visibility":"tier_or_above",
+       "target_tier_rank":2,"delivered_count":3,"read_count":2}
+    ]}
+    """
+
+    static let defaultPersonaTiersJSON = """
+    {"tiers":[
+      {"id":"t1","rank":1,"name":"Followers","priceCents":0,"currency":"usd"},
+      {"id":"t2","rank":2,"name":"Members","priceCents":500,"currency":"usd"},
+      {"id":"t3","rank":3,"name":"Insiders","priceCents":2500,"currency":"usd"}
+    ]}
+    """
+
+    static let defaultMembershipStatsJSON = """
+    {"counts":{"followers":8,"members":3,"insiders":1,"direct":0}}
+    """
+
+    static let defaultPersonaThreadsJSON = """
+    {"threads":[
+      {"id":"th1","membershipId":"m1","fanHandle":"alex","fanDisplayName":"Alex M.",
+       "tier":{"rank":2,"name":"Members"},
+       "lastMessagePreview":"Loved the workshop! Any plans for July?",
+       "lastMessageAt":"2026-05-15T10:00:00Z","unreadCount":2}
+    ]}
+    """
+
+    /// The visitor-side persona returned by GET /api/personas/:handle
+    /// — paired with the stubs below so the T3.4 Privacy Handshake
+    /// wizard renders cleanly for `16_PrivacyHandshake`.
+    static let defaultHandshakePersonaJSON = """
+    {
+      "persona": {
+        "id": "p_demo", "handle": "mayabuilds",
+        "displayName": "Maya Builds", "bio": "Building things in the Mission.",
+        "category": "creator", "audienceLabel": "followers",
+        "followerCount": 12, "postCount": 7
+      },
+      "channel": null
+    }
+    """
+
+    static let defaultFanHandleSuggestionJSON = """
+    {"suggestion":"fan_8a2c41","locked":false,"identity":null}
+    """
+
+    static let defaultFollowStatusJSON = """
+    {"following":false,"status":"none","relationshipType":null,"notificationLevel":"none"}
+    """
+
+    static let defaultHandshakeSuccessJSON = """
+    {"follow":{"id":"f_demo","status":"active","relationshipType":"follower"},
+     "status":"active",
+     "membership":{"id":"m_demo","fan_handle":"fan_8a2c41","tier_id":"t1","status":"active"}}
+    """
+
+    /// Home invite preview — used by the 17_TokenAccept screenshot.
+    static let defaultHomeInviteJSON = """
+    {
+      "invitation": {
+        "id": "inv_demo", "status": "pending",
+        "proposed_role": "co_owner",
+        "invitee_email": "alice@example.com",
+        "expires_at": "2026-06-01T00:00:00Z",
+        "created_at": "2026-05-15T10:00:00Z"
+      },
+      "home": {
+        "id": "home_demo", "name": "412 Elm St",
+        "city": "Portland, OR", "home_type": "single_family"
+      },
+      "inviter": {
+        "name": "Maya K.", "username": "mayak", "profilePicture": null
+      }
+    }
+    """
+
+    static let defaultHomeAcceptJSON = """
+    {
+      "homeId": "home_demo",
+      "occupancy": {"id": "occ_demo", "role": "co_owner"},
+      "merged": false,
+      "accepted_role_base": "co_owner"
+    }
+    """
+
+    /// Ceremonial Mail Compose recipients list — used by the
+    /// 19_CeremonialMail screenshot.
+    static let defaultMailComposeRecipientsJSON = """
+    {"recipients":[
+      {"userId":"u_maya","name":"Maya K.","username":"mayak",
+       "homeId":"home_demo","homeAddress":"412 Elm St, Portland, OR",
+       "isVerified":true,"homeMediaUrl":null,"isOnPantopus":true},
+      {"userId":"u_omar","name":"Omar B.","username":"omarb",
+       "homeId":"home_omar","homeAddress":"77 Birch Ln, Portland, OR",
+       "isVerified":false,"homeMediaUrl":null,"isOnPantopus":true}
+    ]}
+    """
+
+    static let defaultMailComposeHomeContextJSON = """
+    {
+      "homeId":"home_demo",
+      "addressDisplay":"412 Elm St, Portland, OR",
+      "memberCount":2,
+      "homeMediaUrl":null,
+      "privateDeliveryAvailable":true,
+      "members":[
+        {"userId":"u_maya","name":"Maya K.","role":"co_owner"},
+        {"userId":"u_alice","name":"Alice D.","role":"co_owner"}
+      ]
+    }
+    """
+
+    static let defaultMailSendJSON = """
+    {"message":"Letter sent","mail":{"id":"mail_demo","subject":"A note from a friend","created_at":"2026-05-15T12:00:00Z"}}
+    """
+
+    /// Notifications list used by the 21_Notifications screenshot. Two
+    /// unread rows so the "Mark all read" action lights up and the
+    /// projection covers both NEW chip + chevron variants once any one
+    /// row gets tapped.
+    static let defaultNotificationsListJSON = """
+    {"notifications":[
+      {"id":"n_1","user_id":"u_test","type":"post","title":"Maya posted in your block",
+       "body":"\\"Anyone seen the moving truck on Elm?\\"","icon":null,
+       "link":"/post/p_demo","is_read":false,
+       "created_at":"2026-05-15T10:00:00Z","context":null},
+      {"id":"n_2","user_id":"u_test","type":"gig","title":"New bid on your gig",
+       "body":"$60 — Hang 3 shelves","icon":null,
+       "link":"/gig/g_demo","is_read":false,
+       "created_at":"2026-05-15T09:30:00Z","context":null},
+      {"id":"n_3","user_id":"u_test","type":"home_member_request","title":"Membership request",
+       "body":"Sam wants to join your home","icon":null,
+       "link":"/homes/home_test/members?tab=requests","is_read":true,
+       "created_at":"2026-05-15T08:00:00Z","context":null}
+    ],"unreadCount":2,"hasMore":false}
+    """
+
+    /// Ceremonial mail item — used by the 20_CeremonialMailOpen
+    /// screenshot. Includes the object_payload that decides the
+    /// stationery / ink / seal / voice postscript tones.
+    static let defaultCeremonialMailItemJSON = """
+    {
+      "mail": {
+        "id":"mail_demo",
+        "subject":"A note from a friend",
+        "content":"Dear Alice,\\n\\nI was thinking about the afternoon we spent at the old library — the smell of paper, the dust drifting in the light.\\n\\nI hope this letter finds you well.\\n\\nWith warmth,\\nMaya",
+        "type":"letter",
+        "mail_type":"letter",
+        "drawer":"inbox",
+        "lifecycle":"delivered",
+        "viewed":false,
+        "ack_required":false,
+        "payout_amount":0,
+        "trust_level":"verified",
+        "created_at":"2026-05-15T12:00:00Z",
+        "sender":{"name":"Maya K.","username":"mayak"},
+        "sender_display":"Maya K.",
+        "sender_trust":"pantopus_user",
+        "package":null,
+        "timeline":[],
+        "object_payload":{
+          "stationeryTheme":"midnight_blue",
+          "inkSelection":"navy",
+          "sealChoice":"wax_red",
+          "intent":"say_hello",
+          "returnAddressShared":false,
+          "voicePostscriptUri":"https://uploads.test/voice/v1.m4a"
+        }
+      }
+    }
+    """
+
+    /// Identity Center overview — all four identities populated so the
+    /// 14_IdentityCenter screenshot captures the loaded state with
+    /// Profile-links toggles, blocked counts, and the Live chip on the
+    /// Public profile card.
+    static let defaultIdentityCenterJSON = """
+    {
+      "private_account": {
+        "id": "u_demo", "email": "alice@example.com", "name": "Alice Doe",
+        "verified": true
+      },
+      "local_profile": {
+        "id": "lp_demo", "handle": "alice.d", "display_name": "Alice D.",
+        "post_count": 47, "connection_count": 23, "verified": true
+      },
+      "audience_profile": {
+        "id": "ap_demo", "handle": "aliceonline", "display_name": "Alice Online",
+        "follower_count": 1247, "post_cadence": "weekly", "status": "live"
+      },
+      "bridges": {"show_persona_on_local": true, "show_local_on_persona": false},
+      "homes": [{"id": "home_demo", "name": "412 Elm St"}],
+      "business_profiles": [
+        {"id": "biz_demo", "display_name": "Alice Masonry", "is_active": true}
+      ],
+      "persona_count": 1,
+      "block_counts": {"personal": 2, "audience": 5}
+    }
     """
 }
 #endif

@@ -41,7 +41,9 @@ final class MailboxListViewModel: ListOfRowsDataSource {
         TopBarAction(
             icon: .search,
             accessibilityLabel: "Search mail"
-        ) { [weak self] in Task { @MainActor in self?.toast = "Search coming soon" } }
+        ) { [weak self] in
+            Task { @MainActor in self?.onOpenSearch() }
+        }
     }
 
     var fab: FABAction? {
@@ -59,13 +61,16 @@ final class MailboxListViewModel: ListOfRowsDataSource {
     private var loadedItems: [MailItem] = []
     private var isLoadingPage = false
     private let onOpenMail: (String) -> Void
+    private let onOpenSearch: @MainActor () -> Void
 
     init(
         api: APIClient = .shared,
-        onOpenMail: @escaping (String) -> Void = { _ in }
+        onOpenMail: @escaping (String) -> Void = { _ in },
+        onOpenSearch: @escaping @MainActor () -> Void = {}
     ) {
         self.api = api
         self.onOpenMail = onOpenMail
+        self.onOpenSearch = onOpenSearch
     }
 
     func load() async {

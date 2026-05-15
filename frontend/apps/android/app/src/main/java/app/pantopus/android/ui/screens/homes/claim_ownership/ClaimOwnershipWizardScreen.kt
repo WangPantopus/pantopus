@@ -41,12 +41,11 @@ import app.pantopus.android.ui.screens.shared.wizard.blocks.HeadlineBlock
 import app.pantopus.android.ui.screens.shared.wizard.blocks.RequirementsCardBlock
 import app.pantopus.android.ui.screens.shared.wizard.blocks.RequirementsRow
 import app.pantopus.android.ui.screens.shared.wizard.blocks.SubcopyBlock
-import app.pantopus.android.ui.screens.shared.wizard.blocks.SuccessHeroBlock
-import app.pantopus.android.ui.screens.shared.wizard.blocks.TimelineBlock
-import app.pantopus.android.ui.screens.shared.wizard.blocks.TimelineStage
 import app.pantopus.android.ui.screens.shared.wizard.blocks.UploadSlot
 import app.pantopus.android.ui.screens.shared.wizard.blocks.UploadSlotState
 import app.pantopus.android.ui.screens.shared.wizard.blocks.UploadSlotsBlock
+import app.pantopus.android.ui.screens.status.StatusWaitingBody
+import app.pantopus.android.ui.screens.status.StatusWaitingContent
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -199,19 +198,10 @@ private fun UploadStep(
 
 @Composable
 private fun SuccessStep() {
-    SuccessHeroBlock(
-        headline = "Claim submitted",
-        subcopy = "We'll review your evidence and email you within 2–3 days.",
-    )
-    TimelineBlock(
-        stages =
-            listOf(
-                TimelineStage(id = "submitted", label = "Submitted"),
-                TimelineStage(id = "review", label = "Under review"),
-                TimelineStage(id = "complete", label = "Complete"),
-            ),
-        currentStageId = "submitted",
-    )
+    // Route through the shared T3.6 Status / Waiting body so the
+    // claim-submitted state shares its hero, timeline, action cards,
+    // and explainer bullets with every other "submitted" surface.
+    StatusWaitingBody(content = StatusWaitingContent.claimSubmitted())
 }
 
 // MARK: - Helpers

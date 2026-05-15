@@ -1,0 +1,148 @@
+@file:Suppress("MagicNumber", "PackageNaming")
+
+package app.pantopus.android.ui.screens.feed.pulse
+
+import app.pantopus.android.data.api.models.feed.FeedPagination
+import app.pantopus.android.data.api.models.feed.FeedPost
+import app.pantopus.android.data.api.models.feed.FeedPostCreator
+import app.pantopus.android.data.api.models.feed.FeedResponse
+import app.pantopus.android.data.api.models.posts.PostLikeResponse
+import app.pantopus.android.data.api.net.NetworkError
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.posts.PostsRepository
+import io.mockk.coEvery
+import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class PulseFeedViewModelTest {
+    private val repo: PostsRepository = mockk()
+
+    @Before fun setUp() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+    }
+
+    @After fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    private fun askPost(
+        id: String = "p1",
+        likeCount: Int = 12,
+        userHasLiked: Boolean = false,
+    ): FeedPost =
+        FeedPost(
+            id = id,
+            userId = "u1",
+            title = null,
+            content = "Anyone know a good dog-walker?",
+            postType = "ask_local",
+            createdAt = "2026-04-20T10:00:00Z",
+            likeCount = likeCount,
+            commentCount = 3,
+            userHasLiked = userHasLiked,
+            locationName = "Elm Park",
+            creator =
+                FeedPostCreator(
+                    id = "u1",
+                    username = "maria",
+                    name = "Maria L.",
+                    firstName = "Maria",
+                    lastName = "L.",
+                    profilePictureUrl = null,
+                    city = "Cambridge",
+                    state = "MA",
+                    accountType = "personal",
+                ),
+        )
+
+    private fun makeVm(): PulseFeedViewModel = PulseFeedViewModel(repo)
+
+    @Test fun load_with_posts_transitions_loaded() =
+        runTest {
+            coEvery {
+                repo.feed("place", null, null, null, 20)
+            } returns NetworkResult.Success(FeedResponse(listOf(askPost()), FeedPagination(null, false)))
+            val vm = makeVm()
+            vm.load()
+            val loaded = vm.state.value as PulseFeedUiState.Loaded
+            assertEquals(1, loaded.rows.size)
+            assertEquals(PulseIntent.Ask, loaded.rows.first().intent)
+            assertEquals("Maria L.", loaded.rows.first().authorName)
+        }
+
+    @Test fun load_empty_transitions_empty() =
+        runTest {
+            coEvery {
+                repo.feed("place", null, null, null, 20)
+            } returns NetworkResult.Success(FeedResponse(emptyList(), null))
+            val vm = makeVm()
+            vm.load()
+            assertTrue(vm.state.value is PulseFeedUiState.Empty)
+        }
+
+    @Test fun load_failure_transitions_error() =
+        runTest {
+            coEvery {
+                repo.feed("place", null, null, null, 20)
+            } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = makeVm()
+            vm.load()
+            assertTrue(vm.state.value is PulseFeedUiState.Error)
+        }
+
+    @Test fun select_intent_refetches_with_post_type() =
+        runTest {
+            coEvery {
+                repo.feed("place", null, null, null, 20)
+            } returns NetworkResult.Success(FeedResponse(listOf(askPost()), null))
+            coEvery {
+                repo.feed("place", null, null, "event", 20)
+            } returns NetworkResult.Success(FeedResponse(emptyList(), null))
+            val vm = makeVm()
+            vm.load()
+            vm.selectIntent(PulseIntent.Event)
+            assertEquals(PulseIntent.Event, vm.activeIntent.value)
+            assertTrue(vm.state.value is PulseFeedUiState.Empty)
+        }
+
+    @Test fun tap_reaction_optimistically_increments_and_reconciles() =
+        runTest {
+            coEvery {
+                repo.feed("place", null, null, null, 20)
+            } returns NetworkResult.Success(FeedResponse(listOf(askPost()), null))
+            coEvery { repo.toggleLike("p1") } returns
+                NetworkResult.Success(PostLikeResponse(message = "ok", liked = true, likeCount = 13))
+            val vm = makeVm()
+            vm.load()
+            vm.tapReaction("p1")
+            val loaded = vm.state.value as PulseFeedUiState.Loaded
+            assertEquals(13, loaded.rows.first().reactions.first().count)
+            assertTrue(loaded.rows.first().userHasReacted)
+        }
+
+    @Test fun tap_reaction_rolls_back_on_failure() =
+        runTest {
+            coEvery {
+                repo.feed("place", null, null, null, 20)
+            } returns NetworkResult.Success(FeedResponse(listOf(askPost()), null))
+            coEvery { repo.toggleLike("p1") } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = makeVm()
+            vm.load()
+            vm.tapReaction("p1")
+            val loaded = vm.state.value as PulseFeedUiState.Loaded
+            assertEquals(12, loaded.rows.first().reactions.first().count)
+            assertFalse(loaded.rows.first().userHasReacted)
+        }
+}

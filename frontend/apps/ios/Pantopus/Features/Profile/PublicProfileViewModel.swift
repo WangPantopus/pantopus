@@ -58,6 +58,14 @@ public struct PublicProfileHeader: Sendable, Equatable, Hashable {
     }
 }
 
+/// In-flight state for an action button (Connect, Block).
+public enum PublicProfileActionState: Sendable, Equatable {
+    case idle
+    case inFlight
+    case succeeded
+    case failed(message: String)
+}
+
 /// View-model for the public profile screen.
 @MainActor
 @Observable
@@ -68,7 +76,18 @@ public final class PublicProfileViewModel {
     /// Currently visible tab. Switching this is local; no refetch.
     public var selectedTab: ProfileTab = .about
 
-    /// Transient toast surface (used by Message / Connect placeholders).
+    /// Connect button state — toggles between `idle` → `inFlight` →
+    /// `succeeded` after a successful `POST /api/relationships/requests`.
+    public private(set) var connectState: PublicProfileActionState = .idle
+
+    /// Block action state — surfaces toast on success or failure of
+    /// `POST /api/users/:userId/block`.
+    public private(set) var blockState: PublicProfileActionState = .idle
+
+    /// Drives the overflow action sheet presentation.
+    public var showOverflow: Bool = false
+
+    /// Transient toast surface used for action feedback.
     public var toastMessage: String?
 
     private let userId: String
@@ -89,19 +108,53 @@ public final class PublicProfileViewModel {
         await fetch()
     }
 
-    /// Tap on Message — surfaces a "not yet" toast until chat lands.
-    public func tapMessage() {
-        toastMessage = "Messaging coming soon"
+    /// Send a connection request. Wraps
+    /// `POST /api/relationships/requests` (relationships.js:67).
+    public func connect() async {
+        guard connectState != .inFlight, connectState != .succeeded else { return }
+        connectState = .inFlight
+        let body = ConnectionRequestBody(addresseeId: userId)
+        do {
+            _ = try await client.request(
+                RelationshipsEndpoints.sendRequest(body: body),
+                as: ConnectionRequestResponse.self
+            )
+            connectState = .succeeded
+            toastMessage = "Connection request sent"
+        } catch let error as APIError {
+            let message = friendlyMessage(for: error)
+            connectState = .failed(message: message)
+            toastMessage = message
+            logger.warning("Connect failed: \(error)")
+        } catch {
+            connectState = .failed(message: "Something went wrong")
+            toastMessage = "Couldn't send the request"
+            logger.warning("Connect failed: \(error)")
+        }
     }
 
-    /// Tap on Connect — surfaces a "not yet" toast.
-    public func tapConnect() {
-        toastMessage = "Connect coming soon"
-    }
-
-    /// Tap on overflow — surfaces a "not yet" toast.
-    public func tapOverflow() {
-        toastMessage = "More actions coming soon"
+    /// Block this user. Wraps `POST /api/users/:userId/block`
+    /// (blocks.js:13).
+    public func block() async {
+        guard blockState != .inFlight else { return }
+        blockState = .inFlight
+        do {
+            _ = try await client.request(
+                BlocksEndpoints.block(userId: userId),
+                as: EmptyResponse.self
+            )
+            blockState = .succeeded
+            toastMessage = "User blocked"
+        } catch let error as APIError {
+            let message = friendlyMessage(for: error)
+            blockState = .failed(message: message)
+            toastMessage = message
+            logger.warning("Block failed: \(error)")
+        } catch {
+            blockState = .failed(message: "Something went wrong")
+            toastMessage = "Couldn't block this user"
+            logger.warning("Block failed: \(error)")
+        }
     }
 
     private func fetch() async {

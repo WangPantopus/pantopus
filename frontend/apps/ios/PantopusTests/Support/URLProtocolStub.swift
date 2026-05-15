@@ -30,18 +30,28 @@ final class URLProtocolStub: URLProtocol {
     }
 
     /// Request URL path → canned response. Matched by suffix.
-    nonisolated(unsafe) static var stubs: [(pathSuffix: String, response: Response)] = []
+    nonisolated(unsafe) static var stubs: [(pathSuffix: String, responses: [Response])] = []
 
     /// Captured requests in the order they were made.
     nonisolated(unsafe) static var capturedRequests: [URLRequest] = []
 
+    private static let lock = NSLock()
+
     static func reset() {
+        lock.lock()
+        defer { lock.unlock() }
         stubs = []
         capturedRequests = []
     }
 
     static func stub(path: String, response: Response) {
-        stubs.append((path, response))
+        stub(path: path, responses: [response])
+    }
+
+    static func stub(path: String, responses: [Response]) {
+        lock.lock()
+        defer { lock.unlock() }
+        stubs.append((path, responses))
     }
 
     // MARK: - URLProtocol
@@ -57,16 +67,7 @@ final class URLProtocolStub: URLProtocol {
     override func stopLoading() {}
 
     override func startLoading() {
-        Self.capturedRequests.append(request)
-
-        let path = request.url?.path ?? ""
-        let match = Self.stubs.first { path.hasSuffix($0.pathSuffix) }
-
-        let resp: Response = if let match {
-            match.response
-        } else {
-            Response(status: 404, body: Data("{\"error\":\"no stub\"}".utf8), headers: [:])
-        }
+        let resp = Self.response(for: request)
 
         guard let url = request.url,
               let httpResponse = HTTPURLResponse(
@@ -80,6 +81,23 @@ final class URLProtocolStub: URLProtocol {
         client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: resp.body)
         client?.urlProtocolDidFinishLoading(self)
+    }
+
+    private static func response(for request: URLRequest) -> Response {
+        lock.lock()
+        defer { lock.unlock() }
+        capturedRequests.append(request)
+
+        let path = request.url?.path ?? ""
+        if let index = stubs.firstIndex(where: { path.hasSuffix($0.pathSuffix) }) {
+            if stubs[index].responses.count > 1 {
+                return stubs[index].responses.removeFirst()
+            }
+            if let response = stubs[index].responses.first {
+                return response
+            }
+        }
+        return Response(status: 404, body: Data("{\"error\":\"no stub\"}".utf8), headers: [:])
     }
 }
 

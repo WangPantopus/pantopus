@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,6 +17,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -25,7 +27,19 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.pantopus.android.BuildConfig
+import app.pantopus.android.core.routing.DeepLinkRouter
 import app.pantopus.android.ui.screens._internal.TokenGalleryScreen
+import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
+import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
+import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
+import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
+import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
+import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
+import app.pantopus.android.ui.screens.feed.FeedScreen
+import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
+import app.pantopus.android.ui.screens.gigs.GigsCategory
+import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
+import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
@@ -37,22 +51,43 @@ import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_E
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
+import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
+import app.pantopus.android.ui.screens.hub.DiscoveryKind
 import app.pantopus.android.ui.screens.hub.HubNavigationIntent
 import app.pantopus.android.ui.screens.hub.HubScreen
+import app.pantopus.android.ui.screens.hub.JumpBackItem
 import app.pantopus.android.ui.screens.hub.PillarTile
+import app.pantopus.android.ui.screens.identity_center.IdentityCenterScreen
+import app.pantopus.android.ui.screens.identity_center.IdentityKind
 import app.pantopus.android.ui.screens.inbox.InboxScreen
+import app.pantopus.android.ui.screens.inbox.chat.ConversationIdentityChip
+import app.pantopus.android.ui.screens.inbox.chat.ConversationRowContent
+import app.pantopus.android.ui.screens.inbox.chat.ConversationRowVariant
+import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationHost
+import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
+import app.pantopus.android.ui.screens.inbox.conversation.ChatThreadMode
 import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
-import app.pantopus.android.ui.screens.nearby.NearbyScreen
+import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
+import app.pantopus.android.ui.screens.nearby.map.MapEntity
+import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
+import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
+import app.pantopus.android.ui.screens.notifications.NotificationsScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
 import app.pantopus.android.ui.screens.profile.PublicProfileScreen
+import app.pantopus.android.ui.screens.settings.NotificationSettingsScreen
+import app.pantopus.android.ui.screens.settings.PrivacySettingsScreen
+import app.pantopus.android.ui.screens.settings.SettingsIndexScreen
+import app.pantopus.android.ui.screens.settings.SettingsRoute
+import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.you.YouScreen
+import app.pantopus.android.ui.theme.PantopusIcon
 
 /** Non-tab routes reachable from within the Hub stack. */
 private object ChildRoutes {
@@ -62,6 +97,7 @@ private object ChildRoutes {
     const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
     const val MAILBOX_LIST = "mailbox/list"
     const val MAILBOX_DRAWERS = "mailbox/drawers"
+    const val MAILBOX_SEARCH = "mailbox/search"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
     const val HOME_DASHBOARD = "homes/{$HOME_DASHBOARD_HOME_ID_KEY}"
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
@@ -69,6 +105,111 @@ private object ChildRoutes {
     const val INVITE_OWNER =
         "homes/{$INVITE_OWNER_HOME_ID_KEY}/invite?email={$INVITE_OWNER_CURRENT_EMAIL_KEY}"
     const val DISAMBIGUATE_MAIL = "mailbox/disambiguate/{$DISAMBIGUATE_MAIL_ID_KEY}"
+
+    /** Notifications center (T4.1). Reached from the Hub bell icon. */
+    const val NOTIFICATIONS = "notifications"
+
+    /** Hub menu icon target. Replaced by Settings in T3.1. */
+    const val MENU = "settings"
+
+    /** Notification preferences (T3.1). */
+    const val SETTINGS_NOTIFICATIONS = "settings/notifications"
+
+    /** Privacy preferences (T3.1). */
+    const val SETTINGS_PRIVACY = "settings/privacy"
+
+    /** Profiles & Privacy / Identity Center (T3.2). */
+    const val IDENTITY_CENTER = "identity-center"
+
+    /** Public Profile management / Creator audience dashboard (T3.3). */
+    const val AUDIENCE_PROFILE = "audience-profile"
+
+    /** Ceremonial Mail Compose wizard (T3.7). */
+    const val CEREMONIAL_MAIL = "mailbox/compose-letter"
+
+    /** Ceremonial Mail Open reader (T3.8). `:id` is the Mail UUID. */
+    const val CEREMONIAL_MAIL_OPEN_ID_KEY = "mailId"
+    const val CEREMONIAL_MAIL_OPEN = "mailbox/letter/{$CEREMONIAL_MAIL_OPEN_ID_KEY}"
+
+    fun ceremonialMailOpen(mailId: String): String = "mailbox/letter/${java.net.URLEncoder.encode(mailId, "UTF-8")}"
+
+    /** Privacy Handshake wizard (T3.4). `:handle` is the persona being followed. */
+    const val PRIVACY_HANDSHAKE_HANDLE_KEY = "personaHandle"
+    const val PRIVACY_HANDSHAKE = "handshake/{$PRIVACY_HANDSHAKE_HANDLE_KEY}"
+
+    fun privacyHandshake(handle: String): String = "handshake/${java.net.URLEncoder.encode(handle, "UTF-8")}"
+
+    /** Token / Accept screen (T3.5). Resolves the token then accepts
+     *  via the matching backend route. Mirrors iOS DeepLinkRouter's
+     *  `.invite(token)` destination. */
+    const val TOKEN_ACCEPT_TOKEN_KEY = "token"
+    const val TOKEN_ACCEPT = "invite/{$TOKEN_ACCEPT_TOKEN_KEY}"
+
+    fun tokenAccept(token: String): String = "invite/${java.net.URLEncoder.encode(token, "UTF-8")}"
+
+    /**
+     * Generic placeholder for intents whose destination hasn't been
+     * built yet. `label` is URL-encoded into the path and rendered by
+     * the placeholder composable.
+     */
+    const val PLACEHOLDER_LABEL_KEY = "label"
+    const val PLACEHOLDER = "_placeholder/generic?$PLACEHOLDER_LABEL_KEY={$PLACEHOLDER_LABEL_KEY}"
+
+    /** Pulse tab (T1.2). Reached from Hub → pillar(.Pulse). */
+    const val PULSE_FEED = "feed/pulse"
+
+    /** Gigs feed (T2.3). Reached from Hub → pillar(.Gigs). */
+    const val GIGS_FEED = "gigs/feed"
+
+    /** Gig detail target — placeholder until T2.6 Transactional Detail. */
+    const val GIG_DETAIL_ID_KEY = "gigId"
+    const val GIG_DETAIL = "gigs/{$GIG_DETAIL_ID_KEY}"
+
+    /** Compose gig target — placeholder until the compose flow ships. */
+    const val COMPOSE_GIG_CATEGORY_KEY = "category"
+    const val COMPOSE_GIG = "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY={$COMPOSE_GIG_CATEGORY_KEY}"
+
+    /** Nearby map opened from the Gigs feed map-toggle — seeded with the
+     *  active category so the same filter applies on the map. */
+    const val NEARBY_MAP_FOR_GIGS_CATEGORY_KEY = "category"
+    const val NEARBY_MAP_FOR_GIGS =
+        "gigs/map?$NEARBY_MAP_FOR_GIGS_CATEGORY_KEY={$NEARBY_MAP_FOR_GIGS_CATEGORY_KEY}"
+
+    /** Marketplace tab (T2.5). Reached from Hub → pillar(.Marketplace). */
+    const val MARKETPLACE = "marketplace"
+
+    /** Listing detail target — placeholder until T2.6. */
+    const val LISTING_DETAIL_ID_KEY = "listingId"
+    const val LISTING_DETAIL = "listings/{$LISTING_DETAIL_ID_KEY}"
+
+    /** Snap & sell — placeholder until the marketplace compose flow ships. */
+    const val COMPOSE_LISTING = "listings/compose"
+
+    /** Invoice detail (T2.6 ContentDetailShell · invoice variant). */
+    const val INVOICE_DETAIL_ID_KEY = "invoiceId"
+    const val INVOICE_DETAIL = "invoices/{$INVOICE_DETAIL_ID_KEY}"
+
+    /** Chat conversation (T2.2). Reached from Inbox → row tap. */
+    const val CHAT_KIND_KEY = "kind"
+    const val CHAT_ID_KEY = "id"
+    const val CHAT_NAME_KEY = "name"
+    const val CHAT_INITIALS_KEY = "initials"
+    const val CHAT_VERIFIED_KEY = "verified"
+    const val CHAT_IDENTITY_KEY = "identity"
+    const val CHAT_LOCALITY_KEY = "locality"
+    const val CHAT_ONLINE_KEY = "online"
+    const val CHAT_CONVERSATION =
+        "chat/{$CHAT_KIND_KEY}/{$CHAT_ID_KEY}?" +
+            "$CHAT_NAME_KEY={$CHAT_NAME_KEY}" +
+            "&$CHAT_INITIALS_KEY={$CHAT_INITIALS_KEY}" +
+            "&$CHAT_VERIFIED_KEY={$CHAT_VERIFIED_KEY}" +
+            "&$CHAT_IDENTITY_KEY={$CHAT_IDENTITY_KEY}" +
+            "&$CHAT_LOCALITY_KEY={$CHAT_LOCALITY_KEY}" +
+            "&$CHAT_ONLINE_KEY={$CHAT_ONLINE_KEY}"
+
+    /** Compose post target — placeholder until the compose flow ships. */
+    const val COMPOSE_INTENT_KEY = "intent"
+    const val COMPOSE_POST = "feed/compose?$COMPOSE_INTENT_KEY={$COMPOSE_INTENT_KEY}"
 
     /** Debug-only route reached via 5-tap easter egg on the Hub. */
     const val TOKEN_GALLERY = "_debug/token-gallery"
@@ -99,6 +240,53 @@ private object ChildRoutes {
 
     /** Build the claim-ownership wizard path. */
     fun claimOwnership(homeId: String): String = "homes/$homeId/claim"
+
+    /** Build the generic placeholder path with an encoded label. */
+    fun placeholder(label: String): String = "_placeholder/generic?$PLACEHOLDER_LABEL_KEY=${java.net.URLEncoder.encode(label, "UTF-8")}"
+
+    /** Build the compose-post path with the pre-fill intent encoded. */
+    fun composePost(intent: String): String = "feed/compose?$COMPOSE_INTENT_KEY=${java.net.URLEncoder.encode(intent, "UTF-8")}"
+
+    /** Build the gig-detail path. */
+    fun gigDetail(gigId: String): String = "gigs/$gigId"
+
+    /** Build the compose-gig path with the active category pre-fill. */
+    fun composeGig(category: String): String = "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
+
+    /** Build the Nearby-map-for-gigs path with the active category seed. */
+    fun nearbyMapForGigs(category: String): String =
+        "gigs/map?$NEARBY_MAP_FOR_GIGS_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
+
+    /** Build the listing-detail path. */
+    fun listingDetail(listingId: String): String = "listings/$listingId"
+
+    /** Build the invoice-detail path. */
+    fun invoiceDetail(invoiceId: String): String = "invoices/$invoiceId"
+
+    /** Build the chat-conversation path with all header context encoded. */
+    fun chatConversation(row: ConversationRowContent): String {
+        val kind =
+            when (row.variant) {
+                ConversationRowVariant.AiAssistant -> "ai"
+                is ConversationRowVariant.Group -> "room"
+                ConversationRowVariant.Dm -> "person"
+            }
+        val identity =
+            when (row.identityChip) {
+                ConversationIdentityChip.Business -> "business"
+                ConversationIdentityChip.Home -> "home"
+                null -> ""
+            }
+
+        fun enc(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
+        return "chat/$kind/${enc(row.id)}?" +
+            "$CHAT_NAME_KEY=${enc(row.displayName)}" +
+            "&$CHAT_INITIALS_KEY=${enc(row.initials)}" +
+            "&$CHAT_VERIFIED_KEY=${row.verified}" +
+            "&$CHAT_IDENTITY_KEY=${enc(identity)}" +
+            "&$CHAT_LOCALITY_KEY=" +
+            "&$CHAT_ONLINE_KEY=false"
+    }
 }
 
 /**
@@ -116,6 +304,79 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
     val currentRoute = PantopusRoute.fromPath(backStackEntry?.destination?.route) ?: PantopusRoute.Hub
     val badges: Map<PantopusRoute, Int> =
         if (inboxBadgeCount > 0) mapOf(PantopusRoute.Inbox to inboxBadgeCount) else emptyMap()
+
+    // Consume pending deep links — when the host activity (or a
+    // notification tap) routed a URL or path through DeepLinkRouter,
+    // dispatch to the matching screen. Mirrors the iOS T4.1 routing
+    // table from `docs/07-frontend-mobile-app.md §9`.
+    val pendingDeepLink by DeepLinkRouter.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingDeepLink) {
+        when (val pending = pendingDeepLink) {
+            null -> Unit
+            is DeepLinkRouter.Destination.Invite -> {
+                navController.navigate(ChildRoutes.tokenAccept(pending.token))
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.Notifications -> {
+                navController.navigate(ChildRoutes.NOTIFICATIONS)
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.Feed -> {
+                navController.navigate(ChildRoutes.PULSE_FEED)
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.Home -> {
+                navController.navigate(PantopusRoute.Hub.path)
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.Connections -> {
+                navController.navigate(ChildRoutes.placeholder("Connections"))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.Post -> {
+                navController.navigate(ChildRoutes.pulsePost(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.Conversation -> {
+                // Drop the user on the Inbox tab — the chat-conversation
+                // route needs counterparty metadata the deep link doesn't
+                // carry. Mirrors iOS, which selects the Inbox tab.
+                navController.navigate(PantopusRoute.Inbox.path)
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.SupportTrain -> {
+                navController.navigate(ChildRoutes.placeholder("Support train · ${pending.id}"))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.Gig -> {
+                navController.navigate(ChildRoutes.gigDetail(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.Listing -> {
+                navController.navigate(ChildRoutes.listingDetail(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.HomeDetail -> {
+                navController.navigate(ChildRoutes.homeDashboard(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.HomeDashboard -> {
+                navController.navigate(ChildRoutes.homeDashboard(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.HomeMemberRequests -> {
+                navController.navigate(ChildRoutes.placeholder("Member requests · ${pending.id}"))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.User -> {
+                navController.navigate(ChildRoutes.publicProfile(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.Unknown -> {
+                DeepLinkRouter.consume()
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -142,31 +403,62 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 HubWithDebugFiveTap(navController = navController) {
                     HubScreen(onIntent = { intent ->
                         when (intent) {
-                            is HubNavigationIntent.PillarTapped ->
-                                when (intent.pillar) {
-                                    PillarTile.Pillar.Mail -> navController.navigate(ChildRoutes.MAILBOX_LIST)
-                                    else -> Unit
-                                }
-                            is HubNavigationIntent.ActionTapped ->
-                                when (intent.kind) {
-                                    ActionChipContent.Kind.AddHome -> navController.navigate(ChildRoutes.ADD_HOME)
-                                    ActionChipContent.Kind.ScanMail -> navController.navigate(ChildRoutes.MAILBOX_DRAWERS)
-                                    else -> Unit
-                                }
+                            HubNavigationIntent.OpenNotifications ->
+                                navController.navigate(ChildRoutes.NOTIFICATIONS)
+                            HubNavigationIntent.OpenMenu ->
+                                navController.navigate(ChildRoutes.MENU)
                             HubNavigationIntent.StartVerification ->
                                 navController.navigate(ChildRoutes.ADD_HOME)
-                            // TODO(routing): re-enable DiscoveryTapped → publicProfile
-                            // once HubViewModel surfaces the discovery item type.
-                            // P17 routed unconditionally, but discovery currently
-                            // fetches `filter=gigs` and the gig UUIDs do not resolve
-                            // as user IDs.
-                            else -> Unit
+                            is HubNavigationIntent.ActionTapped ->
+                                when (intent.kind) {
+                                    ActionChipContent.Kind.AddHome ->
+                                        navController.navigate(ChildRoutes.ADD_HOME)
+                                    ActionChipContent.Kind.ScanMail ->
+                                        navController.navigate(ChildRoutes.MAILBOX_DRAWERS)
+                                    ActionChipContent.Kind.PostTask ->
+                                        navController.navigate(ChildRoutes.placeholder("Post a gig"))
+                                    ActionChipContent.Kind.SnapAndSell ->
+                                        navController.navigate(ChildRoutes.placeholder("Snap & sell"))
+                                }
+                            is HubNavigationIntent.PillarTapped ->
+                                when (intent.pillar) {
+                                    PillarTile.Pillar.Mail ->
+                                        navController.navigate(ChildRoutes.MAILBOX_LIST)
+                                    PillarTile.Pillar.Pulse ->
+                                        navController.navigate(ChildRoutes.PULSE_FEED)
+                                    PillarTile.Pillar.Marketplace ->
+                                        navController.navigate(ChildRoutes.MARKETPLACE)
+                                    PillarTile.Pillar.Gigs ->
+                                        navController.navigate(ChildRoutes.GIGS_FEED)
+                                }
+                            is HubNavigationIntent.DiscoveryTapped ->
+                                routeForDiscovery(intent.item).also { navController.navigate(it) }
+                            is HubNavigationIntent.JumpBackTapped ->
+                                routeForJumpBackIn(intent.item).also { navController.navigate(it) }
                         }
                     })
                 }
             }
-            composable(PantopusRoute.Nearby.path) { NearbyScreen() }
-            composable(PantopusRoute.Inbox.path) { InboxScreen() }
+            composable(PantopusRoute.Nearby.path) {
+                NearbyMapScreen(
+                    onOpenEntity = { entity: MapEntity ->
+                        when (entity.kind) {
+                            MapEntityKind.Gig -> navController.navigate(ChildRoutes.gigDetail(entity.id))
+                            MapEntityKind.Listing -> navController.navigate(ChildRoutes.listingDetail(entity.id))
+                        }
+                    },
+                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Map filters")) },
+                )
+            }
+            composable(PantopusRoute.Inbox.path) {
+                InboxScreen(
+                    onOpenConversation = { row ->
+                        navController.navigate(ChildRoutes.chatConversation(row))
+                    },
+                    onCompose = { navController.navigate(ChildRoutes.placeholder("New message")) },
+                    onOpenSearch = { navController.navigate(ChildRoutes.placeholder("Chat search")) },
+                )
+            }
             composable(PantopusRoute.You.path) {
                 YouScreen(
                     onOpenPublicProfile = { userId ->
@@ -181,6 +473,26 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onDisambiguateMail = { mailId ->
                         navController.navigate(ChildRoutes.disambiguateMail(mailId))
                     },
+                    onOpenPrivacyHandshake = { handle ->
+                        navController.navigate(ChildRoutes.privacyHandshake(handle))
+                    },
+                    onOpenInviteToken = { token ->
+                        navController.navigate(ChildRoutes.tokenAccept(token))
+                    },
+                    onOpenCeremonialMail = {
+                        navController.navigate(ChildRoutes.CEREMONIAL_MAIL)
+                    },
+                    onOpenCeremonialMailOpen = { mailId ->
+                        navController.navigate(ChildRoutes.ceremonialMailOpen(mailId))
+                    },
+                    onOpenMailbox = { navController.navigate(ChildRoutes.MAILBOX_LIST) },
+                    onOpenEditProfile = {
+                        navController.navigate(ChildRoutes.placeholder("Edit profile"))
+                    },
+                    onOpenPlaceholder = { label ->
+                        navController.navigate(ChildRoutes.placeholder(label))
+                    },
+                    onOpenSettings = { navController.navigate(ChildRoutes.MENU) },
                 )
             }
 
@@ -204,6 +516,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.claimOwnership(homeId))
                     },
                     onOpenClaimsList = { navController.navigate(ChildRoutes.MY_CLAIMS) },
+                    onOpenPlaceholder = { label ->
+                        navController.navigate(ChildRoutes.placeholder(label))
+                    },
                 )
             }
             composable(ChildRoutes.MAILBOX_LIST) {
@@ -211,6 +526,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenMail = { mailId ->
                         navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
                     },
+                    onOpenSearch = { navController.navigate(ChildRoutes.MAILBOX_SEARCH) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -229,7 +545,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.PUBLIC_PROFILE,
                 arguments = listOf(navArgument(PUBLIC_PROFILE_USER_ID_KEY) { type = NavType.StringType }),
             ) {
-                PublicProfileScreen(onBack = { navController.popBackStack() })
+                PublicProfileScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                    onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report")) },
+                )
             }
             composable(
                 route = ChildRoutes.PULSE_POST,
@@ -263,9 +583,315 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(ChildRoutes.MAILBOX_DRAWERS) {
                 MailboxDrawersScreen(
-                    onOpenDrawer = { /* drawer detail lands later */ },
+                    onOpenDrawer = { drawer ->
+                        navController.navigate(ChildRoutes.placeholder("Drawer · $drawer"))
+                    },
                     onBack = { navController.popBackStack() },
                 )
+            }
+            composable(
+                route = ChildRoutes.CHAT_CONVERSATION,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.CHAT_KIND_KEY) { type = NavType.StringType },
+                        navArgument(ChildRoutes.CHAT_ID_KEY) { type = NavType.StringType },
+                        navArgument(ChildRoutes.CHAT_NAME_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                        navArgument(ChildRoutes.CHAT_INITIALS_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                        navArgument(ChildRoutes.CHAT_VERIFIED_KEY) {
+                            type = NavType.StringType
+                            defaultValue = "false"
+                        },
+                        navArgument(ChildRoutes.CHAT_IDENTITY_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                        navArgument(ChildRoutes.CHAT_LOCALITY_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                        navArgument(ChildRoutes.CHAT_ONLINE_KEY) {
+                            type = NavType.StringType
+                            defaultValue = "false"
+                        },
+                    ),
+            ) { entry ->
+                val args = entry.arguments ?: return@composable
+                val kind = args.getString(ChildRoutes.CHAT_KIND_KEY).orEmpty()
+                val id = args.getString(ChildRoutes.CHAT_ID_KEY).orEmpty()
+                val name = args.getString(ChildRoutes.CHAT_NAME_KEY).orEmpty()
+                val initials = args.getString(ChildRoutes.CHAT_INITIALS_KEY).orEmpty()
+                val verified = args.getString(ChildRoutes.CHAT_VERIFIED_KEY) == "true"
+                val locality = args.getString(ChildRoutes.CHAT_LOCALITY_KEY).orEmpty().takeIf { it.isNotEmpty() }
+                val online = args.getString(ChildRoutes.CHAT_ONLINE_KEY) == "true"
+                val mode: ChatThreadMode =
+                    when (kind) {
+                        "ai" -> ChatThreadMode.Ai
+                        "room" -> ChatThreadMode.Room(id)
+                        else -> ChatThreadMode.Person(otherUserId = id)
+                    }
+                val counterparty: ChatCounterparty =
+                    when (kind) {
+                        "ai" -> ChatCounterparty.Ai(displayName = name)
+                        "room" -> ChatCounterparty.Group(displayName = name, memberCount = null)
+                        else ->
+                            ChatCounterparty.Person(
+                                displayName = name,
+                                initials = initials,
+                                locality = locality,
+                                verified = verified,
+                                online = online,
+                            )
+                    }
+                ChatConversationHost(
+                    mode = mode,
+                    counterparty = counterparty,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.PULSE_FEED) {
+                FeedScreen(
+                    onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
+                    onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.MARKETPLACE) {
+                MarketplaceScreen(
+                    onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
+                    onCompose = { navController.navigate(ChildRoutes.COMPOSE_LISTING) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.LISTING_DETAIL,
+                arguments = listOf(navArgument(ChildRoutes.LISTING_DETAIL_ID_KEY) { type = NavType.StringType }),
+            ) {
+                ListingDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                )
+            }
+            composable(
+                route = ChildRoutes.INVOICE_DETAIL,
+                arguments = listOf(navArgument(ChildRoutes.INVOICE_DETAIL_ID_KEY) { type = NavType.StringType }),
+            ) {
+                InvoiceDetailScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.COMPOSE_LISTING) {
+                NotYetAvailableView(tabName = "Snap & sell", icon = PantopusIcon.Camera)
+            }
+            composable(ChildRoutes.GIGS_FEED) {
+                GigsFeedScreen(
+                    onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
+                    onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
+                    onOpenMap = { category -> navController.navigate(ChildRoutes.nearbyMapForGigs(category.key)) },
+                    onOpenSearch = { navController.navigate(ChildRoutes.placeholder("Gig search")) },
+                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Gig filters")) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.GIG_DETAIL,
+                arguments = listOf(navArgument(ChildRoutes.GIG_DETAIL_ID_KEY) { type = NavType.StringType }),
+            ) {
+                GigDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                )
+            }
+            composable(
+                route = ChildRoutes.NEARBY_MAP_FOR_GIGS,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.NEARBY_MAP_FOR_GIGS_CATEGORY_KEY) {
+                            type = NavType.StringType
+                            defaultValue = GigsCategory.All.key
+                        },
+                    ),
+            ) { entry ->
+                val raw =
+                    entry.arguments?.getString(ChildRoutes.NEARBY_MAP_FOR_GIGS_CATEGORY_KEY) ?: GigsCategory.All.key
+                NearbyMapScreen(
+                    onOpenEntity = { entity ->
+                        when (entity.kind) {
+                            MapEntityKind.Gig -> navController.navigate(ChildRoutes.gigDetail(entity.id))
+                            MapEntityKind.Listing -> navController.navigate(ChildRoutes.listingDetail(entity.id))
+                        }
+                    },
+                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Map filters")) },
+                    onBack = { navController.popBackStack() },
+                    initialCategory = GigsCategory.fromBackendKey(raw),
+                )
+            }
+            composable(
+                route = ChildRoutes.COMPOSE_GIG,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.COMPOSE_GIG_CATEGORY_KEY) {
+                            type = NavType.StringType
+                            defaultValue = GigsCategory.All.key
+                        },
+                    ),
+            ) { entry ->
+                val raw = entry.arguments?.getString(ChildRoutes.COMPOSE_GIG_CATEGORY_KEY) ?: GigsCategory.All.key
+                val label =
+                    GigsCategory.entries.firstOrNull { it.key == raw }?.label ?: raw.replaceFirstChar { it.uppercase() }
+                NotYetAvailableView(tabName = "Post a task · $label", icon = PantopusIcon.Pencil)
+            }
+            composable(
+                route = ChildRoutes.COMPOSE_POST,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.COMPOSE_INTENT_KEY) {
+                            type = NavType.StringType
+                            defaultValue = PulseIntent.All.key
+                        },
+                    ),
+            ) { entry ->
+                val raw = entry.arguments?.getString(ChildRoutes.COMPOSE_INTENT_KEY) ?: PulseIntent.All.key
+                val intent = PulseIntent.fromKey(raw)
+                NotYetAvailableView(
+                    tabName = "Compose · ${intent.label}",
+                    icon = PantopusIcon.Pencil,
+                )
+            }
+            composable(ChildRoutes.NOTIFICATIONS) {
+                NotificationsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.MENU) {
+                SettingsIndexScreen(
+                    onClose = { navController.popBackStack() },
+                    onNavigate = { route ->
+                        when (route) {
+                            SettingsRoute.Notifications -> navController.navigate(ChildRoutes.SETTINGS_NOTIFICATIONS)
+                            SettingsRoute.Privacy -> navController.navigate(ChildRoutes.SETTINGS_PRIVACY)
+                            SettingsRoute.IdentityCenter -> navController.navigate(ChildRoutes.IDENTITY_CENTER)
+                            SettingsRoute.EditProfile -> navController.navigate(ChildRoutes.placeholder("Edit profile"))
+                            SettingsRoute.Password -> navController.navigate(ChildRoutes.placeholder("Password"))
+                            SettingsRoute.Verification -> navController.navigate(ChildRoutes.placeholder("Verification"))
+                            SettingsRoute.Blocks -> navController.navigate(ChildRoutes.placeholder("Blocked users"))
+                            SettingsRoute.DataExport -> navController.navigate(ChildRoutes.placeholder("Data export"))
+                            SettingsRoute.PaymentsPayouts -> navController.navigate(ChildRoutes.placeholder("Payments & payouts"))
+                            SettingsRoute.Help -> navController.navigate(ChildRoutes.placeholder("Help"))
+                            SettingsRoute.Legal -> navController.navigate(ChildRoutes.placeholder("Legal"))
+                            SettingsRoute.About -> navController.navigate(ChildRoutes.placeholder("About"))
+                            SettingsRoute.DidSignOut -> navController.popBackStack()
+                        }
+                    },
+                )
+            }
+            composable(ChildRoutes.SETTINGS_NOTIFICATIONS) {
+                NotificationSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.SETTINGS_PRIVACY) {
+                PrivacySettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.PRIVACY_HANDSHAKE,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.PRIVACY_HANDSHAKE_HANDLE_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                PrivacyHandshakeScreen(
+                    onDismiss = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.TOKEN_ACCEPT,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.TOKEN_ACCEPT_TOKEN_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                TokenAcceptScreen(
+                    onDismiss = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.CEREMONIAL_MAIL) {
+                CeremonialMailWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenMail = { mailId ->
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.CEREMONIAL_MAIL_OPEN,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.CEREMONIAL_MAIL_OPEN_ID_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                CeremonialMailOpenScreen(
+                    onBack = { navController.popBackStack() },
+                    onWriteBack = {
+                        navController.navigate(ChildRoutes.CEREMONIAL_MAIL)
+                    },
+                )
+            }
+            composable(ChildRoutes.AUDIENCE_PROFILE) {
+                AudienceProfileScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenFollower = { row ->
+                        navController.navigate(ChildRoutes.placeholder("Follower · ${row.displayName}"))
+                    },
+                    onOpenThread = { row ->
+                        navController.navigate(ChildRoutes.placeholder("Thread · ${row.displayName}"))
+                    },
+                    onOpenSetup = {
+                        navController.navigate(ChildRoutes.placeholder("Set up Public Profile"))
+                    },
+                )
+            }
+            composable(ChildRoutes.IDENTITY_CENTER) {
+                IdentityCenterScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenIdentity = { card ->
+                        when (card.kind) {
+                            IdentityKind.PublicProfile ->
+                                navController.navigate(ChildRoutes.AUDIENCE_PROFILE)
+                            IdentityKind.Local ->
+                                navController.navigate(ChildRoutes.placeholder("Local profile"))
+                            IdentityKind.Personal ->
+                                navController.navigate(ChildRoutes.placeholder("Personal"))
+                            IdentityKind.Professional ->
+                                navController.navigate(ChildRoutes.placeholder("Professional"))
+                        }
+                    },
+                    onOpenPlaceholder = { label ->
+                        navController.navigate(ChildRoutes.placeholder(label))
+                    },
+                )
+            }
+            composable(ChildRoutes.MAILBOX_SEARCH) {
+                NotYetAvailableView(tabName = "Mail search", icon = PantopusIcon.Search)
+            }
+            composable(
+                route = ChildRoutes.PLACEHOLDER,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.PLACEHOLDER_LABEL_KEY) {
+                            type = NavType.StringType
+                            defaultValue = "This"
+                        },
+                    ),
+            ) { entry ->
+                val label = entry.arguments?.getString(ChildRoutes.PLACEHOLDER_LABEL_KEY) ?: "This"
+                NotYetAvailableView(tabName = label, icon = PantopusIcon.Info)
             }
             composable(ChildRoutes.ADD_HOME) {
                 AddHomeWizardScreen(
@@ -293,6 +919,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(ChildRoutes.MY_CLAIMS) {
                 MyClaimsListScreen(
                     onStartNewClaim = { navController.navigate(ChildRoutes.ADD_HOME) },
+                    onOpenClaim = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Claim status"))
+                    },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -346,3 +975,41 @@ private fun HubWithDebugFiveTap(
 }
 
 private const val FIVE_TAP_WINDOW_MS: Long = 1_500L
+
+/**
+ * Dispatch a Hub discovery-card tap to the matching detail route. Items
+ * whose detail screen isn't built yet land on the generic placeholder
+ * with a labelled title.
+ */
+private fun routeForDiscovery(item: DiscoveryCardContent): String =
+    when (item.kind) {
+        DiscoveryKind.Post -> ChildRoutes.pulsePost(item.id)
+        DiscoveryKind.Person -> ChildRoutes.publicProfile(item.id)
+        DiscoveryKind.Gig -> ChildRoutes.placeholder("Gig detail")
+        DiscoveryKind.Business -> ChildRoutes.placeholder("Business")
+        DiscoveryKind.Unknown -> ChildRoutes.placeholder(item.title)
+    }
+
+/**
+ * Backend `jumpBackIn` items carry a canonical web route (e.g.
+ * `/app/mailbox?scope=home&homeId=…`, `/app/homes/<id>/dashboard`,
+ * `/app/chat`, `/gigs/new`). Map onto a native destination; fall back
+ * to a labelled placeholder when nothing matches.
+ */
+private fun routeForJumpBackIn(item: JumpBackItem): String {
+    val path = item.route
+    if (path.startsWith("/app/mailbox")) return ChildRoutes.MAILBOX_LIST
+    homeIdFromRoute(path)?.let { return ChildRoutes.homeDashboard(it) }
+    if (path.startsWith("/app/chat")) return ChildRoutes.placeholder("Messages")
+    if (path.startsWith("/gigs/new")) return ChildRoutes.composeGig(GigsCategory.All.key)
+    if (path.startsWith("/gigs")) return ChildRoutes.GIGS_FEED
+    return ChildRoutes.placeholder(item.title)
+}
+
+/** Extracts `<id>` from `/app/homes/<id>/dashboard`. */
+private fun homeIdFromRoute(route: String): String? {
+    val prefix = "/app/homes/"
+    if (!route.startsWith(prefix)) return null
+    val segment = route.removePrefix(prefix).substringBefore('/')
+    return segment.takeIf { it.isNotEmpty() }
+}

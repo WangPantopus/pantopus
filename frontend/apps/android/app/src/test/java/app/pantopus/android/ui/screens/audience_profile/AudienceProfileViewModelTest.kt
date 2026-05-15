@@ -1,0 +1,344 @@
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod")
+
+package app.pantopus.android.ui.screens.audience_profile
+
+import app.pantopus.android.data.api.models.audience.AudienceCountsDto
+import app.pantopus.android.data.api.models.audience.AudienceListResponse
+import app.pantopus.android.data.api.models.audience.BroadcastChannelDto
+import app.pantopus.android.data.api.models.audience.BroadcastMessageDto
+import app.pantopus.android.data.api.models.audience.FanDto
+import app.pantopus.android.data.api.models.audience.FanTierBadgeDto
+import app.pantopus.android.data.api.models.audience.MembershipStatsCountsDto
+import app.pantopus.android.data.api.models.audience.MembershipStatsResponse
+import app.pantopus.android.data.api.models.audience.PersonaMeResponse
+import app.pantopus.android.data.api.models.audience.PersonaPostDto
+import app.pantopus.android.data.api.models.audience.PersonaPostsResponse
+import app.pantopus.android.data.api.models.audience.PersonaSummaryDto
+import app.pantopus.android.data.api.models.audience.PersonaThreadDto
+import app.pantopus.android.data.api.models.audience.PersonaThreadsResponse
+import app.pantopus.android.data.api.models.audience.PersonaTierDto
+import app.pantopus.android.data.api.models.audience.PersonaTiersResponse
+import app.pantopus.android.data.api.models.audience.PublishUpdateBody
+import app.pantopus.android.data.api.models.audience.PublishUpdateResponse
+import app.pantopus.android.data.api.net.NetworkError
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.audience.AudienceProfileRepository
+import io.mockk.coEvery
+import io.mockk.mockk
+import io.mockk.slot
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+/**
+ * Mirrors [AudienceProfileViewModelTests] (iOS): load → loaded /
+ * empty / error, composer canSubmit gating, optimistic clear on
+ * post success, error on post failure, tier filter narrows the
+ * follower list, and the projection hits all branches (Live tier
+ * label, persona-count fallback, etc.).
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+class AudienceProfileViewModelTest {
+    private val repository: AudienceProfileRepository = mockk()
+
+    @Before fun setUp() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+    }
+
+    @After fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    private fun fullPersona(): PersonaSummaryDto =
+        PersonaSummaryDto(
+            id = "p_demo",
+            handle = "mayabuilds",
+            displayName = "Maya Builds",
+            audienceLabel = "followers",
+            followerCount = 42,
+            postCount = 7,
+        )
+
+    private fun stubLoaded() {
+        coEvery { repository.me() } returns
+            NetworkResult.Success(
+                PersonaMeResponse(
+                    persona = fullPersona(),
+                    channel = BroadcastChannelDto(id = "ch_demo", title = "Maya Broadcast", status = "active"),
+                ),
+            )
+        coEvery { repository.audience() } returns
+            NetworkResult.Success(
+                AudienceListResponse(
+                    persona = null,
+                    items =
+                        listOf(
+                            FanDto(
+                                membershipId = "m1",
+                                fanHandle = "alex",
+                                fanDisplayName = "Alex",
+                                status = "active",
+                                tier = FanTierBadgeDto(rank = 1, name = "Followers"),
+                                verifiedLocal = true,
+                                tenureMonths = 3,
+                            ),
+                            FanDto(
+                                membershipId = "m2",
+                                fanHandle = "billie",
+                                fanDisplayName = "Billie B.",
+                                status = "active",
+                                tier = FanTierBadgeDto(rank = 2, name = "Members"),
+                                tenureMonths = 12,
+                            ),
+                        ),
+                    counts =
+                        AudienceCountsDto(
+                            totalActive = 12,
+                            pending = 3,
+                            byTier = mapOf("1" to 8, "2" to 3, "3" to 1, "4" to 0),
+                        ),
+                ),
+            )
+        coEvery { repository.posts(any()) } returns
+            NetworkResult.Success(
+                PersonaPostsResponse(
+                    posts =
+                        listOf(
+                            PersonaPostDto(
+                                id = "u1",
+                                body = "New mural going up next week.",
+                                createdAt = "2026-05-14T18:00:00Z",
+                                visibility = "followers",
+                                deliveredCount = 40,
+                                readCount = 31,
+                            ),
+                            PersonaPostDto(
+                                id = "u2",
+                                body = "Workshop seats open.",
+                                createdAt = "2026-05-13T09:00:00Z",
+                                visibility = "tier_or_above",
+                                targetTierRank = 2,
+                                deliveredCount = 3,
+                                readCount = 2,
+                            ),
+                        ),
+                ),
+            )
+        coEvery { repository.tiers(any()) } returns
+            NetworkResult.Success(
+                PersonaTiersResponse(
+                    tiers =
+                        listOf(
+                            PersonaTierDto(id = "t1", rank = 1, name = "Followers", priceCents = 0, currency = "usd"),
+                            PersonaTierDto(id = "t2", rank = 2, name = "Members", priceCents = 500, currency = "usd"),
+                            PersonaTierDto(id = "t3", rank = 3, name = "Insiders", priceCents = 2500, currency = "usd"),
+                        ),
+                ),
+            )
+        coEvery { repository.membershipStats(any()) } returns
+            NetworkResult.Success(
+                MembershipStatsResponse(
+                    counts = MembershipStatsCountsDto(followers = 8, members = 3, insiders = 1, direct = 0),
+                ),
+            )
+        coEvery { repository.threads(any()) } returns
+            NetworkResult.Success(
+                PersonaThreadsResponse(
+                    threads =
+                        listOf(
+                            PersonaThreadDto(
+                                id = "th1",
+                                membershipId = "m1",
+                                fanHandle = "alex",
+                                fanDisplayName = "Alex",
+                                tier = FanTierBadgeDto(rank = 2, name = "Members"),
+                                lastMessagePreview = "Loved the workshop",
+                                lastMessageAt = "2026-05-15T10:00:00Z",
+                                unreadCount = 2,
+                            ),
+                        ),
+                ),
+            )
+    }
+
+    @Test fun load_projects_header_updates_followers_threads() =
+        runTest {
+            stubLoaded()
+            val vm = AudienceProfileViewModel(repository)
+            vm.load()
+            val loaded = vm.state.value as AudienceProfileUiState.Loaded
+            assertEquals("Maya Builds", loaded.content.header.displayName)
+            assertEquals("@mayabuilds", loaded.content.header.handle)
+            assertEquals(12, loaded.content.header.followerCount)
+            assertEquals(3, loaded.content.header.newThisWeek)
+            assertEquals(2, loaded.content.updates.size)
+            assertEquals(UpdateVisibility.Followers, loaded.content.updates[0].visibility)
+            assertEquals(UpdateVisibility.TierOrAbove, loaded.content.updates[1].visibility)
+            assertEquals(2, loaded.content.updates[1].targetTierRank)
+            assertEquals(2, loaded.content.followers.size)
+            assertEquals(1, loaded.content.threads.size)
+            assertEquals(2, loaded.content.threads[0].unreadCount)
+            assertEquals("ch_demo", loaded.content.channelId)
+        }
+
+    @Test fun load_projects_analytics_cells_and_stacked_bar() =
+        runTest {
+            stubLoaded()
+            val vm = AudienceProfileViewModel(repository)
+            vm.load()
+            val loaded = vm.state.value as AudienceProfileUiState.Loaded
+            assertEquals(4, loaded.content.analyticsCells.size)
+            assertEquals("8", loaded.content.analyticsCells.first { it.id == "followers" }.value)
+            assertEquals("0", loaded.content.analyticsCells.first { it.id == "direct" }.value)
+            assertEquals(12, loaded.content.tierBreakdown.total)
+            assertEquals(3, loaded.content.tierBreakdown.segments.size)
+            assertEquals(8, loaded.content.tierBreakdown.segments[0].count)
+            assertEquals(4, loaded.content.tierChips.size)
+            assertEquals("all", loaded.content.tierChips.first().id)
+            assertEquals(12, loaded.content.tierChips.first().count)
+        }
+
+    @Test fun empty_persona_transitions_to_empty() =
+        runTest {
+            coEvery { repository.me() } returns
+                NetworkResult.Success(PersonaMeResponse(persona = null, channel = null))
+            val vm = AudienceProfileViewModel(repository)
+            vm.load()
+            assertTrue(vm.state.value is AudienceProfileUiState.Empty)
+        }
+
+    @Test fun load_failure_transitions_error() =
+        runTest {
+            coEvery { repository.me() } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = AudienceProfileViewModel(repository)
+            vm.load()
+            assertTrue(vm.state.value is AudienceProfileUiState.Error)
+        }
+
+    @Test fun submitUpdate_requires_non_empty_body() =
+        runTest {
+            stubLoaded()
+            val vm = AudienceProfileViewModel(repository)
+            vm.load()
+            vm.onComposerText("   ")
+            assertTrue(!vm.composer.value.canSubmit)
+            vm.submitUpdate()
+            assertEquals("   ", vm.composer.value.text)
+        }
+
+    @Test fun submitUpdate_tier_or_above_requires_rank() =
+        runTest {
+            stubLoaded()
+            val vm = AudienceProfileViewModel(repository)
+            vm.load()
+            vm.onComposerText("Hello tier 2")
+            vm.onComposerVisibility(UpdateVisibility.TierOrAbove)
+            assertTrue(!vm.composer.value.canSubmit)
+            vm.onComposerTier(2)
+            assertTrue(vm.composer.value.canSubmit)
+        }
+
+    @Test fun submitUpdate_success_clears_composer_and_reloads() =
+        runTest {
+            stubLoaded()
+            val captured = slot<PublishUpdateBody>()
+            coEvery { repository.publishUpdate(any(), capture(captured)) } returns
+                NetworkResult.Success(
+                    PublishUpdateResponse(
+                        message = BroadcastMessageDto(id = "new1", body = "Hello", visibility = "followers"),
+                    ),
+                )
+            val vm = AudienceProfileViewModel(repository)
+            vm.load()
+            vm.onComposerText("Hello")
+            vm.onComposerVisibility(UpdateVisibility.Followers)
+            vm.submitUpdate()
+            assertEquals("", vm.composer.value.text)
+            assertNull(vm.composer.value.error)
+            assertEquals(false, vm.composer.value.isSubmitting)
+            assertEquals("Hello", captured.captured.body)
+            assertEquals("followers", captured.captured.visibility)
+            assertNull(captured.captured.targetTierRank)
+            assertTrue(vm.state.value is AudienceProfileUiState.Loaded)
+        }
+
+    @Test fun submitUpdate_failure_populates_error_and_keeps_text() =
+        runTest {
+            stubLoaded()
+            coEvery { repository.publishUpdate(any(), any()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = AudienceProfileViewModel(repository)
+            vm.load()
+            vm.onComposerText("Hello")
+            vm.submitUpdate()
+            assertNotNull(vm.composer.value.error)
+            assertEquals(false, vm.composer.value.isSubmitting)
+            assertEquals("Hello", vm.composer.value.text)
+        }
+
+    @Test fun submitUpdate_tier_or_above_sends_target_rank() =
+        runTest {
+            stubLoaded()
+            val captured = slot<PublishUpdateBody>()
+            coEvery { repository.publishUpdate(any(), capture(captured)) } returns
+                NetworkResult.Success(PublishUpdateResponse(message = null))
+            val vm = AudienceProfileViewModel(repository)
+            vm.load()
+            vm.onComposerText("Members only")
+            vm.onComposerVisibility(UpdateVisibility.TierOrAbove)
+            vm.onComposerTier(2)
+            vm.submitUpdate()
+            assertEquals("tier_or_above", captured.captured.visibility)
+            assertEquals(2, captured.captured.targetTierRank)
+        }
+
+    @Test fun tier_filter_reduces_visible_followers() =
+        runTest {
+            stubLoaded()
+            val vm = AudienceProfileViewModel(repository)
+            vm.load()
+            assertEquals(2, vm.visibleFollowers().size)
+            vm.selectTierFilter(2)
+            assertEquals(1, vm.visibleFollowers().size)
+            assertEquals(2, vm.visibleFollowers().first().tierRank)
+            vm.selectTierFilter(null)
+            assertEquals(2, vm.visibleFollowers().size)
+        }
+
+    @Test fun active_tab_defaults_to_updates() =
+        runTest {
+            val vm = AudienceProfileViewModel(repository)
+            assertEquals(AudienceProfileTab.Updates, vm.activeTab.value)
+            vm.selectTab(AudienceProfileTab.Followers)
+            assertEquals(AudienceProfileTab.Followers, vm.activeTab.value)
+        }
+
+    @Test fun update_card_visibility_label_for_tier_includes_rank() =
+        runTest {
+            stubLoaded()
+            val vm = AudienceProfileViewModel(repository)
+            vm.load()
+            val loaded = vm.state.value as AudienceProfileUiState.Loaded
+            assertEquals("Followers", loaded.content.updates.first { it.id == "u1" }.visibilityLabel)
+            assertEquals("Tier 2+", loaded.content.updates.first { it.id == "u2" }.visibilityLabel)
+        }
+
+    @Test fun tier_chip_for_rank_1_surfaces_correct_count() =
+        runTest {
+            stubLoaded()
+            val vm = AudienceProfileViewModel(repository)
+            vm.load()
+            val loaded = vm.state.value as AudienceProfileUiState.Loaded
+            assertEquals(8, loaded.content.tierChips.first { it.id == "tier_1" }.count)
+        }
+}

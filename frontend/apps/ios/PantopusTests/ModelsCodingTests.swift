@@ -29,9 +29,10 @@ final class ModelsCodingTests: XCTestCase {
         let data = Data(Fixtures.feedJSON.utf8)
         let feed = try decoder.decode(FeedResponse.self, from: data)
         XCTAssertEqual(feed.posts.count, 1)
-        XCTAssertEqual(feed.posts.first?.authorName, "Alice")
+        XCTAssertEqual(feed.posts.first?.creator?.displayName, "Alice Doe")
+        XCTAssertEqual(feed.posts.first?.postType, "ask_local")
         XCTAssertEqual(feed.posts.first?.likeCount, 3)
-        XCTAssertNil(feed.nextCursor)
+        XCTAssertEqual(feed.pagination?.hasMore, false)
     }
 
     func testLoginResponseWithoutRefreshToken() throws {

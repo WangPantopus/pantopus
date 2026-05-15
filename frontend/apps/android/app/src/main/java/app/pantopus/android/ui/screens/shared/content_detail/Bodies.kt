@@ -193,8 +193,8 @@ private fun StubBody(
     ) {
         EmptyState(
             icon = icon,
-            headline = "$label coming soon",
-            subcopy = "We're designing this section next.",
+            headline = "$label isn't here yet",
+            subcopy = "This section ships in a later tier.",
         )
     }
 }

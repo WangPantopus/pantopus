@@ -73,7 +73,13 @@ struct MailboxItemDetailView: View {
             timeline: content.timeline,
             cta: ctaContent(for: content),
             onBack: onBack,
-            onAIChip: { _ in },
+            onAIChip: { kind in
+                // AI suggestion chips are shortcuts for the bottom CTAs.
+                switch kind {
+                case .primary: Task { await viewModel.performPrimaryAction() }
+                case .secondary: handleGhost(for: content)
+                }
+            },
             onPrimary: { Task { await viewModel.performPrimaryAction() } },
             onGhost: { handleGhost(for: content) },
             onSenderAvatarTap: onOpenSenderProfile

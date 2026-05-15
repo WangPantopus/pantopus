@@ -5,9 +5,12 @@ package app.pantopus.android.ui.screens.profile
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.models.profile.PublicProfileReview
+import app.pantopus.android.data.api.models.relationships.ConnectionRequestResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.blocks.BlocksRepository
 import app.pantopus.android.data.profile.ProfileRepository
+import app.pantopus.android.data.relationships.RelationshipsRepository
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileTab
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -28,6 +31,8 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class PublicProfileViewModelTest {
     private val repo: ProfileRepository = mockk()
+    private val relationships: RelationshipsRepository = mockk()
+    private val blocks: BlocksRepository = mockk()
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -40,6 +45,8 @@ class PublicProfileViewModelTest {
     private fun makeVm(): PublicProfileViewModel =
         PublicProfileViewModel(
             repo = repo,
+            relationships = relationships,
+            blocks = blocks,
             savedStateHandle = SavedStateHandle(mapOf(PUBLIC_PROFILE_USER_ID_KEY to "u1")),
         )
 
@@ -115,14 +122,48 @@ class PublicProfileViewModelTest {
             assertTrue(errorState.message.contains("profile"))
         }
 
-    @Test fun placeholder_actions_show_toasts() =
+    @Test fun connect_sends_request_and_marks_succeeded() =
+        runTest {
+            coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile())
+            coEvery { relationships.sendRequest("u1", null) } returns
+                NetworkResult.Success(ConnectionRequestResponse(message = "ok"))
+            val vm = makeVm()
+            vm.load()
+            vm.connect()
+            assertEquals(PublicProfileActionState.Succeeded, vm.connectState.value)
+            assertEquals("Connection request sent", vm.toastMessage.value)
+        }
+
+    @Test fun connect_failure_surfaces_toast() =
+        runTest {
+            coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile())
+            coEvery { relationships.sendRequest("u1", null) } returns
+                NetworkResult.Failure(NetworkError.Forbidden)
+            val vm = makeVm()
+            vm.load()
+            vm.connect()
+            assertTrue(vm.connectState.value is PublicProfileActionState.Failed)
+            assertTrue(!vm.toastMessage.value.isNullOrEmpty())
+        }
+
+    @Test fun block_succeeds_and_emits_toast() =
+        runTest {
+            coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile())
+            coEvery { blocks.block("u1") } returns NetworkResult.Success(Unit)
+            val vm = makeVm()
+            vm.load()
+            vm.block()
+            assertEquals(PublicProfileActionState.Succeeded, vm.blockState.value)
+            assertEquals("User blocked", vm.toastMessage.value)
+        }
+
+    @Test fun overflow_flag_toggles() =
         runTest {
             coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile())
             val vm = makeVm()
             vm.load()
-            vm.tapMessage()
-            assertEquals("Messaging coming soon", vm.toastMessage.value)
-            vm.tapConnect()
-            assertEquals("Connect coming soon", vm.toastMessage.value)
+            assertFalse(vm.showOverflow.value)
+            vm.setShowOverflow(true)
+            assertTrue(vm.showOverflow.value)
         }
 }

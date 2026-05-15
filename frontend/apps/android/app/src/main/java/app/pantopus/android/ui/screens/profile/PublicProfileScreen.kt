@@ -3,14 +3,19 @@
 package app.pantopus.android.ui.screens.profile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,15 +42,24 @@ import kotlinx.coroutines.delay
 /**
  * Public profile detail screen. ViewModel reads the user id via the
  * nav-backstack [androidx.lifecycle.SavedStateHandle].
+ *
+ * `onOpenMessages` and `onOpenReport` are nav-host callbacks; their
+ * destinations currently land on `NotYetAvailableView` placeholders
+ * until the Chat and Report flows ship.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublicProfileScreen(
     onBack: () -> Unit,
+    onOpenMessages: () -> Unit = {},
+    onOpenReport: () -> Unit = {},
     viewModel: PublicProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
+    val showOverflow by viewModel.showOverflow.collectAsStateWithLifecycle()
+    val sheetState = rememberModalBottomSheetState()
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -81,9 +95,9 @@ fun PublicProfileScreen(
                             content = content.stats,
                             selectedTab = selectedTab,
                             onSelectTab = { viewModel.selectTab(it) },
-                            onMessage = { viewModel.tapMessage() },
-                            onConnect = { viewModel.tapConnect() },
-                            onOverflow = { viewModel.tapOverflow() },
+                            onMessage = onOpenMessages,
+                            onConnect = { viewModel.connect() },
+                            onOverflow = { viewModel.setShowOverflow(true) },
                         )
                     },
                 )
@@ -102,6 +116,63 @@ fun PublicProfileScreen(
                 Text(message, style = PantopusTextStyle.small, color = PantopusColors.appTextInverse)
             }
         }
+        if (showOverflow) {
+            ModalBottomSheet(
+                onDismissRequest = { viewModel.setShowOverflow(false) },
+                sheetState = sheetState,
+            ) {
+                OverflowSheetContent(
+                    onBlock = {
+                        viewModel.setShowOverflow(false)
+                        viewModel.block()
+                    },
+                    onReport = {
+                        viewModel.setShowOverflow(false)
+                        onOpenReport()
+                    },
+                    onCancel = { viewModel.setShowOverflow(false) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverflowSheetContent(
+    onBlock: () -> Unit,
+    onReport: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.s5),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        OverflowSheetRow(label = "Block this user", destructive = true, onClick = onBlock)
+        OverflowSheetRow(label = "Report", onClick = onReport)
+        OverflowSheetRow(label = "Cancel", onClick = onCancel)
+    }
+}
+
+@Composable
+private fun OverflowSheetRow(
+    label: String,
+    destructive: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .clickable(onClick = onClick)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = label,
+            style = PantopusTextStyle.body,
+            color = if (destructive) PantopusColors.error else PantopusColors.appText,
+        )
     }
 }
 

@@ -50,6 +50,8 @@ public final class RootTabModel {
 /// NavigationStack so deep navigation within a tab survives tab switches.
 public struct RootTabView: View {
     @State private var model = RootTabModel()
+    @State private var router = DeepLinkRouter.shared
+    @State private var pendingInviteToken: String?
 
     public init() {}
 
@@ -74,6 +76,57 @@ public struct RootTabView: View {
         }
         .tint(Theme.Color.primary600)
         .environment(model)
+        .onChange(of: router.pending) { _, pending in
+            consumeInviteDeepLinkIfNeeded(pending: pending)
+        }
+        .task {
+            consumeInviteDeepLinkIfNeeded(pending: router.pending)
+        }
+        .fullScreenCover(
+            item: Binding<InviteSheetToken?>(
+                get: { pendingInviteToken.map(InviteSheetToken.init(token:)) },
+                set: { pendingInviteToken = $0?.token }
+            )
+        ) { item in
+            TokenAcceptView(
+                viewModel: TokenAcceptViewModel(
+                    token: item.token,
+                    onAccepted: { _ in pendingInviteToken = nil },
+                    onDeclined: { pendingInviteToken = nil }
+                )
+            )
+        }
+    }
+
+    private func consumeInviteDeepLinkIfNeeded(pending: DeepLinkRouter.Destination?) {
+        guard let pending else { return }
+        // Tab-level destinations: switch tabs (the per-tab route stack
+        // handles deeper drill-downs when those tabs route the
+        // pending entry into their own NavigationStack — for the T4.1
+        // pass we just land the user on the matching tab and let the
+        // user finish the drill).
+        switch pending {
+        case let .invite(token):
+            pendingInviteToken = token
+            _ = router.consume()
+        case .feed, .post, .supportTrain, .user, .connections:
+            model.selected = .hub
+            _ = router.consume()
+        case .gig, .listing, .homeDetail, .homeDashboard, .homeMemberRequests:
+            model.selected = .hub
+            _ = router.consume()
+        case .conversation:
+            model.selected = .inbox
+            _ = router.consume()
+        case .notifications:
+            model.selected = .hub
+            _ = router.consume()
+        case .home:
+            model.selected = .hub
+            _ = router.consume()
+        case .unknown:
+            _ = router.consume()
+        }
     }
 
     private var tabBinding: Binding<RootTab> {
@@ -92,6 +145,15 @@ public struct RootTabView: View {
         }
         .accessibilityLabel(tab.label)
         .accessibilityIdentifier("tab.\(tab)")
+    }
+}
+
+/// `Identifiable` wrapper so `fullScreenCover(item:)` can fire when
+/// the token string is non-nil.
+private struct InviteSheetToken: Identifiable, Equatable {
+    let token: String
+    var id: String {
+        token
     }
 }
 

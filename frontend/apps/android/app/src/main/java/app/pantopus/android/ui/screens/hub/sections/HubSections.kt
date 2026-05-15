@@ -412,7 +412,7 @@ private fun PillarTileView(
 @Composable
 fun HubDiscoveryRail(
     items: List<DiscoveryCardContent>,
-    onTap: (String) -> Unit,
+    onTap: (DiscoveryCardContent) -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -434,7 +434,7 @@ fun HubDiscoveryRail(
                             .pantopusShadow(PantopusElevations.sm, RoundedCornerShape(Radii.lg))
                             .clip(RoundedCornerShape(Radii.lg))
                             .background(PantopusColors.appSurface)
-                            .clickable { onTap(item.id) }
+                            .clickable { onTap(item) }
                             .padding(Spacing.s3)
                             .semantics { contentDescription = "${item.title}, ${item.meta}" },
                     verticalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -463,7 +463,7 @@ fun HubDiscoveryRail(
 @Composable
 fun HubJumpBackIn(
     items: List<JumpBackItem>,
-    onTap: (String) -> Unit,
+    onTap: (JumpBackItem) -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -483,7 +483,7 @@ fun HubJumpBackIn(
                             .pantopusShadow(PantopusElevations.sm, RoundedCornerShape(Radii.lg))
                             .clip(RoundedCornerShape(Radii.lg))
                             .background(PantopusColors.appSurface)
-                            .clickable { onTap(item.id) }
+                            .clickable { onTap(item) }
                             .padding(Spacing.s3)
                             .semantics { contentDescription = item.title },
                     verticalArrangement = Arrangement.spacedBy(Spacing.s2),

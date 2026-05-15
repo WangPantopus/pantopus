@@ -110,15 +110,14 @@ class PulsePostDetailViewModel
         }
 
         /**
-         * Tap one of the reaction pills. Helpful → backend toggle; Heart
-         * and Going → "coming soon" toast.
+         * Tap one of the reaction pills. Only `.Helpful` is wired to a
+         * backend route today; the `ReactionsBar` view renders the
+         * other kinds as display-only so this method only ever sees
+         * `.Helpful`, but we keep the guard as a safety net.
          */
         fun tapReaction(kind: PostReactionKind) {
             val loaded = _state.value as? PulsePostDetailUiState.Loaded ?: return
-            if (!kind.isBackendWired) {
-                _toastMessage.value = "${kind.accessibilityLabel} reactions coming soon"
-                return
-            }
+            if (!kind.isBackendWired) return
             val initialReactions = loaded.content.reactions
             val wasOn = initialReactions.userReaction == PostReactionKind.Helpful
             val optimistic =

@@ -257,12 +257,15 @@ private fun ReactionsBar(
             onTap = { onTap(app.pantopus.android.data.api.models.posts.PostReactionKind.Helpful) },
             accessibilityLabel = "Helpful, ${counts.helpful}",
         )
+        // Heart and Going are display-only until the backend supports
+        // reactions beyond `like`. They show the count but don't accept
+        // taps or announce as buttons.
         ReactionPill(
             label = "Heart",
             icon = PantopusIcon.Heart,
             count = counts.heart,
             isSelected = counts.userReaction == app.pantopus.android.data.api.models.posts.PostReactionKind.Heart,
-            onTap = { onTap(app.pantopus.android.data.api.models.posts.PostReactionKind.Heart) },
+            onTap = null,
             accessibilityLabel = "Loved, ${counts.heart}",
         )
         ReactionPill(
@@ -270,7 +273,7 @@ private fun ReactionsBar(
             icon = PantopusIcon.Check,
             count = counts.going,
             isSelected = counts.userReaction == app.pantopus.android.data.api.models.posts.PostReactionKind.Going,
-            onTap = { onTap(app.pantopus.android.data.api.models.posts.PostReactionKind.Going) },
+            onTap = null,
             accessibilityLabel = "Going, ${counts.going}",
         )
     }
@@ -282,18 +285,26 @@ private fun ReactionPill(
     icon: PantopusIcon,
     count: Int,
     isSelected: Boolean,
-    onTap: () -> Unit,
+    /** `null` renders the pill as display-only (no click handler). */
+    onTap: (() -> Unit)?,
     accessibilityLabel: String,
 ) {
     val background = if (isSelected) PantopusColors.primary600 else PantopusColors.appSurfaceSunken
     val foreground = if (isSelected) PantopusColors.appTextInverse else PantopusColors.appText
+    val baseModifier =
+        Modifier
+            .clip(RoundedCornerShape(Radii.pill))
+            .background(background)
+            .sizeIn(minHeight = 44.dp)
+    val withClick =
+        if (onTap != null) {
+            baseModifier.clickable(onClick = onTap)
+        } else {
+            baseModifier
+        }
     Box(
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(background)
-                .sizeIn(minHeight = 44.dp)
-                .clickable(onClick = onTap)
+            withClick
                 .padding(horizontal = Spacing.s3, vertical = 6.dp)
                 .semantics { contentDescription = accessibilityLabel },
         contentAlignment = Alignment.Center,

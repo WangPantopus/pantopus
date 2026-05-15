@@ -25,7 +25,7 @@ struct PantopusApp: App {
                 .environment(apiClient)
                 .environment(socketClient)
                 .task {
-                    if !ProcessInfo.processInfo.isUITestSignedInSession {
+                    if !ProcessInfo.processInfo.isUITestSeededAuthSession {
                         await authManager.restoreSession()
                     }
                 }
@@ -39,6 +39,9 @@ struct PantopusApp: App {
         if ProcessInfo.processInfo.isUITestSignedInSession {
             return AuthManager.previewSignedIn
         }
+        if ProcessInfo.processInfo.isUITestSignedOutSession {
+            return AuthManager.previewSignedOut
+        }
         return AuthManager.shared
     }
 }
@@ -48,6 +51,14 @@ private extension ProcessInfo {
     /// seeded signed-in session.
     var isUITestSignedInSession: Bool {
         environment["UI_TESTS_SIGNED_IN"] == "1"
+    }
+
+    var isUITestSignedOutSession: Bool {
+        environment["UI_TESTS_SIGNED_OUT"] == "1"
+    }
+
+    var isUITestSeededAuthSession: Bool {
+        isUITestSignedInSession || isUITestSignedOutSession
     }
 }
 
