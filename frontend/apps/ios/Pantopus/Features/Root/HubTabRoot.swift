@@ -31,6 +31,12 @@ public enum HubRoute: Hashable {
     case gigDetail(gigId: String)
     /// Compose gig target — placeholder until the compose flow ships.
     case composeGig(category: String)
+    /// Marketplace tab (T2.5). Reached from Hub → pillar(.marketplace).
+    case marketplace
+    /// Listing detail target — placeholder until Transactional Detail (T2.6).
+    case listingDetail(listingId: String)
+    /// Snap & sell — placeholder until the marketplace compose flow ships.
+    case composeListing
     /// Bell icon target. Replaced by the real notifications screen in T4.1.
     case notifications
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
@@ -85,7 +91,7 @@ public struct HubTabRoot: View {
             case .pillar(.mail): path.append(.mailbox)
             case .pillar(.pulse): path.append(.pulseFeed)
             case .pillar(.gigs): path.append(.gigsFeed)
-            case .pillar(.marketplace): path.append(.placeholder(label: "Marketplace"))
+            case .pillar(.marketplace): path.append(.marketplace)
             case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
             case let .jumpBackIn(item): path.append(Self.route(forJumpBackIn: item))
             }
@@ -273,6 +279,18 @@ public struct HubTabRoot: View {
             NotYetAvailableView(tabName: "Gig · \(gigId)", icon: .briefcase)
         case let .composeGig(category):
             NotYetAvailableView(tabName: "Post a task · \(category.capitalized)", icon: .pencil)
+        case .marketplace:
+            MarketplaceView(
+                onOpenListing: { listingId in
+                    Task { @MainActor in push(.listingDetail(listingId: listingId)) }
+                },
+                onCompose: { Task { @MainActor in push(.composeListing) } },
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
+        case let .listingDetail(listingId):
+            NotYetAvailableView(tabName: "Listing · \(listingId)", icon: .shoppingBag)
+        case .composeListing:
+            NotYetAvailableView(tabName: "Snap & sell", icon: .camera)
         case .notifications:
             NotYetAvailableView(tabName: "Notifications", icon: .bell)
         case .menu:

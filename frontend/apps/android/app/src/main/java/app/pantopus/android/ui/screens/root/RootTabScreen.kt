@@ -40,6 +40,7 @@ import app.pantopus.android.ui.screens.feed.FeedScreen
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
+import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
@@ -115,6 +116,16 @@ private object ChildRoutes {
     const val COMPOSE_GIG_CATEGORY_KEY = "category"
     const val COMPOSE_GIG = "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY={$COMPOSE_GIG_CATEGORY_KEY}"
 
+    /** Marketplace tab (T2.5). Reached from Hub → pillar(.Marketplace). */
+    const val MARKETPLACE = "marketplace"
+
+    /** Listing detail target — placeholder until T2.6. */
+    const val LISTING_DETAIL_ID_KEY = "listingId"
+    const val LISTING_DETAIL = "listings/{$LISTING_DETAIL_ID_KEY}"
+
+    /** Snap & sell — placeholder until the marketplace compose flow ships. */
+    const val COMPOSE_LISTING = "listings/compose"
+
     /** Chat conversation (T2.2). Reached from Inbox → row tap. */
     const val CHAT_KIND_KEY = "kind"
     const val CHAT_ID_KEY = "id"
@@ -181,6 +192,9 @@ private object ChildRoutes {
     /** Build the compose-gig path with the active category pre-fill. */
     fun composeGig(category: String): String =
         "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
+
+    /** Build the listing-detail path. */
+    fun listingDetail(listingId: String): String = "listings/$listingId"
 
     /** Build the chat-conversation path with all header context encoded. */
     fun chatConversation(row: ConversationRowContent): String {
@@ -272,7 +286,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     PillarTile.Pillar.Pulse ->
                                         navController.navigate(ChildRoutes.PULSE_FEED)
                                     PillarTile.Pillar.Marketplace ->
-                                        navController.navigate(ChildRoutes.placeholder("Marketplace"))
+                                        navController.navigate(ChildRoutes.MARKETPLACE)
                                     PillarTile.Pillar.Gigs ->
                                         navController.navigate(ChildRoutes.GIGS_FEED)
                                 }
@@ -492,6 +506,23 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
                     onBack = { navController.popBackStack() },
                 )
+            }
+            composable(ChildRoutes.MARKETPLACE) {
+                MarketplaceScreen(
+                    onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
+                    onCompose = { navController.navigate(ChildRoutes.COMPOSE_LISTING) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.LISTING_DETAIL,
+                arguments = listOf(navArgument(ChildRoutes.LISTING_DETAIL_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val listingId = entry.arguments?.getString(ChildRoutes.LISTING_DETAIL_ID_KEY) ?: ""
+                NotYetAvailableView(tabName = "Listing · $listingId", icon = PantopusIcon.ShoppingBag)
+            }
+            composable(ChildRoutes.COMPOSE_LISTING) {
+                NotYetAvailableView(tabName = "Snap & sell", icon = PantopusIcon.Camera)
             }
             composable(ChildRoutes.GIGS_FEED) {
                 GigsFeedScreen(
