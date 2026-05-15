@@ -40,11 +40,13 @@ public final class NearbyMapViewModel {
 
     public init(
         api: APIClient = .shared,
-        location: LocationProviding = FallbackLocationProvider.shared
+        location: LocationProviding = FallbackLocationProvider.shared,
+        initialCategory: GigsCategory = .all
     ) {
         self.api = api
         self.location = location
         self.userCoordinate = location.cachedCoordinate()
+        self.activeCategory = initialCategory
     }
 
     /// Initial load — resolves the user's coordinate (uses cache if

@@ -95,6 +95,7 @@ fun NearbyMapScreen(
     onOpenEntity: (MapEntity) -> Unit = {},
     onOpenFilters: () -> Unit = {},
     onBack: (() -> Unit)? = null,
+    initialCategory: app.pantopus.android.ui.screens.gigs.GigsCategory? = null,
     viewModel: NearbyMapViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -103,7 +104,17 @@ fun NearbyMapScreen(
     val sheetStop by viewModel.sheetStop.collectAsStateWithLifecycle()
     val userCoord by viewModel.userCoordinate.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) { viewModel.load() }
+    LaunchedEffect(Unit) {
+        // Seed the chip first so the initial fetch already filters
+        // by the caller's preferred category (selectCategory will
+        // refetch internally; if it's already the active value the
+        // call is a no-op and load() drives the initial fetch).
+        if (initialCategory != null && viewModel.activeCategory.value != initialCategory) {
+            viewModel.selectCategory(initialCategory)
+        } else {
+            viewModel.load()
+        }
+    }
 
     val cameraState =
         rememberCameraPositionState {

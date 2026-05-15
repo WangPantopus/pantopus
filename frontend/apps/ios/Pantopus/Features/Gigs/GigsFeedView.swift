@@ -14,7 +14,7 @@ public struct GigsFeedView: View {
     @State private var viewModel: GigsFeedViewModel
     private let onOpenGig: @MainActor (String) -> Void
     private let onCompose: @MainActor (GigsCategory) -> Void
-    private let onOpenMap: @MainActor () -> Void
+    private let onOpenMap: @MainActor (GigsCategory) -> Void
     private let onOpenSearch: @MainActor () -> Void
     private let onOpenFilters: @MainActor () -> Void
     private let onBack: (@MainActor () -> Void)?
@@ -23,7 +23,7 @@ public struct GigsFeedView: View {
         viewModel: GigsFeedViewModel = GigsFeedViewModel(),
         onOpenGig: @escaping @MainActor (String) -> Void = { _ in },
         onCompose: @escaping @MainActor (GigsCategory) -> Void = { _ in },
-        onOpenMap: @escaping @MainActor () -> Void = {},
+        onOpenMap: @escaping @MainActor (GigsCategory) -> Void = { _ in },
         onOpenSearch: @escaping @MainActor () -> Void = {},
         onOpenFilters: @escaping @MainActor () -> Void = {},
         onBack: (@MainActor () -> Void)? = nil
@@ -76,7 +76,9 @@ public struct GigsFeedView: View {
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
-            Button(action: onOpenMap) {
+            Button {
+                onOpenMap(viewModel.activeCategory)
+            } label: {
                 Icon(.map, size: 19, color: Theme.Color.appText)
                     .frame(width: 36, height: 36)
             }

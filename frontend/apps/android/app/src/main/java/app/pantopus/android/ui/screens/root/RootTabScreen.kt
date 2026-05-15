@@ -122,6 +122,12 @@ private object ChildRoutes {
     const val COMPOSE_GIG_CATEGORY_KEY = "category"
     const val COMPOSE_GIG = "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY={$COMPOSE_GIG_CATEGORY_KEY}"
 
+    /** Nearby map opened from the Gigs feed map-toggle — seeded with the
+     *  active category so the same filter applies on the map. */
+    const val NEARBY_MAP_FOR_GIGS_CATEGORY_KEY = "category"
+    const val NEARBY_MAP_FOR_GIGS =
+        "gigs/map?$NEARBY_MAP_FOR_GIGS_CATEGORY_KEY={$NEARBY_MAP_FOR_GIGS_CATEGORY_KEY}"
+
     /** Marketplace tab (T2.5). Reached from Hub → pillar(.Marketplace). */
     const val MARKETPLACE = "marketplace"
 
@@ -202,6 +208,10 @@ private object ChildRoutes {
     /** Build the compose-gig path with the active category pre-fill. */
     fun composeGig(category: String): String =
         "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
+
+    /** Build the Nearby-map-for-gigs path with the active category seed. */
+    fun nearbyMapForGigs(category: String): String =
+        "gigs/map?$NEARBY_MAP_FOR_GIGS_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
 
     /** Build the listing-detail path. */
     fun listingDetail(listingId: String): String = "listings/$listingId"
@@ -549,7 +559,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 GigsFeedScreen(
                     onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
                     onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
-                    onOpenMap = { navController.navigate(ChildRoutes.placeholder("Map & list")) },
+                    onOpenMap = { category -> navController.navigate(ChildRoutes.nearbyMapForGigs(category.key)) },
                     onOpenSearch = { navController.navigate(ChildRoutes.placeholder("Gig search")) },
                     onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Gig filters")) },
                     onBack = { navController.popBackStack() },
@@ -562,6 +572,30 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 GigDetailScreen(
                     onBack = { navController.popBackStack() },
                     onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                )
+            }
+            composable(
+                route = ChildRoutes.NEARBY_MAP_FOR_GIGS,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.NEARBY_MAP_FOR_GIGS_CATEGORY_KEY) {
+                            type = NavType.StringType
+                            defaultValue = GigsCategory.All.key
+                        },
+                    ),
+            ) { entry ->
+                val raw =
+                    entry.arguments?.getString(ChildRoutes.NEARBY_MAP_FOR_GIGS_CATEGORY_KEY) ?: GigsCategory.All.key
+                NearbyMapScreen(
+                    onOpenEntity = { entity ->
+                        when (entity.kind) {
+                            MapEntityKind.Gig -> navController.navigate(ChildRoutes.gigDetail(entity.id))
+                            MapEntityKind.Listing -> navController.navigate(ChildRoutes.listingDetail(entity.id))
+                        }
+                    },
+                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Map filters")) },
+                    onBack = { navController.popBackStack() },
+                    initialCategory = GigsCategory.fromBackendKey(raw),
                 )
             }
             composable(

@@ -88,6 +88,18 @@ final class StoreScreenshots: XCTestCase {
         // Back to Hub.
         app.buttons["tab.hub"].firstMatch.tap()
 
+        // Hub → Gigs pillar → Gigs feed.
+        let gigsPillar = app.descendants(matching: .any)
+            .matching(identifier: "hub.pillar.gigs").firstMatch
+        if gigsPillar.waitForExistence(timeout: 3) {
+            gigsPillar.tap()
+            _ = app.descendants(matching: .any)
+                .matching(identifier: "gigsFeed").firstMatch
+                .waitForExistence(timeout: 5)
+            snapshot("09_GigsFeed")
+            app.buttons["gigsBackButton"].firstMatch.tap()
+        }
+
         // Inbox tab → Chat list.
         app.buttons["tab.inbox"].firstMatch.tap()
         if app.descendants(matching: .any)

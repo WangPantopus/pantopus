@@ -29,6 +29,9 @@ public enum HubRoute: Hashable {
     case gigsFeed
     /// Gig detail target — placeholder until the Transactional Detail (T2.6) ships.
     case gigDetail(gigId: String)
+    /// Map+List Hybrid opened from the Gigs feed map-toggle. Carries the
+    /// active category so the map renders the same filtered window.
+    case nearbyMapForGigs(categoryKey: String)
     /// Compose gig target — placeholder until the compose flow ships.
     case composeGig(category: String)
     /// Marketplace tab (T2.5). Reached from Hub → pillar(.marketplace).
@@ -273,7 +276,9 @@ public struct HubTabRoot: View {
                 onCompose: { category in
                     Task { @MainActor in push(.composeGig(category: category.rawValue)) }
                 },
-                onOpenMap: { Task { @MainActor in push(.placeholder(label: "Map & list")) } },
+                onOpenMap: { category in
+                    Task { @MainActor in push(.nearbyMapForGigs(categoryKey: category.rawValue)) }
+                },
                 onOpenSearch: { Task { @MainActor in push(.placeholder(label: "Gig search")) } },
                 onOpenFilters: { Task { @MainActor in push(.placeholder(label: "Gig filters")) } },
                 onBack: { if !path.isEmpty { path.removeLast() } }
@@ -286,6 +291,22 @@ public struct HubTabRoot: View {
             )
         case let .composeGig(category):
             NotYetAvailableView(tabName: "Post a task · \(category.capitalized)", icon: .pencil)
+        case let .nearbyMapForGigs(categoryKey):
+            NearbyMapView(
+                viewModel: NearbyMapViewModel(
+                    initialCategory: GigsCategory(rawValue: categoryKey) ?? .all
+                ),
+                onOpenEntity: { entity in
+                    Task { @MainActor in
+                        switch entity.kind {
+                        case .gig: push(.gigDetail(gigId: entity.id))
+                        case .listing: push(.listingDetail(listingId: entity.id))
+                        }
+                    }
+                },
+                onOpenFilters: { Task { @MainActor in push(.placeholder(label: "Map filters")) } },
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
         case .marketplace:
             MarketplaceView(
                 onOpenListing: { listingId in

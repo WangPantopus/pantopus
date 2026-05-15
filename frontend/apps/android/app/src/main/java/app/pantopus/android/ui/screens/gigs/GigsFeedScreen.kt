@@ -62,7 +62,7 @@ import app.pantopus.android.ui.theme.Spacing
 fun GigsFeedScreen(
     onOpenGig: (String) -> Unit = {},
     onCompose: (GigsCategory) -> Unit = {},
-    onOpenMap: () -> Unit = {},
+    onOpenMap: (GigsCategory) -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onOpenFilters: () -> Unit = {},
     onBack: (() -> Unit)? = null,
@@ -83,7 +83,7 @@ fun GigsFeedScreen(
                 .testTag("gigsFeed"),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            GigsTopBar(onBack = onBack, onOpenMap = onOpenMap)
+            GigsTopBar(onBack = onBack, onOpenMap = { onOpenMap(activeCategory) })
             GigsSearchBar(onOpenSearch = onOpenSearch)
             GigsCategoryChipRow(
                 active = activeCategory,
@@ -209,7 +209,7 @@ private fun GigsSearchBar(onOpenSearch: () -> Unit) {
 }
 
 @Composable
-private fun GigsCategoryChipRow(
+internal fun GigsCategoryChipRow(
     active: GigsCategory,
     onSelect: (GigsCategory) -> Unit,
 ) {
@@ -342,7 +342,7 @@ private fun GigsSortFilterRow(
 // MARK: - Frames
 
 @Composable
-private fun LoadingFrame() {
+internal fun LoadingFrame() {
     LazyColumn(
         modifier =
             Modifier
@@ -356,7 +356,7 @@ private fun LoadingFrame() {
 }
 
 @Composable
-private fun EmptyFrame(
+internal fun EmptyFrame(
     radiusMiles: Double,
     onPostTask: () -> Unit,
 ) {
@@ -476,7 +476,7 @@ private fun RadiusHintPill(radiusMiles: Double) {
 }
 
 @Composable
-private fun PopulatedFrame(
+internal fun PopulatedFrame(
     rows: List<GigCardContent>,
     onOpenGig: (String) -> Unit,
 ) {
