@@ -46,11 +46,11 @@ public final class ChatListViewModel {
         topicKinds: []
     )
 
-    // `nonisolated(unsafe)` lets `deinit` (which is nonisolated for a
+    // `nonisolated` lets `deinit` (which is nonisolated for a
     // `@MainActor` class) tear these tasks down without warnings under
     // Swift 6 strict concurrency. `Task` is `Sendable`.
-    private nonisolated(unsafe) var badgeTask: Task<Void, Never>?
-    private nonisolated(unsafe) var messageTask: Task<Void, Never>?
+    private nonisolated var badgeTask: Task<Void, Never>?
+    private nonisolated var messageTask: Task<Void, Never>?
 
     init(api: APIClient = .shared, socket: SocketClient = .shared) {
         self.api = api

@@ -67,11 +67,11 @@ public final class ChatConversationViewModel {
     private var failedClientIds: Set<String> = []
     private var hasMore: Bool = false
     private var oldestCursor: String?
-    // `nonisolated(unsafe)` lets `deinit` (which is nonisolated for a
+    // `nonisolated` lets `deinit` (which is nonisolated for a
     // `@MainActor` class) tear these tasks down without warnings under
     // Swift 6 strict concurrency. `Task` is `Sendable`.
-    private nonisolated(unsafe) var markReadTask: Task<Void, Never>?
-    private nonisolated(unsafe) var socketTasks: [Task<Void, Never>] = []
+    private nonisolated var markReadTask: Task<Void, Never>?
+    private nonisolated var socketTasks: [Task<Void, Never>] = []
 
     init(
         mode: ChatThreadMode,

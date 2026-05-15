@@ -150,9 +150,10 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
             )
             return
         }
-        let rows = notifications.map { dto in Self.row(dto: dto) { [weak self] in
-            self?.handleTap(dto: dto)
-        }
+        let rows = notifications.map { dto in
+            Self.row(dto: dto) { [weak self] in
+                Task { @MainActor in self?.handleTap(dto: dto) }
+            }
         }
         state = .loaded(
             sections: [RowSection(rows: rows)],
