@@ -37,6 +37,21 @@ export default function ListOfRowsPreviewPage() {
       leading: { kind: 'icon', icon: Bell, tint: 'rgb(2 132 199)' },
       trailing: { kind: 'statusChip', text: 'NEW', variant: 'info' },
     },
+    // B. avatar + title + subtitle + trailing kebab (existing)
+    {
+      id: 'b',
+      template: 'avatarKebab',
+      title: 'B — avatar + kebab (existing)',
+      subtitle: 'Original render path; identity-ringed avatar + 44pt kebab tap target.',
+      leading: {
+        kind: 'avatar',
+        name: 'Avery Park',
+        identity: 'personal',
+        ringProgress: 0.7,
+      },
+      trailing: { kind: 'kebab' },
+      onSecondary: () => {},
+    },
     // C. category gradient icon + price stack + footer
     {
       id: 'c',
