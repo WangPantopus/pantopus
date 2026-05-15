@@ -9,7 +9,7 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.GradientPair
  * T5.2.1 — Per-species visual tokens for the Pets row. Lifted from the
  * design at `more-designed-pages/pets-frames.jsx:22-30`. Feature code
  * (`PetsListViewModel`, etc.) references these typed swatches; no raw
- * `Color(0xFF…)` ever appears in `ui/screens/**`.
+ * `Color(0xFF...)` ever appears in feature screens.
  *
  * Mirrors iOS `Core/Design/SpeciesPalette.swift` 1:1 — same wire enum,
  * same five gradient palettes plus an `Other` fallback.

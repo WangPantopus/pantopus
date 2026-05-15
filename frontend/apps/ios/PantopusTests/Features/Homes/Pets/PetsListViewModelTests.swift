@@ -114,7 +114,7 @@ final class PetsListViewModelTests: XCTestCase {
         XCTAssertEqual(mango?.subtitle, "Golden Retriever")
         XCTAssertEqual(mango?.body, "Allergic to chicken.")
         XCTAssertEqual(mango?.inlineChip?.text, "Dog")
-        guard case .thumbnail(_, let size) = mango?.leading else {
+        guard case let .thumbnail(_, size) = mango?.leading else {
             XCTFail("Expected thumbnail leading")
             return
         }

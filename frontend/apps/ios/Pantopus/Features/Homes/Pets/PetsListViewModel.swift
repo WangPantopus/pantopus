@@ -145,13 +145,12 @@ final class PetsListViewModel: ListOfRowsDataSource {
                     icon: .pawPrint,
                     headline: "No pets yet",
                     subcopy:
-                        "Add your pets so household members and pet-sitters " +
+                    "Add your pets so household members and pet-sitters " +
                         "have the info they need.",
-                    ctaTitle: "Add a pet",
-                    onCTA: { @Sendable [weak self] in
-                        Task { @MainActor in self?.pendingEvent = .openAdd }
-                    }
-                )
+                    ctaTitle: "Add a pet"
+                ) { @Sendable [weak self] in
+                    Task { @MainActor in self?.pendingEvent = .openAdd }
+                }
             )
             return
         }
@@ -198,5 +197,7 @@ final class PetsListViewModel: ListOfRowsDataSource {
 }
 
 private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }

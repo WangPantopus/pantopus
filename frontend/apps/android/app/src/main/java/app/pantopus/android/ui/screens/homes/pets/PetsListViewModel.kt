@@ -85,7 +85,7 @@ class PetsListViewModel
         fun refresh() = reload()
 
         /** Backend doesn't paginate /pets. */
-        fun loadMoreIfNeeded() {}
+        fun loadMoreIfNeeded() = Unit
 
         /** Screen calls this after dispatching a pending event. */
         fun acknowledgeEvent() {
