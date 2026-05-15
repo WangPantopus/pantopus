@@ -88,6 +88,16 @@ final class StoreScreenshots: XCTestCase {
         // Back to Hub.
         app.buttons["tab.hub"].firstMatch.tap()
 
+        // Inbox tab → Chat list.
+        app.buttons["tab.inbox"].firstMatch.tap()
+        if app.descendants(matching: .any)
+            .matching(identifier: "chatList").firstMatch
+            .waitForExistence(timeout: 5)
+        {
+            snapshot("03_ChatList")
+        }
+        app.buttons["tab.hub"].firstMatch.tap()
+
         // You tab → Me view (Personal identity by default).
         app.buttons["tab.you"].firstMatch.tap()
         _ = app.descendants(matching: .any)

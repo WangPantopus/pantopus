@@ -167,7 +167,7 @@ private fun SearchBar(
 }
 
 @Composable
-private fun FilterTabs(
+internal fun FilterTabs(
     active: ChatFilter,
     unreadByFilter: Map<ChatFilter, Int>,
     skeleton: Boolean,
@@ -263,7 +263,7 @@ private fun FilterTab(
 }
 
 @Composable
-private fun LoadingFrame() {
+internal fun LoadingFrame() {
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("chatListLoading"),
     ) {
@@ -293,7 +293,7 @@ private fun SkeletonRow() {
 }
 
 @Composable
-private fun EmptyFrame(onCompose: () -> Unit) {
+internal fun EmptyFrame(onCompose: () -> Unit) {
     Column(
         modifier =
             Modifier
@@ -387,7 +387,7 @@ private fun EmptyFrame(onCompose: () -> Unit) {
 }
 
 @Composable
-private fun PopulatedFrame(
+internal fun PopulatedFrame(
     rows: List<ConversationRowContent>,
     onTap: (ConversationRowContent) -> Unit,
 ) {
