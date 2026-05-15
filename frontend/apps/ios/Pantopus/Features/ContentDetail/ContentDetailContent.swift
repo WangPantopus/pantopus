@@ -255,7 +255,7 @@ public struct ContentDetailPhotoStrip: Sendable, Hashable {
     public let countLabel: String?
     public let tiles: [ContentDetailPhotoTile]
 
-    public init(title: String, icon: PantopusIcon? = .image, countLabel: String? = nil, tiles: [ContentDetailPhotoTile]) {
+    public init(title: String, icon: PantopusIcon? = .camera, countLabel: String? = nil, tiles: [ContentDetailPhotoTile]) {
         self.title = title
         self.icon = icon
         self.countLabel = countLabel

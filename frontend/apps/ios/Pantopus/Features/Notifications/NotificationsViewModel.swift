@@ -226,29 +226,3 @@ private extension NotificationDTO {
         )
     }
 }
-
-public extension NotificationDTO {
-    init(
-        id: String,
-        userId: String?,
-        type: String?,
-        title: String?,
-        body: String?,
-        icon: String?,
-        link: String?,
-        isRead: Bool?,
-        createdAt: String?,
-        context: String?
-    ) {
-        self.id = id
-        self.userId = userId
-        self.type = type
-        self.title = title
-        self.body = body
-        self.icon = icon
-        self.link = link
-        self.isRead = isRead
-        self.createdAt = createdAt
-        self.context = context
-    }
-}
