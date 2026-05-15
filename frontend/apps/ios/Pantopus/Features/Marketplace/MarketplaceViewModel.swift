@@ -21,13 +21,13 @@ public final class MarketplaceViewModel {
     public var searchText: String = ""
 
     private let api: APIClient
-    private let location: LocationProviding
+    private let location: any LocationProviding
     private var loadedItems: [ListingDTO] = []
     private var isLoading = false
 
     init(
         api: APIClient = .shared,
-        location: LocationProviding = FallbackLocationProvider.shared,
+        location: any LocationProviding = FallbackLocationProvider.shared,
         radiusMiles: Double = 2
     ) {
         self.api = api

@@ -173,9 +173,7 @@ public struct FeedView: View {
                         onTap: { onOpenPost(row.id) },
                         onPrimaryReaction: { Task { await viewModel.tapReaction(postId: row.id) } },
                         onRSVP: row.attendees == nil ? nil : {
-                            Task { @MainActor in
-                                await viewModel.tapReaction(postId: row.id)
-                            }
+                            _ = Task { await viewModel.tapReaction(postId: row.id) }
                         }
                     )
                 }

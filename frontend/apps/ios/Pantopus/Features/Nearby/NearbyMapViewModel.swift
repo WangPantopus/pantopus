@@ -34,7 +34,7 @@ public final class NearbyMapViewModel {
     public private(set) var userCoordinate: UserCoordinate?
 
     private let api: APIClient
-    private let location: LocationProviding
+    private let location: any LocationProviding
     private var entities: [MapEntity] = []
     private var fetchTask: Task<Void, Never>?
     /// Grid-bucket cluster radius. ~0.005° ≈ 500m at NYC latitude —
@@ -44,7 +44,7 @@ public final class NearbyMapViewModel {
 
     init(
         api: APIClient = .shared,
-        location: LocationProviding = FallbackLocationProvider.shared,
+        location: any LocationProviding = FallbackLocationProvider.shared,
         initialCategory: GigsCategory = .all
     ) {
         self.api = api
