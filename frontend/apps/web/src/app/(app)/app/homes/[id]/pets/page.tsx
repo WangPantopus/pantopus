@@ -1,167 +1,214 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+// Pantopus — T5.2.1 Pets screen on the shared `<ListOfRowsShell />`.
+// Single source of truth = the shell; this page only owns the data
+// fetch (via `@pantopus/api`) + the row projection. Each pet renders
+// as shape **E** (64dp rounded-square thumbnail leading + inline
+// species chip + breed subtitle + notes preview + kebab trailing).
+// Mirrors the iOS PetsListView and Android PetsListScreen exactly.
+
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, ChevronDown, ChevronUp, Stethoscope, FileText, Dumbbell, Trash2 } from 'lucide-react';
+import { PawPrint, Plus } from 'lucide-react';
 import * as api from '@pantopus/api';
 import { getAuthToken } from '@pantopus/api';
+import ListOfRowsShell from '@/components/list-of-rows/ListOfRowsShell';
+import type { ListOfRowsState, RowModel } from '@/components/list-of-rows/types';
 import { toast } from '@/components/ui/toast-store';
 import { confirmStore } from '@/components/ui/confirm-store';
+import {
+  SPECIES_LABEL,
+  parseSpecies,
+  swatchFor,
+  type PetSpeciesWire,
+} from './species-palette';
+import AddPetWizard from './AddPetWizard';
 
-const SPECIES_ICON: Record<string, string> = {
-  dog: '\uD83D\uDC15', cat: '\uD83D\uDC08', bird: '\uD83D\uDC26', fish: '\uD83D\uDC1F', rabbit: '\uD83D\uDC07',
-  hamster: '\uD83D\uDC39', reptile: '\uD83E\uDD8E', other: '\uD83D\uDC3E',
-};
+interface PetRecord {
+  id: string;
+  home_id?: string;
+  name: string;
+  species?: string | null;
+  breed?: string | null;
+  notes?: string | null;
+  photo_url?: string | null;
+  vet_name?: string | null;
+  vet_phone?: string | null;
+  vet_address?: string | null;
+  vaccine_notes?: string | null;
+  feeding_schedule?: string | null;
+  medications?: string | null;
+  microchip_id?: string | null;
+  age_years?: number | null;
+  weight_lbs?: number | null;
+}
 
 function PetsContent() {
   const router = useRouter();
   const { id: homeId } = useParams<{ id: string }>();
 
-  const [pets, setPets] = useState<any[]>([]);
+  const [pets, setPets] = useState<PetRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [editingPet, setEditingPet] = useState<PetRecord | null>(null);
+  const [adding, setAdding] = useState(false);
 
-  const [newName, setNewName] = useState('');
-  const [newSpecies, setNewSpecies] = useState('dog');
-  const [newBreed, setNewBreed] = useState('');
-  const [newVet, setNewVet] = useState('');
-  const [newNotes, setNewNotes] = useState('');
-  const [creating, setCreating] = useState(false);
-
-  useEffect(() => { if (!getAuthToken()) router.push('/login'); }, [router]);
+  useEffect(() => {
+    if (!getAuthToken()) router.push('/login');
+  }, [router]);
 
   const fetchPets = useCallback(async () => {
     if (!homeId) return;
+    setErrorMessage(null);
     try {
       const res = await api.homeProfile.getHomePets(homeId);
-      setPets((res as any)?.pets || []);
-    } catch { toast.error('Failed to load pets'); }
+      setPets(((res as { pets?: PetRecord[] } | undefined)?.pets) || []);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load pets';
+      setErrorMessage(message);
+      toast.error('Failed to load pets');
+    }
   }, [homeId]);
 
-  useEffect(() => { setLoading(true); fetchPets().finally(() => setLoading(false)); }, [fetchPets]);
+  useEffect(() => {
+    setLoading(true);
+    fetchPets().finally(() => setLoading(false));
+  }, [fetchPets]);
 
-  const handleCreate = useCallback(async () => {
-    if (!newName.trim()) return;
-    setCreating(true);
-    try {
-      await api.homeProfile.createHomePet(homeId!, {
-        name: newName.trim(), species: newSpecies,
-        breed: newBreed.trim() || undefined, vet_name: newVet.trim() || undefined, notes: newNotes.trim() || undefined,
+  const handleDelete = useCallback(
+    async (pet: PetRecord) => {
+      const yes = await confirmStore.open({
+        title: 'Remove pet?',
+        description: `${pet.name} will be removed from this home.`,
+        confirmLabel: 'Remove',
+        variant: 'destructive',
       });
-      setNewName(''); setNewBreed(''); setNewVet(''); setNewNotes(''); setShowCreate(false);
-      toast.success('Pet added');
-      await fetchPets();
-    } catch (err: any) { toast.error(err?.message || 'Failed to add pet'); }
-    finally { setCreating(false); }
-  }, [homeId, newName, newSpecies, newBreed, newVet, newNotes, fetchPets]);
+      if (!yes || !homeId) return;
+      const previous = pets;
+      setPets((rows) => rows.filter((p) => p.id !== pet.id));
+      try {
+        await api.homeProfile.deleteHomePet(homeId, pet.id);
+        toast.success('Pet removed');
+      } catch {
+        setPets(previous);
+        toast.error('Failed to remove pet');
+      }
+    },
+    [homeId, pets],
+  );
 
-  const handleDelete = useCallback(async (petId: string, petName: string) => {
-    const yes = await confirmStore.open({ title: 'Remove Pet', description: `Remove ${petName} from this home?`, confirmLabel: 'Remove', variant: 'destructive' });
-    if (!yes) return;
-    try { await api.homeProfile.deleteHomePet(homeId!, petId); toast.success('Pet removed'); await fetchPets(); }
-    catch { toast.error('Failed to remove pet'); }
-  }, [homeId, fetchPets]);
+  const rows = useMemo<RowModel[]>(() => {
+    return pets.map((pet) => {
+      const species = parseSpecies(pet.species);
+      const swatch = swatchFor(species);
+      return {
+        id: pet.id,
+        title: pet.name,
+        subtitle: pet.breed?.trim() || undefined,
+        template: 'avatarKebab',
+        leading: pet.photo_url
+          ? {
+              kind: 'thumbnail',
+              size: 'large',
+              image: {
+                kind: 'url',
+                url: pet.photo_url,
+                fallback: swatch.icon,
+                gradient: swatch.iconBackground,
+              },
+            }
+          : {
+              kind: 'thumbnail',
+              size: 'large',
+              image: {
+                kind: 'icon',
+                icon: swatch.icon,
+                gradient: swatch.iconBackground,
+              },
+            },
+        trailing: { kind: 'kebab' },
+        onTap: () => setEditingPet(pet),
+        onSecondary: () => void handleDelete(pet),
+        body: pet.notes?.trim() || undefined,
+        inlineChip: {
+          text: SPECIES_LABEL[species],
+          tint: {
+            kind: 'custom',
+            background: swatch.chipBackground,
+            foreground: swatch.chipForeground,
+          },
+        },
+      } satisfies RowModel;
+    });
+  }, [pets, handleDelete]);
 
-  if (loading) return <div className="flex items-center justify-center min-h-[50vh]"><div className="animate-spin h-8 w-8 border-3 border-emerald-600 border-t-transparent rounded-full" /></div>;
+  const state: ListOfRowsState = useMemo(() => {
+    if (loading) return { kind: 'loading' };
+    if (errorMessage) return { kind: 'error', message: errorMessage };
+    if (rows.length === 0) {
+      return {
+        kind: 'empty',
+        config: {
+          icon: PawPrint,
+          headline: 'No pets yet',
+          subcopy:
+            'Add your pets so household members and pet-sitters have the info they need.',
+          ctaTitle: 'Add a pet',
+          onCta: () => setAdding(true),
+        },
+      };
+    }
+    return {
+      kind: 'loaded',
+      sections: [{ id: 'pets', rows }],
+      hasMore: false,
+    };
+  }, [loading, errorMessage, rows]);
+
+  if (!homeId) return null;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="p-1.5 hover:bg-app-hover rounded-lg transition"><ArrowLeft className="w-5 h-5 text-app-text" /></button>
-          <h1 className="text-xl font-bold text-app-text">Pets</h1>
-        </div>
-        <button onClick={() => setShowCreate(!showCreate)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">
-          <Plus className="w-4 h-4" /> Add Pet
-        </button>
-      </div>
-
-      {showCreate && (
-        <div className="bg-app-surface border border-app-border rounded-xl p-4 mb-4 space-y-3">
-          <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Pet name" className="w-full px-3 py-2 border border-app-border rounded-lg text-sm text-app-text bg-app-surface placeholder:text-app-text-muted focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-          <div>
-            <p className="text-xs font-semibold text-app-text-strong mb-1.5">Species</p>
-            <div className="flex flex-wrap gap-1.5">
-              {Object.entries(SPECIES_ICON).map(([species, emoji]) => (
-                <button key={species} type="button" onClick={() => setNewSpecies(species)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-sm transition ${newSpecies === species ? 'border-emerald-500 bg-emerald-50 font-semibold text-emerald-700' : 'border-app-border text-app-text-secondary'}`}>
-                  <span>{emoji}</span>{species.charAt(0).toUpperCase() + species.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-          <input type="text" value={newBreed} onChange={(e) => setNewBreed(e.target.value)} placeholder="Breed (optional)" className="w-full px-3 py-2 border border-app-border rounded-lg text-sm text-app-text bg-app-surface placeholder:text-app-text-muted focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-          <input type="text" value={newVet} onChange={(e) => setNewVet(e.target.value)} placeholder="Vet name / phone (optional)" className="w-full px-3 py-2 border border-app-border rounded-lg text-sm text-app-text bg-app-surface placeholder:text-app-text-muted focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-          <textarea value={newNotes} onChange={(e) => setNewNotes(e.target.value)} placeholder="Notes (allergies, medication, etc.)" rows={2} className="w-full px-3 py-2 border border-app-border rounded-lg text-sm text-app-text bg-app-surface placeholder:text-app-text-muted focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none" />
-          <button onClick={handleCreate} disabled={creating || !newName.trim()} className="w-full py-2.5 bg-emerald-600 text-white rounded-lg font-semibold text-sm hover:bg-emerald-700 disabled:opacity-50 transition">
-            {creating ? 'Adding...' : 'Add Pet'}
-          </button>
-        </div>
+    <>
+      <ListOfRowsShell
+        title="Pets"
+        state={state}
+        onRefresh={() => {
+          void fetchPets();
+        }}
+        fab={{
+          icon: Plus,
+          accessibilityLabel: 'Add a pet',
+          variant: { kind: 'secondaryCreate' },
+          onClick: () => setAdding(true),
+        }}
+      />
+      {(adding || editingPet) && (
+        <AddPetWizard
+          homeId={homeId}
+          existing={editingPet}
+          onClose={(result) => {
+            const wasEditing = editingPet !== null;
+            setAdding(false);
+            setEditingPet(null);
+            if (!result) return;
+            if (wasEditing) {
+              setPets((rows) => rows.map((p) => (p.id === result.id ? result : p)));
+              toast.success('Pet updated');
+            } else {
+              setPets((rows) => [result, ...rows]);
+              toast.success('Pet added');
+            }
+          }}
+        />
       )}
-
-      {pets.length === 0 ? (
-        <div className="text-center py-16">
-          <span className="text-4xl block mb-3">{'\uD83D\uDC3E'}</span>
-          <p className="text-sm text-app-text-secondary">No pets registered</p>
-          <p className="text-xs text-app-text-muted mt-1">Add your furry (or scaly) friends!</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {pets.map((pet) => {
-            const expanded = expandedId === pet.id;
-            const vetInfo = pet.vet_info || [pet.vet_name, pet.vet_phone].filter(Boolean).join(' \u00b7 ');
-            return (
-              <button key={pet.id} type="button" onClick={() => setExpandedId(expanded ? null : pet.id)}
-                className="w-full text-left bg-app-surface border border-app-border rounded-xl p-4 hover:bg-app-hover transition">
-                <div className="flex items-start gap-3">
-                  <div className="w-14 h-14 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
-                    <span className="text-3xl">{SPECIES_ICON[pet.species] || '\uD83D\uDC3E'}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-base font-semibold text-app-text">{pet.name}</p>
-                    <p className="text-sm text-app-text-secondary mt-0.5">
-                      {pet.species?.charAt(0).toUpperCase() + pet.species?.slice(1)}
-                      {pet.breed ? ` \u00b7 ${pet.breed}` : ''}
-                    </p>
-
-                    {expanded && (
-                      <div className="mt-3 space-y-2">
-                        {vetInfo && (
-                          <div className="flex items-start gap-2 text-sm text-app-text-secondary">
-                            <Stethoscope className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" /><span>{vetInfo}</span>
-                          </div>
-                        )}
-                        {pet.notes && (
-                          <div className="flex items-start gap-2 text-sm text-app-text-secondary">
-                            <FileText className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" /><span>{pet.notes}</span>
-                          </div>
-                        )}
-                        {(pet.weight_lbs || pet.weight) && (
-                          <div className="flex items-start gap-2 text-sm text-app-text-secondary">
-                            <Dumbbell className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" /><span>{pet.weight_lbs || pet.weight} lbs</span>
-                          </div>
-                        )}
-                        <div className="pt-2">
-                          <button type="button" onClick={(e) => { e.stopPropagation(); handleDelete(pet.id, pet.name); }}
-                            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700">
-                            <Trash2 className="w-3.5 h-3.5" /> Remove
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-shrink-0">
-                    {expanded ? <ChevronUp className="w-4 h-4 text-app-text-muted" /> : <ChevronDown className="w-4 h-4 text-app-text-muted" />}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    </>
   );
 }
 
-export default function PetsPage() { return <Suspense><PetsContent /></Suspense>; }
+export default function PetsPage() {
+  return (
+    <Suspense>
+      <PetsContent />
+    </Suspense>
+  );
+}

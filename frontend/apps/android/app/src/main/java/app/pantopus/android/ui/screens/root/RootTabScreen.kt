@@ -50,6 +50,8 @@ import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.homes.pets.PETS_LIST_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.pets.PetsListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
@@ -101,6 +103,13 @@ private object ChildRoutes {
     const val MAILBOX_SEARCH = "mailbox/search"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
     const val HOME_DASHBOARD = "homes/{$HOME_DASHBOARD_HOME_ID_KEY}"
+
+    /** Pets list per home (T5.2.1). */
+    const val HOME_PETS = "homes/{$PETS_LIST_HOME_ID_KEY}/pets"
+
+    /** Build the concrete path for a home pets list. */
+    fun homePets(homeId: String): String = "homes/$homeId/pets"
+
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
     const val INVITE_OWNER =
@@ -524,7 +533,16 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenPlaceholder = { label ->
                         navController.navigate(ChildRoutes.placeholder(label))
                     },
+                    onOpenPets = { homeId ->
+                        navController.navigate(ChildRoutes.homePets(homeId))
+                    },
                 )
+            }
+            composable(
+                route = ChildRoutes.HOME_PETS,
+                arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                PetsListScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.MAILBOX_LIST) {
                 MailboxListScreen(

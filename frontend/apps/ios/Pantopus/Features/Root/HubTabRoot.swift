@@ -19,6 +19,8 @@ public enum HubRoute: Hashable {
     case addHome
     case claimOwnership(homeId: String)
     case homeDashboard(homeId: String)
+    /// Pets sub-screen for a specific home (T5.2.1).
+    case homePets(homeId: String)
     case publicProfile(userId: String)
     case pulsePost(postId: String)
     /// Pulse tab (T1.2). Reached from Hub → pillar(.pulse).
@@ -196,8 +198,13 @@ public struct HubTabRoot: View {
                 onOpenClaimsList: { Task { @MainActor in push(.myClaims) } },
                 onOpenPlaceholder: { label in
                     Task { @MainActor in push(.placeholder(label: label)) }
+                },
+                onOpenPets: { id in
+                    Task { @MainActor in push(.homePets(homeId: id)) }
                 }
             )
+        case let .homePets(homeId):
+            PetsListView(homeId: homeId)
         case let .claimOwnership(homeId):
             ClaimOwnershipWizardView(
                 homeId: homeId,

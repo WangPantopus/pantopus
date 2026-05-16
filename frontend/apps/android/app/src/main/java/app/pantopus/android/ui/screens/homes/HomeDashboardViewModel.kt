@@ -189,8 +189,8 @@ class HomeDashboardViewModel
                 quickActions =
                     listOf(
                         QuickActionTile("add_mail", "Add mail", PantopusIcon.Mailbox, IdentityPillar.Home),
-                        QuickActionTile("log_package", "Log package", PantopusIcon.ShoppingBag, IdentityPillar.Business),
                         QuickActionTile("add_member", "Add member", PantopusIcon.UserPlus, IdentityPillar.Personal),
+                        QuickActionTile("pets", "Pets", PantopusIcon.PawPrint, IdentityPillar.Home),
                         QuickActionTile("verify", "Verify", PantopusIcon.ShieldCheck, IdentityPillar.Home),
                     ),
                 tabs =
