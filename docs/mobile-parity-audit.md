@@ -138,6 +138,17 @@ same backend endpoint with the same query params.
 | Ceremonial Mail Compose | per-step | `ceremonialMail` (`wizardShell`) | `ceremonialMail` (`wizardShell`) | `GET /api/mailbox/compose/recipients` · `GET /api/mailbox/compose/home-context/:id` · `POST /api/mailbox/send` | All wizard step tags identical. |
 | Ceremonial Mail Open | Loading / Loaded / Error | `ceremonialMailOpen` | `ceremonialMailOpen` | `GET /api/mailbox/v2/item/:id` | Parity through every phase (Sealed / Breaking / Open / Replying). |
 
+### Tier 5 — Web-only screens (no mobile parity by design)
+
+Listed for completeness. These screens ship on web but are intentionally
+out of scope on iOS / Android per `docs/mobile/pantopus-t5-notes.md`
+§1.8 — the mobile codebase has no admin role, so the parity column
+collapses to `(web only)` until that infra ships.
+
+| Screen | States | Web route | Endpoints | Notes |
+|---|---|---|---|---|
+| Review claims (T5.4.3 / P16) | Loading / Loaded / Empty / Error · 3 tabs (Pending / Approved / Rejected) with counts · `BannerConfig` above the Pending tab summarising "N claims awaiting review · Oldest in queue: …d" · Shape C row (40pt gradient `avatarWithBadge` leading + claimant name title + address subtitle + status chip + `paperclip` evidence chip + submitted-ago meta + 34pt `RowFooter` "Review claim" primary footer button) · row tap or footer button opens the claim detail overlay (Approve / Reject / Request Info) | `/app/admin/review-claims` | `GET /api/admin/claims?bucket=&limit=&offset=` (new) · `GET /api/admin/claims/counts` (new) · `GET /api/admin/claims/:claimId` · `POST /api/admin/claims/:claimId/review` | **Web only.** Mobile deferred per §1.8 of `pantopus-t5-notes.md` and F9 of `t5-buildout-plan.md`: there is no admin tier on iOS / Android today (no `me.is_admin` field, no role guard). The web page now uses the shared `<ListOfRowsShell />` mirror — same tab/banner/empty-state contract iOS and Android use for non-admin queues. Backend `/api/admin/claims` was extended with a `bucket` enum (`pending` ↔ `submitted, pending_review, needs_more_info, disputed`; `approved`; `rejected`) and per-bucket enrichment (`home`, `claimant`, `evidence_count`); `/api/admin/claims/counts` returns the three tab badges in one call. Approve / Reject / Request Info still hit the existing `POST /api/admin/claims/:claimId/review` with admin auth via `requireAdmin`. Revisit mobile when an admin role lands. |
+
 ### Tier 4.1 — Push + deep-link routing
 
 The routing table (`docs/07-frontend-mobile-app.md §9`) was extended on
