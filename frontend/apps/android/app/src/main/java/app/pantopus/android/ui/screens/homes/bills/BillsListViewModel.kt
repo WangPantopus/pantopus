@@ -74,15 +74,21 @@ const val BILLS_HOME_ID_KEY = "homeId"
  */
 @HiltViewModel
 class BillsListViewModel
-    @Inject
-    constructor(
+    internal constructor(
         private val repo: HomesRepository,
         savedStateHandle: SavedStateHandle,
         private val clock: () -> Instant = Instant::now,
     ) : ViewModel() {
-        private val homeId: String = checkNotNull(savedStateHandle.get<String>(BILLS_HOME_ID_KEY)) {
-            "BillsListViewModel requires a $BILLS_HOME_ID_KEY nav argument"
-        }
+        @Inject
+        constructor(
+            repo: HomesRepository,
+            savedStateHandle: SavedStateHandle,
+        ) : this(repo, savedStateHandle, Instant::now)
+
+        private val homeId: String =
+            checkNotNull(savedStateHandle.get<String>(BILLS_HOME_ID_KEY)) {
+                "BillsListViewModel requires a $BILLS_HOME_ID_KEY nav argument"
+            }
 
         private val _state = MutableStateFlow<ListOfRowsUiState>(ListOfRowsUiState.Loading)
         val state: StateFlow<ListOfRowsUiState> = _state.asStateFlow()
@@ -201,6 +207,7 @@ class BillsListViewModel
             tab: BillsTab,
             now: Instant,
         ): Boolean {
+            if (bill.status == "cancelled") return false
             val chip = chipStatus(bill, now)
             return when (tab) {
                 BillsTab.Upcoming ->
@@ -208,7 +215,7 @@ class BillsListViewModel
                         chip == BillChipStatus.Overdue ||
                         chip == BillChipStatus.Scheduled
                 BillsTab.Paid -> chip == BillChipStatus.Paid
-                BillsTab.All -> bill.status != "cancelled"
+                BillsTab.All -> true
             }
         }
 
@@ -315,7 +322,7 @@ class BillsListViewModel
             fun formatDateShort(iso: String?): String? {
                 if (iso.isNullOrBlank()) return null
                 val instant = parseInstant(iso) ?: return null
-                val local = instant.atZone(ZoneId.systemDefault())
+                val local = instant.atZone(ZoneId.of("UTC"))
                 return DateTimeFormatter.ofPattern("MMM d", Locale.US).format(local)
             }
 

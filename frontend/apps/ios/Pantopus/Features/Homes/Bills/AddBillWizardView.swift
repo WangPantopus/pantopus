@@ -63,7 +63,7 @@ private struct DetailsStep: View {
             TextField("ConEd Electric", text: $viewModel.payee)
                 .textInputAutocapitalization(.words)
                 .focused($focused, equals: .payee)
-                .pantopusTextStyle(.body)
+                .font(Theme.Font.body)
                 .padding(Spacing.s3)
                 .background(Theme.Color.appSurface)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.md))
@@ -79,7 +79,7 @@ private struct DetailsStep: View {
                 TextField("0.00", text: $viewModel.amount)
                     .keyboardType(.decimalPad)
                     .focused($focused, equals: .amount)
-                    .pantopusTextStyle(.body)
+                    .font(Theme.Font.body)
                     .accessibilityIdentifier("addBill_amount")
             }
             .padding(Spacing.s3)
@@ -247,32 +247,12 @@ private struct SuccessStep: View {
 
 // MARK: - Local helpers
 
-private struct HeadlineBlock: View {
-    let title: String
-    let subtitle: String?
-
-    init(_ title: String, subtitle: String? = nil) {
-        self.title = title
-        self.subtitle = subtitle
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            Text(title)
-                .pantopusTextStyle(.h2)
-                .foregroundStyle(Theme.Color.appText)
-            if let subtitle {
-                Text(subtitle)
-                    .pantopusTextStyle(.body)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-            }
-        }
-    }
-}
-
 private struct FieldLabel: View {
     let text: String
-    init(_ text: String) { self.text = text }
+    init(_ text: String) {
+        self.text = text
+    }
+
     var body: some View {
         Text(text)
             .pantopusTextStyle(.caption)

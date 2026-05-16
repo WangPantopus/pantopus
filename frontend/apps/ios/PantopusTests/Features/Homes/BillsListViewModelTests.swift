@@ -25,11 +25,11 @@ final class BillsListViewModelTests: XCTestCase {
         )
     }
 
-    // Fixed "now" so chip derivation + subtitle formatting are deterministic.
+    /// Fixed "now" so chip derivation + subtitle formatting are deterministic.
     private static let fixedNow: Date = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f.date(from: "2026-05-15T12:00:00.000Z")!
+        return f.date(from: "2026-05-15T12:00:00.000Z") ?? Date(timeIntervalSince1970: 1_778_846_400)
     }()
 
     private func makeVM(api: APIClient? = nil) -> BillsListViewModel {
@@ -38,8 +38,26 @@ final class BillsListViewModelTests: XCTestCase {
         let frozen = Self.fixedNow
         return BillsListViewModel(
             homeId: "home-1",
-            api: api ?? makeAPI(),
-            now: { frozen }
+            api: api ?? makeAPI()
+        ) { frozen }
+    }
+
+    private func makeBill(
+        status: String = "pending",
+        dueDate: String? = "2026-05-20T00:00:00Z",
+        providerName: String? = nil,
+        amount: Decimal = 10,
+        paidAt: String? = nil
+    ) -> BillDTO {
+        BillDTO(
+            id: "b",
+            homeId: "h",
+            billType: "x",
+            providerName: providerName,
+            amount: amount,
+            dueDate: dueDate,
+            status: status,
+            paidAt: paidAt
         )
     }
 
@@ -99,38 +117,22 @@ final class BillsListViewModelTests: XCTestCase {
     // MARK: - Chip status derivation
 
     func testChipStatusPaidWins() {
-        let bill = BillDTO(
-            id: "b", homeId: "h", billType: "x",
-            providerName: nil, amount: 10,
-            dueDate: "2030-01-01T00:00:00Z", status: "paid", paidAt: "2026-05-08T00:00:00Z"
-        )
+        let bill = makeBill(status: "paid", dueDate: "2030-01-01T00:00:00Z", paidAt: "2026-05-08T00:00:00Z")
         XCTAssertEqual(BillsListViewModel.chipStatus(for: bill, now: Self.fixedNow), .paid)
     }
 
     func testChipStatusOverdueWhenDueInPastAndNotPaid() {
-        let bill = BillDTO(
-            id: "b", homeId: "h", billType: "x",
-            providerName: nil, amount: 10,
-            dueDate: "2026-05-01T00:00:00Z", status: "pending"
-        )
+        let bill = makeBill(dueDate: "2026-05-01T00:00:00Z")
         XCTAssertEqual(BillsListViewModel.chipStatus(for: bill, now: Self.fixedNow), .overdue)
     }
 
     func testChipStatusScheduledRespectsStatusField() {
-        let bill = BillDTO(
-            id: "b", homeId: "h", billType: "x",
-            providerName: nil, amount: 10,
-            dueDate: "2026-05-20T00:00:00Z", status: "scheduled"
-        )
+        let bill = makeBill(status: "scheduled")
         XCTAssertEqual(BillsListViewModel.chipStatus(for: bill, now: Self.fixedNow), .scheduled)
     }
 
     func testChipStatusDueDefaultsForFutureDueDate() {
-        let bill = BillDTO(
-            id: "b", homeId: "h", billType: "x",
-            providerName: nil, amount: 10,
-            dueDate: "2026-05-20T00:00:00Z", status: "pending"
-        )
+        let bill = makeBill()
         XCTAssertEqual(BillsListViewModel.chipStatus(for: bill, now: Self.fixedNow), .due)
     }
 
@@ -138,10 +140,11 @@ final class BillsListViewModelTests: XCTestCase {
 
     func testProjectionPaidSubtitle() {
         let projection = BillsListViewModel.project(
-            bill: BillDTO(
-                id: "b", homeId: "h", billType: "x",
-                providerName: "Verizon", amount: 67.40,
-                dueDate: "2026-05-08T00:00:00Z", status: "paid",
+            bill: makeBill(
+                status: "paid",
+                dueDate: "2026-05-08T00:00:00Z",
+                providerName: "Verizon",
+                amount: 67.40,
                 paidAt: "2026-05-08T00:00:00Z"
             ),
             now: Self.fixedNow
@@ -153,10 +156,10 @@ final class BillsListViewModelTests: XCTestCase {
 
     func testProjectionOverdueSubtitle() {
         let projection = BillsListViewModel.project(
-            bill: BillDTO(
-                id: "b", homeId: "h", billType: "x",
-                providerName: "Elm St HOA", amount: 325.00,
-                dueDate: "2026-05-05T00:00:00Z", status: "pending"
+            bill: makeBill(
+                dueDate: "2026-05-05T00:00:00Z",
+                providerName: "Elm St HOA",
+                amount: 325.00
             ),
             now: Self.fixedNow
         )
@@ -166,10 +169,11 @@ final class BillsListViewModelTests: XCTestCase {
 
     func testProjectionScheduledSubtitle() {
         let projection = BillsListViewModel.project(
-            bill: BillDTO(
-                id: "b", homeId: "h", billType: "x",
-                providerName: "Verizon Fios", amount: 89.99,
-                dueDate: "2026-05-18T00:00:00Z", status: "scheduled"
+            bill: makeBill(
+                status: "scheduled",
+                dueDate: "2026-05-18T00:00:00Z",
+                providerName: "Verizon Fios",
+                amount: 89.99
             ),
             now: Self.fixedNow
         )
@@ -179,10 +183,9 @@ final class BillsListViewModelTests: XCTestCase {
 
     func testProjectionDueSubtitle() {
         let projection = BillsListViewModel.project(
-            bill: BillDTO(
-                id: "b", homeId: "h", billType: "x",
-                providerName: "ConEd", amount: 142.80,
-                dueDate: "2026-05-20T00:00:00Z", status: "pending"
+            bill: makeBill(
+                providerName: "ConEd",
+                amount: 142.80
             ),
             now: Self.fixedNow
         )
@@ -201,7 +204,7 @@ final class BillsListViewModelTests: XCTestCase {
             XCTFail("Expected loaded, got \(vm.state)")
             return
         }
-        let ids = sections.flatMap { $0.rows }.map(\.id)
+        let ids = sections.flatMap(\.rows).map(\.id)
         XCTAssertEqual(Set(ids), Set(["b-due", "b-overdue", "b-scheduled"]))
     }
 
@@ -226,7 +229,7 @@ final class BillsListViewModelTests: XCTestCase {
             XCTFail("Expected loaded, got \(vm.state)")
             return
         }
-        let ids = Set(sections.flatMap { $0.rows }.map(\.id))
+        let ids = Set(sections.flatMap(\.rows).map(\.id))
         XCTAssertEqual(ids, Set(["b-due", "b-overdue", "b-scheduled", "b-paid"]))
         XCTAssertFalse(ids.contains("b-cancelled"))
     }

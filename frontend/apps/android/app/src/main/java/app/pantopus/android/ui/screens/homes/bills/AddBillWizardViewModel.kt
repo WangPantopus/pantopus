@@ -59,9 +59,10 @@ class AddBillWizardViewModel
         private val repo: HomesRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel(), WizardModel {
-        private val homeId: String = checkNotNull(savedStateHandle[ADD_BILL_HOME_ID_KEY]) {
-            "AddBillWizardViewModel requires a $ADD_BILL_HOME_ID_KEY nav argument"
-        }
+        private val homeId: String =
+            checkNotNull(savedStateHandle[ADD_BILL_HOME_ID_KEY]) {
+                "AddBillWizardViewModel requires a $ADD_BILL_HOME_ID_KEY nav argument"
+            }
 
         // Step 1
         var payee: String by mutableStateOf("")
@@ -193,12 +194,13 @@ class AddBillWizardViewModel
             _isSubmitting.value = true
             _submitError.value = null
             viewModelScope.launch {
-                val details = buildMap {
-                    put("schedule", schedule.detailsKey)
-                    if (schedule != AddBillSchedule.OneTime) {
-                        put("frequency", schedule.detailsKey)
+                val details =
+                    buildMap {
+                        put("schedule", schedule.detailsKey)
+                        if (schedule != AddBillSchedule.OneTime) {
+                            put("frequency", schedule.detailsKey)
+                        }
                     }
-                }
                 val request =
                     CreateBillRequest(
                         billType = "other",

@@ -45,12 +45,14 @@ class BillDetailViewModel
         private val repo: HomesRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        private val homeId: String = checkNotNull(savedStateHandle[BILL_DETAIL_HOME_ID_KEY]) {
-            "BillDetailViewModel requires a $BILL_DETAIL_HOME_ID_KEY nav argument"
-        }
-        private val billId: String = checkNotNull(savedStateHandle[BILL_DETAIL_BILL_ID_KEY]) {
-            "BillDetailViewModel requires a $BILL_DETAIL_BILL_ID_KEY nav argument"
-        }
+        private val homeId: String =
+            checkNotNull(savedStateHandle[BILL_DETAIL_HOME_ID_KEY]) {
+                "BillDetailViewModel requires a $BILL_DETAIL_HOME_ID_KEY nav argument"
+            }
+        private val billId: String =
+            checkNotNull(savedStateHandle[BILL_DETAIL_BILL_ID_KEY]) {
+                "BillDetailViewModel requires a $BILL_DETAIL_BILL_ID_KEY nav argument"
+            }
 
         private val _state = MutableStateFlow<BillDetailUiState>(BillDetailUiState.Loading)
         val state: StateFlow<BillDetailUiState> = _state.asStateFlow()

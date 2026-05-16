@@ -238,8 +238,10 @@ private object ChildRoutes {
     fun homeBills(homeId: String): String = "homes/$homeId/bills"
 
     /** Build the concrete path for a Bill detail. */
-    fun billDetail(homeId: String, billId: String): String =
-        "homes/$homeId/bills/$billId"
+    fun billDetail(
+        homeId: String,
+        billId: String,
+    ): String = "homes/$homeId/bills/$billId"
 
     /** Build the concrete path for the Add Bill wizard. */
     fun addBill(homeId: String): String = "homes/$homeId/bills/new"

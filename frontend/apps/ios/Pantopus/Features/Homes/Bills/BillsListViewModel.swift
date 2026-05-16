@@ -37,6 +37,12 @@ enum BillsTab: String, CaseIterable {
     case all
 }
 
+private struct BillsTabCounts {
+    let upcoming: Int?
+    let paid: Int?
+    let all: Int?
+}
+
 /// ViewModel for the Bills list. Builds `RowModel`s from `BillDTO`s and
 /// re-renders the tab filter client-side — backend supports a
 /// `?status=` query but the design wants three buckets the server
@@ -48,14 +54,13 @@ final class BillsListViewModel: ListOfRowsDataSource {
     var topBarAction: TopBarAction? {
         TopBarAction(
             icon: .plusCircle,
-            accessibilityLabel: "Add a bill",
-            handler: { [onAddBill] in onAddBill() }
-        )
+            accessibilityLabel: "Add a bill"
+        ) { [onAddBill] in onAddBill() }
     }
 
     /// Tabs with live counts. Rebuilt whenever `bills` changes.
     var tabs: [ListOfRowsTab] {
-        let summary = bills.map(counts) ?? (upcoming: nil, paid: nil, all: nil)
+        let summary = bills.map(counts) ?? BillsTabCounts(upcoming: nil, paid: nil, all: nil)
         return [
             ListOfRowsTab(id: BillsTab.upcoming.rawValue, label: "Upcoming", count: summary.upcoming),
             ListOfRowsTab(id: BillsTab.paid.rawValue, label: "Paid", count: summary.paid),
@@ -71,9 +76,8 @@ final class BillsListViewModel: ListOfRowsDataSource {
         FABAction(
             icon: .plusCircle,
             accessibilityLabel: "Add a bill",
-            variant: .secondaryCreate,
-            handler: { [onAddBill] in onAddBill() }
-        )
+            variant: .secondaryCreate
+        ) { [onAddBill] in onAddBill() }
     }
 
     private(set) var state: ListOfRowsState = .loading
@@ -149,9 +153,8 @@ final class BillsListViewModel: ListOfRowsDataSource {
                     icon: .receipt,
                     headline: "No bills yet",
                     subcopy: "Add a bill to track due dates, schedule payments, and split with household members.",
-                    ctaTitle: "Add a bill",
-                    onCTA: { [onAddBill] in onAddBill() }
-                )
+                    ctaTitle: "Add a bill"
+                ) { [onAddBill] in onAddBill() }
             )
             return
         }
@@ -175,9 +178,8 @@ final class BillsListViewModel: ListOfRowsDataSource {
                 chipText: projection.chipText,
                 chipVariant: projection.chipVariant,
                 chipIcon: projection.chipIcon
-            ),
-            onTap: { [onOpenBill] in onOpenBill(billId) }
-        )
+            )
+        ) { [onOpenBill] in onOpenBill(billId) }
     }
 
     /// Pure mapping from a bill + clock to display strings. Exposed
@@ -244,6 +246,7 @@ final class BillsListViewModel: ListOfRowsDataSource {
     }
 
     private func passes(_ bill: BillDTO, tab: BillsTab, now: Date) -> Bool {
+        if bill.status == "cancelled" { return false }
         let chip = BillsListViewModel.chipStatus(for: bill, now: now)
         switch tab {
         case .upcoming:
@@ -251,12 +254,11 @@ final class BillsListViewModel: ListOfRowsDataSource {
         case .paid:
             return chip == .paid
         case .all:
-            // Hide soft-deleted (cancelled) bills from the All tab.
-            return bill.status != "cancelled"
+            return true
         }
     }
 
-    private func counts(_ bills: [BillDTO]) -> (upcoming: Int?, paid: Int?, all: Int?) {
+    private func counts(_ bills: [BillDTO]) -> BillsTabCounts {
         let nowDate = now()
         var upcoming = 0
         var paid = 0
@@ -270,7 +272,7 @@ final class BillsListViewModel: ListOfRowsDataSource {
             case .due, .overdue, .scheduled: upcoming += 1
             }
         }
-        return (upcoming, paid, all)
+        return BillsTabCounts(upcoming: upcoming, paid: paid, all: all)
     }
 
     // MARK: - Formatting
@@ -288,6 +290,7 @@ final class BillsListViewModel: ListOfRowsDataSource {
         guard let iso, let date = parseDate(iso) else { return nil }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "MMM d"
         return formatter.string(from: date)
     }

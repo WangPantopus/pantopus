@@ -20,7 +20,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class BillDetailViewModel {
-    enum State: Sendable, Equatable {
+    enum State: Equatable {
         case loading
         case loaded(BillDTO, [BillSplitDTO])
         case error(message: String)
@@ -62,7 +62,7 @@ final class BillDetailViewModel {
                 api.request(HomesEndpoints.billSplits(homeId: homeId, billId: billId))
 
             let bills = try await billsTask.bills
-            let splits = (try? await splitsTask.splits) ?? []
+            let splits = await (try? splitsTask.splits) ?? []
             guard let bill = bills.first(where: { $0.id == billId }) else {
                 state = .error(message: "This bill is no longer available.")
                 return
@@ -113,20 +113,21 @@ final class BillDetailViewModel {
 
 struct BillDetailView: View {
     @State private var viewModel: BillDetailViewModel
-    private let onBack: () -> Void
+    private let onBack: @Sendable () -> Void
 
     init(
         homeId: String,
         billId: String,
-        onBack: @escaping () -> Void,
+        onBack: @escaping @Sendable () -> Void,
         onChanged: @escaping @Sendable () -> Void = {}
     ) {
         _viewModel = State(initialValue: BillDetailViewModel(
             homeId: homeId,
             billId: billId,
-            onChanged: onChanged,
-            onClose: { Task { @MainActor in onBack() } }
-        ))
+            onChanged: onChanged
+        ) {
+            Task { @MainActor in onBack() }
+        })
         self.onBack = onBack
     }
 
@@ -142,21 +143,30 @@ struct BillDetailView: View {
                     saving: viewModel.isSaving,
                     saveError: viewModel.saveError,
                     onBack: onBack,
-                    onMarkPaid: { Task { await viewModel.markPaid() } },
-                    onRemove: { Task { await viewModel.remove() } }
+                    onMarkPaid: markPaid,
+                    onRemove: removeBill
                 )
             case let .error(message):
                 ErrorShell(
                     message: message,
-                    onBack: onBack,
-                    onRetry: { Task { await viewModel.load() } }
-                )
+                    onBack: onBack
+                ) {
+                    Task { await viewModel.load() }
+                }
             }
         }
         .accessibilityIdentifier("billDetail")
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .onAppear { Analytics.track(.screenBillDetailViewed) }
         .task { await viewModel.load() }
+    }
+
+    private func markPaid() {
+        Task { await viewModel.markPaid() }
+    }
+
+    private func removeBill() {
+        Task { await viewModel.remove() }
     }
 }
 
@@ -404,5 +414,5 @@ private struct SplitsSection: View {
 }
 
 #Preview {
-    BillDetailView(homeId: "preview", billId: "bill-1", onBack: {})
+    BillDetailView(homeId: "preview", billId: "bill-1") {}
 }

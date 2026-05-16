@@ -71,6 +71,11 @@ class IconTest {
             "shield-alert",
             "check-check",
             "history",
+            "receipt",
+            "clock",
+            "repeat",
+            "users",
+            "dollar-sign",
         )
 
     @Test

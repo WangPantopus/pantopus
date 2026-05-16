@@ -30,8 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -162,16 +160,22 @@ private fun DetailsStep(viewModel: AddBillWizardViewModel) {
         FieldLabel("Due date")
         var showPicker by remember { mutableStateOf(false) }
         OutlinedField(testTag = "addBill_dueDate") {
-            Box(modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showPicker = true }
-                .padding(Spacing.s3)) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { showPicker = true }
+                        .padding(Spacing.s3),
+            ) {
                 Text(
                     text = viewModel.dueDate?.toString() ?: "Pick a date",
                     style = PantopusTextStyle.body,
                     color =
-                        if (viewModel.dueDate != null) PantopusColors.appText
-                        else PantopusColors.appTextMuted,
+                        if (viewModel.dueDate != null) {
+                            PantopusColors.appText
+                        } else {
+                            PantopusColors.appTextMuted
+                        },
                 )
             }
         }
@@ -206,8 +210,11 @@ private fun ScheduleStep(viewModel: AddBillWizardViewModel) {
                             .border(
                                 width = 1.dp,
                                 color =
-                                    if (selected) PantopusColors.primary600
-                                    else PantopusColors.appBorderSubtle,
+                                    if (selected) {
+                                        PantopusColors.primary600
+                                    } else {
+                                        PantopusColors.appBorderSubtle
+                                    },
                                 shape = RoundedCornerShape(Radii.md),
                             )
                             .clickable { viewModel.schedule = schedule }
@@ -218,8 +225,11 @@ private fun ScheduleStep(viewModel: AddBillWizardViewModel) {
                 ) {
                     PantopusIconImage(
                         icon =
-                            if (schedule == AddBillSchedule.OneTime) PantopusIcon.Clock
-                            else PantopusIcon.Repeat,
+                            if (schedule == AddBillSchedule.OneTime) {
+                                PantopusIcon.Clock
+                            } else {
+                                PantopusIcon.Repeat
+                            },
                         contentDescription = null,
                         size = 18.dp,
                         tint = PantopusColors.primary600,
@@ -278,10 +288,11 @@ private fun ReviewStep(
             HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
             ReviewRow(
                 label = "Due date",
-                value = viewModel.dueDate?.let { date ->
-                    val instant = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
-                    DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date.from(instant))
-                } ?: "—",
+                value =
+                    viewModel.dueDate?.let { date ->
+                        val instant = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
+                        DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date.from(instant))
+                    } ?: "—",
             )
             HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
             ReviewRow("Schedule", viewModel.schedule.label)

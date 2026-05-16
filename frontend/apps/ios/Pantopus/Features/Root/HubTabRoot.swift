@@ -4,7 +4,7 @@
 //
 //  Navigation stack for the Hub tab.
 //
-// swiftlint:disable cyclomatic_complexity function_body_length
+// swiftlint:disable cyclomatic_complexity function_body_length type_body_length
 
 import SwiftUI
 
@@ -207,20 +207,15 @@ public struct HubTabRoot: View {
             )
         case let .homeBills(homeId):
             BillsListView(
-                viewModel: BillsListViewModel(
-                    homeId: homeId,
-                    onOpenBill: { billId in
-                        Task { @MainActor in push(.billDetail(homeId: homeId, billId: billId)) }
-                    },
-                    onAddBill: { Task { @MainActor in push(.addBill(homeId: homeId)) } }
-                )
+                viewModel: Self.billsListViewModel(homeId: homeId, push: push)
             )
         case let .billDetail(homeId, billId):
             BillDetailView(
                 homeId: homeId,
-                billId: billId,
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+                billId: billId
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case let .addBill(homeId):
             AddBillWizardView(
                 homeId: homeId,
@@ -392,6 +387,23 @@ public struct HubTabRoot: View {
         case .componentGallery: ComponentGalleryView()
         #endif
         }
+    }
+
+    private static func billsListViewModel(
+        homeId: String,
+        push: @escaping (HubRoute) -> Void
+    ) -> BillsListViewModel {
+        let openBill: @Sendable (String) -> Void = { billId in
+            Task { @MainActor in push(.billDetail(homeId: homeId, billId: billId)) }
+        }
+        let addBill: @Sendable () -> Void = {
+            Task { @MainActor in push(.addBill(homeId: homeId)) }
+        }
+        return BillsListViewModel(
+            homeId: homeId,
+            onOpenBill: openBill,
+            onAddBill: addBill
+        )
     }
 }
 

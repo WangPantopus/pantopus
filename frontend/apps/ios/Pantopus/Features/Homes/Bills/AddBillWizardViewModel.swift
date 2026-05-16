@@ -33,7 +33,9 @@ public enum AddBillSchedule: String, Sendable, CaseIterable, Identifiable {
     case quarterly
     case yearly
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -68,7 +70,7 @@ final class AddBillWizardViewModel: WizardModel {
     var amount: String = ""
     var dueDate: Date?
 
-    // Step 2 fields
+    /// Step 2 fields
     var schedule: AddBillSchedule = .oneTime
 
     // Lifecycle

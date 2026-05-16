@@ -39,9 +39,10 @@ data class BillDto(
      *  `amount_cents` as authoritative when set, then falls back to
      *  `amount`. */
     val displayAmount: BigDecimal
-        get() = amountCents
-            ?.let { BigDecimal.valueOf(it).movePointLeft(2) }
-            ?: amount
+        get() =
+            amountCents
+                ?.let { BigDecimal.valueOf(it).movePointLeft(2) }
+                ?: amount
 }
 
 /** Envelope for `GET /api/homes/:id/bills`. */
@@ -133,7 +134,10 @@ class BillDecimalAdapter {
         }
 
     @ToJson
-    fun toJson(writer: com.squareup.moshi.JsonWriter, value: BigDecimal) {
+    fun toJson(
+        writer: com.squareup.moshi.JsonWriter,
+        value: BigDecimal,
+    ) {
         writer.value(value)
     }
 }
