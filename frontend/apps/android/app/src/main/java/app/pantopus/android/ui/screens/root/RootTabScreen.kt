@@ -37,6 +37,8 @@ import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
+import app.pantopus.android.ui.screens.discoverhub.DiscoverHubScreen
+import app.pantopus.android.ui.screens.discoverhub.DiscoverHubTarget
 import app.pantopus.android.ui.screens.feed.FeedScreen
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.gigs.GigsCategory
@@ -161,6 +163,14 @@ private object ChildRoutes {
 
     /** My posts (T5.3.3). Reached from the You / Me Activity-section row. */
     const val MY_POSTS = "my-posts"
+
+    /** Discover hub (T5.4.1 / P11). Reached from the Hub Discovery rail's
+     *  "See all" CTA or via `pantopus://discover-hub`. */
+    const val DISCOVER_HUB = "discover-hub"
+
+    /** Discover businesses (T5.4.2 / P12). Until P12 lands, the Discover
+     *  hub Businesses "See all" pushes here and renders a placeholder. */
+    const val DISCOVER_BUSINESSES = "discover-businesses"
 
     /** Hub menu icon target. Replaced by Settings in T3.1. */
     const val MENU = "settings"
@@ -413,6 +423,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 navController.navigate(ChildRoutes.CONNECTIONS)
                 DeepLinkRouter.consume()
             }
+            DeepLinkRouter.Destination.DiscoverHub -> {
+                navController.navigate(ChildRoutes.DISCOVER_HUB)
+                DeepLinkRouter.consume()
+            }
             is DeepLinkRouter.Destination.Post -> {
                 navController.navigate(ChildRoutes.pulsePost(pending.id))
                 DeepLinkRouter.consume()
@@ -513,6 +527,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 }
                             is HubNavigationIntent.DiscoveryTapped ->
                                 routeForDiscovery(intent.item).also { navController.navigate(it) }
+                            HubNavigationIntent.OpenDiscoverHub ->
+                                navController.navigate(ChildRoutes.DISCOVER_HUB)
                             is HubNavigationIntent.JumpBackTapped ->
                                 routeForJumpBackIn(intent.item).also { navController.navigate(it) }
                         }
@@ -947,6 +963,39 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.placeholder("Find people"))
                     },
                 )
+            }
+            composable(ChildRoutes.DISCOVER_HUB) {
+                DiscoverHubScreen(
+                    onBack = { navController.popBackStack() },
+                    onSelect = { target ->
+                        when (target) {
+                            is DiscoverHubTarget.Person ->
+                                navController.navigate(ChildRoutes.publicProfile(target.userId))
+                            is DiscoverHubTarget.Business ->
+                                // Per buildout plan F6, the typed business
+                                // profile screen lands later — push the
+                                // discover-businesses placeholder for now.
+                                navController.navigate(ChildRoutes.DISCOVER_BUSINESSES)
+                            is DiscoverHubTarget.Gig ->
+                                navController.navigate(ChildRoutes.gigDetail(target.gigId))
+                            is DiscoverHubTarget.Listing ->
+                                navController.navigate(ChildRoutes.listingDetail(target.listingId))
+                            DiscoverHubTarget.SeeAllPeople ->
+                                navController.navigate(ChildRoutes.CONNECTIONS)
+                            DiscoverHubTarget.SeeAllBusinesses ->
+                                navController.navigate(ChildRoutes.DISCOVER_BUSINESSES)
+                            DiscoverHubTarget.SeeAllGigs ->
+                                navController.navigate(ChildRoutes.GIGS_FEED)
+                            DiscoverHubTarget.SeeAllListings ->
+                                navController.navigate(ChildRoutes.MARKETPLACE)
+                            DiscoverHubTarget.OpenFilters ->
+                                navController.navigate(ChildRoutes.placeholder("Discovery filters"))
+                        }
+                    },
+                )
+            }
+            composable(ChildRoutes.DISCOVER_BUSINESSES) {
+                NotYetAvailableView(tabName = "Discover businesses", icon = PantopusIcon.Compass)
             }
             composable(ChildRoutes.OFFERS) {
                 OffersScreen(

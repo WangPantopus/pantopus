@@ -198,7 +198,16 @@ data class HubTodayResponse(
     val error: String?,
 )
 
-/** `GET /api/hub/discovery` — route `backend/routes/hub.js:720`. */
+/**
+ * `GET /api/hub/discovery` — route `backend/routes/hub.js:757`.
+ *
+ * T5.4.1 — extended additively for the Discover hub screen. Legacy
+ * fields (`meta`, `category`, `avatarUrl`, `route`) are preserved so
+ * the existing Hub Discovery rail keeps rendering unchanged. New
+ * optional fields (`subtitle`, `price`, `rating`, `verified`,
+ * `isFree`, `isWanted`, `createdAt`) carry the structured payload the
+ * typed Discover hub rows render.
+ */
 @JsonClass(generateAdapter = true)
 data class HubDiscoveryResponse(
     val items: List<DiscoveryItem>,
@@ -210,7 +219,15 @@ data class DiscoveryItem(
     val type: String,
     val title: String,
     val meta: String,
-    val category: String,
+    val category: String?,
     val avatarUrl: String?,
     val route: String,
+    // ─── T5.4.1 additive fields ──────────────────────────────────
+    val subtitle: String? = null,
+    val price: String? = null,
+    val rating: Double? = null,
+    val verified: Boolean? = null,
+    val isFree: Boolean? = null,
+    val isWanted: Boolean? = null,
+    val createdAt: String? = null,
 )

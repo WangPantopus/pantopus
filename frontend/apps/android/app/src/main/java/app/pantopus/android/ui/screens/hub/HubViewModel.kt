@@ -125,7 +125,7 @@ class HubViewModel
                                     id = it.id,
                                     title = it.title,
                                     meta = it.meta,
-                                    category = it.category,
+                                    category = it.category.orEmpty(),
                                     avatarInitials = initials(it.title),
                                     kind = DiscoveryKind.fromRawType(it.type),
                                 )

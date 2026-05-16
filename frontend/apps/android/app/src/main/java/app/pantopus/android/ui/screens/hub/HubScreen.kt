@@ -129,7 +129,11 @@ private fun PopulatedLayout(
         }
         if (content.discovery.isNotEmpty()) {
             item(key = "discovery") {
-                HubDiscoveryRail(content.discovery) { onIntent(HubNavigationIntent.DiscoveryTapped(it)) }
+                HubDiscoveryRail(
+                    items = content.discovery,
+                    onTap = { onIntent(HubNavigationIntent.DiscoveryTapped(it)) },
+                    onSeeAll = { onIntent(HubNavigationIntent.OpenDiscoverHub) },
+                )
             }
         }
         if (content.jumpBackIn.isNotEmpty()) {

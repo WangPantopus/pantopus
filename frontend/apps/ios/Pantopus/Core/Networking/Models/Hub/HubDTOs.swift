@@ -187,9 +187,17 @@ public struct HubTodayResponse: Decodable, Sendable, Hashable {
     public let error: String?
 }
 
-// MARK: - Hub Discovery (GET /api/hub/discovery — backend/routes/hub.js:720)
+// MARK: - Hub Discovery (GET /api/hub/discovery — backend/routes/hub.js:757)
 
 /// `GET /api/hub/discovery` response envelope.
+///
+/// T5.4.1 — extended additively for the Discover hub screen. The legacy
+/// `meta` field stays intact (used by the Hub Discovery rail at
+/// `Features/Hub/Sections/HubSections.swift:281`); new optional fields
+/// (`subtitle`, `price`, `rating`, `verified`, `isFree`, `isWanted`,
+/// `createdAt`) carry the structured payload the typed Discover hub
+/// rows render. Backend default for filters and shape lives at
+/// `backend/routes/hub.js:757`.
 public struct HubDiscoveryResponse: Decodable, Sendable, Hashable {
     public let items: [Item]
 
@@ -198,8 +206,32 @@ public struct HubDiscoveryResponse: Decodable, Sendable, Hashable {
         public let type: String
         public let title: String
         public let meta: String
-        public let category: String
+        public let category: String?
         public let avatarUrl: String?
         public let route: String
+
+        // MARK: T5.4.1 additive fields
+
+        /// Pre-rendered single-line subtitle for the typed-row layout.
+        /// Falls back to `meta` at the call site if absent.
+        public let subtitle: String?
+        /// Display string for the price column (e.g. `$45`, `Free`,
+        /// `Wanted`). Listings + gigs only.
+        public let price: String?
+        /// Numeric rating for the per-row star render (people +
+        /// businesses).
+        public let rating: Double?
+        /// True for the chip-strip "Verified" filter — the backend
+        /// derives this per-type (people: rating present; businesses:
+        /// published profile).
+        public let verified: Bool?
+        /// True for `price == 0` listings/gigs — chip-strip "Free /
+        /// wanted" filter on the client side.
+        public let isFree: Bool?
+        /// True for `is_wanted` listings — same chip-strip filter.
+        public let isWanted: Bool?
+        /// ISO-8601 created timestamp; the chip-strip "New today"
+        /// filter uses this to keep items within 24h.
+        public let createdAt: String?
     }
 }

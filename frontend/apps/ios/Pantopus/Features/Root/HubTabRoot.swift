@@ -62,6 +62,14 @@ public enum HubRoute: Hashable {
     /// T5.3.4 — per-listing offers panel reached from a listing detail
     /// "View offers" affordance (only the listing's owner sees it).
     case listingOffers(listingId: String, title: String?)
+    /// Discover hub — typed-section discovery list (T5.4.1 / P11).
+    /// Reached from the Hub Discovery rail's "See all" CTA or via the
+    /// `pantopus://discover-hub` deep link.
+    case discoverHub
+    /// Discover businesses — full business search list (T5.4.2 / P12).
+    /// Until P12 lands, the Discover hub Businesses "See all" pushes
+    /// here and renders a `NotYetAvailableView`.
+    case discoverBusinesses
     /// Push the chat conversation for a given counterparty. Used by the
     /// Connections row's message-CTA — payload mirrors the Inbox tab's
     /// `InboxConversationDestination` so the same `ChatConversationView`
@@ -129,6 +137,9 @@ public struct HubTabRoot: View {
         case .connections:
             path.append(.connections)
             _ = router.consume()
+        case .discoverHub:
+            path.append(.discoverHub)
+            _ = router.consume()
         default:
             break
         }
@@ -149,6 +160,7 @@ public struct HubTabRoot: View {
             case .pillar(.gigs): path.append(.gigsFeed)
             case .pillar(.marketplace): path.append(.marketplace)
             case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
+            case .openDiscoverHub: path.append(.discoverHub)
             case let .jumpBackIn(item): path.append(Self.route(forJumpBackIn: item))
             }
         }
@@ -494,6 +506,38 @@ public struct HubTabRoot: View {
                     }
                 )
             )
+        case .discoverHub:
+            DiscoverHubView(
+                viewModel: DiscoverHubViewModel { target in
+                    Task { @MainActor in
+                        switch target {
+                        case let .person(userId, _):
+                            push(.publicProfile(userId: userId))
+                        case .business:
+                            // Per buildout plan F6, the typed business
+                            // profile screen lands later — push the
+                            // discover-businesses placeholder for now.
+                            push(.discoverBusinesses)
+                        case let .gig(gigId):
+                            push(.gigDetail(gigId: gigId))
+                        case let .listing(listingId):
+                            push(.listingDetail(listingId: listingId))
+                        case .seeAllPeople:
+                            push(.connections)
+                        case .seeAllBusinesses:
+                            push(.discoverBusinesses)
+                        case .seeAllGigs:
+                            push(.gigsFeed)
+                        case .seeAllListings:
+                            push(.marketplace)
+                        case .openFilters:
+                            push(.placeholder(label: "Discovery filters"))
+                        }
+                    }
+                }
+            )
+        case .discoverBusinesses:
+            NotYetAvailableView(tabName: "Discover businesses", icon: .compass)
         case .myBids:
             MyBidsView(
                 viewModel: MyBidsViewModel(

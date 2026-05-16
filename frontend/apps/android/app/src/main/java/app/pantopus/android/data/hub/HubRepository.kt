@@ -22,9 +22,27 @@ class HubRepository
         /** `GET /api/hub/today`. */
         suspend fun today(): NetworkResult<HubTodayResponse> = safeApiCall { api.today() }
 
-        /** `GET /api/hub/discovery?filter=gigs&limit=10`. */
+        /**
+         * `GET /api/hub/discovery?filter=...&limit=...`.
+         *
+         * T5.4.1 — chip-strip filter params (`since` / `verified` /
+         * `freeOrWanted`) plumb through the same call so the Discover
+         * hub VM can re-fetch with one parameterised entry point.
+         */
         suspend fun discovery(
             filter: String = "gigs",
             limit: Int = 10,
-        ): NetworkResult<HubDiscoveryResponse> = safeApiCall { api.discovery(filter = filter, limit = limit) }
+            since: String? = null,
+            verified: Boolean? = null,
+            freeOrWanted: Boolean? = null,
+        ): NetworkResult<HubDiscoveryResponse> =
+            safeApiCall {
+                api.discovery(
+                    filter = filter,
+                    limit = limit,
+                    since = since,
+                    verified = verified,
+                    freeOrWanted = freeOrWanted,
+                )
+            }
     }

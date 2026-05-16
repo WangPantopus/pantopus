@@ -31,6 +31,8 @@ object DeepLinkRouter {
 
         data object Connections : Destination
 
+        data object DiscoverHub : Destination
+
         data class SupportTrain(val id: String) : Destination
 
         data class Post(val id: String) : Destination
@@ -122,6 +124,7 @@ object DeepLinkRouter {
             "home" -> Destination.Home
             "notifications" -> Destination.Notifications
             "connections" -> Destination.Connections
+            "discover-hub", "discover_hub", "discoverhub" -> Destination.DiscoverHub
             "support-trains", "support_train" -> {
                 val id = segments.getOrNull(1)
                 if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.SupportTrain(id)

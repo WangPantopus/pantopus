@@ -112,10 +112,10 @@ public struct RootTabView: View {
         case .feed, .post, .supportTrain, .user:
             model.selected = .hub
             _ = router.consume()
-        case .connections:
+        case .connections, .discoverHub:
             // Switch to Hub but leave the destination pending — `HubTabRoot`
-            // consumes it from there and pushes the Connections screen
-            // onto the Hub navigation stack.
+            // consumes it from there and pushes the target screen onto the
+            // Hub navigation stack.
             model.selected = .hub
         case .gig, .listing, .homeDetail, .homeDashboard, .homeMemberRequests:
             model.selected = .hub

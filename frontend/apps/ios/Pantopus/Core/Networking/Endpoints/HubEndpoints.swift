@@ -22,16 +22,26 @@ public enum HubEndpoints {
         Endpoint(method: .get, path: "/api/hub/today")
     }
 
-    /// `GET /api/hub/discovery` — route `backend/routes/hub.js:720`.
+    /// `GET /api/hub/discovery` — route `backend/routes/hub.js:757`.
+    ///
+    /// T5.4.1 chip-strip filters (`since` / `verified` / `freeOrWanted`)
+    /// are passed through as query params; the Discover hub VM
+    /// re-fetches with the new shape per chip selection.
     public static func discovery(
         filter: String,
         lat: Double? = nil,
         lng: Double? = nil,
-        limit: Int = 10
+        limit: Int = 10,
+        since: String? = nil,
+        verified: Bool? = nil,
+        freeOrWanted: Bool? = nil
     ) -> Endpoint {
         var query: [String: String] = ["filter": filter, "limit": String(limit)]
         if let lat { query["lat"] = String(lat) }
         if let lng { query["lng"] = String(lng) }
+        if let since { query["since"] = since }
+        if let verified { query["verified"] = String(verified) }
+        if let freeOrWanted { query["freeOrWanted"] = String(freeOrWanted) }
         return Endpoint(method: .get, path: "/api/hub/discovery", query: query)
     }
 }

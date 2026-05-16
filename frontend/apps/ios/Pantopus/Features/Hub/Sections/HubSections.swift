@@ -281,11 +281,30 @@ struct HubPillarGrid: View {
 struct HubDiscoveryRail: View {
     let items: [DiscoveryCardContent]
     let onTap: (DiscoveryCardContent) -> Void
+    /// Optional `See all` action — pushes to the typed Discover hub
+    /// screen (T5.4.1).
+    var onSeeAll: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            SectionHeader("Discover nearby")
-                .padding(.horizontal, Spacing.s4)
+            HStack(spacing: Spacing.s2) {
+                SectionHeader("Discover nearby")
+                Spacer()
+                if let onSeeAll {
+                    Button(action: onSeeAll) {
+                        HStack(spacing: Spacing.s1) {
+                            Text("See all")
+                                .pantopusTextStyle(.caption)
+                                .foregroundStyle(Theme.Color.primary600)
+                            Icon(.chevronRight, size: 12, color: Theme.Color.primary600)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("See all discovery")
+                    .accessibilityIdentifier("hubDiscoveryRail.seeAll")
+                }
+            }
+            .padding(.horizontal, Spacing.s4)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Spacing.s3) {
                     ForEach(items) { item in

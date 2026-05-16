@@ -179,7 +179,7 @@ final class HubViewModel {
             id: item.id,
             title: item.title,
             meta: item.meta,
-            category: item.category,
+            category: item.category ?? "",
             avatarInitials: initials(from: item.title),
             kind: DiscoveryKind(rawType: item.type)
         )

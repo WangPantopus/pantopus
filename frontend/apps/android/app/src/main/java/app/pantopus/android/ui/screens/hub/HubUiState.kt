@@ -192,6 +192,10 @@ sealed interface HubNavigationIntent {
         val item: DiscoveryCardContent,
     ) : HubNavigationIntent
 
+    /** Hub Discovery rail "See all" CTA — pushes the typed Discover hub
+     *  screen (T5.4.1 / P11). */
+    data object OpenDiscoverHub : HubNavigationIntent
+
     data class JumpBackTapped(
         val item: JumpBackItem,
     ) : HubNavigationIntent

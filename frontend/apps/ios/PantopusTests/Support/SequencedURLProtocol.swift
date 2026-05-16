@@ -71,6 +71,13 @@ final class SequencedURLProtocol: URLProtocol {
         lock.lock()
         defer { lock.unlock() }
         capturedRequests.append(request)
+        if let key = routeKey(for: request),
+           var responses = routeResponses[key],
+           !responses.isEmpty {
+            let response = responses.removeFirst()
+            routeResponses[key] = responses
+            return response
+        }
         if let path = request.url?.path,
            var responses = routeResponses[path],
            !responses.isEmpty {
@@ -82,5 +89,11 @@ final class SequencedURLProtocol: URLProtocol {
             return Response.status(599, body: "{\"error\":\"no stubbed response\"}")
         }
         return sequence.removeFirst()
+    }
+
+    private static func routeKey(for request: URLRequest) -> String? {
+        guard let url = request.url else { return nil }
+        guard let query = url.query, !query.isEmpty else { return url.path }
+        return "\(url.path)?\(query)"
     }
 }
