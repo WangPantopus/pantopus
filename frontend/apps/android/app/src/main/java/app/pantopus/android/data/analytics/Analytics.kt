@@ -27,6 +27,24 @@ sealed class AnalyticsEvent(
 
     data object ScreenMyClaimsViewed : AnalyticsEvent("screen.my_claims.viewed")
 
+    data object ScreenBillsViewed : AnalyticsEvent("screen.bills.viewed")
+
+    data object ScreenBillDetailViewed : AnalyticsEvent("screen.bill_detail.viewed")
+
+    data class ScreenAddBillWizardStepViewed(
+        val stepNumber: Int,
+        val stepName: String,
+    ) : AnalyticsEvent("screen.add_bill_wizard.step_viewed") {
+        override val properties =
+            mapOf("step_number" to stepNumber.toString(), "step_name" to stepName)
+    }
+
+    data class CtaAddBillSubmit(
+        val result: AnalyticsResult,
+    ) : AnalyticsEvent("cta.add_bill.submit") {
+        override val properties = mapOf("result" to result.value)
+    }
+
     data object ScreenNotificationsViewed : AnalyticsEvent("screen.notifications.viewed")
 
     data object ScreenPetsListViewed : AnalyticsEvent("screen.pets_list.viewed")

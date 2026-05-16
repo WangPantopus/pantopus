@@ -89,10 +89,49 @@ export async function updateHomeIssue(homeId: string, issueId: string, data: Par
 
 // ---- HomeBill + HomeBillSplit ----
 
+/** Bill payload returned by `GET /api/homes/:id/bills` —
+ *  route `backend/routes/home.js:4506`. The backend table stores
+ *  `amount` as a numeric column (string over the wire). Older clients
+ *  also read `amount_cents` from a now-defunct field — accept both. */
+export interface HomeBill {
+  id: string;
+  home_id: string;
+  bill_type: string;
+  provider_name: string | null;
+  amount: number | string;
+  amount_cents?: number | null;
+  currency?: string;
+  period_start?: string | null;
+  period_end?: string | null;
+  due_date: string | null;
+  status: string;
+  paid_at?: string | null;
+  paid_by?: string | null;
+  details?: Record<string, unknown> | null;
+  created_at?: string;
+  updated_at?: string;
+  // Legacy/dashboard fields some surfaces still display
+  title?: string;
+}
+
+export interface HomeBillSplit {
+  id: string;
+  bill_id: string;
+  user_id: string;
+  amount: number | string;
+  status?: string;
+  user?: {
+    id: string;
+    username?: string | null;
+    name?: string | null;
+    profile_picture_url?: string | null;
+  };
+}
+
 export async function getHomeBills(homeId: string, params?: {
   status?: string;
 }) {
-  return get<{ bills: any[] }>(`/api/homes/${homeId}/bills`, params);
+  return get<{ bills: HomeBill[] }>(`/api/homes/${homeId}/bills`, params);
 }
 
 export async function createHomeBill(homeId: string, data: {
@@ -102,20 +141,24 @@ export async function createHomeBill(homeId: string, data: {
   due_date?: string;
   period_start?: string;
   period_end?: string;
+  details?: Record<string, unknown>;
 }) {
-  return post<{ bill: any }>(`/api/homes/${homeId}/bills`, data);
+  return post<{ bill: HomeBill }>(`/api/homes/${homeId}/bills`, data);
 }
 
 export async function updateHomeBill(homeId: string, billId: string, data: Partial<{
   status: string;
   paid_at: string;
   amount: number;
+  provider_name: string;
+  due_date: string;
+  details: Record<string, unknown>;
 }>) {
-  return put<{ bill: any }>(`/api/homes/${homeId}/bills/${billId}`, data);
+  return put<{ bill: HomeBill }>(`/api/homes/${homeId}/bills/${billId}`, data);
 }
 
 export async function getHomeBillSplits(homeId: string, billId: string) {
-  return get<{ splits: any[] }>(`/api/homes/${homeId}/bills/${billId}/splits`);
+  return get<{ splits: HomeBillSplit[] }>(`/api/homes/${homeId}/bills/${billId}/splits`);
 }
 
 // ---- HomePackage ----

@@ -27,6 +27,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenAddHomeWizardStepViewed(stepNumber: Int, stepName: String)
     case screenClaimOwnershipStepViewed(stepName: String)
     case screenMyClaimsViewed
+    case screenBillsViewed
+    case screenBillDetailViewed
+    case screenAddBillWizardStepViewed(stepNumber: Int, stepName: String)
+    case ctaAddBillSubmit(result: AnalyticsResult)
     case screenPetsListViewed
     case screenPetsWizardStepViewed(stepNumber: Int, stepName: String)
     case screenPulseFeedViewed(intent: String)
@@ -52,6 +56,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenAddHomeWizardStepViewed: "screen.add_home_wizard.step_viewed"
         case .screenClaimOwnershipStepViewed: "screen.claim_ownership_wizard.step_viewed"
         case .screenMyClaimsViewed: "screen.my_claims.viewed"
+        case .screenBillsViewed: "screen.bills.viewed"
+        case .screenBillDetailViewed: "screen.bill_detail.viewed"
+        case .screenAddBillWizardStepViewed: "screen.add_bill_wizard.step_viewed"
+        case .ctaAddBillSubmit: "cta.add_bill.submit"
         case .screenPetsListViewed: "screen.pets_list.viewed"
         case .screenPetsWizardStepViewed: "screen.pets_wizard.step_viewed"
         case .screenPulseFeedViewed: "screen.pulse_feed.viewed"
@@ -89,12 +97,18 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["result": result.rawValue]
         case let .formEditProfileValidationError(field):
             ["field": field]
+        case let .screenAddBillWizardStepViewed(stepNumber, stepName):
+            ["step_number": "\(stepNumber)", "step_name": stepName]
+        case let .ctaAddBillSubmit(result):
+            ["result": result.rawValue]
         case .screenHubViewed,
              .screenMailboxListViewed,
              .screenMailboxDrawersViewed,
              .screenMyHomesViewed,
              .screenHomeDashboardViewed,
              .screenMyClaimsViewed,
+             .screenBillsViewed,
+             .screenBillDetailViewed,
              .screenPetsListViewed,
              .screenEditProfileViewed,
              .ctaMailboxItemLogReceived,

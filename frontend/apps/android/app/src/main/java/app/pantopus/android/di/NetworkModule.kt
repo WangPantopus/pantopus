@@ -66,6 +66,7 @@ object NetworkModule {
             // UploadEvidenceRequest one omits optional fields when
             // null instead of writing JSON `null`.
             .add(UploadEvidenceRequestJsonAdapter())
+            .add(app.pantopus.android.data.api.models.homes.BillDecimalAdapter())
             .add(Instant::class.java, Rfc3339DateJsonAdapter().nullSafe())
             .addLast(KotlinJsonAdapterFactory())
             .build()

@@ -4,7 +4,7 @@
 //
 //  Navigation stack for the Hub tab.
 //
-// swiftlint:disable cyclomatic_complexity function_body_length type_body_length
+// swiftlint:disable cyclomatic_complexity function_body_length type_body_length file_length
 
 import SwiftUI
 
@@ -23,6 +23,12 @@ public enum HubRoute: Hashable {
     case homePets(homeId: String)
     case publicProfile(userId: String)
     case pulsePost(postId: String)
+    /// Bills list for a home (T5.2.2 / P13).
+    case homeBills(homeId: String)
+    /// Bill detail (read-mostly summary with mark-paid / remove).
+    case billDetail(homeId: String, billId: String)
+    /// Add Bill wizard.
+    case addBill(homeId: String)
     /// Pulse tab (T1.2). Reached from Hub → pillar(.pulse).
     case pulseFeed
     /// Compose post target — placeholder until the compose flow ships.
@@ -267,11 +273,38 @@ public struct HubTabRoot: View {
                 homeId: homeId,
                 onClaimOwnership: { Task { @MainActor in push(.claimOwnership(homeId: homeId)) } },
                 onOpenClaimsList: { Task { @MainActor in push(.myClaims) } },
+                onOpenBills: { Task { @MainActor in push(.homeBills(homeId: homeId)) } },
                 onOpenPlaceholder: { label in
                     Task { @MainActor in push(.placeholder(label: label)) }
                 },
                 onOpenPets: { id in
                     Task { @MainActor in push(.homePets(homeId: id)) }
+                }
+            )
+        case let .homeBills(homeId):
+            BillsListView(
+                viewModel: Self.billsListViewModel(homeId: homeId, push: push)
+            )
+        case let .billDetail(homeId, billId):
+            BillDetailView(
+                homeId: homeId,
+                billId: billId
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
+        case let .addBill(homeId):
+            AddBillWizardView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCreated: { billId in
+                    // Replace the wizard with the new bill's detail so
+                    // Back returns to the Bills list, not the success
+                    // step.
+                    path.removeAll { route in
+                        if case .addBill = route { return true }
+                        return false
+                    }
+                    path.append(.billDetail(homeId: homeId, billId: billId))
                 }
             )
         case let .homePets(homeId):
@@ -459,6 +492,23 @@ public struct HubTabRoot: View {
         case .componentGallery: ComponentGalleryView()
         #endif
         }
+    }
+
+    private static func billsListViewModel(
+        homeId: String,
+        push: @escaping (HubRoute) -> Void
+    ) -> BillsListViewModel {
+        let openBill: @Sendable (String) -> Void = { billId in
+            Task { @MainActor in push(.billDetail(homeId: homeId, billId: billId)) }
+        }
+        let addBill: @Sendable () -> Void = {
+            Task { @MainActor in push(.addBill(homeId: homeId)) }
+        }
+        return BillsListViewModel(
+            homeId: homeId,
+            onOpenBill: openBill,
+            onAddBill: addBill
+        )
     }
 }
 

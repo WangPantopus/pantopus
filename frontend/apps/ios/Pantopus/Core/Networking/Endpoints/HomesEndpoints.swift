@@ -77,6 +77,50 @@ public enum HomesEndpoints {
         Endpoint(method: .get, path: "/api/homes/my-ownership-claims")
     }
 
+    /// `GET /api/homes/:id/bills` — route `backend/routes/home.js:4506`.
+    public static func bills(homeId: String, status: String? = nil) -> Endpoint {
+        var query: [String: String] = [:]
+        if let status { query["status"] = status }
+        return Endpoint(
+            method: .get,
+            path: "/api/homes/\(homeId)/bills",
+            query: query
+        )
+    }
+
+    /// `POST /api/homes/:id/bills` — route `backend/routes/home.js:4539`.
+    public static func createBill(homeId: String, request: CreateBillRequest) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/bills",
+            body: request
+        )
+    }
+
+    /// `PUT /api/homes/:id/bills/:billId` — route `backend/routes/home.js:4585`.
+    public static func updateBill(
+        homeId: String,
+        billId: String,
+        request: UpdateBillRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .put,
+            path: "/api/homes/\(homeId)/bills/\(billId)",
+            body: request
+        )
+    }
+
+    /// `GET /api/homes/:id/bills/:billId/splits` — route
+    /// `backend/routes/home.js:4627`. Backend has no POST/PATCH/DELETE
+    /// for splits; the detail view treats them as read-only until a
+    /// follow-up PR ships the write side.
+    public static func billSplits(homeId: String, billId: String) -> Endpoint {
+        Endpoint(
+            method: .get,
+            path: "/api/homes/\(homeId)/bills/\(billId)/splits"
+        )
+    }
+
     // MARK: - Pets (T5.2.1)
 
     /// `GET /api/homes/:id/pets` — route `backend/routes/home.js:6789`.

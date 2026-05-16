@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AlternateEmail
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Campaign
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.GppGood
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.HourglassEmpty
@@ -55,6 +57,8 @@ import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Share
@@ -150,6 +154,10 @@ enum class PantopusIcon(
     ShieldAlert("shield-alert"),
     CheckCheck("check-check"),
     History("history"),
+    Receipt("receipt"),
+    Clock("clock"),
+    Users("users"),
+    DollarSign("dollar-sign"),
 
     // T5.2.1 — Pets species iconography. Material doesn't ship dog / cat /
     // bird / fish / turtle vectors, so every species falls back to
@@ -207,7 +215,7 @@ internal sealed interface IconSource {
  * is "close to Lucide" — swap the mapping to real Lucide SVGs by changing
  * this function's bodies only.
  */
-@Suppress("CyclomaticComplexMethod")
+@Suppress("CyclomaticComplexMethod", "LongMethod")
 internal fun PantopusIcon.source(): IconSource =
     when (this) {
         PantopusIcon.Home -> IconSource.Material(Icons.Filled.Home)
@@ -270,6 +278,10 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.ShieldAlert -> IconSource.Material(Icons.Filled.Warning)
         PantopusIcon.CheckCheck -> IconSource.Material(Icons.Filled.DoneAll)
         PantopusIcon.History -> IconSource.Material(Icons.Filled.History)
+        PantopusIcon.Receipt -> IconSource.Material(Icons.Filled.Receipt)
+        PantopusIcon.Clock -> IconSource.Material(Icons.Filled.Schedule)
+        PantopusIcon.Users -> IconSource.Material(Icons.Filled.Group)
+        PantopusIcon.DollarSign -> IconSource.Material(Icons.Filled.AttachMoney)
         PantopusIcon.Dog -> IconSource.Material(Icons.Filled.Pets)
         PantopusIcon.Cat -> IconSource.Material(Icons.Filled.Pets)
         PantopusIcon.Bird -> IconSource.Material(Icons.Filled.Pets)

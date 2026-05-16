@@ -3,8 +3,12 @@ package app.pantopus.android.data.api.services
 import app.pantopus.android.data.api.models.common.JsonValue
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CheckAddressResponse
+import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
+import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
+import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.HomeDetailResponse
 import app.pantopus.android.data.api.models.homes.HomePublicProfileResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
@@ -14,14 +18,18 @@ import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
+import app.pantopus.android.data.api.models.homes.UpdateBillRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /** Home routes from `backend/routes/home.js`. */
+@Suppress("TooManyFunctions")
 interface HomesApi {
     /** `GET /api/homes/my-homes` — route `backend/routes/home.js:1464`. */
     @GET("api/homes/my-homes")
@@ -99,4 +107,35 @@ interface HomesApi {
      */
     @GET("api/homes/my-ownership-claims")
     suspend fun myOwnershipClaims(): MyOwnershipClaimsResponse
+
+    /** `GET /api/homes/:id/bills` — route `backend/routes/home.js:4506`. */
+    @GET("api/homes/{id}/bills")
+    suspend fun getHomeBills(
+        @Path("id") homeId: String,
+        @Query("status") status: String? = null,
+    ): GetHomeBillsResponse
+
+    /** `POST /api/homes/:id/bills` — route `backend/routes/home.js:4539`. */
+    @POST("api/homes/{id}/bills")
+    suspend fun createHomeBill(
+        @Path("id") homeId: String,
+        @Body body: CreateBillRequest,
+    ): HomeBillResponse
+
+    /** `PUT /api/homes/:id/bills/:billId` — route `backend/routes/home.js:4585`. */
+    @PUT("api/homes/{id}/bills/{billId}")
+    suspend fun updateHomeBill(
+        @Path("id") homeId: String,
+        @Path("billId") billId: String,
+        @Body body: UpdateBillRequest,
+    ): HomeBillResponse
+
+    /** `GET /api/homes/:id/bills/:billId/splits` — route
+     *  `backend/routes/home.js:4627`. Backend has no POST/PATCH/DELETE
+     *  for splits today; the detail view treats them as read-only. */
+    @GET("api/homes/{id}/bills/{billId}/splits")
+    suspend fun getHomeBillSplits(
+        @Path("id") homeId: String,
+        @Path("billId") billId: String,
+    ): GetBillSplitsResponse
 }
