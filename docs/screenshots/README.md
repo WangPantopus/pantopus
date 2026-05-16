@@ -1,7 +1,34 @@
 # Screenshots
 
-Visual artifacts captured during the T5.x mobile UI/UX work. Two
+Visual artifacts captured during the T5.x mobile UI/UX work. Three
 categories live here:
+
+## T5 cross-platform parity composites (12)
+
+Side-by-side iOS + Android + web renders of every new T5 list screen.
+One composite per screen, generated from the static HTML harness at
+`tools/t5-screenshots/` (kept in `/tmp` — regenerable; the harness
+mirrors the design package verbatim). Each frame is rendered at the
+canonical mobile viewport (iOS 390pt / Android 411dp / Web 400px).
+
+| File | Screen | Caption — intentional platform-specific differences |
+|---|---|---|
+| `parity-notifications.png` | Notifications V2 | Web has a legacy `personal / business` context filter (mobile drops it per F2); iOS+Android tab strip is shrink-to-fit, web is `flex: 1`. Same primary-tinted unread tint + date sections on all three. |
+| `parity-bills.png` | Bills | No platform divergence. `amountWithChip` trailing variant, 4-chip status set, 52pt `secondaryCreate` FAB. |
+| `parity-pets.png` | Pets | Mobile ships a 3-step Add wizard; web keeps a single-page modal. Same row + species chip + kebab. |
+| `parity-connections.png` | Connections | No data / a11y divergence. Same row geometry; pending tab switches the trailing CTA shape on all three. |
+| `parity-offers.png` | Offers (cross-listing) | No platform divergence; T5.2.4 reskinned the web on top of `<ListOfRowsShell />`. |
+| `parity-my-bids.png` | My bids | 48pt `extendedNav` "Browse tasks" pill FAB is identical on all three (not a create — F1). |
+| `parity-my-tasks.png` | My tasks V2 | 56pt `canonicalCreate` FAB (largest variant) is identical; `BidderStack` leading is identical. |
+| `parity-my-pulse.png` | My posts | No platform divergence on the row shape. Archive/Restore is local-only optimistic on all three (backend route lands T6). |
+| `parity-listing-offers.png` | Listing offers | No platform divergence. Same `ListingContextConfig` hero card on all three. |
+| `parity-discover-hub.png` | Discover hub | No platform divergence. Same 4-chip filter strip + 4 typed sections. |
+| `parity-discover-businesses.png` | Discover businesses | Top-bar action: sliders icon on iOS/Android; on wide-viewport web the same icon sits inside a button with an explicit label. |
+| `parity-review-claims.png` | Review claims | Web only — mobile placeholder rendered for visual contract continuity. Mobile admin tier is a T6 candidate. |
+
+The per-platform PNGs that compose each parity image live under each
+app's `__snapshots__/t5/` directory — see the T5 snapshot lockfile
+section in `RELEASES.md`.
 
 ## Production-rendered (real)
 
