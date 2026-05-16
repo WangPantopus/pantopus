@@ -537,7 +537,25 @@ public struct HubTabRoot: View {
                 }
             )
         case .discoverBusinesses:
-            NotYetAvailableView(tabName: "Discover businesses", icon: .compass)
+            DiscoverBusinessesView(
+                viewModel: DiscoverBusinessesViewModel { target in
+                    Task { @MainActor in
+                        switch target {
+                        case let .business(businessId, name):
+                            // The dedicated business-profile screen is
+                            // still pending. Use the placeholder until
+                            // it lands.
+                            push(.placeholder(label: "Business: \(name) (\(businessId))"))
+                        case .openFilters:
+                            push(.placeholder(label: "Business filters"))
+                        case .widenRadius:
+                            push(.placeholder(label: "Set home address"))
+                        case .inviteBusiness:
+                            push(.placeholder(label: "Invite a business"))
+                        }
+                    }
+                }
+            )
         case .myBids:
             MyBidsView(
                 viewModel: MyBidsViewModel(

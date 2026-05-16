@@ -23,3 +23,7 @@ pnpm-debug.log*
 
 # macOS
 .DS_Store
+
+# Local design caches (not committed)
+more-designed-pages/
+per-screen-and-previous-designs/
