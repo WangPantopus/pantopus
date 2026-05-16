@@ -25,6 +25,19 @@ final class CeremonialMailViewModelTests: XCTestCase {
         )
     }
 
+    private func waitFor(
+        _ description: String,
+        timeout: TimeInterval = 15.0,
+        _ predicate: @MainActor () -> Bool
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if predicate() { return }
+            try? await Task.sleep(nanoseconds: 25_000_000)
+        }
+        XCTFail("Timed out waiting for \(description)")
+    }
+
     private static let recipientsJSON = """
     {"recipients":[
       {"userId":"u_maya","name":"Maya K.","username":"mayak",
@@ -56,8 +69,7 @@ final class CeremonialMailViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [.status(200, body: Self.recipientsJSON)]
         let vm = CeremonialMailViewModel(api: makeAPI())
         vm.updateRecipientQuery("maya")
-        // Wait for the 250 ms debounce + search.
-        try? await Task.sleep(nanoseconds: 400_000_000)
+        await waitFor("recipient search results") { !vm.recipientResults.isEmpty }
         XCTAssertFalse(vm.recipientResults.isEmpty)
         XCTAssertFalse(vm.chrome.primaryCTAEnabled)
         vm.selectRecipient(vm.recipientResults[0])
@@ -72,12 +84,11 @@ final class CeremonialMailViewModelTests: XCTestCase {
         ]
         let vm = CeremonialMailViewModel(api: makeAPI())
         vm.updateRecipientQuery("maya")
-        try? await Task.sleep(nanoseconds: 400_000_000)
+        await waitFor("recipient search results") { !vm.recipientResults.isEmpty }
         vm.selectRecipient(vm.recipientResults[0])
         vm.primaryTapped()
         XCTAssertEqual(vm.step, .verify)
-        // Wait for the home-context load triggered by primaryTapped.
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        await waitFor("home context") { vm.homeContext?.homeId == "home_demo" }
         XCTAssertEqual(vm.homeContext?.homeId, "home_demo")
     }
 
@@ -109,10 +120,10 @@ final class CeremonialMailViewModelTests: XCTestCase {
         ]
         let vm = CeremonialMailViewModel(api: makeAPI())
         vm.updateRecipientQuery("maya")
-        try? await Task.sleep(nanoseconds: 400_000_000)
+        await waitFor("recipient search results") { !vm.recipientResults.isEmpty }
         vm.selectRecipient(vm.recipientResults[0])
         vm.primaryTapped() // → verify (fires home context fetch)
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        await waitFor("home context") { vm.homeContext?.homeId == "home_demo" }
         vm.toggleAddressConfirmed(true)
         vm.primaryTapped() // → compose
         vm.updateBody("Dear Maya, thinking of you.")
@@ -122,7 +133,7 @@ final class CeremonialMailViewModelTests: XCTestCase {
         vm.primaryTapped() // → commit
         vm.selectSendTiming(.morning)
         vm.primaryTapped() // submit
-        try? await Task.sleep(nanoseconds: 300_000_000)
+        await waitFor("submit success") { vm.step == .success }
         XCTAssertEqual(vm.step, .success)
         if case let .openMail(mailId) = vm.pendingEvent {
             XCTAssertEqual(mailId, "mail_demo")
@@ -139,16 +150,16 @@ final class CeremonialMailViewModelTests: XCTestCase {
         ]
         let vm = CeremonialMailViewModel(api: makeAPI())
         vm.updateRecipientQuery("maya")
-        try? await Task.sleep(nanoseconds: 400_000_000)
+        await waitFor("recipient search results") { !vm.recipientResults.isEmpty }
         vm.selectRecipient(vm.recipientResults[0])
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        await waitFor("home context") { vm.homeContext?.homeId == "home_demo" }
         vm.toggleAddressConfirmed(true)
         vm.primaryTapped()
         vm.updateBody("Hello")
         vm.primaryTapped()
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 300_000_000)
+        await waitFor("submit error") { vm.submitError != nil }
         XCTAssertEqual(vm.step, .commit)
         XCTAssertNotNil(vm.submitError)
     }
@@ -159,7 +170,7 @@ final class CeremonialMailViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [.status(200, body: Self.recipientsJSON)]
         let vm = CeremonialMailViewModel(api: makeAPI())
         vm.updateRecipientQuery("maya")
-        try? await Task.sleep(nanoseconds: 400_000_000)
+        await waitFor("recipient search results") { !vm.recipientResults.isEmpty }
         vm.selectRecipient(vm.recipientResults[0])
         XCTAssertNotNil(vm.selectedRecipient)
         vm.updateRecipientQuery("zzz")
@@ -219,16 +230,16 @@ final class CeremonialMailViewModelTests: XCTestCase {
         ]
         let vm = CeremonialMailViewModel(api: makeAPI())
         vm.updateRecipientQuery("maya")
-        try? await Task.sleep(nanoseconds: 400_000_000)
+        await waitFor("recipient search results") { !vm.recipientResults.isEmpty }
         vm.selectRecipient(vm.recipientResults[0])
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        await waitFor("home context") { vm.homeContext?.homeId == "home_demo" }
         vm.toggleAddressConfirmed(true)
         vm.primaryTapped()
         vm.updateBody("Hello")
         vm.primaryTapped()
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 300_000_000)
+        await waitFor("submit success") { vm.step == .success }
         XCTAssertFalse(vm.chrome.showsProgressBar)
         XCTAssertEqual(vm.chrome.progressLabel, .hidden)
     }
