@@ -35,7 +35,9 @@ final class IconTests: XCTestCase {
         // T5.3.3 My posts — archive chip + empty-state compose icon.
         "archive", "message-square-plus",
         // T5.3.4 Listing offers — listing-context header icons.
-        "bookmark"
+        "bookmark",
+        // T6.0a Bills — utility category iconography + banner/auto-pay markers.
+        "zap", "flame", "droplet", "wifi", "building-2", "smartphone", "wallet", "hash"
     ]
 
     func testInventoryMatches() {

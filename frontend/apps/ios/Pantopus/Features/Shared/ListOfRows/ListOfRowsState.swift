@@ -148,10 +148,10 @@ public struct BannerCTA: Sendable {
 /// Tint options for the banner's trailing CTA pill. Resolved at render
 /// time to the matching token pair (background + foreground).
 public enum BannerCTATint: Sendable, Hashable {
-    case primary    // sky
-    case home       // green
-    case business   // violet
-    case warning    // amber (overdue surfaces)
+    case primary // sky
+    case home // green
+    case business // violet
+    case warning // amber (overdue surfaces)
 }
 
 /// Primary-tinted summary banner rendered above the first row in the
@@ -372,9 +372,9 @@ public struct TopBarAction: Sendable {
 /// (My businesses) can swap the FAB color to match their identity
 /// without forking the FAB variant taxonomy.
 public enum FabTint: Sendable, Hashable {
-    case sky        // primary600 — default
-    case home       // home green
-    case business   // business violet
+    case sky // primary600 — default
+    case home // home green
+    case business // business violet
 }
 
 /// Floating-action-button payload.

@@ -31,6 +31,8 @@ import Foundation
 import Observation
 import SwiftUI
 
+// swiftlint:disable file_length type_body_length function_body_length
+
 /// Canonical bill-chip status, derived from `BillDTO.status` + `due_date`.
 /// T6.0a adds `dueSoon` (≤ 7 days from now) and `cancelled` (soft-deleted).
 public enum BillChipStatus: String, Sendable, Hashable {
@@ -95,12 +97,14 @@ public struct BillsBannerSummary: Sendable, Equatable {
 @MainActor
 final class BillsListViewModel: ListOfRowsDataSource {
     let title = "Bills"
-    // No top-bar action in T6.0a: the design's filter glyph isn't
-    // wired to a real filter sheet yet; the 3 tabs cover the design's
-    // filter intent. The FAB owns the canonical "Add a bill" action so
-    // we don't need a duplicate entry point in the top bar. Tracked for
-    // a follow-up if a filter sheet ships.
-    var topBarAction: TopBarAction? { nil }
+    /// No top-bar action in T6.0a: the design's filter glyph isn't
+    /// wired to a real filter sheet yet; the 3 tabs cover the design's
+    /// filter intent. The FAB owns the canonical "Add a bill" action so
+    /// we don't need a duplicate entry point in the top bar. Tracked for
+    /// a follow-up if a filter sheet ships.
+    var topBarAction: TopBarAction? {
+        nil
+    }
 
     /// Tabs with live counts. Rebuilt whenever `bills` changes.
     var tabs: [ListOfRowsTab] {
@@ -214,7 +218,8 @@ final class BillsListViewModel: ListOfRowsDataSource {
                 ListOfRowsState.EmptyContent(
                     icon: .receipt,
                     headline: "No bills tracked yet",
-                    subcopy: "Add the utilities, insurance, and HOA dues for this home. Schedule auto-pay or split between household members.",
+                    subcopy: "Add the utilities, insurance, and HOA dues for this home. " +
+                        "Schedule auto-pay or split between household members.",
                     ctaTitle: "Add a bill"
                 ) { [onAddBill] in onAddBill() }
             )
@@ -432,10 +437,8 @@ final class BillsListViewModel: ListOfRowsDataSource {
                 if due <= thirtyDaysOut {
                     totalDue += bill.displayAmount
                 }
-                if due >= now {
-                    if nextDue == nil || due < nextDue!.0 {
-                        nextDue = (due, bill)
-                    }
+                if due >= now, nextDue.map({ due < $0.0 }) ?? true {
+                    nextDue = (due, bill)
                 }
             } else {
                 // No due date — still surface in the total when the bill
@@ -445,7 +448,7 @@ final class BillsListViewModel: ListOfRowsDataSource {
             if chip == .overdue { overdueCount += 1 }
         }
         let totalLabel = totalCount > 0 ? formatCurrency(totalDue) : nil
-        let nextSubtitle = nextDue.map { (date, _) -> String in
+        let nextSubtitle = nextDue.map { date, _ -> String in
             let days = Int(date.timeIntervalSince(now) / (24 * 60 * 60))
             if days <= 0 {
                 return "Next bill due today"

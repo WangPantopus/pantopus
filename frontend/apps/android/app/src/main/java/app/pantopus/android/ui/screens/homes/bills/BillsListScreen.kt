@@ -50,7 +50,7 @@ fun BillsListScreen(
             tabs = tabs,
             selectedTab = selectedTab,
             onSelectTab = viewModel::selectTab,
-            topBarAction = viewModel.topBarAction(),
+            topBarAction = viewModel.topBarAction,
             fab = viewModel.fab(),
             onBack = onBack,
             banner = banner,

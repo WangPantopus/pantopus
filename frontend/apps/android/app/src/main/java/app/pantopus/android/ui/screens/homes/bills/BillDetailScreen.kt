@@ -150,13 +150,16 @@ private fun LoadedShell(
         onBack = onBack,
         header = {
             BillHeader(
-                payee = projection.payee,
-                amount = projection.amount,
-                chipText = projection.chipText,
-                chipVariant = projection.chipVariant,
-                chipIcon = projection.chipIcon,
-                category = projection.category,
-                autoPay = autoPay,
+                model =
+                    BillHeaderModel(
+                        payee = projection.payee,
+                        amount = projection.amount,
+                        chipText = projection.chipText,
+                        chipVariant = projection.chipVariant,
+                        chipIcon = projection.chipIcon,
+                        category = projection.category,
+                        autoPay = autoPay,
+                    ),
                 modifier = Modifier.padding(horizontal = Spacing.s4),
             )
         },
@@ -211,15 +214,19 @@ private fun LoadedShell(
     )
 }
 
+private data class BillHeaderModel(
+    val payee: String,
+    val amount: String,
+    val chipText: String,
+    val chipVariant: StatusChipVariant,
+    val chipIcon: PantopusIcon?,
+    val category: UtilityCategory,
+    val autoPay: Boolean,
+)
+
 @Composable
 private fun BillHeader(
-    payee: String,
-    amount: String,
-    chipText: String,
-    chipVariant: StatusChipVariant,
-    chipIcon: PantopusIcon?,
-    category: UtilityCategory,
-    autoPay: Boolean,
+    model: BillHeaderModel,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -237,14 +244,14 @@ private fun BillHeader(
                     Modifier
                         .size(48.dp)
                         .clip(RoundedCornerShape(Radii.sm))
-                        .background(category.background),
+                        .background(model.category.background),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
-                    icon = category.icon,
+                    icon = model.category.icon,
                     contentDescription = null,
                     size = 24.dp,
-                    tint = category.foreground,
+                    tint = model.category.foreground,
                 )
             }
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
@@ -252,20 +259,20 @@ private fun BillHeader(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
                 ) {
-                    Text(payee, style = PantopusTextStyle.h3, color = PantopusColors.appText)
-                    if (autoPay) {
+                    Text(model.payee, style = PantopusTextStyle.h3, color = PantopusColors.appText)
+                    if (model.autoPay) {
                         AutoPayPill()
                     }
                 }
                 Text(
-                    text = amount,
+                    text = model.amount,
                     style = PantopusTextStyle.body,
                     fontWeight = FontWeight.Bold,
                     color = PantopusColors.appText,
                 )
             }
         }
-        StatusChip(text = chipText, variant = chipVariant, icon = chipIcon)
+        StatusChip(text = model.chipText, variant = model.chipVariant, icon = model.chipIcon)
     }
 }
 

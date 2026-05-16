@@ -68,31 +68,31 @@ public enum UtilityCategory: String, CaseIterable, Sendable {
     public var background: Color {
         switch self {
         case .electric:
-            // #fef9c3
+            // CSS fef9c3
             Color(red: 0xFE / 255.0, green: 0xF9 / 255.0, blue: 0xC3 / 255.0)
         case .gas:
-            // #ffedd5
+            // CSS ffedd5
             Color(red: 0xFF / 255.0, green: 0xED / 255.0, blue: 0xD5 / 255.0)
         case .water:
-            // #dbeafe
+            // CSS dbeafe
             Color(red: 0xDB / 255.0, green: 0xEA / 255.0, blue: 0xFE / 255.0)
         case .internetService:
-            // #ede9fe
+            // CSS ede9fe
             Color(red: 0xED / 255.0, green: 0xE9 / 255.0, blue: 0xFE / 255.0)
         case .hoa:
-            // #dcfce7
+            // CSS dcfce7
             Color(red: 0xDC / 255.0, green: 0xFC / 255.0, blue: 0xE7 / 255.0)
         case .insurance:
-            // #ccfbf1
+            // CSS ccfbf1
             Color(red: 0xCC / 255.0, green: 0xFB / 255.0, blue: 0xF1 / 255.0)
         case .trash:
-            // #e2e8f0
+            // CSS e2e8f0
             Color(red: 0xE2 / 255.0, green: 0xE8 / 255.0, blue: 0xF0 / 255.0)
         case .phone:
-            // #fee2e2
+            // CSS fee2e2
             Color(red: 0xFE / 255.0, green: 0xE2 / 255.0, blue: 0xE2 / 255.0)
         case .generic:
-            // primary50 — matches Theme.Color.primary50 token (#f0f9ff)
+            // primary50 — matches Theme.Color.primary50 token.
             Color(red: 0xF0 / 255.0, green: 0xF9 / 255.0, blue: 0xFF / 255.0)
         }
     }
@@ -101,31 +101,31 @@ public enum UtilityCategory: String, CaseIterable, Sendable {
     public var foreground: Color {
         switch self {
         case .electric:
-            // #a16207
+            // CSS a16207
             Color(red: 0xA1 / 255.0, green: 0x62 / 255.0, blue: 0x07 / 255.0)
         case .gas:
-            // #c2410c
+            // CSS c2410c
             Color(red: 0xC2 / 255.0, green: 0x41 / 255.0, blue: 0x0C / 255.0)
         case .water:
-            // #1d4ed8
+            // CSS 1d4ed8
             Color(red: 0x1D / 255.0, green: 0x4E / 255.0, blue: 0xD8 / 255.0)
         case .internetService:
-            // #6d28d9
+            // CSS 6d28d9
             Color(red: 0x6D / 255.0, green: 0x28 / 255.0, blue: 0xD9 / 255.0)
         case .hoa:
-            // #15803d
+            // CSS 15803d
             Color(red: 0x15 / 255.0, green: 0x80 / 255.0, blue: 0x3D / 255.0)
         case .insurance:
-            // #0f766e
+            // CSS 0f766e
             Color(red: 0x0F / 255.0, green: 0x76 / 255.0, blue: 0x6E / 255.0)
         case .trash:
-            // #334155
+            // CSS 334155
             Color(red: 0x33 / 255.0, green: 0x41 / 255.0, blue: 0x55 / 255.0)
         case .phone:
-            // #b91c1c
+            // CSS b91c1c
             Color(red: 0xB9 / 255.0, green: 0x1C / 255.0, blue: 0x1C / 255.0)
         case .generic:
-            // primary600 — matches Theme.Color.primary600 token (#0284c7)
+            // primary600 — matches Theme.Color.primary600 token.
             Color(red: 0x02 / 255.0, green: 0x84 / 255.0, blue: 0xC7 / 255.0)
         }
     }
@@ -144,10 +144,8 @@ public enum UtilityCategory: String, CaseIterable, Sendable {
     public static func from(payee: String?) -> UtilityCategory {
         guard let payee, !payee.isEmpty else { return .generic }
         let lower = payee.lowercased()
-        for entry in patterns {
-            if entry.matchers.contains(where: { lower.contains($0) }) {
-                return entry.category
-            }
+        for entry in patterns where entry.matchers.contains(where: { lower.contains($0) }) {
+            return entry.category
         }
         return .generic
     }
@@ -162,6 +160,15 @@ public enum UtilityCategory: String, CaseIterable, Sendable {
     }
 
     private static let patterns: [Pattern] = [
+        // Gas — branded gas providers first, then generic.
+        Pattern(
+            category: .gas,
+            matchers: [
+                "national grid gas", "socalgas", "southern california gas",
+                "atmos", "centerpoint", "national fuel", "spire",
+                "natural gas", "gas company", "gas bill", " gas"
+            ]
+        ),
         // Electric — utility brands first, generic "electric" last.
         Pattern(
             category: .electric,
@@ -170,15 +177,6 @@ public enum UtilityCategory: String, CaseIterable, Sendable {
                 "dominion", "duke energy", "eversource",
                 "national grid", "pacificorp", "xcel",
                 "electric"
-            ]
-        ),
-        // Gas — branded gas providers first, then generic.
-        Pattern(
-            category: .gas,
-            matchers: [
-                "socalgas", "southern california gas", "atmos",
-                "centerpoint", "national fuel", "spire",
-                "natural gas", "gas company", "gas bill", " gas"
             ]
         ),
         // Water — water board / municipal water + sewer.

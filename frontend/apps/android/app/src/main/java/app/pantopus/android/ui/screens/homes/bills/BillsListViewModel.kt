@@ -76,6 +76,15 @@ data class BillRowProjection(
     val highlight: RowHighlight?,
 )
 
+private data class BillProjectionStyle(
+    val subtitle: String,
+    val chipText: String,
+    val chipVariant: StatusChipVariant,
+    val chipIcon: PantopusIcon?,
+    val inlineChip: RowChip?,
+    val highlight: RowHighlight?,
+)
+
 /**
  * Banner data for the Bills summary banner. Pure projection from the
  * loaded bills + clock — exposed as a top-level value so tests can
@@ -210,7 +219,7 @@ class BillsListViewModel
          * bill" action so we don't need a duplicate entry point in the
          * top bar. Tracked for a follow-up if a filter sheet ships.
          */
-        fun topBarAction(): TopBarAction? = null
+        val topBarAction: TopBarAction? = null
 
         /**
          * Compute the banner summary for the currently-loaded bills.
@@ -375,70 +384,70 @@ class BillsListViewModel
                 val amount = formatCurrency(bill.displayAmount)
                 val dueShort = formatDateShort(bill.dueDate)
                 val paidShort = formatDateShort(bill.paidAt)
+                val style = projectionStyle(chip, dueShort, paidShort)
 
-                return when (chip) {
+                return BillRowProjection(
+                    payee = payee,
+                    subtitle = style.subtitle,
+                    amount = amount,
+                    chipText = style.chipText,
+                    chipVariant = style.chipVariant,
+                    chipIcon = style.chipIcon,
+                    status = chip,
+                    category = category,
+                    inlineChip = style.inlineChip,
+                    highlight = style.highlight,
+                )
+            }
+
+            private fun projectionStyle(
+                chip: BillChipStatus,
+                dueShort: String?,
+                paidShort: String?,
+            ): BillProjectionStyle =
+                when (chip) {
                     BillChipStatus.Paid ->
-                        BillRowProjection(
-                            payee = payee,
+                        BillProjectionStyle(
                             subtitle = paidShort?.let { "Paid $it" } ?: "Paid",
-                            amount = amount,
                             chipText = "Paid",
                             chipVariant = StatusChipVariant.Success,
                             chipIcon = PantopusIcon.Check,
-                            status = chip,
-                            category = category,
                             inlineChip = null,
                             highlight = null,
                         )
                     BillChipStatus.Cancelled ->
-                        BillRowProjection(
-                            payee = payee,
+                        BillProjectionStyle(
                             subtitle = "Cancelled",
-                            amount = amount,
                             chipText = "Cancelled",
                             chipVariant = StatusChipVariant.Neutral,
                             chipIcon = PantopusIcon.X,
-                            status = chip,
-                            category = category,
                             inlineChip = null,
                             highlight = RowHighlight.Muted,
                         )
                     BillChipStatus.Overdue ->
-                        BillRowProjection(
-                            payee = payee,
+                        BillProjectionStyle(
                             subtitle = dueShort?.let { "Overdue · was due $it" } ?: "Overdue",
-                            amount = amount,
                             chipText = "Overdue",
                             chipVariant = StatusChipVariant.ErrorVariant,
                             chipIcon = PantopusIcon.AlertCircle,
-                            status = chip,
-                            category = category,
                             inlineChip = null,
                             highlight = null,
                         )
                     BillChipStatus.DueSoon ->
-                        BillRowProjection(
-                            payee = payee,
+                        BillProjectionStyle(
                             subtitle = dueShort?.let { "Due $it" } ?: "Due soon",
-                            amount = amount,
                             chipText = "Due soon",
                             chipVariant = StatusChipVariant.Warning,
                             chipIcon = PantopusIcon.Clock,
-                            status = chip,
-                            category = category,
                             inlineChip = null,
                             highlight = null,
                         )
                     BillChipStatus.Scheduled ->
-                        BillRowProjection(
-                            payee = payee,
+                        BillProjectionStyle(
                             subtitle = dueShort?.let { "Auto-pays $it" } ?: "Auto-pay scheduled",
-                            amount = amount,
                             chipText = "Scheduled",
                             chipVariant = StatusChipVariant.Info,
                             chipIcon = PantopusIcon.Calendar,
-                            status = chip,
-                            category = category,
                             inlineChip =
                                 RowChip(
                                     text = "Auto-pay",
@@ -448,20 +457,15 @@ class BillsListViewModel
                             highlight = null,
                         )
                     BillChipStatus.Due ->
-                        BillRowProjection(
-                            payee = payee,
+                        BillProjectionStyle(
                             subtitle = dueShort?.let { "Due $it" } ?: "No due date",
-                            amount = amount,
                             chipText = "Due",
                             chipVariant = StatusChipVariant.Warning,
                             chipIcon = PantopusIcon.Clock,
-                            status = chip,
-                            category = category,
                             inlineChip = null,
                             highlight = null,
                         )
                 }
-            }
 
             /**
              * Derive the chip status per the T6.0a contract:
@@ -477,16 +481,16 @@ class BillsListViewModel
                 bill: BillDto,
                 now: Instant,
             ): BillChipStatus {
-                if (bill.status == "cancelled") return BillChipStatus.Cancelled
-                if (bill.status == "paid") return BillChipStatus.Paid
-                if (bill.status == "scheduled") return BillChipStatus.Scheduled
                 val due = bill.dueDate?.let(::parseInstant)
-                if (due != null) {
-                    if (due.isBefore(now)) return BillChipStatus.Overdue
-                    val sevenDaysOut = now.plus(Duration.ofDays(7))
-                    if (!due.isAfter(sevenDaysOut)) return BillChipStatus.DueSoon
+                val sevenDaysOut = now.plus(Duration.ofDays(7))
+                return when {
+                    bill.status == "cancelled" -> BillChipStatus.Cancelled
+                    bill.status == "paid" -> BillChipStatus.Paid
+                    bill.status == "scheduled" -> BillChipStatus.Scheduled
+                    due?.isBefore(now) == true -> BillChipStatus.Overdue
+                    due != null && !due.isAfter(sevenDaysOut) -> BillChipStatus.DueSoon
+                    else -> BillChipStatus.Due
                 }
-                return BillChipStatus.Due
             }
 
             /** Pure summary projection. Public-static for tests. */
@@ -505,21 +509,14 @@ class BillsListViewModel
                     if (chip == BillChipStatus.Cancelled || chip == BillChipStatus.Paid) continue
                     totalCount += 1
                     val due = bill.dueDate?.let(::parseInstant)
-                    if (due != null) {
-                        // Sum due in next 30 days (overdue counts too — user owes it).
-                        if (!due.isAfter(thirtyDaysOut)) {
-                            totalDue = totalDue + bill.displayAmount
-                        }
-                        if (!due.isBefore(now)) {
-                            val current = nextDue
-                            if (current == null || due.isBefore(current.first)) {
-                                nextDue = due to bill
-                            }
-                        }
-                    } else {
+                    if (due == null) {
                         // No due date — still surface in the total when the
                         // bill is upcoming (scheduled with no date, etc.).
                         totalDue = totalDue + bill.displayAmount
+                    } else {
+                        // Sum due in next 30 days (overdue counts too — user owes it).
+                        totalDue = totalDue + dueAmountInWindow(bill, due, thirtyDaysOut)
+                        nextDue = nextDueCandidate(nextDue, due, bill, now)
                     }
                     if (chip == BillChipStatus.Overdue) overdueCount += 1
                 }
@@ -539,6 +536,24 @@ class BillsListViewModel
                     nextBillSubtitle = nextSubtitle,
                 )
             }
+
+            private fun dueAmountInWindow(
+                bill: BillDto,
+                due: Instant,
+                thirtyDaysOut: Instant,
+            ): BigDecimal = if (!due.isAfter(thirtyDaysOut)) bill.displayAmount else BigDecimal.ZERO
+
+            private fun nextDueCandidate(
+                current: Pair<Instant, BillDto>?,
+                due: Instant,
+                bill: BillDto,
+                now: Instant,
+            ): Pair<Instant, BillDto>? =
+                when {
+                    due.isBefore(now) -> current
+                    current == null || due.isBefore(current.first) -> due to bill
+                    else -> current
+                }
 
             @JvmStatic
             fun formatCurrency(amount: BigDecimal): String =

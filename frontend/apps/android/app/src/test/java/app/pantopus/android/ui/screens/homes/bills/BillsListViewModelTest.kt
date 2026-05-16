@@ -496,7 +496,7 @@ class BillsListViewModelTest {
 
     @Test fun topBar_action_is_null_by_design() {
         val vm = makeVm()
-        assertNull(vm.topBarAction())
+        assertNull(vm.topBarAction)
     }
 
     private fun mixedBills(): List<BillDto> =
@@ -517,5 +517,4 @@ class BillsListViewModelTest {
                 dueDate = "2026-05-08T00:00:00Z",
             ),
         )
-
 }
