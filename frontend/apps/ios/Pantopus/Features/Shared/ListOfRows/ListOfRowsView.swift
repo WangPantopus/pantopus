@@ -534,7 +534,7 @@ private struct ListingContextHeader: View {
         }
     }
 
-    @ViewBuilder private var sortStrip: some View {
+    private var sortStrip: some View {
         HStack(alignment: .center) {
             if let count = config.offerCount {
                 Text("\(count) \(count == 1 ? "offer" : "offers")")

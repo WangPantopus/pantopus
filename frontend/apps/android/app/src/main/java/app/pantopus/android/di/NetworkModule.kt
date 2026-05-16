@@ -177,8 +177,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideListingOffersApi(retrofit: Retrofit): ListingOffersApi =
-        retrofit.create(ListingOffersApi::class.java)
+    fun provideListingOffersApi(retrofit: Retrofit): ListingOffersApi = retrofit.create(ListingOffersApi::class.java)
 
     @Provides
     @Singleton

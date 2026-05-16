@@ -120,7 +120,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case archive
     case messageSquarePlus = "message-square-plus"
 
-    // T5.3.4 Listing offers — listing-context header icons.
+    /// T5.3.4 Listing offers — listing-context header icons.
     case bookmark
 
     /// SF Symbol name used to render this icon. Chosen for closest visual

@@ -87,37 +87,60 @@ public final class ListingDetailViewModel {
             else { return false }
             return owner == viewer
         }()
-        let isFree = listing.isFree ?? false
-        let priceLine: String = if isFree {
-            "Free"
-        } else if let price = listing.price {
-            price.truncatingRemainder(dividingBy: 1) == 0
-                ? "$\(Int(price))"
-                : String(format: "$%.2f", price)
-        } else {
-            "—"
-        }
-        let imageUrl = (listing.firstImage ?? listing.mediaUrls?.first).flatMap(URL.init(string:))
-        let cover = ContentDetailCover(
-            imageUrl: imageUrl,
+        return ContentDetailContent(
+            kind: .listing,
+            cover: cover(for: listing),
+            statusPill: nil,
+            hero: ContentDetailHero(
+                title: listing.title ?? "Listing",
+                categoryChip: nil,
+                meta: nil,
+                priceLine: priceLine(for: listing),
+                priceCaption: listing.layer == "rentals" ? "per week" : nil
+            ),
+            statStrip: [],
+            counterparty: counterparty(for: listing),
+            modules: modules(for: listing),
+            trustCapsules: trustCapsules(for: listing),
+            dock: dock(isViewerOwner: isViewerOwner)
+        )
+    }
+
+    private static func priceLine(for listing: ListingDTO) -> String {
+        if listing.isFree ?? false { return "Free" }
+        guard let price = listing.price else { return "—" }
+        return price.truncatingRemainder(dividingBy: 1) == 0
+            ? "$\(Int(price))"
+            : String(format: "$%.2f", price)
+    }
+
+    private static func cover(for listing: ListingDTO) -> ContentDetailCover {
+        ContentDetailCover(
+            imageUrl: (listing.firstImage ?? listing.mediaUrls?.first).flatMap(URL.init(string:)),
             gradient: ListingGradient.from(id: listing.id),
             placeholderIcon: placeholderIcon(category: listing.category, layer: listing.layer),
             pageCount: max(listing.mediaUrls?.count ?? 1, 1),
             activePage: 0
         )
-        let condition = conditionLabel(listing.condition)
+    }
+
+    private static func trustCapsules(for listing: ListingDTO) -> [ContentDetailTrustCapsule] {
         var trust: [ContentDetailTrustCapsule] = []
-        if let condition {
+        if let condition = conditionLabel(listing.condition) {
             trust.append(ContentDetailPill(label: condition, icon: .star, tone: .success))
         }
         if listing.layer == "rentals" {
             trust.append(ContentDetailPill(label: "Rental", icon: .calendar, tone: .business))
-        } else if isFree {
+        } else if listing.isFree ?? false {
             trust.append(ContentDetailPill(label: "Free", icon: .heart, tone: .success))
         } else {
             trust.append(ContentDetailPill(label: "Pickup", icon: .mapPin, tone: .neutral))
         }
-        let counterparty = ContentDetailCounterparty(
+        return trust
+    }
+
+    private static func counterparty(for listing: ListingDTO) -> ContentDetailCounterparty {
+        ContentDetailCounterparty(
             displayName: "Seller",
             initials: "S",
             identityKind: "personal",
@@ -126,6 +149,9 @@ public final class ListingDetailViewModel {
             trailing: listing.locationName,
             showsMessageButton: true
         )
+    }
+
+    private static func modules(for listing: ListingDTO) -> [ContentDetailModule] {
         var modules: [ContentDetailModule] = []
         if let body = listing.description, !body.isEmpty {
             modules.append(.description(ContentDetailDescription(
@@ -143,29 +169,13 @@ public final class ListingDetailViewModel {
                 trailing: distanceLabel(listing.distanceMeters)
             )))
         }
-        let dock = ContentDetailDock(
+        return modules
+    }
+
+    private static func dock(isViewerOwner: Bool) -> ContentDetailDock {
+        ContentDetailDock(
             secondary: ContentDetailDockButton(label: "Message", icon: .send),
-            primary: ContentDetailDockButton(
-                label: isViewerOwner ? "View offers" : "Make offer",
-                icon: nil
-            )
-        )
-        return ContentDetailContent(
-            kind: .listing,
-            cover: cover,
-            statusPill: nil,
-            hero: ContentDetailHero(
-                title: listing.title ?? "Listing",
-                categoryChip: nil,
-                meta: nil,
-                priceLine: priceLine,
-                priceCaption: listing.layer == "rentals" ? "per week" : nil
-            ),
-            statStrip: [],
-            counterparty: counterparty,
-            modules: modules,
-            trustCapsules: trust,
-            dock: dock
+            primary: ContentDetailDockButton(label: isViewerOwner ? "View offers" : "Make offer", icon: nil)
         )
     }
 

@@ -244,12 +244,12 @@ public enum ListingOffersAvatarTone: Sendable, CaseIterable {
 
     public var background: AvatarBackground {
         switch self {
-        case .sky:    .solid(Theme.Color.personalBg)
-        case .teal:   .solid(Theme.Color.successBg)
-        case .amber:  .solid(Theme.Color.warningBg)
-        case .rose:   .solid(Theme.Color.errorBg)
+        case .sky: .solid(Theme.Color.personalBg)
+        case .teal: .solid(Theme.Color.successBg)
+        case .amber: .solid(Theme.Color.warningBg)
+        case .rose: .solid(Theme.Color.errorBg)
         case .violet: .solid(Theme.Color.businessBg)
-        case .slate:  .solid(Theme.Color.appSurfaceSunken)
+        case .slate: .solid(Theme.Color.appSurfaceSunken)
         }
     }
 
@@ -280,13 +280,17 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         }
     }
 
-    public var tabs: [ListOfRowsTab] { [] }
+    public var tabs: [ListOfRowsTab] {
+        []
+    }
 
     public var selectedTab: String = "" {
         didSet { /* no tabs */ }
     }
 
-    public var fab: FABAction? { nil }
+    public var fab: FABAction? {
+        nil
+    }
 
     public private(set) var state: ListOfRowsState = .loading
 
@@ -295,12 +299,11 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         return Self.context(
             for: listing,
             offerCount: offers.count,
-            sortLabel: sort.label,
-            onSort: { [weak self] in
-                guard let self else { return }
-                Task { @MainActor in self.onSort() }
-            }
-        )
+            sortLabel: sort.label
+        ) { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in self.onSort() }
+        }
     }
 
     /// Bound to the view's `.sheet(item:)` to drive the counter
@@ -357,7 +360,7 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         self.onOpenBuyer = onOpenBuyer
         self.onOpenTransaction = onOpenTransaction
         self.onEditPrice = onEditPrice
-        self.onSortHandler = onSort
+        onSortHandler = onSort
         self.now = now
     }
 
@@ -429,14 +432,17 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         let total = sorted.count
         let nowSnapshot = now()
         let rows = sorted.enumerated().map { index, dto in
-            Self.row(
-                offer: dto,
+            let context = RowProjectionContext(
                 index: index,
                 total: total,
                 askingPrice: listing?.price,
                 isLeading: dto.id == leadingId,
                 now: nowSnapshot,
                 callbacks: callbacks(for: dto)
+            )
+            return Self.row(
+                offer: dto,
+                context: context
             )
         }
         state = .loaded(sections: [RowSection(id: "offers", rows: rows)], hasMore: false)
@@ -478,6 +484,31 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
             self.onCounter = onCounter
             self.onDecline = onDecline
             self.onViewTransaction = onViewTransaction
+        }
+    }
+
+    public struct RowProjectionContext: Sendable {
+        public let index: Int
+        public let total: Int
+        public let askingPrice: Double?
+        public let isLeading: Bool
+        public let now: Date
+        public let callbacks: RowCallbacks
+
+        public init(
+            index: Int,
+            total: Int,
+            askingPrice: Double?,
+            isLeading: Bool,
+            now: Date,
+            callbacks: RowCallbacks
+        ) {
+            self.index = index
+            self.total = total
+            self.askingPrice = askingPrice
+            self.isLeading = isLeading
+            self.now = now
+            self.callbacks = callbacks
         }
     }
 
@@ -645,19 +676,14 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
     /// touching network state.
     public static func row(
         offer: ListingOfferDTO,
-        index: Int,
-        total: Int,
-        askingPrice: Double?,
-        isLeading: Bool,
-        now: Date,
-        callbacks: RowCallbacks
+        context: RowProjectionContext
     ) -> RowModel {
         let status = ListingOfferStatus.fromRaw(offer.status)
         let footer = footerFor(status: status)
         let buyerName = displayName(for: offer.buyer)
         let tone = ListingOffersAvatarTone.deterministic(for: offer.buyer?.id ?? offer.id)
         let amount = Self.formatPrice(offer.amount)
-        let asking = Self.formatAskingSublabel(askingPrice)
+        let asking = Self.formatAskingSublabel(context.askingPrice)
         let statusChip = RowChip(
             text: status.label,
             icon: status.icon,
@@ -679,7 +705,7 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         return RowModel(
             id: offer.id,
             title: buyerName,
-            subtitle: subtitle(for: offer, now: now),
+            subtitle: subtitle(for: offer, now: context.now),
             template: .statusChip,
             leading: .avatarWithBadge(
                 name: buyerName,
@@ -689,12 +715,12 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
                 verified: false
             ),
             trailing: .priceStack(amount: amount, sublabel: asking),
-            onTap: callbacks.onTap,
+            onTap: context.callbacks.onTap,
             chips: chips,
-            metaTail: metaTail(for: offer, index: index, total: total, now: now),
+            metaTail: metaTail(for: offer, index: context.index, total: context.total, now: context.now),
             note: offer.message?.isEmpty == false ? offer.message : nil,
-            highlight: isLeading ? .leading : nil,
-            footer: footerActions(for: footer, callbacks: callbacks)
+            highlight: context.isLeading ? .leading : nil,
+            footer: footerActions(for: footer, callbacks: context.callbacks)
         )
     }
 
@@ -776,13 +802,12 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
             rawCategory: listing.category,
             layer: listing.layer
         )
-        let thumbnail: ThumbnailImage
-        if let url = listing.firstImage.flatMap(URL.init(string:)) {
-            thumbnail = .url(url, fallback: category.icon, gradient: category.gradient)
+        let thumbnail: ThumbnailImage = if let url = listing.firstImage.flatMap(URL.init(string:)) {
+            .url(url, fallback: category.icon, gradient: category.gradient)
         } else if let firstMedia = listing.mediaUrls?.first.flatMap(URL.init(string:)) {
-            thumbnail = .url(firstMedia, fallback: category.icon, gradient: category.gradient)
+            .url(firstMedia, fallback: category.icon, gradient: category.gradient)
         } else {
-            thumbnail = .icon(category.icon, gradient: category.gradient)
+            .icon(category.icon, gradient: category.gradient)
         }
         let askPrice = formatHeaderPrice(listing.price, isFree: listing.isFree)
         let meta = headerMeta(for: listing)
@@ -851,10 +876,8 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
 
     private func leadingOfferId(in sorted: [ListingOfferDTO]) -> String? {
         // Highest-amount pending offer wins the LEADING badge.
-        for offer in sorted {
-            if ListingOfferStatus.fromRaw(offer.status) == .pending {
-                return offer.id
-            }
+        for offer in sorted where ListingOfferStatus.fromRaw(offer.status) == .pending {
+            return offer.id
         }
         return nil
     }
@@ -865,9 +888,9 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
     ) -> RowFooter? {
         switch variant {
         case .none:
-            return nil
+            nil
         case .respondPending:
-            return RowFooter(actions: [
+            RowFooter(actions: [
                 RowFooterAction(
                     title: "Counter",
                     icon: .arrowsRepeat,
@@ -882,7 +905,7 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
                 )
             ])
         case .undoCounter:
-            return RowFooter(actions: [
+            RowFooter(actions: [
                 RowFooterAction(
                     title: "Withdraw counter",
                     icon: .x,
@@ -897,7 +920,7 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
                 )
             ])
         case .viewTransaction:
-            return RowFooter(actions: [
+            RowFooter(actions: [
                 RowFooterAction(
                     title: "View transaction",
                     icon: .fileText,
@@ -924,8 +947,7 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
     public static func ageInDays(of raw: String?, now: Date) -> Int? {
         guard let date = parseDate(raw) else { return nil }
         let seconds = now.timeIntervalSince(date)
-        let days = Int(seconds / 86400)
-        return days
+        return Int(seconds / 86400)
     }
 
     public static func formatRelativeTime(_ raw: String?, now: Date) -> String? {

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -131,139 +133,190 @@ private fun CounterOfferSheet(
                 .padding(Spacing.s4),
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            Text(
-                text = "Counter ${target.buyerName}'s offer",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.appText,
-            )
-            target.originalAmount?.let {
-                Text(
-                    text = "Original offer: ${ListingOffersViewModel.formatPrice(it)}",
-                    style = PantopusTextStyle.small,
-                    color = PantopusColors.appTextSecondary,
-                )
-            }
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            Text(
-                text = "Your counter amount",
-                style = PantopusTextStyle.small,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.appText,
-            )
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp)
-                        .clip(RoundedCornerShape(Radii.md))
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                        .padding(Spacing.s3),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-            ) {
-                Text(
-                    text = "$",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = PantopusColors.appText,
-                )
-                BasicTextField(
-                    value = amountText,
-                    onValueChange = { value -> amountText = value.filter { it.isDigit() || it == '.' } },
-                    textStyle =
-                        TextStyle(
-                            color = PantopusColors.appText,
-                            fontSize = 16.sp,
-                        ),
-                    cursorBrush = SolidColor(PantopusColors.primary600),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth().testTag("counter-amount"),
-                )
-            }
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            Text(
-                text = "Optional message",
-                style = PantopusTextStyle.small,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.appText,
-            )
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 64.dp)
-                        .clip(RoundedCornerShape(Radii.md))
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                        .padding(Spacing.s3),
-            ) {
-                BasicTextField(
-                    value = messageText,
-                    onValueChange = { messageText = it },
-                    textStyle =
-                        TextStyle(
-                            color = PantopusColors.appText,
-                            fontSize = 14.sp,
-                        ),
-                    cursorBrush = SolidColor(PantopusColors.primary600),
-                    modifier = Modifier.fillMaxWidth().testTag("counter-message"),
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = 44.dp)
-                        .clip(RoundedCornerShape(Radii.md))
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                        .clickable { onCancel() }
-                        .padding(Spacing.s3)
-                        .testTag("counter-cancel"),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "Cancel",
-                    style = PantopusTextStyle.small,
-                    fontWeight = FontWeight.SemiBold,
-                    color = PantopusColors.appText,
-                )
-            }
-            val parsedAmount = amountText.toDoubleOrNull()
-            val canSend = parsedAmount != null && parsedAmount > 0
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = 44.dp)
-                        .clip(RoundedCornerShape(Radii.md))
-                        .background(if (canSend) PantopusColors.primary600 else PantopusColors.appTextMuted)
-                        .clickable(enabled = canSend) {
-                            parsedAmount?.let { onConfirm(it, messageText.ifEmpty { null }) }
-                        }
-                        .padding(Spacing.s3)
-                        .testTag("counter-confirm"),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "Send counter",
-                    style = PantopusTextStyle.small,
-                    fontWeight = FontWeight.SemiBold,
-                    color = PantopusColors.appTextInverse,
-                )
-            }
-        }
+        CounterOfferHeader(target)
+        CounterAmountField(
+            amountText = amountText,
+            onAmountChange = { amountText = it },
+        )
+        CounterMessageField(
+            messageText = messageText,
+            onMessageChange = { messageText = it },
+        )
+        CounterOfferActions(
+            amountText = amountText,
+            messageText = messageText,
+            onCancel = onCancel,
+            onConfirm = onConfirm,
+        )
         Spacer(Modifier.height(Spacing.s2))
+    }
+}
+
+@Composable
+private fun CounterOfferHeader(target: CounterSheetTarget) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        Text(
+            text = "Counter ${target.buyerName}'s offer",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+        )
+        target.originalAmount?.let {
+            Text(
+                text = "Original offer: ${ListingOffersViewModel.formatPrice(it)}",
+                style = PantopusTextStyle.small,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CounterAmountField(
+    amountText: String,
+    onAmountChange: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        Text(
+            text = "Your counter amount",
+            style = PantopusTextStyle.small,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+        )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                    .padding(Spacing.s3),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            Text(
+                text = "$",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            BasicTextField(
+                value = amountText,
+                onValueChange = { value -> onAmountChange(value.filter { it.isDigit() || it == '.' }) },
+                textStyle =
+                    TextStyle(
+                        color = PantopusColors.appText,
+                        fontSize = 16.sp,
+                    ),
+                cursorBrush = SolidColor(PantopusColors.primary600),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth().testTag("counter-amount"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CounterMessageField(
+    messageText: String,
+    onMessageChange: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        Text(
+            text = "Optional message",
+            style = PantopusTextStyle.small,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+        )
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 64.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                    .padding(Spacing.s3),
+        ) {
+            BasicTextField(
+                value = messageText,
+                onValueChange = onMessageChange,
+                textStyle =
+                    TextStyle(
+                        color = PantopusColors.appText,
+                        fontSize = 14.sp,
+                    ),
+                cursorBrush = SolidColor(PantopusColors.primary600),
+                modifier = Modifier.fillMaxWidth().testTag("counter-message"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CounterOfferActions(
+    amountText: String,
+    messageText: String,
+    onCancel: () -> Unit,
+    onConfirm: (Double, String?) -> Unit,
+) {
+    val parsedAmount = amountText.toDoubleOrNull()
+    val canSend = parsedAmount != null && parsedAmount > 0
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        CounterActionButton(
+            label = "Cancel",
+            testTag = "counter-cancel",
+            backgroundColor = null,
+            onClick = onCancel,
+        )
+        CounterActionButton(
+            label = "Send counter",
+            testTag = "counter-confirm",
+            backgroundColor = if (canSend) PantopusColors.primary600 else PantopusColors.appTextMuted,
+            onClick = { parsedAmount?.let { onConfirm(it, messageText.ifEmpty { null }) } },
+            enabled = canSend,
+        )
+    }
+}
+
+@Composable
+private fun RowScope.CounterActionButton(
+    label: String,
+    testTag: String,
+    backgroundColor: Color?,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    val shape = RoundedCornerShape(Radii.md)
+    val colorModifier =
+        if (backgroundColor == null) {
+            Modifier.border(1.dp, PantopusColors.appBorder, shape)
+        } else {
+            Modifier.background(backgroundColor)
+        }
+    val modifier =
+        Modifier
+            .weight(1f)
+            .heightIn(min = 44.dp)
+            .clip(shape)
+            .then(colorModifier)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(Spacing.s3)
+            .testTag(testTag)
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = PantopusTextStyle.small,
+            fontWeight = FontWeight.SemiBold,
+            color = if (backgroundColor == null) PantopusColors.appText else PantopusColors.appTextInverse,
+        )
     }
 }

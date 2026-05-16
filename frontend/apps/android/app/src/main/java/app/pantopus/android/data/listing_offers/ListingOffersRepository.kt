@@ -22,20 +22,17 @@ class ListingOffersRepository
     constructor(
         private val api: ListingOffersApi,
     ) {
-        suspend fun listOffers(listingId: String): NetworkResult<ListingOffersResponse> =
-            safeApiCall { api.listOffers(listingId) }
+        suspend fun listOffers(listingId: String): NetworkResult<ListingOffersResponse> = safeApiCall { api.listOffers(listingId) }
 
         suspend fun accept(
             listingId: String,
             offerId: String,
-        ): NetworkResult<ListingOfferResponseEnvelope> =
-            safeApiCall { api.acceptOffer(listingId, offerId) }
+        ): NetworkResult<ListingOfferResponseEnvelope> = safeApiCall { api.acceptOffer(listingId, offerId) }
 
         suspend fun decline(
             listingId: String,
             offerId: String,
-        ): NetworkResult<ListingOfferResponseEnvelope> =
-            safeApiCall { api.declineOffer(listingId, offerId) }
+        ): NetworkResult<ListingOfferResponseEnvelope> = safeApiCall { api.declineOffer(listingId, offerId) }
 
         suspend fun counter(
             listingId: String,

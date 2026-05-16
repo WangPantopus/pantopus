@@ -33,7 +33,9 @@ final class IconTests: XCTestCase {
         // T5.3.2 My tasks — poster-side chips + footer.
         "plus", "rocket", "clipboard-list", "clock-plus", "circle-slash", "play",
         // T5.3.3 My posts — archive chip + empty-state compose icon.
-        "archive", "message-square-plus"
+        "archive", "message-square-plus",
+        // T5.3.4 Listing offers — listing-context header icons.
+        "bookmark"
     ]
 
     func testInventoryMatches() {

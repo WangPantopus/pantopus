@@ -18,7 +18,7 @@
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable type_body_length file_length
+// swiftlint:disable type_body_length
 
 @MainActor
 final class ListingOffersViewModelTests: XCTestCase {
@@ -54,9 +54,10 @@ final class ListingOffersViewModelTests: XCTestCase {
         ListingOffersViewModel(
             listingId: "listing-1",
             listingTitleHint: "Mid-century walnut credenza",
-            api: api ?? makeAPI(),
-            now: { Self.fixedNow }
-        )
+            api: api ?? makeAPI()
+        ) {
+            Self.fixedNow
+        }
     }
 
     private static let listingJSON = """

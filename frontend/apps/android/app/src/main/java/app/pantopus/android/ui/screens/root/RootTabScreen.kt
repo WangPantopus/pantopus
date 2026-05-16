@@ -77,6 +77,7 @@ import app.pantopus.android.ui.screens.inbox.chat.ConversationRowVariant
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationHost
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
 import app.pantopus.android.ui.screens.inbox.conversation.ChatThreadMode
+import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
@@ -84,7 +85,6 @@ import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailForm
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
-import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
 import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
 import app.pantopus.android.ui.screens.my_posts.MyPostsScreen
 import app.pantopus.android.ui.screens.my_tasks.MyTasksScreen
@@ -242,7 +242,10 @@ private object ChildRoutes {
         "listings/{$LISTING_OFFERS_ID_KEY}/offers?$LISTING_OFFERS_TITLE_KEY={$LISTING_OFFERS_TITLE_KEY}"
 
     /** Build the listing-offers path with an optional title hint. */
-    fun listingOffers(listingId: String, title: String? = null): String {
+    fun listingOffers(
+        listingId: String,
+        title: String? = null,
+    ): String {
         val encodedTitle = java.net.URLEncoder.encode(title ?: "", "UTF-8")
         return "listings/$listingId/offers?$LISTING_OFFERS_TITLE_KEY=$encodedTitle"
     }

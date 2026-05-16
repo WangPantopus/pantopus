@@ -23,6 +23,7 @@ import app.pantopus.android.data.listings.ListingsRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBackground
 import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBadgeSize
+import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.GradientPair
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListingContextConfig
@@ -39,7 +40,6 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.screens.shared.list_of_rows.ThumbnailImage
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
-import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -257,22 +257,24 @@ class ListingOffersViewModel
                 val tone = ListingOffersAvatarTone.deterministic(offer.buyer?.id ?: offer.id)
                 val amount = formatPrice(offer.amount)
                 val asking = formatAskingSublabel(askingPrice)
-                val chips = mutableListOf<RowChip>(
-                    RowChip(
-                        text = status.label,
-                        icon = status.icon,
-                        tint = RowChip.Tint.Status(status.chipVariant),
-                    ),
-                )
+                val chips =
+                    mutableListOf<RowChip>(
+                        RowChip(
+                            text = status.label,
+                            icon = status.icon,
+                            tint = RowChip.Tint.Status(status.chipVariant),
+                        ),
+                    )
                 if (status == ListingOfferStatus.Countered && offer.counterAmount != null) {
                     chips.add(
                         RowChip(
                             text = "Your counter ${formatPrice(offer.counterAmount)}",
                             icon = PantopusIcon.ArrowsRepeat,
-                            tint = RowChip.Tint.Custom(
-                                background = PantopusColors.appSurfaceSunken,
-                                foreground = PantopusColors.appTextStrong,
-                            ),
+                            tint =
+                                RowChip.Tint.Custom(
+                                    background = PantopusColors.appSurfaceSunken,
+                                    foreground = PantopusColors.appTextStrong,
+                                ),
                         ),
                     )
                 }
@@ -481,8 +483,7 @@ class ListingOffersViewModel
                 }
             }
 
-            fun formatPrice(amount: Double?): String =
-                if (amount == null) "$—" else "$${kotlin.math.round(amount).toInt()}"
+            fun formatPrice(amount: Double?): String = if (amount == null) "$—" else "$${kotlin.math.round(amount).toInt()}"
 
             fun formatAskingSublabel(askingPrice: Double?): String? {
                 val price = askingPrice ?: return null
