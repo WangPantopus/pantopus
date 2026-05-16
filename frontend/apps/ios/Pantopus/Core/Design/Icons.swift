@@ -108,6 +108,14 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case ban
     case fileText = "file-text"
 
+    // T5.3.2 My tasks V2 — poster-side chip + footer icons.
+    case plus
+    case rocket
+    case clipboardList = "clipboard-list"
+    case clockPlus = "clock-plus"
+    case circleSlash = "circle-slash"
+    case play
+
     // T5.3.3 My posts — archive chip + empty-state compose icon.
     case archive
     case messageSquarePlus = "message-square-plus"
@@ -199,6 +207,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .trendingDown: "chart.line.downtrend.xyaxis"
         case .ban: "nosign"
         case .fileText: "doc.text"
+        case .plus: "plus"
+        case .rocket: "paperplane.fill"
+        case .clipboardList: "list.clipboard"
+        case .clockPlus: "clock.arrow.circlepath"
+        case .circleSlash: "circle.slash"
+        case .play: "play.fill"
         case .archive: "archivebox"
         case .messageSquarePlus: "bubble.left.and.text.bubble.right"
         }

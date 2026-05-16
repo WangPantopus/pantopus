@@ -659,7 +659,12 @@ private fun ContentColumn(
 ) {
     Column(modifier = modifier) {
         if (!row.headerChips.isNullOrEmpty()) {
-            ChipRowView(chips = row.headerChips, timeMeta = row.timeMeta, metaTail = null)
+            ChipRowView(
+                bidderStack = null,
+                chips = row.headerChips,
+                timeMeta = row.timeMeta,
+                metaTail = null,
+            )
             Spacer(Modifier.height(2.dp))
         }
         if (row.title.isNotEmpty()) {
@@ -704,10 +709,11 @@ private fun ContentColumn(
             Spacer(Modifier.height(Spacing.s1))
             BodyLine(text = row.body, icon = row.bodyIcon, emphasis = row.bodyEmphasis)
         }
-        if (!row.chips.isNullOrEmpty()) {
+        if (!row.chips.isNullOrEmpty() || row.bidderStack != null) {
             Spacer(Modifier.height(Spacing.s1))
             ChipRowView(
-                chips = row.chips,
+                bidderStack = row.bidderStack,
+                chips = row.chips.orEmpty(),
                 timeMeta = if (row.headerChips == null) row.timeMeta else null,
                 metaTail = row.metaTail,
             )
@@ -1107,6 +1113,7 @@ private fun TrailingView(
 
 @Composable
 private fun ChipRowView(
+    bidderStack: BidderStackData?,
     chips: List<RowChip>,
     timeMeta: String?,
     metaTail: String?,
@@ -1116,6 +1123,10 @@ private fun ChipRowView(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         modifier = Modifier.fillMaxWidth(),
     ) {
+        if (bidderStack != null && (bidderStack.bidders.isNotEmpty() || bidderStack.overflow > 0)) {
+            InlineBidderStack(bidderStack)
+            Spacer(Modifier.width(Spacing.s1))
+        }
         chips.forEach { chip -> ChipPill(chip) }
         if (metaTail != null) {
             Text(
@@ -1133,6 +1144,54 @@ private fun ChipRowView(
                 style = PantopusTextStyle.caption,
                 color = PantopusColors.appTextMuted,
             )
+        }
+    }
+}
+
+@Composable
+private fun InlineBidderStack(data: BidderStackData) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        data.bidders.forEachIndexed { index, bidder ->
+            val tileSize = 22.dp
+            val offset = if (index == 0) 0.dp else (-8).dp
+            Box(
+                modifier =
+                    Modifier
+                        .offset(x = offset)
+                        .size(tileSize)
+                        .clip(CircleShape)
+                        .background(toneBackground(bidder.tone))
+                        .border(2.dp, PantopusColors.appSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = bidder.initials.take(2).uppercase(),
+                    color = toneForeground(bidder.tone),
+                    fontSize = (tileSize.value * 0.36f).sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+        if (data.overflow > 0) {
+            val tileSize = 22.dp
+            val offset = if (data.bidders.isEmpty()) 0.dp else (-8).dp
+            Box(
+                modifier =
+                    Modifier
+                        .offset(x = offset)
+                        .size(tileSize)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appSurfaceSunken)
+                        .border(2.dp, PantopusColors.appSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "+${data.overflow}",
+                    color = PantopusColors.appTextStrong,
+                    fontSize = (tileSize.value * 0.36f).sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
     }
 }

@@ -29,7 +29,11 @@ final class IconTests: XCTestCase {
         "sparkles", "timer", "repeat", "hourglass", "hand-coins", "package",
         "compass", "filter",
         // T5.3.1 My bids — bid lifecycle chips + footer.
-        "crown", "trending-down", "ban", "file-text"
+        "crown", "trending-down", "ban", "file-text",
+        // T5.3.2 My tasks — poster-side chips + footer.
+        "plus", "rocket", "clipboard-list", "clock-plus", "circle-slash", "play",
+        // T5.3.3 My posts — archive chip + empty-state compose icon.
+        "archive", "message-square-plus"
     ]
 
     func testInventoryMatches() {

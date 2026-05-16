@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AlternateEmail
@@ -55,14 +57,17 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MarkunreadMailbox
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sell
@@ -194,6 +199,14 @@ enum class PantopusIcon(
     Ban("ban"),
     FileText("file-text"),
 
+    // T5.3.2 — My tasks V2 poster-side chip + footer icons.
+    Plus("plus"),
+    Rocket("rocket"),
+    ClipboardList("clipboard-list"),
+    ClockPlus("clock-plus"),
+    CircleSlash("circle-slash"),
+    Play("play"),
+
     // T5.3.3 — My posts: archive chip + empty-state compose icon.
     Archive("archive"),
     MessageSquarePlus("message-square-plus"),
@@ -316,6 +329,12 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.TrendingDown -> IconSource.Material(Icons.AutoMirrored.Filled.TrendingDown)
         PantopusIcon.Ban -> IconSource.Material(Icons.Filled.Block)
         PantopusIcon.FileText -> IconSource.Material(Icons.AutoMirrored.Filled.Article)
+        PantopusIcon.Plus -> IconSource.Material(Icons.Filled.Add)
+        PantopusIcon.Rocket -> IconSource.Material(Icons.Filled.RocketLaunch)
+        PantopusIcon.ClipboardList -> IconSource.Material(Icons.AutoMirrored.Filled.Assignment)
+        PantopusIcon.ClockPlus -> IconSource.Material(Icons.Filled.MoreTime)
+        PantopusIcon.CircleSlash -> IconSource.Material(Icons.Filled.Block)
+        PantopusIcon.Play -> IconSource.Material(Icons.Filled.PlayArrow)
         PantopusIcon.Archive -> IconSource.Material(Icons.Filled.Archive)
         PantopusIcon.MessageSquarePlus -> IconSource.Material(Icons.Filled.BorderColor)
     }

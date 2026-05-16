@@ -84,6 +84,7 @@ fun YouScreen(
     onOpenSettings: () -> Unit = {},
     onOpenOffers: () -> Unit = {},
     onOpenMyBids: () -> Unit = {},
+    onOpenMyTasks: () -> Unit = {},
     onOpenMyPosts: () -> Unit = {},
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
@@ -109,6 +110,7 @@ fun YouScreen(
             when (tile.routeKey) {
                 "me.mail" -> onOpenMailbox()
                 "me.bids" -> onOpenMyBids()
+                "me.gigs" -> onOpenMyTasks()
                 else -> onOpenPlaceholder(tile.label)
             }
         },
