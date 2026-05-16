@@ -4,7 +4,7 @@
 //
 //  Navigation stack for the Hub tab.
 //
-// swiftlint:disable cyclomatic_complexity function_body_length type_body_length
+// swiftlint:disable cyclomatic_complexity function_body_length type_body_length file_length
 
 import SwiftUI
 

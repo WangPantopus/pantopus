@@ -215,7 +215,7 @@ internal sealed interface IconSource {
  * is "close to Lucide" — swap the mapping to real Lucide SVGs by changing
  * this function's bodies only.
  */
-@Suppress("CyclomaticComplexMethod")
+@Suppress("CyclomaticComplexMethod", "LongMethod")
 internal fun PantopusIcon.source(): IconSource =
     when (this) {
         PantopusIcon.Home -> IconSource.Material(Icons.Filled.Home)
