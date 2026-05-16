@@ -142,8 +142,7 @@ object NetworkModule {
     fun provideHubApi(retrofit: Retrofit): HubApi = retrofit.create(HubApi::class.java)
 
     @Provides @Singleton
-    fun provideBusinessDiscoveryApi(retrofit: Retrofit): BusinessDiscoveryApi =
-        retrofit.create(BusinessDiscoveryApi::class.java)
+    fun provideBusinessDiscoveryApi(retrofit: Retrofit): BusinessDiscoveryApi = retrofit.create(BusinessDiscoveryApi::class.java)
 
     @Provides @Singleton
     fun provideHomesApi(retrofit: Retrofit): HomesApi = retrofit.create(HomesApi::class.java)

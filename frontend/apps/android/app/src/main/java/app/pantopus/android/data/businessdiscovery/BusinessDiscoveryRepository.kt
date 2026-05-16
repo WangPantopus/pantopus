@@ -26,12 +26,14 @@ class BusinessDiscoveryRepository
             pageSize: Int = 20,
         ): NetworkResult<BusinessDiscoverySearchResponse> =
             safeApiCall {
-                api.search(
-                    q = q,
-                    categories = categories?.takeIf { it.isNotEmpty() }?.joinToString(","),
-                    sort = sort,
-                    page = page,
-                    pageSize = pageSize,
-                )
+                val query =
+                    buildMap {
+                        q?.takeIf { it.isNotBlank() }?.let { put("q", it) }
+                        categories?.takeIf { it.isNotEmpty() }?.joinToString(",")?.let { put("categories", it) }
+                        sort?.takeIf { it.isNotBlank() }?.let { put("sort", it) }
+                        put("page", page.toString())
+                        put("page_size", pageSize.toString())
+                    }
+                api.search(query)
             }
     }

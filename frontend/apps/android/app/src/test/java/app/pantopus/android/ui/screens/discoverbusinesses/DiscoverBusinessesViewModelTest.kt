@@ -12,8 +12,8 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.screens.shared.list_of_rows.SectionStyle
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
-import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -23,7 +23,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -236,11 +235,10 @@ class DiscoverBusinessesViewModelTest {
     @Test
     fun chipSelectionPassesCategoriesArgument() =
         runTest {
-            val categoriesSlot = slot<List<String>?>()
             coEvery {
                 repo.search(
                     q = any(),
-                    categories = capture(categoriesSlot),
+                    categories = any(),
                     sort = any(),
                     page = any(),
                     pageSize = any(),
@@ -249,10 +247,26 @@ class DiscoverBusinessesViewModelTest {
 
             val vm = DiscoverBusinessesViewModel(repo)
             vm.load()
-            assertNull("All chip must NOT pass categories", categoriesSlot.captured)
+            coVerify {
+                repo.search(
+                    q = null,
+                    categories = null,
+                    sort = null,
+                    page = 1,
+                    pageSize = 50,
+                )
+            }
 
             vm.selectChip(DiscoverBusinessesChip.CLEANING)
-            assertEquals(listOf("cleaning"), categoriesSlot.captured)
+            coVerify {
+                repo.search(
+                    q = null,
+                    categories = listOf("cleaning"),
+                    sort = null,
+                    page = 1,
+                    pageSize = 50,
+                )
+            }
         }
 
     // ───────── Search ─────────
@@ -260,10 +274,9 @@ class DiscoverBusinessesViewModelTest {
     @Test
     fun submitSearchPassesQueryArgument() =
         runTest {
-            val qSlot = slot<String?>()
             coEvery {
                 repo.search(
-                    q = capture(qSlot),
+                    q = any(),
                     categories = any(),
                     sort = any(),
                     page = any(),
@@ -276,7 +289,15 @@ class DiscoverBusinessesViewModelTest {
             vm.setSearchText("tree")
             vm.submitSearch()
 
-            assertEquals("tree", qSlot.captured)
+            coVerify {
+                repo.search(
+                    q = "tree",
+                    categories = null,
+                    sort = null,
+                    page = 1,
+                    pageSize = 50,
+                )
+            }
         }
 
     // ───────── Row mapping ─────────

@@ -62,7 +62,9 @@ public struct BusinessDiscoverySearchResponse: Decodable, Sendable, Hashable {
         public let verificationBadge: String?
         public let foundingBadge: Bool?
 
-        public var id: String { businessUserId }
+        public var id: String {
+            businessUserId
+        }
 
         enum CodingKeys: String, CodingKey {
             case businessUserId = "business_user_id"

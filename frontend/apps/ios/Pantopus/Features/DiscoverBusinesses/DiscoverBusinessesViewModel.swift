@@ -32,6 +32,8 @@
 //  "All".
 //
 
+// swiftlint:disable type_body_length
+
 import Foundation
 import Observation
 import SwiftUI
@@ -105,13 +107,17 @@ public final class DiscoverBusinessesViewModel: ListOfRowsDataSource {
         }
     }
 
-    public var tabs: [ListOfRowsTab] { [] }
+    public var tabs: [ListOfRowsTab] {
+        []
+    }
 
     public var selectedTab: String = "" {
         didSet { /* unused — chip-strip drives filter selection */ }
     }
 
-    public var fab: FABAction? { nil }
+    public var fab: FABAction? {
+        nil
+    }
 
     public private(set) var state: ListOfRowsState = .loading
 
@@ -153,7 +159,7 @@ public final class DiscoverBusinessesViewModel: ListOfRowsDataSource {
     private var loadedOnce = false
     private var pendingSearchTask: Task<Void, Never>?
 
-    public init(
+    init(
         api: APIClient = .shared,
         onSelect: @escaping @MainActor (DiscoverBusinessesTarget) -> Void = { _ in }
     ) {
@@ -303,13 +309,12 @@ public final class DiscoverBusinessesViewModel: ListOfRowsDataSource {
             icon: .compass,
             headline: "No verified businesses nearby yet",
             subcopy:
-                "Widen your search radius, or invite a business you trust on " +
+            "Widen your search radius, or invite a business you trust on " +
                 "the block. They'll show up here once they verify their address.",
-            ctaTitle: "Invite a business",
-            onCTA: { [weak self] in
-                MainActor.assumeIsolated { self?.onSelect(.inviteBusiness) }
-            }
-        )
+            ctaTitle: "Invite a business"
+        ) { [weak self] in
+            MainActor.assumeIsolated { self?.onSelect(.inviteBusiness) }
+        }
     }
 
     private func noLocationContent() -> ListOfRowsState.EmptyContent {
@@ -317,13 +322,12 @@ public final class DiscoverBusinessesViewModel: ListOfRowsDataSource {
             icon: .mapPin,
             headline: "Set a home address",
             subcopy:
-                "We need a verified home address to surface businesses near " +
+            "We need a verified home address to surface businesses near " +
                 "you. Add one in your profile and they'll appear here.",
-            ctaTitle: "Widen radius",
-            onCTA: { [weak self] in
-                MainActor.assumeIsolated { self?.onSelect(.widenRadius) }
-            }
-        )
+            ctaTitle: "Widen radius"
+        ) { [weak self] in
+            MainActor.assumeIsolated { self?.onSelect(.widenRadius) }
+        }
     }
 
     // MARK: - Row mapping (pure projection, public for tests)
@@ -413,53 +417,73 @@ public final class DiscoverBusinessesViewModel: ListOfRowsDataSource {
     public static func categorySpec(for id: String) -> DiscoverBusinessesCategorySpec {
         switch id {
         case DiscoverBusinessesChip.all:
-            return DiscoverBusinessesCategorySpec(
-                id: id, label: "All", icon: .briefcase,
+            DiscoverBusinessesCategorySpec(
+                id: id,
+                label: "All",
+                icon: .briefcase,
                 gradient: GradientPair(start: Theme.Color.primary500, end: Theme.Color.primary700)
             )
         case DiscoverBusinessesChip.handyman:
-            return DiscoverBusinessesCategorySpec(
-                id: id, label: "Handyman", icon: .hammer,
+            DiscoverBusinessesCategorySpec(
+                id: id,
+                label: "Handyman",
+                icon: .hammer,
                 gradient: GradientPair(start: Theme.Color.warning, end: Theme.Color.handyman)
             )
         case DiscoverBusinessesChip.cleaning:
-            return DiscoverBusinessesCategorySpec(
-                id: id, label: "Cleaning", icon: .sparkles,
+            DiscoverBusinessesCategorySpec(
+                id: id,
+                label: "Cleaning",
+                icon: .sparkles,
                 gradient: GradientPair(start: Theme.Color.success, end: Theme.Color.cleaning)
             )
         case DiscoverBusinessesChip.petCare:
-            return DiscoverBusinessesCategorySpec(
-                id: id, label: "Pet Care", icon: .pawPrint,
+            DiscoverBusinessesCategorySpec(
+                id: id,
+                label: "Pet Care",
+                icon: .pawPrint,
                 gradient: GradientPair(start: Theme.Color.error, end: Theme.Color.petCare)
             )
         case DiscoverBusinessesChip.plumbing:
-            return DiscoverBusinessesCategorySpec(
-                id: id, label: "Plumbing", icon: .hammer,
+            DiscoverBusinessesCategorySpec(
+                id: id,
+                label: "Plumbing",
+                icon: .hammer,
                 gradient: GradientPair(start: Theme.Color.primary500, end: Theme.Color.tech)
             )
         case DiscoverBusinessesChip.tutoring:
-            return DiscoverBusinessesCategorySpec(
-                id: id, label: "Tutoring", icon: .lightbulb,
+            DiscoverBusinessesCategorySpec(
+                id: id,
+                label: "Tutoring",
+                icon: .lightbulb,
                 gradient: GradientPair(start: Theme.Color.info, end: Theme.Color.tutoring)
             )
         case DiscoverBusinessesChip.childcare:
-            return DiscoverBusinessesCategorySpec(
-                id: id, label: "Childcare", icon: .heart,
+            DiscoverBusinessesCategorySpec(
+                id: id,
+                label: "Childcare",
+                icon: .heart,
                 gradient: GradientPair(start: Theme.Color.warning, end: Theme.Color.childCare)
             )
         case DiscoverBusinessesChip.moving:
-            return DiscoverBusinessesCategorySpec(
-                id: id, label: "Moving", icon: .package,
+            DiscoverBusinessesCategorySpec(
+                id: id,
+                label: "Moving",
+                icon: .package,
                 gradient: GradientPair(start: Theme.Color.business, end: Theme.Color.moving)
             )
         case DiscoverBusinessesChip.lawnCare:
-            return DiscoverBusinessesCategorySpec(
-                id: id, label: "Lawn Care", icon: .sparkles,
+            DiscoverBusinessesCategorySpec(
+                id: id,
+                label: "Lawn Care",
+                icon: .sparkles,
                 gradient: GradientPair(start: Theme.Color.success, end: Theme.Color.home)
             )
         default:
-            return DiscoverBusinessesCategorySpec(
-                id: id, label: "Other", icon: .briefcase,
+            DiscoverBusinessesCategorySpec(
+                id: id,
+                label: "Other",
+                icon: .briefcase,
                 gradient: GradientPair(start: Theme.Color.appTextSecondary, end: Theme.Color.appTextStrong)
             )
         }

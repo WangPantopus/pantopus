@@ -394,52 +394,72 @@ class DiscoverBusinessesViewModel
                 when (id) {
                     DiscoverBusinessesChip.ALL ->
                         DiscoverBusinessesCategorySpec(
-                            id = id, label = "All", icon = PantopusIcon.Briefcase,
+                            id = id,
+                            label = "All",
+                            icon = PantopusIcon.Briefcase,
                             gradient = GradientPair(PantopusColors.primary500, PantopusColors.primary700),
                         )
                     DiscoverBusinessesChip.HANDYMAN ->
                         DiscoverBusinessesCategorySpec(
-                            id = id, label = "Handyman", icon = PantopusIcon.Hammer,
+                            id = id,
+                            label = "Handyman",
+                            icon = PantopusIcon.Hammer,
                             gradient = GradientPair(PantopusColors.warning, PantopusColors.handyman),
                         )
                     DiscoverBusinessesChip.CLEANING ->
                         DiscoverBusinessesCategorySpec(
-                            id = id, label = "Cleaning", icon = PantopusIcon.Sparkles,
+                            id = id,
+                            label = "Cleaning",
+                            icon = PantopusIcon.Sparkles,
                             gradient = GradientPair(PantopusColors.success, PantopusColors.cleaning),
                         )
                     DiscoverBusinessesChip.PET_CARE ->
                         DiscoverBusinessesCategorySpec(
-                            id = id, label = "Pet Care", icon = PantopusIcon.PawPrint,
+                            id = id,
+                            label = "Pet Care",
+                            icon = PantopusIcon.PawPrint,
                             gradient = GradientPair(PantopusColors.error, PantopusColors.petCare),
                         )
                     DiscoverBusinessesChip.PLUMBING ->
                         DiscoverBusinessesCategorySpec(
-                            id = id, label = "Plumbing", icon = PantopusIcon.Hammer,
+                            id = id,
+                            label = "Plumbing",
+                            icon = PantopusIcon.Hammer,
                             gradient = GradientPair(PantopusColors.primary500, PantopusColors.tech),
                         )
                     DiscoverBusinessesChip.TUTORING ->
                         DiscoverBusinessesCategorySpec(
-                            id = id, label = "Tutoring", icon = PantopusIcon.Lightbulb,
+                            id = id,
+                            label = "Tutoring",
+                            icon = PantopusIcon.Lightbulb,
                             gradient = GradientPair(PantopusColors.info, PantopusColors.tutoring),
                         )
                     DiscoverBusinessesChip.CHILDCARE ->
                         DiscoverBusinessesCategorySpec(
-                            id = id, label = "Childcare", icon = PantopusIcon.Heart,
+                            id = id,
+                            label = "Childcare",
+                            icon = PantopusIcon.Heart,
                             gradient = GradientPair(PantopusColors.warning, PantopusColors.childCare),
                         )
                     DiscoverBusinessesChip.MOVING ->
                         DiscoverBusinessesCategorySpec(
-                            id = id, label = "Moving", icon = PantopusIcon.Package,
+                            id = id,
+                            label = "Moving",
+                            icon = PantopusIcon.Package,
                             gradient = GradientPair(PantopusColors.business, PantopusColors.moving),
                         )
                     DiscoverBusinessesChip.LAWN_CARE ->
                         DiscoverBusinessesCategorySpec(
-                            id = id, label = "Lawn Care", icon = PantopusIcon.Sparkles,
+                            id = id,
+                            label = "Lawn Care",
+                            icon = PantopusIcon.Sparkles,
                             gradient = GradientPair(PantopusColors.success, PantopusColors.home),
                         )
                     else ->
                         DiscoverBusinessesCategorySpec(
-                            id = id, label = "Other", icon = PantopusIcon.Briefcase,
+                            id = id,
+                            label = "Other",
+                            icon = PantopusIcon.Briefcase,
                             gradient =
                                 GradientPair(
                                     PantopusColors.appTextSecondary,
