@@ -121,7 +121,7 @@ private struct ScheduleStep: View {
                     } label: {
                         HStack(spacing: Spacing.s3) {
                             Icon(
-                                schedule == .oneTime ? .clock : .repeatIcon,
+                                schedule == .oneTime ? .clock : .arrowsRepeat,
                                 size: 18,
                                 color: Theme.Color.primary600
                             )

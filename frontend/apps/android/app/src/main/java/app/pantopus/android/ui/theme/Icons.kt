@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -29,14 +31,18 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
@@ -45,12 +51,12 @@ import androidx.compose.material.icons.filled.MarkunreadMailbox
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sell
@@ -59,6 +65,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -148,9 +155,16 @@ enum class PantopusIcon(
     History("history"),
     Receipt("receipt"),
     Clock("clock"),
-    Repeat("repeat"),
     Users("users"),
     DollarSign("dollar-sign"),
+    Sparkles("sparkles"),
+    Timer("timer"),
+    ArrowsRepeat("repeat"),
+    Hourglass("hourglass"),
+    HandCoins("hand-coins"),
+    Package("package"),
+    Compass("compass"),
+    Filter("filter"),
     ;
 
     companion object {
@@ -250,9 +264,16 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.History -> IconSource.Material(Icons.Filled.History)
         PantopusIcon.Receipt -> IconSource.Material(Icons.Filled.Receipt)
         PantopusIcon.Clock -> IconSource.Material(Icons.Filled.Schedule)
-        PantopusIcon.Repeat -> IconSource.Material(Icons.Filled.Refresh)
         PantopusIcon.Users -> IconSource.Material(Icons.Filled.Group)
         PantopusIcon.DollarSign -> IconSource.Material(Icons.Filled.AttachMoney)
+        PantopusIcon.Sparkles -> IconSource.Material(Icons.Filled.AutoAwesome)
+        PantopusIcon.Timer -> IconSource.Material(Icons.Filled.Timer)
+        PantopusIcon.ArrowsRepeat -> IconSource.Material(Icons.Filled.Autorenew)
+        PantopusIcon.Hourglass -> IconSource.Material(Icons.Filled.HourglassEmpty)
+        PantopusIcon.HandCoins -> IconSource.Material(Icons.Filled.Payments)
+        PantopusIcon.Package -> IconSource.Material(Icons.Filled.Inventory2)
+        PantopusIcon.Compass -> IconSource.Material(Icons.Filled.Explore)
+        PantopusIcon.Filter -> IconSource.Material(Icons.Filled.FilterAlt)
     }
 
 /**

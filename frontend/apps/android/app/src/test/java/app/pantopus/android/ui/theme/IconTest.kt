@@ -73,9 +73,16 @@ class IconTest {
             "history",
             "receipt",
             "clock",
-            "repeat",
             "users",
             "dollar-sign",
+            "sparkles",
+            "timer",
+            "repeat",
+            "hourglass",
+            "hand-coins",
+            "package",
+            "compass",
+            "filter",
         )
 
     @Test

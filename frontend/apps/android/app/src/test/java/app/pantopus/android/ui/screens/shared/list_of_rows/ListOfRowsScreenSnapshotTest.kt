@@ -310,6 +310,45 @@ class ListOfRowsScreenSnapshotTest {
         }
     }
 
+    @Test fun row_offer_category_gradient_with_price_stack() {
+        paparazzi.snapshot {
+            Frame {
+                RowView(
+                    row =
+                        RowModel(
+                            id = "offer-cross",
+                            title = "Mid-century walnut credenza",
+                            subtitle = "From Anika R. · Mid-City · 12m",
+                            template = RowTemplate.StatusChip,
+                            leading =
+                                RowLeading.CategoryGradientIcon(
+                                    icon = PantopusIcon.Package,
+                                    gradient =
+                                        GradientPair(
+                                            PantopusColors.moving,
+                                            PantopusColors.business,
+                                        ),
+                                ),
+                            trailing =
+                                RowTrailing.PriceStack(
+                                    amount = "$220",
+                                    sublabel = "asking $240",
+                                ),
+                            onTap = {},
+                            chips =
+                                listOf(
+                                    RowChip(
+                                        text = "New offer",
+                                        icon = PantopusIcon.Sparkles,
+                                        tint = RowChip.Tint.Status(StatusChipVariant.Personal),
+                                    ),
+                                ),
+                        ),
+                )
+            }
+        }
+    }
+
     @Test fun row_leading_offer_with_note_block() {
         paparazzi.snapshot {
             Frame {

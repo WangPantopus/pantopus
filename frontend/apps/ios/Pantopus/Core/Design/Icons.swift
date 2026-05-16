@@ -79,9 +79,18 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case history
     case receipt
     case clock
-    case repeatIcon = "repeat"
     case users
     case dollarSign = "dollar-sign"
+    case sparkles
+    case timer
+    /// Lucide `repeat`. Named `arrowsRepeat` to dodge Swift's `repeat`
+    /// keyword while preserving the upstream token in `rawValue`.
+    case arrowsRepeat = "repeat"
+    case hourglass
+    case handCoins = "hand-coins"
+    case package
+    case compass
+    case filter
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
@@ -150,9 +159,16 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .history: "clock.arrow.circlepath"
         case .receipt: "doc.text"
         case .clock: "clock"
-        case .repeatIcon: "arrow.triangle.2.circlepath"
         case .users: "person.2"
         case .dollarSign: "dollarsign"
+        case .sparkles: "sparkles"
+        case .timer: "timer"
+        case .arrowsRepeat: "arrow.triangle.2.circlepath"
+        case .hourglass: "hourglass"
+        case .handCoins: "hand.raised"
+        case .package: "shippingbox"
+        case .compass: "safari"
+        case .filter: "line.3.horizontal.decrease"
         }
     }
 }

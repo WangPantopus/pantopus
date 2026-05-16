@@ -228,7 +228,7 @@ private fun ScheduleStep(viewModel: AddBillWizardViewModel) {
                             if (schedule == AddBillSchedule.OneTime) {
                                 PantopusIcon.Clock
                             } else {
-                                PantopusIcon.Repeat
+                                PantopusIcon.ArrowsRepeat
                             },
                         contentDescription = null,
                         size = 18.dp,

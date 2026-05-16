@@ -24,7 +24,9 @@ final class IconTests: XCTestCase {
         "help-circle", "calendar", "lightbulb", "eye", "share", "radio", "map-pin",
         "pencil", "briefcase", "gavel", "sliders-horizontal", "message-circle",
         "at-sign", "badge-check", "tag", "shield-alert", "check-check", "history",
-        "receipt", "clock", "repeat", "users", "dollar-sign"
+        "receipt", "clock", "users", "dollar-sign",
+        "sparkles", "timer", "repeat", "hourglass", "hand-coins", "package",
+        "compass", "filter"
     ]
 
     func testInventoryMatches() {
