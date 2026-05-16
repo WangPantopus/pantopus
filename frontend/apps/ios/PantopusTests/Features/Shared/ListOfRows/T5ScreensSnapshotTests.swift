@@ -46,22 +46,58 @@ final class T5ScreensSnapshotTests: XCTestCase {
             .deletingLastPathComponent() // ListOfRows
             .deletingLastPathComponent() // Shared
             .deletingLastPathComponent() // Features
+            .deletingLastPathComponent() // PantopusTests
             .appendingPathComponent("__Snapshots__")
             .appendingPathComponent("t5")
     }
 
-    func test_notifications_ios_baseline_is_present() throws { try assertBaseline("notifications") }
-    func test_bills_ios_baseline_is_present() throws { try assertBaseline("bills") }
-    func test_pets_ios_baseline_is_present() throws { try assertBaseline("pets") }
-    func test_connections_ios_baseline_is_present() throws { try assertBaseline("connections") }
-    func test_offers_ios_baseline_is_present() throws { try assertBaseline("offers") }
-    func test_myBids_ios_baseline_is_present() throws { try assertBaseline("my-bids") }
-    func test_myTasks_ios_baseline_is_present() throws { try assertBaseline("my-tasks") }
-    func test_myPulse_ios_baseline_is_present() throws { try assertBaseline("my-pulse") }
-    func test_listingOffers_ios_baseline_is_present() throws { try assertBaseline("listing-offers") }
-    func test_discoverHub_ios_baseline_is_present() throws { try assertBaseline("discover-hub") }
-    func test_discoverBusinesses_ios_baseline_is_present() throws { try assertBaseline("discover-businesses") }
-    func test_reviewClaims_ios_baseline_is_present() throws { try assertBaseline("review-claims") }
+    func test_notifications_ios_baseline_is_present() throws {
+        try assertBaseline("notifications")
+    }
+
+    func test_bills_ios_baseline_is_present() throws {
+        try assertBaseline("bills")
+    }
+
+    func test_pets_ios_baseline_is_present() throws {
+        try assertBaseline("pets")
+    }
+
+    func test_connections_ios_baseline_is_present() throws {
+        try assertBaseline("connections")
+    }
+
+    func test_offers_ios_baseline_is_present() throws {
+        try assertBaseline("offers")
+    }
+
+    func test_myBids_ios_baseline_is_present() throws {
+        try assertBaseline("my-bids")
+    }
+
+    func test_myTasks_ios_baseline_is_present() throws {
+        try assertBaseline("my-tasks")
+    }
+
+    func test_myPulse_ios_baseline_is_present() throws {
+        try assertBaseline("my-pulse")
+    }
+
+    func test_listingOffers_ios_baseline_is_present() throws {
+        try assertBaseline("listing-offers")
+    }
+
+    func test_discoverHub_ios_baseline_is_present() throws {
+        try assertBaseline("discover-hub")
+    }
+
+    func test_discoverBusinesses_ios_baseline_is_present() throws {
+        try assertBaseline("discover-businesses")
+    }
+
+    func test_reviewClaims_ios_baseline_is_present() throws {
+        try assertBaseline("review-claims")
+    }
 
     private func assertBaseline(_ screen: String) throws {
         let url = baselineURL.appendingPathComponent("\(screen)-ios.png")
