@@ -74,7 +74,8 @@ class GigsRepository
         suspend fun markCompleted(
             gigId: String,
             note: String? = null,
-        ): NetworkResult<MarkCompletedResponse> = safeApiCall {
-            api.markCompleted(gigId, MarkCompletedBody(note = note))
-        }
+        ): NetworkResult<MarkCompletedResponse> =
+            safeApiCall {
+                api.markCompleted(gigId, MarkCompletedBody(note = note))
+            }
     }

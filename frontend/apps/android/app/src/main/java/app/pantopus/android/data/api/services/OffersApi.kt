@@ -7,7 +7,6 @@ import app.pantopus.android.data.api.models.offers.UpdateBidBody
 import app.pantopus.android.data.api.models.offers.WithdrawBidBody
 import app.pantopus.android.data.api.models.offers.WithdrawBidResponse
 import retrofit2.http.Body
-import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.HTTP
 import retrofit2.http.PUT

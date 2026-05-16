@@ -146,10 +146,15 @@ sealed class MyBidsStatus {
 /** Footer archetype per the design's `actions` prop. */
 sealed class MyBidsFooter {
     data object Edit : MyBidsFooter()
+
     data object Message : MyBidsFooter()
+
     data object Complete : MyBidsFooter()
+
     data class Review(val firstName: String) : MyBidsFooter()
+
     data object Rebid : MyBidsFooter()
+
     data object None : MyBidsFooter()
 }
 
@@ -438,7 +443,7 @@ class MyBidsViewModel
             val footer: MyBidsFooter,
         )
 
-        private data class TabCounts(
+        data class TabCounts(
             val active: Int = 0,
             val accepted: Int = 0,
             val rejected: Int = 0,
@@ -543,11 +548,12 @@ class MyBidsViewModel
                             ),
                     )
                 is MyBidsFooter.Review -> {
-                    val title = if (variant.firstName.isBlank()) {
-                        "Leave a review"
-                    } else {
-                        "Leave a review for ${variant.firstName}"
-                    }
+                    val title =
+                        if (variant.firstName.isBlank()) {
+                            "Leave a review"
+                        } else {
+                            "Leave a review for ${variant.firstName}"
+                        }
                     RowFooter(
                         actions =
                             listOf(

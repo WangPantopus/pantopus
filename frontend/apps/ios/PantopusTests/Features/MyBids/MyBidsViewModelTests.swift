@@ -57,10 +57,7 @@ final class MyBidsViewModelTests: XCTestCase {
     }
 
     private func makeVM(api: APIClient? = nil) -> MyBidsViewModel {
-        MyBidsViewModel(
-            api: api ?? makeAPI(),
-            now: { Self.fixedNow }
-        )
+        MyBidsViewModel(api: api ?? makeAPI()) { Self.fixedNow }
     }
 
     // MARK: - Lifecycle
@@ -387,13 +384,7 @@ final class MyBidsViewModelTests: XCTestCase {
         let row = MyBidsViewModel.row(
             projection: proj,
             now: Self.fixedNow,
-            onTap: {},
-            onWithdraw: {},
-            onEditBid: {},
-            onMessage: {},
-            onMarkComplete: {},
-            onLeaveReview: {},
-            onRebid: {}
+            callbacks: MyBidsViewModel.RowCallbacks()
         )
         // Leading: category gradient icon (hammer for handyman).
         if case let .categoryGradientIcon(icon, _) = row.leading {

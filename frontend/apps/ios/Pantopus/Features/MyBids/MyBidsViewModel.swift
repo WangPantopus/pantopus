@@ -273,7 +273,7 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
         var closingSoon = 0   // active bids closing within 24h
     }
 
-    public init(
+    init(
         api: APIClient = .shared,
         onOpenBid: @escaping @MainActor (BidDTO) -> Void = { _ in },
         onOpenFilters: @escaping @MainActor () -> Void = {},
@@ -349,37 +349,46 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             Self.row(
                 projection: proj,
                 now: nowSnapshot,
-                onTap: { [weak self] in
-                    guard let self else { return }
-                    Task { @MainActor in self.onOpenBid(proj.dto) }
-                },
-                onWithdraw: { [weak self] in
-                    guard let self else { return }
-                    Task { @MainActor in self.requestWithdraw(proj.dto) }
-                },
-                onEditBid: { [weak self] in
-                    guard let self else { return }
-                    Task { @MainActor in self.onEditBid(proj.dto) }
-                },
-                onMessage: { [weak self] in
-                    guard let self else { return }
-                    Task { @MainActor in self.onMessageClient(proj.dto) }
-                },
-                onMarkComplete: { [weak self] in
-                    guard let self else { return }
-                    Task { @MainActor in await self.markComplete(proj.dto) }
-                },
-                onLeaveReview: { [weak self] in
-                    guard let self else { return }
-                    Task { @MainActor in self.onLeaveReview(proj.dto) }
-                },
-                onRebid: { [weak self] in
-                    guard let self else { return }
-                    Task { @MainActor in self.onBrowseTasks() }
-                }
+                callbacks: callbacks(for: proj.dto)
             )
         }
         state = .loaded(sections: [RowSection(id: selectedTab, rows: rows)], hasMore: false)
+    }
+
+    /// Build the bundled [RowCallbacks] for a given bid — each handler
+    /// dispatches back onto the @MainActor so the row's `@Sendable`
+    /// closure contract holds.
+    private func callbacks(for dto: BidDTO) -> RowCallbacks {
+        RowCallbacks(
+            onTap: { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in self.onOpenBid(dto) }
+            },
+            onWithdraw: { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in self.requestWithdraw(dto) }
+            },
+            onEditBid: { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in self.onEditBid(dto) }
+            },
+            onMessage: { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in self.onMessageClient(dto) }
+            },
+            onMarkComplete: { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in await self.markComplete(dto) }
+            },
+            onLeaveReview: { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in self.onLeaveReview(dto) }
+            },
+            onRebid: { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in self.onBrowseTasks() }
+            }
+        )
     }
 
     private func emptyContent(for tab: String) -> ListOfRowsState.EmptyContent {
@@ -540,10 +549,10 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
         let gigStatus = (dto.gig?.status ?? "").lowercased()
 
         // Terminal states take precedence over the live signals.
-        if gigStatus == "cancelled" && bidStatus != "accepted" {
+        if gigStatus == "cancelled", bidStatus != "accepted" {
             return .taskCancelled
         }
-        if gigStatus == "completed" && bidStatus == "accepted" {
+        if gigStatus == "completed", bidStatus == "accepted" {
             // TODO(reviews-flag): swap to `.paid(amount:)` when a
             // backend-driven "already_reviewed" signal lands. For now
             // the chip prompts for a review on every completed gig.
@@ -551,44 +560,43 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
         }
 
         switch bidStatus {
-        case "rejected", "declined":
-            return .notSelected
-        case "withdrawn":
-            return .notSelected
-        case "expired":
+        case "rejected", "declined", "withdrawn", "expired":
             return .notSelected
         case "accepted", "assigned":
-            // "Starts Tue" derived from `proposed_time` when set in the
-            // future; otherwise fall back to the plain "Accepted" chip.
-            if let proposed = parseDate(dto.proposedTime), proposed > now {
-                let weekday = formatWeekday(proposed)
-                return .scheduled(weekday: weekday)
-            }
-            return .accepted
+            return acceptedStatus(for: dto, now: now)
         case "pending", "countered":
-            // Time signal first — a bid that's about to expire takes
-            // visual priority over Top bid / Shortlisted.
-            if let expires = parseDate(dto.expiresAt) {
-                let timeLeft = expires.timeIntervalSince(now)
-                if timeLeft > 0, timeLeft < MyBidsStatus.expiringWindow {
-                    let hours = max(1, Int(ceil(timeLeft / 3600)))
-                    return .expiring(hoursLeft: hours)
-                }
-            }
-            // Backend competition signals (P3 prep, may be nil today).
-            if dto.shortlisted == true {
-                return .shortlisted
-            }
-            if let rank = dto.yourRank, rank == 1 {
-                return .topBid
-            }
-            if let rank = dto.yourRank, rank > 1, dto.topPrice != nil {
-                return .outbid
-            }
-            return .pending
+            return pendingStatus(for: dto, now: now)
         default:
             return .pending
         }
+    }
+
+    /// `accepted` / `assigned` projection — "Starts {weekday}" when the
+    /// worker has a future `proposed_time`, otherwise the plain
+    /// "Accepted" chip.
+    private static func acceptedStatus(for dto: BidDTO, now: Date) -> MyBidsStatus {
+        if let proposed = parseDate(dto.proposedTime), proposed > now {
+            return .scheduled(weekday: formatWeekday(proposed))
+        }
+        return .accepted
+    }
+
+    /// `pending` / `countered` projection — expiring-soon takes visual
+    /// priority over Top bid / Shortlisted / Outbid (the P3 backend-prep
+    /// fields). Falls back to a neutral "Pending" chip when no signal
+    /// fires.
+    private static func pendingStatus(for dto: BidDTO, now: Date) -> MyBidsStatus {
+        if let expires = parseDate(dto.expiresAt) {
+            let timeLeft = expires.timeIntervalSince(now)
+            if timeLeft > 0, timeLeft < MyBidsStatus.expiringWindow {
+                let hours = max(1, Int(ceil(timeLeft / 3600)))
+                return .expiring(hoursLeft: hours)
+            }
+        }
+        if dto.shortlisted == true { return .shortlisted }
+        if let rank = dto.yourRank, rank == 1 { return .topBid }
+        if let rank = dto.yourRank, rank > 1, dto.topPrice != nil { return .outbid }
+        return .pending
     }
 
     /// Footer action for the row. Live bids are editable / withdrawable;
@@ -624,18 +632,42 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
         }
     }
 
+    /// Bundle of row callbacks — keeps the public `row()` projection
+    /// under SwiftLint's 5-param ceiling without losing wire fidelity.
+    public struct RowCallbacks: Sendable {
+        public let onTap: @Sendable () -> Void
+        public let onWithdraw: @Sendable () -> Void
+        public let onEditBid: @Sendable () -> Void
+        public let onMessage: @Sendable () -> Void
+        public let onMarkComplete: @Sendable () -> Void
+        public let onLeaveReview: @Sendable () -> Void
+        public let onRebid: @Sendable () -> Void
+
+        public init(
+            onTap: @escaping @Sendable () -> Void = {},
+            onWithdraw: @escaping @Sendable () -> Void = {},
+            onEditBid: @escaping @Sendable () -> Void = {},
+            onMessage: @escaping @Sendable () -> Void = {},
+            onMarkComplete: @escaping @Sendable () -> Void = {},
+            onLeaveReview: @escaping @Sendable () -> Void = {},
+            onRebid: @escaping @Sendable () -> Void = {}
+        ) {
+            self.onTap = onTap
+            self.onWithdraw = onWithdraw
+            self.onEditBid = onEditBid
+            self.onMessage = onMessage
+            self.onMarkComplete = onMarkComplete
+            self.onLeaveReview = onLeaveReview
+            self.onRebid = onRebid
+        }
+    }
+
     /// Render a single row. Pure projection — public so tests can
     /// assert the mapping without standing up the VM.
     public static func row(
         projection: BidProjection,
         now: Date,
-        onTap: @escaping @Sendable () -> Void,
-        onWithdraw: @escaping @Sendable () -> Void,
-        onEditBid: @escaping @Sendable () -> Void,
-        onMessage: @escaping @Sendable () -> Void,
-        onMarkComplete: @escaping @Sendable () -> Void,
-        onLeaveReview: @escaping @Sendable () -> Void,
-        onRebid: @escaping @Sendable () -> Void
+        callbacks: RowCallbacks
     ) -> RowModel {
         let dto = projection.dto
         let category = OffersCategory.from(rawCategory: dto.gig?.category)
@@ -655,19 +687,11 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             template: .statusChip,
             leading: .categoryGradientIcon(category.icon, gradient: category.gradient),
             trailing: .priceStack(amount: amount, sublabel: budget),
-            onTap: onTap,
+            onTap: callbacks.onTap,
             chips: [chip],
             metaTail: metaTail(for: dto, status: projection.status, now: now),
             highlight: highlight(for: projection),
-            footer: footer(
-                for: projection.footer,
-                onWithdraw: onWithdraw,
-                onEditBid: onEditBid,
-                onMessage: onMessage,
-                onMarkComplete: onMarkComplete,
-                onLeaveReview: onLeaveReview,
-                onRebid: onRebid
-            )
+            footer: footer(for: projection.footer, callbacks: callbacks)
         )
     }
 
@@ -756,12 +780,7 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
 
     private static func footer(
         for variant: MyBidsFooter,
-        onWithdraw: @escaping @Sendable () -> Void,
-        onEditBid: @escaping @Sendable () -> Void,
-        onMessage: @escaping @Sendable () -> Void,
-        onMarkComplete: @escaping @Sendable () -> Void,
-        onLeaveReview: @escaping @Sendable () -> Void,
-        onRebid: @escaping @Sendable () -> Void
+        callbacks: RowCallbacks
     ) -> RowFooter? {
         switch variant {
         case .none:
@@ -772,13 +791,13 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
                     title: "Withdraw",
                     icon: .x,
                     variant: .destructive,
-                    handler: onWithdraw
+                    handler: callbacks.onWithdraw
                 ),
                 RowFooterAction(
                     title: "Edit bid",
                     icon: .pencil,
                     variant: .primary,
-                    handler: onEditBid
+                    handler: callbacks.onEditBid
                 )
             ])
         case .message:
@@ -787,13 +806,13 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
                     title: "View details",
                     icon: .fileText,
                     variant: .ghost,
-                    handler: { /* tap-the-card already opens details */ }
+                    handler: callbacks.onTap
                 ),
                 RowFooterAction(
                     title: "Message client",
                     icon: .messageCircle,
                     variant: .primary,
-                    handler: onMessage
+                    handler: callbacks.onMessage
                 )
             ])
         case .complete:
@@ -802,13 +821,13 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
                     title: "Message",
                     icon: .messageCircle,
                     variant: .ghost,
-                    handler: onMessage
+                    handler: callbacks.onMessage
                 ),
                 RowFooterAction(
                     title: "Mark complete",
                     icon: .checkCheck,
                     variant: .primary,
-                    handler: onMarkComplete
+                    handler: callbacks.onMarkComplete
                 )
             ])
         case let .review(firstName):
@@ -818,7 +837,7 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
                     title: title,
                     icon: .star,
                     variant: .primary,
-                    handler: onLeaveReview
+                    handler: callbacks.onLeaveReview
                 )
             ])
         case .rebid:
@@ -827,7 +846,7 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
                     title: "Bid on similar",
                     icon: .arrowsRepeat,
                     variant: .ghost,
-                    handler: onRebid
+                    handler: callbacks.onRebid
                 )
             ])
         }

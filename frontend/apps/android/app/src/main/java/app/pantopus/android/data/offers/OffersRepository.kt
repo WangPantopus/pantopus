@@ -25,8 +25,7 @@ class OffersRepository
     ) {
         suspend fun myBids(limit: Int = 100): NetworkResult<MyBidsResponse> = safeApiCall { api.myBids(limit) }
 
-        suspend fun receivedOffers(limit: Int = 100): NetworkResult<ReceivedOffersResponse> =
-            safeApiCall { api.receivedOffers(limit) }
+        suspend fun receivedOffers(limit: Int = 100): NetworkResult<ReceivedOffersResponse> = safeApiCall { api.receivedOffers(limit) }
 
         suspend fun updateBid(
             gigId: String,
@@ -38,7 +37,8 @@ class OffersRepository
             gigId: String,
             bidId: String,
             reason: String?,
-        ): NetworkResult<WithdrawBidResponse> = safeApiCall {
-            api.withdrawBid(gigId, bidId, WithdrawBidBody(reason = reason))
-        }
+        ): NetworkResult<WithdrawBidResponse> =
+            safeApiCall {
+                api.withdrawBid(gigId, bidId, WithdrawBidBody(reason = reason))
+            }
     }
