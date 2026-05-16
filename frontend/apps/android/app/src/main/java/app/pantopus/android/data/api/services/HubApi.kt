@@ -16,12 +16,23 @@ interface HubApi {
     @GET("api/hub/today")
     suspend fun today(): HubTodayResponse
 
-    /** `GET /api/hub/discovery` — route `backend/routes/hub.js:720`. */
+    /**
+     * `GET /api/hub/discovery` — route `backend/routes/hub.js:757`.
+     *
+     * T5.4.1 chip-strip filters for the Discover hub: `since=today`
+     * keeps items created in the last 24h; `verified=true` filters to
+     * verified people / published businesses; `freeOrWanted=true`
+     * filters listings to `price=0` / `is_wanted=true` (and gigs to
+     * `price=0`).
+     */
     @GET("api/hub/discovery")
     suspend fun discovery(
         @Query("filter") filter: String,
         @Query("lat") lat: Double? = null,
         @Query("lng") lng: Double? = null,
         @Query("limit") limit: Int = 10,
+        @Query("since") since: String? = null,
+        @Query("verified") verified: Boolean? = null,
+        @Query("freeOrWanted") freeOrWanted: Boolean? = null,
     ): HubDiscoveryResponse
 }

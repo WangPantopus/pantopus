@@ -751,66 +751,118 @@ router.put('/preferences', verifyToken, validate(preferencesSchema), async (req,
 
 // ============================================================
 // GET /api/hub/discovery
-// Returns curated nearby items for the Discovery module.
-// Query params: filter (gigs|people|businesses|posts), lat, lng, limit
+// Returns curated nearby items for the Discovery module + the new
+// Discover hub screen (T5.4.1 — iOS / Android / web).
+// Query params: filter (gigs|people|businesses|posts|listings), lat, lng,
+// limit, since (today), verified (true), freeOrWanted (true).
+// Per-item structured fields (subtitle, price, rating, locality,
+// verified, isFree, isWanted, createdAt) are additive — `meta` is kept
+// as the flattened legacy string so the existing Hub Discovery rail
+// keeps rendering unchanged.
 // ============================================================
 router.get('/discovery', verifyToken, async (req, res) => {
-  const { filter = 'gigs', lat, lng, limit = 3 } = req.query;
+  const {
+    filter = 'gigs',
+    lat,
+    lng,
+    limit = 3,
+    since,
+    verified,
+    freeOrWanted,
+  } = req.query;
   const userId = req.user.id;
   const parsedLimit = Math.min(parseInt(limit) || 3, 10);
+  const sinceToday = since === 'today';
+  const verifiedOnly = verified === 'true';
+  const freeOrWantedOnly = freeOrWanted === 'true';
+  const todayCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   try {
     let items = [];
 
     switch (filter) {
       case 'gigs': {
-        const { data: gigs } = await supabaseAdmin
+        let query = supabaseAdmin
           .from('Gig')
-          .select('id, title, price, category, status, created_at, description')
+          .select('id, title, price, category, status, created_at, description, user_id')
           .eq('status', 'open')
           .neq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(parsedLimit);
+        if (sinceToday) query = query.gte('created_at', todayCutoff);
+        if (freeOrWantedOnly) query = query.or('price.eq.0,price.is.null');
+        const { data: gigs } = await query;
 
-        items = (gigs || []).map((g) => ({
-          id: g.id,
-          type: 'gig',
-          title: g.title,
-          meta: [
-            g.price ? `$${Number(g.price).toFixed(0)}` : null,
-            g.category,
-          ].filter(Boolean).join(' · '),
-          category: g.category || 'General',
-          route: `/gigs/${g.id}`,
-        }));
+        const posterIds = Array.from(
+          new Set((gigs || []).map((g) => g.user_id).filter(Boolean))
+        );
+        const posters = posterIds.length
+          ? (await supabaseAdmin
+              .from('User')
+              .select('id, name, first_name, username')
+              .in('id', posterIds)).data || []
+          : [];
+        const posterById = new Map(posters.map((u) => [u.id, u]));
+        const posterDisplayName = (id) => {
+          const u = posterById.get(id);
+          if (!u) return null;
+          return u.first_name || u.name || u.username || null;
+        };
+
+        items = (gigs || []).map((g) => {
+          const priceStr = g.price != null ? `$${Number(g.price).toFixed(0)}` : null;
+          const isFree = g.price == null || Number(g.price) === 0;
+          const postedBy = posterDisplayName(g.user_id);
+          return {
+            id: g.id,
+            type: 'gig',
+            title: g.title,
+            meta: [priceStr, g.category].filter(Boolean).join(' · '),
+            subtitle: postedBy ? `Posted by ${postedBy}` : (g.category || null),
+            price: priceStr,
+            category: g.category || 'General',
+            createdAt: g.created_at,
+            isFree,
+            route: `/gigs/${g.id}`,
+          };
+        });
         break;
       }
 
       case 'people': {
-        const { data: users } = await supabaseAdmin
+        let query = supabaseAdmin
           .from('User')
-          .select('id, username, name, first_name, last_name, profile_picture_url, average_rating, city, state')
+          .select('id, username, name, first_name, last_name, profile_picture_url, average_rating, city, state, created_at')
           .eq('account_type', 'personal')
           .neq('id', userId)
           .not('name', 'is', null)
           .order('average_rating', { ascending: false, nullsFirst: false })
           .limit(parsedLimit);
+        if (sinceToday) query = query.gte('created_at', todayCutoff);
+        const { data: users } = await query;
 
         items = (users || []).map((u) => {
           const displayName = u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username;
+          const ratingStr = u.average_rating ? `${u.average_rating.toFixed(1)} stars` : null;
+          const locality = [u.city, u.state].filter(Boolean).join(', ') || null;
+          // The current schema doesn't expose a per-user verification
+          // flag yet; rating presence is the honest stand-in until
+          // identity verification ships through here.
+          const isVerified = u.average_rating != null;
           return {
             id: u.id,
             type: 'person',
             title: displayName,
-            meta: [
-              u.average_rating ? `${u.average_rating.toFixed(1)} stars` : null,
-              u.city,
-            ].filter(Boolean).join(' · '),
+            meta: [ratingStr, u.city].filter(Boolean).join(' · '),
+            subtitle: locality,
+            rating: u.average_rating != null ? Number(u.average_rating.toFixed(1)) : null,
             avatarUrl: u.profile_picture_url,
             category: 'People',
+            createdAt: u.created_at,
+            verified: isVerified,
             route: `/user/${u.id}`,
           };
-        });
+        }).filter((p) => !verifiedOnly || p.verified);
         break;
       }
 
@@ -826,42 +878,56 @@ router.get('/discovery', verifyToken, async (req, res) => {
             .eq('is_active', true),
           supabaseAdmin
             .from('BusinessProfile')
-            .select('business_user_id')
+            .select('business_user_id, category')
             .eq('is_published', true),
         ]);
 
         const myBusinessIds = new Set(
           (myTeams || []).map((t) => t.business_user_id).filter(Boolean)
         );
-        const publishedIds = (publishedProfiles || [])
-          .map((p) => p.business_user_id)
-          .filter((id) => id && !myBusinessIds.has(id));
+        const profileById = new Map(
+          (publishedProfiles || [])
+            .filter((p) => p.business_user_id && !myBusinessIds.has(p.business_user_id))
+            .map((p) => [p.business_user_id, p])
+        );
+        const publishedIds = Array.from(profileById.keys());
 
         if (publishedIds.length === 0) {
           items = [];
           break;
         }
 
-        const { data: bizUsers } = await supabaseAdmin
+        let query = supabaseAdmin
           .from('User')
-          .select('id, username, name, profile_picture_url, average_rating, city, state, bio')
+          .select('id, username, name, profile_picture_url, average_rating, city, state, bio, created_at')
           .eq('account_type', 'business')
           .in('id', publishedIds)
           .order('average_rating', { ascending: false, nullsFirst: false })
           .limit(parsedLimit);
+        if (sinceToday) query = query.gte('created_at', todayCutoff);
+        const { data: bizUsers } = await query;
 
-        items = (bizUsers || []).map((b) => ({
-          id: b.id,
-          type: 'business',
-          title: b.name || b.username,
-          meta: [
-            b.average_rating ? `${b.average_rating.toFixed(1)} stars` : null,
-            b.city,
-          ].filter(Boolean).join(' · '),
-          avatarUrl: b.profile_picture_url,
-          category: 'Business',
-          route: `/businesses/${b.id}`,
-        }));
+        items = (bizUsers || []).map((b) => {
+          const profile = profileById.get(b.id);
+          const category = profile?.category || null;
+          const ratingStr = b.average_rating ? `${b.average_rating.toFixed(1)} stars` : null;
+          // Published businesses on the discover page count as
+          // "verified" for the chip — the publish gate already filters
+          // unprofiled businesses out.
+          return {
+            id: b.id,
+            type: 'business',
+            title: b.name || b.username,
+            meta: [ratingStr, b.city].filter(Boolean).join(' · '),
+            subtitle: [category, b.city].filter(Boolean).join(' · ') || null,
+            category,
+            rating: b.average_rating != null ? Number(b.average_rating.toFixed(1)) : null,
+            avatarUrl: b.profile_picture_url,
+            createdAt: b.created_at,
+            verified: true,
+            route: `/businesses/${b.id}`,
+          };
+        }).filter((p) => !verifiedOnly || p.verified);
         break;
       }
 
@@ -878,13 +944,69 @@ router.get('/discovery', verifyToken, async (req, res) => {
           title: p.title || (p.content || '').slice(0, 60) + ((p.content || '').length > 60 ? '...' : ''),
           meta: p.post_type ? p.post_type.replace(/_/g, ' ') : 'Post',
           category: p.post_type ? p.post_type.replace(/_/g, ' ') : 'Post',
+          createdAt: p.created_at,
           route: `/posts/${p.id}`,
         }));
         break;
       }
 
+      case 'listings': {
+        let query = supabaseAdmin
+          .from('Listing')
+          .select('id, title, price, category, condition, created_at, user_id, is_wanted, status, media_urls')
+          .eq('status', 'active')
+          .neq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(parsedLimit);
+        if (sinceToday) query = query.gte('created_at', todayCutoff);
+        if (freeOrWantedOnly) query = query.or('price.eq.0,price.is.null,is_wanted.eq.true');
+        const { data: listings } = await query;
+
+        const sellerIds = Array.from(
+          new Set((listings || []).map((l) => l.user_id).filter(Boolean))
+        );
+        const sellers = sellerIds.length
+          ? (await supabaseAdmin
+              .from('User')
+              .select('id, name, first_name, username, city')
+              .in('id', sellerIds)).data || []
+          : [];
+        const sellerById = new Map(sellers.map((u) => [u.id, u]));
+
+        items = (listings || []).map((l) => {
+          const seller = sellerById.get(l.user_id);
+          const sellerName = seller?.first_name || seller?.name || seller?.username || null;
+          const isWanted = l.is_wanted === true;
+          const isFree = !isWanted && (l.price == null || Number(l.price) === 0);
+          const priceStr = isWanted
+            ? 'Wanted'
+            : (isFree ? 'Free' : `$${Number(l.price).toFixed(0)}`);
+          const subtitleParts = [sellerName, seller?.city].filter(Boolean);
+          const mediaUrl = Array.isArray(l.media_urls) && l.media_urls.length > 0
+            ? l.media_urls[0]
+            : null;
+          return {
+            id: l.id,
+            type: 'listing',
+            title: l.title,
+            meta: [priceStr, l.category].filter(Boolean).join(' · '),
+            subtitle: subtitleParts.length ? subtitleParts.join(' · ') : (l.category || null),
+            price: priceStr,
+            category: l.category || 'General',
+            avatarUrl: mediaUrl,
+            createdAt: l.created_at,
+            isFree,
+            isWanted,
+            route: `/listings/${l.id}`,
+          };
+        });
+        break;
+      }
+
       default:
-        return res.status(400).json({ error: 'Invalid filter. Use: gigs, people, businesses, posts' });
+        return res.status(400).json({
+          error: 'Invalid filter. Use: gigs, people, businesses, posts, listings',
+        });
     }
 
     res.json({ filter, items });

@@ -149,14 +149,28 @@ export interface HubPayload {
 
 // ---- Discovery Types ----
 
+/**
+ * Item shape returned by `GET /api/hub/discovery`. Legacy fields
+ * (`meta`, `category`, `avatarUrl`, `route`) are preserved so the
+ * existing Hub Discovery rail keeps rendering unchanged. T5.4.1
+ * adds the structured fields the Discover hub typed rows render.
+ */
 export interface DiscoveryItem {
   id: string;
-  type: 'gig' | 'person' | 'business' | 'post';
+  type: 'gig' | 'person' | 'business' | 'post' | 'listing';
   title: string;
   meta: string | null;
-  category?: string;
-  avatarUrl?: string;
+  category?: string | null;
+  avatarUrl?: string | null;
   route: string;
+  // ---- T5.4.1 additive fields ----
+  subtitle?: string | null;
+  price?: string | null;
+  rating?: number | null;
+  verified?: boolean | null;
+  isFree?: boolean | null;
+  isWanted?: boolean | null;
+  createdAt?: string | null;
 }
 
 export interface DiscoveryResponse {
@@ -164,7 +178,7 @@ export interface DiscoveryResponse {
   items: DiscoveryItem[];
 }
 
-export type DiscoveryFilter = 'gigs' | 'people' | 'businesses' | 'posts';
+export type DiscoveryFilter = 'gigs' | 'people' | 'businesses' | 'posts' | 'listings';
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -248,6 +262,12 @@ export async function getDiscovery(params: {
   lat?: number;
   lng?: number;
   limit?: number;
+  /** T5.4.1 chip-strip filter — `today` keeps items created in the last 24h. */
+  since?: 'today';
+  /** T5.4.1 chip-strip filter — verified people / published businesses only. */
+  verified?: boolean;
+  /** T5.4.1 chip-strip filter — `price=0` listings/gigs + `is_wanted=true` listings. */
+  freeOrWanted?: boolean;
 }): Promise<DiscoveryResponse> {
   return get<DiscoveryResponse>('/api/hub/discovery', params);
 }

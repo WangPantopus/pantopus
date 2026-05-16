@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -413,13 +414,41 @@ private fun PillarTileView(
 fun HubDiscoveryRail(
     items: List<DiscoveryCardContent>,
     onTap: (DiscoveryCardContent) -> Unit,
+    onSeeAll: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        Box(modifier = Modifier.padding(horizontal = Spacing.s4)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             SectionHeader("Discover nearby")
+            Spacer(Modifier.weight(1f))
+            if (onSeeAll != null) {
+                Row(
+                    modifier =
+                        Modifier
+                            .clickable { onSeeAll() }
+                            .testTag("hubDiscoveryRail.seeAll")
+                            .semantics { contentDescription = "See all discovery" },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                ) {
+                    Text(
+                        "See all",
+                        style = PantopusTextStyle.caption,
+                        color = PantopusColors.primary600,
+                    )
+                    PantopusIconImage(
+                        icon = PantopusIcon.ChevronRight,
+                        contentDescription = null,
+                        size = 12.dp,
+                        tint = PantopusColors.primary600,
+                    )
+                }
+            }
         }
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.s4),

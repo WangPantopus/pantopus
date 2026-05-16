@@ -63,7 +63,11 @@ struct HubView: View {
                 }
                 HubPillarGrid(tiles: content.pillars) { onNavigate(.pillar($0)) }
                 if !content.discovery.isEmpty {
-                    HubDiscoveryRail(items: content.discovery) { onNavigate(.openDiscovery($0)) }
+                    HubDiscoveryRail(
+                        items: content.discovery,
+                        onTap: { onNavigate(.openDiscovery($0)) },
+                        onSeeAll: { onNavigate(.openDiscoverHub) }
+                    )
                 }
                 if !content.jumpBackIn.isEmpty {
                     HubJumpBackIn(items: content.jumpBackIn) { onNavigate(.jumpBackIn($0)) }
@@ -110,6 +114,7 @@ enum HubNavigationIntent {
     case startVerification
     case pillar(PillarTile.Pillar)
     case openDiscovery(DiscoveryCardContent)
+    case openDiscoverHub
     case jumpBackIn(JumpBackItem)
 }
 

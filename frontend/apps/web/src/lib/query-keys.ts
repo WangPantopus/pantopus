@@ -12,6 +12,8 @@ export const queryKeys = {
   // ── Hub ────────────────────────────────────────────────────
   hub: () => ['hub'] as const,
   hubToday: () => ['hub', 'today'] as const,
+  hubDiscovery: (filter: string, chip: string) =>
+    ['hub', 'discovery', filter, chip] as const,
 
   // ── Feed ───────────────────────────────────────────────────
   feed: (surface: string, filter: string) =>
