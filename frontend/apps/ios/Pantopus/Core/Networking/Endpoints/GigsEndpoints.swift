@@ -143,6 +143,40 @@ public enum GigsEndpoints {
     public static func unsave(id: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/gigs/\(id)/save")
     }
+
+    /// `GET /api/gigs/my-gigs` — list the caller's posted gigs with
+    /// inlined bid count, top bid amount, top-3 bidder thumbnails, and
+    /// boost timestamps. Route `backend/routes/gigs.js:1169`.
+    public static func myGigs(limit: Int = 100, status: String? = nil) -> Endpoint {
+        var query: [String: String] = ["limit": String(limit)]
+        if let status, !status.isEmpty { query["status"] = status }
+        return Endpoint(method: .get, path: "/api/gigs/my-gigs", query: query)
+    }
+
+    /// `POST /api/gigs/:gigId/boost` — poster promotes their gig in the
+    /// feed for 24h. Route `backend/routes/gigs.js`.
+    public static func boostGig(gigId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/boost")
+    }
+
+    /// `POST /api/gigs/:gigId/complete` — poster confirms completion.
+    /// Alias of `/confirm-completion`. Route
+    /// `backend/routes/gigs.js:6170`. Distinct from `markCompleted(...)`
+    /// which is the worker-only `/mark-completed` route.
+    public static func completeGigAsPoster(gigId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs/\(gigId)/complete")
+    }
+
+    /// `POST /api/gigs/:gigId/cancel` — poster cancels the gig. Body
+    /// carries a structured `CancelGigReason`. Route
+    /// `backend/routes/gigs.js:6233`.
+    public static func cancelGig(gigId: String, reason: CancelGigReason?) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/gigs/\(gigId)/cancel",
+            body: CancelGigBody(reason: reason)
+        )
+    }
 }
 
 /// Reasons the backend whitelists for `DELETE /api/gigs/:gigId/bids/:bidId`.

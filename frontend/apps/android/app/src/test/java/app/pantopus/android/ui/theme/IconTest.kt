@@ -94,6 +94,16 @@ class IconTest {
             "trending-down",
             "ban",
             "file-text",
+            // T5.3.2 — My tasks
+            "plus",
+            "rocket",
+            "clipboard-list",
+            "clock-plus",
+            "circle-slash",
+            "play",
+            // T5.3.3 — My posts
+            "archive",
+            "message-square-plus",
         )
 
     @Test

@@ -28,7 +28,8 @@ const GIG_LIST = `
   pickup_address, dropoff_address,
   requires_license, scope_description,
   care_details, logistics_details, remote_details,
-  urgent_details, event_details
+  urgent_details, event_details,
+  boosted_at, boost_expires_at
 `.replace(/\s+/g, ' ').trim();
 
 /** All columns for gig detail view (single gig page) */
