@@ -15,6 +15,7 @@ import app.pantopus.android.data.api.services.HomePetsApi
 import app.pantopus.android.data.api.services.HomesApi
 import app.pantopus.android.data.api.services.HubApi
 import app.pantopus.android.data.api.services.IdentityCenterApi
+import app.pantopus.android.data.api.services.ListingOffersApi
 import app.pantopus.android.data.api.services.ListingsApi
 import app.pantopus.android.data.api.services.MailComposeApi
 import app.pantopus.android.data.api.services.MailboxApi
@@ -173,6 +174,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideListingsApi(retrofit: Retrofit): ListingsApi = retrofit.create(ListingsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideListingOffersApi(retrofit: Retrofit): ListingOffersApi = retrofit.create(ListingOffersApi::class.java)
 
     @Provides
     @Singleton

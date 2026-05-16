@@ -125,3 +125,44 @@ data class BannerConfig(
     val subtitle: String? = null,
     val onTap: (() -> Unit)? = null,
 )
+
+/**
+ * Rich listing-context header rendered above the first row on Listing
+ * offers. Differs from [BannerConfig] in that the leading slot is a
+ * 64dp gradient thumbnail and the trailing slot is an ask price; the
+ * strip below the card carries the offer count + sort label.
+ *
+ * Listing offers is the only screen using this slot today.
+ */
+data class ListingContextConfig(
+    /** 64dp rounded thumbnail (icon-on-gradient — listing category drives the colour pair). */
+    val thumbnail: ThumbnailImage,
+    /** Listing title (1 line, ellipsised). */
+    val title: String,
+    /** Pre-formatted ask price (e.g. "$250"). */
+    val askPrice: String,
+    /** Inline meta items rendered with a "·" separator below the title. */
+    val meta: List<ListingContextMeta> = emptyList(),
+    /** Status pill rendered at the bottom-right of the header card. */
+    val statusChip: ListingContextStatus,
+    /** Count rendered in the sort strip below the header (e.g. "5 offers"). */
+    val offerCount: Int? = null,
+    /** Sort selector label (e.g. "Highest first"). */
+    val sortLabel: String? = null,
+    /** Triggered when the user taps the sort selector — opens a sort sheet, etc. */
+    val onSort: (() -> Unit)? = null,
+)
+
+/** One meta item in the listing-context header (e.g. "2.4k views"). */
+data class ListingContextMeta(
+    val icon: PantopusIcon? = null,
+    val text: String,
+)
+
+/** Status pill payload for [ListingContextConfig]. */
+data class ListingContextStatus(
+    val label: String,
+    val icon: PantopusIcon? = null,
+    val variant: app.pantopus.android.ui.components.StatusChipVariant =
+        app.pantopus.android.ui.components.StatusChipVariant.Success,
+)

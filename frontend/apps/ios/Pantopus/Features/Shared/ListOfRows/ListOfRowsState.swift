@@ -136,6 +136,85 @@ public struct BannerConfig: Sendable {
     }
 }
 
+/// Rich listing-context header rendered above the first row on Listing
+/// offers. Differs from `BannerConfig` in that the leading slot is a
+/// 64pt gradient thumbnail and the trailing slot is an ask price; the
+/// strip below the card carries the offer count + sort label.
+///
+/// Listing offers is the only screen using this slot today. Kept
+/// optional + additive — every other data source inherits `nil` from
+/// the default extension below.
+public struct ListingContextConfig: Sendable {
+    /// 64pt rounded thumbnail (icon-on-gradient — the listing's category
+    /// drives the colour pair).
+    public let thumbnail: ThumbnailImage
+    /// Listing title (1 line, ellipsised).
+    public let title: String
+    /// Pre-formatted ask price (e.g. "$250").
+    public let askPrice: String
+    /// Inline meta items rendered with a "·" separator below the title
+    /// (e.g. ["2.4k views", "18 watching", "Listed 4 days ago"]).
+    public let meta: [ListingContextMeta]
+    /// Status pill rendered at the bottom-right of the header card.
+    public let statusChip: ListingContextStatus
+    /// Count rendered in the sort strip below the header
+    /// (e.g. "5 offers"). `nil` hides the strip.
+    public let offerCount: Int?
+    /// Sort selector label (e.g. "Highest first").
+    public let sortLabel: String?
+    /// Triggered when the user taps the sort selector — opens a sort
+    /// sheet, etc. `nil` makes the selector a non-interactive label.
+    public let onSort: (@Sendable () -> Void)?
+
+    public init(
+        thumbnail: ThumbnailImage,
+        title: String,
+        askPrice: String,
+        meta: [ListingContextMeta],
+        statusChip: ListingContextStatus,
+        offerCount: Int? = nil,
+        sortLabel: String? = nil,
+        onSort: (@Sendable () -> Void)? = nil
+    ) {
+        self.thumbnail = thumbnail
+        self.title = title
+        self.askPrice = askPrice
+        self.meta = meta
+        self.statusChip = statusChip
+        self.offerCount = offerCount
+        self.sortLabel = sortLabel
+        self.onSort = onSort
+    }
+}
+
+/// One meta item in the `ListingContextConfig` header (e.g. "2.4k views").
+public struct ListingContextMeta: Sendable, Hashable {
+    public let icon: PantopusIcon?
+    public let text: String
+
+    public init(icon: PantopusIcon? = nil, text: String) {
+        self.icon = icon
+        self.text = text
+    }
+}
+
+/// Status pill payload for `ListingContextConfig`.
+public struct ListingContextStatus: Sendable, Hashable {
+    public let label: String
+    public let icon: PantopusIcon?
+    public let variant: StatusChipVariant
+
+    public init(
+        label: String,
+        icon: PantopusIcon? = nil,
+        variant: StatusChipVariant = .success
+    ) {
+        self.label = label
+        self.icon = icon
+        self.variant = variant
+    }
+}
+
 // MARK: - Data source
 
 /// Protocol any List-of-Rows ViewModel conforms to. Marked `@MainActor` so
@@ -178,6 +257,13 @@ public extension ListOfRowsDataSource {
 
     /// Optional summary banner above the first row.
     var banner: BannerConfig? {
+        nil
+    }
+
+    /// Optional listing-context header above the first row. Listing
+    /// offers is the only screen using this today; every other data
+    /// source inherits `nil`.
+    var listingContext: ListingContextConfig? {
         nil
     }
 }

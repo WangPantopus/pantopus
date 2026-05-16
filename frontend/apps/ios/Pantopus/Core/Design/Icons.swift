@@ -120,6 +120,9 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case archive
     case messageSquarePlus = "message-square-plus"
 
+    /// T5.3.4 Listing offers — listing-context header icons.
+    case bookmark
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -215,6 +218,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .play: "play.fill"
         case .archive: "archivebox"
         case .messageSquarePlus: "bubble.left.and.text.bubble.right"
+        case .bookmark: "bookmark"
         }
     }
 }

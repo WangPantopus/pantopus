@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.listings.ListingDto
 import app.pantopus.android.data.api.models.listings.MessageListingBody
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.listings.ListingsRepository
 import app.pantopus.android.ui.screens.marketplace.ListingGradient
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -23,6 +24,7 @@ class ListingDetailViewModel
     @Inject
     constructor(
         private val repo: ListingsRepository,
+        private val auth: AuthRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         companion object {
@@ -36,13 +38,32 @@ class ListingDetailViewModel
 
         private var rawListing: ListingDto? = null
 
+        /** Current listing snapshot — null until the first fetch resolves. */
+        fun listingSnapshot(): ListingDto? = rawListing
+
+        /**
+         * True when the loaded listing is owned by the currently signed-in
+         * user. Drives the dock's "Make offer" → "View offers" swap.
+         */
+        fun isOwnedByMe(): Boolean {
+            val owner = rawListing?.userId?.takeIf { it.isNotEmpty() } ?: return false
+            val me = (auth.state.value as? AuthRepository.State.SignedIn)?.user?.id ?: return false
+            return owner == me
+        }
+
         fun load() {
             _state.value = ContentDetailUiState.Loading
             viewModelScope.launch {
                 when (val result = repo.detail(listingId)) {
                     is NetworkResult.Success -> {
                         rawListing = result.data.listing
-                        _state.value = ContentDetailUiState.Loaded(Projection.project(result.data.listing))
+                        _state.value =
+                            ContentDetailUiState.Loaded(
+                                Projection.project(
+                                    result.data.listing,
+                                    isViewerOwner = isOwnedByMe(),
+                                ),
+                            )
                     }
                     is NetworkResult.Failure -> {
                         _state.value = ContentDetailUiState.Error(result.error.message)
@@ -67,7 +88,10 @@ class ListingDetailViewModel
         }
 
         object Projection {
-            fun project(listing: ListingDto): ContentDetailContent {
+            fun project(
+                listing: ListingDto,
+                isViewerOwner: Boolean = false,
+            ): ContentDetailContent {
                 val isFree = listing.isFree ?: false
                 val priceLine =
                     when {
@@ -165,7 +189,10 @@ class ListingDetailViewModel
                 val dock =
                     ContentDetailDock(
                         secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
-                        primary = ContentDetailDockButton(label = "Make offer"),
+                        primary =
+                            ContentDetailDockButton(
+                                label = if (isViewerOwner) "View offers" else "Make offer",
+                            ),
                     )
                 return ContentDetailContent(
                     kind = ContentDetailKind.Listing,

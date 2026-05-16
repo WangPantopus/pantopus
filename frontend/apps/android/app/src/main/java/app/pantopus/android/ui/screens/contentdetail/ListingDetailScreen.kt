@@ -40,6 +40,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 fun ListingDetailScreen(
     onBack: () -> Unit = {},
     onOpenMessages: () -> Unit = {},
+    onViewOffers: ((app.pantopus.android.data.api.models.listings.ListingDto) -> Unit)? = null,
     viewModel: ListingDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -51,7 +52,14 @@ fun ListingDetailScreen(
     ContentDetailShell(
         state = state,
         onBack = onBack,
-        onPrimaryAction = { sheetVisible = true },
+        onPrimaryAction = {
+            val listing = viewModel.listingSnapshot()
+            if (listing != null && viewModel.isOwnedByMe() && onViewOffers != null) {
+                onViewOffers(listing)
+            } else {
+                sheetVisible = true
+            }
+        },
         onSecondaryAction = { onOpenMessages() },
         onRetry = { viewModel.load() },
         onMessageCounterparty = { onOpenMessages() },

@@ -16,22 +16,25 @@ public struct ListingDetailView: View {
     @State private var offerMessage: String = ""
     private let onBack: @MainActor () -> Void
     private let onMessage: (@MainActor (ListingDTO) -> Void)?
+    private let onViewOffers: (@MainActor (ListingDTO) -> Void)?
 
     public init(
         viewModel: ListingDetailViewModel,
         onBack: @escaping @MainActor () -> Void = {},
-        onMessage: (@MainActor (ListingDTO) -> Void)? = nil
+        onMessage: (@MainActor (ListingDTO) -> Void)? = nil,
+        onViewOffers: (@MainActor (ListingDTO) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
         self.onMessage = onMessage
+        self.onViewOffers = onViewOffers
     }
 
     public var body: some View {
         TransactionalDetailShell(
             state: viewModel.state,
             onBack: onBack,
-            onPrimaryAction: { offerSheetVisible = true },
+            onPrimaryAction: { handlePrimaryAction() },
             onSecondaryAction: { if let listing = viewModel.rawListing { onMessage?(listing) } },
             onRetry: { Task { await viewModel.load() } },
             onMessageCounterparty: { if let listing = viewModel.rawListing { onMessage?(listing) } }
@@ -39,6 +42,20 @@ public struct ListingDetailView: View {
         .task { await viewModel.load() }
         .sheet(isPresented: $offerSheetVisible) {
             offerSheet
+        }
+    }
+
+    /// Drive the dock's primary action. When the listing is owned by
+    /// the current user — surfaced server-side via the listing payload
+    /// — and the host wired an `onViewOffers` callback, we push to the
+    /// seller's offers panel instead of the buyer's "Make offer" sheet.
+    private func handlePrimaryAction() {
+        if let listing = viewModel.rawListing,
+           viewModel.isOwnedByMe,
+           let onViewOffers {
+            onViewOffers(listing)
+        } else {
+            offerSheetVisible = true
         }
     }
 

@@ -18,10 +18,34 @@ public final class ListingDetailViewModel {
 
     private let listingId: String
     private let api: APIClient
+    private let currentUserId: @MainActor () -> String?
 
-    init(listingId: String, api: APIClient = .shared) {
+    init(
+        listingId: String,
+        api: APIClient = .shared,
+        currentUserId: @escaping @MainActor () -> String? = ListingDetailViewModel.currentSignedInUserId
+    ) {
         self.listingId = listingId
         self.api = api
+        self.currentUserId = currentUserId
+    }
+
+    /// True when the loaded listing is owned by the currently signed-in
+    /// user. Drives the dock's "Make offer" → "View offers" swap on the
+    /// seller's own listing.
+    public var isOwnedByMe: Bool {
+        guard let ownerId = rawListing?.userId, !ownerId.isEmpty,
+              let me = currentUserId(), !me.isEmpty
+        else { return false }
+        return ownerId == me
+    }
+
+    @MainActor
+    private static func currentSignedInUserId() -> String? {
+        if case let .signedIn(user) = AuthManager.shared.state {
+            return user.id
+        }
+        return nil
     }
 
     public func load() async {
@@ -29,7 +53,8 @@ public final class ListingDetailViewModel {
         do {
             let detail: ListingDetailResponse = try await api.request(ListingsEndpoints.detail(id: listingId))
             rawListing = detail.listing
-            state = .loaded(Self.project(detail.listing))
+            let viewerId = currentUserId()
+            state = .loaded(Self.project(detail.listing, viewerUserId: viewerId))
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load listing."
             state = .error(message: message)
@@ -55,38 +80,67 @@ public final class ListingDetailViewModel {
 
     // MARK: - Projection
 
-    static func project(_ listing: ListingDTO) -> ContentDetailContent {
-        let isFree = listing.isFree ?? false
-        let priceLine: String = if isFree {
-            "Free"
-        } else if let price = listing.price {
-            price.truncatingRemainder(dividingBy: 1) == 0
-                ? "$\(Int(price))"
-                : String(format: "$%.2f", price)
-        } else {
-            "—"
-        }
-        let imageUrl = (listing.firstImage ?? listing.mediaUrls?.first).flatMap(URL.init(string:))
-        let cover = ContentDetailCover(
-            imageUrl: imageUrl,
+    static func project(_ listing: ListingDTO, viewerUserId: String? = nil) -> ContentDetailContent {
+        let isViewerOwner: Bool = {
+            guard let owner = listing.userId, !owner.isEmpty,
+                  let viewer = viewerUserId, !viewer.isEmpty
+            else { return false }
+            return owner == viewer
+        }()
+        return ContentDetailContent(
+            kind: .listing,
+            cover: cover(for: listing),
+            statusPill: nil,
+            hero: ContentDetailHero(
+                title: listing.title ?? "Listing",
+                categoryChip: nil,
+                meta: nil,
+                priceLine: priceLine(for: listing),
+                priceCaption: listing.layer == "rentals" ? "per week" : nil
+            ),
+            statStrip: [],
+            counterparty: counterparty(for: listing),
+            modules: modules(for: listing),
+            trustCapsules: trustCapsules(for: listing),
+            dock: dock(isViewerOwner: isViewerOwner)
+        )
+    }
+
+    private static func priceLine(for listing: ListingDTO) -> String {
+        if listing.isFree ?? false { return "Free" }
+        guard let price = listing.price else { return "—" }
+        return price.truncatingRemainder(dividingBy: 1) == 0
+            ? "$\(Int(price))"
+            : String(format: "$%.2f", price)
+    }
+
+    private static func cover(for listing: ListingDTO) -> ContentDetailCover {
+        ContentDetailCover(
+            imageUrl: (listing.firstImage ?? listing.mediaUrls?.first).flatMap(URL.init(string:)),
             gradient: ListingGradient.from(id: listing.id),
             placeholderIcon: placeholderIcon(category: listing.category, layer: listing.layer),
             pageCount: max(listing.mediaUrls?.count ?? 1, 1),
             activePage: 0
         )
-        let condition = conditionLabel(listing.condition)
+    }
+
+    private static func trustCapsules(for listing: ListingDTO) -> [ContentDetailTrustCapsule] {
         var trust: [ContentDetailTrustCapsule] = []
-        if let condition {
+        if let condition = conditionLabel(listing.condition) {
             trust.append(ContentDetailPill(label: condition, icon: .star, tone: .success))
         }
         if listing.layer == "rentals" {
             trust.append(ContentDetailPill(label: "Rental", icon: .calendar, tone: .business))
-        } else if isFree {
+        } else if listing.isFree ?? false {
             trust.append(ContentDetailPill(label: "Free", icon: .heart, tone: .success))
         } else {
             trust.append(ContentDetailPill(label: "Pickup", icon: .mapPin, tone: .neutral))
         }
-        let counterparty = ContentDetailCounterparty(
+        return trust
+    }
+
+    private static func counterparty(for listing: ListingDTO) -> ContentDetailCounterparty {
+        ContentDetailCounterparty(
             displayName: "Seller",
             initials: "S",
             identityKind: "personal",
@@ -95,6 +149,9 @@ public final class ListingDetailViewModel {
             trailing: listing.locationName,
             showsMessageButton: true
         )
+    }
+
+    private static func modules(for listing: ListingDTO) -> [ContentDetailModule] {
         var modules: [ContentDetailModule] = []
         if let body = listing.description, !body.isEmpty {
             modules.append(.description(ContentDetailDescription(
@@ -112,26 +169,13 @@ public final class ListingDetailViewModel {
                 trailing: distanceLabel(listing.distanceMeters)
             )))
         }
-        let dock = ContentDetailDock(
+        return modules
+    }
+
+    private static func dock(isViewerOwner: Bool) -> ContentDetailDock {
+        ContentDetailDock(
             secondary: ContentDetailDockButton(label: "Message", icon: .send),
-            primary: ContentDetailDockButton(label: "Make offer", icon: nil)
-        )
-        return ContentDetailContent(
-            kind: .listing,
-            cover: cover,
-            statusPill: nil,
-            hero: ContentDetailHero(
-                title: listing.title ?? "Listing",
-                categoryChip: nil,
-                meta: nil,
-                priceLine: priceLine,
-                priceCaption: listing.layer == "rentals" ? "per week" : nil
-            ),
-            statStrip: [],
-            counterparty: counterparty,
-            modules: modules,
-            trustCapsules: trust,
-            dock: dock
+            primary: ContentDetailDockButton(label: isViewerOwner ? "View offers" : "Make offer", icon: nil)
         )
     }
 

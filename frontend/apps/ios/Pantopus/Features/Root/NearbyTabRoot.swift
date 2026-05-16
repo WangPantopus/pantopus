@@ -14,6 +14,9 @@ public enum NearbyRoute: Hashable {
     case entityDetail(kind: MapEntityKind, id: String)
     case filters
     case placeholder(label: String)
+    /// T5.3.4 — per-listing offers panel reached from a listing detail
+    /// "View offers" affordance.
+    case listingOffers(listingId: String, title: String?)
 }
 
 /// NavigationStack wrapper for the Nearby tab.
@@ -50,13 +53,41 @@ public struct NearbyTabRoot: View {
                 ) { if !path.isEmpty { path.removeLast() } }
             case .listing:
                 ListingDetailView(
-                    viewModel: ListingDetailViewModel(listingId: id)
-                ) { if !path.isEmpty { path.removeLast() } }
+                    viewModel: ListingDetailViewModel(listingId: id),
+                    onBack: { if !path.isEmpty { path.removeLast() } },
+                    onViewOffers: { dto in
+                        Task { @MainActor in
+                            path.append(.listingOffers(listingId: dto.id, title: dto.title))
+                        }
+                    }
+                )
             }
         case .filters:
             NotYetAvailableView(tabName: "Map filters", icon: .slidersHorizontal)
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
+        case let .listingOffers(listingId, titleHint):
+            ListingOffersView(
+                viewModel: ListingOffersViewModel(
+                    listingId: listingId,
+                    listingTitleHint: titleHint,
+                    onShareListing: {
+                        Task { @MainActor in path.append(.placeholder(label: "Share listing")) }
+                    },
+                    onOpenBuyer: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Buyer profile")) }
+                    },
+                    onOpenTransaction: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Transaction detail")) }
+                    },
+                    onEditPrice: {
+                        Task { @MainActor in path.append(.placeholder(label: "Edit listing")) }
+                    },
+                    onSort: {
+                        Task { @MainActor in path.append(.placeholder(label: "Sort offers")) }
+                    }
+                )
+            )
         }
     }
 }
