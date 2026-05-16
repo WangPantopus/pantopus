@@ -6,6 +6,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -145,6 +146,7 @@ enum class PantopusIcon(
     Check("check"),
     MoreHorizontal("more-horizontal"),
     ArrowLeft("arrow-left"),
+    ArrowRight("arrow-right"),
     Send("send"),
     ChevronDown("chevron-down"),
     ChevronUp("chevron-up"),
@@ -310,6 +312,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Check -> IconSource.Material(Icons.Filled.Check)
         PantopusIcon.MoreHorizontal -> IconSource.Material(Icons.Filled.MoreHoriz)
         PantopusIcon.ArrowLeft -> IconSource.Material(Icons.AutoMirrored.Filled.ArrowBack)
+        PantopusIcon.ArrowRight -> IconSource.Material(Icons.AutoMirrored.Filled.ArrowForward)
         PantopusIcon.Send -> IconSource.Material(Icons.AutoMirrored.Filled.Send)
         PantopusIcon.ChevronDown -> IconSource.Material(Icons.Filled.ExpandMore)
         PantopusIcon.ChevronUp -> IconSource.Material(Icons.Filled.ExpandLess)

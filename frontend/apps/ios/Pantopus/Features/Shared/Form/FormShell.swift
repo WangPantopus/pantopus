@@ -17,7 +17,8 @@ import SwiftUI
 @MainActor
 public struct FormShell<Content: View>: View {
     private let title: String
-    private let rightActionLabel: String
+    private let rightActionLabel: String?
+    private let bottomActionLabel: String?
     private let isValid: Bool
     private let isDirty: Bool
     private let isSaving: Bool
@@ -29,21 +30,32 @@ public struct FormShell<Content: View>: View {
 
     /// - Parameters:
     ///   - title: Centered top-bar title.
-    ///   - rightActionLabel: Text for the trailing action (`Save`, `Send`,
-    ///     `Post`, `Done`). Defaults to `"Save"`.
+    ///   - rightActionLabel: Text for the trailing top-bar action (`Save`,
+    ///     `Send`, `Post`, `Done`). Defaults to `"Save"`. Pass `nil` to hide
+    ///     the top-right action entirely — typically paired with a
+    ///     `bottomActionLabel` for create-style flows.
+    ///   - bottomActionLabel: When non-nil, renders a sticky full-width
+    ///     primary CTA at the bottom of the scroll area (auth signup, etc.).
+    ///     The label also drives whether the top-right action is hidden.
+    ///     Enabled when `isValid && !isSaving` — does not gate on `isDirty`
+    ///     so create flows (where every field is "new") work cleanly.
     ///   - isValid: Drives whether the right action is enabled.
-    ///   - isDirty: Drives whether the right action is enabled and whether
-    ///     close prompts the discard confirm.
+    ///   - isDirty: Drives whether the top-right action is enabled and
+    ///     whether close prompts the discard confirm. Ignored by the
+    ///     bottom CTA (which is meant for create flows where the whole
+    ///     form starts empty).
     ///   - isSaving: Render a spinner in place of the right-action label
     ///     while a commit is in flight.
     ///   - onClose: Invoked when the user taps X on a clean form, or
     ///     confirms discard on a dirty one.
-    ///   - onCommit: Invoked when the user taps the right action.
+    ///   - onCommit: Invoked when the user taps the top-right action or
+    ///     the bottom CTA.
     ///   - content: Body view builder — typically a stack of
     ///     `FormFieldGroup`s.
     public init(
         title: String,
-        rightActionLabel: String = "Save",
+        rightActionLabel: String? = "Save",
+        bottomActionLabel: String? = nil,
         isValid: Bool,
         isDirty: Bool,
         isSaving: Bool = false,
@@ -53,6 +65,7 @@ public struct FormShell<Content: View>: View {
     ) {
         self.title = title
         self.rightActionLabel = rightActionLabel
+        self.bottomActionLabel = bottomActionLabel
         self.isValid = isValid
         self.isDirty = isDirty
         self.isSaving = isSaving
@@ -65,9 +78,9 @@ public struct FormShell<Content: View>: View {
         VStack(spacing: 0) {
             FormTopBar(
                 title: title,
-                rightActionLabel: rightActionLabel,
+                rightActionLabel: showsTopRightAction ? rightActionLabel : nil,
                 rightActionEnabled: isValid && isDirty && !isSaving,
-                isSaving: isSaving,
+                isSaving: isSaving && bottomActionLabel == nil,
                 onClose: handleClose,
                 onCommit: onCommit
             )
@@ -78,6 +91,14 @@ public struct FormShell<Content: View>: View {
                 .padding(.vertical, Spacing.s4)
             }
             .background(Theme.Color.appBg)
+            if let bottomActionLabel {
+                FormBottomCTA(
+                    label: bottomActionLabel,
+                    isEnabled: isValid && !isSaving,
+                    isSaving: isSaving,
+                    onCommit: onCommit
+                )
+            }
         }
         .background(Theme.Color.appBg)
         .accessibilityIdentifier("formShell")
@@ -93,6 +114,10 @@ public struct FormShell<Content: View>: View {
         }
     }
 
+    private var showsTopRightAction: Bool {
+        bottomActionLabel == nil && rightActionLabel != nil
+    }
+
     private func handleClose() {
         if isDirty {
             showsDiscardConfirm = true
@@ -102,10 +127,10 @@ public struct FormShell<Content: View>: View {
     }
 }
 
-/// 44pt top bar: leading X, centered title, trailing action label.
+/// 44pt top bar: leading X, centered title, optional trailing action label.
 private struct FormTopBar: View {
     let title: String
-    let rightActionLabel: String
+    let rightActionLabel: String?
     let rightActionEnabled: Bool
     let isSaving: Bool
     let onClose: () -> Void
@@ -125,22 +150,28 @@ private struct FormTopBar: View {
                 .accessibilityLabel("Close")
                 .accessibilityIdentifier("formCloseButton")
                 Spacer()
-                Button(action: onCommit) {
-                    if isSaving {
-                        ProgressView()
-                            .frame(width: 60, height: 44)
-                    } else {
-                        Text(rightActionLabel)
-                            .pantopusTextStyle(.body)
-                            .foregroundStyle(
-                                rightActionEnabled ? Theme.Color.primary600 : Theme.Color.appTextMuted
-                            )
-                            .frame(minWidth: 60, minHeight: 44)
+                if let rightActionLabel {
+                    Button(action: onCommit) {
+                        if isSaving {
+                            ProgressView()
+                                .frame(width: 60, height: 44)
+                        } else {
+                            Text(rightActionLabel)
+                                .pantopusTextStyle(.body)
+                                .foregroundStyle(
+                                    rightActionEnabled ? Theme.Color.primary600 : Theme.Color.appTextMuted
+                                )
+                                .frame(minWidth: 60, minHeight: 44)
+                        }
                     }
+                    .disabled(!rightActionEnabled)
+                    .accessibilityLabel(rightActionLabel)
+                    .accessibilityIdentifier("formCommitButton")
+                } else {
+                    // Reserve 60pt so the centered title stays optically
+                    // centered against the leading X button.
+                    Color.clear.frame(width: 60, height: 44)
                 }
-                .disabled(!rightActionEnabled)
-                .accessibilityLabel(rightActionLabel)
-                .accessibilityIdentifier("formCommitButton")
             }
             .padding(.horizontal, Spacing.s2)
         }
@@ -149,6 +180,45 @@ private struct FormTopBar: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
         }
+    }
+}
+
+/// Sticky primary CTA pinned below the scrollable form body. Used by
+/// `FormShell(bottomActionLabel:…)` for create-style flows (auth signup,
+/// later: long create wizards) where a top-right action would scroll out
+/// of view in long forms.
+private struct FormBottomCTA: View {
+    let label: String
+    let isEnabled: Bool
+    let isSaving: Bool
+    let onCommit: () -> Void
+
+    var body: some View {
+        Button(action: onCommit) {
+            Group {
+                if isSaving {
+                    ProgressView()
+                        .tint(Theme.Color.appTextInverse)
+                } else {
+                    Text(label)
+                        .pantopusTextStyle(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .background(isEnabled ? Theme.Color.primary600 : Theme.Color.appBorderStrong)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, Spacing.s3)
+        .background(Theme.Color.appSurface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+        }
+        .disabled(!isEnabled)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier("formBottomCommitButton")
     }
 }
 

@@ -35,20 +35,48 @@ final class LoginViewModelTests: XCTestCase {
         XCTAssertFalse(vm.canSubmit)
     }
 
-    func testErrorMessageRenderedOnFailure() {
+    func testSignInFailureSurfacesTypedAuthError() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.routeResponses["/api/users/login"] = [
+            .status(401, body: "{\"error\":\"Invalid email or password\"}")
+        ]
+        let client = APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
+        let auth = AuthManager(store: InMemorySecureStore(), apiClient: client)
         let vm = LoginViewModel()
         vm.email = "alice@example.com"
         vm.password = "hunter22"
 
-        // Point the shared APIClient at a stub that 401s every login.
-        URLProtocolStub.reset()
-        URLProtocolStub.stub(path: "/api/auth/login", response: .json("{}", status: 401))
-        // signIn uses APIClient.shared (not our test session) — we can't stub
-        // the real network here, so this test only verifies the public contract:
-        // error state flips isLoading and records *some* errorMessage.
-        vm.errorMessage = "seed"
-        XCTAssertEqual(vm.errorMessage, "seed")
-        vm.errorMessage = nil
+        await vm.signIn(using: auth)
+
+        XCTAssertEqual(vm.errorMessage, .invalidCredentials)
+        XCTAssertFalse(vm.isLoading)
+        SequencedURLProtocol.reset()
+    }
+
+    func testClearErrorResetsErrorMessage() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.routeResponses["/api/users/login"] = [
+            .status(401, body: "{\"error\":\"Invalid email or password\"}")
+        ]
+        let client = APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
+        let auth = AuthManager(store: InMemorySecureStore(), apiClient: client)
+        let vm = LoginViewModel()
+        vm.email = "alice@example.com"
+        vm.password = "hunter22"
+
+        await vm.signIn(using: auth)
+        XCTAssertNotNil(vm.errorMessage)
+
+        vm.clearError()
         XCTAssertNil(vm.errorMessage)
+        SequencedURLProtocol.reset()
     }
 }

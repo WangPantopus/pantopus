@@ -15,8 +15,12 @@ import app.pantopus.android.ui.screens.auth.verify_email.VerifyEmailScreen
 
 /**
  * Nav graph rooted at [AuthRoutes.LOGIN] for the signed-out experience.
- * Hosts the temporary nav-out buttons in `LoginScreen` that P4/P5 remove
- * once the designed entry points (footer links, banner) land.
+ * Mirrors iOS `LoginView`'s `NavigationStack` + `navigationDestination`.
+ *
+ * P4 wires Login → SignUp / Forgot, and SignUp success → VerifyEmail
+ * (since the backend currently hard-gates `/login` until verified —
+ * see `docs/mobile/auth-backend-contracts.md`). P5 wires the Verify /
+ * Reset deep links and the inline AuthError destination.
  */
 @Composable
 fun AuthNavHost() {
@@ -36,7 +40,20 @@ fun AuthNavHost() {
                 onNavigateToAuthError = { navController.navigate(AuthRoutes.AUTH_ERROR) },
             )
         }
-        composable(AuthRoutes.SIGN_UP) { SignUpScreen() }
+        composable(AuthRoutes.SIGN_UP) {
+            SignUpScreen(
+                onClose = { navController.popBackStack() },
+                onSuccess = {
+                    // Backend hard-gates login on email_confirmed_at today
+                    // (see docs/mobile/auth-backend-contracts.md
+                    // §"Backend gap"). Route the user to verify-email so
+                    // they can finish onboarding.
+                    navController.navigate(AuthRoutes.VERIFY_EMAIL) {
+                        popUpTo(AuthRoutes.LOGIN)
+                    }
+                },
+            )
+        }
         composable(AuthRoutes.FORGOT_PASSWORD) { ForgotPasswordScreen() }
         composable(
             route = AuthRoutes.RESET_PASSWORD_PATTERN,
@@ -46,6 +63,10 @@ fun AuthNavHost() {
             ResetPasswordScreen(token = token)
         }
         composable(AuthRoutes.VERIFY_EMAIL) { VerifyEmailScreen() }
-        composable(AuthRoutes.AUTH_ERROR) { AuthErrorScreen() }
+        composable(AuthRoutes.AUTH_ERROR) {
+            AuthErrorScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
     }
 }

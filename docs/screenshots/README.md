@@ -30,6 +30,25 @@ The per-platform PNGs that compose each parity image live under each
 app's `__snapshots__/t5/` directory — see the T5 snapshot lockfile
 section in `RELEASES.md`.
 
+## T6.1b — Auth (3 screens × 3 platforms)
+
+Visual contract for the redesigned Log in / Create account / Auth error
+surfaces. All three platforms target the same design (per Q3 the v1
+mobile surface drops phone + SSO so the iOS and Android renders match
+the design 1:1 — web keeps OAuth as a re-skin only). Generated from
+`/tmp/auth-screenshots/{login,signup,error}.html` via Playwright (see
+`render.mjs`).
+
+| File | Frame | Notes |
+|---|---|---|
+| `auth-login-ios.png` / `-android.png` / `-web.png` | Log in (frame 1) | BrandLockup → kicker → headline → subcopy → email + password (eye toggle, inline Forgot link) → primary CTA → Create-account link → trust footer. Inline error banner overlays the email field on submit failure (frame 6 variant). |
+| `auth-signup-ios.png` / `-android.png` / `-web.png` | Create account (frame 2, sketch) | Same brand chrome → 3 core fields shown (email valid, password fair, confirm valid) → terms checkbox → primary CTA. iOS + Android additionally render the long backend-required field set (username, name, DOB, address, account-type, optional phone + invite) under FormShell groups; the design's short form is the visual contract for what the user sees per scroll position. |
+| `auth-error-ios.png` / `-android.png` / `-web.png` | Auth error (frame 6, full-screen variant) | 56pt alert-circle in an error-tinted halo, "Can't reach Pantopus" headline, body, primary "Try again" + ghost "Go back". Headline/body copy comes from `AuthErrorViewModel.copy(_:)` per `AuthError` case. |
+
+Mobile tripwires lock these in:
+- iOS: `frontend/apps/ios/PantopusTests/__Snapshots__/auth/<screen>-ios.png` + `AuthScreensSnapshotTests.swift`
+- Android: `frontend/apps/android/app/src/test/snapshots/auth/<screen>-android.png` + `AuthScreensSnapshotTest.kt`
+
 ## Production-rendered (real)
 
 Captured against the actual platform implementation, via either a

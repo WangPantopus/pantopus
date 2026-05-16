@@ -2,6 +2,10 @@
 //  LoginView.swift
 //  Pantopus
 //
+//  T6.1b Log-in screen redesigned against `auth-frames.jsx` frame 1
+//  (default) and frame 6 (inline error banner on submit failure). Per Q3
+//  the v1 surface is email-only — no phone field, no SSO row.
+//
 
 import SwiftUI
 
@@ -9,87 +13,128 @@ struct LoginView: View {
     @Environment(AuthManager.self) private var auth
     @State private var viewModel = LoginViewModel()
     @State private var path: [AuthRoute] = []
+    @State private var showPassword: Bool = false
 
     var body: some View {
         NavigationStack(path: $path) {
-            VStack(spacing: 24) {
-                Spacer()
-                VStack(spacing: 8) {
-                    Icon(.home, size: 64, color: Theme.Color.primary600)
-                    Text("Pantopus")
-                        .font(.largeTitle.bold())
-                        .accessibilityAddTraits(.isHeader)
-                    Text("Your neighborhood, verified.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityElement(children: .combine)
+            ScrollView {
+                VStack(spacing: 0) {
+                    Spacer(minLength: Spacing.s10)
+                    BrandLockup()
+                        .padding(.bottom, Spacing.s10)
 
-                VStack(spacing: 12) {
-                    TextField("Email", text: $viewModel.email)
-                        .textContentType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.emailAddress)
-                        .autocorrectionDisabled()
-                        .padding()
-                        .background(Color(.systemGray6), in: .rect(cornerRadius: 12))
-                        .accessibilityIdentifier("loginEmailField")
-                        .accessibilityLabel("Email")
-                        .accessibilityHint("Enter the email address for your Pantopus account")
-
-                    SecureField("Password", text: $viewModel.password)
-                        .textContentType(.password)
-                        .padding()
-                        .background(Color(.systemGray6), in: .rect(cornerRadius: 12))
-                        .accessibilityIdentifier("loginPasswordField")
-                        .accessibilityLabel("Password")
-                        .accessibilityHint("At least six characters")
-                }
-
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                        .accessibilityIdentifier("loginErrorMessage")
-                        .accessibilityLabel("Sign-in error: \(error)")
-                }
-
-                Button {
-                    Task { await viewModel.signIn(using: auth) }
-                } label: {
-                    Group {
-                        if viewModel.isLoading {
-                            ProgressView()
-                        } else {
-                            Text("Sign in")
-                                .fontWeight(.semibold)
-                        }
+                    VStack(spacing: Spacing.s2) {
+                        Text("WELCOME BACK")
+                            .pantopusTextStyle(.overline)
+                            .foregroundStyle(Theme.Color.primary600)
+                            .tracking(1.2)
+                        Text("Log in to Pantopus")
+                            .pantopusTextStyle(.h2)
+                            .foregroundStyle(Theme.Color.appText)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("Pick up where you left off on your block.")
+                            .pantopusTextStyle(.small)
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .multilineTextAlignment(.center)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding()
+                    .padding(.horizontal, Spacing.s5)
+                    .padding(.bottom, Spacing.s5)
+
+                    if let error = viewModel.errorMessage {
+                        ErrorBanner(error: error, onDismiss: viewModel.clearError)
+                            .padding(.horizontal, Spacing.s5)
+                            .padding(.bottom, Spacing.s3)
+                            .accessibilityIdentifier("loginErrorBanner")
+                    }
+
+                    VStack(spacing: Spacing.s3) {
+                        PantopusTextField(
+                            "Email",
+                            text: $viewModel.email,
+                            placeholder: "you@email.com",
+                            state: viewModel.emailFieldState,
+                            keyboardType: .emailAddress,
+                            contentType: .emailAddress,
+                            identifier: "loginEmailField"
+                        )
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onChange(of: viewModel.email) { _, _ in viewModel.clearError() }
+
+                        PasswordField(
+                            value: $viewModel.password,
+                            isVisible: $showPassword,
+                            state: viewModel.passwordFieldState,
+                            identifier: "loginPasswordField",
+                            onChange: { viewModel.clearError() },
+                            trailingLink: ("Forgot password?", { path.append(.forgotPassword) })
+                        )
+                    }
+                    .padding(.horizontal, Spacing.s5)
+
+                    Button(action: signIn) {
+                        Group {
+                            if viewModel.isLoading {
+                                ProgressView()
+                                    .tint(Theme.Color.appTextInverse)
+                            } else {
+                                HStack(spacing: Spacing.s1) {
+                                    Text("Log in")
+                                        .fontWeight(.semibold)
+                                    Icon(.arrowRight, size: 16, color: Theme.Color.appTextInverse)
+                                }
+                            }
+                        }
+                        .pantopusTextStyle(.body)
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                    }
+                    .background(
+                        viewModel.canSubmit ? Theme.Color.primary600 : Theme.Color.appBorderStrong
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                    .padding(.horizontal, Spacing.s5)
+                    .padding(.top, Spacing.s5)
+                    .disabled(!viewModel.canSubmit)
+                    .accessibilityIdentifier("loginSubmitButton")
+                    .accessibilityLabel(viewModel.isLoading ? "Signing in" : "Log in")
+
+                    HStack(spacing: Spacing.s1) {
+                        Text("New to Pantopus?")
+                            .pantopusTextStyle(.small)
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                        Button("Create account") { path.append(.signUp) }
+                            .pantopusTextStyle(.small)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Theme.Color.primary600)
+                            .accessibilityIdentifier("loginCreateAccountLink")
+                    }
+                    .padding(.top, Spacing.s4)
+
+                    Spacer(minLength: Spacing.s10)
+
+                    AuthTrustFooter()
+                        .padding(.bottom, Spacing.s4)
                 }
-                .background(Color.accentColor, in: .rect(cornerRadius: 12))
-                .foregroundStyle(.white)
-                .disabled(!viewModel.canSubmit)
-                .accessibilityIdentifier("loginSubmitButton")
-                .accessibilityLabel(viewModel.isLoading ? "Signing in" : "Sign in")
-                .accessibilityHint(viewModel.canSubmit ? "Submits the sign-in form" : "Fill in email and password to enable")
-
-                // ── P3 temporary nav-out buttons. P4/P5 wire these from the
-                // designed footer / inline links and remove this block. ──
-                AuthStubNav(path: $path)
-
-                Spacer()
+                .frame(maxWidth: .infinity)
             }
-            .padding(24)
+            .background(Theme.Color.appSurface)
             .navigationBarHidden(true)
             .navigationDestination(for: AuthRoute.self) { route in
                 switch route {
                 case .login:
                     EmptyView()
                 case .signUp:
-                    SignUpView()
+                    SignUpView(
+                        onClose: { if !path.isEmpty { path.removeLast() } },
+                        onSuccess: {
+                            // Backend hard-gates login on email_confirmed_at
+                            // today (see docs/mobile/auth-backend-contracts.md
+                            // §"Backend gap discovered"). Route through the
+                            // verify-email surface until soft-gate lands.
+                            path = [.verifyEmail]
+                        }
+                    )
                 case .forgotPassword:
                     ForgotPasswordView()
                 case let .resetPassword(token):
@@ -97,40 +142,137 @@ struct LoginView: View {
                 case .verifyEmail:
                     VerifyEmailView()
                 case let .error(authError):
-                    AuthErrorView(error: authError)
+                    AuthErrorView(
+                        error: authError,
+                        onRetry: nil,
+                        onBack: { if !path.isEmpty { path.removeLast() } }
+                    )
                 }
             }
         }
     }
+
+    private func signIn() {
+        Task { await viewModel.signIn(using: auth) }
+    }
 }
 
-/// Temporary in-tree nav row that lets a dev reach each stub before the
-/// designed entry points (footer links, banner) land in P4/P5. Removed in
-/// the next prompt.
-private struct AuthStubNav: View {
-    @Binding var path: [AuthRoute]
+// MARK: - Login subcomponents
+
+/// Centered brand lockup — 48pt mark + wordmark + tagline. Mirrors
+/// `auth-frames.jsx:75-91`.
+private struct BrandLockup: View {
+    var body: some View {
+        VStack(spacing: Spacing.s2) {
+            Icon(.home, size: 48, color: Theme.Color.primary600)
+                .accessibilityHidden(true)
+            Text("Pantopus")
+                .pantopusTextStyle(.h1)
+                .foregroundStyle(Theme.Color.appText)
+            Text("Your neighborhood, verified.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Pantopus — Your neighborhood, verified.")
+    }
+}
+
+/// Password input with show/hide eye toggle. Optional trailing link (used
+/// for "Forgot password?" inline link in the design).
+struct PasswordField: View {
+    @Binding var value: String
+    @Binding var isVisible: Bool
+    let state: PantopusFieldState
+    let identifier: String
+    let onChange: () -> Void
+    /// Optional inline link rendered next to the label — typically
+    /// `"Forgot password?"`.
+    let trailingLink: (label: String, action: () -> Void)?
 
     var body: some View {
-        VStack(spacing: 8) {
-            Text("Dev: Auth stubs (P3)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            HStack(spacing: 8) {
-                Button("Sign up") { path.append(.signUp) }
-                    .accessibilityIdentifier("authNavSignUp")
-                Button("Forgot") { path.append(.forgotPassword) }
-                    .accessibilityIdentifier("authNavForgotPassword")
-                Button("Verify") { path.append(.verifyEmail) }
-                    .accessibilityIdentifier("authNavVerifyEmail")
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            HStack {
+                Text("Password")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                Spacer()
+                if let trailingLink {
+                    Button(trailingLink.label, action: trailingLink.action)
+                        .pantopusTextStyle(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.primary600)
+                        .accessibilityIdentifier("loginForgotPasswordLink")
+                }
             }
-            HStack(spacing: 8) {
-                Button("Reset") { path.append(.resetPassword(token: "stub-token")) }
-                    .accessibilityIdentifier("authNavResetPassword")
-                Button("Error") { path.append(.error(.invalidCredentials)) }
-                    .accessibilityIdentifier("authNavAuthError")
+
+            HStack(spacing: Spacing.s2) {
+                Group {
+                    if isVisible {
+                        TextField("••••••••", text: $value)
+                            .textContentType(.password)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    } else {
+                        SecureField("••••••••", text: $value)
+                            .textContentType(.password)
+                    }
+                }
+                .onChange(of: value) { _, _ in onChange() }
+
+                Button {
+                    isVisible.toggle()
+                } label: {
+                    Icon(.eye, size: 16, color: Theme.Color.appTextSecondary)
+                        .frame(width: 28, height: 28)
+                }
+                .accessibilityLabel(isVisible ? "Hide password" : "Show password")
+                .accessibilityIdentifier("loginPasswordVisibilityToggle")
+
+                if case .error = state {
+                    Icon(.alertCircle, size: 18, color: Theme.Color.error)
+                } else if case .valid = state {
+                    Icon(.check, size: 18, color: Theme.Color.success)
+                }
+            }
+            .padding(.horizontal, Spacing.s3)
+            .frame(minHeight: 44)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(borderColor, lineWidth: 1)
+            )
+
+            if case let .error(message) = state {
+                Text(message)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.error)
             }
         }
-        .font(.footnote)
+        .accessibilityIdentifier(identifier)
+    }
+
+    private var borderColor: SwiftUI.Color {
+        switch state {
+        case .error: Theme.Color.error
+        case .valid: Theme.Color.success
+        case .default: Theme.Color.appBorder
+        }
+    }
+}
+
+/// Trust footer used at the bottom of every auth surface — mirrors
+/// `auth-frames.jsx:247-260`.
+struct AuthTrustFooter: View {
+    var body: some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(.shieldCheck, size: 12, color: Theme.Color.appTextSecondary)
+            Text("Verified by address")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+        .accessibilityLabel("Verified by address")
     }
 }
 
@@ -140,21 +282,48 @@ final class LoginViewModel {
     var email: String = ""
     var password: String = ""
     var isLoading: Bool = false
-    var errorMessage: String?
+    /// Typed error surface so the redesigned banner can render an icon +
+    /// headline + body rather than a single string. Older callers can read
+    /// `errorMessage?.errorDescription` for the legacy stringy form.
+    private(set) var errorMessage: AuthError?
 
     var canSubmit: Bool {
-        !isLoading && email.contains("@") && password.count >= 6
+        !isLoading && AuthValidation.email(email) == nil && password.count >= 6
+    }
+
+    var emailFieldState: PantopusFieldState {
+        guard !email.isEmpty, errorMessage != nil else { return .default }
+        // Don't mark the email field red on a generic login error; only
+        // when the local-only validator fails.
+        if let message = AuthValidation.email(email) {
+            return .error(message)
+        }
+        return .default
+    }
+
+    var passwordFieldState: PantopusFieldState {
+        guard errorMessage != nil else { return .default }
+        return .error("")
     }
 
     func signIn(using auth: AuthManager) async {
-        errorMessage = nil
+        clearError()
         isLoading = true
         defer { isLoading = false }
         do {
-            try await auth.signIn(email: email, password: password)
-        } catch {
-            errorMessage = error.localizedDescription
+            try await auth.signIn(email: email.lowercased(), password: password)
+        } catch let error as AuthError {
+            errorMessage = error
             Observability.shared.capture(error)
+        } catch {
+            errorMessage = .unknown
+            Observability.shared.capture(error)
+        }
+    }
+
+    func clearError() {
+        if errorMessage != nil {
+            errorMessage = nil
         }
     }
 }
