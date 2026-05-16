@@ -206,7 +206,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .plus: "plus"
         case .rocket: "paperplane.fill"
         case .clipboardList: "list.clipboard"
-        case .clockPlus: "clock.badge.plus"
+        case .clockPlus: "clock.arrow.circlepath"
         case .circleSlash: "circle.slash"
         case .play: "play.fill"
         }

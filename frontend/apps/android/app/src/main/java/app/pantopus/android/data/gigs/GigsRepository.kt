@@ -90,8 +90,7 @@ class GigsRepository
 
         suspend fun boostGig(gigId: String): NetworkResult<BoostGigResponse> = safeApiCall { api.boostGig(gigId) }
 
-        suspend fun completeGigAsPoster(gigId: String): NetworkResult<CompleteGigResponse> =
-            safeApiCall { api.completeGigAsPoster(gigId) }
+        suspend fun completeGigAsPoster(gigId: String): NetworkResult<CompleteGigResponse> = safeApiCall { api.completeGigAsPoster(gigId) }
 
         suspend fun cancelGig(
             gigId: String,

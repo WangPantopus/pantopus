@@ -46,7 +46,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -782,7 +781,6 @@ class MyTasksViewModel
             fun formatRelativeTime(
                 raw: String?,
                 now: Instant,
-                zone: ZoneId = ZoneId.systemDefault(),
             ): String? {
                 val date = parseInstant(raw) ?: return null
                 val seconds = ChronoUnit.SECONDS.between(date, now)

@@ -24,6 +24,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable type_body_length
+
 @MainActor
 final class MyTasksViewModelTests: XCTestCase {
     override func setUp() {
@@ -54,7 +56,7 @@ final class MyTasksViewModelTests: XCTestCase {
     }
 
     private func makeVM(api: APIClient? = nil) -> MyTasksViewModel {
-        MyTasksViewModel(api: api ?? makeAPI(), now: { Self.fixedNow })
+        MyTasksViewModel(api: api ?? makeAPI()) { Self.fixedNow }
     }
 
     // MARK: - Lifecycle
@@ -183,7 +185,7 @@ final class MyTasksViewModelTests: XCTestCase {
     }
 
     func testStatusDerivation_AssignedWithFutureScheduledIsScheduled() {
-        let scheduled = Self.fixedNow.addingTimeInterval(2 * 86_400) // 2 days out
+        let scheduled = Self.fixedNow.addingTimeInterval(2 * 86400) // 2 days out
         let dto = makeGig(
             id: "x",
             status: "assigned",

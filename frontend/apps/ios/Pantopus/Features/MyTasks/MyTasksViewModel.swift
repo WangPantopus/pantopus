@@ -44,7 +44,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length function_body_length type_body_length
 
 // MARK: - Tab identifiers
 
@@ -495,13 +495,13 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
     public static func tabFor(status: MyTasksStatus) -> String {
         switch status {
         case .reviewing, .urgent, .noBids:
-            return MyTasksTab.open
+            MyTasksTab.open
         case .inProgress, .scheduled:
-            return MyTasksTab.active
+            MyTasksTab.active
         case .completed, .awaitReview:
-            return MyTasksTab.done
+            MyTasksTab.done
         case .cancelled, .expired:
-            return MyTasksTab.closed
+            MyTasksTab.closed
         }
     }
 
@@ -548,14 +548,14 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
     /// Footer archetype for a row.
     public static func footerFor(status: MyTasksStatus, bidCount: Int) -> MyTasksFooter {
         switch status {
-        case .reviewing: return .open(bidCount: bidCount)
-        case let .urgent(_): return .urgent(bidCount: bidCount)
-        case .noBids: return .boost
-        case .inProgress: return .inProgress
-        case .scheduled: return .inProgress
-        case .awaitReview: return .review
-        case .completed: return .none
-        case .cancelled, .expired: return .repost
+        case .reviewing: .open(bidCount: bidCount)
+        case .urgent: .urgent(bidCount: bidCount)
+        case .noBids: .boost
+        case .inProgress: .inProgress
+        case .scheduled: .inProgress
+        case .awaitReview: .review
+        case .completed: .none
+        case .cancelled, .expired: .repost
         }
     }
 
@@ -639,12 +639,12 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
     /// future palette change on one side doesn't break decoding.
     public static func tone(for raw: String) -> BidderTone {
         switch raw.lowercased() {
-        case "sky": return .sky
-        case "teal": return .teal
-        case "amber": return .amber
-        case "rose": return .rose
-        case "violet": return .violet
-        default: return .slate
+        case "sky": .sky
+        case "teal": .teal
+        case "amber": .amber
+        case "rose": .rose
+        case "violet": .violet
+        default: .slate
         }
     }
 
@@ -703,8 +703,8 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
 
     public static func highlight(for status: MyTasksStatus) -> RowHighlight? {
         switch status {
-        case .cancelled, .expired: return .muted
-        default: return nil
+        case .cancelled, .expired: .muted
+        default: nil
         }
     }
 
@@ -714,9 +714,9 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
     ) -> RowFooter? {
         switch variant {
         case .none:
-            return nil
+            nil
         case let .open(bidCount):
-            return RowFooter(actions: [
+            RowFooter(actions: [
                 RowFooterAction(
                     title: "Edit",
                     icon: .pencil,
@@ -732,7 +732,7 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
                 )
             ])
         case let .urgent(bidCount):
-            return RowFooter(actions: [
+            RowFooter(actions: [
                 RowFooterAction(
                     title: "Extend 24h",
                     icon: .clockPlus,
@@ -748,7 +748,7 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
                 )
             ])
         case .boost:
-            return RowFooter(actions: [
+            RowFooter(actions: [
                 RowFooterAction(
                     title: "Edit details",
                     icon: .pencil,
@@ -763,7 +763,7 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
                 )
             ])
         case .inProgress:
-            return RowFooter(actions: [
+            RowFooter(actions: [
                 RowFooterAction(
                     title: "Message",
                     icon: .messageCircle,
@@ -778,7 +778,7 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
                 )
             ])
         case .review:
-            return RowFooter(actions: [
+            RowFooter(actions: [
                 RowFooterAction(
                     title: "Leave a review",
                     icon: .star,
@@ -787,7 +787,7 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
                 )
             ])
         case .repost:
-            return RowFooter(actions: [
+            RowFooter(actions: [
                 RowFooterAction(
                     title: "Repost task",
                     icon: .arrowsRepeat,
@@ -827,8 +827,8 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
         let seconds = now.timeIntervalSince(date)
         if seconds < 60 { return "just now" }
         if seconds < 3600 { return "\(Int(seconds / 60))m ago" }
-        if seconds < 86_400 { return "\(Int(seconds / 3600))h ago" }
-        let days = Int(seconds / 86_400)
+        if seconds < 86400 { return "\(Int(seconds / 3600))h ago" }
+        let days = Int(seconds / 86400)
         if days == 1 { return "1d ago" }
         if days < 7 { return "\(days)d ago" }
         let weeks = days / 7
@@ -894,4 +894,4 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
     }
 }
 
-// swiftlint:enable file_length type_body_length
+// swiftlint:enable file_length function_body_length type_body_length

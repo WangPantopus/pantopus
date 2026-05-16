@@ -24,6 +24,7 @@ import retrofit2.http.Query
  * Gig endpoints from `backend/routes/gigs.js`. Mounted at `/api/gigs`
  * (see `backend/app.js:308`).
  */
+@Suppress("TooManyFunctions")
 interface GigsApi {
     /**
      * `GET /api/gigs` — paginated browse with category + sort filters.
