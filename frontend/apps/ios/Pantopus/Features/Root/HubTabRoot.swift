@@ -67,8 +67,9 @@ public enum HubRoute: Hashable {
     /// `pantopus://discover-hub` deep link.
     case discoverHub
     /// Discover businesses — full business search list (T5.4.2 / P12).
-    /// Until P12 lands, the Discover hub Businesses "See all" pushes
-    /// here and renders a `NotYetAvailableView`.
+    /// Reached from the Hub Discovery rail's "See all Businesses" CTA,
+    /// from the Marketplace tab, or via the Discover hub Businesses
+    /// section's "See all" target.
     case discoverBusinesses
     /// Push the chat conversation for a given counterparty. Used by the
     /// Connections row's message-CTA — payload mirrors the Inbox tab's

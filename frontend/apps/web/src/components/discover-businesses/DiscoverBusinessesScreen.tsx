@@ -185,6 +185,7 @@ export default function DiscoverBusinessesScreen() {
   ]);
 
   return (
+    <div data-testid="discoverBusinesses" className="flex flex-col min-h-full">
     <ListOfRowsShell
       title="Discover businesses"
       state={state}
@@ -208,6 +209,7 @@ export default function DiscoverBusinessesScreen() {
         onClick: () => router.push('/app/discover/filters'),
       }}
     />
+    </div>
   );
 }
 

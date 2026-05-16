@@ -4,7 +4,15 @@
 // Android `DiscoverBusinessesViewModel.categorySpec(id)` so the three
 // platforms render the same chip label / icon / gradient pair for the
 // same backend `category` value.
+//
+// Theme-token use: shared values come from `@pantopus/theme`'s
+// `colors` constant. The iOS/Android-only category accents (handyman,
+// cleaning, petCare, …) are NOT yet exposed by the web theme module —
+// inline hex with the canonical token name in a trailing comment so a
+// future cleanup can replace them once `colors.category.<name>` lands
+// in `@pantopus/theme/src/colors.ts`.
 
+import { colors } from '@pantopus/theme';
 import {
   Briefcase,
   Hammer,
@@ -54,60 +62,74 @@ export interface CategorySpec {
   gradient: GradientPair;
 }
 
+// Category accent palette — values mirror iOS `Theme.Color.<token>`
+// and Android `PantopusColors.<token>` so the three platforms render
+// the same gradient for the same backend category id. Inline because
+// `@pantopus/theme` doesn't expose category accents on the web yet
+// (tracked: add `colors.category.<name>` to the theme package and
+// import here).
+const HANDYMAN = '#F97316';
+const CLEANING = '#27AE60';
+const PET_CARE = '#E74C3C';
+const TECH = '#3498DB';
+const TUTORING = '#2980B9';
+const CHILD_CARE = '#F39C12';
+const MOVING = '#8E44AD';
+
 const SPECS: Record<string, CategorySpec> = {
   [DiscoverBusinessesChip.ALL]: {
     id: DiscoverBusinessesChip.ALL,
     label: 'All',
     icon: Briefcase,
-    gradient: { start: '#0EA5E9', end: '#0369A1' }, // primary500 → primary700
+    gradient: { start: colors.primary[500], end: colors.primary[700] },
   },
   [DiscoverBusinessesChip.HANDYMAN]: {
     id: DiscoverBusinessesChip.HANDYMAN,
     label: 'Handyman',
     icon: Hammer,
-    gradient: { start: '#D97706', end: '#F97316' }, // warning → handyman
+    gradient: { start: colors.semantic.warning, end: HANDYMAN },
   },
   [DiscoverBusinessesChip.CLEANING]: {
     id: DiscoverBusinessesChip.CLEANING,
     label: 'Cleaning',
     icon: Sparkles,
-    gradient: { start: '#059669', end: '#27AE60' }, // success → cleaning
+    gradient: { start: colors.semantic.success, end: CLEANING },
   },
   [DiscoverBusinessesChip.PET_CARE]: {
     id: DiscoverBusinessesChip.PET_CARE,
     label: 'Pet Care',
     icon: PawPrint,
-    gradient: { start: '#DC2626', end: '#E74C3C' }, // error → petCare
+    gradient: { start: colors.semantic.error, end: PET_CARE },
   },
   [DiscoverBusinessesChip.PLUMBING]: {
     id: DiscoverBusinessesChip.PLUMBING,
     label: 'Plumbing',
     icon: Hammer,
-    gradient: { start: '#0EA5E9', end: '#3498DB' }, // primary500 → tech
+    gradient: { start: colors.primary[500], end: TECH },
   },
   [DiscoverBusinessesChip.TUTORING]: {
     id: DiscoverBusinessesChip.TUTORING,
     label: 'Tutoring',
     icon: Lightbulb,
-    gradient: { start: '#0284C7', end: '#2980B9' }, // info → tutoring
+    gradient: { start: colors.semantic.info, end: TUTORING },
   },
   [DiscoverBusinessesChip.CHILDCARE]: {
     id: DiscoverBusinessesChip.CHILDCARE,
     label: 'Childcare',
     icon: Heart,
-    gradient: { start: '#D97706', end: '#F39C12' }, // warning → childCare
+    gradient: { start: colors.semantic.warning, end: CHILD_CARE },
   },
   [DiscoverBusinessesChip.MOVING]: {
     id: DiscoverBusinessesChip.MOVING,
     label: 'Moving',
     icon: Package,
-    gradient: { start: '#7C3AED', end: '#8E44AD' }, // business → moving
+    gradient: { start: colors.identity.business.color, end: MOVING },
   },
   [DiscoverBusinessesChip.LAWN_CARE]: {
     id: DiscoverBusinessesChip.LAWN_CARE,
     label: 'Lawn Care',
     icon: Sparkles,
-    gradient: { start: '#059669', end: '#16A34A' }, // success → home
+    gradient: { start: colors.semantic.success, end: colors.identity.home.color },
   },
 };
 
@@ -115,7 +137,7 @@ const OTHER_SPEC: CategorySpec = {
   id: DISCOVER_BUSINESSES_OTHER_SECTION,
   label: 'Other',
   icon: Briefcase,
-  gradient: { start: '#6B7280', end: '#374151' }, // appTextSecondary → appTextStrong
+  gradient: { start: colors.text.secondary, end: colors.text.strong },
 };
 
 export function categorySpec(id: string): CategorySpec {
