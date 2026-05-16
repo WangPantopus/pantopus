@@ -58,6 +58,7 @@ public struct BidDTO: Decodable, Sendable, Hashable, Identifiable {
     public let bidder: BidderUserDTO?
 
     // MARK: - P3 backend-prep fields (see docs/mobile/pantopus-t5-notes.md §1.10).
+
     // Optional decoders for the competition signals the buildout plan
     // promised. While the backend prep PR is still pending these come
     // back as `nil`, the row mapper falls back to the neutral "Pending"

@@ -226,17 +226,15 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
         let activeTotal = counts.active
         let closingSoon = counts.closingSoon
         guard activeTotal > 0 else { return nil }
-        let title: String
-        if leadingCount > 0 {
-            title = "Leading on \(leadingCount) of your \(activeTotal) active bids"
+        let title = if leadingCount > 0 {
+            "Leading on \(leadingCount) of your \(activeTotal) active bids"
         } else {
-            title = "\(activeTotal) active bid\(activeTotal == 1 ? "" : "s")"
+            "\(activeTotal) active bid\(activeTotal == 1 ? "" : "s")"
         }
-        let subtitle: String?
-        if closingSoon > 0 {
-            subtitle = "\(closingSoon) closing in the next 24h"
+        let subtitle: String? = if closingSoon > 0 {
+            "\(closingSoon) closing in the next 24h"
         } else {
-            subtitle = nil
+            nil
         }
         return BannerConfig(icon: .gavel, title: title, subtitle: subtitle, onTap: nil)
     }
@@ -264,13 +262,13 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
     private var loadedAtLeastOnce = false
     private var counts = TabCounts()
 
-    private struct TabCounts: Sendable {
+    private struct TabCounts {
         var active = 0
         var accepted = 0
         var rejected = 0
         var done = 0
-        var leading = 0       // bids where status is Top bid
-        var closingSoon = 0   // active bids closing within 24h
+        var leading = 0 // bids where status is Top bid
+        var closingSoon = 0 // active bids closing within 24h
     }
 
     init(
@@ -519,7 +517,7 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
     ///   Accepted = accepted, gig not completed
     ///   Rejected = rejected OR withdrawn OR expired OR (gig cancelled)
     ///   Done     = completed gigs
-    public static func tabFor(dto: BidDTO, now: Date) -> String {
+    public static func tabFor(dto: BidDTO, now _: Date) -> String {
         let bidStatus = (dto.status ?? "").lowercased()
         let gigStatus = (dto.gig?.status ?? "").lowercased()
         // A cancelled gig drops the bid into Rejected regardless of its
@@ -771,10 +769,8 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
     /// Apply the `RowHighlight.muted` opacity to terminal rows.
     public static func highlight(for projection: BidProjection) -> RowHighlight? {
         switch projection.status {
-        case .notSelected, .taskCancelled:
-            return .muted
-        default:
-            return nil
+        case .notSelected, .taskCancelled: .muted
+        default: nil
         }
     }
 

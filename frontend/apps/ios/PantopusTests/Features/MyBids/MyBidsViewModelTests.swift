@@ -33,8 +33,8 @@ final class MyBidsViewModelTests: XCTestCase {
         SequencedURLProtocol.reset()
     }
 
-    // 2026-05-15 12:00:00 UTC — fixed so the time-window verdicts are
-    // deterministic across runs.
+    /// 2026-05-15 12:00:00 UTC — fixed so the time-window verdicts are
+    /// deterministic across runs.
     private static let fixedNow: Date = {
         var components = DateComponents()
         components.year = 2026
