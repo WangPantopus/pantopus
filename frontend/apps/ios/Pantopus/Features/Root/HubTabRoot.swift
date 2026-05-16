@@ -56,6 +56,9 @@ public enum HubRoute: Hashable {
     /// Connections center (T5.2.3). Reached from the You / Me action grid
     /// or via the `pantopus://connections` deep link.
     case connections
+    /// My bids — outgoing bids on neighbour gigs (T5.3.1). Reached from
+    /// the You / Me action grid or from Hub's marketplace pillar shelf.
+    case myBids
     /// Push the chat conversation for a given counterparty. Used by the
     /// Connections row's message-CTA — payload mirrors the Inbox tab's
     /// `InboxConversationDestination` so the same `ChatConversationView`
@@ -458,6 +461,50 @@ public struct HubTabRoot: View {
                     },
                     onFindPeople: {
                         Task { @MainActor in push(.placeholder(label: "Find people")) }
+                    }
+                )
+            )
+        case .myBids:
+            MyBidsView(
+                viewModel: MyBidsViewModel(
+                    onOpenBid: { bid in
+                        Task { @MainActor in
+                            if let gigId = bid.gigId {
+                                push(.gigDetail(gigId: gigId))
+                            }
+                        }
+                    },
+                    onOpenFilters: {
+                        Task { @MainActor in push(.placeholder(label: "Filter bids")) }
+                    },
+                    onBrowseTasks: {
+                        Task { @MainActor in push(.gigsFeed) }
+                    },
+                    onMessageClient: { bid in
+                        Task { @MainActor in
+                            guard let posterId = bid.gig?.userId else { return }
+                            push(.chatConversation(InboxConversationDestination(
+                                mode: .person(otherUserId: posterId),
+                                displayName: bid.gig?.title ?? "Conversation",
+                                initials: "··",
+                                identityKind: nil,
+                                verified: false
+                            )))
+                        }
+                    },
+                    onEditBid: { bid in
+                        Task { @MainActor in
+                            if let gigId = bid.gigId {
+                                push(.gigDetail(gigId: gigId))
+                            }
+                        }
+                    },
+                    onLeaveReview: { bid in
+                        Task { @MainActor in
+                            if let gigId = bid.gigId {
+                                push(.gigDetail(gigId: gigId))
+                            }
+                        }
                     }
                 )
             )

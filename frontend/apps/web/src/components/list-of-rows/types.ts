@@ -135,7 +135,7 @@ export interface RowFooter {
   actions: RowFooterAction[];
 }
 
-export type RowHighlight = 'unread' | 'leading' | 'archived';
+export type RowHighlight = 'unread' | 'leading' | 'archived' | 'muted';
 
 // ─── RowModel ──────────────────────────────────────────────────
 

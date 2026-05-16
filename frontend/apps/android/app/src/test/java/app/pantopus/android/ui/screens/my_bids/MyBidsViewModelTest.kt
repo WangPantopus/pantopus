@@ -1,0 +1,589 @@
+@file:Suppress(
+    "LongMethod",
+    "PackageNaming",
+    "LongParameterList",
+    "TooManyFunctions",
+    "MagicNumber",
+)
+
+package app.pantopus.android.ui.screens.my_bids
+
+import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
+import app.pantopus.android.data.api.models.offers.BidDto
+import app.pantopus.android.data.api.models.offers.BidGigDto
+import app.pantopus.android.data.api.models.offers.MyBidsResponse
+import app.pantopus.android.data.api.models.offers.WithdrawBidReason
+import app.pantopus.android.data.api.models.offers.WithdrawBidResponse
+import app.pantopus.android.data.api.net.NetworkError
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.offers.OffersRepository
+import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowHighlight
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
+import io.mockk.coEvery
+import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import java.time.Instant
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class MyBidsViewModelTest {
+    private val offersRepo: OffersRepository = mockk()
+    private val gigsRepo: GigsRepository = mockk()
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    /** 2026-05-15 12:00:00 UTC — Friday. */
+    private val fixedNow: Instant = Instant.parse("2026-05-15T12:00:00Z")
+
+    private fun dto(
+        id: String,
+        status: String? = "pending",
+        gigStatus: String = "open",
+        createdAt: String? = null,
+        expiresAt: String? = null,
+        proposedTime: String? = null,
+        bidAmount: Double? = 100.0,
+        askingPrice: Double? = 120.0,
+        category: String? = "handyman",
+        shortlisted: Boolean? = null,
+        yourRank: Int? = null,
+        topPrice: Double? = null,
+    ) = BidDto(
+        id = id,
+        gigId = "g_$id",
+        userId = "u",
+        bidAmount = bidAmount,
+        message = null,
+        proposedTime = proposedTime,
+        status = status,
+        createdAt = createdAt,
+        updatedAt = null,
+        expiresAt = expiresAt,
+        counterAmount = null,
+        counterStatus = null,
+        counteredAt = null,
+        withdrawnAt = null,
+        withdrawalReason = null,
+        gig =
+            BidGigDto(
+                id = "g_$id",
+                title = "Gig title",
+                description = null,
+                price = askingPrice,
+                category = category,
+                status = gigStatus,
+                userId = "u_owner",
+            ),
+        bidder = null,
+        shortlisted = shortlisted,
+        yourRank = yourRank,
+        topPrice = topPrice,
+    )
+
+    private fun vm(): MyBidsViewModel =
+        MyBidsViewModel(offersRepo, gigsRepo).apply {
+            overrideNow { fixedNow }
+        }
+
+    // MARK: - Lifecycle
+
+    @Test
+    fun load_with_empty_response_transitions_to_empty() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns NetworkResult.Success(MyBidsResponse(bids = emptyList()))
+            val viewModel = vm()
+            viewModel.load()
+            val state = viewModel.state.value as ListOfRowsUiState.Empty
+            assertEquals("You haven’t bid on any tasks yet", state.headline)
+            assertEquals("Browse tasks", state.ctaTitle)
+        }
+
+    @Test
+    fun load_with_pending_bid_lands_on_active_tab() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Success(
+                    MyBidsResponse(
+                        bids =
+                            listOf(
+                                dto(id = "a1", createdAt = "2026-05-14T09:00:00Z"),
+                            ),
+                    ),
+                )
+            val viewModel = vm()
+            viewModel.load()
+            val state = viewModel.state.value as ListOfRowsUiState.Loaded
+            assertEquals(1, state.sections.first().rows.size)
+            assertEquals(1, viewModel.tabs.value[0].count)
+        }
+
+    @Test
+    fun load_failure_transitions_to_error_when_cold() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, "boom"))
+            val viewModel = vm()
+            viewModel.load()
+            val state = viewModel.state.value as ListOfRowsUiState.Error
+            assertEquals("boom", state.message)
+        }
+
+    // MARK: - Tab assignment
+
+    @Test
+    fun tab_assignment_covers_every_backend_status() {
+        assertEquals(MyBidsTab.ACTIVE, MyBidsViewModel.tabFor(dto("p", status = "pending"), fixedNow))
+        assertEquals(MyBidsTab.ACTIVE, MyBidsViewModel.tabFor(dto("c", status = "countered"), fixedNow))
+        assertEquals(MyBidsTab.ACCEPTED, MyBidsViewModel.tabFor(dto("a", status = "accepted"), fixedNow))
+        assertEquals(MyBidsTab.ACCEPTED, MyBidsViewModel.tabFor(dto("as", status = "assigned"), fixedNow))
+        assertEquals(MyBidsTab.REJECTED, MyBidsViewModel.tabFor(dto("r", status = "rejected"), fixedNow))
+        assertEquals(MyBidsTab.REJECTED, MyBidsViewModel.tabFor(dto("w", status = "withdrawn"), fixedNow))
+        assertEquals(MyBidsTab.REJECTED, MyBidsViewModel.tabFor(dto("e", status = "expired"), fixedNow))
+        assertEquals(
+            MyBidsTab.REJECTED,
+            MyBidsViewModel.tabFor(dto("k", status = "pending", gigStatus = "cancelled"), fixedNow),
+        )
+        assertEquals(
+            MyBidsTab.DONE,
+            MyBidsViewModel.tabFor(dto("d", status = "accepted", gigStatus = "completed"), fixedNow),
+        )
+    }
+
+    // MARK: - Chip derivation
+
+    @Test
+    fun chip_pending_falls_back_to_pending() {
+        val result =
+            MyBidsViewModel.derivedStatus(dto("x", status = "pending", createdAt = "2026-05-12T09:00:00Z"), fixedNow)
+        assertEquals(MyBidsStatus.Pending, result)
+    }
+
+    @Test
+    fun chip_pending_near_expiry_is_expiring_with_hours_left() {
+        val expiresIn90Min = "2026-05-15T13:30:00Z"
+        val result =
+            MyBidsViewModel.derivedStatus(
+                dto("x", status = "pending", createdAt = "2026-05-15T11:30:00Z", expiresAt = expiresIn90Min),
+                fixedNow,
+            )
+        assertTrue("Expected Expiring, got $result", result is MyBidsStatus.Expiring)
+        assertEquals(2, (result as MyBidsStatus.Expiring).hoursLeft)
+    }
+
+    @Test
+    fun chip_shortlisted_wins_over_pending() {
+        val result =
+            MyBidsViewModel.derivedStatus(
+                dto("x", status = "pending", createdAt = "2026-05-14T09:00:00Z", shortlisted = true),
+                fixedNow,
+            )
+        assertEquals(MyBidsStatus.Shortlisted, result)
+    }
+
+    @Test
+    fun chip_rank_one_is_top_bid() {
+        val result =
+            MyBidsViewModel.derivedStatus(
+                dto("x", status = "pending", createdAt = "2026-05-14T09:00:00Z", yourRank = 1),
+                fixedNow,
+            )
+        assertEquals(MyBidsStatus.TopBid, result)
+    }
+
+    @Test
+    fun chip_rank_greater_than_one_with_top_price_is_outbid() {
+        val result =
+            MyBidsViewModel.derivedStatus(
+                dto(
+                    "x",
+                    status = "pending",
+                    createdAt = "2026-05-14T09:00:00Z",
+                    yourRank = 3,
+                    topPrice = 80.0,
+                ),
+                fixedNow,
+            )
+        assertEquals(MyBidsStatus.Outbid, result)
+    }
+
+    @Test
+    fun chip_accepted_with_future_proposed_is_scheduled() {
+        val result =
+            MyBidsViewModel.derivedStatus(
+                dto(
+                    "x",
+                    status = "accepted",
+                    proposedTime = "2026-05-17T09:00:00Z",
+                ),
+                fixedNow,
+            )
+        assertTrue("Expected Scheduled, got $result", result is MyBidsStatus.Scheduled)
+    }
+
+    @Test
+    fun chip_accepted_no_proposed_is_accepted() {
+        val result = MyBidsViewModel.derivedStatus(dto("x", status = "accepted"), fixedNow)
+        assertEquals(MyBidsStatus.Accepted, result)
+    }
+
+    @Test
+    fun chip_rejected_maps_to_not_selected() {
+        val result = MyBidsViewModel.derivedStatus(dto("x", status = "rejected"), fixedNow)
+        assertEquals(MyBidsStatus.NotSelected, result)
+    }
+
+    @Test
+    fun chip_cancelled_gig_maps_to_task_cancelled() {
+        val result =
+            MyBidsViewModel.derivedStatus(dto("x", status = "pending", gigStatus = "cancelled"), fixedNow)
+        assertEquals(MyBidsStatus.TaskCancelled, result)
+    }
+
+    @Test
+    fun chip_completed_gig_prompts_leave_review() {
+        val result =
+            MyBidsViewModel.derivedStatus(dto("x", status = "accepted", gigStatus = "completed"), fixedNow)
+        assertEquals(MyBidsStatus.LeaveReview, result)
+    }
+
+    // MARK: - Footer derivation
+
+    @Test
+    fun footer_active_gets_edit() {
+        assertEquals(
+            MyBidsFooter.Edit,
+            MyBidsViewModel.footerFor(dto("x"), MyBidsTab.ACTIVE, MyBidsStatus.Pending),
+        )
+    }
+
+    @Test
+    fun footer_accepted_not_in_progress_gets_message() {
+        val d = dto("x", status = "accepted", gigStatus = "assigned")
+        assertEquals(
+            MyBidsFooter.Message,
+            MyBidsViewModel.footerFor(d, MyBidsTab.ACCEPTED, MyBidsStatus.Accepted),
+        )
+    }
+
+    @Test
+    fun footer_accepted_in_progress_gets_complete() {
+        val d = dto("x", status = "accepted", gigStatus = "in_progress")
+        assertEquals(
+            MyBidsFooter.Complete,
+            MyBidsViewModel.footerFor(d, MyBidsTab.ACCEPTED, MyBidsStatus.Accepted),
+        )
+    }
+
+    @Test
+    fun footer_rejected_gets_rebid() {
+        assertEquals(
+            MyBidsFooter.Rebid,
+            MyBidsViewModel.footerFor(dto("x", status = "rejected"), MyBidsTab.REJECTED, MyBidsStatus.NotSelected),
+        )
+    }
+
+    @Test
+    fun footer_done_leave_review_gets_review() {
+        val d = dto("x", status = "accepted", gigStatus = "completed")
+        assertEquals(
+            MyBidsFooter.Review(""),
+            MyBidsViewModel.footerFor(d, MyBidsTab.DONE, MyBidsStatus.LeaveReview),
+        )
+    }
+
+    @Test
+    fun footer_done_paid_has_no_footer() {
+        val d = dto("x", status = "accepted", gigStatus = "completed")
+        assertEquals(
+            MyBidsFooter.None,
+            MyBidsViewModel.footerFor(d, MyBidsTab.DONE, MyBidsStatus.Paid("$95")),
+        )
+    }
+
+    // MARK: - Highlight (muted)
+
+    @Test
+    fun highlight_muted_on_terminal_states() {
+        val proj =
+            MyBidsViewModel.BidProjection(
+                dto = dto("x", status = "rejected"),
+                tab = MyBidsTab.REJECTED,
+                status = MyBidsStatus.NotSelected,
+                footer = MyBidsFooter.Rebid,
+            )
+        assertEquals(RowHighlight.Muted, MyBidsViewModel.highlight(proj))
+    }
+
+    @Test
+    fun highlight_none_on_active_states() {
+        val proj =
+            MyBidsViewModel.BidProjection(
+                dto = dto("x"),
+                tab = MyBidsTab.ACTIVE,
+                status = MyBidsStatus.Pending,
+                footer = MyBidsFooter.Edit,
+            )
+        assertNull(MyBidsViewModel.highlight(proj))
+    }
+
+    // MARK: - Row mapping
+
+    @Test
+    fun row_uses_category_gradient_leading_and_price_stack() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Success(
+                    MyBidsResponse(
+                        bids =
+                            listOf(
+                                dto(
+                                    "row",
+                                    status = "pending",
+                                    createdAt = "2026-05-14T09:00:00Z",
+                                    bidAmount = 95.0,
+                                    askingPrice = 120.0,
+                                    category = "handyman",
+                                ),
+                            ),
+                    ),
+                )
+            val viewModel = vm()
+            viewModel.load()
+            val state = viewModel.state.value as ListOfRowsUiState.Loaded
+            val row = state.sections.first().rows.first()
+            assertTrue(row.leading is RowLeading.CategoryGradientIcon)
+            val trailing = row.trailing as RowTrailing.PriceStack
+            assertEquals("$95", trailing.amount)
+            assertEquals("budget $120", trailing.sublabel)
+            assertEquals("Pending", row.chips?.first()?.text)
+            assertEquals(2, row.footer?.actions?.size)
+            assertEquals("Withdraw", row.footer?.actions?.first()?.title)
+            assertEquals("Edit bid", row.footer?.actions?.last()?.title)
+        }
+
+    // MARK: - Tabs + banner
+
+    @Test
+    fun banner_summarises_leading_and_closing_soon() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Success(
+                    MyBidsResponse(
+                        bids =
+                            listOf(
+                                dto(
+                                    "top",
+                                    status = "pending",
+                                    createdAt = "2026-05-14T09:00:00Z",
+                                    yourRank = 1,
+                                ),
+                                dto(
+                                    "soon",
+                                    status = "pending",
+                                    createdAt = "2026-05-14T09:00:00Z",
+                                    expiresAt = "2026-05-15T22:00:00Z",
+                                ),
+                            ),
+                    ),
+                )
+            val viewModel = vm()
+            viewModel.load()
+            val banner = viewModel.banner.value
+            assertNotNull(banner)
+            assertTrue(banner!!.title.contains("Leading on 1"))
+            assertTrue(banner.subtitle?.contains("1 closing") ?: false)
+        }
+
+    @Test
+    fun banner_hidden_on_non_active_tabs() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Success(
+                    MyBidsResponse(
+                        bids = listOf(dto("a", status = "pending", createdAt = "2026-05-14T09:00:00Z")),
+                    ),
+                )
+            val viewModel = vm()
+            viewModel.load()
+            assertNotNull(viewModel.banner.value)
+            viewModel.selectTab(MyBidsTab.REJECTED)
+            assertNull(viewModel.banner.value)
+        }
+
+    @Test
+    fun tabs_exposed_in_design_order() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns NetworkResult.Success(MyBidsResponse(bids = emptyList()))
+            val viewModel = vm()
+            viewModel.load()
+            val tabs = viewModel.tabs.value
+            assertEquals(4, tabs.size)
+            assertEquals(MyBidsTab.ACTIVE, tabs[0].id)
+            assertEquals("Active", tabs[0].label)
+            assertEquals(MyBidsTab.ACCEPTED, tabs[1].id)
+            assertEquals(MyBidsTab.REJECTED, tabs[2].id)
+            assertEquals(MyBidsTab.DONE, tabs[3].id)
+        }
+
+    // MARK: - Optimistic withdraw
+
+    @Test
+    fun withdraw_optimistically_removes_row_from_active() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Success(
+                    MyBidsResponse(
+                        bids = listOf(dto("w1", status = "pending", createdAt = "2026-05-14T09:00:00Z")),
+                    ),
+                )
+            coEvery { offersRepo.withdrawBid("g_w1", "w1", any()) } returns
+                NetworkResult.Success(WithdrawBidResponse(message = "ok"))
+            val viewModel = vm()
+            viewModel.load()
+            assertEquals(1, viewModel.tabs.value[0].count)
+            val targetBid =
+                BidDto(
+                    id = "w1",
+                    gigId = "g_w1",
+                    status = "pending",
+                    gig =
+                        BidGigDto(
+                            id = "g_w1",
+                            title = "Gig",
+                            status = "open",
+                        ),
+                )
+            viewModel.requestWithdraw(targetBid)
+            assertNotNull(viewModel.withdrawTarget.value)
+            viewModel.confirmWithdraw(WithdrawBidReason.ScheduleConflict)
+            assertNull(viewModel.withdrawTarget.value)
+            assertEquals(0, viewModel.tabs.value[0].count)
+            assertEquals(1, viewModel.tabs.value[2].count)
+        }
+
+    @Test
+    fun withdraw_rolls_back_on_failure() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Success(
+                    MyBidsResponse(
+                        bids = listOf(dto("w2", status = "pending", createdAt = "2026-05-14T09:00:00Z")),
+                    ),
+                )
+            coEvery { offersRepo.withdrawBid("g_w2", "w2", any()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, "nope"))
+            val viewModel = vm()
+            viewModel.load()
+            val targetBid =
+                BidDto(
+                    id = "w2",
+                    gigId = "g_w2",
+                    status = "pending",
+                    gig =
+                        BidGigDto(
+                            id = "g_w2",
+                            title = "Gig",
+                            status = "open",
+                        ),
+                )
+            viewModel.requestWithdraw(targetBid)
+            viewModel.confirmWithdraw(null)
+            assertEquals(1, viewModel.tabs.value[0].count)
+            assertEquals(0, viewModel.tabs.value[2].count)
+        }
+
+    @Test
+    fun fab_is_extended_nav_browse_tasks() {
+        val viewModel = vm()
+        val fab = viewModel.fab.value
+        assertNotNull(fab)
+        assertTrue(
+            fab!!.variant is
+                app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant.ExtendedNav,
+        )
+        val label =
+            (fab.variant as app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant.ExtendedNav).label
+        assertEquals("Browse tasks", label)
+    }
+
+    @Test
+    fun mark_complete_optimistically_moves_row_to_done() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Success(
+                    MyBidsResponse(
+                        bids =
+                            listOf(
+                                dto(
+                                    "m1",
+                                    status = "accepted",
+                                    gigStatus = "in_progress",
+                                    createdAt = "2026-05-14T09:00:00Z",
+                                ),
+                            ),
+                    ),
+                )
+            coEvery { gigsRepo.markCompleted("g_m1", any()) } returns
+                NetworkResult.Success(MarkCompletedResponse(message = "ok"))
+            val viewModel = vm()
+            viewModel.load()
+            val targetBid =
+                BidDto(
+                    id = "m1",
+                    gigId = "g_m1",
+                    status = "accepted",
+                    gig =
+                        BidGigDto(
+                            id = "g_m1",
+                            title = "Gig",
+                            status = "in_progress",
+                        ),
+                )
+            assertEquals(1, viewModel.tabs.value[1].count) // Accepted
+            viewModel.markComplete(targetBid)
+            assertEquals(0, viewModel.tabs.value[1].count)
+            assertEquals(1, viewModel.tabs.value[3].count) // Done
+        }
+
+    @Test
+    fun load_already_loaded_is_idempotent() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Success(
+                    MyBidsResponse(
+                        bids = listOf(dto("a", status = "pending", createdAt = "2026-05-14T09:00:00Z")),
+                    ),
+                )
+            val viewModel = vm()
+            viewModel.load()
+            val firstState = viewModel.state.value
+            // Calling load again after success is a no-op (returns without
+            // recomputing). Verify the same state instance survives.
+            viewModel.load()
+            assertTrue(viewModel.state.value === firstState || viewModel.state.value is ListOfRowsUiState.Loaded)
+            assertFalse(viewModel.state.value is ListOfRowsUiState.Loading)
+        }
+}

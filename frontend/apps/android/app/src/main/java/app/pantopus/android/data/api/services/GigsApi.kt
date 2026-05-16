@@ -5,6 +5,8 @@ import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
+import app.pantopus.android.data.api.models.gigs.MarkCompletedBody
+import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
 import app.pantopus.android.data.api.models.gigs.PlaceBidResponse
 import retrofit2.http.Body
@@ -90,4 +92,16 @@ interface GigsApi {
     suspend fun unsave(
         @Path("id") id: String,
     ): GigSaveResponse
+
+    /**
+     * `POST /api/gigs/:gigId/mark-completed` — assigned worker marks
+     * the gig done. Route `backend/routes/gigs.js:5926`. T5.3.1 sends
+     * only the optional `note`; the full backend shape also accepts
+     * photos + checklist for a future PR.
+     */
+    @POST("api/gigs/{gigId}/mark-completed")
+    suspend fun markCompleted(
+        @Path("gigId") gigId: String,
+        @Body body: MarkCompletedBody,
+    ): MarkCompletedResponse
 }

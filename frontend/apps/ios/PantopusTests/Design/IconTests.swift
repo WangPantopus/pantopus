@@ -27,7 +27,9 @@ final class IconTests: XCTestCase {
         "receipt", "clock", "users", "dollar-sign",
         "dog", "cat", "bird", "fish", "turtle", "paw-print",
         "sparkles", "timer", "repeat", "hourglass", "hand-coins", "package",
-        "compass", "filter"
+        "compass", "filter",
+        // T5.3.1 My bids — bid lifecycle chips + footer.
+        "crown", "trending-down", "ban", "file-text"
     ]
 
     func testInventoryMatches() {

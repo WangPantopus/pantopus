@@ -23,7 +23,29 @@ import { toast } from '@/components/ui/toast-store';
 import { confirmStore } from '@/components/ui/confirm-store';
 import type { GigBidWithUser } from '@pantopus/types';
 
-type FilterStatus = 'all' | 'pending' | 'accepted' | 'rejected' | 'countered' | 'withdrawn' | 'expired';
+// T5.3.1 — the mobile design groups the 7 backend statuses into 4 tabs.
+// Web mirrors the same tab vocabulary so iOS / Android / web parity holds.
+// See docs/t5-buildout-plan.md "My bids implementation notes" for the
+// canonical bucket → status mapping.
+type FilterStatus = 'active' | 'accepted' | 'rejected' | 'done';
+
+function bidTabBucket(bid: GigBidWithUser): FilterStatus {
+  const bidStatus = (bid.status ?? '').toLowerCase();
+  const gigStatus = (bid.gig?.status ?? '').toLowerCase();
+  if (gigStatus === 'cancelled' && bidStatus !== 'accepted') return 'rejected';
+  if (gigStatus === 'completed' && bidStatus === 'accepted') return 'done';
+  if (bidStatus === 'pending' || bidStatus === 'countered') return 'active';
+  if (bidStatus === 'accepted' || bidStatus === 'assigned') return 'accepted';
+  if (
+    bidStatus === 'rejected' ||
+    bidStatus === 'declined' ||
+    bidStatus === 'withdrawn' ||
+    bidStatus === 'expired'
+  ) {
+    return 'rejected';
+  }
+  return 'active';
+}
 
 const WITHDRAW_REASONS = [
   { value: 'schedule_conflict', label: 'Schedule conflict', icon: CalendarDays },
@@ -34,7 +56,7 @@ const WITHDRAW_REASONS = [
 
 export default function MyBidsPage() {
   const router = useRouter();
-  const [filter, setFilter] = useState<FilterStatus>('all');
+  const [filter, setFilter] = useState<FilterStatus>('active');
   const [search, setSearch] = useState('');
   const [withdrawModal, setWithdrawModal] = useState<{ gigId: string; bidId: string } | null>(null);
   const [withdrawReason, setWithdrawReason] = useState('');
@@ -128,7 +150,7 @@ export default function MyBidsPage() {
   };
 
   const filteredBids = bids.filter(bid => {
-    if (filter !== 'all' && bid.status !== filter) return false;
+    if (bidTabBucket(bid) !== filter) return false;
     if (search.trim()) {
       const q = search.toLowerCase();
       const gig = bid.gig || {};
@@ -147,6 +169,11 @@ export default function MyBidsPage() {
     countered: bids.filter(b => b.status === 'countered').length,
     withdrawn: bids.filter(b => b.status === 'withdrawn').length,
     expired: bids.filter(b => b.status === 'expired').length,
+    // T5.3.1 — 4-tab grouping matching iOS / Android.
+    active: bids.filter(b => bidTabBucket(b) === 'active').length,
+    activeAccepted: bids.filter(b => bidTabBucket(b) === 'accepted').length,
+    activeRejected: bids.filter(b => bidTabBucket(b) === 'rejected').length,
+    done: bids.filter(b => bidTabBucket(b) === 'done').length,
   };
 
   const totalEarnings = bids
@@ -198,15 +225,14 @@ export default function MyBidsPage() {
           </div>
         </div>
 
-        {/* Filter pills */}
+        {/* Filter pills — 4-tab design grouping (Active / Accepted / Rejected / Done).
+            The 7 backend statuses are bucketed via `bidTabBucket()` so iOS,
+            Android, and web share the same vocabulary. */}
         <div className="flex flex-wrap gap-3 mb-8">
-          <StatPill label="All" count={stats.all} active={filter === 'all'} onClick={() => setFilter('all')} />
-          <StatPill label="Pending" count={stats.pending} active={filter === 'pending'} onClick={() => setFilter('pending')} color="amber" />
-          <StatPill label="Countered" count={stats.countered} active={filter === 'countered'} onClick={() => setFilter('countered')} color="purple" />
-          <StatPill label="Accepted" count={stats.accepted} active={filter === 'accepted'} onClick={() => setFilter('accepted')} color="teal" />
-          <StatPill label="Rejected" count={stats.rejected} active={filter === 'rejected'} onClick={() => setFilter('rejected')} color="red" />
-          <StatPill label="Withdrawn" count={stats.withdrawn} active={filter === 'withdrawn'} onClick={() => setFilter('withdrawn')} color="gray" />
-          <StatPill label="Expired" count={stats.expired} active={filter === 'expired'} onClick={() => setFilter('expired')} color="gray" />
+          <StatPill label="Active" count={stats.active} active={filter === 'active'} onClick={() => setFilter('active')} color="amber" />
+          <StatPill label="Accepted" count={stats.activeAccepted} active={filter === 'accepted'} onClick={() => setFilter('accepted')} color="teal" />
+          <StatPill label="Rejected" count={stats.activeRejected} active={filter === 'rejected'} onClick={() => setFilter('rejected')} color="gray" />
+          <StatPill label="Done" count={stats.done} active={filter === 'done'} onClick={() => setFilter('done')} color="green" />
         </div>
 
         {/* Bids list */}
@@ -215,8 +241,24 @@ export default function MyBidsPage() {
         ) : filteredBids.length === 0 ? (
           <EmptyState
             icon={Mailbox}
-            title={filter === 'all' ? 'No bids placed yet' : `No ${filter} bids`}
-            description="Browse tasks and place your first bid!"
+            title={
+              filter === 'active'
+                ? "You haven't bid on any tasks yet"
+                : filter === 'accepted'
+                  ? 'No accepted bids yet'
+                  : filter === 'rejected'
+                    ? 'Nothing here'
+                    : 'No completed gigs yet'
+            }
+            description={
+              filter === 'active'
+                ? 'Browse tasks and place your first bid!'
+                : filter === 'accepted'
+                  ? 'Bids the poster accepts will show up here.'
+                  : filter === 'rejected'
+                    ? 'Rejected, withdrawn, or expired bids will land here.'
+                    : 'Finished gigs and their reviews will show up here.'
+            }
             actionLabel="Browse Tasks"
             onAction={() => router.push('/app/gigs')}
           />
@@ -301,13 +343,19 @@ function StatPill({
 }: {
   label: string; count: number; active: boolean; onClick: () => void; color?: string;
 }) {
-  if (count === 0 && !active && label !== 'All') return null;
+  // T5.3.1 — the design shows all 4 tabs even when a count is 0 so the
+  // user always sees the tab vocabulary. Hide other-context pills (the
+  // legacy "All / Pending / Countered" set, kept off the page now) only
+  // when they're 0 + unactive.
+  const isCoreTab = label === 'Active' || label === 'Accepted' || label === 'Rejected' || label === 'Done';
+  if (count === 0 && !active && label !== 'All' && !isCoreTab) return null;
 
   const colorMap: Record<string, string> = {
     amber: 'bg-amber-100 text-amber-700',
     teal: 'bg-teal-100 text-teal-700',
     red: 'bg-red-100 text-red-700',
     purple: 'bg-purple-100 text-purple-700',
+    green: 'bg-green-100 text-green-700',
     gray: 'bg-app-surface-sunken text-app-text-secondary',
   };
 

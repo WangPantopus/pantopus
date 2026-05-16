@@ -248,6 +248,16 @@ sealed interface RowHighlight {
 
     /** My-posts archived row — 0.78 opacity. */
     data object Archived : RowHighlight
+
+    /**
+     * Terminal / non-actionable row — 0.78 opacity. Used by My bids for
+     * rejected / withdrawn / expired / task-cancelled rows so the user
+     * can scan them at a glance without confusing them for live bids.
+     * Same visual effect as [Archived] but semantically distinct so
+     * other screens (Review claims, completed offers) can opt in
+     * without overloading the "archived" intent.
+     */
+    data object Muted : RowHighlight
 }
 
 // MARK: - RowModel

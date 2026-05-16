@@ -40,7 +40,7 @@ export default function RowCard({ row, context = 'standalone', isLastInGroup = f
           : row.highlight === 'leading'
             ? 'bg-app-surface border-app-warning'
             : 'bg-app-surface border-app-border',
-        row.highlight === 'archived' ? 'opacity-[0.78]' : '',
+        row.highlight === 'archived' || row.highlight === 'muted' ? 'opacity-[0.78]' : '',
       ]
         .filter(Boolean)
         .join(' ');
