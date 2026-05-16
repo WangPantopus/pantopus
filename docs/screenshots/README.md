@@ -40,6 +40,21 @@ geometry, same row spec).
 | `connections-v2-android-empty.png` | Same | Same |
 | `connections-v2-web-empty.png` | Same | Same |
 
+### Planned (T5.2.4 Offers)
+
+To be captured in CI on the Mac / Android Studio runs that ship with
+this PR. Stubbed entries so the docs stay aligned with the parity
+audit; updated when the PNGs land.
+
+| File | Frame | Notes |
+|---|---|---|
+| `offers-v2-ios.png` | Received tab, 5 offers | Shape C rows — category gradient leading + priceStack ("$220" / "asking $240") + status chip. Hits `/api/gigs/received-offers`. |
+| `offers-v2-android.png` | Received tab, 5 offers | Mirrors iOS. Hits the same endpoint. |
+| `offers-v2-web.png` | Received tab, 5 offers | Production web via Playwright vs `/app/offers` (now backed by `<ListOfRowsShell />`). |
+| `offers-v2-ios-sent.png` | Sent tab, populated | Same row shape, subtitle reads "Your offer · {time}" — no bidder identity. |
+| `offers-v2-android-sent.png` | Sent tab | Mirrors iOS. |
+| `offers-v2-web-sent.png` | Sent tab | Mirrors iOS. |
+
 ## Why the design-reference shots exist
 
 The acceptance gate calls for "one screenshot per platform" showing
