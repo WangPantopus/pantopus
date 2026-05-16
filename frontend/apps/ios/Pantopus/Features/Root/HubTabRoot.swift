@@ -67,8 +67,9 @@ public enum HubRoute: Hashable {
     /// `pantopus://discover-hub` deep link.
     case discoverHub
     /// Discover businesses — full business search list (T5.4.2 / P12).
-    /// Until P12 lands, the Discover hub Businesses "See all" pushes
-    /// here and renders a `NotYetAvailableView`.
+    /// Reached from the Hub Discovery rail's "See all Businesses" CTA,
+    /// from the Marketplace tab, or via the Discover hub Businesses
+    /// section's "See all" target.
     case discoverBusinesses
     /// Push the chat conversation for a given counterparty. Used by the
     /// Connections row's message-CTA — payload mirrors the Inbox tab's
@@ -537,7 +538,25 @@ public struct HubTabRoot: View {
                 }
             )
         case .discoverBusinesses:
-            NotYetAvailableView(tabName: "Discover businesses", icon: .compass)
+            DiscoverBusinessesView(
+                viewModel: DiscoverBusinessesViewModel { target in
+                    Task { @MainActor in
+                        switch target {
+                        case let .business(businessId, name):
+                            // The dedicated business-profile screen is
+                            // still pending. Use the placeholder until
+                            // it lands.
+                            push(.placeholder(label: "Business: \(name) (\(businessId))"))
+                        case .openFilters:
+                            push(.placeholder(label: "Business filters"))
+                        case .widenRadius:
+                            push(.placeholder(label: "Set home address"))
+                        case .inviteBusiness:
+                            push(.placeholder(label: "Invite a business"))
+                        }
+                    }
+                }
+            )
         case .myBids:
             MyBidsView(
                 viewModel: MyBidsViewModel(

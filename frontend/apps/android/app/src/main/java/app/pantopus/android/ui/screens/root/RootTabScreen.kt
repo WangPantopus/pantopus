@@ -37,6 +37,8 @@ import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
+import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesScreen
+import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesTarget
 import app.pantopus.android.ui.screens.discoverhub.DiscoverHubScreen
 import app.pantopus.android.ui.screens.discoverhub.DiscoverHubTarget
 import app.pantopus.android.ui.screens.feed.FeedScreen
@@ -995,7 +997,26 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.DISCOVER_BUSINESSES) {
-                NotYetAvailableView(tabName = "Discover businesses", icon = PantopusIcon.Compass)
+                DiscoverBusinessesScreen(
+                    onBack = { navController.popBackStack() },
+                    onSelect = { target ->
+                        when (target) {
+                            is DiscoverBusinessesTarget.Business ->
+                                // The dedicated business-profile screen is
+                                // still pending. Use the placeholder until
+                                // it lands.
+                                navController.navigate(
+                                    ChildRoutes.placeholder("Business: ${target.name} (${target.businessId})"),
+                                )
+                            DiscoverBusinessesTarget.OpenFilters ->
+                                navController.navigate(ChildRoutes.placeholder("Business filters"))
+                            DiscoverBusinessesTarget.WidenRadius ->
+                                navController.navigate(ChildRoutes.placeholder("Set home address"))
+                            DiscoverBusinessesTarget.InviteBusiness ->
+                                navController.navigate(ChildRoutes.placeholder("Invite a business"))
+                        }
+                    },
+                )
             }
             composable(ChildRoutes.OFFERS) {
                 OffersScreen(

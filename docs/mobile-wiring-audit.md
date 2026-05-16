@@ -273,19 +273,224 @@ strings. Each one resolves to a concrete destination on the You tab — no
 | Tile | routeKey | iOS destination | Android destination | Notes |
 |---|---|---|---|---|
 | My bids | `me.bids` | `YouRoute.myBids` → `MyBidsView` | `ChildRoutes.MY_BIDS` → `MyBidsScreen` | T5.3.1. Bidder side. `GET /api/gigs/my-bids`. |
-| My gigs | `me.gigs` | `YouRoute.myTasks` → `MyTasksView` | `ChildRoutes.MY_TASKS` → `MyTasksScreen` | **T5.3.2 (this PR).** Poster side. `GET /api/gigs/my-gigs` (now joined with `top_bidders[≤3]` for the BidderStack). FAB → `YouRoute.composeTask` / `ChildRoutes.COMPOSE_TASK` (placeholder until T2.3 lands a real composer). |
+| My gigs | `me.gigs` | `YouRoute.myTasks` → `MyTasksView` | `ChildRoutes.MY_TASKS` → `MyTasksScreen` | T5.3.2. Poster side. `GET /api/gigs/my-gigs` (joined with `top_bidders[≤3]` for the BidderStack). FAB → `YouRoute.composeTask` / `ChildRoutes.COMPOSE_TASK` (placeholder until T2.3 lands a real composer). |
+| My posts | `me.posts` | `YouRoute.myPosts` → `MyPostsView` | `ChildRoutes.MY_POSTS` → `MyPostsScreen` | T5.3.3. Activity-section row (not tile). `GET /api/posts/user/:userId` (active set). Archive / Restore are local-only optimistic; Delete uses real `DELETE /api/posts/:id`. |
+| Mail | `me.mail` | `YouRoute.mailbox` → `MailboxListView` | `ChildRoutes.MAILBOX` → `MailboxListScreen` | Pre-T5; verified still wired. |
+| Edit profile | `me.editProfile` | Sheet → `EditProfileView` | Sheet → `EditProfileScreen` | Pre-T5. Android iOS-only this milestone — see parity audit §3 known-acceptable. |
+| Settings | `me.settings` | `YouRoute.settings` → `SettingsView` | `ChildRoutes.SETTINGS` → `SettingsScreen` | Pre-T5. |
 
 The `composeTask` placeholder route is a `NotYetAvailableView("Post a task")`
 on both platforms — replaces the previous "Post a task" `placeholder`
 route used by HubTabRoot. Replace with the dedicated Post-a-task screen
 when T2.3 (Gigs) lands its composer flow.
 
+### Active Home pillar tiles (`me.home.*`)
+
+The Active Home pillar surfaces six action tiles when the user has a
+verified primary home (`MeViewModel.homeActionTiles()`). They currently
+fall through to the generic `placeholder` dispatcher — a parallel-entry
+gap, **not** a parity-blocker because each destination has a primary
+entry point elsewhere. Tracked for a follow-up PR that adds `homeId` to
+`MeIdentityContent` + plumbs it through the YouTabRoot dispatcher so
+the tiles deep-link with the resolved home id.
+
+| Tile | routeKey | Current dispatch | Primary entry today | Future home-tab dispatch |
+|---|---|---|---|---|
+| Bills | `me.home.bills` | placeholder | Home dashboard "Bills" quick-action tile → `BillsListView(homeId)` | `YouRoute.billsList(homeId)` / `ChildRoutes.billsList(homeId)` |
+| Access | `me.home.access` | placeholder | n/a (no screen built yet) | follow-up |
+| Packages | `me.home.packages` | placeholder | Mailbox → drawers | follow-up |
+| Members | `me.home.members` | placeholder | Home dashboard "Members" quick-action | follow-up |
+| Docs / Calendar | `me.home.docs`, `me.home.calendar` | placeholder | n/a (no screen built yet) | follow-up |
+
+## T5 — screen-by-screen wiring (P5–P16)
+
+Every screen the T5 buildout shipped has had its real wiring verified.
+Source-of-truth is the parity-audit row in `docs/mobile-parity-audit.md`;
+the rows below are the **wiring-only** highlights (what the chrome
+controls + interactive rows hit when tapped) for each new screen. No
+`NotYetAvailableView` in any of these screens.
+
+### Notifications V2 (T5.1 / P5)
+
+| Element | Wiring |
+|---|---|
+| Pull-to-refresh / tab switch | `GET /api/notifications?limit=&offset=&unread=true` |
+| Row tap | Routes by `notification.type` — reply/mention → `pulsePost(id)`, claim → `myClaims`, gig → `gigDetail(id)`, listing → `listingDetail(id)`, safety/system → mailbox or settings |
+| Mark all read (top-bar) | `POST /api/notifications/read-all` |
+| Row tap on unread row | `PATCH /api/notifications/:id/read` (optimistic) |
+| Hub bell entry | `HubRoute.notifications` / `ChildRoutes.NOTIFICATIONS` |
+
+### Connections (T5.2.3 / P6)
+
+| Element | Wiring |
+|---|---|
+| Pull-to-refresh | parallel `GET /api/relationships?status=accepted` + `GET /api/relationships/requests/pending` |
+| Tab switch (All / Neighbors / Pending) | client-side filter, no refetch |
+| Search bar | client-side filter on cached list |
+| Per-row message CTA (`circularAction`) | `HubRoute.chatConversation(InboxConversationDestination)` |
+| Accept (`verticalActions.primary`) | `POST /api/relationships/:id/accept` (optimistic) |
+| Ignore (`verticalActions.secondary`) | `POST /api/relationships/:id/reject` (optimistic) |
+| FAB "Find people" | `HubRoute.placeholder("Find people")` (deferred — no people-search screen yet) |
+| Deep link `pantopus://connections` | lands on `ConnectionsView` / `ConnectionsScreen` |
+
+### Bills list + detail + Add Bill wizard (T5.2.2 / P13)
+
+| Element | Wiring |
+|---|---|
+| List pull-to-refresh | `GET /api/homes/:id/bills` |
+| Tab switch (Upcoming / Paid / All) | client-side filter |
+| Row tap | `BillsRoute.detail(billId)` |
+| FAB (52pt) | `BillsRoute.addBill(homeId)` → Add Bill wizard |
+| Detail "Mark paid" | `PUT /api/homes/:id/bills/:billId` body `{ status: "paid" }` |
+| Detail "Remove" | `PUT /api/homes/:id/bills/:billId` body `{ status: "cancelled" }` (soft-delete — no DELETE handler yet) |
+| Detail splits | `GET /api/homes/:id/bills/:billId/splits` (read-only — backend gap) |
+| Wizard submit | `POST /api/homes/:id/bills` |
+
+### Pets list + Add Pet wizard (T5.2.1 / P15)
+
+| Element | Wiring |
+|---|---|
+| List pull-to-refresh | `GET /api/homes/:id/pets` |
+| Row kebab → Edit | `PetsRoute.addEdit(homeId, petId)` |
+| Row kebab → Delete | `DELETE /api/homes/:id/pets/:petId` (optimistic) |
+| FAB (52pt) | `PetsRoute.addEdit(homeId, nil)` → wizard |
+| Wizard submit | `POST /api/homes/:id/pets` or `PUT /api/homes/:id/pets/:petId` |
+
+### Offers V2 — cross-listing (T5.2.4 / P9)
+
+| Element | Wiring |
+|---|---|
+| Received tab load | `GET /api/gigs/received-offers` |
+| Sent tab load | `GET /api/gigs/my-bids` |
+| Tab switch | in-memory only |
+| Row tap | `HubRoute.gigDetail(gigId)` |
+| Top-bar filter | placeholder (filter sheet deferred) |
+
+### My bids (T5.3.1 / P7)
+
+| Element | Wiring |
+|---|---|
+| Pull-to-refresh | `GET /api/gigs/my-bids` |
+| Tab switch (Active / Accepted / Rejected / Done) | client-side bucket-by-status |
+| Footer "Edit bid" | `PUT /api/gigs/:gigId/bids/:bidId` |
+| Footer "Withdraw" | `DELETE /api/gigs/:gigId/bids/:bidId` body `{ reason }` (optimistic + rollback) |
+| Footer "Mark complete" (Accepted in-progress) | `POST /api/gigs/:gigId/mark-completed` |
+| Footer "Leave review" (Done) | `POST /api/reviews` |
+| Banner "Browse tasks" (extendedNav FAB) | `HubRoute.gigsFeed` |
+
+### My tasks V2 (T5.3.2 / P8)
+
+| Element | Wiring |
+|---|---|
+| Pull-to-refresh | `GET /api/gigs/my-gigs` (inlines `top_bidders[≤3]` + `boost_expires_at`) |
+| Tab switch (Open / Active / Done / Closed) | client-side derive-status + bucket |
+| Footer "Boost in feed" (No bids yet) | `POST /api/gigs/:gigId/boost` (new in T5.3.2) |
+| Footer "Mark complete" (In progress) | `POST /api/gigs/:gigId/complete` (poster confirmation — distinct from `/mark-completed`) |
+| Footer "Repost task" (Closed / Cancelled) | `HubRoute.composeGig(category)` |
+| Footer "Leave a review" (Done) | `HubRoute.reviewCompose(gigId)` |
+| FAB (56pt canonical) | `HubRoute.composeGig(category)` (placeholder composer until T2.3) |
+
+### My posts (T5.3.3 / P14)
+
+| Element | Wiring |
+|---|---|
+| Pull-to-refresh | `GET /api/posts/user/:userId` |
+| Tab switch (Active / Archived) | client-side bucket on local archive overrides |
+| Row tap | `HubRoute.pulsePost(postId)` |
+| Engagement "Edit" / "Restore" CTA | local optimistic toggle |
+| Kebab → Archive / Restore | local optimistic state (no backend route yet — documented) |
+| Kebab → Delete | `DELETE /api/posts/:id` (real + rollback) |
+| FAB (52pt secondaryCreate "Write a post") | `HubRoute.placeholder("Compose post")` — real composer is T2.3-ish |
+
+### Listing offers (T5.3.4 / P10)
+
+| Element | Wiring |
+|---|---|
+| Pull-to-refresh | parallel `GET /api/listings/:listingId` + `GET /api/listings/:listingId/offers` |
+| Footer "Accept" | `POST /api/listings/:listingId/offers/:offerId/accept` (optimistic) |
+| Footer "Decline" | `POST /api/listings/:listingId/offers/:offerId/decline` (optimistic) |
+| Footer "Counter" | sheet → `POST /api/listings/:listingId/offers/:offerId/counter` |
+| Footer "Withdraw counter" | maps to `/decline` (no withdraw-counter route exists — documented) |
+| Footer "View transaction" (Accepted) | `HubRoute.invoiceDetail(invoiceId)` |
+| Top-bar share | system share sheet |
+
+### Discover hub (T5.4.1 / P11)
+
+| Element | Wiring |
+|---|---|
+| Pull-to-refresh / chip select | parallel `GET /api/hub/discovery?filter=people&since=&verified=&freeOrWanted=` ×4 (People + Businesses + Gigs + Listings) |
+| Row tap (People) | `HubRoute.publicProfile(userId)` |
+| Row tap (Businesses) | `HubRoute.discoverBusinesses` (was placeholder until T5.4.2 / P12) |
+| Row tap (Gigs) | `HubRoute.gigDetail(gigId)` |
+| Row tap (Listings) | `HubRoute.listingDetail(listingId)` |
+| "See all People" | `HubRoute.connections` |
+| "See all Businesses" | `HubRoute.discoverBusinesses` |
+| "See all Gigs" | `HubRoute.gigsFeed` |
+| "See all Listings" | `HubRoute.marketplace` |
+| Top-bar `sliders-horizontal` (filters) | `HubRoute.placeholder("Discovery filters")` — filter sheet deferred |
+| Deep link `pantopus://discover-hub` | lands on screen |
+
+### Discover businesses (T5.4.2 / P12)
+
+| Element | Wiring |
+|---|---|
+| Pull-to-refresh / chip select / search | `GET /api/businesses/search?q=&categories=&page=&page_size=` (viewer home resolved server-side) |
+| Row tap | `HubRoute.placeholder("Business: \(name) (\(id))")` — typed business-profile screen lands in a separate tier |
+| Top-bar `sliders-horizontal` (filters) | `HubRoute.placeholder("Business filters")` — filter sheet deferred |
+| Empty-state "Widen radius" (no-location 400) | `HubRoute.placeholder("Set home address")` — Edit Address Wizard is iOS-only this milestone |
+| Empty-state "Invite a business" (no results) | `HubRoute.placeholder("Invite a business")` — real invite flow deferred |
+| Inbound entry | from Discover hub "See all Businesses" + (web) `/app/discover` |
+
+### Review claims (T5.4.3 / P16) — web only
+
+See parity audit Tier 5. Mobile deferred per F9.
+
+---
+
+## Remaining `NotYetAvailableView` / `placeholder` references — justification
+
+A reproducible audit:
+
+```bash
+grep -rn 'NotYetAvailable' frontend/apps/ios/Pantopus
+grep -rn 'placeholder(label:' frontend/apps/ios/Pantopus
+grep -rn 'NotYetAvailableView' frontend/apps/android/app/src/main/java
+grep -rn 'ChildRoutes\.placeholder(' frontend/apps/android/app/src/main/java
+```
+
+Every remaining match falls in one of these buckets:
+
+| Bucket | iOS examples | Android examples | Justification |
+|---|---|---|---|
+| Component definition | `Features/Root/NotYetAvailableView.swift` | `ui/screens/root/NotYetAvailableView.kt` | The placeholder component itself. |
+| Content-detail body slots | `Features/Shared/ContentDetail/Bodies.swift:117/131/140/149` + `Headers.swift:100/110` | `ui/screens/shared/content_detail/Bodies.kt` | Generic body / header stubs for non-Home detail types. Future tiers swap them. |
+| Mailbox category bodies | `Features/Mailbox/ItemDetail/Bodies/CategoryBodies.swift:56` | `ui/screens/mailbox/item_detail/bodies/CategoryBodies.kt:88` | 13 of the 14 mailbox categories don't yet have a designed body; fallback is correct. |
+| Hub-tab pillar / action chip | `HubTabRoot.swift:387/399/422/481/618/620` | `RootTabScreen.kt:863/921/935/1206/1219` | Drawer detail, compose gig, compose listing, mail search, generic placeholder — each names the tier (T2.3 composer, T2.5 Snap & sell, etc.) in inline doc-comments. |
+| You-tab generic | `YouTabRoot.swift:351/512` | `RootTabScreen.kt:1081` | Generic + `composeTask` — the latter is the only Me-tab route that still placeholders; T2.3 will land the composer screen. |
+| Inbox / Nearby tab | `InboxTabRoot.swift:100/102` + `NearbyTabRoot.swift:66/68` | `RootTabScreen.kt:548/556/557/903` | New-message composer, chat search, map filters, gig search — all out-of-scope for T5 (covered by T2.1 / T2.4). |
+| Settings sub-screens | `Features/Settings/SettingsView.swift:80` | (Android parity row in T3.1) | Several settings sub-pages still placeholder (Notifications detail, Privacy etc.) — T3.1 secondary work. |
+| Discover hub filter / Discover businesses filter | `HubTabRoot.swift` (discoverHub case onOpenFilters) | `RootTabScreen.kt:994` | Filter sheet redesign is post-T5. The chip strip already covers the canonical filter cases; the icon entry-point lands on a placeholder. |
+| `me.home.*` Active Home tiles | YouTabRoot default case | RootTabScreen default case | Bills / Members / Packages etc. are reachable from the Home Dashboard quick-action tiles; the Me-tab parallel-entry tiles fall through to a labelled placeholder. Documented in the Active Home pillar table above. |
+
+Every remaining placeholder is either a future-tier deferral or a
+parallel-entry gap with a real primary path. **Zero stale references
+to T5 screens** — every "Discover businesses", "My bids", "My tasks",
+"Bills", "Connections", "Notifications", "Listing offers", "Discover
+hub", "My posts", "Pets" route now points at the real screen.
+
 ## Tier links
 
-- Notifications screen → **T4.1**
+- Notifications screen → **T5.1 (canonical V2 with tabs)**, was T4.1
 - Settings / menu screen → **T3.1**
 - Chat list & conversation → **T2.1 / T2.2**
-- Gigs → **T2.3**
+- Gigs feed + composer → **T2.3**
 - Marketplace / Snap & Sell → **T2.5**
 - Pulse feed → **T1.2**
 - Post-a-task composer → **T2.3 (replaces `composeTask` placeholder)**
+- Discover businesses → **T5.4.2 (replaces `discoverBusinesses` NotYetAvailableView)**
+- Connections → **T5.2.3**
+- Bills → **T5.2.2**
+- Pets → **T5.2.1**
+- My bids / My tasks V2 / My posts → **T5.3.1 / T5.3.2 / T5.3.3**
+- Discover hub → **T5.4.1**
+- Listing offers / Offers V2 → **T5.3.4 / T5.2.4**
