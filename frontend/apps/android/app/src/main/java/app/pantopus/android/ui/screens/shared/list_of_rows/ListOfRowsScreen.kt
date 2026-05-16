@@ -966,6 +966,10 @@ private fun ContentColumn(
             )
             Spacer(Modifier.height(2.dp))
         }
+        if (!row.archetypeOverline.isNullOrEmpty()) {
+            ArchetypeOverline(row.archetypeOverline)
+            Spacer(Modifier.height(2.dp))
+        }
         if (row.title.isNotEmpty()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1019,6 +1023,26 @@ private fun ContentColumn(
             )
         }
     }
+}
+
+/**
+ * T6.0b — small uppercase magic-violet overline rendered above the
+ * title on My tasks V2 rows. Truncates with ellipsis at 24 characters
+ * so a long archetype string can't push the title off-screen.
+ */
+@Composable
+private fun ArchetypeOverline(text: String) {
+    val truncated = if (text.length > 24) text.take(24) + "…" else text
+    Text(
+        text = truncated.uppercase(),
+        fontSize = 10.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.6.sp,
+        color = PantopusColors.magic,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.testTag("rowArchetypeOverline"),
+    )
 }
 
 @Composable
@@ -1148,6 +1172,55 @@ private fun LeadingView(leading: RowLeading) {
         is RowLeading.AvatarWithBadge -> AvatarWithBadgeView(leading)
         is RowLeading.Thumbnail -> ThumbnailView(leading)
         is RowLeading.BidderStack -> BidderStackView(leading)
+        is RowLeading.MagicArchetypeTile -> MagicArchetypeTileView(leading)
+    }
+}
+
+/**
+ * T6.0b — 44dp rounded gradient tile + sparkles disc clipped over the
+ * top-right corner. Mirrors the iOS `magicArchetypeTile` and the
+ * design's `ArchetypeTile` block in `mytasks-frames.jsx`.
+ */
+@Composable
+private fun MagicArchetypeTileView(leading: RowLeading.MagicArchetypeTile) {
+    Box(modifier = Modifier.size(44.dp)) {
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(leading.gradient.start, leading.gradient.end),
+                        ),
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = leading.icon,
+                contentDescription = null,
+                size = 22.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+        }
+        Box(
+            modifier =
+                Modifier
+                    .size(18.dp)
+                    .align(Alignment.TopEnd)
+                    .offset(x = 3.dp, y = (-3).dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.appSurface)
+                    .border(1.5.dp, PantopusColors.magicBorder, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Sparkles,
+                contentDescription = null,
+                size = 10.dp,
+                tint = PantopusColors.magic,
+            )
+        }
     }
 }
 
@@ -1904,6 +1977,55 @@ private fun FabComposable(fab: FabAction) {
                     fontWeight = FontWeight.SemiBold,
                     color = PantopusColors.appTextInverse,
                 )
+            }
+        is FabVariant.MagicCreate ->
+            // T6.0b — 60dp gradient FAB with sparkles disc clipped over
+            // the top-right corner. Tint param is ignored; the gradient
+            // is fixed at primary600 → primary700 to match the design's
+            // PostFab block in `mytasks-frames.jsx`.
+            Box(modifier = Modifier.size(60.dp)) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(60.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    colors =
+                                        listOf(
+                                            PantopusColors.primary600,
+                                            PantopusColors.primary700,
+                                        ),
+                                ),
+                            )
+                            .clickable(onClick = fab.onClick)
+                            .semantics { contentDescription = fab.contentDescription },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = fab.icon,
+                        contentDescription = null,
+                        size = 22.dp,
+                        tint = PantopusColors.appTextInverse,
+                    )
+                }
+                Box(
+                    modifier =
+                        Modifier
+                            .size(18.dp)
+                            .align(Alignment.TopEnd)
+                            .offset(x = (-8).dp, y = 8.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.appSurface),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.Sparkles,
+                        contentDescription = null,
+                        size = 11.dp,
+                        tint = PantopusColors.magic,
+                    )
+                }
             }
     }
 }

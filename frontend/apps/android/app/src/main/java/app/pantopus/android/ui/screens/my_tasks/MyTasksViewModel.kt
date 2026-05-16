@@ -26,6 +26,7 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.BidderTone
 import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
+import app.pantopus.android.ui.screens.shared.list_of_rows.GradientPair
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsTab
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
@@ -38,6 +39,7 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
+import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -130,6 +132,114 @@ sealed class MyTasksStatus {
     }
 }
 
+/**
+ * T6.0b — Magic Task archetype taxonomy. Maps the backend's
+ * `task_archetype` enum to the design's row chrome — uppercase
+ * overline label, leading-tile icon, and the two-stop gradient used to
+ * tint the tile background. Mirrors iOS [MyTasksArchetype].
+ */
+enum class MyTasksArchetype(val wireValue: String) {
+    QuickHelp("quick_help"),
+    DeliveryErrand("delivery_errand"),
+    HomeService("home_service"),
+    ProServiceQuote("pro_service_quote"),
+    CareTask("care_task"),
+    EventShift("event_shift"),
+    RemoteTask("remote_task"),
+    RecurringService("recurring_service"),
+    General("general"),
+    ;
+
+    val overlineLabel: String
+        get() = when (this) {
+            QuickHelp -> "Quick help"
+            DeliveryErrand -> "Delivery"
+            HomeService -> "Mount & install"
+            ProServiceQuote -> "Pro service"
+            CareTask -> "Pet care"
+            EventShift -> "Event help"
+            RemoteTask -> "Tech support"
+            RecurringService -> "Recurring"
+            General -> "Magic task"
+        }
+
+    val icon: PantopusIcon
+        get() = when (this) {
+            QuickHelp -> PantopusIcon.Sparkles
+            DeliveryErrand -> PantopusIcon.Package
+            HomeService -> PantopusIcon.Tv
+            ProServiceQuote -> PantopusIcon.Hammer
+            CareTask -> PantopusIcon.Dog
+            EventShift -> PantopusIcon.Calendar
+            RemoteTask -> PantopusIcon.Laptop
+            RecurringService -> PantopusIcon.ArrowsRepeat
+            General -> PantopusIcon.ClipboardList
+        }
+
+    fun gradient(): GradientPair =
+        when (this) {
+            QuickHelp -> GradientPair(PantopusColors.primary400, PantopusColors.primary700)
+            DeliveryErrand -> GradientPair(PantopusColors.business, PantopusColors.magic)
+            HomeService -> GradientPair(PantopusColors.primary400, PantopusColors.primary700)
+            ProServiceQuote -> GradientPair(PantopusColors.warning, PantopusColors.warning)
+            CareTask -> GradientPair(PantopusColors.success, PantopusColors.success)
+            EventShift -> GradientPair(PantopusColors.error, PantopusColors.error)
+            RemoteTask -> GradientPair(PantopusColors.primary500, PantopusColors.primary800)
+            RecurringService -> GradientPair(PantopusColors.primary600, PantopusColors.primary800)
+            General -> GradientPair(PantopusColors.magicBorder, PantopusColors.magic)
+        }
+
+    companion object {
+        fun fromRaw(raw: String?): MyTasksArchetype {
+            val key = raw?.lowercase(Locale.ROOT).orEmpty()
+            if (key.isEmpty()) return General
+            return entries.firstOrNull { it.wireValue == key } ?: General
+        }
+    }
+}
+
+/**
+ * T6.0b — Helper-engagement format taxonomy. Per T6 Q13 the design's
+ * `engagement_mode` concept is renamed `task_format` on the backend.
+ * Drives the neutral-tinted badge that sits flush after the status
+ * chip on a My tasks V2 row.
+ */
+enum class MyTasksFormat(val wireValue: String) {
+    InPerson("in_person"),
+    DropOff("drop_off"),
+    Remote("remote"),
+    Hybrid("hybrid"),
+    ;
+
+    val label: String
+        get() = when (this) {
+            InPerson -> "In person"
+            DropOff -> "Drop-off"
+            Remote -> "Remote"
+            Hybrid -> "Hybrid"
+        }
+
+    val icon: PantopusIcon
+        get() = when (this) {
+            InPerson -> PantopusIcon.MapPin
+            DropOff -> PantopusIcon.Package
+            Remote -> PantopusIcon.Monitor
+            Hybrid -> PantopusIcon.Shuffle
+        }
+
+    companion object {
+        fun fromRaw(raw: String?): MyTasksFormat? {
+            val key = raw?.lowercase(Locale.ROOT).orEmpty()
+            if (key.isEmpty()) return null
+            return entries.firstOrNull { it.wireValue == key }
+        }
+    }
+}
+
+/** True when a gig was posted via the Magic Task flow. Mirrors iOS isMagicTask(). */
+fun isMagicTask(dto: MyGigDto): Boolean =
+    (dto.sourceFlow ?: "").lowercase(Locale.ROOT) == "magic"
+
 /** Footer archetype per the design's `actions` prop. */
 sealed class MyTasksFooter {
     data class Open(val bidCount: Int) : MyTasksFooter()
@@ -194,8 +304,8 @@ class MyTasksViewModel
             MutableStateFlow<FabAction?>(
                 FabAction(
                     icon = PantopusIcon.Plus,
-                    contentDescription = "Post a task",
-                    variant = FabVariant.CanonicalCreate,
+                    contentDescription = "Post a task with Magic Task",
+                    variant = FabVariant.MagicCreate,
                     onClick = { postTaskHandler() },
                 ),
             )
@@ -236,8 +346,8 @@ class MyTasksViewModel
             _fab.value =
                 FabAction(
                     icon = PantopusIcon.Plus,
-                    contentDescription = "Post a task",
-                    variant = FabVariant.CanonicalCreate,
+                    contentDescription = "Post a task with Magic Task",
+                    variant = FabVariant.MagicCreate,
                     onClick = { postTaskHandler() },
                 )
         }
@@ -319,14 +429,18 @@ class MyTasksViewModel
         private fun emptyStateFor(tab: String): ListOfRowsUiState.Empty =
             when (tab) {
                 MyTasksTab.OPEN ->
+                    // T6.0b — Magic Task primary CTA. The shell's
+                    // EmptyState renders the headline + body + single
+                    // primary button; the FAB stays visible below for
+                    // the manual-post fallback.
                     ListOfRowsUiState.Empty(
                         icon = PantopusIcon.ClipboardList,
-                        headline = "No tasks posted yet",
+                        headline = "No tasks posted yet — try Magic Task",
                         subcopy =
-                            "Need a hand mounting something, moving a couch, " +
-                                "walking the dog? Post a task and neighbors will " +
-                                "bid within a few hours.",
-                        ctaTitle = "Post a task",
+                            "Describe what you need in a sentence. Magic Task " +
+                                "drafts the title, budget, and schedule — you just " +
+                                "confirm and post.",
+                        ctaTitle = "Try Magic Task",
                         onCta = { postTaskHandler() },
                     )
                 MyTasksTab.ACTIVE ->
@@ -428,31 +542,70 @@ class MyTasksViewModel
             val category = OffersCategory.fromRaw(dto.category)
             val budget = formatBudget(dto.price, dto.payType)
             val title = dto.title.takeIf { it.isNotBlank() } ?: "Untitled task"
+            val isMagic = isMagicTask(dto)
+            val archetype = MyTasksArchetype.fromRaw(dto.taskArchetype)
+
+            val statusChip =
+                RowChip(
+                    text = projection.status.label,
+                    icon = projection.status.icon,
+                    tint = RowChip.Tint.Status(projection.status.chipVariant),
+                )
+            val chips =
+                buildList {
+                    add(statusChip)
+                    MyTasksFormat.fromRaw(dto.taskFormat)?.let { add(modeChip(it)) }
+                }
+
+            // Magic Task rows use the new sparkles-disc tile + lavender
+            // gradient + uppercase overline. Non-magic rows keep the
+            // existing 40dp category gradient icon for back-compat.
+            val leading: RowLeading =
+                if (isMagic) {
+                    RowLeading.MagicArchetypeTile(
+                        icon = archetype.icon,
+                        gradient = archetype.gradient(),
+                    )
+                } else {
+                    RowLeading.CategoryGradientIcon(
+                        icon = category.icon,
+                        gradient = category.gradient(),
+                    )
+                }
+            val overline: String? = if (isMagic) archetype.overlineLabel else null
+
             return RowModel(
                 id = dto.id,
                 title = title,
                 subtitle = subtitle(dto, now, projection.status),
                 template = RowTemplate.StatusChip,
-                leading =
-                    RowLeading.CategoryGradientIcon(
-                        icon = category.icon,
-                        gradient = category.gradient(),
-                    ),
+                leading = leading,
                 trailing = RowTrailing.PriceStack(amount = budget, sublabel = null),
                 onTap = { openTaskHandler(dto) },
-                chips =
-                    listOf(
-                        RowChip(
-                            text = projection.status.label,
-                            icon = projection.status.icon,
-                            tint = RowChip.Tint.Status(projection.status.chipVariant),
-                        ),
-                    ),
+                chips = chips,
                 highlight = highlight(projection.status),
                 footer = footer(projection.footer, dto),
                 bidderStack = bidderStack(dto),
+                archetypeOverline = overline,
             )
         }
+
+        /**
+         * Neutral-tinted chip rendering for the engagement-mode badge.
+         * Distinct shape/tint from the status chip so it reads as a task
+         * PROPERTY rather than a state.
+         */
+        @Suppress("MemberVisibilityCanBePrivate")
+        fun modeChip(format: MyTasksFormat): RowChip =
+            RowChip(
+                text = format.label,
+                icon = format.icon,
+                tint =
+                    RowChip.Tint.Custom(
+                        background = PantopusColors.appSurface,
+                        foreground = PantopusColors.appTextStrong,
+                    ),
+            )
 
         private fun footer(
             variant: MyTasksFooter,

@@ -37,6 +37,22 @@ public struct MyGigDTO: Decodable, Sendable, Hashable, Identifiable {
     public let boostedAt: String?
     public let boostExpiresAt: String?
 
+    // T6.0b additions — drive the Magic Task archetype tile + overline +
+    // engagement-mode badge on My tasks V2 rows. All optional so older
+    // backends that don't yet expose these fields continue to decode.
+    /// `source_flow` from the gig row. When `magic`, the row renders the
+    /// Magic Task gradient tile + sparkles disc + archetype overline.
+    public let sourceFlow: String?
+    /// `task_archetype` enum (`quick_help`, `delivery_errand`, …). Drives
+    /// the overline label + tile gradient/icon mapping.
+    public let taskArchetype: String?
+    /// `task_format` enum (`in_person`, `drop_off`, `remote`, `hybrid`).
+    /// Drives the engagement-mode badge that sits flush after the
+    /// status chip. Per T6 Q13 this is the design's `engagement_mode`
+    /// concept renamed to avoid colliding with the backend's
+    /// offer-acceptance `engagement_mode` enum.
+    public let taskFormat: String?
+
     public init(
         id: String,
         title: String,
@@ -57,7 +73,10 @@ public struct MyGigDTO: Decodable, Sendable, Hashable, Identifiable {
         topBidAmount: Double? = nil,
         topBidders: [TopBidderDTO]? = nil,
         boostedAt: String? = nil,
-        boostExpiresAt: String? = nil
+        boostExpiresAt: String? = nil,
+        sourceFlow: String? = nil,
+        taskArchetype: String? = nil,
+        taskFormat: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -79,6 +98,9 @@ public struct MyGigDTO: Decodable, Sendable, Hashable, Identifiable {
         self.topBidders = topBidders
         self.boostedAt = boostedAt
         self.boostExpiresAt = boostExpiresAt
+        self.sourceFlow = sourceFlow
+        self.taskArchetype = taskArchetype
+        self.taskFormat = taskFormat
     }
 
     enum CodingKeys: String, CodingKey {
@@ -97,6 +119,9 @@ public struct MyGigDTO: Decodable, Sendable, Hashable, Identifiable {
         case topBidders = "top_bidders"
         case boostedAt = "boosted_at"
         case boostExpiresAt = "boost_expires_at"
+        case sourceFlow = "source_flow"
+        case taskArchetype = "task_archetype"
+        case taskFormat = "task_format"
     }
 }
 

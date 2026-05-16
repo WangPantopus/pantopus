@@ -468,6 +468,8 @@ const createGigSchema = Joi.object({
   time_window_end: Joi.date().iso().allow(null).optional(),
   source_flow: Joi.string().valid('magic', 'classic', 'template', 'context_shortcut').optional(),
   engagement_mode: Joi.string().valid('instant_accept', 'curated_offers', 'quotes').optional(),
+  // T6.0b — helper-engagement format (orthogonal to engagement_mode).
+  task_format: Joi.string().valid('in_person', 'drop_off', 'remote', 'hybrid').optional(),
   special_instructions: Joi.string().max(2000).allow('', null).optional(),
   access_notes: Joi.string().max(1000).allow('', null).optional(),
   required_tools: Joi.array().items(Joi.string().max(100)).max(10).optional(),
@@ -865,6 +867,7 @@ router.post('/', verifyToken, validate(createGigSchema), async (req, res) => {
     time_window_end,
     source_flow,
     engagement_mode,
+    task_format,
     special_instructions,
     access_notes,
     required_tools,
@@ -954,6 +957,8 @@ router.post('/', verifyToken, validate(createGigSchema), async (req, res) => {
       time_window_end: time_window_end || null,
       source_flow: source_flow || 'classic',
       engagement_mode: engagement_mode || null, // DB default 'curated_offers' applies when null
+      // T6.0b — helper-engagement format. DB default 'in_person' applies when null.
+      task_format: task_format || null,
       special_instructions: special_instructions || null,
       access_notes: access_notes || null,
       required_tools: required_tools || [],

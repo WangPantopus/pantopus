@@ -125,6 +125,144 @@ public enum MyTasksStatus: Sendable, Hashable {
     }
 }
 
+// MARK: - Magic archetype + task format
+
+/// T6.0b — Magic Task archetype taxonomy. Maps the backend's
+/// `task_archetype` enum to the design's row chrome — uppercase
+/// overline label, leading-tile icon, and the two-stop gradient used
+/// to tint the tile background. The mapping mirrors the
+/// `mytasks-frames.jsx` populated frame (Mount & install · Moving
+/// help · Pet care · Tech support · Furniture assembly).
+public enum MyTasksArchetype: String, Sendable, Hashable, CaseIterable {
+    case quickHelp = "quick_help"
+    case deliveryErrand = "delivery_errand"
+    case homeService = "home_service"
+    case proServiceQuote = "pro_service_quote"
+    case careTask = "care_task"
+    case eventShift = "event_shift"
+    case remoteTask = "remote_task"
+    case recurringService = "recurring_service"
+    case general
+
+    /// Resolve a raw backend string to the typed enum. Unknown values
+    /// fall through to `.general` so a future backend addition doesn't
+    /// break the row.
+    public static func from(rawArchetype: String?) -> MyTasksArchetype {
+        guard let raw = rawArchetype?.lowercased(), !raw.isEmpty else { return .general }
+        return MyTasksArchetype(rawValue: raw) ?? .general
+    }
+
+    /// Uppercase, +0.06em-tracked overline label rendered above the row
+    /// title — the design's "MOUNT & INSTALL" / "MOVING HELP" /
+    /// "DOG-WALK" overline.
+    public var overlineLabel: String {
+        switch self {
+        case .quickHelp: "Quick help"
+        case .deliveryErrand: "Delivery"
+        case .homeService: "Mount & install"
+        case .proServiceQuote: "Pro service"
+        case .careTask: "Pet care"
+        case .eventShift: "Event help"
+        case .remoteTask: "Tech support"
+        case .recurringService: "Recurring"
+        case .general: "Magic task"
+        }
+    }
+
+    /// Leading-tile icon for the archetype. White-on-gradient.
+    public var icon: PantopusIcon {
+        switch self {
+        case .quickHelp: .sparkles
+        case .deliveryErrand: .package
+        case .homeService: .tv
+        case .proServiceQuote: .hammer
+        case .careTask: .dog
+        case .eventShift: .calendar
+        case .remoteTask: .laptop
+        case .recurringService: .arrowsRepeat
+        case .general: .clipboardList
+        }
+    }
+
+    /// Two-stop linear gradient (135°) used to tint the leading tile.
+    /// Per-archetype palette mirrors the design's frame —
+    /// `mytasks-frames.jsx:540-585`.
+    public var gradient: GradientPair {
+        switch self {
+        case .quickHelp:
+            // Sky 400 → Blue 700
+            GradientPair(start: Theme.Color.primary400, end: Theme.Color.primary700)
+        case .deliveryErrand:
+            // Violet 400 → Violet 700 (matches "Moving help" tile)
+            GradientPair(start: Theme.Color.business, end: Theme.Color.magic)
+        case .homeService:
+            // Sky 400 → Blue 700 (TV mount)
+            GradientPair(start: Theme.Color.primary400, end: Theme.Color.primary700)
+        case .proServiceQuote:
+            // Amber 500 → Amber 700 (furniture assembly)
+            GradientPair(start: Theme.Color.warning, end: Theme.Color.warning)
+        case .careTask:
+            // Emerald 400 → Emerald 700 (pet care)
+            GradientPair(start: Theme.Color.success, end: Theme.Color.success)
+        case .eventShift:
+            // Rose 400 → Rose 700
+            GradientPair(start: Theme.Color.error, end: Theme.Color.error)
+        case .remoteTask:
+            // Cyan 400 → Cyan 700 (tech support)
+            GradientPair(start: Theme.Color.primary500, end: Theme.Color.primary800)
+        case .recurringService:
+            // Sky 600 → Sky 800
+            GradientPair(start: Theme.Color.primary600, end: Theme.Color.primary800)
+        case .general:
+            // Magic lavender — when the archetype is unknown we still
+            // surface the Magic Task signal via the lavender tint.
+            GradientPair(start: Theme.Color.magicBorder, end: Theme.Color.magic)
+        }
+    }
+}
+
+/// T6.0b — Helper-engagement format taxonomy. Per T6 Q13 the design's
+/// `engagement_mode` concept is renamed `task_format` on the backend
+/// to avoid colliding with the offer-acceptance mode. Drives the
+/// neutral-tinted badge that sits flush after the status chip on a
+/// My tasks V2 row.
+public enum MyTasksFormat: String, Sendable, Hashable, CaseIterable {
+    case inPerson = "in_person"
+    case dropOff = "drop_off"
+    case remote
+    case hybrid
+
+    public static func from(rawFormat: String?) -> MyTasksFormat? {
+        guard let raw = rawFormat?.lowercased(), !raw.isEmpty else { return nil }
+        return MyTasksFormat(rawValue: raw)
+    }
+
+    public var label: String {
+        switch self {
+        case .inPerson: "In person"
+        case .dropOff: "Drop-off"
+        case .remote: "Remote"
+        case .hybrid: "Hybrid"
+        }
+    }
+
+    public var icon: PantopusIcon {
+        switch self {
+        case .inPerson: .mapPin
+        case .dropOff: .package
+        case .remote: .monitor
+        case .hybrid: .shuffle
+        }
+    }
+}
+
+/// True when a gig was posted via the Magic Task flow. Pure projection
+/// from the DTO's `source_flow` field; exposed at module scope so the
+/// shell, tests, and the row mapper can all share one definition.
+public func isMagicTask(_ dto: MyGigDTO) -> Bool {
+    (dto.sourceFlow ?? "").lowercased() == "magic"
+}
+
 // MARK: - Footer actions
 
 /// Footer-action archetype per the design's `actions` prop. The shell
@@ -173,10 +311,16 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
     }
 
     public var fab: FABAction? {
+        // T6.0b — Magic Task FAB. 60pt gradient (primary600 → primary700)
+        // with a sparkles disc clipped over the top-right corner.
+        // Tapping invokes the same `onPostTask` callback the screen
+        // already wires; the destination route is responsible for
+        // opening the Magic Task draft flow (or falling back to the
+        // classic compose form when Magic Task is feature-flagged off).
         FABAction(
             icon: .plus,
-            accessibilityLabel: "Post a task",
-            variant: .canonicalCreate
+            accessibilityLabel: "Post a task with Magic Task",
+            variant: .magicCreate
         ) { [weak self] in
             guard let self else { return }
             Task { @MainActor in self.onPostTask() }
@@ -365,13 +509,17 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
     private func emptyContent(for tab: String) -> ListOfRowsState.EmptyContent {
         switch tab {
         case MyTasksTab.open:
+            // T6.0b — Magic Task primary CTA. The shell's EmptyState
+            // renders the headline + body + single primary button; the
+            // ghost "Or post manually" fallback is wired through the
+            // FAB which remains visible underneath.
             ListOfRowsState.EmptyContent(
                 icon: .clipboardList,
-                headline: "No tasks posted yet",
-                subcopy: "Need a hand mounting something, moving a couch, "
-                    + "walking the dog? Post a task and neighbors will bid "
-                    + "within a few hours.",
-                ctaTitle: "Post a task"
+                headline: "No tasks posted yet — try Magic Task",
+                subcopy: "Describe what you need in a sentence. Magic Task "
+                    + "drafts the title, budget, and schedule — you just "
+                    + "confirm and post.",
+                ctaTitle: "Try Magic Task"
             ) { [weak self] in
                 Task { @MainActor in self?.onPostTask() }
             }
@@ -570,25 +718,62 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
         let category = OffersCategory.from(rawCategory: dto.category)
         let budget = Self.formatBudget(price: dto.price, payType: dto.payType)
         let title = dto.title.isEmpty ? "Untitled task" : dto.title
-        let chip = RowChip(
+        let statusChip = RowChip(
             text: projection.status.label,
             icon: projection.status.icon,
             tint: .status(projection.status.chipVariant)
         )
         let bidderStack = Self.bidderStack(for: dto)
+        let isMagic = isMagicTask(dto)
+        let archetype = MyTasksArchetype.from(rawArchetype: dto.taskArchetype)
+
+        // Build chip list. Status chip first (always), then optional
+        // engagement-mode badge as a neutral-tinted custom chip.
+        var chips: [RowChip] = [statusChip]
+        if let format = MyTasksFormat.from(rawFormat: dto.taskFormat) {
+            chips.append(modeChip(format))
+        }
+
+        // Magic Task rows use the new sparkles-disc tile + lavender
+        // gradient + uppercase overline. Non-magic rows keep the
+        // existing 40pt category gradient icon for back-compat.
+        let leading: RowLeading
+        let overline: String?
+        if isMagic {
+            leading = .magicArchetypeTile(archetype.icon, gradient: archetype.gradient)
+            overline = archetype.overlineLabel
+        } else {
+            leading = .categoryGradientIcon(category.icon, gradient: category.gradient)
+            overline = nil
+        }
 
         return RowModel(
             id: dto.id,
             title: title,
             subtitle: subtitle(for: dto, now: now, status: projection.status),
             template: .statusChip,
-            leading: .categoryGradientIcon(category.icon, gradient: category.gradient),
+            leading: leading,
             trailing: .priceStack(amount: budget.amount, sublabel: budget.sublabel),
             onTap: callbacks.onTap,
-            chips: [chip],
+            chips: chips,
             highlight: highlight(for: projection.status),
             footer: footer(for: projection.footer, callbacks: callbacks),
-            bidderStack: bidderStack
+            bidderStack: bidderStack,
+            archetypeOverline: overline
+        )
+    }
+
+    /// Neutral-tinted chip rendering for the engagement-mode badge.
+    /// Distinct from the status chip's variant tint so it reads as a
+    /// task PROPERTY rather than a state.
+    public static func modeChip(_ format: MyTasksFormat) -> RowChip {
+        RowChip(
+            text: format.label,
+            icon: format.icon,
+            tint: .custom(
+                background: Theme.Color.appSurface,
+                foreground: Theme.Color.appTextStrong
+            )
         )
     }
 
@@ -862,7 +1047,10 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
             topBidAmount: dto.topBidAmount,
             topBidders: dto.topBidders,
             boostedAt: formatter.string(from: now),
-            boostExpiresAt: formatter.string(from: expires)
+            boostExpiresAt: formatter.string(from: expires),
+            sourceFlow: dto.sourceFlow,
+            taskArchetype: dto.taskArchetype,
+            taskFormat: dto.taskFormat
         )
     }
 
@@ -889,7 +1077,10 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
             topBidAmount: dto.topBidAmount,
             topBidders: dto.topBidders,
             boostedAt: dto.boostedAt,
-            boostExpiresAt: dto.boostExpiresAt
+            boostExpiresAt: dto.boostExpiresAt,
+            sourceFlow: dto.sourceFlow,
+            taskArchetype: dto.taskArchetype,
+            taskFormat: dto.taskFormat
         )
     }
 }

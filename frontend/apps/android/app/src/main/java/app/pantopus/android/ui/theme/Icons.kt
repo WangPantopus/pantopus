@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Bolt
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Edit
@@ -54,6 +56,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
@@ -62,6 +65,7 @@ import androidx.compose.material.icons.filled.MarkunreadMailbox
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreTime
+import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
@@ -77,12 +81,14 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -232,6 +238,15 @@ enum class PantopusIcon(
     Smartphone("smartphone"),
     Wallet("wallet"),
     Hash("hash"),
+
+    // T6.0b — My tasks V2 Magic Task archetype tile + engagement-mode
+    // badge icons + empty-state quick-prompt arrow.
+    Tv("tv"),
+    Laptop("laptop"),
+    Monitor("monitor"),
+    Shuffle("shuffle"),
+    WandSparkles("wand-sparkles"),
+    ArrowUpRight("arrow-up-right"),
     ;
 
     companion object {
@@ -370,6 +385,16 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Smartphone -> IconSource.Material(Icons.Filled.Smartphone)
         PantopusIcon.Wallet -> IconSource.Material(Icons.Filled.AccountBalanceWallet)
         PantopusIcon.Hash -> IconSource.Material(Icons.Filled.Tag)
+        // T6.0b — Magic Task archetype tile + engagement-mode badge icons.
+        // Material doesn't ship a Lucide-equivalent `wand-sparkles`; fall
+        // back to `AutoFixHigh` (closest match) and `NorthEast` for the
+        // arrow-up-right quick-prompt glyph.
+        PantopusIcon.Tv -> IconSource.Material(Icons.Filled.Tv)
+        PantopusIcon.Laptop -> IconSource.Material(Icons.Filled.Laptop)
+        PantopusIcon.Monitor -> IconSource.Material(Icons.Filled.DesktopWindows)
+        PantopusIcon.Shuffle -> IconSource.Material(Icons.Filled.Shuffle)
+        PantopusIcon.WandSparkles -> IconSource.Material(Icons.Filled.AutoFixHigh)
+        PantopusIcon.ArrowUpRight -> IconSource.Material(Icons.Filled.NorthEast)
     }
 
 /**

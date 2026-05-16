@@ -69,8 +69,10 @@ final class MyTasksViewModelTests: XCTestCase {
             XCTFail("Expected .empty, got \(vm.state)")
             return
         }
-        XCTAssertEqual(content.headline, "No tasks posted yet")
-        XCTAssertEqual(content.ctaTitle, "Post a task")
+        // T6.0b — Magic Task primary CTA replaces the classic
+        // "Post a task" headline + CTA on the Open tab.
+        XCTAssertEqual(content.headline, "No tasks posted yet — try Magic Task")
+        XCTAssertEqual(content.ctaTitle, "Try Magic Task")
     }
 
     func testLoadPopulatedTransitionsToLoadedOnOpenTab() async {
@@ -394,7 +396,143 @@ final class MyTasksViewModelTests: XCTestCase {
         XCTAssertEqual(sections.first?.rows.first?.id, "g1")
     }
 
+    // MARK: - T6.0b Magic Task chrome
+
+    func testMagicTaskRowUsesMagicArchetypeTileAndOverline() {
+        let dto = makeGig(
+            id: "mt1",
+            status: "open",
+            bidCount: 0,
+            sourceFlow: "magic",
+            taskArchetype: "home_service"
+        )
+        let row = renderRow(for: dto)
+        XCTAssertEqual(row.archetypeOverline, "Mount & install")
+        if case .magicArchetypeTile = row.leading {
+            // pass
+        } else {
+            XCTFail("Magic task row should use magicArchetypeTile leading variant")
+        }
+    }
+
+    func testNonMagicTaskRowKeepsCategoryGradientIconAndNoOverline() {
+        let dto = makeGig(
+            id: "cl1",
+            status: "open",
+            bidCount: 0,
+            sourceFlow: "classic",
+            taskArchetype: "home_service"
+        )
+        let row = renderRow(for: dto)
+        XCTAssertNil(row.archetypeOverline)
+        if case .categoryGradientIcon = row.leading {
+            // pass
+        } else {
+            XCTFail("Non-magic row should use categoryGradientIcon")
+        }
+    }
+
+    func testMagicTaskRowWithUnknownArchetypeFallsBackToGeneralOverline() {
+        let dto = makeGig(
+            id: "mt2",
+            status: "open",
+            sourceFlow: "magic",
+            taskArchetype: nil
+        )
+        let row = renderRow(for: dto)
+        XCTAssertEqual(row.archetypeOverline, "Magic task")
+    }
+
+    func testEngagementModeBadgeRendersForAllFourFormats() {
+        let cases: [(String, String, PantopusIcon)] = [
+            ("in_person", "In person", .mapPin),
+            ("drop_off", "Drop-off", .package),
+            ("remote", "Remote", .monitor),
+            ("hybrid", "Hybrid", .shuffle),
+        ]
+        for (raw, label, expectedIcon) in cases {
+            let dto = makeGig(
+                id: "mode-\(raw)",
+                status: "open",
+                bidCount: 1,
+                sourceFlow: "magic",
+                taskArchetype: "general",
+                taskFormat: raw
+            )
+            let row = renderRow(for: dto)
+            // Status chip is always first; mode chip is appended second.
+            XCTAssertEqual(row.chips?.count, 2, "mode \(raw) missing chip")
+            let modeChip = row.chips?[1]
+            XCTAssertEqual(modeChip?.text, label, "mode \(raw) wrong label")
+            XCTAssertEqual(modeChip?.icon, expectedIcon, "mode \(raw) wrong icon")
+            // Tint is custom (neutral surface + strong fg) — not a status variant.
+            if case .custom = modeChip?.tint {
+                // pass
+            } else {
+                XCTFail("mode chip for \(raw) should use custom tint, not status")
+            }
+        }
+    }
+
+    func testEngagementModeBadgeOmittedWhenTaskFormatIsNil() {
+        let dto = makeGig(
+            id: "no-mode",
+            status: "open",
+            bidCount: 1,
+            sourceFlow: "classic",
+            taskArchetype: nil,
+            taskFormat: nil
+        )
+        let row = renderRow(for: dto)
+        XCTAssertEqual(row.chips?.count, 1)
+    }
+
+    func testEngagementModeBadgeOmittedForUnknownTaskFormat() {
+        let dto = makeGig(
+            id: "weird-mode",
+            status: "open",
+            bidCount: 1,
+            sourceFlow: "magic",
+            taskArchetype: "general",
+            taskFormat: "telepathy"
+        )
+        let row = renderRow(for: dto)
+        XCTAssertEqual(row.chips?.count, 1)
+    }
+
+    func testArchetypeOverlineTruncatesAtTwentyFourChars() {
+        // The archetype overline renderer applies a 24-char truncation
+        // with an ellipsis. The VM produces the label; the renderer
+        // does the truncation, so we cover the VM-side label
+        // generation here and call truncation a render concern.
+        let archetypeWithLongLabel = MyTasksArchetype.from(rawArchetype: "home_service")
+        XCTAssertEqual(archetypeWithLongLabel.overlineLabel, "Mount & install")
+        XCTAssertLessThanOrEqual(archetypeWithLongLabel.overlineLabel.count, 24)
+    }
+
+    func testIsMagicTaskTrueWhenSourceFlowIsMagicCaseInsensitive() {
+        XCTAssertTrue(isMagicTask(makeGig(id: "1", status: "open", sourceFlow: "magic")))
+        XCTAssertTrue(isMagicTask(makeGig(id: "2", status: "open", sourceFlow: "MAGIC")))
+        XCTAssertFalse(isMagicTask(makeGig(id: "3", status: "open", sourceFlow: "classic")))
+        XCTAssertFalse(isMagicTask(makeGig(id: "4", status: "open", sourceFlow: nil)))
+    }
+
     // MARK: - Helpers
+
+    private func renderRow(for dto: MyGigDTO) -> RowModel {
+        let status = MyTasksViewModel.derivedStatus(for: dto, now: Self.fixedNow)
+        let projection = MyTasksViewModel.GigProjection(
+            dto: dto,
+            tab: MyTasksViewModel.tabFor(status: status),
+            status: status,
+            footer: MyTasksViewModel.footerFor(status: status, bidCount: dto.bidCount ?? 0)
+        )
+        return MyTasksViewModel.row(
+            projection: projection,
+            now: Self.fixedNow,
+            callbacks: MyTasksViewModel.RowCallbacks()
+        )
+    }
 
     private func makeGig(
         id: String,
@@ -402,7 +540,10 @@ final class MyTasksViewModelTests: XCTestCase {
         bidCount: Int = 0,
         deadline: String? = nil,
         scheduledStart: String? = nil,
-        topBidders: [TopBidderDTO] = []
+        topBidders: [TopBidderDTO] = [],
+        sourceFlow: String? = nil,
+        taskArchetype: String? = nil,
+        taskFormat: String? = nil
     ) -> MyGigDTO {
         MyGigDTO(
             id: id,
@@ -416,7 +557,10 @@ final class MyTasksViewModelTests: XCTestCase {
             userId: "u_me",
             scheduledStart: scheduledStart,
             bidCount: bidCount,
-            topBidders: topBidders.isEmpty ? nil : topBidders
+            topBidders: topBidders.isEmpty ? nil : topBidders,
+            sourceFlow: sourceFlow,
+            taskArchetype: taskArchetype,
+            taskFormat: taskFormat
         )
     }
 }

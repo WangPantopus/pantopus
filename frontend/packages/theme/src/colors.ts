@@ -71,6 +71,17 @@ export const colors = {
     home: { color: '#16A34A', bg: '#DCFCE7', light: '#F0FDF4' },
     business: { color: '#7C3AED', bg: '#F3E8FF', light: '#FAF5FF' },
     professional: { color: '#D97706', bg: '#FEF3C7', light: '#FFFBEB' },
+    // T6.0b — Magic Task lavender quartet. Signals AI-resolved metadata
+    // on My tasks V2 rows (gradient archetype tile + sparkles disc +
+    // archetype overline) and the Magic ingest FAB on Mailbox-A17 root.
+    // Mirrors `Theme.Color.magic*` on iOS and `PantopusColors.magic*`
+    // on Android.
+    magic: {
+      color: '#6D28D9',
+      bg: '#EDE9FE',
+      light: '#F5F3FF',
+      border: '#DDD6FE',
+    },
   },
 
   // ─── Accent palette ──────────────────────────────────────

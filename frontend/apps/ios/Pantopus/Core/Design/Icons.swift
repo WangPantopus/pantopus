@@ -133,6 +133,15 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case wallet
     case hash
 
+    // T6.0b My tasks V2 — Magic Task archetype tile icons + engagement-mode
+    // badge icons + empty-state quick-prompt arrow.
+    case tv
+    case laptop
+    case monitor
+    case shuffle
+    case wandSparkles = "wand-sparkles"
+    case arrowUpRight = "arrow-up-right"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -237,6 +246,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .smartphone: "iphone"
         case .wallet: "wallet.pass"
         case .hash: "number"
+        case .tv: "tv"
+        case .laptop: "laptopcomputer"
+        case .monitor: "display"
+        case .shuffle: "shuffle"
+        case .wandSparkles: "wand.and.stars"
+        case .arrowUpRight: "arrow.up.right"
         }
     }
 }

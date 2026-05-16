@@ -44,6 +44,18 @@ data class MyGigDto(
     @Json(name = "top_bidders") val topBidders: List<TopBidderDto>? = null,
     @Json(name = "boosted_at") val boostedAt: String? = null,
     @Json(name = "boost_expires_at") val boostExpiresAt: String? = null,
+    // T6.0b additions — Magic Task archetype tile + overline + engagement-mode badge.
+    /** `source_flow`. When `magic`, the row renders the Magic Task gradient tile + overline. */
+    @Json(name = "source_flow") val sourceFlow: String? = null,
+    /** `task_archetype` enum. Drives the overline label + tile icon mapping. */
+    @Json(name = "task_archetype") val taskArchetype: String? = null,
+    /**
+     * `task_format` enum (`in_person`, `drop_off`, `remote`, `hybrid`).
+     * Drives the engagement-mode badge that sits after the status chip.
+     * Per T6 Q13 this is the design's `engagement_mode` concept renamed
+     * to avoid colliding with the backend's offer-acceptance enum.
+     */
+    @Json(name = "task_format") val taskFormat: String? = null,
 )
 
 /** Envelope from `GET /api/gigs/my-gigs`. */

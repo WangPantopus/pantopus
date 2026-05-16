@@ -63,6 +63,11 @@
   --color-identity-home-bg: #DCFCE7;
   --color-identity-business: #7C3AED;
   --color-identity-business-bg: #F3E8FF;
+  /* T6.0b — Magic Task lavender quartet. */
+  --color-identity-magic: #6D28D9;
+  --color-identity-magic-bg: #EDE9FE;
+  --color-identity-magic-light: #F5F3FF;
+  --color-identity-magic-border: #DDD6FE;
 
   /* ── Spacing (px) ────────────────────────────────────────── */
   --spacing-0: 0px;

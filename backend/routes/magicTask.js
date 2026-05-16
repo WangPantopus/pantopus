@@ -110,6 +110,8 @@ const magicPostSchema = Joi.object({
   beneficiary_user_id: Joi.string().uuid().allow(null).optional(),
   source_flow: Joi.string().valid('magic', 'classic', 'template', 'context_shortcut').default('magic'),
   engagement_mode: Joi.string().valid('instant_accept', 'curated_offers', 'quotes').optional(),
+  // T6.0b — helper-engagement format (in_person / drop_off / remote / hybrid).
+  task_format: Joi.string().valid('in_person', 'drop_off', 'remote', 'hybrid').optional(),
   ai_confidence: Joi.number().min(0).max(1).allow(null).optional(),
   ai_draft_json: Joi.object().allow(null).optional(),
 });
@@ -393,7 +395,7 @@ router.post('/basic-draft', verifyToken, validate(magicDraftSchema), async (req,
  * During the undo window, the gig won't appear in search/feed.
  */
 router.post('/magic-post', verifyToken, validate(magicPostSchema), async (req, res) => {
-  const { text, draft, location, beneficiary_user_id, source_flow, engagement_mode, ai_confidence, ai_draft_json } = req.body;
+  const { text, draft, location, beneficiary_user_id, source_flow, engagement_mode, task_format, ai_confidence, ai_draft_json } = req.body;
   const userId = req.user.id;
 
   logger.info('Magic post', { userId, title: draft.title, source_flow });
@@ -507,6 +509,8 @@ router.post('/magic-post', verifyToken, validate(magicPostSchema), async (req, r
       // Source tracking
       source_flow: source_flow || 'magic',
       engagement_mode: resolvedEngagementMode,
+      // T6.0b — helper-engagement format. Defaults to in_person via DB.
+      task_format: task_format || null,
       ai_confidence: ai_confidence || null,
       ai_draft_json: ai_draft_json || null,
       // Task archetype + module fields

@@ -153,6 +153,20 @@ public enum RowLeading: Sendable {
     /// Overlapping mini-avatars + `+N` overflow tile, used by My tasks
     /// bidder summary.
     case bidderStack(bidders: [Bidder], overflow: Int)
+
+    // MARK: T6.0b additions
+
+    /// 44pt rounded-square tile with a two-stop gradient background +
+    /// white foreground icon + a small sparkles disc clipped over the
+    /// top-right corner. The disc is the scannable "Magic Task understood
+    /// this" signal.
+    ///
+    /// Used by My tasks V2 when the gig was posted via Magic Task
+    /// (server-derived from `source_flow === 'magic'`). The shell renders
+    /// the tile at 44pt to make room for the disc overlay; the disc is
+    /// 18pt with a 1.5pt magic-border ring and a 10pt magic-violet
+    /// sparkles glyph.
+    case magicArchetypeTile(PantopusIcon, gradient: GradientPair)
 }
 
 // MARK: - Bidder stack data
@@ -520,6 +534,18 @@ public struct RowModel: Identifiable, Sendable {
     /// each in the correct slot (left for bidder, right for splits).
     public let splitWith: SplitStackData?
 
+    /// T6.0b — small uppercase magic-violet text rendered ABOVE the
+    /// title, used by My tasks V2 when the gig was posted via Magic Task
+    /// (the AI-derived archetype name — e.g. "MOUNT & INSTALL", "MOVING
+    /// HELP", "DOG-WALK"). Renders as 10pt semibold, +0.06em tracking,
+    /// `Theme.Color.magic` foreground.
+    ///
+    /// Truncates with ellipsis at 24 characters so a long archetype
+    /// string can't push the title off-screen. Pass `nil` to suppress
+    /// the overline entirely — all non-magic rows render with this slot
+    /// hidden.
+    public let archetypeOverline: String?
+
     public init(
         id: String,
         title: String,
@@ -543,7 +569,8 @@ public struct RowModel: Identifiable, Sendable {
         footer: RowFooter? = nil,
         engagement: RowEngagement? = nil,
         bidderStack: BidderStackData? = nil,
-        splitWith: SplitStackData? = nil
+        splitWith: SplitStackData? = nil,
+        archetypeOverline: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -568,6 +595,7 @@ public struct RowModel: Identifiable, Sendable {
         self.engagement = engagement
         self.bidderStack = bidderStack
         self.splitWith = splitWith
+        self.archetypeOverline = archetypeOverline
     }
 }
 

@@ -110,6 +110,14 @@ sealed interface FabVariant {
 
     /** 48dp pill with a label beside the icon. */
     data class ExtendedNav(val label: String) : FabVariant
+
+    /**
+     * T6.0b — 60dp Magic Task FAB. Gradient primary600 → primary700,
+     * plus glyph (or icon override), 18dp white sparkles disc clipped
+     * over the top-right corner. Used by My tasks V2 (sparkles+plus)
+     * and Mailbox-A17 root (scan-line variant for magic ingest).
+     */
+    data object MagicCreate : FabVariant
 }
 
 // ─── T5 chrome slots (all default-null) ─────────────────────────
