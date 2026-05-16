@@ -37,7 +37,9 @@ final class IconTests: XCTestCase {
         // T5.3.4 Listing offers — listing-context header icons.
         "bookmark",
         // T6.0a Bills — utility category iconography + banner/auto-pay markers.
-        "zap", "flame", "droplet", "wifi", "building-2", "smartphone", "wallet", "hash"
+        "zap", "flame", "droplet", "wifi", "building-2", "smartphone", "wallet", "hash",
+        // T6.0b My tasks V2 — Magic Task archetype + task-format icons.
+        "tv", "laptop", "monitor", "shuffle", "wand-sparkles", "arrow-up-right"
     ]
 
     func testInventoryMatches() {

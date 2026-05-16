@@ -151,30 +151,32 @@ enum class MyTasksArchetype(val wireValue: String) {
     ;
 
     val overlineLabel: String
-        get() = when (this) {
-            QuickHelp -> "Quick help"
-            DeliveryErrand -> "Delivery"
-            HomeService -> "Mount & install"
-            ProServiceQuote -> "Pro service"
-            CareTask -> "Pet care"
-            EventShift -> "Event help"
-            RemoteTask -> "Tech support"
-            RecurringService -> "Recurring"
-            General -> "Magic task"
-        }
+        get() =
+            when (this) {
+                QuickHelp -> "Quick help"
+                DeliveryErrand -> "Delivery"
+                HomeService -> "Mount & install"
+                ProServiceQuote -> "Pro service"
+                CareTask -> "Pet care"
+                EventShift -> "Event help"
+                RemoteTask -> "Tech support"
+                RecurringService -> "Recurring"
+                General -> "Magic task"
+            }
 
     val icon: PantopusIcon
-        get() = when (this) {
-            QuickHelp -> PantopusIcon.Sparkles
-            DeliveryErrand -> PantopusIcon.Package
-            HomeService -> PantopusIcon.Tv
-            ProServiceQuote -> PantopusIcon.Hammer
-            CareTask -> PantopusIcon.Dog
-            EventShift -> PantopusIcon.Calendar
-            RemoteTask -> PantopusIcon.Laptop
-            RecurringService -> PantopusIcon.ArrowsRepeat
-            General -> PantopusIcon.ClipboardList
-        }
+        get() =
+            when (this) {
+                QuickHelp -> PantopusIcon.Sparkles
+                DeliveryErrand -> PantopusIcon.Package
+                HomeService -> PantopusIcon.Tv
+                ProServiceQuote -> PantopusIcon.Hammer
+                CareTask -> PantopusIcon.Dog
+                EventShift -> PantopusIcon.Calendar
+                RemoteTask -> PantopusIcon.Laptop
+                RecurringService -> PantopusIcon.ArrowsRepeat
+                General -> PantopusIcon.ClipboardList
+            }
 
     fun gradient(): GradientPair =
         when (this) {
@@ -212,20 +214,22 @@ enum class MyTasksFormat(val wireValue: String) {
     ;
 
     val label: String
-        get() = when (this) {
-            InPerson -> "In person"
-            DropOff -> "Drop-off"
-            Remote -> "Remote"
-            Hybrid -> "Hybrid"
-        }
+        get() =
+            when (this) {
+                InPerson -> "In person"
+                DropOff -> "Drop-off"
+                Remote -> "Remote"
+                Hybrid -> "Hybrid"
+            }
 
     val icon: PantopusIcon
-        get() = when (this) {
-            InPerson -> PantopusIcon.MapPin
-            DropOff -> PantopusIcon.Package
-            Remote -> PantopusIcon.Monitor
-            Hybrid -> PantopusIcon.Shuffle
-        }
+        get() =
+            when (this) {
+                InPerson -> PantopusIcon.MapPin
+                DropOff -> PantopusIcon.Package
+                Remote -> PantopusIcon.Monitor
+                Hybrid -> PantopusIcon.Shuffle
+            }
 
     companion object {
         fun fromRaw(raw: String?): MyTasksFormat? {
@@ -237,8 +241,7 @@ enum class MyTasksFormat(val wireValue: String) {
 }
 
 /** True when a gig was posted via the Magic Task flow. Mirrors iOS isMagicTask(). */
-fun isMagicTask(dto: MyGigDto): Boolean =
-    (dto.sourceFlow ?: "").lowercase(Locale.ROOT) == "magic"
+fun isMagicTask(dto: MyGigDto): Boolean = (dto.sourceFlow ?: "").lowercase(Locale.ROOT) == "magic"
 
 /** Footer archetype per the design's `actions` prop. */
 sealed class MyTasksFooter {

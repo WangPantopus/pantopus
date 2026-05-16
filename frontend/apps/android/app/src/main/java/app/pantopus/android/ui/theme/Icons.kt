@@ -55,8 +55,8 @@ import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Laptop
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
@@ -81,15 +81,15 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Visibility

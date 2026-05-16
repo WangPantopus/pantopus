@@ -37,9 +37,9 @@ public struct MyGigDTO: Decodable, Sendable, Hashable, Identifiable {
     public let boostedAt: String?
     public let boostExpiresAt: String?
 
-    // T6.0b additions — drive the Magic Task archetype tile + overline +
-    // engagement-mode badge on My tasks V2 rows. All optional so older
-    // backends that don't yet expose these fields continue to decode.
+    /// T6.0b additions drive the Magic Task archetype tile + overline +
+    /// engagement-mode badge on My tasks V2 rows. All optional so older
+    /// backends that don't yet expose these fields continue to decode.
     /// `source_flow` from the gig row. When `magic`, the row renders the
     /// Magic Task gradient tile + sparkles disc + archetype overline.
     public let sourceFlow: String?

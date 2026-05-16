@@ -957,7 +957,6 @@ private struct LeadingView: View {
     /// 44pt rounded gradient tile + sparkles disc clipped over the top-
     /// right corner. Matches the `ArchetypeTile` block in
     /// `mytasks-frames.jsx`.
-    @ViewBuilder
     private func magicArchetypeTile(icon: PantopusIcon, gradient: GradientPair) -> some View {
         Icon(icon, size: 22, strokeWidth: 1.7, color: Theme.Color.appTextInverse)
             .frame(width: 44, height: 44)
