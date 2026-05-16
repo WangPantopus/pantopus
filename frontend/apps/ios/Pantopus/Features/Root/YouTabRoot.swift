@@ -8,7 +8,7 @@
 //  with three identity bindings (Personal / Home / Business).
 //
 
-// swiftlint:disable cyclomatic_complexity
+// swiftlint:disable cyclomatic_complexity function_body_length type_body_length
 
 import SwiftUI
 
@@ -19,6 +19,11 @@ public enum YouRoute: Hashable {
     case mailItemDetail(mailId: String)
     case settings
     case placeholder(label: String)
+    /// T5.2.4 — cross-listing Offers (incoming + outgoing).
+    case offers
+    /// Gig detail destination for an offer-row tap. Reuses the existing
+    /// Transactional Detail shell.
+    case gigDetail(gigId: String)
     #if DEBUG
     case publicProfile(userId: String)
     case pulsePost(postId: String)
@@ -217,6 +222,10 @@ public struct YouTabRoot: View {
         switch tile.routeKey {
         case "me.mail":
             path.append(.mailbox)
+        case "me.bids":
+            // T5.2.4 — the "My bids" tile is the cross-listing Offers
+            // entry point until P7 ships the dedicated My-bids screen.
+            path.append(.offers)
         default:
             path.append(.placeholder(label: tile.label))
         }
@@ -313,6 +322,32 @@ public struct YouTabRoot: View {
             )
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
+        case .offers:
+            OffersView(
+                viewModel: OffersViewModel(
+                    onOpenOfferDetail: { dto in
+                        guard let gigId = dto.gigId ?? dto.gig?.id else { return }
+                        Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
+                    },
+                    onOpenFilters: {
+                        Task { @MainActor in path.append(.placeholder(label: "Offer filters")) }
+                    },
+                    onBrowseListings: {
+                        Task { @MainActor in path.append(.placeholder(label: "Browse listings")) }
+                    },
+                    onPostTask: {
+                        Task { @MainActor in path.append(.placeholder(label: "Post a task")) }
+                    }
+                )
+            )
+        case let .gigDetail(gigId):
+            GigDetailView(
+                viewModel: GigDetailViewModel(gigId: gigId),
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onMessage: { _ in
+                    Task { @MainActor in path.append(.placeholder(label: "Messages")) }
+                }
+            )
         #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(

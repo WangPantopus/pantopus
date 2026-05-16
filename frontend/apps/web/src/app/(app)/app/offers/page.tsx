@@ -1,256 +1,423 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import * as api from '@pantopus/api';
-import PageHeader from '@/components/PageHeader';
-import SearchInput from '@/components/SearchInput';
-import { BID_STATUS } from '@/components/statusColors';
-import UserIdentityLink from '@/components/user/UserIdentityLink';
-import { formatTimeAgo as timeAgo } from '@pantopus/ui-utils';
+// T5.2.4 — Cross-listing Offers V2 (web).
+//
+// Rewritten to use `<ListOfRowsShell />` so iOS / Android / web all
+// render the same shape:
+//   - Two equal-width tabs: "Received (N)" + "Sent (N)"
+//   - No FAB (offers are created from a listing/gig detail)
+//   - Each row is a Shape C — category gradient icon + listing title +
+//     priceStack ("$220" + "asking $240") + status chip
+//   - Row tap pushes the gig detail (each offer is on a gig).
+//
+// Backend (existing, unchanged): `/api/gigs/received-offers` and
+// `/api/gigs/my-bids`. Both wrappers already live in `@pantopus/api`.
 
-type Offer = {
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ArrowLeft,
+  AlertCircle,
+  Briefcase,
+  Check,
+  Filter,
+  Hammer,
+  HandCoins,
+  Heart,
+  Hourglass,
+  Info,
+  Lightbulb,
+  Package,
+  Repeat,
+  Send,
+  Sparkles,
+  Timer,
+  UserPlus,
+  X as XIcon,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import * as api from '@pantopus/api';
+import { getAuthToken } from '@pantopus/api';
+import ListOfRowsShell from '@/components/list-of-rows/ListOfRowsShell';
+import type {
+  GradientPair,
+  ListOfRowsState,
+  RowModel,
+  StatusChipVariant,
+} from '@/components/list-of-rows/types';
+
+type Tab = 'received' | 'sent';
+
+type Bid = {
   id: string;
-  gig_id: string;
-  user_id: string;
-  bid_amount: number;
-  message: string;
-  proposed_time?: string;
-  status: string;
-  created_at: string;
-  gig?: { id: string; title: string; price: number; status: string; category?: string };
-  bidder?: { id: string; username: string; name?: string; first_name?: string; profile_picture_url?: string; city?: string; state?: string };
+  gig_id?: string | null;
+  user_id?: string | null;
+  bid_amount?: number | null;
+  message?: string | null;
+  proposed_time?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  expires_at?: string | null;
+  counter_amount?: number | null;
+  counter_status?: string | null;
+  countered_at?: string | null;
+  withdrawn_at?: string | null;
+  gig?: {
+    id: string;
+    title?: string | null;
+    description?: string | null;
+    price?: number | null;
+    category?: string | null;
+    status?: string | null;
+    user_id?: string | null;
+  } | null;
+  bidder?: {
+    id: string;
+    username?: string | null;
+    name?: string | null;
+    first_name?: string | null;
+    profile_picture_url?: string | null;
+    city?: string | null;
+    state?: string | null;
+  } | null;
 };
 
-const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = BID_STATUS;
+// ─── Status derivation (mirrors iOS / Android) ─────────────────
 
-export default function OffersPage() {
-  const router = useRouter();
-  const [tab, setTab] = useState<'received' | 'sent'>('received');
-  const [received, setReceived] = useState<Offer[]>([]);
-  const [sent, setSent] = useState<Offer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<string>('all');
-  const [search, setSearch] = useState('');
+type OfferStatus =
+  | 'new'
+  | 'expiring'
+  | 'countered'
+  | 'accepted'
+  | 'pending'
+  | 'declined'
+  | 'withdrawn'
+  | 'expired';
 
-  useEffect(() => {
-    loadData();
-  }, []);
+const NEW_WINDOW_MS = 12 * 60 * 60 * 1000;
+const EXPIRING_WINDOW_MS = 4 * 60 * 60 * 1000;
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [recvRes, sentRes] = await Promise.allSettled([
-        api.gigs.getReceivedOffers(),
-        api.gigs.getMyBids(),
-      ]);
-      if (recvRes.status === 'fulfilled') setReceived(((recvRes.value as Record<string, unknown>).offers || []) as Offer[]);
-      if (sentRes.status === 'fulfilled') setSent(((sentRes.value as Record<string, unknown>).bids || []) as Offer[]);
-    } catch {}
-    setLoading(false);
-  };
+const STATUS_META: Record<OfferStatus, {
+  label: string;
+  icon: LucideIcon;
+  variant: StatusChipVariant;
+}> = {
+  new: { label: 'New offer', icon: Sparkles, variant: 'personal' },
+  expiring: { label: 'Expiring soon', icon: Timer, variant: 'error' },
+  countered: { label: 'Countered', icon: Repeat, variant: 'warning' },
+  accepted: { label: 'Accepted', icon: Check, variant: 'success' },
+  pending: { label: 'Pending response', icon: Hourglass, variant: 'neutral' },
+  declined: { label: 'Declined', icon: XIcon, variant: 'neutral' },
+  withdrawn: { label: 'Withdrawn', icon: ArrowLeft, variant: 'neutral' },
+  expired: { label: 'Expired', icon: AlertCircle, variant: 'neutral' },
+};
 
-  const items = tab === 'received' ? received : sent;
-  const filtered = items.filter(o => {
-    if (filter !== 'all' && o.status !== filter) return false;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      const title = (o.gig?.title || '').toLowerCase();
-      const msg = (o.message || '').toLowerCase();
-      const name = (o.bidder?.name || o.bidder?.username || '').toLowerCase();
-      if (!title.includes(q) && !msg.includes(q) && !name.includes(q)) return false;
+function derivedStatus(bid: Bid, now: Date): OfferStatus {
+  const status = (bid.status || '').toLowerCase();
+  const hasLiveCounter =
+    (bid.counter_amount ?? 0) > 0 || !!(bid.counter_status && bid.counter_status.length);
+  if (hasLiveCounter && status === 'pending') return 'countered';
+  switch (status) {
+    case 'accepted':
+    case 'assigned':
+      return 'accepted';
+    case 'rejected':
+    case 'declined':
+      return 'declined';
+    case 'withdrawn':
+      return 'withdrawn';
+    case 'expired':
+      return 'expired';
+    case 'pending': {
+      if (bid.expires_at) {
+        const expires = new Date(bid.expires_at).getTime();
+        const left = expires - now.getTime();
+        if (left > 0 && left < EXPIRING_WINDOW_MS) return 'expiring';
+        if (left <= 0) return 'expired';
+      }
+      if (bid.created_at) {
+        const created = new Date(bid.created_at).getTime();
+        if (now.getTime() - created < NEW_WINDOW_MS) return 'new';
+      }
+      return 'pending';
     }
-    return true;
-  });
+    default:
+      return 'pending';
+  }
+}
 
-  const recvPending = received.filter(o => o.status === 'pending').length;
-  const sentPending = sent.filter(o => o.status === 'pending').length;
+// ─── Category mapping (mirrors iOS / Android `OffersCategory`) ─
 
+type Category =
+  | 'handyman'
+  | 'cleaning'
+  | 'moving'
+  | 'petCare'
+  | 'childCare'
+  | 'tutoring'
+  | 'tech'
+  | 'delivery'
+  | 'other';
+
+interface CategoryStyle {
+  icon: LucideIcon;
+  gradient: GradientPair;
+}
+
+// Hex literals here mirror the design-token values in
+// `@pantopus/theme` (Category/* + Semantic/*). Wrapping them in the
+// `CATEGORY_STYLES` map keeps individual row mappers token-free.
+const CATEGORY_STYLES: Record<Category, CategoryStyle> = {
+  handyman: { icon: Hammer, gradient: { start: '#f97316', end: '#d97706' } },
+  cleaning: { icon: Briefcase, gradient: { start: '#27AE60', end: '#0284c7' } },
+  moving: { icon: Package, gradient: { start: '#8E44AD', end: '#7c3aed' } },
+  petCare: { icon: Heart, gradient: { start: '#E74C3C', end: '#16a34a' } },
+  childCare: { icon: UserPlus, gradient: { start: '#F39C12', end: '#b91c1c' } },
+  tutoring: { icon: Lightbulb, gradient: { start: '#2980B9', end: '#d97706' } },
+  tech: { icon: Info, gradient: { start: '#3498DB', end: '#6b7280' } },
+  delivery: { icon: Send, gradient: { start: '#374151', end: '#0369a1' } },
+  other: { icon: Briefcase, gradient: { start: '#0284c7', end: '#0369a1' } },
+};
+
+function categoryFrom(raw: string | null | undefined): Category {
+  const key = (raw ?? '').toLowerCase().replace(/[_\-\s]/g, '');
+  switch (key) {
+    case 'handyman':
+    case 'handy':
+    case 'repair':
+    case 'repairs':
+      return 'handyman';
+    case 'cleaning':
+    case 'clean':
+      return 'cleaning';
+    case 'moving':
+    case 'move':
+    case 'movers':
+      return 'moving';
+    case 'petcare':
+    case 'pet':
+    case 'pets':
+    case 'dogwalking':
+    case 'petsitting':
+      return 'petCare';
+    case 'childcare':
+    case 'child':
+    case 'babysitting':
+    case 'nanny':
+      return 'childCare';
+    case 'tutoring':
+    case 'tutor':
+    case 'lessons':
+    case 'teaching':
+      return 'tutoring';
+    case 'tech':
+    case 'technology':
+    case 'it':
+    case 'computer':
+    case 'techsupport':
+      return 'tech';
+    case 'delivery':
+    case 'deliveries':
+    case 'courier':
+      return 'delivery';
+    default:
+      return 'other';
+  }
+}
+
+// ─── Formatters (mirrors iOS / Android) ────────────────────────
+
+function formatPrice(amount: number | null | undefined): string {
+  if (amount == null) return '$—';
+  return `$${Math.round(amount)}`;
+}
+
+function formatAskingSublabel(price: number | null | undefined): string | undefined {
+  if (price == null || price <= 0) return undefined;
+  return `asking ${formatPrice(price)}`;
+}
+
+function formatRelativeTime(raw: string | null | undefined, now: Date): string | undefined {
+  if (!raw) return undefined;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return undefined;
+  const ms = now.getTime() - date.getTime();
+  if (ms < 60_000) return 'now';
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m`;
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h`;
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfDate = new Date(date);
+  startOfDate.setHours(0, 0, 0, 0);
+  const days = Math.round((startOfToday.getTime() - startOfDate.getTime()) / 86_400_000);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return date.toLocaleDateString('en-US', { weekday: 'short' });
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function displayBidderName(bid: Bid): string {
   return (
-    <div className="max-w-3xl mx-auto p-4 sm:p-6">
-      {/* Header */}
-      <PageHeader
-        title="Offers"
-        subtitle="Manage bids and offers on your tasks"
-        ctaLabel="Post a Task"
-        ctaOnClick={() => router.push('/app/gigs-v2/new')}
-      >
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search offers…"
-          className="max-w-sm"
-        />
-      </PageHeader>
-
-      {/* Tabs */}
-      <div className="flex gap-1 bg-app-surface-sunken rounded-lg p-1 mb-5">
-        <button
-          onClick={() => { setTab('received'); setFilter('all'); }}
-          className={`flex-1 py-2 text-sm font-medium rounded-md transition ${
-            tab === 'received' ? 'bg-app-surface text-app-text shadow-sm' : 'text-app-text-secondary hover:text-app-text'
-          }`}
-        >
-          Received {recvPending > 0 && (
-            <span className="ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-amber-500 text-white text-[11px] font-bold rounded-full">
-              {recvPending}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => { setTab('sent'); setFilter('all'); }}
-          className={`flex-1 py-2 text-sm font-medium rounded-md transition ${
-            tab === 'sent' ? 'bg-app-surface text-app-text shadow-sm' : 'text-app-text-secondary hover:text-app-text'
-          }`}
-        >
-          Sent {sentPending > 0 && (
-            <span className="ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-blue-500 text-white text-[11px] font-bold rounded-full">
-              {sentPending}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* Filter */}
-      <div className="flex gap-2 mb-4 overflow-x-auto">
-        {['all', 'pending', 'accepted', 'declined'].map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition ${
-              filter === f
-                ? 'bg-gray-900 text-white'
-                : 'bg-app-surface-sunken text-app-text-secondary hover:bg-app-hover'
-            }`}
-          >
-            {f === 'all' ? 'All' : (STATUS_STYLES[f]?.label || f)}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      {loading ? (
-        <div className="py-16 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-app-border border-t-gray-600 mx-auto" />
-          <p className="text-sm text-app-text-secondary mt-3">Loading offers...</p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="py-16 text-center bg-app-surface rounded-xl border border-app-border">
-          <div className="text-4xl mb-3">{tab === 'received' ? '📥' : '📤'}</div>
-          <h3 className="text-lg font-semibold text-app-text mb-1">
-            {filter !== 'all'
-              ? `No ${filter} offers`
-              : tab === 'received'
-                ? 'No offers received yet'
-                : 'No offers sent yet'}
-          </h3>
-          <p className="text-sm text-app-text-secondary mb-4">
-            {tab === 'received'
-              ? 'Post a task and people will send you offers.'
-              : 'Browse the map and bid on tasks to get started.'}
-          </p>
-          <button
-            onClick={() => router.push(tab === 'received' ? '/app/gigs-v2/new' : '/app/map')}
-            className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition"
-          >
-            {tab === 'received' ? 'Post a Task' : 'Browse Tasks'}
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map(offer => (
-            <OfferCard
-              key={offer.id}
-              offer={offer}
-              perspective={tab}
-              onNavigate={(path) => router.push(path)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+    bid.bidder?.name ||
+    bid.bidder?.first_name ||
+    bid.bidder?.username ||
+    'Someone'
   );
 }
 
-function OfferCard({
-  offer,
-  perspective,
-  onNavigate,
-}: {
-  offer: Offer;
-  perspective: 'received' | 'sent';
-  onNavigate: (path: string) => void;
-}) {
-  const status = STATUS_STYLES[offer.status] || STATUS_STYLES.pending;
-  const personName = perspective === 'received'
-    ? (offer.bidder?.name || offer.bidder?.first_name || offer.bidder?.username || 'Unknown')
-    : null;
+function subtitleFor(bid: Bid, perspective: Tab, now: Date): string {
+  const parts: string[] = [];
+  if (perspective === 'received') {
+    parts.push(`From ${displayBidderName(bid)}`);
+    if (bid.bidder?.city) parts.push(bid.bidder.city);
+  } else {
+    parts.push('Your offer');
+  }
+  const time = formatRelativeTime(bid.created_at, now);
+  if (time) parts.push(time);
+  return parts.join(' · ');
+}
+
+function metaTailFor(bid: Bid, status: OfferStatus, perspective: Tab): string | undefined {
+  if (status !== 'countered') return undefined;
+  const counter = bid.counter_amount;
+  if (counter == null || counter <= 0) return undefined;
+  return perspective === 'received'
+    ? `you countered ${formatPrice(counter)}`
+    : `counter ${formatPrice(counter)}`;
+}
+
+function makeRow(bid: Bid, perspective: Tab, now: Date, onTap: (b: Bid) => void): RowModel {
+  const status = derivedStatus(bid, now);
+  const meta = STATUS_META[status];
+  const category = categoryFrom(bid.gig?.category);
+  const style = CATEGORY_STYLES[category];
+  return {
+    id: bid.id,
+    title: bid.gig?.title || 'Offer',
+    subtitle: subtitleFor(bid, perspective, now),
+    template: 'statusChip',
+    leading: { kind: 'categoryGradientIcon', icon: style.icon, gradient: style.gradient },
+    trailing: {
+      kind: 'priceStack',
+      amount: formatPrice(bid.bid_amount),
+      sublabel: formatAskingSublabel(bid.gig?.price),
+    },
+    onTap: () => onTap(bid),
+    chips: [{ text: meta.label, icon: meta.icon, tint: { kind: 'status', variant: meta.variant } }],
+    metaTail: metaTailFor(bid, status, perspective),
+  };
+}
+
+// ─── Page ──────────────────────────────────────────────────────
+
+export default function OffersPage() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState<Tab>('received');
+
+  useEffect(() => {
+    if (!getAuthToken()) router.push('/login');
+  }, [router]);
+
+  const receivedQuery = useQuery({
+    queryKey: ['offers', 'received'],
+    queryFn: async () => (await api.gigs.getReceivedOffers()) as { offers: Bid[]; total?: number },
+    staleTime: 30_000,
+  });
+  const sentQuery = useQuery({
+    queryKey: ['offers', 'sent'],
+    queryFn: async () => (await api.gigs.getMyBids()) as { bids: Bid[] },
+    staleTime: 30_000,
+  });
+
+  const received = useMemo<Bid[]>(() => receivedQuery.data?.offers ?? [], [receivedQuery.data]);
+  const sent = useMemo<Bid[]>(() => sentQuery.data?.bids ?? [], [sentQuery.data]);
+
+  const now = useMemo(() => new Date(), [received, sent]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleOpenOffer = useCallback(
+    (bid: Bid) => {
+      const id = bid.gig_id || bid.gig?.id;
+      if (id) router.push(`/app/gigs/${id}`);
+    },
+    [router],
+  );
+
+  const handleRefresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['offers'] });
+  }, [queryClient]);
+
+  const state = useMemo<ListOfRowsState>(() => {
+    const loading = receivedQuery.isPending || sentQuery.isPending;
+    if (loading) return { kind: 'loading' };
+    if (receivedQuery.isError && sentQuery.isError) {
+      const message =
+        receivedQuery.error?.message ?? sentQuery.error?.message ?? "Couldn't load offers.";
+      return { kind: 'error', message };
+    }
+    const items = tab === 'received' ? received : sent;
+    if (items.length === 0) {
+      return {
+        kind: 'empty',
+        config:
+          tab === 'received'
+            ? {
+                icon: HandCoins,
+                headline: 'No offers yet',
+                subcopy:
+                  'When a neighbor offers a price on one of your listings, it’ll land here. Listings with photos and a fair ask tend to draw offers within a day.',
+                ctaTitle: 'Post a task',
+                onCta: () => router.push('/app/gigs-v2/new'),
+              }
+            : {
+                icon: HandCoins,
+                headline: 'No offers sent yet',
+                subcopy:
+                  "Browse listings and gigs you'd like to buy or help with — your offers will show up here.",
+                ctaTitle: 'Browse listings',
+                onCta: () => router.push('/app/map'),
+              },
+      };
+    }
+    const rows = items.map((bid) => makeRow(bid, tab, now, handleOpenOffer));
+    return {
+      kind: 'loaded',
+      sections: [{ id: tab, rows }],
+      hasMore: false,
+    };
+  }, [
+    receivedQuery.isPending,
+    receivedQuery.isError,
+    receivedQuery.error,
+    sentQuery.isPending,
+    sentQuery.isError,
+    sentQuery.error,
+    received,
+    sent,
+    tab,
+    now,
+    handleOpenOffer,
+    router,
+  ]);
 
   return (
-    <div
-      onClick={() => offer.gig?.id && onNavigate(`/app/gigs/${offer.gig.id}`)}
-      className={`bg-app-surface rounded-xl border border-app-border p-4 hover:border-app-border hover:shadow-sm transition cursor-pointer ${
-        offer.status === 'pending' ? 'border-l-4 border-l-amber-400' : ''
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        {/* Left: info */}
-        <div className="min-w-0 flex-1">
-          {/* Gig title */}
-          <h3 className="text-sm font-semibold text-app-text truncate">
-            {offer.gig?.title || 'Unknown Gig'}
-          </h3>
-
-          {/* Person (for received offers) */}
-          {perspective === 'received' && offer.bidder && (
-            <div className="flex items-center gap-2 mt-1.5">
-              {offer.bidder.profile_picture_url ? (
-                <Image src={offer.bidder.profile_picture_url} alt="" width={20} height={20} sizes="20px" quality={75} className="w-5 h-5 rounded-full object-cover" />
-              ) : (
-                <div className="w-5 h-5 rounded-full bg-gray-300 text-white text-[10px] font-bold flex items-center justify-center">
-                  {(personName || '?')[0].toUpperCase()}
-                </div>
-              )}
-              {offer.bidder.username ? (
-                <UserIdentityLink
-                  userId={offer.bidder.id}
-                  username={offer.bidder.username}
-                  displayName={personName || offer.bidder.username}
-                  avatarUrl={offer.bidder.profile_picture_url || null}
-                  city={offer.bidder.city || null}
-                  state={offer.bidder.state || null}
-                  textClassName="text-xs text-app-text-secondary hover:underline"
-                />
-              ) : (
-                <span className="text-xs text-app-text-secondary">
-                  {personName}
-                  {offer.bidder.city && ` · ${offer.bidder.city}`}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Message */}
-          {offer.message && (
-            <p className="text-xs text-app-text-secondary mt-1.5 line-clamp-2">&quot;{offer.message}&quot;</p>
-          )}
-
-          {/* Time */}
-          <p className="text-[10px] text-app-text-muted mt-2">{timeAgo(offer.created_at)}</p>
-        </div>
-
-        {/* Right: amount + status */}
-        <div className="text-right flex-shrink-0">
-          <div className="text-lg font-bold text-app-text">${offer.bid_amount}</div>
-          {offer.gig?.price && offer.bid_amount !== offer.gig.price && (
-            <div className="text-[10px] text-app-text-muted line-through">${offer.gig.price} asked</div>
-          )}
-          <span className={`inline-block mt-1.5 px-2 py-0.5 text-[10px] font-semibold rounded-full ${status.bg} ${status.text}`}>
-            {status.label}
-          </span>
-        </div>
-      </div>
-    </div>
+    <ListOfRowsShell
+      title="Offers"
+      state={state}
+      onRefresh={handleRefresh}
+      tabs={[
+        { id: 'received', label: 'Received', count: received.length },
+        { id: 'sent', label: 'Sent', count: sent.length },
+      ]}
+      selectedTab={tab}
+      onTabChange={(id) => setTab(id as Tab)}
+      topBarAction={{
+        icon: Filter,
+        accessibilityLabel: 'Filter offers',
+        onClick: () => router.push('/app/offers'),
+      }}
+    />
   );
 }

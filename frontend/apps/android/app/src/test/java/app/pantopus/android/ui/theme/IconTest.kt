@@ -77,6 +77,14 @@ class IconTest {
             "fish",
             "turtle",
             "paw-print",
+            "sparkles",
+            "timer",
+            "repeat",
+            "hourglass",
+            "hand-coins",
+            "package",
+            "compass",
+            "filter",
         )
 
     @Test

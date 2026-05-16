@@ -79,6 +79,7 @@ import app.pantopus.android.ui.screens.nearby.map.MapEntity
 import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
 import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
 import app.pantopus.android.ui.screens.notifications.NotificationsScreen
+import app.pantopus.android.ui.screens.offers.OffersScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
@@ -117,6 +118,9 @@ private object ChildRoutes {
 
     /** Notifications center (T4.1). Reached from the Hub bell icon. */
     const val NOTIFICATIONS = "notifications"
+
+    /** Cross-listing Offers (T5.2.4). Reached from the You tab. */
+    const val OFFERS = "offers"
 
     /** Hub menu icon target. Replaced by Settings in T3.1. */
     const val MENU = "settings"
@@ -502,6 +506,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.placeholder(label))
                     },
                     onOpenSettings = { navController.navigate(ChildRoutes.MENU) },
+                    onOpenOffers = { navController.navigate(ChildRoutes.OFFERS) },
                 )
             }
 
@@ -781,6 +786,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(ChildRoutes.NOTIFICATIONS) {
                 NotificationsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.OFFERS) {
+                OffersScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenOfferDetail = { dto ->
+                        val gigId = dto.gigId ?: dto.gig?.id
+                        if (!gigId.isNullOrBlank()) {
+                            navController.navigate(ChildRoutes.gigDetail(gigId))
+                        }
+                    },
+                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Offer filters")) },
+                    onBrowseListings = { navController.navigate(ChildRoutes.placeholder("Browse listings")) },
+                    onPostTask = { navController.navigate(ChildRoutes.placeholder("Post a task")) },
+                )
             }
             composable(ChildRoutes.MENU) {
                 SettingsIndexScreen(
