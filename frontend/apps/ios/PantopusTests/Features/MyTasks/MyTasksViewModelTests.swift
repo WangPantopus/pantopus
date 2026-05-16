@@ -69,8 +69,10 @@ final class MyTasksViewModelTests: XCTestCase {
             XCTFail("Expected .empty, got \(vm.state)")
             return
         }
-        XCTAssertEqual(content.headline, "No tasks posted yet")
-        XCTAssertEqual(content.ctaTitle, "Post a task")
+        // T6.0b — Magic Task primary CTA replaces the classic
+        // "Post a task" headline + CTA on the Open tab.
+        XCTAssertEqual(content.headline, "No tasks posted yet — try Magic Task")
+        XCTAssertEqual(content.ctaTitle, "Try Magic Task")
     }
 
     func testLoadPopulatedTransitionsToLoadedOnOpenTab() async {
@@ -396,13 +398,31 @@ final class MyTasksViewModelTests: XCTestCase {
 
     // MARK: - Helpers
 
+    private func renderRow(for dto: MyGigDTO) -> RowModel {
+        let status = MyTasksViewModel.derivedStatus(for: dto, now: Self.fixedNow)
+        let projection = MyTasksViewModel.GigProjection(
+            dto: dto,
+            tab: MyTasksViewModel.tabFor(status: status),
+            status: status,
+            footer: MyTasksViewModel.footerFor(status: status, bidCount: dto.bidCount ?? 0)
+        )
+        return MyTasksViewModel.row(
+            projection: projection,
+            now: Self.fixedNow,
+            callbacks: MyTasksViewModel.RowCallbacks()
+        )
+    }
+
     private func makeGig(
         id: String,
         status: String,
         bidCount: Int = 0,
         deadline: String? = nil,
         scheduledStart: String? = nil,
-        topBidders: [TopBidderDTO] = []
+        topBidders: [TopBidderDTO] = [],
+        sourceFlow: String? = nil,
+        taskArchetype: String? = nil,
+        taskFormat: String? = nil
     ) -> MyGigDTO {
         MyGigDTO(
             id: id,
@@ -416,7 +436,10 @@ final class MyTasksViewModelTests: XCTestCase {
             userId: "u_me",
             scheduledStart: scheduledStart,
             bidCount: bidCount,
-            topBidders: topBidders.isEmpty ? nil : topBidders
+            topBidders: topBidders.isEmpty ? nil : topBidders,
+            sourceFlow: sourceFlow,
+            taskArchetype: taskArchetype,
+            taskFormat: taskFormat
         )
     }
 }

@@ -783,6 +783,9 @@ private struct RowView: View {
                 )
                 .padding(.bottom, 2)
             }
+            if let overline = row.archetypeOverline, !overline.isEmpty {
+                archetypeOverlineView(overline)
+            }
             if !row.title.isEmpty {
                 titleLine
             }
@@ -845,6 +848,23 @@ private struct RowView: View {
             }
             .padding(.top, 2)
         }
+    }
+
+    /// T6.0b — small uppercase magic-violet overline rendered above the
+    /// title. Truncates with ellipsis at 24 characters so a long
+    /// archetype string can't push the title off-screen.
+    @ViewBuilder
+    private func archetypeOverlineView(_ overline: String) -> some View {
+        let truncated = overline.count > 24
+            ? String(overline.prefix(24)) + "…"
+            : overline
+        Text(truncated.uppercased())
+            .font(.system(size: 10, weight: .semibold))
+            .tracking(0.6)
+            .foregroundStyle(Theme.Color.magic)
+            .lineLimit(1)
+            .padding(.bottom, 2)
+            .accessibilityIdentifier("rowArchetypeOverline")
     }
 
     private var titleLine: some View {
@@ -929,7 +949,36 @@ private struct LeadingView: View {
             thumbnail(image: image, size: size)
         case let .bidderStack(bidders, overflow):
             BidderStack(bidders: bidders, overflow: overflow)
+        case let .magicArchetypeTile(icon, gradient):
+            magicArchetypeTile(icon: icon, gradient: gradient)
         }
+    }
+
+    /// 44pt rounded gradient tile + sparkles disc clipped over the top-
+    /// right corner. Matches the `ArchetypeTile` block in
+    /// `mytasks-frames.jsx`.
+    private func magicArchetypeTile(icon: PantopusIcon, gradient: GradientPair) -> some View {
+        Icon(icon, size: 22, strokeWidth: 1.7, color: Theme.Color.appTextInverse)
+            .frame(width: 44, height: 44)
+            .background(
+                LinearGradient(
+                    colors: [gradient.start, gradient.end],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .overlay(alignment: .topTrailing) {
+                Icon(.sparkles, size: 10, strokeWidth: 2.4, color: Theme.Color.magic)
+                    .frame(width: 18, height: 18)
+                    .background(Theme.Color.appSurface)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle().strokeBorder(Theme.Color.magicBorder, lineWidth: 1.5)
+                    )
+                    .offset(x: 3, y: -3)
+                    .pantopusShadow(.sm)
+            }
     }
 
     private func avatarWithBadge(
@@ -1420,7 +1469,38 @@ private struct FABButton: View {
             .background(tintBackground)
             .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
             .pantopusShadow(.primary)
+        case .magicCreate:
+            // 60pt gradient FAB with sparkles disc clipped over the
+            // top-right corner. Per the design's `PostFab` in
+            // `mytasks-frames.jsx`.
+            Icon(action.icon, size: 22, color: Theme.Color.appTextInverse)
+                .frame(width: 60, height: 60)
+                .background(magicGradient)
+                .clipShape(Circle())
+                .overlay(alignment: .topTrailing) { sparklesDisc }
+                .pantopusShadow(.primary)
         }
+    }
+
+    /// 18pt white disc with an 11pt magic-violet sparkles glyph,
+    /// inset 8pt from the top-right corner of the 60pt gradient FAB.
+    private var sparklesDisc: some View {
+        Icon(.sparkles, size: 11, strokeWidth: 2.6, color: Theme.Color.magic)
+            .frame(width: 18, height: 18)
+            .background(Theme.Color.appSurface)
+            .clipShape(Circle())
+            .padding(.top, Spacing.s2)
+            .padding(.trailing, Spacing.s2)
+    }
+
+    /// 135° linear gradient from primary600 → primary700 used by the
+    /// 60pt Magic Task FAB.
+    private var magicGradient: LinearGradient {
+        LinearGradient(
+            colors: [Theme.Color.primary600, Theme.Color.primary700],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 
     /// Resolve the FAB's tint to a fill color. Default `.sky` keeps the

@@ -82,6 +82,25 @@ public extension Theme.Color {
     /// Business identity background — `#F3E8FF`.
     static let businessBg = SwiftUI.Color("Identity/BusinessBg", bundle: Theme.bundle)
 
+    /// T6.0b — Magic Task lavender quartet. Signals AI-resolved metadata
+    /// on My tasks V2 rows and the Magic ingest FAB on Mailbox-A17 root.
+    /// Distinct from the primary sky so users can tell automated chrome
+    /// from interactive primary surfaces.
+    ///
+    /// Magic violet — `#6D28D9`. The accent — used for the archetype
+    /// overline, the sparkles disc glyph, and the magic FAB's overlay
+    /// dot foreground.
+    static let magic = SwiftUI.Color("Identity/Magic", bundle: Theme.bundle)
+    /// Magic background — `#EDE9FE`. The lavender fill for empty-state
+    /// illustration discs and the Magic-Task gradient tile's soft tint.
+    static let magicBg = SwiftUI.Color("Identity/MagicBg", bundle: Theme.bundle)
+    /// Magic soft background — `#F5F3FF`. Off-white lavender; pairs with
+    /// `magicBg` for radial gradient fills on illustration backdrops.
+    static let magicBgSoft = SwiftUI.Color("Identity/MagicBgSoft", bundle: Theme.bundle)
+    /// Magic border — `#DDD6FE`. Hairline border for sparkles discs and
+    /// magic-tinted callouts.
+    static let magicBorder = SwiftUI.Color("Identity/MagicBorder", bundle: Theme.bundle)
+
     // MARK: - App shell / neutrals
 
     /// App background — `#f6f7f9`.

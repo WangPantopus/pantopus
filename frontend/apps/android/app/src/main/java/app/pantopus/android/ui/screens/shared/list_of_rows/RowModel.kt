@@ -188,6 +188,24 @@ sealed interface RowLeading {
         val bidders: List<Bidder>,
         val overflow: Int = 0,
     ) : RowLeading
+
+    // ─── T6.0b additions ──────────────────────────────────────
+
+    /**
+     * T6.0b — 44dp rounded-square tile with a two-stop gradient
+     * background + white foreground icon + a small sparkles disc
+     * clipped over the top-right corner. The disc is the scannable
+     * "Magic Task understood this" signal.
+     *
+     * Used by My tasks V2 when the gig was posted via Magic Task
+     * (derived from `source_flow === 'magic'`). The tile renders at
+     * 44dp to make room for the disc overlay; the disc is 18dp with a
+     * 1.5dp magic-border ring and a 10dp magic-violet sparkles glyph.
+     */
+    data class MagicArchetypeTile(
+        val icon: PantopusIcon,
+        val gradient: GradientPair,
+    ) : RowLeading
 }
 
 // MARK: - Compact button shared variant
@@ -422,6 +440,18 @@ data class RowModel(
      * each in the correct slot (left for bidder, right for splits).
      */
     val splitWith: SplitStackData? = null,
+    /**
+     * T6.0b — small uppercase magic-violet text rendered ABOVE the
+     * title, used by My tasks V2 when the gig was posted via Magic
+     * Task (the AI-derived archetype name — e.g. "MOUNT & INSTALL",
+     * "MOVING HELP", "DOG-WALK"). Renders as 10sp semibold with
+     * +0.06em tracking and [PantopusColors.magic] foreground.
+     *
+     * Truncates with ellipsis at 24 characters so a long archetype
+     * string can't push the title off-screen. Pass `null` to suppress
+     * the overline entirely.
+     */
+    val archetypeOverline: String? = null,
 )
 
 // MARK: - Section

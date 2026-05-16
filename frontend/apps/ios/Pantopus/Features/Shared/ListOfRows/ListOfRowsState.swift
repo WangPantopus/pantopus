@@ -393,11 +393,19 @@ public enum FabTint: Sendable, Hashable {
 /// T6.0a adds an optional `tint: FabTint` field (default `.sky`) for
 /// the home / business identity tints. Existing call sites compile
 /// unchanged because the parameter defaults.
+///
+/// T6.0b adds:
+///   - `.magicCreate` (60pt) — gradient `primary600 → primary700`,
+///     plus glyph + 18pt sparkles disc clipped over the top-right.
+///     Used by My tasks V2 (sparkles+plus) and Mailbox-A17 root
+///     (scan-line variant for magic ingest). The variant is additive;
+///     no existing call site changes.
 public struct FABAction: Sendable {
     public enum Variant: Sendable {
         case canonicalCreate
         case secondaryCreate
         case extendedNav(label: String)
+        case magicCreate
     }
 
     public let icon: PantopusIcon

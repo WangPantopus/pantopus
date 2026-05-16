@@ -55,6 +55,22 @@ object PantopusColors {
     val business = Color(0xFF7C3AED)
     val businessBg = Color(0xFFF3E8FF)
 
+    // T6.0b — Magic Task lavender quartet. Signals AI-resolved metadata
+    // on My tasks V2 rows and the Magic ingest FAB on Mailbox-A17 root.
+    // Distinct from the primary sky so users can tell automated chrome
+    // from interactive primary surfaces.
+    /** Magic violet — `#6D28D9`. Archetype overline, sparkles glyph, magic FAB overlay foreground. */
+    val magic = Color(0xFF6D28D9)
+
+    /** Magic background — `#EDE9FE`. Lavender fill for empty-state illustration discs + Magic gradient tile. */
+    val magicBg = Color(0xFFEDE9FE)
+
+    /** Magic soft background — `#F5F3FF`. Off-white lavender; pairs with [magicBg] for radial gradients. */
+    val magicBgSoft = Color(0xFFF5F3FF)
+
+    /** Magic border — `#DDD6FE`. Hairline border for sparkles discs and magic-tinted callouts. */
+    val magicBorder = Color(0xFFDDD6FE)
+
     // App shell / neutrals
     val appBg = Color(0xFFF6F7F9)
     val appSurface = Color(0xFFFFFFFF)

@@ -113,6 +113,13 @@ class IconTest {
             "smartphone",
             "wallet",
             "hash",
+            // T6.0b — My tasks V2 Magic Task archetype + task-format icons.
+            "tv",
+            "laptop",
+            "monitor",
+            "shuffle",
+            "wand-sparkles",
+            "arrow-up-right",
         )
 
     @Test

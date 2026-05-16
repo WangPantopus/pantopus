@@ -23,7 +23,9 @@ import { queryKeys } from '@/lib/query-keys';
 import {
   Inbox, Timer, Play, Calendar, Star, CheckCheck, X, Ban,
   CircleSlash, Pencil, Rocket, MessageCircle, ClipboardList,
-  RotateCcw, Plus,
+  RotateCcw, Plus, Sparkles, Tv, Package as PackageIcon,
+  Hammer, Dog, Laptop, Repeat, MapPin, Monitor, Shuffle,
+  ArrowUpRight,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
@@ -55,7 +57,49 @@ type MyGig = {
   top_bidders?: TopBidder[];
   boosted_at?: string | null;
   boost_expires_at?: string | null;
+  // T6.0b — Magic Task archetype + engagement-mode badge.
+  source_flow?: string | null;
+  task_archetype?: string | null;
+  task_format?: 'in_person' | 'drop_off' | 'remote' | 'hybrid' | null;
 };
+
+// T6.0b — Magic Task archetype taxonomy mirrors iOS/Android.
+type ArchetypeKey =
+  | 'quick_help' | 'delivery_errand' | 'home_service' | 'pro_service_quote'
+  | 'care_task' | 'event_shift' | 'remote_task' | 'recurring_service' | 'general';
+
+const ARCHETYPE_META: Record<ArchetypeKey, { label: string; icon: typeof Sparkles; gradient: string }> = {
+  quick_help:        { label: 'Quick help',        icon: Sparkles,    gradient: 'from-sky-400 to-sky-700' },
+  delivery_errand:   { label: 'Delivery',          icon: PackageIcon, gradient: 'from-violet-400 to-violet-700' },
+  home_service:      { label: 'Mount & install',   icon: Tv,          gradient: 'from-sky-400 to-blue-700' },
+  pro_service_quote: { label: 'Pro service',       icon: Hammer,      gradient: 'from-amber-500 to-amber-700' },
+  care_task:         { label: 'Pet care',          icon: Dog,         gradient: 'from-emerald-400 to-emerald-700' },
+  event_shift:       { label: 'Event help',        icon: Calendar,    gradient: 'from-rose-400 to-rose-700' },
+  remote_task:       { label: 'Tech support',      icon: Laptop,      gradient: 'from-cyan-400 to-cyan-700' },
+  recurring_service: { label: 'Recurring',         icon: Repeat,      gradient: 'from-sky-600 to-sky-800' },
+  general:           { label: 'Magic task',        icon: ClipboardList, gradient: 'from-violet-300 to-violet-700' },
+};
+
+function archetypeOf(raw: string | null | undefined): ArchetypeKey {
+  if (!raw) return 'general';
+  const k = raw.toLowerCase() as ArchetypeKey;
+  return (k in ARCHETYPE_META) ? k : 'general';
+}
+
+const FORMAT_META: Record<NonNullable<MyGig['task_format']>, { label: string; icon: typeof MapPin }> = {
+  in_person: { label: 'In person', icon: MapPin },
+  drop_off:  { label: 'Drop-off',  icon: PackageIcon },
+  remote:    { label: 'Remote',    icon: Monitor },
+  hybrid:    { label: 'Hybrid',    icon: Shuffle },
+};
+
+function isMagicTask(gig: MyGig): boolean {
+  return (gig.source_flow || '').toLowerCase() === 'magic';
+}
+
+function truncateOverline(s: string): string {
+  return s.length > 24 ? s.slice(0, 24) + '…' : s;
+}
 
 type MyTasksTab = 'open' | 'active' | 'done' | 'closed';
 
@@ -364,13 +408,23 @@ export default function MyTasksV2Page() {
         )}
       </main>
 
+      {/* T6.0b — 60px Magic Task FAB. Gradient primary600 → primary700
+          with a sparkles disc clipped over the top-right corner. */}
       <button
         onClick={() => router.push('/app/gigs/new')}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition flex items-center justify-center"
-        aria-label="Post a task"
+        className="fixed bottom-6 right-6 w-[60px] h-[60px] rounded-full bg-gradient-to-br from-primary-600 to-primary-700 text-white shadow-lg shadow-primary-600/40 hover:from-primary-700 hover:to-primary-700 transition flex items-center justify-center relative"
+        aria-label="Post a task with Magic Task"
         data-testid="post-a-task-fab"
       >
-        <Plus className="w-6 h-6" strokeWidth={2.4} />
+        <Plus className="w-[22px] h-[22px]" strokeWidth={2.4} />
+        <span
+          className="absolute top-2 right-2 w-[18px] h-[18px] rounded-full bg-white flex items-center justify-center"
+          style={{ color: 'var(--color-identity-magic)' }}
+          aria-hidden="true"
+          data-testid="magic-fab-sparkles"
+        >
+          <Sparkles className="w-[11px] h-[11px]" strokeWidth={2.6} />
+        </span>
       </button>
     </div>
   );
@@ -412,6 +466,15 @@ function TaskRow({
   const topBidders = gig.top_bidders ?? [];
   const overflow = Math.max(0, bidCount - topBidders.length);
 
+  // T6.0b — Magic Task chrome.
+  const isMagic = isMagicTask(gig);
+  const archetypeKey = archetypeOf(gig.task_archetype);
+  const archetypeMeta = ARCHETYPE_META[archetypeKey];
+  const ArchetypeIcon = archetypeMeta.icon;
+  const overline = isMagic ? truncateOverline(archetypeMeta.label) : null;
+  const format = gig.task_format ? FORMAT_META[gig.task_format] : null;
+  const FormatIcon = format?.icon;
+
   return (
     <div
       className={`bg-app-surface border border-app-border rounded-2xl p-4 shadow-sm hover:shadow-md transition ${
@@ -421,10 +484,35 @@ function TaskRow({
     >
       <button onClick={onOpen} className="w-full text-left">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 text-white flex items-center justify-center flex-shrink-0">
-            <ClipboardList className="w-5 h-5" />
-          </div>
+          {isMagic ? (
+            // 44px Magic Task archetype tile with sparkles disc.
+            <div className="relative w-11 h-11 flex-shrink-0" data-testid="magic-archetype-tile">
+              <div className={`w-11 h-11 rounded-[11px] bg-gradient-to-br ${archetypeMeta.gradient} text-white flex items-center justify-center`}>
+                <ArchetypeIcon className="w-[22px] h-[22px]" strokeWidth={1.7} />
+              </div>
+              <div
+                className="absolute -top-1 -right-1 w-[18px] h-[18px] rounded-full bg-white flex items-center justify-center shadow-sm"
+                style={{ border: '1.5px solid var(--color-identity-magic-border)', color: 'var(--color-identity-magic)' }}
+                aria-hidden="true"
+              >
+                <Sparkles className="w-[10px] h-[10px]" strokeWidth={2.4} />
+              </div>
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 text-white flex items-center justify-center flex-shrink-0">
+              <ClipboardList className="w-5 h-5" />
+            </div>
+          )}
           <div className="flex-1 min-w-0">
+            {overline && (
+              <div
+                className="text-[9.5px] font-bold uppercase mb-0.5"
+                style={{ color: 'var(--color-identity-magic)', letterSpacing: '0.06em' }}
+                data-testid="row-archetype-overline"
+              >
+                {overline}
+              </div>
+            )}
             <div className="flex items-start gap-2 mb-1">
               <h3 className="flex-1 text-sm font-semibold text-app-text line-clamp-2 leading-snug">
                 {gig.title || 'Untitled task'}
@@ -439,6 +527,15 @@ function TaskRow({
                 <BidderStack bidders={topBidders} overflow={overflow} />
               )}
               <StatusChip icon={StatusIcon} label={statusLabel(status)} variant={variant} />
+              {format && FormatIcon && (
+                <span
+                  className="inline-flex items-center gap-1 px-[7px] py-[3px] rounded-md text-[10px] font-semibold bg-app-surface border border-app-border text-app-text-strong whitespace-nowrap"
+                  data-testid="row-task-format-badge"
+                >
+                  <FormatIcon className="w-2.5 h-2.5" />
+                  {format.label}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -640,14 +737,35 @@ function EmptyTabContent({
 }: { tab: MyTasksTab; onPostTask: () => void }) {
   switch (tab) {
     case 'open':
+      // T6.0b — Magic Task primary CTA on empty state.
       return (
-        <EmptyState
-          icon={ClipboardList}
-          title="No tasks posted yet"
-          description="Need a hand mounting something, moving a couch, walking the dog? Post a task and neighbors will bid within a few hours."
-          actionLabel="Post a task"
-          onAction={onPostTask}
-        />
+        <div data-testid="my-tasks-empty-open">
+          <EmptyState
+            icon={Sparkles}
+            title="No tasks posted yet — try Magic Task"
+            description="Describe what you need in a sentence. Magic Task drafts the title, budget, and schedule — you just confirm and post."
+            actionLabel="Try Magic Task"
+            onAction={onPostTask}
+          />
+          <div className="max-w-md mx-auto mt-4 flex flex-col gap-1.5">
+            {[
+              'Mount a TV above my fireplace this weekend',
+              'Walk my dog Tue / Thu mornings',
+              'Help me move a couch on Saturday',
+            ].map((prompt) => (
+              <button
+                key={prompt}
+                onClick={onPostTask}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-app-surface border border-app-border text-app-text-strong text-xs font-medium text-left hover:shadow-sm transition"
+                data-testid="my-tasks-empty-magic-prompt"
+              >
+                <Sparkles className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-identity-magic)' }} strokeWidth={2.2} />
+                <span className="flex-1 min-w-0">{prompt}</span>
+                <ArrowUpRight className="w-3 h-3 flex-shrink-0 text-app-text-muted" strokeWidth={2} />
+              </button>
+            ))}
+          </div>
+        </div>
       );
     case 'active':
       return (
