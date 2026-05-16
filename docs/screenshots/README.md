@@ -67,6 +67,20 @@ geometry, same row spec).
 | `connections-v2-android-empty.png` | Same | Same |
 | `connections-v2-web-empty.png` | Same | Same |
 
+### T6.0a Bills V2 re-skin (design-reference)
+
+Re-skin of the T5.2.2 Bills list — utility-tinted leading + 6-status
+chips + summary banner with home-tinted "Pay all" CTA + optional
+split-payer 18pt avatar stack + 56pt `canonicalCreate` FAB tinted
+home-green. Rendered via `tools/t5-screenshots/bills-v2.mjs` (sister
+script to `render.mjs`, kept separate so T5 baselines don't churn).
+
+| File | Frame | Notes |
+|---|---|---|
+| `bills-v2-ios.png` | Bills · Upcoming tab (6 bills) | Visual ground truth for iOS / Android / web. Confirms: 6 status chips render in design colors (Overdue red, Due soon amber, Due amber, Scheduled blue, Paid green, Cancelled neutral); 8 utility category tiles (electric · gas · water · internet · hoa · insurance · trash · phone) plus `generic` fallback all source bg+fg from `UtilityCategoryPalette`; summary banner shows total $ due + overdue count + home-tinted "Pay all" CTA; auto-pay rows render an `Auto-pay` `inlineChip` next to the title; split rows render "Split N ways" + 18pt avatar stack at the right edge of the chip row. |
+| `bills-v2-android.png` | Same | Mirrors iOS. Android status bar at the top differs by platform convention. |
+| `bills-v2-web.png` | Same | Mirrors iOS. Status bar omitted in web frame (same convention as T5 web reference shots). |
+
 ### Planned (T5.2.4 Offers)
 
 To be captured in CI on the Mac / Android Studio runs that ship with

@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber")
+@file:Suppress("PackageNaming", "MagicNumber", "TooManyFunctions", "LongMethod")
 
 package app.pantopus.android.ui.screens.homes.bills
 
@@ -9,17 +9,21 @@ import app.pantopus.android.data.api.models.homes.BillDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.components.StatusChipVariant
+import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
+import app.pantopus.android.ui.screens.shared.list_of_rows.BannerCtaTint
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
+import app.pantopus.android.ui.screens.shared.list_of_rows.FabTint
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsTab
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowHighlight
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowModel
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
-import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,14 +32,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.text.NumberFormat
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import javax.inject.Inject
 
-/** Canonical chip status for a bill, derived from `status` + `due_date`. */
-enum class BillChipStatus { Due, Overdue, Paid, Scheduled }
+/**
+ * Canonical chip status for a bill, derived from `BillDto.status` +
+ * `due_date`. T6.0a adds [DueSoon] (≤ 7 days from now) and [Cancelled]
+ * (soft-deleted).
+ */
+enum class BillChipStatus { Due, DueSoon, Overdue, Scheduled, Paid, Cancelled }
 
 /** Tab identifiers — kept as strings so they survive the
  *  `ListOfRowsScreen` selectedTab contract. */
@@ -62,15 +71,63 @@ data class BillRowProjection(
     val chipVariant: StatusChipVariant,
     val chipIcon: PantopusIcon?,
     val status: BillChipStatus,
+    val category: UtilityCategory,
+    val inlineChip: RowChip?,
+    val highlight: RowHighlight?,
 )
+
+/**
+ * Banner data for the Bills summary banner. Pure projection from the
+ * loaded bills + clock — exposed as a top-level value so tests can
+ * exercise it without standing the VM up.
+ */
+data class BillsBannerSummary(
+    /**
+     * Pre-formatted USD string for the 30-day total
+     * (e.g. `"$1,248.19"`). `null` when zero bills are due.
+     */
+    val totalDueLabel: String?,
+    /** Count of overdue, non-cancelled, unpaid bills. */
+    val overdueCount: Int,
+    /**
+     * Pre-formatted next-bill subtitle when nothing is overdue, e.g.
+     * `"All current · next bill in 4 days"`.
+     */
+    val nextBillSubtitle: String?,
+) {
+    /**
+     * Whether the banner has anything to render. The shell hides the
+     * banner when this returns `false` so empty-state surfaces don't
+     * carry a "0 due in the next 30 days" preamble.
+     */
+    val hasContent: Boolean
+        get() = totalDueLabel != null || overdueCount > 0
+}
 
 /** Nav arg key for the Bills list route. */
 const val BILLS_HOME_ID_KEY = "homeId"
 
 /**
- * ViewModel for the Bills list (T5.2.2 / P13). Wraps
+ * ViewModel for the Bills list (T6.0a re-skin of T5.2.2). Wraps
  * `GET /api/homes/:id/bills` and projects each bill into the
- * `RowTrailing.AmountWithChip` template.
+ * `RowTrailing.AmountWithChip` template + a utility-tinted
+ * `RowLeading.TypeIcon` (utility category derived client-side from
+ * the payee string — see [UtilityCategory]).
+ *
+ * Drift from T5.2.2:
+ *  - 8 utility-tinted category tiles + `generic`.
+ *  - 6-status chip palette (added `DueSoon` for due-in-7d and
+ *    `Cancelled` for soft-deleted rows).
+ *  - Summary banner above the list — 30-day total + overdue count.
+ *  - Optional inline "Auto-pay" chip on scheduled rows.
+ *  - FAB shrunk to 56dp [FabVariant.CanonicalCreate] + [FabTint.Home].
+ *  - Top-bar action is `null` by design — the FAB owns the create
+ *    intent and the design's filter glyph isn't wired to a real filter
+ *    sheet yet.
+ *
+ * Splits: [SplitStackData] is wired on `RowModel` (shell extension
+ * T6.0a) but stays `null` on every row today — the backend list
+ * endpoint doesn't surface split membership on bills yet.
  */
 @HiltViewModel
 class BillsListViewModel
@@ -99,6 +156,9 @@ class BillsListViewModel
         private val _tabs = MutableStateFlow(initialTabs())
         val tabs: StateFlow<List<ListOfRowsTab>> = _tabs.asStateFlow()
 
+        private val _banner = MutableStateFlow<BannerConfig?>(null)
+        val banner: StateFlow<BannerConfig?> = _banner.asStateFlow()
+
         private var bills: List<BillDto>? = null
         private var onOpenBill: (String) -> Unit = {}
         private var onAddBill: () -> Unit = {}
@@ -120,8 +180,11 @@ class BillsListViewModel
             viewModelScope.launch {
                 when (val result = repo.getHomeBills(homeId)) {
                     is NetworkResult.Success -> applySuccess(result.data.bills)
-                    is NetworkResult.Failure ->
+                    is NetworkResult.Failure -> {
+                        bills = null
+                        _banner.value = null
                         _state.value = ListOfRowsUiState.Error(result.error.message)
+                    }
                 }
             }
         }
@@ -133,18 +196,31 @@ class BillsListViewModel
 
         fun fab(): FabAction =
             FabAction(
-                icon = PantopusIcon.PlusCircle,
+                icon = PantopusIcon.Plus,
                 contentDescription = "Add a bill",
-                variant = FabVariant.SecondaryCreate,
+                variant = FabVariant.CanonicalCreate,
+                tint = FabTint.Home,
                 onClick = { onAddBill() },
             )
 
-        fun topBarAction(): TopBarAction =
-            TopBarAction(
-                icon = PantopusIcon.PlusCircle,
-                contentDescription = "Add a bill",
-                onClick = { onAddBill() },
-            )
+        /**
+         * T6.0a: top-bar action is `null` by design. The design's filter
+         * glyph isn't wired to a real filter sheet yet; the 3 tabs cover
+         * the design's filter intent. The FAB owns the canonical "Add a
+         * bill" action so we don't need a duplicate entry point in the
+         * top bar. Tracked for a follow-up if a filter sheet ships.
+         */
+        fun topBarAction(): TopBarAction? = null
+
+        /**
+         * Compute the banner summary for the currently-loaded bills.
+         * Exposed `internal` so tests can exercise it without going
+         * through the Compose layer.
+         */
+        fun currentBannerSummary(): BillsBannerSummary {
+            val loaded = bills ?: return BillsBannerSummary(null, 0, null)
+            return summarize(loaded, clock())
+        }
 
         private fun applySuccess(loaded: List<BillDto>) {
             bills = loaded
@@ -157,11 +233,14 @@ class BillsListViewModel
             val tab = BillsTab.fromId(_selectedTab.value)
             val active = loaded.filter { passes(it, tab, now) }
             if (active.isEmpty()) {
+                _banner.value = null
                 _state.value =
                     ListOfRowsUiState.Empty(
                         icon = PantopusIcon.Receipt,
-                        headline = "No bills yet",
-                        subcopy = "Add a bill to track due dates, schedule payments, and split with household members.",
+                        headline = "No bills tracked yet",
+                        subcopy =
+                            "Add the utilities, insurance, and HOA dues for this home. " +
+                                "Schedule auto-pay or split between household members.",
                         ctaTitle = "Add a bill",
                         onCta = { onAddBill() },
                     )
@@ -173,6 +252,39 @@ class BillsListViewModel
                     sections = listOf(RowSection(id = "bills", rows = rows)),
                     hasMore = false,
                 )
+            _banner.value = bannerFor(tab, loaded, now)
+        }
+
+        private fun bannerFor(
+            tab: BillsTab,
+            loaded: List<BillDto>,
+            now: Instant,
+        ): BannerConfig? {
+            // Only show the banner on the Upcoming tab (matches iOS).
+            if (tab != BillsTab.Upcoming) return null
+            val summary = summarize(loaded, now)
+            if (!summary.hasContent) return null
+            return BannerConfig(
+                icon = PantopusIcon.Wallet,
+                title = bannerTitle(summary),
+                subtitle = bannerSubtitle(summary),
+                tint = BannerCtaTint.Home,
+            )
+        }
+
+        private fun bannerTitle(summary: BillsBannerSummary): String =
+            summary.totalDueLabel?.let { "$it due in the next 30 days" } ?: "No upcoming bills"
+
+        private fun bannerSubtitle(summary: BillsBannerSummary): String? {
+            if (summary.overdueCount > 0) {
+                val count = summary.overdueCount
+                return if (count == 1) {
+                    "1 overdue · pay or schedule today"
+                } else {
+                    "$count overdue · pay or schedule today"
+                }
+            }
+            return summary.nextBillSubtitle
         }
 
         private fun rowFor(
@@ -180,6 +292,7 @@ class BillsListViewModel
             now: Instant,
         ): RowModel {
             val projection = project(bill, now)
+            val category = projection.category
             return RowModel(
                 id = bill.id,
                 title = projection.payee,
@@ -187,9 +300,9 @@ class BillsListViewModel
                 template = RowTemplate.StatusChip,
                 leading =
                     RowLeading.TypeIcon(
-                        icon = PantopusIcon.Receipt,
-                        background = PantopusColors.primary50,
-                        foreground = PantopusColors.primary600,
+                        icon = category.icon,
+                        background = category.background,
+                        foreground = category.foreground,
                     ),
                 trailing =
                     RowTrailing.AmountWithChip(
@@ -199,6 +312,8 @@ class BillsListViewModel
                         chipIcon = projection.chipIcon,
                     ),
                 onTap = { onOpenBill(bill.id) },
+                inlineChip = projection.inlineChip,
+                highlight = projection.highlight,
             )
         }
 
@@ -207,15 +322,14 @@ class BillsListViewModel
             tab: BillsTab,
             now: Instant,
         ): Boolean {
-            if (bill.status == "cancelled") return false
             val chip = chipStatus(bill, now)
             return when (tab) {
                 BillsTab.Upcoming ->
-                    chip == BillChipStatus.Due ||
-                        chip == BillChipStatus.Overdue ||
-                        chip == BillChipStatus.Scheduled
+                    // Upcoming excludes cancelled + paid; everything else
+                    // (due, dueSoon, overdue, scheduled) is upcoming.
+                    chip != BillChipStatus.Cancelled && chip != BillChipStatus.Paid
                 BillsTab.Paid -> chip == BillChipStatus.Paid
-                BillsTab.All -> true
+                BillsTab.All -> chip != BillChipStatus.Cancelled
             }
         }
 
@@ -225,11 +339,13 @@ class BillsListViewModel
             var paid = 0
             var all = 0
             for (b in loaded) {
-                if (b.status == "cancelled") continue
+                val chip = chipStatus(b, now)
+                if (chip == BillChipStatus.Cancelled) continue
                 all += 1
-                when (chipStatus(b, now)) {
-                    BillChipStatus.Paid -> paid += 1
-                    BillChipStatus.Due, BillChipStatus.Overdue, BillChipStatus.Scheduled -> upcoming += 1
+                if (chip == BillChipStatus.Paid) {
+                    paid += 1
+                } else {
+                    upcoming += 1
                 }
             }
             return listOf(
@@ -248,12 +364,14 @@ class BillsListViewModel
 
         companion object {
             /** Pure mapping from a bill + clock to display strings. */
+            @JvmStatic
             fun project(
                 bill: BillDto,
                 now: Instant,
             ): BillRowProjection {
                 val chip = chipStatus(bill, now)
-                val payee = bill.providerName ?: bill.billType.replaceFirstChar(Char::uppercase)
+                val category = UtilityCategory.from(bill.providerName)
+                val payee = bill.providerName ?: category.label
                 val amount = formatCurrency(bill.displayAmount)
                 val dueShort = formatDateShort(bill.dueDate)
                 val paidShort = formatDateShort(bill.paidAt)
@@ -268,57 +386,167 @@ class BillsListViewModel
                             chipVariant = StatusChipVariant.Success,
                             chipIcon = PantopusIcon.Check,
                             status = chip,
+                            category = category,
+                            inlineChip = null,
+                            highlight = null,
+                        )
+                    BillChipStatus.Cancelled ->
+                        BillRowProjection(
+                            payee = payee,
+                            subtitle = "Cancelled",
+                            amount = amount,
+                            chipText = "Cancelled",
+                            chipVariant = StatusChipVariant.Neutral,
+                            chipIcon = PantopusIcon.X,
+                            status = chip,
+                            category = category,
+                            inlineChip = null,
+                            highlight = RowHighlight.Muted,
                         )
                     BillChipStatus.Overdue ->
                         BillRowProjection(
                             payee = payee,
-                            subtitle = dueShort?.let { "Due $it" } ?: "Overdue",
+                            subtitle = dueShort?.let { "Overdue · was due $it" } ?: "Overdue",
                             amount = amount,
                             chipText = "Overdue",
                             chipVariant = StatusChipVariant.ErrorVariant,
                             chipIcon = PantopusIcon.AlertCircle,
                             status = chip,
+                            category = category,
+                            inlineChip = null,
+                            highlight = null,
+                        )
+                    BillChipStatus.DueSoon ->
+                        BillRowProjection(
+                            payee = payee,
+                            subtitle = dueShort?.let { "Due $it" } ?: "Due soon",
+                            amount = amount,
+                            chipText = "Due soon",
+                            chipVariant = StatusChipVariant.Warning,
+                            chipIcon = PantopusIcon.Clock,
+                            status = chip,
+                            category = category,
+                            inlineChip = null,
+                            highlight = null,
                         )
                     BillChipStatus.Scheduled ->
                         BillRowProjection(
                             payee = payee,
-                            subtitle = dueShort?.let { "Auto-pay $it" } ?: "Auto-pay",
+                            subtitle = dueShort?.let { "Auto-pays $it" } ?: "Auto-pay scheduled",
                             amount = amount,
                             chipText = "Scheduled",
-                            chipVariant = StatusChipVariant.Personal,
+                            chipVariant = StatusChipVariant.Info,
                             chipIcon = PantopusIcon.Calendar,
                             status = chip,
+                            category = category,
+                            inlineChip =
+                                RowChip(
+                                    text = "Auto-pay",
+                                    icon = PantopusIcon.ArrowsRepeat,
+                                    tint = RowChip.Tint.Status(StatusChipVariant.Info),
+                                ),
+                            highlight = null,
                         )
                     BillChipStatus.Due ->
                         BillRowProjection(
                             payee = payee,
-                            subtitle = dueShort ?: "No due date",
+                            subtitle = dueShort?.let { "Due $it" } ?: "No due date",
                             amount = amount,
-                            chipText = dueShort?.let { "Due $it" } ?: "Due",
+                            chipText = "Due",
                             chipVariant = StatusChipVariant.Warning,
                             chipIcon = PantopusIcon.Clock,
                             status = chip,
+                            category = category,
+                            inlineChip = null,
+                            highlight = null,
                         )
                 }
             }
 
+            /**
+             * Derive the chip status per the T6.0a contract:
+             *  - [BillChipStatus.Cancelled]  when status is "cancelled"
+             *  - [BillChipStatus.Paid]       when status is "paid"
+             *  - [BillChipStatus.Scheduled]  when status is "scheduled"
+             *  - [BillChipStatus.Overdue]    when due_date is in the past
+             *  - [BillChipStatus.DueSoon]    when due_date is within 7 days
+             *  - [BillChipStatus.Due]        otherwise
+             */
+            @JvmStatic
             fun chipStatus(
                 bill: BillDto,
                 now: Instant,
             ): BillChipStatus {
+                if (bill.status == "cancelled") return BillChipStatus.Cancelled
                 if (bill.status == "paid") return BillChipStatus.Paid
                 if (bill.status == "scheduled") return BillChipStatus.Scheduled
                 val due = bill.dueDate?.let(::parseInstant)
-                if (due != null && due.isBefore(now)) return BillChipStatus.Overdue
+                if (due != null) {
+                    if (due.isBefore(now)) return BillChipStatus.Overdue
+                    val sevenDaysOut = now.plus(Duration.ofDays(7))
+                    if (!due.isAfter(sevenDaysOut)) return BillChipStatus.DueSoon
+                }
                 return BillChipStatus.Due
             }
 
+            /** Pure summary projection. Public-static for tests. */
+            @JvmStatic
+            fun summarize(
+                bills: List<BillDto>,
+                now: Instant,
+            ): BillsBannerSummary {
+                val thirtyDaysOut = now.plus(Duration.ofDays(30))
+                var totalDue: BigDecimal = BigDecimal.ZERO
+                var overdueCount = 0
+                var totalCount = 0
+                var nextDue: Pair<Instant, BillDto>? = null
+                for (bill in bills) {
+                    val chip = chipStatus(bill, now)
+                    if (chip == BillChipStatus.Cancelled || chip == BillChipStatus.Paid) continue
+                    totalCount += 1
+                    val due = bill.dueDate?.let(::parseInstant)
+                    if (due != null) {
+                        // Sum due in next 30 days (overdue counts too — user owes it).
+                        if (!due.isAfter(thirtyDaysOut)) {
+                            totalDue = totalDue + bill.displayAmount
+                        }
+                        if (!due.isBefore(now)) {
+                            if (nextDue == null || due.isBefore(nextDue.first)) {
+                                nextDue = due to bill
+                            }
+                        }
+                    } else {
+                        // No due date — still surface in the total when the
+                        // bill is upcoming (scheduled with no date, etc.).
+                        totalDue = totalDue + bill.displayAmount
+                    }
+                    if (chip == BillChipStatus.Overdue) overdueCount += 1
+                }
+                val totalLabel = if (totalCount > 0) formatCurrency(totalDue) else null
+                val nextSubtitle =
+                    nextDue?.let { (date, _) ->
+                        val days = Duration.between(now, date).toDays().toInt()
+                        when {
+                            days <= 0 -> "Next bill due today"
+                            days == 1 -> "All current · next bill tomorrow"
+                            else -> "All current · next bill in $days days"
+                        }
+                    }
+                return BillsBannerSummary(
+                    totalDueLabel = totalLabel,
+                    overdueCount = overdueCount,
+                    nextBillSubtitle = nextSubtitle,
+                )
+            }
+
+            @JvmStatic
             fun formatCurrency(amount: BigDecimal): String =
                 NumberFormat.getCurrencyInstance(Locale.US).apply {
                     maximumFractionDigits = 2
                     minimumFractionDigits = 2
                 }.format(amount)
 
+            @JvmStatic
             fun formatDateShort(iso: String?): String? {
                 if (iso.isNullOrBlank()) return null
                 val instant = parseInstant(iso) ?: return null

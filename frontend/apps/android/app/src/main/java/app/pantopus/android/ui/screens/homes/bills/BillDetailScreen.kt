@@ -144,6 +144,7 @@ private fun LoadedShell(
 ) {
     val projection = BillsListViewModel.project(bill, Instant.now())
     val isPaid = bill.status == "paid"
+    val autoPay = projection.status == BillChipStatus.Scheduled
     ContentDetailShell(
         title = "Bill",
         onBack = onBack,
@@ -154,6 +155,8 @@ private fun LoadedShell(
                 chipText = projection.chipText,
                 chipVariant = projection.chipVariant,
                 chipIcon = projection.chipIcon,
+                category = projection.category,
+                autoPay = autoPay,
                 modifier = Modifier.padding(horizontal = Spacing.s4),
             )
         },
@@ -215,6 +218,8 @@ private fun BillHeader(
     chipText: String,
     chipVariant: StatusChipVariant,
     chipIcon: PantopusIcon?,
+    category: UtilityCategory,
+    autoPay: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -232,18 +237,26 @@ private fun BillHeader(
                     Modifier
                         .size(48.dp)
                         .clip(RoundedCornerShape(Radii.sm))
-                        .background(PantopusColors.primary50),
+                        .background(category.background),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
-                    icon = PantopusIcon.Receipt,
+                    icon = category.icon,
                     contentDescription = null,
                     size = 24.dp,
-                    tint = PantopusColors.primary600,
+                    tint = category.foreground,
                 )
             }
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                Text(payee, style = PantopusTextStyle.h3, color = PantopusColors.appText)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                ) {
+                    Text(payee, style = PantopusTextStyle.h3, color = PantopusColors.appText)
+                    if (autoPay) {
+                        AutoPayPill()
+                    }
+                }
                 Text(
                     text = amount,
                     style = PantopusTextStyle.body,
@@ -257,7 +270,33 @@ private fun BillHeader(
 }
 
 @Composable
+private fun AutoPayPill() {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.infoBg)
+                .padding(horizontal = Spacing.s2, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.ArrowsRepeat,
+            contentDescription = null,
+            size = 11.dp,
+            tint = PantopusColors.info,
+        )
+        Text(
+            text = "Auto-pay",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.info,
+        )
+    }
+}
+
+@Composable
 private fun DetailGrid(bill: BillDto) {
+    val category = UtilityCategory.from(bill.providerName)
     Column(
         modifier =
             Modifier
@@ -266,9 +305,13 @@ private fun DetailGrid(bill: BillDto) {
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.lg)),
     ) {
-        DetailRow("Type", bill.billType.replaceFirstChar(Char::uppercase))
+        DetailRow("Category", category.label)
         HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
         DetailRow("Status", bill.status.replaceFirstChar(Char::uppercase))
+        if (bill.status == "scheduled") {
+            HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
+            DetailRow("Auto-pay", "Scheduled")
+        }
         BillsListViewModel.formatDateShort(bill.dueDate)?.let {
             HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
             DetailRow("Due", it)

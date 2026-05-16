@@ -91,14 +91,16 @@ export function rowCard({
   metaTail = '',
   footer = '',
   unread = false,
-  highlight = null, // 'leading' / 'unread' / null
+  highlight = null, // 'leading' / 'unread' / 'muted' / null
   inlineChip = '',
   engagement = null,
   headerChips = [],
   edit = false,
+  splitWith = null, // { members: ['J','A'], totalWays: 3 } — T6.0a Bills
 }) {
   let bgTint = P.surface;
   let borderColor = P.border;
+  let opacity = 1;
   if (highlight === 'unread' || unread) {
     bgTint = P.primary25;
     borderColor = P.personalBg;
@@ -107,15 +109,21 @@ export function rowCard({
     bgTint = '#fff7ed'; // amber-50
     borderColor = '#fcd34d'; // amber-300
   }
+  if (highlight === 'muted') {
+    opacity = 0.78;
+  }
   const dot = unread
     ? `<span style="display:inline-block;width:8px;height:8px;border-radius:4px;background:${P.primary600};margin-left:8px;flex-shrink:0;align-self:center"></span>`
     : '';
   const headerChipsHtml = headerChips.length
     ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${headerChips.map(c => chip(c)).join('')}</div>`
     : '';
+  const splitTailHtml = splitWith ? splitStackTail(splitWith) : '';
   const chipsHtml = chips.length
-    ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center">${chips.map(c => chip(c)).join('')}${metaTail ? `<span style="font-size:11px;color:${P.fg3}">${metaTail}</span>` : ''}</div>`
-    : (metaTail ? `<div style="margin-top:6px;font-size:11px;color:${P.fg3}">${metaTail}</div>` : '');
+    ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center">${chips.map(c => chip(c)).join('')}${metaTail ? `<span style="font-size:11px;color:${P.fg3}">${metaTail}</span>` : ''}${splitTailHtml}</div>`
+    : (metaTail || splitTailHtml
+        ? `<div style="display:flex;align-items:center;margin-top:6px;font-size:11px;color:${P.fg3}">${metaTail || ''}${splitTailHtml}</div>`
+        : '');
   const engagementHtml = engagement
     ? `<div style="display:flex;align-items:center;gap:12px;padding-top:10px;margin-top:10px;border-top:1px solid ${P.borderSubtle};font-size:12px;color:${P.fg3}">
         ${engagement.items.map(it => `<span style="display:inline-flex;align-items:center;gap:4px">${icon(it.icon, { size: 14, color: P.fg3 })}${it.count}</span>`).join('')}
@@ -123,7 +131,7 @@ export function rowCard({
       </div>`
     : '';
   return `
-    <div style="background:${bgTint};border:1px solid ${borderColor};border-radius:14px;padding:12px;margin-bottom:10px">
+    <div style="background:${bgTint};border:1px solid ${borderColor};border-radius:14px;padding:12px;margin-bottom:10px;opacity:${opacity}">
       <div style="display:flex;gap:12px;align-items:flex-start">
         ${leading}
         <div style="flex:1;min-width:0">
@@ -201,17 +209,49 @@ export function sectionHeader({ title, count, onSeeAll = true }) {
   </div>`;
 }
 
-export function banner({ title, body, tone = 'info' }) {
+export function banner({ title, body, tone = 'info', iconName, cta }) {
+  // T6.0a — `iconName` adds a leading icon disc; `cta` adds a trailing
+  // tinted pill button. Both optional, additive.
   const tones = {
     info:    { bg: P.primary50,  fg: P.primary700, accent: P.primary600 },
     success: { bg: P.successBg,  fg: P.success,    accent: P.success },
     amber:   { bg: P.warningBg,  fg: P.warning,    accent: P.warning },
+    home:    { bg: P.homeBg,     fg: P.home,       accent: P.home },
   };
   const t = tones[tone] || tones.info;
-  return `<div style="background:${t.bg};border:1px solid ${t.bg};border-radius:14px;padding:12px 14px;margin-bottom:10px;display:flex;flex-direction:column;gap:2px">
-    <div style="font-size:13px;font-weight:700;color:${t.fg}">${title}</div>
-    <div style="font-size:12px;color:${t.fg};opacity:0.85">${body}</div>
+  const iconHtml = iconName
+    ? `<div style="width:36px;height:36px;border-radius:9px;background:${P.surface};border:1px solid ${t.bg};color:${t.accent};display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:12px">${icon(iconName, { size: 18, color: t.accent })}</div>`
+    : '';
+  const ctaHtml = cta
+    ? `<button style="padding:7px 12px;border-radius:9px;background:${t.accent};border:none;color:${P.surface};font-size:12px;font-weight:600;flex-shrink:0;margin-left:8px;cursor:pointer;display:inline-flex;align-items:center;gap:4px">${cta.iconName ? icon(cta.iconName, { size: 14, color: P.surface }) : ''}${cta.label}</button>`
+    : '';
+  return `<div style="background:${t.bg};border:1px solid ${t.bg};border-radius:14px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:0">
+    ${iconHtml}
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+      <div style="font-size:13px;font-weight:700;color:${P.fg1}">${title}</div>
+      <div style="font-size:12px;color:${P.fg2};opacity:0.85">${body}</div>
+    </div>
+    ${ctaHtml}
   </div>`;
+}
+
+// Right-edge "Split N ways" caption + 18pt overlapping avatars on a row.
+// T6.0a additive — used by Bills rows when a bill is split between
+// household members. Tones come from the existing palette so future
+// consumers (e.g. Household tasks "assigned-to" stacks) can reuse.
+export function splitStackTail({ members, totalWays }) {
+  const tones = [
+    { bg: P.personalBg, fg: P.personal },
+    { bg: P.successBg, fg: P.success },
+    { bg: P.warningBg, fg: P.warning },
+    { bg: P.errorBg, fg: P.error },
+  ];
+  const visible = members.slice(0, 3);
+  const avatars = visible.map((m, i) => {
+    const t = tones[i % tones.length];
+    return `<div style="width:18px;height:18px;border-radius:9px;background:${t.bg};color:${t.fg};display:inline-flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;border:1.5px solid ${P.surface};box-sizing:border-box;margin-left:-4px">${m}</div>`;
+  }).join('');
+  return `<div style="display:inline-flex;align-items:center;gap:6px;margin-left:auto"><span style="font-size:11px;color:${P.fg3};white-space:nowrap">Split ${totalWays} ways</span><div style="display:inline-flex;align-items:center;padding-left:4px">${avatars}</div></div>`;
 }
 
 // "X others bid" italic note — Listing offers / Offers.

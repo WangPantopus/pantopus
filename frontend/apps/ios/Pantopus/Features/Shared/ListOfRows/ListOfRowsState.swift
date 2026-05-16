@@ -115,24 +115,75 @@ public struct ChipStripConfig: Sendable {
     }
 }
 
+/// Optional trailing CTA on a `BannerConfig`. T6.0a added this for the
+/// Bills banner's "Pay all" button. When `cta` is set, the banner
+/// renders the CTA as a tinted pill on the trailing edge and disables
+/// the whole-card `onTap` (the CTA's `handler` is the focused action).
+/// When `cta` is nil, banner-wide tap behavior is unchanged from T5.0.
+public struct BannerCTA: Sendable {
+    public let label: String
+    public let icon: PantopusIcon?
+    public let accessibilityLabel: String
+    /// Tint for the CTA pill. Defaults to the active screen's identity
+    /// tone (resolved by the shell) — pass an explicit tint to force a
+    /// home / business / personal pill regardless of context.
+    public let tint: BannerCTATint
+    public let handler: @Sendable () -> Void
+
+    public init(
+        label: String,
+        icon: PantopusIcon? = nil,
+        accessibilityLabel: String? = nil,
+        tint: BannerCTATint = .primary,
+        handler: @escaping @Sendable () -> Void
+    ) {
+        self.label = label
+        self.icon = icon
+        self.accessibilityLabel = accessibilityLabel ?? label
+        self.tint = tint
+        self.handler = handler
+    }
+}
+
+/// Tint options for the banner's trailing CTA pill. Resolved at render
+/// time to the matching token pair (background + foreground).
+public enum BannerCTATint: Sendable, Hashable {
+    case primary    // sky
+    case home       // green
+    case business   // violet
+    case warning    // amber (overdue surfaces)
+}
+
 /// Primary-tinted summary banner rendered above the first row in the
-/// scroll area. Used by My bids, My tasks, Offers, Review claims.
+/// scroll area. Used by My bids, My tasks, Offers, Review claims, Bills.
 public struct BannerConfig: Sendable {
     public let icon: PantopusIcon
     public let title: String
     public let subtitle: String?
     public let onTap: (@Sendable () -> Void)?
+    /// T6.0a — optional trailing CTA pill (Bills "Pay all").
+    /// When set, takes precedence over `onTap` for the user's focused
+    /// action; `onTap` still fires for whole-card taps outside the CTA.
+    public let cta: BannerCTA?
+    /// T6.0a — optional override for the banner's background + border
+    /// tint. Default `.primary` (sky) matches T5 behavior. Bills uses
+    /// `.home` (soft green) per the home-pillar identity.
+    public let tint: BannerCTATint
 
     public init(
         icon: PantopusIcon,
         title: String,
         subtitle: String? = nil,
-        onTap: (@Sendable () -> Void)? = nil
+        onTap: (@Sendable () -> Void)? = nil,
+        cta: BannerCTA? = nil,
+        tint: BannerCTATint = .primary
     ) {
         self.icon = icon
         self.title = title
         self.subtitle = subtitle
         self.onTap = onTap
+        self.cta = cta
+        self.tint = tint
     }
 }
 
@@ -312,6 +363,20 @@ public struct TopBarAction: Sendable {
     }
 }
 
+/// Identity tint for a FAB. Resolved at render time to a (background,
+/// shadow) pair. Defaults to `.sky` so every existing FAB call site —
+/// which doesn't pass a tint — keeps the T5 sky-blue render.
+///
+/// T6.0a added home + business tints so home-pillar screens (Bills,
+/// Maintenance, Calendar, etc.) and business-pillar screens
+/// (My businesses) can swap the FAB color to match their identity
+/// without forking the FAB variant taxonomy.
+public enum FabTint: Sendable, Hashable {
+    case sky        // primary600 — default
+    case home       // home green
+    case business   // business violet
+}
+
 /// Floating-action-button payload.
 ///
 /// T5.0 adds a `Variant` enum:
@@ -324,6 +389,10 @@ public struct TopBarAction: Sendable {
 ///   - `.extendedNav(label:)` (48pt pill with label) — navigation FAB
 ///     that signals "go elsewhere", not "create" (My bids "Browse
 ///     tasks").
+///
+/// T6.0a adds an optional `tint: FabTint` field (default `.sky`) for
+/// the home / business identity tints. Existing call sites compile
+/// unchanged because the parameter defaults.
 public struct FABAction: Sendable {
     public enum Variant: Sendable {
         case canonicalCreate
@@ -334,6 +403,7 @@ public struct FABAction: Sendable {
     public let icon: PantopusIcon
     public let accessibilityLabel: String
     public let variant: Variant
+    public let tint: FabTint
     public let handler: @Sendable () -> Void
 
     /// Full init — pick a variant explicitly.
@@ -341,16 +411,19 @@ public struct FABAction: Sendable {
         icon: PantopusIcon = .plusCircle,
         accessibilityLabel: String,
         variant: Variant,
+        tint: FabTint = .sky,
         handler: @escaping @Sendable () -> Void
     ) {
         self.icon = icon
         self.accessibilityLabel = accessibilityLabel
         self.variant = variant
+        self.tint = tint
         self.handler = handler
     }
 
     /// Backwards-compatible convenience matching the T1–T4.1 signature.
-    /// Defaults to `.canonicalCreate` (56pt) — the historical geometry.
+    /// Defaults to `.canonicalCreate` (56pt) + `.sky` tint — the
+    /// historical geometry / color.
     public init(
         icon: PantopusIcon = .plusCircle,
         accessibilityLabel: String,
@@ -360,6 +433,7 @@ public struct FABAction: Sendable {
             icon: icon,
             accessibilityLabel: accessibilityLabel,
             variant: .canonicalCreate,
+            tint: .sky,
             handler: handler
         )
     }

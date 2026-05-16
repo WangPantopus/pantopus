@@ -12,6 +12,8 @@
 import { useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import type {
+  BannerConfig,
+  BannerCtaTint,
   ChipStripChip,
   ListOfRowsShellProps,
   RowSection,
@@ -122,14 +124,7 @@ export default function ListOfRowsShell(props: ListOfRowsShellProps) {
         {state.kind === 'empty' && <EmptyState config={state.config} />}
         {state.kind === 'loaded' && (
           <div className="px-4 py-4 space-y-4">
-            {banner && (
-              <BannerCard
-                title={banner.title}
-                subtitle={banner.subtitle}
-                Icon={banner.icon}
-                onTap={banner.onTap}
-              />
-            )}
+            {banner && <BannerCard config={banner} />}
             {state.sections.map((section) => (
               <SectionView key={section.id} section={section} />
             ))}
@@ -217,37 +212,125 @@ function ChipStripRow({ chipStrip }: { chipStrip: { chips: ChipStripChip[]; sele
   );
 }
 
-function BannerCard({
-  title,
-  subtitle,
-  Icon,
-  onTap,
-}: {
-  title: string;
-  subtitle?: string;
-  Icon: import('lucide-react').LucideIcon;
-  onTap?: () => void;
-}) {
-  const content = (
-    <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-primary-50 border border-primary-100">
-      <div className="w-8 h-8 rounded-md bg-app-surface border border-primary-100 flex items-center justify-center shrink-0">
-        <Icon className="w-4 h-4 text-primary-600" />
+/**
+ * Resolved background / border / foreground classes for a banner tint.
+ * Mirrors the iOS `BannerTokens` switch so the two platforms render
+ * identical surfaces.
+ */
+function bannerTintClasses(tint: BannerCtaTint): {
+  background: string;
+  border: string;
+  iconFg: string;
+} {
+  switch (tint) {
+    case 'primary':
+      return {
+        background: 'bg-primary-50',
+        border: 'border-primary-100',
+        iconFg: 'text-primary-600',
+      };
+    case 'home':
+      return {
+        background: 'bg-app-home-bg',
+        border: 'border-app-home-bg',
+        iconFg: 'text-app-home',
+      };
+    case 'business':
+      return {
+        background: 'bg-app-business-bg',
+        border: 'border-app-business-bg',
+        iconFg: 'text-app-business',
+      };
+    case 'warning':
+      return {
+        background: 'bg-app-warning-bg',
+        border: 'border-app-warning-bg',
+        iconFg: 'text-app-warning',
+      };
+  }
+}
+
+/** Solid fill class used by the banner CTA pill / FAB. */
+function tintFillClasses(tint: BannerCtaTint): string {
+  switch (tint) {
+    case 'primary':
+      return 'bg-primary-600 hover:bg-primary-700';
+    case 'home':
+      return 'bg-app-home hover:opacity-90';
+    case 'business':
+      return 'bg-app-business hover:opacity-90';
+    case 'warning':
+      return 'bg-app-warning hover:opacity-90';
+  }
+}
+
+function BannerCard({ config }: { config: BannerConfig }) {
+  const tint = config.tint ?? 'primary';
+  const tokens = bannerTintClasses(tint);
+  const Icon = config.icon;
+  const cta = config.cta;
+  const iconTileBorder = tint === 'primary' ? 'border-primary-100' : tokens.border;
+  const body = (
+    <div
+      className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border ${tokens.background} ${tokens.border}`}
+    >
+      <div
+        className={`w-8 h-8 rounded-md bg-app-surface border flex items-center justify-center shrink-0 ${iconTileBorder}`}
+      >
+        <Icon className={`w-4 h-4 ${tokens.iconFg}`} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-semibold text-app-text">{title}</div>
-        {subtitle && (
-          <div className="text-[11px] text-app-text-secondary mt-0.5">{subtitle}</div>
+        <div className="text-xs font-semibold text-app-text">{config.title}</div>
+        {config.subtitle && (
+          <div className="text-[11px] text-app-text-secondary mt-0.5">{config.subtitle}</div>
         )}
       </div>
-      <ChevronRight className="w-4 h-4 text-app-text-muted shrink-0" />
+      {cta ? (
+        <BannerCtaButton cta={cta} fallbackTint={tint} />
+      ) : (
+        // T6.0a: kept the trailing chevron on the no-cta path so
+        // existing banner consumers (review-claims, etc.) render
+        // identically to T5. iOS doesn't show a chevron — the web
+        // archetype has always carried it as a visual affordance.
+        <ChevronRight className="w-4 h-4 text-app-text-muted shrink-0" />
+      )}
     </div>
   );
-  return onTap ? (
-    <button type="button" onClick={onTap} className="w-full text-left">
-      {content}
+  // When a CTA is present the focused action is the pill — don't wrap
+  // the whole card in a button (that would steal taps on the CTA).
+  if (!cta && config.onTap) {
+    return (
+      <button type="button" onClick={config.onTap} className="w-full text-left">
+        {body}
+      </button>
+    );
+  }
+  return body;
+}
+
+function BannerCtaButton({
+  cta,
+  fallbackTint,
+}: {
+  cta: NonNullable<BannerConfig['cta']>;
+  fallbackTint: BannerCtaTint;
+}) {
+  const Icon = cta.icon;
+  const tint = cta.tint ?? fallbackTint;
+  const fill = tintFillClasses(tint);
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        cta.onClick();
+      }}
+      aria-label={cta.accessibilityLabel ?? cta.label}
+      className={`inline-flex items-center gap-1 px-3 py-[7px] rounded-md text-[11.5px] font-semibold text-white shrink-0 transition ${fill}`}
+    >
+      {Icon && <Icon className="w-3.5 h-3.5" />}
+      {cta.label}
     </button>
-  ) : (
-    content
   );
 }
 

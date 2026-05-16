@@ -56,6 +56,27 @@ data class TopBarAction(
 )
 
 /**
+ * Identity tint for a FAB. Resolved at render time to a fill color.
+ * Defaults to [Sky] so every existing FAB call site — which doesn't
+ * pass a tint — keeps the T5 sky-blue render.
+ *
+ * T6.0a added [Home] + [Business] tints so home-pillar screens (Bills,
+ * Maintenance, Calendar, etc.) and business-pillar screens
+ * (My businesses) can swap the FAB color to match their identity
+ * without forking the FAB variant taxonomy.
+ */
+enum class FabTint {
+    /** primary600 — default. */
+    Sky,
+
+    /** Home green. */
+    Home,
+
+    /** Business violet. */
+    Business,
+}
+
+/**
  * FAB payload.
  *
  * T5.0 adds a [variant]:
@@ -67,11 +88,16 @@ data class TopBarAction(
  *    (My posts, Connections, Bills, Pets).
  *  - [FabVariant.ExtendedNav] (48dp pill with label) — navigation FAB
  *    that signals "go elsewhere", not "create" (My bids "Browse tasks").
+ *
+ * T6.0a adds an optional [tint] (default [FabTint.Sky]) for the
+ * home / business identity tints. Existing call sites compile
+ * unchanged because the parameter defaults.
  */
 data class FabAction(
     val icon: PantopusIcon = PantopusIcon.PlusCircle,
     val contentDescription: String,
     val variant: FabVariant = FabVariant.CanonicalCreate,
+    val tint: FabTint = FabTint.Sky,
     val onClick: () -> Unit,
 )
 
@@ -116,14 +142,67 @@ data class ChipStripConfig(
 }
 
 /**
+ * Tint options for the banner background/border and the trailing CTA
+ * pill. Resolved at render time to the matching token pair
+ * (background + foreground).
+ *
+ *  - [Primary] — sky (T5 default)
+ *  - [Home]    — soft green (Bills banner)
+ *  - [Business] — violet
+ *  - [Warning] — amber (overdue surfaces)
+ */
+enum class BannerCtaTint {
+    Primary,
+    Home,
+    Business,
+    Warning,
+}
+
+/**
+ * Optional trailing CTA on a [BannerConfig]. T6.0a added this for the
+ * Bills banner's "Pay all" button. When [cta] is set, the banner
+ * renders the CTA as a tinted pill on the trailing edge and disables
+ * the whole-card [BannerConfig.onTap] (the CTA's [onClick] is the focused
+ * action). When `cta` is null, banner-wide tap behavior is unchanged from T5.0.
+ */
+data class BannerCta(
+    val label: String,
+    val icon: PantopusIcon? = null,
+    val accessibilityLabel: String = label,
+    /**
+     * Tint for the CTA pill. Defaults to the active screen's identity
+     * tone (resolved by the shell) — pass an explicit tint to force a
+     * home / business / personal pill regardless of context.
+     */
+    val tint: BannerCtaTint = BannerCtaTint.Primary,
+    val onClick: () -> Unit,
+)
+
+/**
  * Primary-tinted summary banner rendered above the first row in the
- * scroll area. Used by My bids, My tasks, Offers, Review claims.
+ * scroll area. Used by My bids, My tasks, Offers, Review claims, Bills.
+ *
+ * T6.0a — adds an optional trailing [cta] pill and a [tint] override
+ * for the background + border. Defaults preserve T5 behavior.
  */
 data class BannerConfig(
     val icon: PantopusIcon,
     val title: String,
     val subtitle: String? = null,
     val onTap: (() -> Unit)? = null,
+    /**
+     * T6.0a — optional trailing CTA pill (Bills "Pay all"). When set,
+     * takes precedence over [onTap] for the user's focused action;
+     * [onTap] still fires for whole-card taps outside the CTA.
+     */
+    val cta: BannerCta? = null,
+    /**
+     * T6.0a — optional override for the banner's background + border
+     * tint. Default [BannerCtaTint.Primary] (sky) matches T5 behavior.
+     * Bills uses [BannerCtaTint.Home] (soft green) per the home-pillar
+     * identity.
+     */
+    val tint: BannerCtaTint = BannerCtaTint.Primary,
 )
 
 /**

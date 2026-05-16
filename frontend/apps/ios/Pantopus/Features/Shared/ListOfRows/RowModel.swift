@@ -171,6 +171,49 @@ public struct BidderStackData: Sendable, Hashable {
     }
 }
 
+// MARK: - Split stack (T6.0a Bills)
+
+/// One member in a split-payer stack. Geometry is smaller than `Bidder`
+/// (18pt vs 22pt) so the visual reads as a property tag, not social
+/// proof. Tone palette is shared with `Bidder` so split members and
+/// bidders pick from the same six-color set.
+public struct SplitMember: Sendable, Hashable, Identifiable {
+    public let id: String
+    public let initials: String
+    public let tone: BidderTone
+
+    public init(id: String, initials: String, tone: BidderTone) {
+        self.id = id
+        self.initials = initials
+        self.tone = tone
+    }
+}
+
+/// Split-payer stack payload rendered at the RIGHT EDGE of the chip
+/// line — used by Bills (T6.0a) when a bill is split between household
+/// members. Different geometry + alignment from `BidderStackData`:
+///
+///   - 18pt overlapping avatars (vs Bidder 22pt)
+///   - right-aligned (vs Bidder which sits before the chips)
+///   - includes the "Split N ways" caption alongside the avatars
+///
+/// Kept as a separate struct so the two concerns don't share an enum
+/// case the shell would have to disambiguate.
+public struct SplitStackData: Sendable, Hashable {
+    public let members: [SplitMember]
+    public let overflow: Int
+    /// Total people in the split, including the viewer. The "Split N
+    /// ways" caption uses this count so the math is explicit at the
+    /// VM (not the renderer).
+    public let totalWays: Int
+
+    public init(members: [SplitMember], overflow: Int = 0, totalWays: Int) {
+        self.members = members
+        self.overflow = max(0, overflow)
+        self.totalWays = max(0, totalWays)
+    }
+}
+
 // MARK: - Trailing
 
 /// Compact-button variant — used by `RowTrailing.verticalActions` and
@@ -470,6 +513,13 @@ public struct RowModel: Identifiable, Sendable {
     /// a `+N` overflow tile communicating competition at a glance.
     public let bidderStack: BidderStackData?
 
+    /// Optional split-payer stack rendered at the RIGHT EDGE of the
+    /// chip line. Used by Bills (T6.0a) when a bill is split between
+    /// household members — 18pt overlapping avatars + "Split N ways"
+    /// caption. Separate from `bidderStack` so the renderer can place
+    /// each in the correct slot (left for bidder, right for splits).
+    public let splitWith: SplitStackData?
+
     public init(
         id: String,
         title: String,
@@ -492,7 +542,8 @@ public struct RowModel: Identifiable, Sendable {
         highlight: RowHighlight? = nil,
         footer: RowFooter? = nil,
         engagement: RowEngagement? = nil,
-        bidderStack: BidderStackData? = nil
+        bidderStack: BidderStackData? = nil,
+        splitWith: SplitStackData? = nil
     ) {
         self.id = id
         self.title = title
@@ -516,6 +567,7 @@ public struct RowModel: Identifiable, Sendable {
         self.footer = footer
         self.engagement = engagement
         self.bidderStack = bidderStack
+        self.splitWith = splitWith
     }
 }
 

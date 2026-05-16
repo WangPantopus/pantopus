@@ -2,19 +2,29 @@
 //  BillsListViewModel.swift
 //  Pantopus
 //
-//  Backs `BillsListView` (T5.2.2 / P13). Fetches
+//  Backs `BillsListView` (T6.0a — re-skin of T5.2.2 / P13). Fetches
 //  `GET /api/homes/:id/bills` (route `backend/routes/home.js:4506`) and
-//  maps each row to the `RowTrailing.amountWithChip` template defined
-//  in the T5.0 shell. Three tabs (Upcoming / Paid / All) filter by a
-//  client-derived `ChipStatus`:
+//  maps each row to the `RowTrailing.amountWithChip` template + a
+//  utility-tinted `RowLeading.typeIcon` (utility category derived
+//  client-side from the payee string — see `UtilityCategoryPalette`).
 //
-//    paid       — `status == "paid"`
-//    overdue    — non-paid and `due_date` is in the past
-//    scheduled  — `status == "scheduled"`
-//    due        — everything else still upcoming
+//  Drift from T5.2.2:
+//    • 8 utility-tinted category tiles (electric / gas / water /
+//      internet / hoa / insurance / trash / phone) + `generic`.
+//    • 6-status chip palette (added `dueSoon` for due-in-7d and
+//      `cancelled` for soft-deleted rows).
+//    • Summary banner above the list — 30-day total + overdue count.
+//    • Optional inline "Auto-pay" chip on scheduled rows.
+//    • FAB shrunk to 56pt `canonicalCreate` + `.home` tint (was 52pt
+//      sky `secondaryCreate`).
 //
-//  Row taps emit `onOpenBill(billId)`; the FAB / empty-state CTA emit
-//  `onAddBill()`. The host (HubTabRoot) routes both.
+//  Splits: `splitWith` field is wired on `RowModel` (shell extension
+//  T6.0a) but stays `nil` on every row today — the backend list
+//  endpoint doesn't surface split membership on bills yet. Splits are
+//  visible on the bill detail screen, which makes its own fetch to
+//  `GET /api/homes/:id/bills/:billId/splits`. Wiring rows to splits is
+//  a backend-prep follow-up (extend `/api/homes/:id/bills` response
+//  with `split_members[≤3]` + `split_total_ways`).
 //
 
 import Foundation
@@ -22,11 +32,14 @@ import Observation
 import SwiftUI
 
 /// Canonical bill-chip status, derived from `BillDTO.status` + `due_date`.
+/// T6.0a adds `dueSoon` (≤ 7 days from now) and `cancelled` (soft-deleted).
 public enum BillChipStatus: String, Sendable, Hashable {
     case due
+    case dueSoon
     case overdue
-    case paid
     case scheduled
+    case paid
+    case cancelled
 }
 
 /// Tab identifiers for the Bills shell — kept as raw strings so they
@@ -43,6 +56,37 @@ private struct BillsTabCounts {
     let all: Int?
 }
 
+/// Banner data for the Bills summary banner. Pure projection from the
+/// loaded bills + clock — exposed as a top-level value so tests can
+/// exercise it without standing the VM up.
+public struct BillsBannerSummary: Sendable, Equatable {
+    /// Pre-formatted USD string for the 30-day total
+    /// (e.g. `"$1,248.19"`). `nil` when zero bills are due.
+    public let totalDueLabel: String?
+    /// Count of overdue, non-cancelled, unpaid bills.
+    public let overdueCount: Int
+    /// Pre-formatted next-bill subtitle when nothing is overdue, e.g.
+    /// `"All current · next bill in 4 days"`.
+    public let nextBillSubtitle: String?
+
+    public init(
+        totalDueLabel: String?,
+        overdueCount: Int,
+        nextBillSubtitle: String?
+    ) {
+        self.totalDueLabel = totalDueLabel
+        self.overdueCount = overdueCount
+        self.nextBillSubtitle = nextBillSubtitle
+    }
+
+    /// Whether the banner has anything to render. The shell hides the
+    /// banner when this returns `false` so empty-state surfaces don't
+    /// carry a "0 due in the next 30 days" preamble.
+    public var hasContent: Bool {
+        totalDueLabel != nil || overdueCount > 0
+    }
+}
+
 /// ViewModel for the Bills list. Builds `RowModel`s from `BillDTO`s and
 /// re-renders the tab filter client-side — backend supports a
 /// `?status=` query but the design wants three buckets the server
@@ -51,12 +95,12 @@ private struct BillsTabCounts {
 @MainActor
 final class BillsListViewModel: ListOfRowsDataSource {
     let title = "Bills"
-    var topBarAction: TopBarAction? {
-        TopBarAction(
-            icon: .plusCircle,
-            accessibilityLabel: "Add a bill"
-        ) { [onAddBill] in onAddBill() }
-    }
+    // No top-bar action in T6.0a: the design's filter glyph isn't
+    // wired to a real filter sheet yet; the 3 tabs cover the design's
+    // filter intent. The FAB owns the canonical "Add a bill" action so
+    // we don't need a duplicate entry point in the top bar. Tracked for
+    // a follow-up if a filter sheet ships.
+    var topBarAction: TopBarAction? { nil }
 
     /// Tabs with live counts. Rebuilt whenever `bills` changes.
     var tabs: [ListOfRowsTab] {
@@ -74,10 +118,28 @@ final class BillsListViewModel: ListOfRowsDataSource {
 
     var fab: FABAction? {
         FABAction(
-            icon: .plusCircle,
+            icon: .plus,
             accessibilityLabel: "Add a bill",
-            variant: .secondaryCreate
+            variant: .canonicalCreate,
+            tint: .home
         ) { [onAddBill] in onAddBill() }
+    }
+
+    /// Optional summary banner above the rows. Nil on the Paid tab,
+    /// nil on Upcoming when nothing is due and nothing is overdue,
+    /// nil on the All tab. Loading / empty / error states also hide it.
+    var banner: BannerConfig? {
+        guard case .loaded = state, BillsTab(rawValue: selectedTab) == .upcoming else {
+            return nil
+        }
+        let summary = currentBannerSummary()
+        guard summary.hasContent else { return nil }
+        return BannerConfig(
+            icon: .wallet,
+            title: bannerTitle(for: summary),
+            subtitle: bannerSubtitle(for: summary),
+            tint: .home
+        )
     }
 
     private(set) var state: ListOfRowsState = .loading
@@ -151,8 +213,8 @@ final class BillsListViewModel: ListOfRowsDataSource {
             state = .empty(
                 ListOfRowsState.EmptyContent(
                     icon: .receipt,
-                    headline: "No bills yet",
-                    subcopy: "Add a bill to track due dates, schedule payments, and split with household members.",
+                    headline: "No bills tracked yet",
+                    subcopy: "Add the utilities, insurance, and HOA dues for this home. Schedule auto-pay or split between household members.",
                     ctaTitle: "Add a bill"
                 ) { [onAddBill] in onAddBill() }
             )
@@ -167,19 +229,27 @@ final class BillsListViewModel: ListOfRowsDataSource {
     func row(for bill: BillDTO, now: Date) -> RowModel {
         let projection = BillsListViewModel.project(bill: bill, now: now)
         let billId = bill.id
+        let category = projection.category
         return RowModel(
             id: bill.id,
             title: projection.payee,
             subtitle: projection.subtitle,
             template: .statusChip,
-            leading: .typeIcon(.receipt, background: Theme.Color.primary50, foreground: Theme.Color.primary600),
+            leading: .typeIcon(
+                category.icon,
+                background: category.background,
+                foreground: category.foreground
+            ),
             trailing: .amountWithChip(
                 amount: projection.amount,
                 chipText: projection.chipText,
                 chipVariant: projection.chipVariant,
                 chipIcon: projection.chipIcon
-            )
-        ) { [onOpenBill] in onOpenBill(billId) }
+            ),
+            onTap: { [onOpenBill] in onOpenBill(billId) },
+            inlineChip: projection.inlineChip,
+            highlight: projection.highlight
+        )
     }
 
     /// Pure mapping from a bill + clock to display strings. Exposed
@@ -187,7 +257,8 @@ final class BillsListViewModel: ListOfRowsDataSource {
     /// derivation without standing the VM up.
     static func project(bill: BillDTO, now: Date) -> BillRowProjection {
         let chip = chipStatus(for: bill, now: now)
-        let payee = bill.providerName ?? bill.billType.capitalized
+        let category = UtilityCategory.from(payee: bill.providerName)
+        let payee = bill.providerName ?? category.label
         let amount = formatCurrency(bill.displayAmount)
         let dueShort = formatDateShort(iso: bill.dueDate)
         let paidShort = formatDateShort(iso: bill.paidAt)
@@ -201,60 +272,113 @@ final class BillsListViewModel: ListOfRowsDataSource {
                 chipText: "Paid",
                 chipVariant: .success,
                 chipIcon: .check,
-                status: chip
+                status: chip,
+                category: category,
+                inlineChip: nil,
+                highlight: nil
+            )
+        case .cancelled:
+            return BillRowProjection(
+                payee: payee,
+                subtitle: "Cancelled",
+                amount: amount,
+                chipText: "Cancelled",
+                chipVariant: .neutral,
+                chipIcon: .x,
+                status: chip,
+                category: category,
+                inlineChip: nil,
+                highlight: .muted
             )
         case .overdue:
             return BillRowProjection(
                 payee: payee,
-                subtitle: dueShort.map { "Due \($0)" } ?? "Overdue",
+                subtitle: dueShort.map { "Overdue · was due \($0)" } ?? "Overdue",
                 amount: amount,
                 chipText: "Overdue",
                 chipVariant: .error,
                 chipIcon: .alertCircle,
-                status: chip
+                status: chip,
+                category: category,
+                inlineChip: nil,
+                highlight: nil
+            )
+        case .dueSoon:
+            return BillRowProjection(
+                payee: payee,
+                subtitle: dueShort.map { "Due \($0)" } ?? "Due soon",
+                amount: amount,
+                chipText: "Due soon",
+                chipVariant: .warning,
+                chipIcon: .clock,
+                status: chip,
+                category: category,
+                inlineChip: nil,
+                highlight: nil
             )
         case .scheduled:
             return BillRowProjection(
                 payee: payee,
-                subtitle: dueShort.map { "Auto-pay \($0)" } ?? "Auto-pay",
+                subtitle: dueShort.map { "Auto-pays \($0)" } ?? "Auto-pay scheduled",
                 amount: amount,
                 chipText: "Scheduled",
-                chipVariant: .personal,
+                chipVariant: .info,
                 chipIcon: .calendar,
-                status: chip
+                status: chip,
+                category: category,
+                inlineChip: RowChip(
+                    text: "Auto-pay",
+                    icon: .arrowsRepeat,
+                    tint: .status(.info)
+                ),
+                highlight: nil
             )
         case .due:
             return BillRowProjection(
                 payee: payee,
-                subtitle: dueShort ?? "No due date",
+                subtitle: dueShort.map { "Due \($0)" } ?? "No due date",
                 amount: amount,
-                chipText: dueShort.map { "Due \($0)" } ?? "Due",
+                chipText: "Due",
                 chipVariant: .warning,
                 chipIcon: .clock,
-                status: chip
+                status: chip,
+                category: category,
+                inlineChip: nil,
+                highlight: nil
             )
         }
     }
 
+    /// Derive the chip status per the T6.0a contract:
+    ///   - `cancelled`   when status is "cancelled"
+    ///   - `paid`        when status is "paid"
+    ///   - `scheduled`   when status is "scheduled"
+    ///   - `overdue`     when due_date is in the past
+    ///   - `dueSoon`     when due_date is within the next 7 days
+    ///   - `due`         otherwise
     static func chipStatus(for bill: BillDTO, now: Date) -> BillChipStatus {
+        if bill.status == "cancelled" { return .cancelled }
         if bill.status == "paid" { return .paid }
         if bill.status == "scheduled" { return .scheduled }
-        if let iso = bill.dueDate, let due = parseDate(iso), due < now {
-            return .overdue
+        if let iso = bill.dueDate, let due = parseDate(iso) {
+            if due < now { return .overdue }
+            let sevenDaysOut = now.addingTimeInterval(7 * 24 * 60 * 60)
+            if due <= sevenDaysOut { return .dueSoon }
         }
         return .due
     }
 
     private func passes(_ bill: BillDTO, tab: BillsTab, now: Date) -> Bool {
-        if bill.status == "cancelled" { return false }
         let chip = BillsListViewModel.chipStatus(for: bill, now: now)
         switch tab {
         case .upcoming:
-            return chip == .due || chip == .overdue || chip == .scheduled
+            // Upcoming excludes cancelled + paid; everything else (due,
+            // dueSoon, overdue, scheduled) is upcoming.
+            return chip != .cancelled && chip != .paid
         case .paid:
             return chip == .paid
         case .all:
-            return true
+            return chip != .cancelled
         }
     }
 
@@ -264,15 +388,95 @@ final class BillsListViewModel: ListOfRowsDataSource {
         var paid = 0
         var all = 0
         for b in bills {
-            if b.status == "cancelled" { continue }
-            all += 1
             let chip = BillsListViewModel.chipStatus(for: b, now: nowDate)
-            switch chip {
-            case .paid: paid += 1
-            case .due, .overdue, .scheduled: upcoming += 1
+            if chip == .cancelled { continue }
+            all += 1
+            if chip == .paid {
+                paid += 1
+            } else {
+                upcoming += 1
             }
         }
         return BillsTabCounts(upcoming: upcoming, paid: paid, all: all)
+    }
+
+    // MARK: - Banner
+
+    /// Compute the banner summary for the currently-loaded bills.
+    /// Exposed `internal` so tests can exercise it without going through
+    /// the SwiftUI view body.
+    func currentBannerSummary() -> BillsBannerSummary {
+        guard let bills else {
+            return BillsBannerSummary(
+                totalDueLabel: nil,
+                overdueCount: 0,
+                nextBillSubtitle: nil
+            )
+        }
+        return BillsListViewModel.summarize(bills: bills, now: now())
+    }
+
+    /// Pure summary projection. Public-static for tests.
+    static func summarize(bills: [BillDTO], now: Date) -> BillsBannerSummary {
+        let thirtyDaysOut = now.addingTimeInterval(30 * 24 * 60 * 60)
+        var totalDue: Decimal = 0
+        var overdueCount = 0
+        var totalCount = 0
+        var nextDue: (Date, BillDTO)?
+        for bill in bills {
+            let chip = chipStatus(for: bill, now: now)
+            if chip == .cancelled || chip == .paid { continue }
+            totalCount += 1
+            // Sum due in next 30 days (overdue counts too — the user owes it).
+            if let iso = bill.dueDate, let due = parseDate(iso) {
+                if due <= thirtyDaysOut {
+                    totalDue += bill.displayAmount
+                }
+                if due >= now {
+                    if nextDue == nil || due < nextDue!.0 {
+                        nextDue = (due, bill)
+                    }
+                }
+            } else {
+                // No due date — still surface in the total when the bill
+                // is upcoming (scheduled with no date, etc.).
+                totalDue += bill.displayAmount
+            }
+            if chip == .overdue { overdueCount += 1 }
+        }
+        let totalLabel = totalCount > 0 ? formatCurrency(totalDue) : nil
+        let nextSubtitle = nextDue.map { (date, _) -> String in
+            let days = Int(date.timeIntervalSince(now) / (24 * 60 * 60))
+            if days <= 0 {
+                return "Next bill due today"
+            } else if days == 1 {
+                return "All current · next bill tomorrow"
+            } else {
+                return "All current · next bill in \(days) days"
+            }
+        }
+        return BillsBannerSummary(
+            totalDueLabel: totalLabel,
+            overdueCount: overdueCount,
+            nextBillSubtitle: nextSubtitle
+        )
+    }
+
+    private func bannerTitle(for summary: BillsBannerSummary) -> String {
+        if let total = summary.totalDueLabel {
+            return "\(total) due in the next 30 days"
+        }
+        return "No upcoming bills"
+    }
+
+    private func bannerSubtitle(for summary: BillsBannerSummary) -> String? {
+        if summary.overdueCount > 0 {
+            let count = summary.overdueCount
+            return count == 1
+                ? "1 overdue · pay or schedule today"
+                : "\(count) overdue · pay or schedule today"
+        }
+        return summary.nextBillSubtitle
     }
 
     // MARK: - Formatting
@@ -295,7 +499,7 @@ final class BillsListViewModel: ListOfRowsDataSource {
         return formatter.string(from: date)
     }
 
-    private static func parseDate(_ iso: String) -> Date? {
+    static func parseDate(_ iso: String) -> Date? {
         // Accept full ISO timestamps and bare yyyy-MM-dd strings.
         let isoFull = ISO8601DateFormatter()
         isoFull.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -321,4 +525,7 @@ public struct BillRowProjection: Sendable, Equatable {
     public let chipVariant: StatusChipVariant
     public let chipIcon: PantopusIcon?
     public let status: BillChipStatus
+    public let category: UtilityCategory
+    public let inlineChip: RowChip?
+    public let highlight: RowHighlight?
 }

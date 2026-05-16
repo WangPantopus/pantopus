@@ -393,9 +393,9 @@ private struct BannerCard: View {
                     .fill(Theme.Color.appSurface)
                     .overlay(
                         RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
-                            .stroke(Theme.Color.primary100, lineWidth: 1)
+                            .stroke(tokens.border, lineWidth: 1)
                     )
-                Icon(config.icon, size: 16, color: Theme.Color.primary600)
+                Icon(config.icon, size: 16, color: tokens.foreground)
             }
             .frame(width: 32, height: 32)
             VStack(alignment: .leading, spacing: 2) {
@@ -409,20 +409,92 @@ private struct BannerCard: View {
                 }
             }
             Spacer()
+            if let cta = config.cta {
+                BannerCTAButton(cta: cta)
+            }
         }
         .padding(Spacing.s3)
-        .background(Theme.Color.primary50)
+        .background(tokens.background)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .stroke(Theme.Color.primary100, lineWidth: 1)
+                .stroke(tokens.border, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
 
-        if let onTap = config.onTap {
+        // When a CTA is present, the focused action is the pill — don't
+        // wrap the whole card in a Button (would steal the CTA's tap).
+        if config.cta == nil, let onTap = config.onTap {
             Button(action: onTap) { content }
                 .buttonStyle(.plain)
         } else {
             content
+        }
+    }
+
+    private var tokens: BannerTokens {
+        BannerTokens(tint: config.tint)
+    }
+}
+
+/// Resolved token pair (background / border / foreground) for a banner
+/// tint. Centralised so the BannerCard and any future banner consumers
+/// don't fork the lookup.
+private struct BannerTokens {
+    let background: Color
+    let border: Color
+    let foreground: Color
+
+    init(tint: BannerCTATint) {
+        switch tint {
+        case .primary:
+            background = Theme.Color.primary50
+            border = Theme.Color.primary100
+            foreground = Theme.Color.primary600
+        case .home:
+            background = Theme.Color.homeBg
+            border = Theme.Color.homeBg
+            foreground = Theme.Color.home
+        case .business:
+            background = Theme.Color.businessBg
+            border = Theme.Color.businessBg
+            foreground = Theme.Color.business
+        case .warning:
+            background = Theme.Color.warningBg
+            border = Theme.Color.warningBg
+            foreground = Theme.Color.warning
+        }
+    }
+}
+
+private struct BannerCTAButton: View {
+    let cta: BannerCTA
+
+    var body: some View {
+        Button(action: cta.handler) {
+            HStack(spacing: Spacing.s1) {
+                if let icon = cta.icon {
+                    Icon(icon, size: 14, color: Theme.Color.appTextInverse)
+                }
+                Text(cta.label)
+                    .pantopusTextStyle(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appTextInverse)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, 7)
+            .background(tintColor)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(cta.accessibilityLabel)
+    }
+
+    private var tintColor: Color {
+        switch cta.tint {
+        case .primary: Theme.Color.primary600
+        case .home: Theme.Color.home
+        case .business: Theme.Color.business
+        case .warning: Theme.Color.warning
         }
     }
 }
@@ -706,7 +778,8 @@ private struct RowView: View {
                     bidderStack: nil,
                     chips: headerChips,
                     timeMeta: row.timeMeta,
-                    metaTail: nil
+                    metaTail: nil,
+                    splitWith: nil
                 )
                 .padding(.bottom, 2)
             }
@@ -719,12 +792,13 @@ private struct RowView: View {
             if let body = row.body {
                 bodyLine(text: body, icon: row.bodyIcon, emphasis: row.bodyEmphasis)
             }
-            if (row.chips?.isEmpty == false) || row.bidderStack != nil {
+            if (row.chips?.isEmpty == false) || row.bidderStack != nil || row.splitWith != nil {
                 ChipRowView(
                     bidderStack: row.bidderStack,
                     chips: row.chips ?? [],
                     timeMeta: row.headerChips == nil ? row.timeMeta : nil,
-                    metaTail: row.metaTail
+                    metaTail: row.metaTail,
+                    splitWith: row.splitWith
                 )
                 .padding(.top, 4)
             }
@@ -1021,6 +1095,11 @@ private struct ChipRowView: View {
     let chips: [RowChip]
     let timeMeta: String?
     let metaTail: String?
+    /// T6.0a — right-edge split-payer stack (Bills). When set, renders
+    /// "Split N ways" + 18pt overlapping avatars where `timeMeta` would
+    /// otherwise sit. The two don't coexist on Bills rows in practice;
+    /// when both are set, splitWith wins.
+    let splitWith: SplitStackData?
 
     var body: some View {
         HStack(spacing: Spacing.s1) {
@@ -1038,12 +1117,99 @@ private struct ChipRowView: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
-            if let timeMeta {
+            if let splitWith {
+                SplitStackTail(data: splitWith)
+            } else if let timeMeta {
                 Text(timeMeta)
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextMuted)
             }
         }
+    }
+}
+
+/// Right-edge "Split N ways" caption + 18pt overlapping avatars,
+/// rendered on Bills rows when the bill is split between household
+/// members. Tone palette shared with `BidderStack` so a future feature
+/// can mix the two without re-keying the colors.
+private struct SplitStackTail: View {
+    let data: SplitStackData
+
+    var body: some View {
+        HStack(spacing: Spacing.s1) {
+            Text(captionText)
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextMuted)
+                .lineLimit(1)
+            avatars
+        }
+    }
+
+    private var captionText: String {
+        if data.totalWays > 1 {
+            return "Split \(data.totalWays) ways"
+        }
+        return "Split"
+    }
+
+    private var avatars: some View {
+        let visible = Array(data.members.prefix(3))
+        return HStack(spacing: -4) {
+            ForEach(Array(visible.enumerated()), id: \.element.id) { _, member in
+                SplitAvatar(member: member)
+            }
+            if data.overflow > 0 {
+                SplitOverflow(count: data.overflow)
+            }
+        }
+    }
+}
+
+private struct SplitAvatar: View {
+    let member: SplitMember
+
+    var body: some View {
+        Text(member.initials)
+            .font(.system(size: 7, weight: .bold))
+            .foregroundStyle(foreground)
+            .frame(width: 18, height: 18)
+            .background(Circle().fill(background))
+            .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 1.5))
+    }
+
+    private var background: Color {
+        switch member.tone {
+        case .sky: Theme.Color.personalBg
+        case .teal: Theme.Color.successBg
+        case .amber: Theme.Color.warningBg
+        case .rose: Theme.Color.errorBg
+        case .violet: Theme.Color.businessBg
+        case .slate: Theme.Color.appSurfaceSunken
+        }
+    }
+
+    private var foreground: Color {
+        switch member.tone {
+        case .sky: Theme.Color.personal
+        case .teal: Theme.Color.success
+        case .amber: Theme.Color.warning
+        case .rose: Theme.Color.error
+        case .violet: Theme.Color.business
+        case .slate: Theme.Color.appTextSecondary
+        }
+    }
+}
+
+private struct SplitOverflow: View {
+    let count: Int
+
+    var body: some View {
+        Text("+\(count)")
+            .font(.system(size: 7, weight: .bold))
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            .frame(width: 18, height: 18)
+            .background(Circle().fill(Theme.Color.appSurfaceSunken))
+            .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 1.5))
     }
 }
 
@@ -1232,13 +1398,13 @@ private struct FABButton: View {
         case .canonicalCreate:
             Icon(action.icon, size: 24, color: Theme.Color.appTextInverse)
                 .frame(width: 56, height: 56)
-                .background(Theme.Color.primary600)
+                .background(tintBackground)
                 .clipShape(Circle())
                 .pantopusShadow(.primary)
         case .secondaryCreate:
             Icon(action.icon, size: 22, color: Theme.Color.appTextInverse)
                 .frame(width: 52, height: 52)
-                .background(Theme.Color.primary600)
+                .background(tintBackground)
                 .clipShape(Circle())
                 .pantopusShadow(.primary)
         case let .extendedNav(label):
@@ -1251,9 +1417,20 @@ private struct FABButton: View {
             }
             .padding(.horizontal, Spacing.s5)
             .frame(height: 48)
-            .background(Theme.Color.primary600)
+            .background(tintBackground)
             .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
             .pantopusShadow(.primary)
+        }
+    }
+
+    /// Resolve the FAB's tint to a fill color. Default `.sky` keeps the
+    /// pre-T6 sky-blue render; `.home` and `.business` swap to the
+    /// matching identity tokens.
+    private var tintBackground: Color {
+        switch action.tint {
+        case .sky: Theme.Color.primary600
+        case .home: Theme.Color.home
+        case .business: Theme.Color.business
         }
     }
 }

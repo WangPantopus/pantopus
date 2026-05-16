@@ -14,6 +14,8 @@ import type {
   RowLeading,
   RowModel,
   RowTrailing,
+  SplitMember,
+  SplitStackData,
   StatusChipVariant,
 } from './types';
 
@@ -123,11 +125,12 @@ function ContentColumn({ row }: { row: RowModel }) {
         ) : (
           <div className="mt-1 text-xs text-app-text-secondary line-clamp-2">{row.body}</div>
         ))}
-      {row.chips && row.chips.length > 0 && (
+      {((row.chips && row.chips.length > 0) || row.splitWith) && (
         <ChipRow
-          chips={row.chips}
+          chips={row.chips ?? []}
           timeMeta={row.headerChips ? undefined : row.timeMeta}
           metaTail={row.metaTail}
+          splitWith={row.splitWith}
         />
       )}
     </div>
@@ -437,11 +440,16 @@ function ChipRow({
   timeMeta,
   metaTail,
   marginTop = 'mt-1',
+  splitWith,
 }: {
   chips: RowChip[];
   timeMeta?: string;
   metaTail?: string;
   marginTop?: string;
+  /** T6.0a — right-edge split-payer stack (Bills). When set, takes
+   *  precedence over `timeMeta` and renders "Split N ways" alongside
+   *  18px overlapping avatars. The two never coexist on Bills rows. */
+  splitWith?: SplitStackData;
 }) {
   return (
     <div className={`${marginTop} flex items-center gap-1 flex-wrap`}>
@@ -452,8 +460,51 @@ function ChipRow({
         <span className="text-[10.5px] text-app-text-muted truncate">{metaTail}</span>
       )}
       <span className="flex-1" />
-      {timeMeta && <span className="text-[10.5px] text-app-text-muted">{timeMeta}</span>}
+      {splitWith ? (
+        <SplitStackTail data={splitWith} />
+      ) : (
+        timeMeta && <span className="text-[10.5px] text-app-text-muted">{timeMeta}</span>
+      )}
     </div>
+  );
+}
+
+// ─── Split stack tail (T6.0a Bills) ────────────────────────────
+
+function SplitStackTail({ data }: { data: SplitStackData }) {
+  const visible = data.members.slice(0, 3);
+  const overflow = data.overflow ?? 0;
+  const caption = data.totalWays > 1 ? `Split ${data.totalWays} ways` : 'Split';
+  return (
+    <div className="flex items-center gap-1.5 shrink-0">
+      <span className="text-[10.5px] text-app-text-muted whitespace-nowrap">{caption}</span>
+      <div className="flex items-center">
+        {visible.map((m, i) => (
+          <SplitAvatar key={m.id} member={m} stacked={i > 0} />
+        ))}
+        {overflow > 0 && (
+          <span
+            className={`w-[18px] h-[18px] rounded-full border-[1.5px] border-app-surface bg-app-surface-sunken text-app-text-secondary text-[7px] font-bold flex items-center justify-center ${
+              visible.length === 0 ? '' : '-ml-1.5'
+            }`}
+          >
+            +{overflow}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SplitAvatar({ member, stacked }: { member: SplitMember; stacked: boolean }) {
+  return (
+    <span
+      className={`w-[18px] h-[18px] rounded-full border-[1.5px] border-app-surface flex items-center justify-center text-[7px] font-bold ${
+        stacked ? '-ml-1.5' : ''
+      } ${toneClasses(member.tone)}`}
+    >
+      {member.initials.slice(0, 2).toUpperCase()}
+    </span>
   );
 }
 
