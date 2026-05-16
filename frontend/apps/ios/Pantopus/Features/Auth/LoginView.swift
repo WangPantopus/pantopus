@@ -8,9 +8,10 @@ import SwiftUI
 struct LoginView: View {
     @Environment(AuthManager.self) private var auth
     @State private var viewModel = LoginViewModel()
+    @State private var path: [AuthRoute] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack(spacing: 24) {
                 Spacer()
                 VStack(spacing: 8) {
@@ -75,11 +76,61 @@ struct LoginView: View {
                 .accessibilityLabel(viewModel.isLoading ? "Signing in" : "Sign in")
                 .accessibilityHint(viewModel.canSubmit ? "Submits the sign-in form" : "Fill in email and password to enable")
 
+                // ── P3 temporary nav-out buttons. P4/P5 wire these from the
+                // designed footer / inline links and remove this block. ──
+                AuthStubNav(path: $path)
+
                 Spacer()
             }
             .padding(24)
             .navigationBarHidden(true)
+            .navigationDestination(for: AuthRoute.self) { route in
+                switch route {
+                case .login:
+                    EmptyView()
+                case .signUp:
+                    SignUpView()
+                case .forgotPassword:
+                    ForgotPasswordView()
+                case let .resetPassword(token):
+                    ResetPasswordView(token: token)
+                case .verifyEmail:
+                    VerifyEmailView()
+                case let .error(authError):
+                    AuthErrorView(error: authError)
+                }
+            }
         }
+    }
+}
+
+/// Temporary in-tree nav row that lets a dev reach each stub before the
+/// designed entry points (footer links, banner) land in P4/P5. Removed in
+/// the next prompt.
+private struct AuthStubNav: View {
+    @Binding var path: [AuthRoute]
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text("Dev: Auth stubs (P3)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Button("Sign up") { path.append(.signUp) }
+                    .accessibilityIdentifier("authNavSignUp")
+                Button("Forgot") { path.append(.forgotPassword) }
+                    .accessibilityIdentifier("authNavForgotPassword")
+                Button("Verify") { path.append(.verifyEmail) }
+                    .accessibilityIdentifier("authNavVerifyEmail")
+            }
+            HStack(spacing: 8) {
+                Button("Reset") { path.append(.resetPassword(token: "stub-token")) }
+                    .accessibilityIdentifier("authNavResetPassword")
+                Button("Error") { path.append(.error(.invalidCredentials)) }
+                    .accessibilityIdentifier("authNavAuthError")
+            }
+        }
+        .font(.footnote)
     }
 }
 

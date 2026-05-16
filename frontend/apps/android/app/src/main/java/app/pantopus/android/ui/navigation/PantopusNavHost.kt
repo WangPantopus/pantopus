@@ -16,13 +16,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.ui.screens.RootViewModel
-import app.pantopus.android.ui.screens.auth.LoginScreen
+import app.pantopus.android.ui.screens.auth.AuthNavHost
 import app.pantopus.android.ui.screens.root.RootTabScreen
 import app.pantopus.android.ui.theme.PantopusColors
 
 /**
- * Top-level dispatcher — cross-fades between splash / login / signed-in
- * root tab container based on [AuthRepository.State].
+ * Top-level dispatcher — cross-fades between splash / signed-out auth nav /
+ * signed-in root tab container based on [AuthRepository.State]. The
+ * signed-out branch hosts its own NavController via [AuthNavHost] so P4/P5
+ * stubs (sign up, forgot, reset, verify, error) are reachable from Login.
  */
 @Composable
 fun PantopusNavHost(viewModel: RootViewModel = hiltViewModel()) {
@@ -35,7 +37,7 @@ fun PantopusNavHost(viewModel: RootViewModel = hiltViewModel()) {
     ) { state ->
         when (state) {
             AuthRepository.State.Unknown -> SplashScreen()
-            AuthRepository.State.SignedOut -> LoginScreen()
+            AuthRepository.State.SignedOut -> AuthNavHost()
             is AuthRepository.State.SignedIn -> RootTabScreen()
         }
     }

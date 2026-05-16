@@ -2,6 +2,7 @@ package app.pantopus.android.ui.screens.auth
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +14,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -34,10 +36,25 @@ object LoginScreenTags {
     const val PASSWORD_FIELD = "loginPasswordField"
     const val SUBMIT_BUTTON = "loginSubmitButton"
     const val ERROR_MESSAGE = "loginErrorMessage"
+
+    // P3 temporary nav-out buttons. Removed in P4/P5 once footer / banner
+    // entry points land per `auth-frames.jsx`.
+    const val NAV_SIGN_UP = "authNavSignUp"
+    const val NAV_FORGOT_PASSWORD = "authNavForgotPassword"
+    const val NAV_VERIFY_EMAIL = "authNavVerifyEmail"
+    const val NAV_RESET_PASSWORD = "authNavResetPassword"
+    const val NAV_AUTH_ERROR = "authNavAuthError"
 }
 
 @Composable
-fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
+fun LoginScreen(
+    viewModel: LoginViewModel = hiltViewModel(),
+    onNavigateToSignUp: () -> Unit = {},
+    onNavigateToForgotPassword: () -> Unit = {},
+    onNavigateToVerifyEmail: () -> Unit = {},
+    onNavigateToResetPassword: (String) -> Unit = {},
+    onNavigateToAuthError: () -> Unit = {},
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Column(
@@ -116,6 +133,35 @@ fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
             } else {
                 Text("Sign in")
             }
+        }
+
+        // ── P3 temporary nav-out buttons. P4/P5 wire these from the
+        // designed footer / inline links and remove this block. ──
+        Spacer(Modifier.height(16.dp))
+        Text("Dev: Auth stubs (P3)", style = MaterialTheme.typography.labelSmall)
+        Row {
+            TextButton(
+                onClick = onNavigateToSignUp,
+                modifier = Modifier.testTag(LoginScreenTags.NAV_SIGN_UP),
+            ) { Text("Sign up") }
+            TextButton(
+                onClick = onNavigateToForgotPassword,
+                modifier = Modifier.testTag(LoginScreenTags.NAV_FORGOT_PASSWORD),
+            ) { Text("Forgot") }
+            TextButton(
+                onClick = onNavigateToVerifyEmail,
+                modifier = Modifier.testTag(LoginScreenTags.NAV_VERIFY_EMAIL),
+            ) { Text("Verify") }
+        }
+        Row {
+            TextButton(
+                onClick = { onNavigateToResetPassword("stub-token") },
+                modifier = Modifier.testTag(LoginScreenTags.NAV_RESET_PASSWORD),
+            ) { Text("Reset") }
+            TextButton(
+                onClick = onNavigateToAuthError,
+                modifier = Modifier.testTag(LoginScreenTags.NAV_AUTH_ERROR),
+            ) { Text("Error") }
         }
     }
 }

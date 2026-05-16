@@ -41,6 +41,11 @@ class TokenStorage
                 .map { it[Keys.ACCESS] }
                 .first()
 
+        suspend fun refreshToken(): String? =
+            context.tokenDataStore.data
+                .map { it[Keys.REFRESH] }
+                .first()
+
         suspend fun save(
             accessToken: String,
             refreshToken: String?,
@@ -50,6 +55,22 @@ class TokenStorage
                 prefs[Keys.ACCESS] = accessToken
                 if (refreshToken != null) prefs[Keys.REFRESH] = refreshToken
                 prefs[Keys.USER_ID] = userId
+            }
+        }
+
+        /**
+         * Refresh-only update — overwrites the access (and optionally
+         * refresh) token without touching the stored userId. Used by
+         * `AuthRepository.refreshSession` to mirror iOS, which never
+         * rewrites the user identity on a token rotation.
+         */
+        suspend fun updateTokens(
+            accessToken: String,
+            refreshToken: String?,
+        ) {
+            context.tokenDataStore.edit { prefs ->
+                prefs[Keys.ACCESS] = accessToken
+                if (refreshToken != null) prefs[Keys.REFRESH] = refreshToken
             }
         }
 
