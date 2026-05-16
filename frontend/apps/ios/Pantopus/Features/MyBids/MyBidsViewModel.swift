@@ -468,7 +468,7 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
         rebuild()
         do {
             _ = try await api.request(
-                OffersEndpoints.withdrawBid(
+                GigsEndpoints.withdrawBid(
                     gigId: target.gigId,
                     bidId: target.id,
                     reason: reason
