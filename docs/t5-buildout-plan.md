@@ -424,6 +424,125 @@ Every PR (P5–P16) must clear, in addition to
 
 ---
 
+## My bids implementation notes (T5.3.1 / P7)
+
+Canonical record of how the My bids screen maps backend status →
+4-tab grouping → design chip → footer action. **This section is the
+source of truth — when iOS, Android, and web disagree, this is what
+wins.**
+
+### Tab grouping
+
+Four equal-width tabs in this exact order. The 7 canonical backend
+statuses (`pending / countered / accepted / rejected / withdrawn /
+expired`, plus the inlined `gig.status` for "cancelled" and
+"completed") bucket as follows:
+
+| Tab        | Backend membership                                              |
+| ---------- | --------------------------------------------------------------- |
+| `Active`   | `pending`, `countered` (gig is `open` or `assigned`)            |
+| `Accepted` | `accepted`, `assigned` (gig is not yet `completed`)             |
+| `Rejected` | `rejected`, `declined`, `withdrawn`, `expired`, or `gig.status === 'cancelled'` (when the bid wasn't already accepted) |
+| `Done`     | `accepted` + `gig.status === 'completed'`                       |
+
+Implementation: `MyBidsViewModel.tabFor(dto, now)` on iOS + Android;
+`bidTabBucket(bid)` on web. All three call sites must stay in sync.
+
+### Chip variant per design
+
+Eleven chip variants live in the design's STATUS map
+(`mybids-frames.jsx:30-44`). Derived from
+`(bid.status, gig.status, expires_at, shortlisted, your_rank,
+top_price, proposed_time)`. The chip variant column comes straight
+from the design; **do not invent new variants**.
+
+| Chip                    | Tab        | Derivation                                                                                                       | Chip variant |
+| ----------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------- | ------------ |
+| `Top bid`               | Active     | `your_rank == 1` (P3 backend prep)                                                                               | success      |
+| `Shortlisted`           | Active     | `shortlisted == true` (P3 backend prep)                                                                          | info         |
+| `Pending`               | Active     | `bid.status == 'pending'`, no signal flag                                                                        | neutral      |
+| `Outbid`                | Active     | `your_rank > 1 && top_price != null` (P3 backend prep)                                                           | warning      |
+| `Closes in Xh`          | Active     | `pending` + `expires_at` within 4h. Replaces Top/Shortlisted/Outbid.                                              | error        |
+| `Accepted`              | Accepted   | `bid.status == 'accepted'` and either no `proposed_time` or it's in the past                                      | success      |
+| `Starts {weekday}`      | Accepted   | `bid.status == 'accepted'` and `proposed_time` is in the future                                                  | info         |
+| `Not selected`          | Rejected   | `bid.status in {rejected, declined, withdrawn, expired}`                                                         | neutral      |
+| `Task cancelled`        | Rejected   | `gig.status == 'cancelled'` and bid wasn't already accepted                                                       | neutral      |
+| `Paid · $X`             | Done       | gig `completed` and the user has already left a review (**TODO** — needs a `already_reviewed` backend signal)    | success      |
+| `Leave review`          | Done       | gig `completed`, review not yet left. Default for completed gigs until the backend signal lands.                  | info         |
+
+### Footer per tab + status
+
+The design's `actions` prop maps to footer archetypes. iOS exposes
+this as `MyBidsFooter`, Android as `MyBidsFooter`, web renders inline
+buttons today (full footer parity is a follow-up).
+
+| Footer       | When                                                       | Buttons                                                                                             |
+| ------------ | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `edit`       | Active rows                                                | `[Withdraw (destructive ghost), Edit bid (primary)]` — full-width split                              |
+| `message`    | Accepted rows (`gig.status != 'in_progress'`)              | `[View details (ghost), Message client (primary)]`                                                  |
+| `complete`   | Accepted rows where `gig.status == 'in_progress'`          | `[Message (ghost), Mark complete (primary)]`                                                        |
+| `review`     | Done rows with `Leave review` chip                         | `[Leave a review for {firstName} (primary)]` — single full-width                                    |
+| `rebid`      | Rejected rows                                              | `[Bid on similar (ghost)]` — single full-width                                                       |
+| `none`       | Done rows with `Paid · $X` chip                            | no footer                                                                                            |
+
+### Muted highlight
+
+Terminal rows render at 0.78 opacity via the new
+`RowHighlight.muted` case (additive, ships with this PR on
+iOS / Android / web). Applies to rows with chip in
+`{Not selected, Task cancelled}`. The shell-level
+`RowHighlight.archived` case is kept untouched — `muted` is the
+semantic synonym other terminal-state screens (Review claims, future
+Done lists) can opt into without overloading the "archived" intent.
+
+### Endpoints
+
+| Action            | Method  | Path                                       | Backend file:line                |
+| ----------------- | ------- | ------------------------------------------ | -------------------------------- |
+| List my bids      | GET     | `/api/gigs/my-bids`                        | `backend/routes/gigs.js:1253`    |
+| Edit a bid        | PUT     | `/api/gigs/:gigId/bids/:bidId`             | `backend/routes/gigs.js:3971`    |
+| Withdraw a bid    | DELETE  | `/api/gigs/:gigId/bids/:bidId`             | `backend/routes/gigs.js:5245`    |
+| Mark gig done     | POST    | `/api/gigs/:gigId/mark-completed`          | `backend/routes/gigs.js:5926`    |
+| Leave review      | POST    | `/api/reviews`                             | `backend/routes/reviews.js:35`   |
+
+Note the **DELETE** method on the withdraw endpoint — the backend
+exposes `DELETE /api/gigs/:gigId/bids/:bidId` (not POST `.../withdraw`
+as some earlier drafts suggested). Both platforms send the
+`{ reason }` body via `DELETE … --data` (Retrofit `@HTTP hasBody=true`
+on Android; URLSession `httpBody` on iOS).
+
+### Backend prep PR (P3) — still pending
+
+Until the `shortlisted`, `your_rank`, and `top_price` fields land on
+the bid response, Top bid / Shortlisted / Outbid never appear — rows
+fall back to `Pending` or `Closes in Xh`. The optional decoders are
+already in place on both DTOs (`BidDTO.swift`, `BidDto.kt`), so
+shipping the backend PR alone will start surfacing the chips with no
+mobile code change.
+
+Same shape applies to `Paid · $X` vs `Leave review`: needs a
+`already_reviewed: boolean` on the bid DTO (or on a sibling
+`reviews_by_me` query). Until then every Done row prompts a review.
+
+### Optimistic mutations
+
+- **Withdraw**: row immediately flips to `withdrawn` in the cache
+  (which moves it from Active → Rejected with the `Not selected` chip
+  + muted highlight). On API failure the cache is restored. Backend
+  cooldown of 5 minutes on re-bid is surfaced by the
+  `rebid_available_at` response field (TODO surface in UI).
+- **Mark complete**: row's inlined `gig.status` flips to `completed`
+  in the cache, moving it from Accepted → Done with the `Leave
+  review` chip. Backend rolls back the cache on failure.
+
+### Parity audit
+
+Updated `docs/mobile-parity-audit.md` row 6 — My bids is now live on
+all three platforms; legacy 7-status web filter is rebucketed to the
+4 design tabs.
+
+---
+
 ## Open-question summary (for the next session)
 
 Before T5.0a (P1) starts, the following need a yes/no/edit from the

@@ -601,7 +601,8 @@ internal fun RowView(
             else -> PantopusColors.appBorder
         }
     val cornerRadius = if (isGrouped) 0.dp else Radii.lg
-    val opacity = if (row.highlight is RowHighlight.Archived) 0.78f else 1f
+    val opacity =
+        if (row.highlight is RowHighlight.Archived || row.highlight is RowHighlight.Muted) 0.78f else 1f
 
     val baseModifier =
         if (isGrouped) {

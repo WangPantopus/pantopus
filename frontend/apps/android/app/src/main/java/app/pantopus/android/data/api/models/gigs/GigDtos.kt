@@ -127,3 +127,19 @@ data class PlaceBidResponse(
     val bid: GigBidDto? = null,
     val message: String? = null,
 )
+
+/**
+ * Body for `POST /api/gigs/:gigId/mark-completed`. T5.3.1 only sends
+ * the optional `note`; the full backend shape also accepts `photos`
+ * and `checklist` for a future photo-strip PR.
+ */
+@JsonClass(generateAdapter = true)
+data class MarkCompletedBody(
+    val note: String? = null,
+)
+
+/** Response envelope from the mark-completed endpoint. */
+@JsonClass(generateAdapter = true)
+data class MarkCompletedResponse(
+    val message: String? = null,
+)

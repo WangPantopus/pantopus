@@ -5,6 +5,8 @@ import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
+import app.pantopus.android.data.api.models.gigs.MarkCompletedBody
+import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
 import app.pantopus.android.data.api.models.gigs.PlaceBidResponse
 import app.pantopus.android.data.api.net.NetworkResult
@@ -68,4 +70,12 @@ class GigsRepository
             gigId: String,
             body: PlaceBidBody,
         ): NetworkResult<PlaceBidResponse> = safeApiCall { api.placeBid(gigId, body) }
+
+        suspend fun markCompleted(
+            gigId: String,
+            note: String? = null,
+        ): NetworkResult<MarkCompletedResponse> =
+            safeApiCall {
+                api.markCompleted(gigId, MarkCompletedBody(note = note))
+            }
     }

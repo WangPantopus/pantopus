@@ -467,7 +467,7 @@ private struct RowView: View {
             .overlay(rowOverlay)
             .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
             .contentShape(Rectangle())
-            .opacity(row.highlight == .archived ? 0.78 : 1.0)
+            .opacity(row.highlight == .archived || row.highlight == .muted ? 0.78 : 1.0)
 
         if row.footer == nil {
             // Whole-row tap is the canonical interaction when no inline

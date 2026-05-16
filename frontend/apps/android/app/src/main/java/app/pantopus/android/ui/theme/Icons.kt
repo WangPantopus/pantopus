@@ -6,15 +6,18 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Autorenew
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -75,6 +78,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.Work
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -181,6 +185,12 @@ enum class PantopusIcon(
     Package("package"),
     Compass("compass"),
     Filter("filter"),
+
+    // T5.3.1 — My bids bid-lifecycle chip + footer icons.
+    Crown("crown"),
+    TrendingDown("trending-down"),
+    Ban("ban"),
+    FileText("file-text"),
     ;
 
     companion object {
@@ -296,6 +306,10 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Package -> IconSource.Material(Icons.Filled.Inventory2)
         PantopusIcon.Compass -> IconSource.Material(Icons.Filled.Explore)
         PantopusIcon.Filter -> IconSource.Material(Icons.Filled.FilterAlt)
+        PantopusIcon.Crown -> IconSource.Material(Icons.Filled.WorkspacePremium)
+        PantopusIcon.TrendingDown -> IconSource.Material(Icons.AutoMirrored.Filled.TrendingDown)
+        PantopusIcon.Ban -> IconSource.Material(Icons.Filled.Block)
+        PantopusIcon.FileText -> IconSource.Material(Icons.AutoMirrored.Filled.Article)
     }
 
 /**

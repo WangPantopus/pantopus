@@ -21,6 +21,8 @@ public enum YouRoute: Hashable {
     case placeholder(label: String)
     /// T5.2.4 — cross-listing Offers (incoming + outgoing).
     case offers
+    /// T5.3.1 — My bids. The "me.bids" action tile pushes here.
+    case myBids
     /// Gig detail destination for an offer-row tap. Reuses the existing
     /// Transactional Detail shell.
     case gigDetail(gigId: String)
@@ -223,9 +225,8 @@ public struct YouTabRoot: View {
         case "me.mail":
             path.append(.mailbox)
         case "me.bids":
-            // T5.2.4 — the "My bids" tile is the cross-listing Offers
-            // entry point until P7 ships the dedicated My-bids screen.
-            path.append(.offers)
+            // T5.3.1 — dedicated My bids screen.
+            path.append(.myBids)
         default:
             path.append(.placeholder(label: tile.label))
         }
@@ -347,6 +348,48 @@ public struct YouTabRoot: View {
                 onMessage: { _ in
                     Task { @MainActor in path.append(.placeholder(label: "Messages")) }
                 }
+            )
+        case .myBids:
+            MyBidsView(
+                viewModel: MyBidsViewModel(
+                    onOpenBid: { dto in
+                        Task { @MainActor in
+                            if let gigId = dto.gigId {
+                                path.append(.gigDetail(gigId: gigId))
+                            }
+                        }
+                    },
+                    onOpenFilters: {
+                        Task { @MainActor in path.append(.placeholder(label: "Filter bids")) }
+                    },
+                    onBrowseTasks: {
+                        Task { @MainActor in path.append(.placeholder(label: "Browse tasks")) }
+                    },
+                    onMessageClient: { dto in
+                        // The chat conversation surface lives on HubTabRoot
+                        // today; from You we push to gig detail where the
+                        // "Message poster" CTA opens the same thread.
+                        Task { @MainActor in
+                            if let gigId = dto.gigId {
+                                path.append(.gigDetail(gigId: gigId))
+                            }
+                        }
+                    },
+                    onEditBid: { dto in
+                        Task { @MainActor in
+                            if let gigId = dto.gigId {
+                                path.append(.gigDetail(gigId: gigId))
+                            }
+                        }
+                    },
+                    onLeaveReview: { dto in
+                        Task { @MainActor in
+                            if let gigId = dto.gigId {
+                                path.append(.gigDetail(gigId: gigId))
+                            }
+                        }
+                    }
+                )
             )
         #if DEBUG
         case let .publicProfile(userId):

@@ -102,6 +102,38 @@ public enum GigsEndpoints {
         Endpoint(method: .post, path: "/api/gigs/\(gigId)/bids", body: body)
     }
 
+    /// `PUT /api/gigs/:gigId/bids/:bidId` — update a placed bid. Backend
+    /// only allows updates while the bid is `pending` or `countered`.
+    /// Route `backend/routes/gigs.js:3971`.
+    public static func updateBid(gigId: String, bidId: String, body: PlaceBidBody) -> Endpoint {
+        Endpoint(method: .put, path: "/api/gigs/\(gigId)/bids/\(bidId)", body: body)
+    }
+
+    /// `DELETE /api/gigs/:gigId/bids/:bidId` — withdraw a placed bid.
+    /// Body carries a structured `WithdrawBidReason`. Backend records
+    /// `withdrawal_reason` + `withdrawn_at` and returns a
+    /// `rebid_available_at` timestamp (5 min cooldown). Route
+    /// `backend/routes/gigs.js:5245`.
+    public static func withdrawBid(gigId: String, bidId: String, reason: WithdrawBidReason?) -> Endpoint {
+        Endpoint(
+            method: .delete,
+            path: "/api/gigs/\(gigId)/bids/\(bidId)",
+            body: WithdrawBidBody(reason: reason)
+        )
+    }
+
+    /// `POST /api/gigs/:gigId/mark-completed` — worker marks an
+    /// assigned gig as done. No body is required; we accept an optional
+    /// note for the photo/notes flow when a future PR brings it in.
+    /// Route `backend/routes/gigs.js:5926`.
+    public static func markCompleted(gigId: String, note: String? = nil) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/gigs/\(gigId)/mark-completed",
+            body: MarkCompletedBody(note: note)
+        )
+    }
+
     /// `POST /api/gigs/:id/save` — bookmark.
     public static func save(id: String) -> Endpoint {
         Endpoint(method: .post, path: "/api/gigs/\(id)/save")
@@ -110,6 +142,46 @@ public enum GigsEndpoints {
     /// `DELETE /api/gigs/:id/save` — un-bookmark.
     public static func unsave(id: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/gigs/\(id)/save")
+    }
+}
+
+/// Reasons the backend whitelists for `DELETE /api/gigs/:gigId/bids/:bidId`.
+/// Anything else falls through as `null` on the server side.
+public enum WithdrawBidReason: String, Sendable, CaseIterable {
+    case scheduleConflict = "schedule_conflict"
+    case underpriced
+    case mistake
+    case other
+
+    /// User-facing label rendered in the withdraw sheet.
+    public var label: String {
+        switch self {
+        case .scheduleConflict: "Schedule conflict"
+        case .underpriced: "Underpriced my bid"
+        case .mistake: "Made a mistake"
+        case .other: "Other reason"
+        }
+    }
+}
+
+/// Body for `DELETE /api/gigs/:gigId/bids/:bidId`. Reason is optional —
+/// the backend whitelist accepts a small set of values.
+public struct WithdrawBidBody: Encodable, Sendable {
+    public let reason: String?
+
+    public init(reason: WithdrawBidReason?) {
+        self.reason = reason?.rawValue
+    }
+}
+
+/// Body for `POST /api/gigs/:gigId/mark-completed`. The full backend
+/// shape also accepts `photos` and `checklist`; T5.3.1 only sends the
+/// optional `note`. Later flows (photo strip) can extend this.
+public struct MarkCompletedBody: Encodable, Sendable {
+    public let note: String?
+
+    public init(note: String? = nil) {
+        self.note = note
     }
 }
 

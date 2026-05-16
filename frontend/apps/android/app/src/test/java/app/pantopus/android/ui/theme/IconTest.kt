@@ -89,6 +89,11 @@ class IconTest {
             "package",
             "compass",
             "filter",
+            // T5.3.1 — My bids
+            "crown",
+            "trending-down",
+            "ban",
+            "file-text",
         )
 
     @Test

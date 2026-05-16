@@ -84,6 +84,7 @@ import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailForm
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
+import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
 import app.pantopus.android.ui.screens.nearby.map.MapEntity
 import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
 import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
@@ -144,6 +145,9 @@ private object ChildRoutes {
 
     /** Cross-listing Offers (T5.2.4). Reached from the You tab. */
     const val OFFERS = "offers"
+
+    /** My bids (T5.3.1). Reached from the You tab "My bids" action tile. */
+    const val MY_BIDS = "my-bids"
 
     /** Hub menu icon target. Replaced by Settings in T3.1. */
     const val MENU = "settings"
@@ -542,6 +546,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenSettings = { navController.navigate(ChildRoutes.MENU) },
                     onOpenOffers = { navController.navigate(ChildRoutes.OFFERS) },
+                    onOpenMyBids = { navController.navigate(ChildRoutes.MY_BIDS) },
                 )
             }
 
@@ -903,6 +908,38 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Offer filters")) },
                     onBrowseListings = { navController.navigate(ChildRoutes.placeholder("Browse listings")) },
                     onPostTask = { navController.navigate(ChildRoutes.placeholder("Post a task")) },
+                )
+            }
+            composable(ChildRoutes.MY_BIDS) {
+                MyBidsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenBid = { dto ->
+                        val gigId = dto.gigId ?: dto.gig?.id
+                        if (!gigId.isNullOrBlank()) {
+                            navController.navigate(ChildRoutes.gigDetail(gigId))
+                        }
+                    },
+                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Filter bids")) },
+                    onBrowseTasks = { navController.navigate(ChildRoutes.GIGS_FEED) },
+                    onMessageClient = { dto ->
+                        // Push to gig detail; "Message poster" is wired there.
+                        val gigId = dto.gigId ?: dto.gig?.id
+                        if (!gigId.isNullOrBlank()) {
+                            navController.navigate(ChildRoutes.gigDetail(gigId))
+                        }
+                    },
+                    onEditBid = { dto ->
+                        val gigId = dto.gigId ?: dto.gig?.id
+                        if (!gigId.isNullOrBlank()) {
+                            navController.navigate(ChildRoutes.gigDetail(gigId))
+                        }
+                    },
+                    onLeaveReview = { dto ->
+                        val gigId = dto.gigId ?: dto.gig?.id
+                        if (!gigId.isNullOrBlank()) {
+                            navController.navigate(ChildRoutes.gigDetail(gigId))
+                        }
+                    },
                 )
             }
             composable(ChildRoutes.MENU) {

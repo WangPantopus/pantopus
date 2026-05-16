@@ -53,11 +53,76 @@ public struct BidDTO: Decodable, Sendable, Hashable, Identifiable {
     public let counterStatus: String?
     public let counteredAt: String?
     public let withdrawnAt: String?
+    public let withdrawalReason: String?
     public let gig: BidGigDTO?
     public let bidder: BidderUserDTO?
 
+    // MARK: - P3 backend-prep fields (see docs/mobile/pantopus-t5-notes.md §1.10).
+
+    // Optional decoders for the competition signals the buildout plan
+    // promised. While the backend prep PR is still pending these come
+    // back as `nil`, the row mapper falls back to the neutral "Pending"
+    // chip. When the backend ships `shortlisted`, `your_rank`, and
+    // `top_price`, the row mapper will start emitting the "Shortlisted",
+    // "Top bid", and "Outbid" chips automatically — no code change.
+
+    /// True when the gig poster has shortlisted this bid. Backend-driven
+    /// signal; cannot be derived client-side from `my-bids` alone.
+    public let shortlisted: Bool?
+    /// 1-indexed rank of this bid against its peer bids on the same gig.
+    /// `1` = highest bid (or by whatever ranking the buyer's perspective
+    /// uses); `> 1` = outbid. Requires backend enrichment.
+    public let yourRank: Int?
+    /// Highest peer bid amount on the same gig. Combined with
+    /// `your_rank`, surfaces the "Outbid" chip.
+    public let topPrice: Double?
+
+    public init(
+        id: String,
+        gigId: String? = nil,
+        userId: String? = nil,
+        bidAmount: Double? = nil,
+        message: String? = nil,
+        proposedTime: String? = nil,
+        status: String? = nil,
+        createdAt: String? = nil,
+        updatedAt: String? = nil,
+        expiresAt: String? = nil,
+        counterAmount: Double? = nil,
+        counterStatus: String? = nil,
+        counteredAt: String? = nil,
+        withdrawnAt: String? = nil,
+        withdrawalReason: String? = nil,
+        gig: BidGigDTO? = nil,
+        bidder: BidderUserDTO? = nil,
+        shortlisted: Bool? = nil,
+        yourRank: Int? = nil,
+        topPrice: Double? = nil
+    ) {
+        self.id = id
+        self.gigId = gigId
+        self.userId = userId
+        self.bidAmount = bidAmount
+        self.message = message
+        self.proposedTime = proposedTime
+        self.status = status
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.expiresAt = expiresAt
+        self.counterAmount = counterAmount
+        self.counterStatus = counterStatus
+        self.counteredAt = counteredAt
+        self.withdrawnAt = withdrawnAt
+        self.withdrawalReason = withdrawalReason
+        self.gig = gig
+        self.bidder = bidder
+        self.shortlisted = shortlisted
+        self.yourRank = yourRank
+        self.topPrice = topPrice
+    }
+
     enum CodingKeys: String, CodingKey {
-        case id, message, status, gig, bidder
+        case id, message, status, gig, bidder, shortlisted
         case gigId = "gig_id"
         case userId = "user_id"
         case bidAmount = "bid_amount"
@@ -69,6 +134,9 @@ public struct BidDTO: Decodable, Sendable, Hashable, Identifiable {
         case counterStatus = "counter_status"
         case counteredAt = "countered_at"
         case withdrawnAt = "withdrawn_at"
+        case withdrawalReason = "withdrawal_reason"
+        case yourRank = "your_rank"
+        case topPrice = "top_price"
     }
 }
 
