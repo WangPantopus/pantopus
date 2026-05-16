@@ -57,6 +57,7 @@ const val MY_BIDS_TAG = "my-bids"
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongParameterList")
 fun MyBidsScreen(
     onBack: () -> Unit,
     onOpenBid: (BidDto) -> Unit,

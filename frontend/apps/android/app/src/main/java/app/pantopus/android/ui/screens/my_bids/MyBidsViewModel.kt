@@ -639,6 +639,7 @@ class MyBidsViewModel
                 return timeLeft in 1 until (24 * 3600).toLong()
             }
 
+            @Suppress("UnusedParameter")
             fun tabFor(
                 dto: BidDto,
                 now: Instant,
