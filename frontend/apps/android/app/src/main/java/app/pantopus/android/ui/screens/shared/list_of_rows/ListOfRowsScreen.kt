@@ -115,6 +115,8 @@ fun ListOfRowsScreen(
     searchBar: SearchBarConfig? = null,
     chipStrip: ChipStripConfig? = null,
     banner: BannerConfig? = null,
+    listingContext: ListingContextConfig? = null,
+    subtitle: String? = null,
 ) {
     val pullState =
         rememberPullRefreshState(
@@ -126,7 +128,26 @@ fun ListOfRowsScreen(
         modifier = Modifier.testTag(LIST_OF_ROWS_TAG),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(title, style = PantopusTextStyle.h3, color = PantopusColors.appText) },
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = title,
+                            style = PantopusTextStyle.h3,
+                            color = PantopusColors.appText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (subtitle != null) {
+                            Text(
+                                text = subtitle,
+                                style = PantopusTextStyle.caption,
+                                color = PantopusColors.appTextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     if (onBack != null) {
                         IconButton(onClick = onBack) {
@@ -171,7 +192,7 @@ fun ListOfRowsScreen(
             Box(modifier = Modifier.fillMaxSize().pullRefresh(pullState)) {
                 when (state) {
                     ListOfRowsUiState.Loading -> LoadingRows()
-                    is ListOfRowsUiState.Loaded -> LoadedList(state, banner, onEndReached)
+                    is ListOfRowsUiState.Loaded -> LoadedList(state, banner, listingContext, onEndReached)
                     is ListOfRowsUiState.Empty ->
                         EmptyState(
                             icon = state.icon,
@@ -394,6 +415,196 @@ private fun BannerCard(config: BannerConfig) {
     }
 }
 
+@Composable
+private fun ListingContextHeader(config: ListingContextConfig) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                    .padding(Spacing.s3)
+                    .testTag("listingContextHeader"),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+            ) {
+                ListingContextThumbnail(image = config.thumbnail)
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                    ) {
+                        Text(
+                            text = config.title,
+                            style = PantopusTextStyle.body,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PantopusColors.appText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            text = config.askPrice,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PantopusColors.appText,
+                        )
+                    }
+                    if (config.meta.isNotEmpty()) {
+                        ListingContextMetaRow(items = config.meta)
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    StatusChip(
+                        text = config.statusChip.label,
+                        variant = config.statusChip.variant,
+                        icon = config.statusChip.icon,
+                    )
+                }
+            }
+        }
+        if (config.offerCount != null || config.sortLabel != null) {
+            Spacer(Modifier.height(Spacing.s3))
+            ListingContextSortStrip(
+                count = config.offerCount,
+                sortLabel = config.sortLabel,
+                onSort = config.onSort,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ListingContextThumbnail(image: ThumbnailImage) {
+    val gradient =
+        when (image) {
+            is ThumbnailImage.IconOnGradient -> image.gradient
+            is ThumbnailImage.Remote -> image.gradient
+        }
+    val icon =
+        when (image) {
+            is ThumbnailImage.IconOnGradient -> image.icon
+            is ThumbnailImage.Remote -> image.fallback
+        }
+    Box(
+        modifier =
+            Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(Radii.md))
+                .background(
+                    Brush.linearGradient(listOf(gradient.start, gradient.end)),
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        PantopusIconImage(
+            icon = icon,
+            contentDescription = null,
+            size = 28.dp,
+            tint = PantopusColors.appTextInverse,
+        )
+    }
+}
+
+@Composable
+private fun ListingContextMetaRow(items: List<ListingContextMeta>) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        items.forEachIndexed { index, item ->
+            if (index > 0) {
+                Text(
+                    text = "·",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextMuted,
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                if (item.icon != null) {
+                    PantopusIconImage(
+                        icon = item.icon,
+                        contentDescription = null,
+                        size = 11.dp,
+                        tint = PantopusColors.appTextSecondary,
+                    )
+                }
+                Text(
+                    text = item.text,
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ListingContextSortStrip(
+    count: Int?,
+    sortLabel: String?,
+    onSort: (() -> Unit)?,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (count != null) {
+            Text(
+                text = "$count ${if (count == 1) "offer" else "offers"}",
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextStrong,
+                modifier = Modifier.testTag("listingContextOfferCount"),
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        if (sortLabel != null) {
+            val rowModifier =
+                if (onSort != null) {
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.sm))
+                        .clickable(onClick = onSort)
+                        .padding(horizontal = Spacing.s1, vertical = 2.dp)
+                        .testTag("listingContextSort")
+                } else {
+                    Modifier
+                }
+            Row(
+                modifier = rowModifier,
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.ArrowsRepeat,
+                    contentDescription = null,
+                    size = 12.dp,
+                    tint = PantopusColors.appTextSecondary,
+                )
+                Text(
+                    text = sortLabel,
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                )
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronDown,
+                    contentDescription = null,
+                    size = 12.dp,
+                    tint = PantopusColors.appTextSecondary,
+                )
+            }
+        }
+    }
+}
+
 // ─── States ────────────────────────────────────────────────────
 
 @Composable
@@ -427,6 +638,7 @@ private fun LoadingRows() {
 private fun LoadedList(
     state: ListOfRowsUiState.Loaded,
     banner: BannerConfig?,
+    listingContext: ListingContextConfig?,
     onEndReached: () -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -448,6 +660,9 @@ private fun LoadedList(
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         modifier = Modifier.fillMaxSize(),
     ) {
+        if (listingContext != null) {
+            item(key = "listingContext") { ListingContextHeader(listingContext) }
+        }
         if (banner != null) {
             item(key = "banner") { BannerCard(banner) }
         }

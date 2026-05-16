@@ -23,9 +23,17 @@ public enum YouRoute: Hashable {
     case offers
     /// T5.3.1 — My bids. The "me.bids" action tile pushes here.
     case myBids
+    /// T5.3.4 — per-listing offers panel. Pushed from a listing detail
+    /// "View offers" affordance (visible when the current user owns the
+    /// listing). The optional `title` is a hint rendered as the
+    /// subtitle while the listing payload is in flight.
+    case listingOffers(listingId: String, title: String?)
     /// Gig detail destination for an offer-row tap. Reuses the existing
     /// Transactional Detail shell.
     case gigDetail(gigId: String)
+    /// Listing detail destination reached from the listing-offers buyer
+    /// row tap so the seller can drill back into the canonical view.
+    case listingDetail(listingId: String)
     #if DEBUG
     case publicProfile(userId: String)
     case pulsePost(postId: String)
@@ -348,6 +356,48 @@ public struct YouTabRoot: View {
                 onMessage: { _ in
                     Task { @MainActor in path.append(.placeholder(label: "Messages")) }
                 }
+            )
+        case let .listingDetail(listingId):
+            ListingDetailView(
+                viewModel: ListingDetailViewModel(listingId: listingId),
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onViewOffers: { dto in
+                    Task { @MainActor in
+                        path.append(.listingOffers(listingId: dto.id, title: dto.title))
+                    }
+                }
+            )
+        case let .listingOffers(listingId, titleHint):
+            ListingOffersView(
+                viewModel: ListingOffersViewModel(
+                    listingId: listingId,
+                    listingTitleHint: titleHint,
+                    onShareListing: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Share listing"))
+                        }
+                    },
+                    onOpenBuyer: { _ in
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Buyer profile"))
+                        }
+                    },
+                    onOpenTransaction: { _ in
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Transaction detail"))
+                        }
+                    },
+                    onEditPrice: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Edit listing"))
+                        }
+                    },
+                    onSort: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Sort offers"))
+                        }
+                    }
+                )
             )
         case .myBids:
             MyBidsView(

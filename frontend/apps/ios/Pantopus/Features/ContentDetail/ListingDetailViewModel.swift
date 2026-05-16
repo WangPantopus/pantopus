@@ -18,10 +18,34 @@ public final class ListingDetailViewModel {
 
     private let listingId: String
     private let api: APIClient
+    private let currentUserId: @MainActor () -> String?
 
-    init(listingId: String, api: APIClient = .shared) {
+    init(
+        listingId: String,
+        api: APIClient = .shared,
+        currentUserId: @escaping @MainActor () -> String? = ListingDetailViewModel.currentSignedInUserId
+    ) {
         self.listingId = listingId
         self.api = api
+        self.currentUserId = currentUserId
+    }
+
+    /// True when the loaded listing is owned by the currently signed-in
+    /// user. Drives the dock's "Make offer" → "View offers" swap on the
+    /// seller's own listing.
+    public var isOwnedByMe: Bool {
+        guard let ownerId = rawListing?.userId, !ownerId.isEmpty,
+              let me = currentUserId(), !me.isEmpty
+        else { return false }
+        return ownerId == me
+    }
+
+    @MainActor
+    private static func currentSignedInUserId() -> String? {
+        if case let .signedIn(user) = AuthManager.shared.state {
+            return user.id
+        }
+        return nil
     }
 
     public func load() async {
@@ -29,7 +53,8 @@ public final class ListingDetailViewModel {
         do {
             let detail: ListingDetailResponse = try await api.request(ListingsEndpoints.detail(id: listingId))
             rawListing = detail.listing
-            state = .loaded(Self.project(detail.listing))
+            let viewerId = currentUserId()
+            state = .loaded(Self.project(detail.listing, viewerUserId: viewerId))
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load listing."
             state = .error(message: message)
@@ -55,7 +80,13 @@ public final class ListingDetailViewModel {
 
     // MARK: - Projection
 
-    static func project(_ listing: ListingDTO) -> ContentDetailContent {
+    static func project(_ listing: ListingDTO, viewerUserId: String? = nil) -> ContentDetailContent {
+        let isViewerOwner: Bool = {
+            guard let owner = listing.userId, !owner.isEmpty,
+                  let viewer = viewerUserId, !viewer.isEmpty
+            else { return false }
+            return owner == viewer
+        }()
         let isFree = listing.isFree ?? false
         let priceLine: String = if isFree {
             "Free"
@@ -114,7 +145,10 @@ public final class ListingDetailViewModel {
         }
         let dock = ContentDetailDock(
             secondary: ContentDetailDockButton(label: "Message", icon: .send),
-            primary: ContentDetailDockButton(label: "Make offer", icon: nil)
+            primary: ContentDetailDockButton(
+                label: isViewerOwner ? "View offers" : "Make offer",
+                icon: nil
+            )
         )
         return ContentDetailContent(
             kind: .listing,

@@ -84,6 +84,7 @@ import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailForm
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
+import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
 import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
 import app.pantopus.android.ui.screens.nearby.map.MapEntity
 import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
@@ -221,6 +222,18 @@ private object ChildRoutes {
     /** Listing detail target — placeholder until T2.6. */
     const val LISTING_DETAIL_ID_KEY = "listingId"
     const val LISTING_DETAIL = "listings/{$LISTING_DETAIL_ID_KEY}"
+
+    /** Per-listing offers panel (T5.3.4). */
+    const val LISTING_OFFERS_ID_KEY = "listingId"
+    const val LISTING_OFFERS_TITLE_KEY = "listingTitle"
+    const val LISTING_OFFERS =
+        "listings/{$LISTING_OFFERS_ID_KEY}/offers?$LISTING_OFFERS_TITLE_KEY={$LISTING_OFFERS_TITLE_KEY}"
+
+    /** Build the listing-offers path with an optional title hint. */
+    fun listingOffers(listingId: String, title: String? = null): String {
+        val encodedTitle = java.net.URLEncoder.encode(title ?: "", "UTF-8")
+        return "listings/$listingId/offers?$LISTING_OFFERS_TITLE_KEY=$encodedTitle"
+    }
 
     /** Snap & sell — placeholder until the marketplace compose flow ships. */
     const val COMPOSE_LISTING = "listings/compose"
@@ -781,6 +794,28 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 ListingDetailScreen(
                     onBack = { navController.popBackStack() },
                     onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                    onViewOffers = { dto ->
+                        navController.navigate(ChildRoutes.listingOffers(dto.id, dto.title))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.LISTING_OFFERS,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.LISTING_OFFERS_ID_KEY) { type = NavType.StringType },
+                        navArgument(ChildRoutes.LISTING_OFFERS_TITLE_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                    ),
+            ) {
+                ListingOffersScreen(
+                    onBack = { navController.popBackStack() },
+                    onShareListing = { navController.navigate(ChildRoutes.placeholder("Share listing")) },
+                    onOpenBuyer = { navController.navigate(ChildRoutes.placeholder("Buyer profile")) },
+                    onOpenTransaction = { navController.navigate(ChildRoutes.placeholder("Transaction detail")) },
+                    onSort = { navController.navigate(ChildRoutes.placeholder("Sort offers")) },
                 )
             }
             composable(
