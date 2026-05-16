@@ -1,6 +1,7 @@
 @file:Suppress(
     "PackageNaming",
     "LongMethod",
+    "LongParameterList",
     "MagicNumber",
 )
 
@@ -29,7 +30,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -48,11 +48,12 @@ class MyPostsViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
-        val state = MutableStateFlow<AuthRepository.State>(
-            AuthRepository.State.SignedIn(
-                user = UserDto(id = "u_me", email = "me@test", displayName = "Me", avatarUrl = null),
-            ),
-        )
+        val state =
+            MutableStateFlow<AuthRepository.State>(
+                AuthRepository.State.SignedIn(
+                    user = UserDto(id = "u_me", email = "me@test", displayName = "Me", avatarUrl = null),
+                ),
+            )
         every { authRepo.state } returns state
     }
 
@@ -91,72 +92,77 @@ class MyPostsViewModelTest {
     // MARK: - Lifecycle
 
     @Test
-    fun loadEmptyTransitionsToEmpty() = runTest {
-        coEvery { postsRepo.userPosts(any(), any()) } returns
-            NetworkResult.Success(MyPostsResponse(posts = emptyList()))
-        val vm = makeVM()
-        vm.load()
-        val state = vm.state.value
-        assertTrue(state is ListOfRowsUiState.Empty)
-        assertEquals("You haven’t posted yet", (state as ListOfRowsUiState.Empty).headline)
-        assertEquals("Write a post", state.ctaTitle)
-    }
+    fun loadEmptyTransitionsToEmpty() =
+        runTest {
+            coEvery { postsRepo.userPosts(any(), any()) } returns
+                NetworkResult.Success(MyPostsResponse(posts = emptyList()))
+            val vm = makeVM()
+            vm.load()
+            val state = vm.state.value
+            assertTrue(state is ListOfRowsUiState.Empty)
+            assertEquals("You haven’t posted yet", (state as ListOfRowsUiState.Empty).headline)
+            assertEquals("Write a post", state.ctaTitle)
+        }
 
     @Test
-    fun loadPopulatedTransitionsToLoadedOnActiveTab() = runTest {
-        coEvery { postsRepo.userPosts(any(), any()) } returns
-            NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
-        val vm = makeVM()
-        vm.load()
-        val state = vm.state.value
-        assertTrue(state is ListOfRowsUiState.Loaded)
-        assertEquals("p1", (state as ListOfRowsUiState.Loaded).sections.first().rows.first().id)
-        assertEquals(MyPostsTab.ACTIVE, vm.tabs.value[0].id)
-        assertEquals(1, vm.tabs.value[0].count)
-    }
+    fun loadPopulatedTransitionsToLoadedOnActiveTab() =
+        runTest {
+            coEvery { postsRepo.userPosts(any(), any()) } returns
+                NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
+            val vm = makeVM()
+            vm.load()
+            val state = vm.state.value
+            assertTrue(state is ListOfRowsUiState.Loaded)
+            assertEquals("p1", (state as ListOfRowsUiState.Loaded).sections.first().rows.first().id)
+            assertEquals(MyPostsTab.ACTIVE, vm.tabs.value[0].id)
+            assertEquals(1, vm.tabs.value[0].count)
+        }
 
     @Test
-    fun loadFailureTransitionsToErrorWhenCold() = runTest {
-        coEvery { postsRepo.userPosts(any(), any()) } returns
-            NetworkResult.Failure(NetworkError.Server(500, "boom"))
-        val vm = makeVM()
-        vm.load()
-        assertTrue(vm.state.value is ListOfRowsUiState.Error)
-    }
+    fun loadFailureTransitionsToErrorWhenCold() =
+        runTest {
+            coEvery { postsRepo.userPosts(any(), any()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, "boom"))
+            val vm = makeVM()
+            vm.load()
+            assertTrue(vm.state.value is ListOfRowsUiState.Error)
+        }
 
     @Test
-    fun noSignedInUserSkipsFetchAndRendersEmpty() = runTest {
-        val signedOut = MutableStateFlow<AuthRepository.State>(AuthRepository.State.SignedOut)
-        every { authRepo.state } returns signedOut
-        val vm = makeVM()
-        vm.load()
-        assertTrue(vm.state.value is ListOfRowsUiState.Empty)
-    }
+    fun noSignedInUserSkipsFetchAndRendersEmpty() =
+        runTest {
+            val signedOut = MutableStateFlow<AuthRepository.State>(AuthRepository.State.SignedOut)
+            every { authRepo.state } returns signedOut
+            val vm = makeVM()
+            vm.load()
+            assertTrue(vm.state.value is ListOfRowsUiState.Empty)
+        }
 
     // MARK: - Tab assignment
 
     @Test
-    fun wirePostWithArchivedAtLandsInArchivedTab() = runTest {
-        coEvery { postsRepo.userPosts(any(), any()) } returns
-            NetworkResult.Success(
-                MyPostsResponse(
-                    posts =
-                        listOf(
-                            dto(id = "a1"),
-                            dto(id = "x1", archivedAt = "2026-05-11T10:00:00Z"),
-                        ),
-                ),
-            )
-        val vm = makeVM()
-        vm.load()
-        assertEquals(1, vm.tabs.value[0].count)
-        assertEquals(1, vm.tabs.value[1].count)
+    fun wirePostWithArchivedAtLandsInArchivedTab() =
+        runTest {
+            coEvery { postsRepo.userPosts(any(), any()) } returns
+                NetworkResult.Success(
+                    MyPostsResponse(
+                        posts =
+                            listOf(
+                                dto(id = "a1"),
+                                dto(id = "x1", archivedAt = "2026-05-11T10:00:00Z"),
+                            ),
+                    ),
+                )
+            val vm = makeVM()
+            vm.load()
+            assertEquals(1, vm.tabs.value[0].count)
+            assertEquals(1, vm.tabs.value[1].count)
 
-        vm.selectTab(MyPostsTab.ARCHIVED)
-        val state = vm.state.value as ListOfRowsUiState.Loaded
-        assertEquals("x1", state.sections.first().rows.first().id)
-        assertEquals(RowHighlight.Archived, state.sections.first().rows.first().highlight)
-    }
+            vm.selectTab(MyPostsTab.ARCHIVED)
+            val state = vm.state.value as ListOfRowsUiState.Loaded
+            assertEquals("x1", state.sections.first().rows.first().id)
+            assertEquals(RowHighlight.Archived, state.sections.first().rows.first().highlight)
+        }
 
     // MARK: - Intent mapping
 
@@ -191,10 +197,11 @@ class MyPostsViewModelTest {
         assertEquals("5 replies", ask[0].label)
         assertEquals("12 likes", ask[1].label)
 
-        val single = MyPostsViewModel.engagementItems(
-            dto(id = "s", likeCount = 1, commentCount = 1),
-            PulseIntent.Ask,
-        )
+        val single =
+            MyPostsViewModel.engagementItems(
+                dto(id = "s", likeCount = 1, commentCount = 1),
+                PulseIntent.Ask,
+            )
         assertEquals("1 reply", single[0].label)
         assertEquals("1 like", single[1].label)
     }
@@ -208,94 +215,100 @@ class MyPostsViewModelTest {
     // MARK: - Row projection asserted via VM load state
 
     @Test
-    fun rowProjectionUsesPrimaryBodyEmphasisAndHeaderChips() = runTest {
-        coEvery { postsRepo.userPosts(any(), any()) } returns
-            NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
-        val vm = makeVM()
-        vm.load()
-        val state = vm.state.value as ListOfRowsUiState.Loaded
-        val row = state.sections.first().rows.first()
-        assertEquals("", row.title)
-        assertEquals("Looking for a chimney sweep", row.body)
-        assertEquals(RowBodyEmphasis.Primary, row.bodyEmphasis)
-        assertEquals(1, row.headerChips?.size)
-        assertEquals("Ask", row.headerChips?.first()?.text)
-        assertEquals("2h · Elm Park", row.timeMeta)
-        assertNotNull(row.engagement)
-        assertEquals("Edit", row.engagement?.cta?.label)
-        assertNull(row.highlight)
-    }
+    fun rowProjectionUsesPrimaryBodyEmphasisAndHeaderChips() =
+        runTest {
+            coEvery { postsRepo.userPosts(any(), any()) } returns
+                NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
+            val vm = makeVM()
+            vm.load()
+            val state = vm.state.value as ListOfRowsUiState.Loaded
+            val row = state.sections.first().rows.first()
+            assertEquals("", row.title)
+            assertEquals("Looking for a chimney sweep", row.body)
+            assertEquals(RowBodyEmphasis.Primary, row.bodyEmphasis)
+            assertEquals(1, row.headerChips?.size)
+            assertEquals("Ask", row.headerChips?.first()?.text)
+            assertEquals("2h · Elm Park", row.timeMeta)
+            assertNotNull(row.engagement)
+            assertEquals("Edit", row.engagement?.cta?.label)
+            assertNull(row.highlight)
+        }
 
     @Test
-    fun archivedRowUsesArchivedHighlightAndRestoreCTA() = runTest {
-        coEvery { postsRepo.userPosts(any(), any()) } returns
-            NetworkResult.Success(
-                MyPostsResponse(posts = listOf(dto(id = "x1", archivedAt = "2026-05-11T10:00:00Z"))),
-            )
-        val vm = makeVM()
-        vm.load()
-        vm.selectTab(MyPostsTab.ARCHIVED)
-        val state = vm.state.value as ListOfRowsUiState.Loaded
-        val row = state.sections.first().rows.first()
-        assertEquals(RowHighlight.Archived, row.highlight)
-        assertEquals(2, row.headerChips?.size)
-        assertEquals("ARCHIVED", row.headerChips?.last()?.text)
-        assertEquals("Restore", row.engagement?.cta?.label)
-    }
+    fun archivedRowUsesArchivedHighlightAndRestoreCTA() =
+        runTest {
+            coEvery { postsRepo.userPosts(any(), any()) } returns
+                NetworkResult.Success(
+                    MyPostsResponse(posts = listOf(dto(id = "x1", archivedAt = "2026-05-11T10:00:00Z"))),
+                )
+            val vm = makeVM()
+            vm.load()
+            vm.selectTab(MyPostsTab.ARCHIVED)
+            val state = vm.state.value as ListOfRowsUiState.Loaded
+            val row = state.sections.first().rows.first()
+            assertEquals(RowHighlight.Archived, row.highlight)
+            assertEquals(2, row.headerChips?.size)
+            assertEquals("ARCHIVED", row.headerChips?.last()?.text)
+            assertEquals("Restore", row.engagement?.cta?.label)
+        }
 
     // MARK: - Optimistic mutations
 
     @Test
-    fun archiveOptimisticallyFlipsRowToArchivedTab() = runTest {
-        coEvery { postsRepo.userPosts(any(), any()) } returns
-            NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
-        val vm = makeVM()
-        vm.load()
-        assertEquals(1, vm.tabs.value[0].count)
-        assertEquals(0, vm.tabs.value[1].count)
+    fun archiveOptimisticallyFlipsRowToArchivedTab() =
+        runTest {
+            coEvery { postsRepo.userPosts(any(), any()) } returns
+                NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
+            val vm = makeVM()
+            vm.load()
+            assertEquals(1, vm.tabs.value[0].count)
+            assertEquals(0, vm.tabs.value[1].count)
 
-        vm.archive("p1")
-        assertEquals(0, vm.tabs.value[0].count)
-        assertEquals(1, vm.tabs.value[1].count)
-        assertTrue(vm.isArchived(dto(id = "p1")))
-    }
-
-    @Test
-    fun unarchiveFlipsRowBackToActive() = runTest {
-        coEvery { postsRepo.userPosts(any(), any()) } returns
-            NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
-        val vm = makeVM()
-        vm.load()
-        vm.archive("p1")
-        assertEquals(1, vm.tabs.value[1].count)
-        vm.unarchive("p1")
-        assertEquals(1, vm.tabs.value[0].count)
-        assertEquals(0, vm.tabs.value[1].count)
-    }
+            vm.archive("p1")
+            assertEquals(0, vm.tabs.value[0].count)
+            assertEquals(1, vm.tabs.value[1].count)
+            assertTrue(vm.isArchived(dto(id = "p1")))
+        }
 
     @Test
-    fun confirmDeleteRemovesRowOnSuccess() = runTest {
-        coEvery { postsRepo.userPosts(any(), any()) } returns
-            NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
-        coEvery { postsRepo.deletePost("p1") } returns NetworkResult.Success(Unit)
-        val vm = makeVM()
-        vm.load()
-        vm.requestDelete("p1")
-        vm.confirmDelete()
-        assertEquals(0, vm.tabs.value[0].count)
-        assertTrue(vm.state.value is ListOfRowsUiState.Empty)
-    }
+    fun unarchiveFlipsRowBackToActive() =
+        runTest {
+            coEvery { postsRepo.userPosts(any(), any()) } returns
+                NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
+            val vm = makeVM()
+            vm.load()
+            vm.archive("p1")
+            assertEquals(1, vm.tabs.value[1].count)
+            vm.unarchive("p1")
+            assertEquals(1, vm.tabs.value[0].count)
+            assertEquals(0, vm.tabs.value[1].count)
+        }
 
     @Test
-    fun confirmDeleteRollsBackOnFailure() = runTest {
-        coEvery { postsRepo.userPosts(any(), any()) } returns
-            NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
-        coEvery { postsRepo.deletePost("p1") } returns
-            NetworkResult.Failure(NetworkError.Server(500, "boom"))
-        val vm = makeVM()
-        vm.load()
-        vm.requestDelete("p1")
-        vm.confirmDelete()
-        assertEquals(1, vm.tabs.value[0].count)
-    }
+    fun confirmDeleteRemovesRowOnSuccess() =
+        runTest {
+            coEvery { postsRepo.userPosts(any(), any()) } returns
+                NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
+            coEvery { postsRepo.deletePost("p1") } returns NetworkResult.Success(Unit)
+            val vm = makeVM()
+            vm.load()
+            vm.requestDelete("p1")
+            vm.confirmDelete()
+            assertEquals(0, vm.tabs.value[0].count)
+            assertTrue(vm.state.value is ListOfRowsUiState.Empty)
+        }
+
+    @Test
+    fun confirmDeleteRollsBackOnFailure() =
+        runTest {
+            coEvery { postsRepo.userPosts(any(), any()) } returns
+                NetworkResult.Success(MyPostsResponse(posts = listOf(dto(id = "p1"))))
+            coEvery { postsRepo.deletePost("p1") } returns
+                NetworkResult.Failure(NetworkError.Server(500, "boom"))
+            val vm = makeVM()
+            vm.load()
+            vm.requestDelete("p1")
+            vm.confirmDelete()
+            assertEquals(1, vm.tabs.value[0].count)
+        }
 }

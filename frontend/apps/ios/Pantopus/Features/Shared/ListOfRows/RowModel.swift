@@ -22,7 +22,7 @@
 
 import SwiftUI
 
-// swiftlint:disable enum_case_associated_values_count
+// swiftlint:disable enum_case_associated_values_count file_length
 
 /// Visual template for a list row.
 public enum RowTemplate: Sendable {

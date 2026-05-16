@@ -209,8 +209,7 @@ class MyPostsViewModel
             }
         }
 
-        private fun currentUserId(): String? =
-            (authRepo.state.value as? AuthRepository.State.SignedIn)?.user?.id
+        private fun currentUserId(): String? = (authRepo.state.value as? AuthRepository.State.SignedIn)?.user?.id
 
         private fun applyState() {
             val now = nowProvider()

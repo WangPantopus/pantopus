@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongParameterList")
+@file:Suppress("PackageNaming", "LongMethod", "LongParameterList")
 
 package app.pantopus.android.ui.screens.my_posts
 

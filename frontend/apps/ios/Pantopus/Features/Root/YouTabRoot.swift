@@ -8,7 +8,7 @@
 //  with three identity bindings (Personal / Home / Business).
 //
 
-// swiftlint:disable cyclomatic_complexity function_body_length type_body_length
+// swiftlint:disable cyclomatic_complexity file_length function_body_length type_body_length
 
 import SwiftUI
 

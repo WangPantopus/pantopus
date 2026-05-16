@@ -176,7 +176,7 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
     /// `POST /api/posts/:id/archive` route lands, this map becomes the
     /// optimistic-cache for in-flight mutations and the wire DTO carries
     /// the canonical value.
-    private enum ArchiveOverride: Sendable {
+    private enum ArchiveOverride {
         case archived
         case unarchived
     }
@@ -192,7 +192,7 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
 
     init(
         api: APIClient = .shared,
-        currentUserId: @escaping @MainActor () -> String? = { Self.defaultCurrentUserId() },
+        currentUserId: @escaping @MainActor () -> String? = { MyPostsViewModel.defaultCurrentUserId() },
         onOpenPost: @escaping @MainActor (MyPostDTO) -> Void = { _ in },
         onOpenFilters: @escaping @MainActor () -> Void = {},
         onCompose: @escaping @MainActor () -> Void = {},
@@ -320,7 +320,7 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
     private func emptyContent(for tab: String) -> ListOfRowsState.EmptyContent {
         switch tab {
         case MyPostsTab.active:
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .messageSquarePlus,
                 headline: "You haven\u{2019}t posted yet",
                 subcopy: "Ask a question, recommend a spot, or share a local heads-up. "
@@ -330,7 +330,7 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
                 Task { @MainActor in self?.onCompose() }
             }
         case MyPostsTab.archived:
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .archive,
                 headline: "Nothing archived",
                 subcopy: "Archived posts move out of the Pulse but stay on your profile. "
@@ -339,7 +339,7 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
                 onCTA: nil
             )
         default:
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .messageSquarePlus,
                 headline: "Nothing here",
                 subcopy: "",
@@ -457,9 +457,9 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
     /// merge rule without going through the full VM.
     public func isArchived(_ dto: MyPostDTO) -> Bool {
         switch localArchiveOverrides[dto.id] {
-        case .archived: return true
-        case .unarchived: return false
-        case .none: return dto.archivedAt != nil
+        case .archived: true
+        case .unarchived: false
+        case .none: dto.archivedAt != nil
         }
     }
 
@@ -580,17 +580,17 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
     private static func paletteFor(intent: PulseIntent) -> IntentPalette {
         switch intent {
         case .all:
-            return IntentPalette(foreground: Theme.Color.appTextSecondary, background: Theme.Color.appSurfaceSunken)
+            IntentPalette(foreground: Theme.Color.appTextSecondary, background: Theme.Color.appSurfaceSunken)
         case .ask:
-            return IntentPalette(foreground: Theme.Color.warning, background: Theme.Color.warningBg)
+            IntentPalette(foreground: Theme.Color.warning, background: Theme.Color.warningBg)
         case .recommend:
-            return IntentPalette(foreground: Theme.Color.success, background: Theme.Color.successBg)
+            IntentPalette(foreground: Theme.Color.success, background: Theme.Color.successBg)
         case .event:
-            return IntentPalette(foreground: Theme.Color.business, background: Theme.Color.businessBg)
+            IntentPalette(foreground: Theme.Color.business, background: Theme.Color.businessBg)
         case .lost:
-            return IntentPalette(foreground: Theme.Color.error, background: Theme.Color.errorBg)
+            IntentPalette(foreground: Theme.Color.error, background: Theme.Color.errorBg)
         case .announce:
-            return IntentPalette(foreground: Theme.Color.appTextStrong, background: Theme.Color.appSurfaceSunken)
+            IntentPalette(foreground: Theme.Color.appTextStrong, background: Theme.Color.appSurfaceSunken)
         }
     }
 
@@ -689,7 +689,7 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
         switch seconds {
         case ..<60: return "now"
         case ..<3600: return "\(Int(seconds / 60))m"
-        case ..<86_400: return "\(Int(seconds / 3600))h"
+        case ..<86400: return "\(Int(seconds / 3600))h"
         default:
             let dayDiff = calendar.dateComponents([.day], from: date, to: now).day ?? 0
             if dayDiff == 1 { return "Yesterday" }
