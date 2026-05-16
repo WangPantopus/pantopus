@@ -34,11 +34,11 @@ import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScree
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
 import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
 import app.pantopus.android.ui.screens.connections.ConnectionsScreen
-import app.pantopus.android.ui.screens.discoverhub.DiscoverHubScreen
-import app.pantopus.android.ui.screens.discoverhub.DiscoverHubTarget
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
+import app.pantopus.android.ui.screens.discoverhub.DiscoverHubScreen
+import app.pantopus.android.ui.screens.discoverhub.DiscoverHubTarget
 import app.pantopus.android.ui.screens.feed.FeedScreen
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.gigs.GigsCategory

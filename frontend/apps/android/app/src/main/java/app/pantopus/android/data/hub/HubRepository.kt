@@ -35,13 +35,14 @@ class HubRepository
             since: String? = null,
             verified: Boolean? = null,
             freeOrWanted: Boolean? = null,
-        ): NetworkResult<HubDiscoveryResponse> = safeApiCall {
-            api.discovery(
-                filter = filter,
-                limit = limit,
-                since = since,
-                verified = verified,
-                freeOrWanted = freeOrWanted,
-            )
-        }
+        ): NetworkResult<HubDiscoveryResponse> =
+            safeApiCall {
+                api.discovery(
+                    filter = filter,
+                    limit = limit,
+                    since = since,
+                    verified = verified,
+                    freeOrWanted = freeOrWanted,
+                )
+            }
     }

@@ -37,8 +37,6 @@ import Foundation
 import Observation
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length
-
 /// Stable chip ids — public so the screen + tests can address them
 /// without sprinkling string literals.
 public enum DiscoverHubChip {
@@ -112,13 +110,17 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
         }
     }
 
-    public var tabs: [ListOfRowsTab] { [] }
+    public var tabs: [ListOfRowsTab] {
+        []
+    }
 
     public var selectedTab: String = "" {
         didSet { /* unused — chip-strip drives filter selection */ }
     }
 
-    public var fab: FABAction? { nil }
+    public var fab: FABAction? {
+        nil
+    }
 
     public private(set) var state: ListOfRowsState = .loading
 
@@ -155,7 +157,7 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
     private var listings: [HubDiscoveryResponse.Item] = []
     private var loadedOnce = false
 
-    public init(
+    init(
         api: APIClient = .shared,
         perTypeLimit: Int = 5,
         onSelect: @escaping @MainActor (DiscoverHubTarget) -> Void = { _ in }
@@ -205,7 +207,7 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
 
         let allFailed =
             peopleResult == nil && businessesResult == nil
-            && gigsResult == nil && listingsResult == nil
+                && gigsResult == nil && listingsResult == nil
         if allFailed {
             state = .error(message: "Couldn't load discovery. Try again.")
             return
@@ -303,7 +305,7 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
             icon: .compass,
             headline: "Nothing to discover yet",
             subcopy:
-                "You're early to this block. People, businesses, gigs, and listings " +
+            "You're early to this block. People, businesses, gigs, and listings " +
                 "will appear here as neighbors verify and join. Check back soon."
         )
     }
@@ -325,11 +327,10 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
                 size: .small,
                 verified: item.verified ?? false
             ),
-            trailing: .chevron,
-            onTap: { [weak self] in
-                MainActor.assumeIsolated { self?.onSelect(.person(userId: userId, displayName: displayName)) }
-            }
-        )
+            trailing: .chevron
+        ) { [weak self] in
+            MainActor.assumeIsolated { self?.onSelect(.person(userId: userId, displayName: displayName)) }
+        }
     }
 
     public func rowForBusiness(_ item: HubDiscoveryResponse.Item) -> RowModel {
@@ -344,11 +345,10 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
                 Self.icon(forBusinessCategory: item.category),
                 gradient: DiscoverHubTone.tone(for: item.id).gradient
             ),
-            trailing: .chevron,
-            onTap: { [weak self] in
-                MainActor.assumeIsolated { self?.onSelect(.business(businessId: businessId, name: name)) }
-            }
-        )
+            trailing: .chevron
+        ) { [weak self] in
+            MainActor.assumeIsolated { self?.onSelect(.business(businessId: businessId, name: name)) }
+        }
     }
 
     public func rowForGig(_ item: HubDiscoveryResponse.Item) -> RowModel {
@@ -362,11 +362,10 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
                 Self.icon(forGigCategory: item.category),
                 gradient: DiscoverHubTone.tone(for: item.id).gradient
             ),
-            trailing: item.price.map { RowTrailing.priceStack(amount: $0) } ?? .chevron,
-            onTap: { [weak self] in
-                MainActor.assumeIsolated { self?.onSelect(.gig(gigId: gigId)) }
-            }
-        )
+            trailing: item.price.map { RowTrailing.priceStack(amount: $0) } ?? .chevron
+        ) { [weak self] in
+            MainActor.assumeIsolated { self?.onSelect(.gig(gigId: gigId)) }
+        }
     }
 
     public func rowForListing(_ item: HubDiscoveryResponse.Item) -> RowModel {
@@ -384,11 +383,10 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
             subtitle: item.subtitle ?? (item.meta.isEmpty ? nil : item.meta),
             template: .fileChevron,
             leading: .thumbnail(image: image, size: .medium),
-            trailing: item.price.map { RowTrailing.priceStack(amount: $0) } ?? .chevron,
-            onTap: { [weak self] in
-                MainActor.assumeIsolated { self?.onSelect(.listing(listingId: listingId)) }
-            }
-        )
+            trailing: item.price.map { RowTrailing.priceStack(amount: $0) } ?? .chevron
+        ) { [weak self] in
+            MainActor.assumeIsolated { self?.onSelect(.listing(listingId: listingId)) }
+        }
     }
 
     // MARK: - Helpers (pure)

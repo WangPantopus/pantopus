@@ -45,6 +45,7 @@ class DiscoverHubViewModelTest {
         Dispatchers.resetMain()
     }
 
+    @Suppress("LongParameterList")
     private fun item(
         id: String,
         type: String,
@@ -187,8 +188,7 @@ class DiscoverHubViewModelTest {
             ),
         )
 
-    private fun fail(): NetworkResult<HubDiscoveryResponse> =
-        NetworkResult.Failure(NetworkError.Server(500, "boom"))
+    private fun fail(): NetworkResult<HubDiscoveryResponse> = NetworkResult.Failure(NetworkError.Server(500, "boom"))
 
     // MARK: - Lifecycle
 

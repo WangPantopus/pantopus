@@ -18,7 +18,148 @@
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable file_length type_body_length
+private enum Fixture {
+    static let peopleJSON = """
+    {"filter":"people","items":[
+      {"id":"u1","type":"person","title":"Maria Kovacs",
+       "meta":"4.7 stars · Elm Park","subtitle":"Elm Park, OR",
+       "rating":4.7,"verified":true,
+       "avatarUrl":null,"category":"People",
+       "createdAt":"2026-05-12T10:00:00Z","route":"/user/u1"},
+      {"id":"u2","type":"person","title":"David Chen",
+       "meta":"5.0 stars · Elm Park","subtitle":"Elm Park, OR",
+       "rating":5.0,"verified":true,
+       "avatarUrl":null,"category":"People",
+       "createdAt":"2026-05-13T10:00:00Z","route":"/user/u2"}
+    ]}
+    """
+
+    static let businessesJSON = """
+    {"filter":"businesses","items":[
+      {"id":"b1","type":"business","title":"Big Tree Handyman",
+       "meta":"4.9 stars · Portland","subtitle":"Handyman · Portland",
+       "rating":4.9,"category":"Handyman","verified":true,
+       "avatarUrl":null,"createdAt":"2026-05-10T10:00:00Z",
+       "route":"/businesses/b1"}
+    ]}
+    """
+
+    static let gigsJSON = """
+    {"filter":"gigs","items":[
+      {"id":"g1","type":"gig","title":"Assemble bed frame (Friday)",
+       "meta":"$80 · Handyman","subtitle":"Posted by Sara T.",
+       "price":"$80","category":"Handyman",
+       "createdAt":"2026-05-14T08:00:00Z","isFree":false,
+       "route":"/gigs/g1"},
+      {"id":"g2","type":"gig","title":"Help lift couch",
+       "meta":"$25 · Handyman","subtitle":"Posted by Michael D.",
+       "price":"$25","category":"Handyman",
+       "createdAt":"2026-05-14T09:00:00Z","isFree":false,
+       "route":"/gigs/g2"}
+    ]}
+    """
+
+    static let listingsJSON = """
+    {"filter":"listings","items":[
+      {"id":"l1","type":"listing","title":"Mid-century walnut credenza",
+       "meta":"$240 · Furniture","subtitle":"Anika R. · Portland",
+       "price":"$240","category":"Furniture",
+       "avatarUrl":"https://example.com/c.jpg",
+       "createdAt":"2026-05-12T10:00:00Z","isFree":false,"isWanted":false,
+       "route":"/listings/l1"}
+    ]}
+    """
+
+    static let emptyJSON = """
+    {"filter":"x","items":[]}
+    """
+
+    static let personItem = HubDiscoveryResponse.Item(
+        id: "u1",
+        type: "person",
+        title: "Maria",
+        meta: "4.7 · Elm Park",
+        category: "People",
+        avatarUrl: nil,
+        route: "/user/u1",
+        subtitle: "Elm Park, OR",
+        price: nil,
+        rating: 4.7,
+        verified: true,
+        isFree: nil,
+        isWanted: nil,
+        createdAt: nil
+    )
+
+    static let gigItem = HubDiscoveryResponse.Item(
+        id: "g1",
+        type: "gig",
+        title: "Assemble bed frame",
+        meta: "$80 · Handyman",
+        category: "Handyman",
+        avatarUrl: nil,
+        route: "/gigs/g1",
+        subtitle: "Posted by Sara T.",
+        price: "$80",
+        rating: nil,
+        verified: nil,
+        isFree: false,
+        isWanted: nil,
+        createdAt: nil
+    )
+
+    static let listingItem = HubDiscoveryResponse.Item(
+        id: "l1",
+        type: "listing",
+        title: "Walnut credenza",
+        meta: "$240 · Furniture",
+        category: "Furniture",
+        avatarUrl: "https://example.com/c.jpg",
+        route: "/listings/l1",
+        subtitle: "Anika R. · Portland",
+        price: "$240",
+        rating: nil,
+        verified: nil,
+        isFree: false,
+        isWanted: false,
+        createdAt: nil
+    )
+}
+
+private typealias StubResponse = SequencedURLProtocol.Response
+
+private func discoveryResponses(
+    people: StubResponse,
+    businesses: StubResponse,
+    gigs: StubResponse,
+    listings: StubResponse,
+    chip: String = DiscoverHubChip.nearby
+) -> [String: [StubResponse]] {
+    [
+        discoveryRoute(filter: "people", chip: chip): [people],
+        discoveryRoute(filter: "businesses", chip: chip): [businesses],
+        discoveryRoute(filter: "gigs", chip: chip): [gigs],
+        discoveryRoute(filter: "listings", chip: chip): [listings]
+    ]
+}
+
+private func discoveryRoute(filter: String, chip: String) -> String {
+    var query = ["filter": filter, "limit": "5"]
+    if chip == DiscoverHubChip.newToday {
+        query["since"] = "today"
+    }
+    if chip == DiscoverHubChip.verified {
+        query["verified"] = "true"
+    }
+    if chip == DiscoverHubChip.freeOrWanted {
+        query["freeOrWanted"] = "true"
+    }
+    let encoded = query
+        .sorted { $0.key < $1.key }
+        .map { "\($0.key)=\($0.value)" }
+        .joined(separator: "&")
+    return "/api/hub/discovery?\(encoded)"
+}
 
 @MainActor
 final class DiscoverHubViewModelTests: XCTestCase {
@@ -42,87 +183,30 @@ final class DiscoverHubViewModelTests: XCTestCase {
         DiscoverHubViewModel(api: api ?? makeAPI(), onSelect: onSelect)
     }
 
-    private typealias StubResponse = SequencedURLProtocol.Response
-
     private func stubAll(
         people: StubResponse,
         businesses: StubResponse,
         gigs: StubResponse,
-        listings: StubResponse
+        listings: StubResponse,
+        chip: String = DiscoverHubChip.nearby
     ) {
-        // The four parallel calls all hit the same path; ordering is
-        // controlled by `Endpoint.query["filter"]`. SequencedURLProtocol's
-        // route bucket pops responses FIFO regardless of query, so we
-        // pre-arrange enough responses for one full fan-out and rely on
-        // the row-mapper assertions to detect cross-wired payloads.
-        SequencedURLProtocol.routeResponses = [
-            "/api/hub/discovery": [people, businesses, gigs, listings]
-        ]
+        SequencedURLProtocol.routeResponses = discoveryResponses(
+            people: people,
+            businesses: businesses,
+            gigs: gigs,
+            listings: listings,
+            chip: chip
+        )
     }
-
-    private static let peopleJSON = """
-    {"filter":"people","items":[
-      {"id":"u1","type":"person","title":"Maria Kovacs",
-       "meta":"4.7 stars · Elm Park","subtitle":"Elm Park, OR",
-       "rating":4.7,"verified":true,
-       "avatarUrl":null,"category":"People",
-       "createdAt":"2026-05-12T10:00:00Z","route":"/user/u1"},
-      {"id":"u2","type":"person","title":"David Chen",
-       "meta":"5.0 stars · Elm Park","subtitle":"Elm Park, OR",
-       "rating":5.0,"verified":true,
-       "avatarUrl":null,"category":"People",
-       "createdAt":"2026-05-13T10:00:00Z","route":"/user/u2"}
-    ]}
-    """
-
-    private static let businessesJSON = """
-    {"filter":"businesses","items":[
-      {"id":"b1","type":"business","title":"Big Tree Handyman",
-       "meta":"4.9 stars · Portland","subtitle":"Handyman · Portland",
-       "rating":4.9,"category":"Handyman","verified":true,
-       "avatarUrl":null,"createdAt":"2026-05-10T10:00:00Z",
-       "route":"/businesses/b1"}
-    ]}
-    """
-
-    private static let gigsJSON = """
-    {"filter":"gigs","items":[
-      {"id":"g1","type":"gig","title":"Assemble bed frame (Friday)",
-       "meta":"$80 · Handyman","subtitle":"Posted by Sara T.",
-       "price":"$80","category":"Handyman",
-       "createdAt":"2026-05-14T08:00:00Z","isFree":false,
-       "route":"/gigs/g1"},
-      {"id":"g2","type":"gig","title":"Help lift couch",
-       "meta":"$25 · Handyman","subtitle":"Posted by Michael D.",
-       "price":"$25","category":"Handyman",
-       "createdAt":"2026-05-14T09:00:00Z","isFree":false,
-       "route":"/gigs/g2"}
-    ]}
-    """
-
-    private static let listingsJSON = """
-    {"filter":"listings","items":[
-      {"id":"l1","type":"listing","title":"Mid-century walnut credenza",
-       "meta":"$240 · Furniture","subtitle":"Anika R. · Portland",
-       "price":"$240","category":"Furniture",
-       "avatarUrl":"https://example.com/c.jpg",
-       "createdAt":"2026-05-12T10:00:00Z","isFree":false,"isWanted":false,
-       "route":"/listings/l1"}
-    ]}
-    """
-
-    private static let emptyJSON = """
-    {"filter":"x","items":[]}
-    """
 
     // MARK: - Lifecycle
 
     func testLoadAllEmptyTransitionsToWholeScreenEmpty() async {
         stubAll(
-            people: .status(200, body: Self.emptyJSON),
-            businesses: .status(200, body: Self.emptyJSON),
-            gigs: .status(200, body: Self.emptyJSON),
-            listings: .status(200, body: Self.emptyJSON)
+            people: .status(200, body: Fixture.emptyJSON),
+            businesses: .status(200, body: Fixture.emptyJSON),
+            gigs: .status(200, body: Fixture.emptyJSON),
+            listings: .status(200, body: Fixture.emptyJSON)
         )
         let vm = makeVM()
         await vm.load()
@@ -152,10 +236,10 @@ final class DiscoverHubViewModelTests: XCTestCase {
 
     func testLoadPopulatedRendersFourSectionsInDesignOrder() async {
         stubAll(
-            people: .status(200, body: Self.peopleJSON),
-            businesses: .status(200, body: Self.businessesJSON),
-            gigs: .status(200, body: Self.gigsJSON),
-            listings: .status(200, body: Self.listingsJSON)
+            people: .status(200, body: Fixture.peopleJSON),
+            businesses: .status(200, body: Fixture.businessesJSON),
+            gigs: .status(200, body: Fixture.gigsJSON),
+            listings: .status(200, body: Fixture.listingsJSON)
         )
         let vm = makeVM()
         await vm.load()
@@ -184,10 +268,10 @@ final class DiscoverHubViewModelTests: XCTestCase {
 
     func testEmptySectionIsHidden() async {
         stubAll(
-            people: .status(200, body: Self.peopleJSON),
-            businesses: .status(200, body: Self.emptyJSON),
-            gigs: .status(200, body: Self.gigsJSON),
-            listings: .status(200, body: Self.emptyJSON)
+            people: .status(200, body: Fixture.peopleJSON),
+            businesses: .status(200, body: Fixture.emptyJSON),
+            gigs: .status(200, body: Fixture.gigsJSON),
+            listings: .status(200, body: Fixture.emptyJSON)
         )
         let vm = makeVM()
         await vm.load()
@@ -204,10 +288,10 @@ final class DiscoverHubViewModelTests: XCTestCase {
 
     func testTransportFailureOnOneTypeStillRendersOthers() async {
         stubAll(
-            people: .status(200, body: Self.peopleJSON),
+            people: .status(200, body: Fixture.peopleJSON),
             businesses: .status(500, body: ""),
-            gigs: .status(200, body: Self.gigsJSON),
-            listings: .status(200, body: Self.listingsJSON)
+            gigs: .status(200, body: Fixture.gigsJSON),
+            listings: .status(200, body: Fixture.listingsJSON)
         )
         let vm = makeVM()
         await vm.load()
@@ -225,16 +309,9 @@ final class DiscoverHubViewModelTests: XCTestCase {
 
     // MARK: - Row mapping
 
-    func testRowForPersonSetsAvatarSmallVerified() async {
+    func testRowForPersonSetsAvatarSmallVerified() {
         let vm = makeVM()
-        let item = HubDiscoveryResponse.Item(
-            id: "u1", type: "person", title: "Maria",
-            meta: "4.7 · Elm Park", category: "People",
-            avatarUrl: nil, route: "/user/u1",
-            subtitle: "Elm Park, OR",
-            price: nil, rating: 4.7, verified: true,
-            isFree: nil, isWanted: nil, createdAt: nil
-        )
+        let item = Fixture.personItem
         let row = vm.rowForPerson(item)
         XCTAssertEqual(row.title, "Maria")
         XCTAssertEqual(row.subtitle, "Elm Park, OR")
@@ -250,16 +327,9 @@ final class DiscoverHubViewModelTests: XCTestCase {
         }
     }
 
-    func testRowForGigSetsCategoryIconAndPriceStack() async {
+    func testRowForGigSetsCategoryIconAndPriceStack() {
         let vm = makeVM()
-        let item = HubDiscoveryResponse.Item(
-            id: "g1", type: "gig", title: "Assemble bed frame",
-            meta: "$80 · Handyman", category: "Handyman",
-            avatarUrl: nil, route: "/gigs/g1",
-            subtitle: "Posted by Sara T.",
-            price: "$80", rating: nil, verified: nil,
-            isFree: false, isWanted: nil, createdAt: nil
-        )
+        let item = Fixture.gigItem
         let row = vm.rowForGig(item)
         if case .categoryGradientIcon = row.leading {
         } else {
@@ -272,17 +342,9 @@ final class DiscoverHubViewModelTests: XCTestCase {
         }
     }
 
-    func testRowForListingSetsThumbnailMediumAndPriceStack() async {
+    func testRowForListingSetsThumbnailMediumAndPriceStack() {
         let vm = makeVM()
-        let item = HubDiscoveryResponse.Item(
-            id: "l1", type: "listing", title: "Walnut credenza",
-            meta: "$240 · Furniture", category: "Furniture",
-            avatarUrl: "https://example.com/c.jpg",
-            route: "/listings/l1",
-            subtitle: "Anika R. · Portland",
-            price: "$240", rating: nil, verified: nil,
-            isFree: false, isWanted: false, createdAt: nil
-        )
+        let item = Fixture.listingItem
         let row = vm.rowForListing(item)
         if case let .thumbnail(_, size) = row.leading {
             XCTAssertEqual(size, .medium)
@@ -300,10 +362,10 @@ final class DiscoverHubViewModelTests: XCTestCase {
 
     func testSeeAllPeopleEmitsSeeAllPeopleTarget() async {
         stubAll(
-            people: .status(200, body: Self.peopleJSON),
-            businesses: .status(200, body: Self.emptyJSON),
-            gigs: .status(200, body: Self.emptyJSON),
-            listings: .status(200, body: Self.emptyJSON)
+            people: .status(200, body: Fixture.peopleJSON),
+            businesses: .status(200, body: Fixture.emptyJSON),
+            gigs: .status(200, body: Fixture.emptyJSON),
+            listings: .status(200, body: Fixture.emptyJSON)
         )
         var captured: DiscoverHubTarget?
         let vm = makeVM { captured = $0 }
@@ -321,10 +383,10 @@ final class DiscoverHubViewModelTests: XCTestCase {
 
     func testSeeAllListingsEmitsSeeAllListingsTarget() async {
         stubAll(
-            people: .status(200, body: Self.emptyJSON),
-            businesses: .status(200, body: Self.emptyJSON),
-            gigs: .status(200, body: Self.emptyJSON),
-            listings: .status(200, body: Self.listingsJSON)
+            people: .status(200, body: Fixture.emptyJSON),
+            businesses: .status(200, body: Fixture.emptyJSON),
+            gigs: .status(200, body: Fixture.emptyJSON),
+            listings: .status(200, body: Fixture.listingsJSON)
         )
         var captured: DiscoverHubTarget?
         let vm = makeVM { captured = $0 }
@@ -343,19 +405,22 @@ final class DiscoverHubViewModelTests: XCTestCase {
     // MARK: - Chip selection
 
     func testSelectChipUpdatesSelectionAndRefetches() async {
-        // Initial fan-out + post-chip-tap fan-out = 8 stubbed responses.
-        SequencedURLProtocol.routeResponses = [
-            "/api/hub/discovery": [
-                .status(200, body: Self.peopleJSON),
-                .status(200, body: Self.emptyJSON),
-                .status(200, body: Self.emptyJSON),
-                .status(200, body: Self.emptyJSON),
-                .status(200, body: Self.emptyJSON),
-                .status(200, body: Self.emptyJSON),
-                .status(200, body: Self.emptyJSON),
-                .status(200, body: Self.emptyJSON)
-            ]
-        ]
+        var responses = discoveryResponses(
+            people: .status(200, body: Fixture.peopleJSON),
+            businesses: .status(200, body: Fixture.emptyJSON),
+            gigs: .status(200, body: Fixture.emptyJSON),
+            listings: .status(200, body: Fixture.emptyJSON)
+        )
+        discoveryResponses(
+            people: .status(200, body: Fixture.emptyJSON),
+            businesses: .status(200, body: Fixture.emptyJSON),
+            gigs: .status(200, body: Fixture.emptyJSON),
+            listings: .status(200, body: Fixture.emptyJSON),
+            chip: DiscoverHubChip.verified
+        ).forEach { key, value in
+            responses[key, default: []].append(contentsOf: value)
+        }
+        SequencedURLProtocol.routeResponses = responses
         let vm = makeVM()
         await vm.load()
         XCTAssertEqual(vm.selectedChip, DiscoverHubChip.nearby)

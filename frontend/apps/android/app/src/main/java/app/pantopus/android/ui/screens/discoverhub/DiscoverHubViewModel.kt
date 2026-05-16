@@ -15,6 +15,8 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.hub.DiscoveryItem
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.hub.HubRepository
+import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBackground
+import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBadgeSize
 import app.pantopus.android.ui.screens.shared.list_of_rows.ChipStripConfig
 import app.pantopus.android.ui.screens.shared.list_of_rows.GradientPair
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
@@ -24,8 +26,6 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.screens.shared.list_of_rows.SectionStyle
-import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBackground
-import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBadgeSize
 import app.pantopus.android.ui.screens.shared.list_of_rows.ThumbnailImage
 import app.pantopus.android.ui.screens.shared.list_of_rows.ThumbnailSize
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
@@ -200,42 +200,46 @@ class DiscoverHubViewModel
                 val freeOrWantedParam =
                     if (_selectedChip.value == DiscoverHubChip.FREE_OR_WANTED) true else null
 
-                val peopleAsync = async {
-                    repo.discovery(
-                        filter = "people",
-                        limit = perTypeLimit,
-                        since = sinceParam,
-                        verified = verifiedParam,
-                        freeOrWanted = freeOrWantedParam,
-                    )
-                }
-                val businessesAsync = async {
-                    repo.discovery(
-                        filter = "businesses",
-                        limit = perTypeLimit,
-                        since = sinceParam,
-                        verified = verifiedParam,
-                        freeOrWanted = freeOrWantedParam,
-                    )
-                }
-                val gigsAsync = async {
-                    repo.discovery(
-                        filter = "gigs",
-                        limit = perTypeLimit,
-                        since = sinceParam,
-                        verified = verifiedParam,
-                        freeOrWanted = freeOrWantedParam,
-                    )
-                }
-                val listingsAsync = async {
-                    repo.discovery(
-                        filter = "listings",
-                        limit = perTypeLimit,
-                        since = sinceParam,
-                        verified = verifiedParam,
-                        freeOrWanted = freeOrWantedParam,
-                    )
-                }
+                val peopleAsync =
+                    async {
+                        repo.discovery(
+                            filter = "people",
+                            limit = perTypeLimit,
+                            since = sinceParam,
+                            verified = verifiedParam,
+                            freeOrWanted = freeOrWantedParam,
+                        )
+                    }
+                val businessesAsync =
+                    async {
+                        repo.discovery(
+                            filter = "businesses",
+                            limit = perTypeLimit,
+                            since = sinceParam,
+                            verified = verifiedParam,
+                            freeOrWanted = freeOrWantedParam,
+                        )
+                    }
+                val gigsAsync =
+                    async {
+                        repo.discovery(
+                            filter = "gigs",
+                            limit = perTypeLimit,
+                            since = sinceParam,
+                            verified = verifiedParam,
+                            freeOrWanted = freeOrWantedParam,
+                        )
+                    }
+                val listingsAsync =
+                    async {
+                        repo.discovery(
+                            filter = "listings",
+                            limit = perTypeLimit,
+                            since = sinceParam,
+                            verified = verifiedParam,
+                            freeOrWanted = freeOrWantedParam,
+                        )
+                    }
                 val peopleResult = peopleAsync.await()
                 val businessesResult = businessesAsync.await()
                 val gigsResult = gigsAsync.await()
