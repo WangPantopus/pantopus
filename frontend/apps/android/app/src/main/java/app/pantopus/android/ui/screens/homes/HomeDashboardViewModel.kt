@@ -190,8 +190,8 @@ class HomeDashboardViewModel
                     listOf(
                         QuickActionTile("view_bills", "Bills", PantopusIcon.Receipt, IdentityPillar.Home),
                         QuickActionTile("add_mail", "Add mail", PantopusIcon.Mailbox, IdentityPillar.Home),
-                        QuickActionTile("log_package", "Log package", PantopusIcon.ShoppingBag, IdentityPillar.Business),
                         QuickActionTile("add_member", "Add member", PantopusIcon.UserPlus, IdentityPillar.Personal),
+                        QuickActionTile("pets", "Pets", PantopusIcon.PawPrint, IdentityPillar.Home),
                     ),
                 tabs =
                     listOf(

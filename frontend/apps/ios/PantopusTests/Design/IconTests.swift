@@ -25,6 +25,7 @@ final class IconTests: XCTestCase {
         "pencil", "briefcase", "gavel", "sliders-horizontal", "message-circle",
         "at-sign", "badge-check", "tag", "shield-alert", "check-check", "history",
         "receipt", "clock", "users", "dollar-sign",
+        "dog", "cat", "bird", "fish", "turtle", "paw-print",
         "sparkles", "timer", "repeat", "hourglass", "hand-coins", "package",
         "compass", "filter"
     ]

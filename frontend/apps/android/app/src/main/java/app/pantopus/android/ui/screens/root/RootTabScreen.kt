@@ -32,6 +32,8 @@ import app.pantopus.android.ui.screens._internal.TokenGalleryScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
+import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
+import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
@@ -57,6 +59,8 @@ import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.homes.pets.PETS_LIST_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.pets.PetsListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
@@ -118,6 +122,13 @@ private object ChildRoutes {
 
     /** Add Bill wizard. */
     const val ADD_BILL = "homes/{$ADD_BILL_HOME_ID_KEY}/bills/new"
+
+    /** Pets list per home (T5.2.1). */
+    const val HOME_PETS = "homes/{$PETS_LIST_HOME_ID_KEY}/pets"
+
+    /** Build the concrete path for a home pets list. */
+    fun homePets(homeId: String): String = "homes/$homeId/pets"
+
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
     const val INVITE_OWNER =
@@ -126,6 +137,10 @@ private object ChildRoutes {
 
     /** Notifications center (T4.1). Reached from the Hub bell icon. */
     const val NOTIFICATIONS = "notifications"
+
+    /** Connections center (T5.2.3). Reached from the You / Me action grid
+     *  or via `pantopus://connections`. */
+    const val CONNECTIONS = "connections"
 
     /** Cross-listing Offers (T5.2.4). Reached from the You tab. */
     const val OFFERS = "offers"
@@ -363,7 +378,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.Connections -> {
-                navController.navigate(ChildRoutes.placeholder("Connections"))
+                navController.navigate(ChildRoutes.CONNECTIONS)
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.Post -> {
@@ -556,6 +571,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenPlaceholder = { label ->
                         navController.navigate(ChildRoutes.placeholder(label))
                     },
+                    onOpenPets = { homeId ->
+                        navController.navigate(ChildRoutes.homePets(homeId))
+                    },
                 )
             }
             composable(
@@ -597,6 +615,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.billDetail(homeId, billId))
                     },
                 )
+            }
+            composable(
+                route = ChildRoutes.HOME_PETS,
+                arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                PetsListScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.MAILBOX_LIST) {
                 MailboxListScreen(
@@ -840,6 +864,32 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(ChildRoutes.NOTIFICATIONS) {
                 NotificationsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.CONNECTIONS) {
+                ConnectionsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenChat = { target: ConnectionsChatTarget ->
+                        val row =
+                            ConversationRowContent(
+                                id = target.userId,
+                                variant = ConversationRowVariant.Dm,
+                                displayName = target.displayName,
+                                initials = target.initials,
+                                avatarUrl = null,
+                                identityChip = null,
+                                verified = target.verified,
+                                preview = "",
+                                timeLabel = "",
+                                unread = 0,
+                                pinned = false,
+                                topicKinds = emptySet(),
+                            )
+                        navController.navigate(ChildRoutes.chatConversation(row))
+                    },
+                    onFindPeople = {
+                        navController.navigate(ChildRoutes.placeholder("Find people"))
+                    },
+                )
             }
             composable(ChildRoutes.OFFERS) {
                 OffersScreen(

@@ -120,4 +120,30 @@ public enum HomesEndpoints {
             path: "/api/homes/\(homeId)/bills/\(billId)/splits"
         )
     }
+
+    // MARK: - Pets (T5.2.1)
+
+    /// `GET /api/homes/:id/pets` — route `backend/routes/home.js:6789`.
+    public static func listPets(homeId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/homes/\(homeId)/pets")
+    }
+
+    /// `POST /api/homes/:id/pets` — route `backend/routes/home.js:6826`.
+    public static func createPet(homeId: String, request: CreatePetRequest) -> Endpoint {
+        Endpoint(method: .post, path: "/api/homes/\(homeId)/pets", body: request)
+    }
+
+    /// `PUT /api/homes/:id/pets/:petId` — route `backend/routes/home.js:6880`.
+    public static func updatePet(
+        homeId: String,
+        petId: String,
+        request: UpdatePetRequest
+    ) -> Endpoint {
+        Endpoint(method: .put, path: "/api/homes/\(homeId)/pets/\(petId)", body: request)
+    }
+
+    /// `DELETE /api/homes/:id/pets/:petId` — route `backend/routes/home.js:6926`.
+    public static func deletePet(homeId: String, petId: String) -> Endpoint {
+        Endpoint(method: .delete, path: "/api/homes/\(homeId)/pets/\(petId)")
+    }
 }

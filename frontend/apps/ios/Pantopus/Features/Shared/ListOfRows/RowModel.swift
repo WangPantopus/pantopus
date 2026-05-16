@@ -324,6 +324,15 @@ public struct RowModel: Identifiable, Sendable {
     /// (2-line clipped) and My posts (2-line clipped).
     public let body: String?
 
+    /// Optional small icon prefix for the subtitle line. Used by
+    /// Connections (map-pin in front of locality).
+    public let subtitleIcon: PantopusIcon?
+
+    /// Optional small icon prefix for the body line. Used by Connections
+    /// (per-row interaction-type icon: message-circle / wrench / megaphone /
+    /// user-plus / sparkles).
+    public let bodyIcon: PantopusIcon?
+
     /// Chip rendered inline with the title (Pets "Dog" pill).
     public let inlineChip: RowChip?
 
@@ -360,6 +369,8 @@ public struct RowModel: Identifiable, Sendable {
         onTap: @escaping @Sendable () -> Void = {},
         onSecondary: (@Sendable () -> Void)? = nil,
         body: String? = nil,
+        subtitleIcon: PantopusIcon? = nil,
+        bodyIcon: PantopusIcon? = nil,
         inlineChip: RowChip? = nil,
         chips: [RowChip]? = nil,
         timeMeta: String? = nil,
@@ -377,6 +388,8 @@ public struct RowModel: Identifiable, Sendable {
         self.onTap = onTap
         self.onSecondary = onSecondary
         self.body = body
+        self.subtitleIcon = subtitleIcon
+        self.bodyIcon = bodyIcon
         self.inlineChip = inlineChip
         self.chips = chips
         self.timeMeta = timeMeta

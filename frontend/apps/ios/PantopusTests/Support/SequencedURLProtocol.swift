@@ -21,6 +21,7 @@ final class SequencedURLProtocol: URLProtocol {
     }
 
     nonisolated(unsafe) static var sequence: [Response] = []
+    nonisolated(unsafe) static var routeResponses: [String: [Response]] = [:]
     nonisolated(unsafe) static var capturedRequests: [URLRequest] = []
 
     private static let lock = NSLock()
@@ -29,6 +30,7 @@ final class SequencedURLProtocol: URLProtocol {
         lock.lock()
         defer { lock.unlock() }
         sequence = []
+        routeResponses = [:]
         capturedRequests = []
     }
 
@@ -69,6 +71,13 @@ final class SequencedURLProtocol: URLProtocol {
         lock.lock()
         defer { lock.unlock() }
         capturedRequests.append(request)
+        if let path = request.url?.path,
+           var responses = routeResponses[path],
+           !responses.isEmpty {
+            let response = responses.removeFirst()
+            routeResponses[path] = responses
+            return response
+        }
         if sequence.isEmpty {
             return Response.status(599, body: "{\"error\":\"no stubbed response\"}")
         }

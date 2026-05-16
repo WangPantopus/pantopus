@@ -688,28 +688,43 @@ private fun ContentColumn(
         }
         if (row.subtitle != null) {
             Spacer(Modifier.height(2.dp))
-            Text(
-                text = row.subtitle,
-                style = PantopusTextStyle.caption,
-                color = PantopusColors.appTextSecondary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            MetaLine(text = row.subtitle, icon = row.subtitleIcon)
         }
         if (row.body != null) {
             Spacer(Modifier.height(Spacing.s1))
-            Text(
-                text = row.body,
-                style = PantopusTextStyle.caption,
-                color = PantopusColors.appTextSecondary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            MetaLine(text = row.body, icon = row.bodyIcon)
         }
         if (!row.chips.isNullOrEmpty()) {
             Spacer(Modifier.height(Spacing.s1))
             ChipRowView(chips = row.chips, timeMeta = row.timeMeta, metaTail = row.metaTail)
         }
+    }
+}
+
+@Composable
+private fun MetaLine(
+    text: String,
+    icon: PantopusIcon?,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        if (icon != null) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 11.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+        }
+        Text(
+            text = text,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

@@ -47,6 +47,16 @@ sealed class AnalyticsEvent(
 
     data object ScreenNotificationsViewed : AnalyticsEvent("screen.notifications.viewed")
 
+    data object ScreenPetsListViewed : AnalyticsEvent("screen.pets_list.viewed")
+
+    data class ScreenPetsWizardStepViewed(
+        val stepNumber: Int,
+        val stepName: String,
+    ) : AnalyticsEvent("screen.pets_wizard.step_viewed") {
+        override val properties =
+            mapOf("step_number" to stepNumber.toString(), "step_name" to stepName)
+    }
+
     data class ScreenPulseFeedViewed(
         val intent: String,
     ) : AnalyticsEvent("screen.pulse_feed.viewed") {

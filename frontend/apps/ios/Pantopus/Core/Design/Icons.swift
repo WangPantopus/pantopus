@@ -81,6 +81,16 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case clock
     case users
     case dollarSign = "dollar-sign"
+    // T5.2.1 — Pets species iconography. Gradient-tinted backgrounds in
+    // `SpeciesPalette` carry the per-species hue; these icons render in
+    // white on top.
+    case dog
+    case cat
+    case bird
+    case fish
+    case turtle
+    case pawPrint = "paw-print"
+    // T5.2.4 — Offers cross-listing iconography.
     case sparkles
     case timer
     /// Lucide `repeat`. Named `arrowsRepeat` to dodge Swift's `repeat`
@@ -161,6 +171,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .clock: "clock"
         case .users: "person.2"
         case .dollarSign: "dollarsign"
+        case .dog: "dog"
+        case .cat: "cat"
+        case .bird: "bird"
+        case .fish: "fish"
+        case .turtle: "tortoise"
+        case .pawPrint: "pawprint"
         case .sparkles: "sparkles"
         case .timer: "timer"
         case .arrowsRepeat: "arrow.triangle.2.circlepath"

@@ -548,17 +548,10 @@ private struct RowView: View {
         VStack(alignment: .leading, spacing: 2) {
             titleLine
             if let subtitle = row.subtitle {
-                Text(subtitle)
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                    .lineLimit(2)
+                metaLine(text: subtitle, icon: row.subtitleIcon)
             }
             if let body = row.body {
-                Text(body)
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                    .lineLimit(2)
-                    .padding(.top, 2)
+                metaLine(text: body, icon: row.bodyIcon, topPadding: 2)
             }
             if let chips = row.chips, !chips.isEmpty {
                 ChipRowView(
@@ -569,6 +562,23 @@ private struct RowView: View {
                 .padding(.top, 4)
             }
         }
+    }
+
+    private func metaLine(
+        text: String,
+        icon: PantopusIcon?,
+        topPadding: CGFloat = 0
+    ) -> some View {
+        HStack(alignment: .center, spacing: Spacing.s1) {
+            if let icon {
+                Icon(icon, size: 11, color: Theme.Color.appTextSecondary)
+            }
+            Text(text)
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .lineLimit(2)
+        }
+        .padding(.top, topPadding)
     }
 
     private var titleLine: some View {

@@ -30,6 +30,15 @@ geometry, same row spec).
 | `notifications-v2-ios-empty.png` | Empty Unread state | Success-tinted check-check + "View all notifications" CTA |
 | `notifications-v2-android-empty.png` | Empty Unread state | Same |
 | `notifications-v2-web-empty.png` | Empty Unread state | Same |
+| `connections-v2-ios.png` | Connections · populated · All tab | Visual ground truth for the iOS Connections (T5.2.3) implementation. 44pt avatar with verified-check overlay, mapPin-prefixed locality subtitle, userPlus-prefixed body, 38pt circular `message-circle` CTA per row, 52pt `secondaryCreate` FAB |
+| `connections-v2-android.png` | Connections · populated · All tab | Same — Android implementation targets the same render |
+| `connections-v2-web.png` | Connections · populated · All tab | Same — web implementation targets the same render |
+| `connections-v2-ios-pending.png` | Connections · Pending tab | Vertical Accept (30pt primary) / Ignore (28pt ghost) stack instead of message-CTA; avatar without verified check |
+| `connections-v2-android-pending.png` | Same | Same |
+| `connections-v2-web-pending.png` | Same | Same |
+| `connections-v2-ios-empty.png` | Connections · All tab empty | `users-round` icon in primary-tinted disc, "No connections yet" + "Find people" CTA |
+| `connections-v2-android-empty.png` | Same | Same |
+| `connections-v2-web-empty.png` | Same | Same |
 
 ### Planned (T5.2.4 Offers)
 

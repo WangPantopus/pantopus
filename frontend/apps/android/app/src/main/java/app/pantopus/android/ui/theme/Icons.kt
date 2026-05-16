@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Receipt
@@ -157,6 +158,21 @@ enum class PantopusIcon(
     Clock("clock"),
     Users("users"),
     DollarSign("dollar-sign"),
+
+    // T5.2.1 — Pets species iconography. Material doesn't ship dog / cat /
+    // bird / fish / turtle vectors, so every species falls back to
+    // [Icons.Filled.Pets] (paw print) on Android today. The per-species
+    // gradient background in [SpeciesPalette] carries the visual signal;
+    // upgrade to bespoke Lucide drawables when the design_system/ vector
+    // export lands.
+    Dog("dog"),
+    Cat("cat"),
+    Bird("bird"),
+    Fish("fish"),
+    Turtle("turtle"),
+    PawPrint("paw-print"),
+
+    // T5.2.4 — Offers cross-listing iconography.
     Sparkles("sparkles"),
     Timer("timer"),
     ArrowsRepeat("repeat"),
@@ -266,6 +282,12 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Clock -> IconSource.Material(Icons.Filled.Schedule)
         PantopusIcon.Users -> IconSource.Material(Icons.Filled.Group)
         PantopusIcon.DollarSign -> IconSource.Material(Icons.Filled.AttachMoney)
+        PantopusIcon.Dog -> IconSource.Material(Icons.Filled.Pets)
+        PantopusIcon.Cat -> IconSource.Material(Icons.Filled.Pets)
+        PantopusIcon.Bird -> IconSource.Material(Icons.Filled.Pets)
+        PantopusIcon.Fish -> IconSource.Material(Icons.Filled.Pets)
+        PantopusIcon.Turtle -> IconSource.Material(Icons.Filled.Pets)
+        PantopusIcon.PawPrint -> IconSource.Material(Icons.Filled.Pets)
         PantopusIcon.Sparkles -> IconSource.Material(Icons.Filled.AutoAwesome)
         PantopusIcon.Timer -> IconSource.Material(Icons.Filled.Timer)
         PantopusIcon.ArrowsRepeat -> IconSource.Material(Icons.Filled.Autorenew)
