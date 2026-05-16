@@ -1,5 +1,8 @@
 package app.pantopus.android.data.gigs
 
+import app.pantopus.android.data.api.models.gigs.BoostGigResponse
+import app.pantopus.android.data.api.models.gigs.CancelGigBody
+import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
@@ -7,6 +10,7 @@ import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
 import app.pantopus.android.data.api.models.gigs.MarkCompletedBody
 import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
+import app.pantopus.android.data.api.models.gigs.MyGigsResponse
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
 import app.pantopus.android.data.api.models.gigs.PlaceBidResponse
 import app.pantopus.android.data.api.net.NetworkResult
@@ -78,4 +82,18 @@ class GigsRepository
             safeApiCall {
                 api.markCompleted(gigId, MarkCompletedBody(note = note))
             }
+
+        suspend fun myGigs(
+            limit: Int = 100,
+            status: String? = null,
+        ): NetworkResult<MyGigsResponse> = safeApiCall { api.myGigs(limit, status) }
+
+        suspend fun boostGig(gigId: String): NetworkResult<BoostGigResponse> = safeApiCall { api.boostGig(gigId) }
+
+        suspend fun completeGigAsPoster(gigId: String): NetworkResult<CompleteGigResponse> = safeApiCall { api.completeGigAsPoster(gigId) }
+
+        suspend fun cancelGig(
+            gigId: String,
+            reason: String? = null,
+        ): NetworkResult<CompleteGigResponse> = safeApiCall { api.cancelGig(gigId, CancelGigBody(reason = reason)) }
     }

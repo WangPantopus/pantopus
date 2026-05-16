@@ -108,6 +108,14 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case ban
     case fileText = "file-text"
 
+    // T5.3.2 My tasks V2 — poster-side chip + footer icons.
+    case plus
+    case rocket
+    case clipboardList = "clipboard-list"
+    case clockPlus = "clock-plus"
+    case circleSlash = "circle-slash"
+    case play
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -195,6 +203,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .trendingDown: "chart.line.downtrend.xyaxis"
         case .ban: "nosign"
         case .fileText: "doc.text"
+        case .plus: "plus"
+        case .rocket: "paperplane.fill"
+        case .clipboardList: "list.clipboard"
+        case .clockPlus: "clock.arrow.circlepath"
+        case .circleSlash: "circle.slash"
+        case .play: "play.fill"
         }
     }
 }

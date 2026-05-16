@@ -23,6 +23,13 @@ public enum YouRoute: Hashable {
     case offers
     /// T5.3.1 — My bids. The "me.bids" action tile pushes here.
     case myBids
+    /// T5.3.2 — My tasks V2. The "me.gigs" action tile pushes here.
+    case myTasks
+    /// Compose-task destination from the My tasks FAB. Today renders
+    /// the not-yet-available placeholder per
+    /// `docs/mobile-wiring-audit.md`; replaces with the real composer
+    /// when T2.3 lands the dedicated screen.
+    case composeTask
     /// Gig detail destination for an offer-row tap. Reuses the existing
     /// Transactional Detail shell.
     case gigDetail(gigId: String)
@@ -227,6 +234,9 @@ public struct YouTabRoot: View {
         case "me.bids":
             // T5.3.1 — dedicated My bids screen.
             path.append(.myBids)
+        case "me.gigs":
+            // T5.3.2 — dedicated My tasks V2 screen (poster side).
+            path.append(.myTasks)
         default:
             path.append(.placeholder(label: tile.label))
         }
@@ -391,6 +401,40 @@ public struct YouTabRoot: View {
                     }
                 )
             )
+        case .myTasks:
+            MyTasksView(
+                viewModel: MyTasksViewModel(
+                    onOpenTask: { dto in
+                        Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) }
+                    },
+                    onOpenFilters: {
+                        Task { @MainActor in path.append(.placeholder(label: "Filter tasks")) }
+                    },
+                    onOpenBids: { dto in
+                        // Gig detail's "Manage bids" sheet renders the
+                        // full bid list — the dedicated bids surface
+                        // lands with T2.3.
+                        Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) }
+                    },
+                    onEditTask: { dto in
+                        Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) }
+                    },
+                    onMessageWorker: { dto in
+                        Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) }
+                    },
+                    onLeaveReview: { dto in
+                        Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) }
+                    },
+                    onPostTask: {
+                        Task { @MainActor in path.append(.composeTask) }
+                    },
+                    onRepost: { _ in
+                        Task { @MainActor in path.append(.composeTask) }
+                    }
+                )
+            )
+        case .composeTask:
+            NotYetAvailableView(tabName: "Post a task", icon: .pencil)
         #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(

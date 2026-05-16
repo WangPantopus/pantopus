@@ -72,6 +72,17 @@ data class Bidder(
     val tone: BidderTone,
 )
 
+/**
+ * Bidder-stack payload rendered inline on the chip row — used by My
+ * tasks V2 (T5.3.2). Separate from [RowLeading.BidderStack] because
+ * the design positions the stack next to the status chip rather than
+ * in the leading slot (which holds the 40dp category icon).
+ */
+data class BidderStackData(
+    val bidders: List<Bidder>,
+    val overflow: Int = 0,
+)
+
 // MARK: - Leading
 
 /** Optional leading visual. */
@@ -305,6 +316,12 @@ data class RowModel(
     val highlight: RowHighlight? = null,
     /** Optional in-card footer with 1–3 compact buttons. */
     val footer: RowFooter? = null,
+    /**
+     * Optional bidder stack rendered inline on the chip line before
+     * the [chips]. Used by My tasks V2 — 22dp overlapping avatars
+     * with a `+N` overflow tile.
+     */
+    val bidderStack: BidderStackData? = null,
 )
 
 // MARK: - Section

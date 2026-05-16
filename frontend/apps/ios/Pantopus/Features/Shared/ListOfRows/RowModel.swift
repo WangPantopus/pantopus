@@ -155,6 +155,22 @@ public enum RowLeading: Sendable {
     case bidderStack(bidders: [Bidder], overflow: Int)
 }
 
+// MARK: - Bidder stack data
+
+/// Bidder stack payload rendered inline on the chip line — used by My
+/// tasks V2 (T5.3.2). Separate from `RowLeading.bidderStack` because
+/// the design positions the stack next to the status chip rather than
+/// in the leading slot (the leading slot is the 40pt category icon).
+public struct BidderStackData: Sendable, Hashable {
+    public let bidders: [Bidder]
+    public let overflow: Int
+
+    public init(bidders: [Bidder], overflow: Int = 0) {
+        self.bidders = bidders
+        self.overflow = max(0, overflow)
+    }
+}
+
 // MARK: - Trailing
 
 /// Compact-button variant — used by `RowTrailing.verticalActions` and
@@ -366,6 +382,11 @@ public struct RowModel: Identifiable, Sendable {
     /// Optional in-card footer with 1–3 compact buttons.
     public let footer: RowFooter?
 
+    /// Optional bidder stack rendered inline on the chip line before
+    /// the `chips`. Used by My tasks V2 — 22pt overlapping avatars with
+    /// a `+N` overflow tile communicating competition at a glance.
+    public let bidderStack: BidderStackData?
+
     public init(
         id: String,
         title: String,
@@ -384,7 +405,8 @@ public struct RowModel: Identifiable, Sendable {
         metaTail: String? = nil,
         note: String? = nil,
         highlight: RowHighlight? = nil,
-        footer: RowFooter? = nil
+        footer: RowFooter? = nil,
+        bidderStack: BidderStackData? = nil
     ) {
         self.id = id
         self.title = title
@@ -404,6 +426,7 @@ public struct RowModel: Identifiable, Sendable {
         self.note = note
         self.highlight = highlight
         self.footer = footer
+        self.bidderStack = bidderStack
     }
 }
 
