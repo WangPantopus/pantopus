@@ -227,6 +227,7 @@ private struct LoadedShell: View {
     var body: some View {
         let projection = BillsListViewModel.project(bill: bill, now: Date())
         let isPaid = bill.status == "paid"
+        let autoPay = projection.status == .scheduled
         return ContentDetailShell(
             title: "Bill",
             onBack: onBack,
@@ -236,7 +237,9 @@ private struct LoadedShell: View {
                     amount: projection.amount,
                     chipText: projection.chipText,
                     chipVariant: projection.chipVariant,
-                    chipIcon: projection.chipIcon
+                    chipIcon: projection.chipIcon,
+                    category: projection.category,
+                    autoPay: autoPay
                 )
                 .padding(.horizontal, Spacing.s4)
             },
@@ -285,20 +288,37 @@ private struct BillHeader: View {
     let chipText: String
     let chipVariant: StatusChipVariant
     let chipIcon: PantopusIcon?
+    let category: UtilityCategory
+    let autoPay: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(spacing: Spacing.s3) {
                 ZStack {
                     RoundedRectangle(cornerRadius: Radii.sm)
-                        .fill(Theme.Color.primary50)
+                        .fill(category.background)
                         .frame(width: 48, height: 48)
-                    Icon(.receipt, size: 24, color: Theme.Color.primary600)
+                    Icon(category.icon, size: 24, color: category.foreground)
                 }
                 VStack(alignment: .leading, spacing: Spacing.s1) {
-                    Text(payee)
-                        .pantopusTextStyle(.h3)
-                        .foregroundStyle(Theme.Color.appText)
+                    HStack(spacing: Spacing.s2) {
+                        Text(payee)
+                            .pantopusTextStyle(.h3)
+                            .foregroundStyle(Theme.Color.appText)
+                            .lineLimit(2)
+                        if autoPay {
+                            HStack(spacing: 3) {
+                                Icon(.arrowsRepeat, size: 11, color: Theme.Color.info)
+                                Text("Auto-pay")
+                                    .pantopusTextStyle(.caption)
+                                    .foregroundStyle(Theme.Color.info)
+                            }
+                            .padding(.horizontal, Spacing.s2)
+                            .padding(.vertical, 3)
+                            .background(Theme.Color.infoBg)
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
+                        }
+                    }
                     Text(amount)
                         .pantopusTextStyle(.body)
                         .fontWeight(.bold)
@@ -323,10 +343,15 @@ private struct DetailGrid: View {
     let bill: BillDTO
 
     var body: some View {
-        VStack(spacing: 0) {
-            row(label: "Type", value: bill.billType.capitalized)
+        let category = UtilityCategory.from(payee: bill.providerName)
+        return VStack(spacing: 0) {
+            row(label: "Category", value: category.label)
             divider
             row(label: "Status", value: bill.status.capitalized)
+            if bill.status == "scheduled" {
+                divider
+                row(label: "Auto-pay", value: "Scheduled")
+            }
             if let due = BillsListViewModel.formatDateShort(iso: bill.dueDate) {
                 divider
                 row(label: "Due", value: due)

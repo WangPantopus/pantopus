@@ -123,6 +123,16 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     /// T5.3.4 Listing offers — listing-context header icons.
     case bookmark
 
+    // T6.0a Bills — utility category iconography + banner/auto-pay markers.
+    case zap
+    case flame
+    case droplet
+    case wifi
+    case building2 = "building-2"
+    case smartphone
+    case wallet
+    case hash
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -219,6 +229,14 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .archive: "archivebox"
         case .messageSquarePlus: "bubble.left.and.text.bubble.right"
         case .bookmark: "bookmark"
+        case .zap: "bolt"
+        case .flame: "flame"
+        case .droplet: "drop"
+        case .wifi: "wifi"
+        case .building2: "building.2"
+        case .smartphone: "iphone"
+        case .wallet: "wallet.pass"
+        case .hash: "number"
         }
     }
 }

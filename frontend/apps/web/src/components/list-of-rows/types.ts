@@ -50,6 +50,41 @@ export interface Bidder {
   tone: BidderTone;
 }
 
+// ─── Split stack (T6.0a Bills) ─────────────────────────────────
+
+/**
+ * One member of a bill-split stack. Smaller geometry (18px vs Bidder
+ * 22px) and right-aligned so it reads as a property tag rather than
+ * social-proof competition. Tone palette is shared with `Bidder` so the
+ * two surfaces draw from the same 6-color set.
+ */
+export interface SplitMember {
+  id: string;
+  initials: string;
+  tone: BidderTone;
+}
+
+/**
+ * Split-payer stack payload rendered at the RIGHT EDGE of the chip row
+ * on Bills rows (T6.0a). Differs from `BidderStackData` in geometry
+ * (18px vs 22px) + alignment (right vs left of the chips) + caption —
+ * "Split N ways" is shown alongside the avatars.
+ *
+ * Kept as a separate field on `RowModel` (`splitWith`) so the renderer
+ * can place each in the correct slot. The shell ships the type today
+ * but Bills rows never populate it yet — backend `/api/homes/:id/bills`
+ * doesn't surface split membership on the list endpoint. Splits remain
+ * visible only on the detail screen until a backend follow-up extends
+ * the list response with `split_members[≤3]` + `split_total_ways`.
+ */
+export interface SplitStackData {
+  members: SplitMember[];
+  overflow?: number;
+  /** Total people in the split including the viewer; drives the
+   *  "Split N ways" caption. */
+  totalWays: number;
+}
+
 export type IdentityPillar = 'personal' | 'home' | 'business';
 
 // ─── Leading ───────────────────────────────────────────────────
@@ -195,6 +230,15 @@ export interface RowModel {
   footer?: RowFooter;
   /** Hairline-separated engagement strip below the body (My posts). */
   engagement?: RowEngagement;
+  /**
+   * T6.0a — split-payer stack rendered at the RIGHT EDGE of the chip
+   * row (Bills "Split N ways" + 18px avatars). Future-ready field —
+   * Bills rows never populate it today because the backend list
+   * endpoint doesn't surface split membership yet. The shell renders
+   * the stack when set so feature code can wire it up additively once
+   * the backend response carries `split_members[≤3]` + `split_total_ways`.
+   */
+  splitWith?: SplitStackData;
 }
 
 // ─── Section ───────────────────────────────────────────────────
@@ -234,10 +278,21 @@ export type FabVariant =
   | { kind: 'secondaryCreate' }
   | { kind: 'extendedNav'; label: string };
 
+/**
+ * Identity tint for a FAB. Default `sky` keeps every existing FAB call
+ * site rendering with the T5 sky-blue background. T6.0a added `home`
+ * and `business` so home-pillar screens (Bills, Maintenance, Calendar)
+ * and business-pillar screens (My businesses) can swap the FAB color
+ * to match identity without forking the variant taxonomy.
+ */
+export type FabTint = 'sky' | 'home' | 'business';
+
 export interface FabAction {
   icon: LucideIcon;
   accessibilityLabel: string;
   variant?: FabVariant;
+  /** Identity tint. Default `sky`. */
+  tint?: FabTint;
   onClick: () => void;
 }
 
@@ -260,11 +315,40 @@ export interface ChipStripConfig {
   onSelect: (id: string) => void;
 }
 
+/**
+ * Tint options for a banner background and its optional trailing CTA
+ * pill. Resolved at render time to the matching token pair. `primary`
+ * (sky) is the default — preserves T5 behaviour. `home` is used by
+ * Bills (T6.0a) per the home-pillar identity; `business` mirrors that
+ * for business surfaces; `warning` is reserved for overdue surfaces.
+ */
+export type BannerCtaTint = 'primary' | 'home' | 'business' | 'warning';
+
+/**
+ * Optional trailing CTA on a banner (Bills "Pay all" — T6.0a).
+ * When set, the banner renders the CTA as a tinted pill on the trailing
+ * edge and disables the whole-card `onTap` — the CTA's `onClick` is the
+ * focused action. When unset, banner-wide tap behavior is unchanged.
+ */
+export interface BannerCta {
+  label: string;
+  icon?: LucideIcon;
+  accessibilityLabel?: string;
+  /** Tint for the CTA pill. Defaults to `primary`. */
+  tint?: BannerCtaTint;
+  onClick: () => void;
+}
+
 export interface BannerConfig {
   icon: LucideIcon;
   title: string;
   subtitle?: string;
   onTap?: () => void;
+  /** T6.0a — optional trailing CTA pill (Bills "Pay all"). */
+  cta?: BannerCta;
+  /** T6.0a — overrides the banner background + border tint. Default
+   *  `primary` matches T5 behaviour. Bills uses `home`. */
+  tint?: BannerCtaTint;
 }
 
 export interface EmptyConfig {

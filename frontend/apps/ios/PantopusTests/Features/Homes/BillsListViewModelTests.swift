@@ -2,13 +2,22 @@
 //  BillsListViewModelTests.swift
 //  PantopusTests
 //
-//  Covers the Bills VM (T5.2.2): four-state transitions, tab filtering
-//  by client-derived chip status, status → chip variant mapping, and
-//  per-status date subtitle formatting.
+//  Covers the Bills VM (T6.0a re-skin of T5.2.2):
+//    - four-state transitions
+//    - 6-state chip derivation (due / dueSoon / overdue / scheduled /
+//      paid / cancelled)
+//    - per-status projection (chip text + subtitle + inlineChip +
+//      highlight)
+//    - utility-category inference from payee string (one test per
+//      utility)
+//    - banner summary projection (30-day total + overdue count)
+//    - tab filtering across the new chip set
 //
 
 import XCTest
 @testable import Pantopus
+
+// swiftlint:disable type_body_length
 
 @MainActor
 final class BillsListViewModelTests: XCTestCase {
@@ -44,7 +53,7 @@ final class BillsListViewModelTests: XCTestCase {
 
     private func makeBill(
         status: String = "pending",
-        dueDate: String? = "2026-05-20T00:00:00Z",
+        dueDate: String? = "2026-05-25T00:00:00Z",
         providerName: String? = nil,
         amount: Decimal = 10,
         paidAt: String? = nil
@@ -71,7 +80,7 @@ final class BillsListViewModelTests: XCTestCase {
             XCTFail("Expected empty, got \(vm.state)")
             return
         }
-        XCTAssertEqual(content.headline, "No bills yet")
+        XCTAssertEqual(content.headline, "No bills tracked yet")
         XCTAssertEqual(content.ctaTitle, "Add a bill")
     }
 
@@ -90,8 +99,8 @@ final class BillsListViewModelTests: XCTestCase {
             .status(200, body: """
             {"bills":[
               {"id":"b1","home_id":"home-1","bill_type":"electric",
-               "provider_name":"ConEd","amount":142.80,
-               "due_date":"2026-05-20T00:00:00Z","status":"pending"}
+               "provider_name":"ConEd Electric","amount":142.80,
+               "due_date":"2026-05-25T00:00:00Z","status":"pending"}
             ]}
             """)
         ]
@@ -105,25 +114,31 @@ final class BillsListViewModelTests: XCTestCase {
         XCTAssertEqual(sections[0].rows.count, 1)
         let row = sections[0].rows[0]
         XCTAssertEqual(row.id, "b1")
-        XCTAssertEqual(row.title, "ConEd")
+        XCTAssertEqual(row.title, "ConEd Electric")
         guard case let .amountWithChip(amount, chipText, _, _) = row.trailing else {
             XCTFail("Expected amountWithChip trailing")
             return
         }
         XCTAssertEqual(amount, "$142.80")
-        XCTAssertTrue(chipText.hasPrefix("Due "))
+        XCTAssertEqual(chipText, "Due")
+        // Leading is typeIcon with the electric category palette.
+        guard case let .typeIcon(icon, _, _) = row.leading else {
+            XCTFail("Expected typeIcon leading, got \(row.leading)")
+            return
+        }
+        XCTAssertEqual(icon, .zap)
     }
 
-    // MARK: - Chip status derivation
+    // MARK: - 6-state chip derivation
+
+    func testChipStatusCancelledWins() {
+        let bill = makeBill(status: "cancelled", dueDate: "2026-05-01T00:00:00Z", paidAt: "2026-05-08T00:00:00Z")
+        XCTAssertEqual(BillsListViewModel.chipStatus(for: bill, now: Self.fixedNow), .cancelled)
+    }
 
     func testChipStatusPaidWins() {
         let bill = makeBill(status: "paid", dueDate: "2030-01-01T00:00:00Z", paidAt: "2026-05-08T00:00:00Z")
         XCTAssertEqual(BillsListViewModel.chipStatus(for: bill, now: Self.fixedNow), .paid)
-    }
-
-    func testChipStatusOverdueWhenDueInPastAndNotPaid() {
-        let bill = makeBill(dueDate: "2026-05-01T00:00:00Z")
-        XCTAssertEqual(BillsListViewModel.chipStatus(for: bill, now: Self.fixedNow), .overdue)
     }
 
     func testChipStatusScheduledRespectsStatusField() {
@@ -131,27 +146,58 @@ final class BillsListViewModelTests: XCTestCase {
         XCTAssertEqual(BillsListViewModel.chipStatus(for: bill, now: Self.fixedNow), .scheduled)
     }
 
-    func testChipStatusDueDefaultsForFutureDueDate() {
-        let bill = makeBill()
+    func testChipStatusOverdueWhenDueInPastAndNotPaid() {
+        let bill = makeBill(dueDate: "2026-05-01T00:00:00Z")
+        XCTAssertEqual(BillsListViewModel.chipStatus(for: bill, now: Self.fixedNow), .overdue)
+    }
+
+    func testChipStatusDueSoonWhenDueWithin7Days() {
+        // fixedNow = 2026-05-15; 6 days out = 2026-05-21 → dueSoon
+        let bill = makeBill(dueDate: "2026-05-21T00:00:00Z")
+        XCTAssertEqual(BillsListViewModel.chipStatus(for: bill, now: Self.fixedNow), .dueSoon)
+    }
+
+    func testChipStatusDueWhenBeyondSevenDays() {
+        // fixedNow = 2026-05-15; 14 days out = 2026-05-29 → due
+        let bill = makeBill(dueDate: "2026-05-29T00:00:00Z")
         XCTAssertEqual(BillsListViewModel.chipStatus(for: bill, now: Self.fixedNow), .due)
     }
 
-    // MARK: - Per-status projection (chip text + subtitle)
+    func testChipStatusDueWhenNoDueDate() {
+        let bill = makeBill(dueDate: nil)
+        XCTAssertEqual(BillsListViewModel.chipStatus(for: bill, now: Self.fixedNow), .due)
+    }
+
+    // MARK: - Per-status projection (chip text + subtitle + highlight)
 
     func testProjectionPaidSubtitle() {
         let projection = BillsListViewModel.project(
             bill: makeBill(
                 status: "paid",
                 dueDate: "2026-05-08T00:00:00Z",
-                providerName: "Verizon",
-                amount: 67.40,
+                providerName: "Verizon Fios",
+                amount: 89.99,
                 paidAt: "2026-05-08T00:00:00Z"
             ),
             now: Self.fixedNow
         )
         XCTAssertEqual(projection.chipText, "Paid")
+        XCTAssertEqual(projection.chipVariant, .success)
         XCTAssertEqual(projection.subtitle, "Paid May 8")
-        XCTAssertEqual(projection.amount, "$67.40")
+        XCTAssertEqual(projection.amount, "$89.99")
+        XCTAssertNil(projection.inlineChip)
+        XCTAssertNil(projection.highlight)
+    }
+
+    func testProjectionCancelledRendersMutedHighlight() {
+        let projection = BillsListViewModel.project(
+            bill: makeBill(status: "cancelled", dueDate: "2026-05-01T00:00:00Z"),
+            now: Self.fixedNow
+        )
+        XCTAssertEqual(projection.chipText, "Cancelled")
+        XCTAssertEqual(projection.chipVariant, .neutral)
+        XCTAssertEqual(projection.subtitle, "Cancelled")
+        XCTAssertEqual(projection.highlight, .muted)
     }
 
     func testProjectionOverdueSubtitle() {
@@ -164,10 +210,26 @@ final class BillsListViewModelTests: XCTestCase {
             now: Self.fixedNow
         )
         XCTAssertEqual(projection.chipText, "Overdue")
-        XCTAssertEqual(projection.subtitle, "Due May 5")
+        XCTAssertEqual(projection.chipVariant, .error)
+        XCTAssertEqual(projection.subtitle, "Overdue · was due May 5")
+        XCTAssertEqual(projection.category, .hoa)
     }
 
-    func testProjectionScheduledSubtitle() {
+    func testProjectionDueSoonSubtitle() {
+        let projection = BillsListViewModel.project(
+            bill: makeBill(
+                dueDate: "2026-05-20T00:00:00Z",
+                providerName: "Verizon Fios",
+                amount: 89.99
+            ),
+            now: Self.fixedNow
+        )
+        XCTAssertEqual(projection.chipText, "Due soon")
+        XCTAssertEqual(projection.chipVariant, .warning)
+        XCTAssertEqual(projection.subtitle, "Due May 20")
+    }
+
+    func testProjectionScheduledAttachesAutoPayInlineChip() {
         let projection = BillsListViewModel.project(
             bill: makeBill(
                 status: "scheduled",
@@ -178,24 +240,131 @@ final class BillsListViewModelTests: XCTestCase {
             now: Self.fixedNow
         )
         XCTAssertEqual(projection.chipText, "Scheduled")
-        XCTAssertEqual(projection.subtitle, "Auto-pay May 18")
+        XCTAssertEqual(projection.chipVariant, .info)
+        XCTAssertEqual(projection.subtitle, "Auto-pays May 18")
+        XCTAssertEqual(projection.inlineChip?.text, "Auto-pay")
+        XCTAssertEqual(projection.inlineChip?.icon, .arrowsRepeat)
     }
 
     func testProjectionDueSubtitle() {
         let projection = BillsListViewModel.project(
             bill: makeBill(
-                providerName: "ConEd",
-                amount: 142.80
+                dueDate: "2026-05-29T00:00:00Z",
+                providerName: "National Grid Gas",
+                amount: 67.40
             ),
             now: Self.fixedNow
         )
-        XCTAssertEqual(projection.chipText, "Due May 20")
-        XCTAssertEqual(projection.subtitle, "May 20")
+        XCTAssertEqual(projection.chipText, "Due")
+        XCTAssertEqual(projection.chipVariant, .warning)
+        XCTAssertEqual(projection.subtitle, "Due May 29")
+        XCTAssertEqual(projection.category, .gas)
+    }
+
+    // MARK: - Utility category inference (one test per utility)
+
+    func testCategoryElectric() {
+        XCTAssertEqual(UtilityCategory.from(payee: "ConEd Electric"), .electric)
+        XCTAssertEqual(UtilityCategory.from(payee: "PG&E"), .electric)
+        XCTAssertEqual(UtilityCategory.from(payee: "Duke Energy"), .electric)
+        XCTAssertEqual(UtilityCategory.from(payee: "Eversource"), .electric)
+    }
+
+    func testCategoryGas() {
+        XCTAssertEqual(UtilityCategory.from(payee: "National Grid Gas"), .gas)
+        XCTAssertEqual(UtilityCategory.from(payee: "SoCalGas"), .gas)
+        XCTAssertEqual(UtilityCategory.from(payee: "Atmos Energy"), .gas)
+    }
+
+    func testCategoryWater() {
+        XCTAssertEqual(UtilityCategory.from(payee: "NYC Water Board"), .water)
+        XCTAssertEqual(UtilityCategory.from(payee: "City Sewer Division"), .water)
+        XCTAssertEqual(UtilityCategory.from(payee: "Aqua America"), .water)
+    }
+
+    func testCategoryInternet() {
+        XCTAssertEqual(UtilityCategory.from(payee: "Verizon Fios"), .internetService)
+        XCTAssertEqual(UtilityCategory.from(payee: "Comcast Xfinity"), .internetService)
+        XCTAssertEqual(UtilityCategory.from(payee: "Spectrum Internet"), .internetService)
+        XCTAssertEqual(UtilityCategory.from(payee: "Starlink"), .internetService)
+    }
+
+    func testCategoryHOA() {
+        XCTAssertEqual(UtilityCategory.from(payee: "Elm St HOA"), .hoa)
+        XCTAssertEqual(UtilityCategory.from(payee: "Sunset Condo Association"), .hoa)
+        XCTAssertEqual(UtilityCategory.from(payee: "Birch Strata Corp"), .hoa)
+    }
+
+    func testCategoryInsurance() {
+        XCTAssertEqual(UtilityCategory.from(payee: "State Farm Renters"), .insurance)
+        XCTAssertEqual(UtilityCategory.from(payee: "GEICO Auto"), .insurance)
+        XCTAssertEqual(UtilityCategory.from(payee: "Allstate Home Insurance"), .insurance)
+    }
+
+    func testCategoryTrash() {
+        XCTAssertEqual(UtilityCategory.from(payee: "Waste Management"), .trash)
+        XCTAssertEqual(UtilityCategory.from(payee: "Recology"), .trash)
+        XCTAssertEqual(UtilityCategory.from(payee: "City Refuse Service"), .trash)
+    }
+
+    func testCategoryPhone() {
+        XCTAssertEqual(UtilityCategory.from(payee: "T-Mobile"), .phone)
+        XCTAssertEqual(UtilityCategory.from(payee: "Sprint Wireless"), .phone)
+        XCTAssertEqual(UtilityCategory.from(payee: "Mint Mobile"), .phone)
+    }
+
+    func testCategoryGenericFallbackForUnknownPayee() {
+        XCTAssertEqual(UtilityCategory.from(payee: nil), .generic)
+        XCTAssertEqual(UtilityCategory.from(payee: ""), .generic)
+        XCTAssertEqual(UtilityCategory.from(payee: "Some Random Vendor"), .generic)
+    }
+
+    // MARK: - Banner summary
+
+    func testBannerSummaryWithOverdueAndUpcoming() {
+        let bills: [BillDTO] = [
+            // Overdue $325 — counts toward total + overdue
+            makeBill(id: "b1", dueDate: "2026-05-05T00:00:00Z", providerName: "HOA", amount: 325),
+            // Due soon $89.99 — counts toward total
+            makeBill(id: "b2", dueDate: "2026-05-20T00:00:00Z", providerName: "Fios", amount: 89.99),
+            // Beyond 30 days $48 — excluded from total
+            makeBill(id: "b3", dueDate: "2026-07-01T00:00:00Z", providerName: "Water", amount: 48),
+            // Paid $42 — excluded entirely
+            makeBill(id: "b4", status: "paid", dueDate: "2026-05-08T00:00:00Z", amount: 42, paidAt: "2026-05-08T00:00:00Z"),
+            // Cancelled $99 — excluded entirely
+            makeBill(id: "b5", status: "cancelled", dueDate: "2026-05-08T00:00:00Z", amount: 99)
+        ]
+        let summary = BillsListViewModel.summarize(bills: bills, now: Self.fixedNow)
+        // 325 (overdue, within 30d) + 89.99 (due soon, within 30d) = 414.99
+        XCTAssertEqual(summary.totalDueLabel, "$414.99")
+        XCTAssertEqual(summary.overdueCount, 1)
+    }
+
+    func testBannerSummaryEmptyWhenAllPaidOrCancelled() {
+        let bills: [BillDTO] = [
+            makeBill(id: "b1", status: "paid", dueDate: "2026-05-08T00:00:00Z", amount: 42, paidAt: "2026-05-08T00:00:00Z"),
+            makeBill(id: "b2", status: "cancelled", dueDate: "2026-05-08T00:00:00Z", amount: 99)
+        ]
+        let summary = BillsListViewModel.summarize(bills: bills, now: Self.fixedNow)
+        XCTAssertNil(summary.totalDueLabel)
+        XCTAssertEqual(summary.overdueCount, 0)
+        XCTAssertFalse(summary.hasContent)
+    }
+
+    func testBannerSubtitleShowsNextBillWhenNoOverdue() {
+        let bills: [BillDTO] = [
+            // Due in 6 days — `dueSoon` chip; banner picks it as next-up
+            makeBill(id: "b1", dueDate: "2026-05-21T00:00:00Z", providerName: "Fios", amount: 89.99)
+        ]
+        let summary = BillsListViewModel.summarize(bills: bills, now: Self.fixedNow)
+        XCTAssertEqual(summary.overdueCount, 0)
+        XCTAssertNotNil(summary.nextBillSubtitle)
+        XCTAssertTrue(summary.nextBillSubtitle?.contains("next bill") ?? false)
     }
 
     // MARK: - Tab filtering
 
-    func testTabFilterUpcomingIncludesDueOverdueScheduledAndExcludesPaid() async {
+    func testTabFilterUpcomingIncludesDueDueSoonOverdueScheduledExcludesPaidCancelled() async {
         SequencedURLProtocol.sequence = [.status(200, body: mixedBillsJSON)]
         let vm = makeVM()
         await vm.load()
@@ -204,8 +373,8 @@ final class BillsListViewModelTests: XCTestCase {
             XCTFail("Expected loaded, got \(vm.state)")
             return
         }
-        let ids = sections.flatMap(\.rows).map(\.id)
-        XCTAssertEqual(Set(ids), Set(["b-due", "b-overdue", "b-scheduled"]))
+        let ids = Set(sections.flatMap(\.rows).map(\.id))
+        XCTAssertEqual(ids, Set(["b-due", "b-dueSoon", "b-overdue", "b-scheduled"]))
     }
 
     func testTabFilterPaidIncludesOnlyPaid() async {
@@ -230,8 +399,30 @@ final class BillsListViewModelTests: XCTestCase {
             return
         }
         let ids = Set(sections.flatMap(\.rows).map(\.id))
-        XCTAssertEqual(ids, Set(["b-due", "b-overdue", "b-scheduled", "b-paid"]))
+        XCTAssertEqual(ids, Set(["b-due", "b-dueSoon", "b-overdue", "b-scheduled", "b-paid"]))
         XCTAssertFalse(ids.contains("b-cancelled"))
+    }
+
+    // MARK: - FAB variant + tint
+
+    func testFabIsCanonicalCreateWithHomeTint() {
+        let vm = makeVM()
+        guard let fab = vm.fab else {
+            XCTFail("Expected FAB")
+            return
+        }
+        if case .canonicalCreate = fab.variant {
+            // OK
+        } else {
+            XCTFail("Expected canonicalCreate variant, got \(fab.variant)")
+        }
+        XCTAssertEqual(fab.tint, .home)
+        XCTAssertEqual(fab.icon, .plus)
+    }
+
+    func testTopBarActionIsNilByDesign() {
+        let vm = makeVM()
+        XCTAssertNil(vm.topBarAction)
     }
 
     // MARK: - Fixtures
@@ -241,7 +432,10 @@ final class BillsListViewModelTests: XCTestCase {
         {"bills":[
           {"id":"b-due","home_id":"home-1","bill_type":"x",
            "provider_name":"Due Bill","amount":10,
-           "due_date":"2026-05-20T00:00:00Z","status":"pending"},
+           "due_date":"2026-05-29T00:00:00Z","status":"pending"},
+          {"id":"b-dueSoon","home_id":"home-1","bill_type":"x",
+           "provider_name":"Soon Bill","amount":10,
+           "due_date":"2026-05-21T00:00:00Z","status":"pending"},
           {"id":"b-overdue","home_id":"home-1","bill_type":"x",
            "provider_name":"Overdue Bill","amount":10,
            "due_date":"2026-05-01T00:00:00Z","status":"pending"},
@@ -257,5 +451,27 @@ final class BillsListViewModelTests: XCTestCase {
            "due_date":"2026-05-08T00:00:00Z","status":"cancelled"}
         ]}
         """
+    }
+
+    /// `makeBill` overload for explicit ids (used by the banner-summary
+    /// + mixed-fixture tests).
+    private func makeBill(
+        id: String,
+        status: String = "pending",
+        dueDate: String? = "2026-05-25T00:00:00Z",
+        providerName: String? = nil,
+        amount: Decimal = 10,
+        paidAt: String? = nil
+    ) -> BillDTO {
+        BillDTO(
+            id: id,
+            homeId: "h",
+            billType: "x",
+            providerName: providerName,
+            amount: amount,
+            dueDate: dueDate,
+            status: status,
+            paidAt: paidAt
+        )
     }
 }

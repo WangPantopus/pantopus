@@ -83,6 +83,43 @@ data class BidderStackData(
     val overflow: Int = 0,
 )
 
+// MARK: - Split stack (T6.0a Bills)
+
+/**
+ * One member in a split-payer stack. Geometry is smaller than [Bidder]
+ * (18dp vs 22dp) so the visual reads as a property tag, not social
+ * proof. Tone palette is shared with [Bidder] so split members and
+ * bidders pick from the same six-color set.
+ */
+data class SplitMember(
+    val id: String,
+    val initials: String,
+    val tone: BidderTone,
+)
+
+/**
+ * Split-payer stack payload rendered at the RIGHT EDGE of the chip
+ * line — used by Bills (T6.0a) when a bill is split between household
+ * members. Different geometry + alignment from [BidderStackData]:
+ *
+ *  - 18dp overlapping avatars (vs Bidder 22dp)
+ *  - right-aligned (vs Bidder which sits before the chips)
+ *  - includes the "Split N ways" caption alongside the avatars
+ *
+ * Kept as a separate data class so the two concerns don't share an enum
+ * case the shell would have to disambiguate.
+ */
+data class SplitStackData(
+    val members: List<SplitMember>,
+    val overflow: Int = 0,
+    /**
+     * Total people in the split, including the viewer. The "Split N
+     * ways" caption uses this count so the math is explicit at the
+     * VM (not the renderer).
+     */
+    val totalWays: Int,
+)
+
 // MARK: - Leading
 
 /** Optional leading visual. */
@@ -377,6 +414,14 @@ data class RowModel(
      * with a `+N` overflow tile.
      */
     val bidderStack: BidderStackData? = null,
+    /**
+     * Optional split-payer stack rendered at the RIGHT EDGE of the
+     * chip line. Used by Bills (T6.0a) when a bill is split between
+     * household members — 18dp overlapping avatars + "Split N ways"
+     * caption. Separate from [bidderStack] so the renderer can place
+     * each in the correct slot (left for bidder, right for splits).
+     */
+    val splitWith: SplitStackData? = null,
 )
 
 // MARK: - Section

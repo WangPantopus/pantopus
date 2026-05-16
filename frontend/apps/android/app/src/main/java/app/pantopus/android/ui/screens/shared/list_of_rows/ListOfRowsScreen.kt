@@ -365,16 +365,64 @@ private fun ChipStripRow(config: ChipStripConfig) {
     }
 }
 
+/**
+ * Resolved token bag for a banner tint (background / border / foreground).
+ * Mirrors iOS `BannerTokens` — centralised so the BannerCard and any
+ * future banner consumers don't fork the lookup.
+ */
+private data class BannerTokens(
+    val background: Color,
+    val border: Color,
+    val foreground: Color,
+)
+
+private fun bannerTokens(tint: BannerCtaTint): BannerTokens =
+    when (tint) {
+        BannerCtaTint.Primary ->
+            BannerTokens(
+                background = PantopusColors.primary50,
+                border = PantopusColors.primary100,
+                foreground = PantopusColors.primary600,
+            )
+        BannerCtaTint.Home ->
+            BannerTokens(
+                background = PantopusColors.homeBg,
+                border = PantopusColors.homeBg,
+                foreground = PantopusColors.home,
+            )
+        BannerCtaTint.Business ->
+            BannerTokens(
+                background = PantopusColors.businessBg,
+                border = PantopusColors.businessBg,
+                foreground = PantopusColors.business,
+            )
+        BannerCtaTint.Warning ->
+            BannerTokens(
+                background = PantopusColors.warningBg,
+                border = PantopusColors.warningBg,
+                foreground = PantopusColors.warning,
+            )
+    }
+
+private fun bannerCtaFillColor(tint: BannerCtaTint): Color =
+    when (tint) {
+        BannerCtaTint.Primary -> PantopusColors.primary600
+        BannerCtaTint.Home -> PantopusColors.home
+        BannerCtaTint.Business -> PantopusColors.business
+        BannerCtaTint.Warning -> PantopusColors.warning
+    }
+
 @Composable
 private fun BannerCard(config: BannerConfig) {
+    val tokens = bannerTokens(config.tint)
     val rowContent: @Composable () -> Unit = {
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(Radii.md))
-                    .background(PantopusColors.primary50)
-                    .border(1.dp, PantopusColors.primary100, RoundedCornerShape(Radii.md))
+                    .background(tokens.background)
+                    .border(1.dp, tokens.border, RoundedCornerShape(Radii.md))
                     .padding(Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -385,14 +433,14 @@ private fun BannerCard(config: BannerConfig) {
                         .size(32.dp)
                         .clip(RoundedCornerShape(Radii.sm))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.primary100, RoundedCornerShape(Radii.sm)),
+                        .border(1.dp, tokens.border, RoundedCornerShape(Radii.sm)),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
                     icon = config.icon,
                     contentDescription = null,
                     size = 16.dp,
-                    tint = PantopusColors.primary600,
+                    tint = tokens.foreground,
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
@@ -405,13 +453,48 @@ private fun BannerCard(config: BannerConfig) {
                     )
                 }
             }
+            if (config.cta != null) {
+                BannerCtaButton(config.cta)
+            }
         }
     }
 
-    if (config.onTap != null) {
+    // When a CTA is present, the focused action is the pill — don't
+    // wrap the whole card in a clickable (would steal the CTA's tap).
+    if (config.cta == null && config.onTap != null) {
         Box(modifier = Modifier.fillMaxWidth().clickable(onClick = config.onTap)) { rowContent() }
     } else {
         rowContent()
+    }
+}
+
+@Composable
+private fun BannerCtaButton(cta: BannerCta) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.sm))
+                .background(bannerCtaFillColor(cta.tint))
+                .clickable(onClick = cta.onClick)
+                .padding(horizontal = Spacing.s3, vertical = 7.dp)
+                .semantics { contentDescription = cta.accessibilityLabel },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        if (cta.icon != null) {
+            PantopusIconImage(
+                icon = cta.icon,
+                contentDescription = null,
+                size = 14.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+        }
+        Text(
+            text = cta.label,
+            style = PantopusTextStyle.caption,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextInverse,
+        )
     }
 }
 
@@ -879,6 +962,7 @@ private fun ContentColumn(
                 chips = row.headerChips,
                 timeMeta = row.timeMeta,
                 metaTail = null,
+                splitWith = null,
             )
             Spacer(Modifier.height(2.dp))
         }
@@ -924,13 +1008,14 @@ private fun ContentColumn(
             Spacer(Modifier.height(Spacing.s1))
             BodyLine(text = row.body, icon = row.bodyIcon, emphasis = row.bodyEmphasis)
         }
-        if (!row.chips.isNullOrEmpty() || row.bidderStack != null) {
+        if (!row.chips.isNullOrEmpty() || row.bidderStack != null || row.splitWith != null) {
             Spacer(Modifier.height(Spacing.s1))
             ChipRowView(
                 bidderStack = row.bidderStack,
                 chips = row.chips.orEmpty(),
                 timeMeta = if (row.headerChips == null) row.timeMeta else null,
                 metaTail = row.metaTail,
+                splitWith = row.splitWith,
             )
         }
     }
@@ -1332,6 +1417,13 @@ private fun ChipRowView(
     chips: List<RowChip>,
     timeMeta: String?,
     metaTail: String?,
+    /**
+     * T6.0a — right-edge split-payer stack (Bills). When set, renders
+     * "Split N ways" + 18dp overlapping avatars where [timeMeta] would
+     * otherwise sit. The two don't coexist on Bills rows in practice;
+     * when both are set, splitWith wins.
+     */
+    splitWith: SplitStackData?,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -1353,7 +1445,9 @@ private fun ChipRowView(
             )
         }
         Spacer(Modifier.weight(1f))
-        if (timeMeta != null) {
+        if (splitWith != null) {
+            SplitStackTail(splitWith)
+        } else if (timeMeta != null) {
             Text(
                 text = timeMeta,
                 style = PantopusTextStyle.caption,
@@ -1362,6 +1456,118 @@ private fun ChipRowView(
         }
     }
 }
+
+/**
+ * Right-edge "Split N ways" caption + 18dp overlapping avatars,
+ * rendered on Bills rows when the bill is split between household
+ * members. Tone palette shared with [InlineBidderStack] so a future
+ * feature can mix the two without re-keying the colors.
+ */
+@Composable
+private fun SplitStackTail(data: SplitStackData) {
+    val captionText =
+        if (data.totalWays > 1) "Split ${data.totalWays} ways" else "Split"
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        Text(
+            text = captionText,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        SplitStackAvatars(data)
+    }
+}
+
+@Composable
+private fun SplitStackAvatars(data: SplitStackData) {
+    val visible = data.members.take(3)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        visible.forEachIndexed { index, member ->
+            val tileSize = 18.dp
+            val offset = if (index == 0) 0.dp else (-4).dp
+            SplitAvatar(
+                member = member,
+                modifier = Modifier.offset(x = offset).size(tileSize),
+            )
+        }
+        if (data.overflow > 0) {
+            val tileSize = 18.dp
+            val offset = if (visible.isEmpty()) 0.dp else (-4).dp
+            SplitOverflow(
+                count = data.overflow,
+                modifier = Modifier.offset(x = offset).size(tileSize),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SplitAvatar(
+    member: SplitMember,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .clip(CircleShape)
+                .background(splitToneBackground(member.tone))
+                .border(1.5.dp, PantopusColors.appSurface, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = member.initials.take(2).uppercase(),
+            color = splitToneForeground(member.tone),
+            fontSize = 7.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
+private fun SplitOverflow(
+    count: Int,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .clip(CircleShape)
+                .background(PantopusColors.appSurfaceSunken)
+                .border(1.5.dp, PantopusColors.appSurface, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "+$count",
+            color = PantopusColors.appTextSecondary,
+            fontSize = 7.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+private fun splitToneBackground(tone: BidderTone): Color =
+    when (tone) {
+        BidderTone.Sky -> PantopusColors.personalBg
+        BidderTone.Teal -> PantopusColors.successBg
+        BidderTone.Amber -> PantopusColors.warningBg
+        BidderTone.Rose -> PantopusColors.errorBg
+        BidderTone.Violet -> PantopusColors.businessBg
+        BidderTone.Slate -> PantopusColors.appSurfaceSunken
+    }
+
+private fun splitToneForeground(tone: BidderTone): Color =
+    when (tone) {
+        BidderTone.Sky -> PantopusColors.personal
+        BidderTone.Teal -> PantopusColors.success
+        BidderTone.Amber -> PantopusColors.warning
+        BidderTone.Rose -> PantopusColors.error
+        BidderTone.Violet -> PantopusColors.business
+        BidderTone.Slate -> PantopusColors.appTextSecondary
+    }
 
 @Composable
 private fun InlineBidderStack(data: BidderStackData) {
@@ -1635,6 +1841,7 @@ private fun TopBarActionButton(action: TopBarAction) {
 
 @Composable
 private fun FabComposable(fab: FabAction) {
+    val tintColor = fabTintColor(fab.tint)
     when (val variant = fab.variant) {
         is FabVariant.CanonicalCreate ->
             Box(
@@ -1642,7 +1849,7 @@ private fun FabComposable(fab: FabAction) {
                     Modifier
                         .size(56.dp)
                         .clip(CircleShape)
-                        .background(PantopusColors.primary600)
+                        .background(tintColor)
                         .clickable(onClick = fab.onClick)
                         .semantics { contentDescription = fab.contentDescription },
                 contentAlignment = Alignment.Center,
@@ -1660,7 +1867,7 @@ private fun FabComposable(fab: FabAction) {
                     Modifier
                         .size(52.dp)
                         .clip(CircleShape)
-                        .background(PantopusColors.primary600)
+                        .background(tintColor)
                         .clickable(onClick = fab.onClick)
                         .semantics { contentDescription = fab.contentDescription },
                 contentAlignment = Alignment.Center,
@@ -1678,7 +1885,7 @@ private fun FabComposable(fab: FabAction) {
                     Modifier
                         .heightIn(min = 48.dp)
                         .clip(RoundedCornerShape(Radii.pill))
-                        .background(PantopusColors.primary600)
+                        .background(tintColor)
                         .clickable(onClick = fab.onClick)
                         .padding(horizontal = Spacing.s5, vertical = Spacing.s2)
                         .semantics { contentDescription = fab.contentDescription },
@@ -1700,6 +1907,18 @@ private fun FabComposable(fab: FabAction) {
             }
     }
 }
+
+/**
+ * Resolve a [FabTint] to a fill color. Default [FabTint.Sky] keeps the
+ * pre-T6 sky-blue render; [FabTint.Home] and [FabTint.Business] swap to
+ * the matching identity tokens.
+ */
+private fun fabTintColor(tint: FabTint): Color =
+    when (tint) {
+        FabTint.Sky -> PantopusColors.primary600
+        FabTint.Home -> PantopusColors.home
+        FabTint.Business -> PantopusColors.business
+    }
 
 // ─── Compact button ────────────────────────────────────────────
 

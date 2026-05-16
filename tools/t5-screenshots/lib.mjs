@@ -88,6 +88,20 @@ const ICONS = {
   'flag': '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>',
   'arrow-up-right': '<path d="M7 7h10v10"/><path d="m7 17 10-10"/>',
   'thumbs-up': '<path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H7V10l5.34-8 1.66 3.88"/>',
+  // T6.0a Bills utility iconography + banner/auto-pay markers.
+  'zap': '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  'flame': '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  'droplet': '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+  'wifi': '<path d="M5 13a10 10 0 0 1 14 0"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M2 8.82a15 15 0 0 1 20 0"/><line x1="12" x2="12.01" y1="20" y2="20"/>',
+  'shield-check': '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+  'trash-2': '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+  'smartphone': '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+  'wallet': '<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>',
+  'repeat': '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  'clock': '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  'alert-circle': '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+  'calendar-clock': '<path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/>',
+  'hash': '<line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/>',
 };
 
 export function icon(name, opts = {}) {
@@ -169,12 +183,20 @@ export function searchBar({ placeholder = 'Search', value = '' }) {
     </div>`;
 }
 
-export function fab({ kind = 'secondaryCreate', label, iconName = 'plus' }) {
+export function fab({ kind = 'secondaryCreate', label, iconName = 'plus', tint = 'sky' }) {
   // canonicalCreate 56pt / secondaryCreate 52pt / extendedNav (pill, 48pt with label)
+  // T6.0a — `tint` selects (background, shadow). `sky` is the default;
+  // `home` and `business` swap to identity tokens.
+  const tints = {
+    sky: { bg: P.primary600, shadow: '0 6px 16px rgba(2,132,199,0.35)' },
+    home: { bg: P.home, shadow: '0 6px 16px rgba(22,163,74,0.35)' },
+    business: { bg: P.business, shadow: '0 6px 16px rgba(124,58,237,0.35)' },
+  };
+  const t = tints[tint] || tints.sky;
   if (kind === 'extendedNav') {
     return `
       <div style="position:absolute;right:20px;bottom:24px;z-index:5">
-        <button style="height:48px;padding:0 22px;border-radius:24px;background:${P.primary600};color:${P.surface};border:none;display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px;box-shadow:0 6px 16px rgba(2,132,199,0.35);cursor:pointer">
+        <button style="height:48px;padding:0 22px;border-radius:24px;background:${t.bg};color:${P.surface};border:none;display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px;box-shadow:${t.shadow};cursor:pointer">
           ${icon(iconName, { size: 18, color: P.surface })}
           ${label}
         </button>
@@ -183,7 +205,7 @@ export function fab({ kind = 'secondaryCreate', label, iconName = 'plus' }) {
   const size = kind === 'canonicalCreate' ? 56 : 52;
   return `
     <div style="position:absolute;right:20px;bottom:24px;z-index:5">
-      <button style="width:${size}px;height:${size}px;border-radius:${size / 2}px;background:${P.primary600};color:${P.surface};border:none;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(2,132,199,0.35);cursor:pointer">
+      <button style="width:${size}px;height:${size}px;border-radius:${size / 2}px;background:${t.bg};color:${P.surface};border:none;display:inline-flex;align-items:center;justify-content:center;box-shadow:${t.shadow};cursor:pointer">
         ${icon(iconName, { size: 22, color: P.surface })}
       </button>
     </div>`;

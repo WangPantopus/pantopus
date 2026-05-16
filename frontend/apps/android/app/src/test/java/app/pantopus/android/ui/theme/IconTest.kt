@@ -104,6 +104,15 @@ class IconTest {
             // T5.3.3 — My posts
             "archive",
             "message-square-plus",
+            // T6.0a — Bills
+            "zap",
+            "flame",
+            "droplet",
+            "wifi",
+            "building-2",
+            "smartphone",
+            "wallet",
+            "hash",
         )
 
     @Test

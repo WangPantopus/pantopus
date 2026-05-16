@@ -12,15 +12,18 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AlternateEmail
+import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.BorderColor
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
@@ -51,6 +54,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
@@ -74,7 +78,9 @@ import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Tune
@@ -82,7 +88,9 @@ import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.WorkspacePremium
@@ -210,6 +218,20 @@ enum class PantopusIcon(
     // T5.3.3 — My posts: archive chip + empty-state compose icon.
     Archive("archive"),
     MessageSquarePlus("message-square-plus"),
+
+    // T6.0a — Bills utility-category iconography. Material's icon pack
+    // doesn't ship 1:1 Lucide-equivalents for every utility glyph, so
+    // each one falls back to the closest Material vector (documented at
+    // the [source] mapping below). Visual signal is reinforced by the
+    // per-category background tint in [UtilityCategoryPalette].
+    Zap("zap"),
+    Flame("flame"),
+    Droplet("droplet"),
+    Wifi("wifi"),
+    Building2("building-2"),
+    Smartphone("smartphone"),
+    Wallet("wallet"),
+    Hash("hash"),
     ;
 
     companion object {
@@ -337,6 +359,17 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Play -> IconSource.Material(Icons.Filled.PlayArrow)
         PantopusIcon.Archive -> IconSource.Material(Icons.Filled.Archive)
         PantopusIcon.MessageSquarePlus -> IconSource.Material(Icons.Filled.BorderColor)
+        // T6.0a — Bills utility-category iconography. Material lacks
+        // direct equivalents for Lucide's `flame`, `droplet`, etc.;
+        // fall back to the closest visually-similar Material vector.
+        PantopusIcon.Zap -> IconSource.Material(Icons.Filled.Bolt)
+        PantopusIcon.Flame -> IconSource.Material(Icons.Filled.LocalFireDepartment)
+        PantopusIcon.Droplet -> IconSource.Material(Icons.Filled.WaterDrop)
+        PantopusIcon.Wifi -> IconSource.Material(Icons.Filled.Wifi)
+        PantopusIcon.Building2 -> IconSource.Material(Icons.Filled.Apartment)
+        PantopusIcon.Smartphone -> IconSource.Material(Icons.Filled.Smartphone)
+        PantopusIcon.Wallet -> IconSource.Material(Icons.Filled.AccountBalanceWallet)
+        PantopusIcon.Hash -> IconSource.Material(Icons.Filled.Tag)
     }
 
 /**

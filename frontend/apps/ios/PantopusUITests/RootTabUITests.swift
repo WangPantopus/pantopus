@@ -24,9 +24,13 @@ final class RootTabUITests: XCTestCase {
         app.launchEnvironment["UI_TESTS_SIGNED_IN"] = "1"
         app.launch()
         // If the app doesn't honour the flag (older builds), skip rather than fail.
-        let hubLabel = app.staticTexts["Hub"]
+        let hubLabel = app.staticTexts["Hub"].firstMatch
         guard hubLabel.waitForExistence(timeout: 5) else { return nil }
         return app
+    }
+
+    private func tabButton(_ tab: String, in app: XCUIApplication) -> XCUIElement {
+        app.buttons["tab.\(tab)"].firstMatch
     }
 
     func testLaunchLandsOnHubTab() throws {
@@ -34,7 +38,7 @@ final class RootTabUITests: XCTestCase {
             throw XCTSkip("Signed-in launch env not honoured; see RootTabUITests docs.")
         }
         // Hub title is visible and the Hub tab bar item is selected.
-        let hubTab = app.buttons["tab.hub"].firstMatch
+        let hubTab = tabButton("hub", in: app)
         XCTAssertTrue(hubTab.waitForExistence(timeout: 2))
         XCTAssertTrue(hubTab.isSelected || hubTab.value as? String == "1")
     }
@@ -44,8 +48,9 @@ final class RootTabUITests: XCTestCase {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
         for tab in ["hub", "nearby", "inbox", "you"] {
+            let button = tabButton(tab, in: app)
             XCTAssertTrue(
-                app.buttons["tab.\(tab)"].waitForExistence(timeout: 2),
+                button.waitForExistence(timeout: 2),
                 "Expected tab bar item tab.\(tab)"
             )
         }
@@ -55,7 +60,7 @@ final class RootTabUITests: XCTestCase {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
-        app.buttons["tab.nearby"].firstMatch.tap()
+        tabButton("nearby", in: app).tap()
         XCTAssertTrue(app.staticTexts["Nearby isn't here yet"].waitForExistence(timeout: 2))
     }
 
@@ -63,7 +68,7 @@ final class RootTabUITests: XCTestCase {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
-        app.buttons["tab.inbox"].firstMatch.tap()
+        tabButton("inbox", in: app).tap()
         XCTAssertTrue(app.staticTexts["Inbox isn't here yet"].waitForExistence(timeout: 2))
     }
 
@@ -71,7 +76,7 @@ final class RootTabUITests: XCTestCase {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
-        app.buttons["tab.you"].firstMatch.tap()
+        tabButton("you", in: app).tap()
         XCTAssertTrue(app.buttons["youSignOutButton"].waitForExistence(timeout: 2))
     }
 }
