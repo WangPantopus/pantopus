@@ -12,8 +12,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Wraps `/api/listings/:listingId/offers/*` in the [NetworkResult]
- * taxonomy. Mirrors the iOS `ListingOffersEndpoints` helper.
+ * Wraps the per-listing offer routes under `/api/listings/:listingId/offers`
+ * in the [NetworkResult] taxonomy. Mirrors the iOS
+ * `ListingOffersEndpoints` helper.
  */
 @Singleton
 class ListingOffersRepository
