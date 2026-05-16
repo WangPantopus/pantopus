@@ -85,6 +85,7 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_M
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
 import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
+import app.pantopus.android.ui.screens.my_posts.MyPostsScreen
 import app.pantopus.android.ui.screens.nearby.map.MapEntity
 import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
 import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
@@ -148,6 +149,9 @@ private object ChildRoutes {
 
     /** My bids (T5.3.1). Reached from the You tab "My bids" action tile. */
     const val MY_BIDS = "my-bids"
+
+    /** My posts (T5.3.3). Reached from the You / Me Activity-section row. */
+    const val MY_POSTS = "my-posts"
 
     /** Hub menu icon target. Replaced by Settings in T3.1. */
     const val MENU = "settings"
@@ -547,6 +551,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenSettings = { navController.navigate(ChildRoutes.MENU) },
                     onOpenOffers = { navController.navigate(ChildRoutes.OFFERS) },
                     onOpenMyBids = { navController.navigate(ChildRoutes.MY_BIDS) },
+                    onOpenMyPosts = { navController.navigate(ChildRoutes.MY_POSTS) },
                 )
             }
 
@@ -940,6 +945,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.navigate(ChildRoutes.gigDetail(gigId))
                         }
                     },
+                )
+            }
+            composable(ChildRoutes.MY_POSTS) {
+                MyPostsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPost = { navController.navigate(ChildRoutes.placeholder("Post detail")) },
+                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Filter posts")) },
+                    onCompose = { navController.navigate(ChildRoutes.placeholder("Write a post")) },
+                    onEditPost = { navController.navigate(ChildRoutes.placeholder("Edit post")) },
                 )
             }
             composable(ChildRoutes.MENU) {

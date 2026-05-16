@@ -9,6 +9,7 @@ import { ChevronRight, MoreHorizontal, Check as CheckIcon } from 'lucide-react';
 import type {
   BidderTone,
   RowChip,
+  RowEngagement,
   RowFooterAction,
   RowLeading,
   RowModel,
@@ -73,6 +74,7 @@ export default function RowCard({ row, context = 'standalone', isLastInGroup = f
         />
       </div>
       {row.note && <NoteBlock text={row.note} />}
+      {row.engagement && <EngagementStrip engagement={row.engagement} />}
       {row.footer && <FooterStack footer={row.footer} />}
     </div>
   );
@@ -81,32 +83,52 @@ export default function RowCard({ row, context = 'standalone', isLastInGroup = f
 // ─── Content column ────────────────────────────────────────────
 
 function ContentColumn({ row }: { row: RowModel }) {
+  const bodyEmphasis = row.bodyEmphasis ?? 'secondary';
   return (
     <div className="flex-1 min-w-0">
-      <div className="flex items-center gap-1.5">
-        <span
-          className={`flex-1 min-w-0 text-sm leading-snug tracking-[-0.01em] line-clamp-2 ${
-            row.highlight === 'unread' ? 'font-bold text-app-text' : 'font-semibold text-app-text'
-          }`}
-        >
-          {row.title}
-        </span>
-        {row.inlineChip && <ChipPill chip={row.inlineChip} />}
-        {row.highlight === 'unread' && (
+      {row.headerChips && row.headerChips.length > 0 && (
+        <ChipRow
+          chips={row.headerChips}
+          timeMeta={row.timeMeta}
+          metaTail={undefined}
+          marginTop="mb-0.5"
+        />
+      )}
+      {row.title.length > 0 && (
+        <div className="flex items-center gap-1.5">
           <span
-            aria-hidden="true"
-            className="inline-block w-2 h-2 rounded-full bg-primary-600 shrink-0"
-          />
-        )}
-      </div>
+            className={`flex-1 min-w-0 text-sm leading-snug tracking-[-0.01em] line-clamp-2 ${
+              row.highlight === 'unread' ? 'font-bold text-app-text' : 'font-semibold text-app-text'
+            }`}
+          >
+            {row.title}
+          </span>
+          {row.inlineChip && <ChipPill chip={row.inlineChip} />}
+          {row.highlight === 'unread' && (
+            <span
+              aria-hidden="true"
+              className="inline-block w-2 h-2 rounded-full bg-primary-600 shrink-0"
+            />
+          )}
+        </div>
+      )}
       {row.subtitle && (
         <div className="mt-0.5 text-xs text-app-text-secondary line-clamp-2">{row.subtitle}</div>
       )}
-      {row.body && (
-        <div className="mt-1 text-xs text-app-text-secondary line-clamp-2">{row.body}</div>
-      )}
+      {row.body &&
+        (bodyEmphasis === 'primary' ? (
+          <div className="mt-1 text-sm text-app-text leading-snug tracking-[-0.005em] line-clamp-2">
+            {row.body}
+          </div>
+        ) : (
+          <div className="mt-1 text-xs text-app-text-secondary line-clamp-2">{row.body}</div>
+        ))}
       {row.chips && row.chips.length > 0 && (
-        <ChipRow chips={row.chips} timeMeta={row.timeMeta} metaTail={row.metaTail} />
+        <ChipRow
+          chips={row.chips}
+          timeMeta={row.headerChips ? undefined : row.timeMeta}
+          metaTail={row.metaTail}
+        />
       )}
     </div>
   );
@@ -414,13 +436,15 @@ function ChipRow({
   chips,
   timeMeta,
   metaTail,
+  marginTop = 'mt-1',
 }: {
   chips: RowChip[];
   timeMeta?: string;
   metaTail?: string;
+  marginTop?: string;
 }) {
   return (
-    <div className="mt-1 flex items-center gap-1 flex-wrap">
+    <div className={`${marginTop} flex items-center gap-1 flex-wrap`}>
       {chips.map((chip, i) => (
         <ChipPill key={i} chip={chip} />
       ))}
@@ -485,6 +509,42 @@ function NoteBlock({ text }: { text: string }) {
   return (
     <div className="ml-13 pl-2 py-2 text-xs italic text-app-text-strong bg-app-surface-sunken rounded-md border-l-2 border-app-border max-w-full">
       “{text}”
+    </div>
+  );
+}
+
+function EngagementStrip({ engagement }: { engagement: RowEngagement }) {
+  return (
+    <div className="pt-2 mt-2 border-t border-app-border flex items-center gap-4 flex-wrap">
+      {engagement.items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <span
+            key={item.id}
+            className="inline-flex items-center gap-1 text-[11.5px] text-app-text-secondary font-medium"
+          >
+            <Icon className="w-[13px] h-[13px]" />
+            {item.label}
+          </span>
+        );
+      })}
+      <span className="flex-1" />
+      {engagement.cta && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            engagement.cta!.onClick();
+          }}
+          aria-label={engagement.cta.accessibilityLabel ?? engagement.cta.label}
+          className="inline-flex items-center gap-1 text-[11.5px] text-primary-600 font-semibold hover:text-primary-700"
+        >
+          {engagement.cta.icon && (
+            <engagement.cta.icon className="w-[12px] h-[12px]" />
+          )}
+          {engagement.cta.label}
+        </button>
+      )}
     </div>
   );
 }

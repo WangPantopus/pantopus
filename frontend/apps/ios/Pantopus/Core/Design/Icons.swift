@@ -108,6 +108,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case ban
     case fileText = "file-text"
 
+    // T5.3.3 My posts — archive chip + empty-state compose icon.
+    case archive
+    case messageSquarePlus = "message-square-plus"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -195,6 +199,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .trendingDown: "chart.line.downtrend.xyaxis"
         case .ban: "nosign"
         case .fileText: "doc.text"
+        case .archive: "archivebox"
+        case .messageSquarePlus: "bubble.left.and.text.bubble.right"
         }
     }
 }

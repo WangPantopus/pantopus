@@ -14,10 +14,12 @@ import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AlternateEmail
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.BorderColor
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -191,6 +193,10 @@ enum class PantopusIcon(
     TrendingDown("trending-down"),
     Ban("ban"),
     FileText("file-text"),
+
+    // T5.3.3 — My posts: archive chip + empty-state compose icon.
+    Archive("archive"),
+    MessageSquarePlus("message-square-plus"),
     ;
 
     companion object {
@@ -310,6 +316,8 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.TrendingDown -> IconSource.Material(Icons.AutoMirrored.Filled.TrendingDown)
         PantopusIcon.Ban -> IconSource.Material(Icons.Filled.Block)
         PantopusIcon.FileText -> IconSource.Material(Icons.AutoMirrored.Filled.Article)
+        PantopusIcon.Archive -> IconSource.Material(Icons.Filled.Archive)
+        PantopusIcon.MessageSquarePlus -> IconSource.Material(Icons.Filled.BorderColor)
     }
 
 /**

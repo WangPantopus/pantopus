@@ -643,6 +643,9 @@ internal fun RowView(
         if (row.note != null) {
             NoteBlock(row.note)
         }
+        if (row.engagement != null) {
+            EngagementStrip(row.engagement)
+        }
         if (row.footer != null) {
             FooterStack(row.footer)
         }
@@ -655,36 +658,42 @@ private fun ContentColumn(
     modifier: Modifier,
 ) {
     Column(modifier = modifier) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-        ) {
-            Text(
-                text = row.title,
-                style = PantopusTextStyle.body,
-                fontWeight =
-                    if (row.highlight is RowHighlight.Unread) {
-                        FontWeight.Bold
-                    } else {
-                        FontWeight.SemiBold
-                    },
-                color = PantopusColors.appText,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            if (row.inlineChip != null) {
-                ChipPill(row.inlineChip)
-            }
-            if (row.highlight is RowHighlight.Unread) {
-                Spacer(Modifier.weight(1f))
-                Box(
-                    modifier =
-                        Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(PantopusColors.primary600),
+        if (!row.headerChips.isNullOrEmpty()) {
+            ChipRowView(chips = row.headerChips, timeMeta = row.timeMeta, metaTail = null)
+            Spacer(Modifier.height(2.dp))
+        }
+        if (row.title.isNotEmpty()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                Text(
+                    text = row.title,
+                    style = PantopusTextStyle.body,
+                    fontWeight =
+                        if (row.highlight is RowHighlight.Unread) {
+                            FontWeight.Bold
+                        } else {
+                            FontWeight.SemiBold
+                        },
+                    color = PantopusColors.appText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
+                if (row.inlineChip != null) {
+                    ChipPill(row.inlineChip)
+                }
+                if (row.highlight is RowHighlight.Unread) {
+                    Spacer(Modifier.weight(1f))
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(PantopusColors.primary600),
+                    )
+                }
             }
         }
         if (row.subtitle != null) {
@@ -693,12 +702,48 @@ private fun ContentColumn(
         }
         if (row.body != null) {
             Spacer(Modifier.height(Spacing.s1))
-            MetaLine(text = row.body, icon = row.bodyIcon)
+            BodyLine(text = row.body, icon = row.bodyIcon, emphasis = row.bodyEmphasis)
         }
         if (!row.chips.isNullOrEmpty()) {
             Spacer(Modifier.height(Spacing.s1))
-            ChipRowView(chips = row.chips, timeMeta = row.timeMeta, metaTail = row.metaTail)
+            ChipRowView(
+                chips = row.chips,
+                timeMeta = if (row.headerChips == null) row.timeMeta else null,
+                metaTail = row.metaTail,
+            )
         }
+    }
+}
+
+@Composable
+private fun BodyLine(
+    text: String,
+    icon: PantopusIcon?,
+    emphasis: RowBodyEmphasis,
+) {
+    when (emphasis) {
+        RowBodyEmphasis.Secondary -> MetaLine(text = text, icon = icon)
+        RowBodyEmphasis.Primary ->
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                if (icon != null) {
+                    PantopusIconImage(
+                        icon = icon,
+                        contentDescription = null,
+                        size = 13.dp,
+                        tint = PantopusColors.appText,
+                    )
+                }
+                Text(
+                    text = text,
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.appText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
     }
 }
 
@@ -1174,6 +1219,71 @@ private fun FooterStack(footer: RowFooter) {
                     onClick = action.onClick,
                     modifier = Modifier.weight(action.flex.toFloat()),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Hairline-separated engagement footer — display-only icon+label items
+ * on the left, optional CTA text-button on the right. Used by My posts.
+ */
+@Composable
+private fun EngagementStrip(engagement: RowEngagement) {
+    Column {
+        HorizontalDivider(color = PantopusColors.appBorder, modifier = Modifier.padding(top = Spacing.s2))
+        Spacer(Modifier.height(Spacing.s2))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s4),
+        ) {
+            engagement.items.forEach { item ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    PantopusIconImage(
+                        icon = item.icon,
+                        contentDescription = null,
+                        size = 13.dp,
+                        tint = PantopusColors.appTextSecondary,
+                    )
+                    Text(
+                        text = item.label,
+                        style = PantopusTextStyle.caption,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            val cta = engagement.cta
+            if (cta != null) {
+                Row(
+                    modifier =
+                        Modifier
+                            .clickable(onClick = cta.onClick)
+                            .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
+                            .testTag("rowEngagementCTA")
+                            .semantics { contentDescription = cta.accessibilityLabel },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (cta.icon != null) {
+                        PantopusIconImage(
+                            icon = cta.icon,
+                            contentDescription = null,
+                            size = 12.dp,
+                            tint = PantopusColors.primary600,
+                        )
+                    }
+                    Text(
+                        text = cta.label,
+                        style = PantopusTextStyle.caption,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.primary600,
+                    )
+                }
             }
         }
     }

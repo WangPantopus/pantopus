@@ -137,6 +137,36 @@ export interface RowFooter {
 
 export type RowHighlight = 'unread' | 'leading' | 'archived' | 'muted';
 
+// ─── Engagement footer (T5.3.3 My posts) ───────────────────────
+
+export interface RowEngagementItem {
+  id: string;
+  icon: LucideIcon;
+  label: string;
+}
+
+export interface RowEngagementCTA {
+  label: string;
+  icon?: LucideIcon;
+  accessibilityLabel?: string;
+  onClick: () => void;
+}
+
+export interface RowEngagement {
+  items: RowEngagementItem[];
+  cta?: RowEngagementCTA;
+}
+
+// ─── Body emphasis (T5.3.3 My posts) ───────────────────────────
+
+/**
+ * `secondary` (default) — 12px caption, secondary text colour
+ * (Notifications V2 body line).
+ * `primary` — 14px small, primary text colour (My posts body IS the
+ * row's headline content).
+ */
+export type RowBodyEmphasis = 'secondary' | 'primary';
+
 // ─── RowModel ──────────────────────────────────────────────────
 
 export type RowTemplate = 'statusChip' | 'fileChevron' | 'avatarKebab';
@@ -153,13 +183,18 @@ export interface RowModel {
 
   // T5 additions — every field optional with `undefined` default
   body?: string | null;
+  bodyEmphasis?: RowBodyEmphasis;
   inlineChip?: RowChip;
   chips?: RowChip[];
+  /** Chip row above the body (My posts intent header). */
+  headerChips?: RowChip[];
   timeMeta?: string;
   metaTail?: string;
   note?: string | null;
   highlight?: RowHighlight;
   footer?: RowFooter;
+  /** Hairline-separated engagement strip below the body (My posts). */
+  engagement?: RowEngagement;
 }
 
 // ─── Section ───────────────────────────────────────────────────
