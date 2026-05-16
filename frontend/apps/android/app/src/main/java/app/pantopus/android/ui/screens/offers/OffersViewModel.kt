@@ -1,0 +1,541 @@
+@file:Suppress(
+    "MagicNumber",
+    "LongMethod",
+    "PackageNaming",
+    "TooManyFunctions",
+    "ComplexMethod",
+    "CyclomaticComplexMethod",
+    "LongParameterList",
+    "ReturnCount",
+)
+
+package app.pantopus.android.ui.screens.offers
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.offers.BidDto
+import app.pantopus.android.data.api.models.offers.BidderUserDto
+import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.offers.OffersRepository
+import app.pantopus.android.ui.components.StatusChipVariant
+import app.pantopus.android.ui.screens.shared.list_of_rows.GradientPair
+import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsTab
+import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowModel
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
+import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
+import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
+import java.util.Locale
+import javax.inject.Inject
+
+/** Stable tab ids exposed for tests + the screen. */
+object OffersTab {
+    const val RECEIVED = "received"
+    const val SENT = "sent"
+}
+
+/** Which list the row was projected from — drives subtitle copy. */
+enum class OfferPerspective { Received, Sent }
+
+/**
+ * Eight lifecycle states the design's STATUS map calls out. Common-case
+ * statuses are `pending / countered / accepted / declined / withdrawn /
+ * expired`; `new` (recently-created pending) and `expiring` (pending
+ * within 4h of `expires_at`) are derived variants of `pending`.
+ */
+enum class OfferStatus {
+    New,
+    Expiring,
+    Countered,
+    Accepted,
+    Pending,
+    Declined,
+    Withdrawn,
+    Expired,
+    ;
+
+    val label: String
+        get() =
+            when (this) {
+                New -> "New offer"
+                Expiring -> "Expiring soon"
+                Countered -> "Countered"
+                Accepted -> "Accepted"
+                Pending -> "Pending response"
+                Declined -> "Declined"
+                Withdrawn -> "Withdrawn"
+                Expired -> "Expired"
+            }
+
+    val icon: PantopusIcon
+        get() =
+            when (this) {
+                New -> PantopusIcon.Sparkles
+                Expiring -> PantopusIcon.Timer
+                Countered -> PantopusIcon.ArrowsRepeat
+                Accepted -> PantopusIcon.Check
+                Pending -> PantopusIcon.Hourglass
+                Declined -> PantopusIcon.X
+                Withdrawn -> PantopusIcon.ArrowLeft
+                Expired -> PantopusIcon.AlertCircle
+            }
+
+    val chipVariant: StatusChipVariant
+        get() =
+            when (this) {
+                New -> StatusChipVariant.Personal
+                Expiring -> StatusChipVariant.ErrorVariant
+                Countered -> StatusChipVariant.Warning
+                Accepted -> StatusChipVariant.Success
+                Pending, Declined, Withdrawn, Expired -> StatusChipVariant.Neutral
+            }
+
+    companion object {
+        const val NEW_WINDOW_SECONDS: Long = 12 * 60 * 60
+        const val EXPIRING_WINDOW_SECONDS: Long = 4 * 60 * 60
+    }
+}
+
+/**
+ * Eight gig-category buckets the row's leading icon represents. Wraps
+ * the existing category color tokens in a [PantopusIcon] + theme-token
+ * [GradientPair] pair so the shell can render
+ * [RowLeading.CategoryGradientIcon] without any raw `Color(0xFF…)` at
+ * the call site.
+ */
+enum class OffersCategory {
+    Handyman,
+    Cleaning,
+    Moving,
+    PetCare,
+    ChildCare,
+    Tutoring,
+    Tech,
+    Delivery,
+    Other,
+    ;
+
+    val icon: PantopusIcon
+        get() =
+            when (this) {
+                Handyman -> PantopusIcon.Hammer
+                Cleaning -> PantopusIcon.Briefcase
+                Moving -> PantopusIcon.Package
+                PetCare -> PantopusIcon.Heart
+                ChildCare -> PantopusIcon.UserPlus
+                Tutoring -> PantopusIcon.Lightbulb
+                Tech -> PantopusIcon.Info
+                Delivery -> PantopusIcon.Send
+                Other -> PantopusIcon.Briefcase
+            }
+
+    fun gradient(): GradientPair =
+        when (this) {
+            Handyman -> GradientPair(PantopusColors.handyman, PantopusColors.warning)
+            Cleaning -> GradientPair(PantopusColors.cleaning, PantopusColors.primary600)
+            Moving -> GradientPair(PantopusColors.moving, PantopusColors.business)
+            PetCare -> GradientPair(PantopusColors.petCare, PantopusColors.success)
+            ChildCare -> GradientPair(PantopusColors.childCare, PantopusColors.error)
+            Tutoring -> GradientPair(PantopusColors.tutoring, PantopusColors.warning)
+            Tech -> GradientPair(PantopusColors.tech, PantopusColors.appTextSecondary)
+            Delivery -> GradientPair(PantopusColors.delivery, PantopusColors.primary700)
+            Other -> GradientPair(PantopusColors.primary600, PantopusColors.primary700)
+        }
+
+    companion object {
+        fun fromRaw(raw: String?): OffersCategory {
+            val key =
+                (raw ?: "")
+                    .lowercase(Locale.ROOT)
+                    .replace("_", "")
+                    .replace("-", "")
+                    .replace(" ", "")
+            return when (key) {
+                "handyman", "handy", "repair", "repairs" -> Handyman
+                "cleaning", "clean" -> Cleaning
+                "moving", "move", "movers" -> Moving
+                "petcare", "pet", "pets", "dogwalking", "petsitting" -> PetCare
+                "childcare", "child", "babysitting", "nanny" -> ChildCare
+                "tutoring", "tutor", "lessons", "teaching" -> Tutoring
+                "tech", "technology", "it", "computer", "techsupport" -> Tech
+                "delivery", "deliveries", "courier" -> Delivery
+                else -> Other
+            }
+        }
+    }
+}
+
+/**
+ * Drives the T5.2.4 Offers screen against the shared [ListOfRowsScreen].
+ * Mirrors iOS `OffersViewModel` field-for-field — same tabs, same
+ * status derivation, same row mapping. No optimistic mutations: the row
+ * tap pushes a gig-detail destination where the user manages the offer.
+ */
+@HiltViewModel
+class OffersViewModel
+    @Inject
+    constructor(
+        private val repo: OffersRepository,
+    ) : ViewModel() {
+        private var received: List<BidDto> = emptyList()
+        private var sent: List<BidDto> = emptyList()
+        private var loadedAtLeastOnce: Boolean = false
+        private var rowTapHandler: (BidDto) -> Unit = {}
+        private var filterHandler: () -> Unit = {}
+        private var browseHandler: () -> Unit = {}
+        private var postTaskHandler: () -> Unit = {}
+
+        private val _state = MutableStateFlow<ListOfRowsUiState>(ListOfRowsUiState.Loading)
+        val state: StateFlow<ListOfRowsUiState> = _state.asStateFlow()
+
+        private val _tabs =
+            MutableStateFlow(
+                listOf(
+                    ListOfRowsTab(id = OffersTab.RECEIVED, label = "Received", count = 0),
+                    ListOfRowsTab(id = OffersTab.SENT, label = "Sent", count = 0),
+                ),
+            )
+        val tabs: StateFlow<List<ListOfRowsTab>> = _tabs.asStateFlow()
+
+        private val _selectedTab = MutableStateFlow(OffersTab.RECEIVED)
+        val selectedTab: StateFlow<String> = _selectedTab.asStateFlow()
+
+        private val _topBarAction =
+            MutableStateFlow<TopBarAction?>(
+                TopBarAction(
+                    icon = PantopusIcon.Filter,
+                    contentDescription = "Filter offers",
+                    label = null,
+                    isEnabled = true,
+                    onClick = { filterHandler() },
+                ),
+            )
+        val topBarAction: StateFlow<TopBarAction?> = _topBarAction.asStateFlow()
+
+        /**
+         * Inject the screen-level callbacks (row tap → detail push,
+         * empty-state CTAs, filter chip handler). Called from the Screen
+         * composable's [androidx.compose.runtime.LaunchedEffect].
+         */
+        fun bindCallbacks(
+            onOpenOfferDetail: (BidDto) -> Unit,
+            onOpenFilters: () -> Unit,
+            onBrowseListings: () -> Unit,
+            onPostTask: () -> Unit,
+        ) {
+            rowTapHandler = onOpenOfferDetail
+            filterHandler = onOpenFilters
+            browseHandler = onBrowseListings
+            postTaskHandler = onPostTask
+            _topBarAction.value =
+                TopBarAction(
+                    icon = PantopusIcon.Filter,
+                    contentDescription = "Filter offers",
+                    label = null,
+                    isEnabled = true,
+                    onClick = { filterHandler() },
+                )
+        }
+
+        fun load() {
+            if (_state.value is ListOfRowsUiState.Loaded && loadedAtLeastOnce) return
+            reload()
+        }
+
+        fun refresh() = reload()
+
+        /** Tab switch — no refetch needed; we already have both lists in memory. */
+        fun selectTab(id: String) {
+            if (_selectedTab.value == id) return
+            _selectedTab.value = id
+            applyState()
+        }
+
+        /** Cross-tab paging isn't part of T5.2.4 — both endpoints return the full list. */
+        fun loadMoreIfNeeded() = Unit
+
+        private fun reload() {
+            if (!loadedAtLeastOnce) _state.value = ListOfRowsUiState.Loading
+            viewModelScope.launch {
+                val receivedDeferred = async { repo.receivedOffers() }
+                val sentDeferred = async { repo.myBids() }
+                val receivedResult = receivedDeferred.await()
+                val sentResult = sentDeferred.await()
+                when {
+                    receivedResult is NetworkResult.Success && sentResult is NetworkResult.Success -> {
+                        received = receivedResult.data.offers
+                        sent = sentResult.data.bids
+                        loadedAtLeastOnce = true
+                        applyState()
+                    }
+                    !loadedAtLeastOnce -> {
+                        val failure =
+                            (receivedResult as? NetworkResult.Failure)
+                                ?: (sentResult as? NetworkResult.Failure)
+                        _state.value =
+                            ListOfRowsUiState.Error(
+                                failure?.error?.message ?: "Couldn't load offers.",
+                            )
+                    }
+                }
+            }
+        }
+
+        private fun applyState() {
+            _tabs.value =
+                listOf(
+                    ListOfRowsTab(
+                        id = OffersTab.RECEIVED,
+                        label = "Received",
+                        count = received.size,
+                    ),
+                    ListOfRowsTab(
+                        id = OffersTab.SENT,
+                        label = "Sent",
+                        count = sent.size,
+                    ),
+                )
+            val items = if (_selectedTab.value == OffersTab.SENT) sent else received
+            if (items.isEmpty()) {
+                _state.value = emptyState()
+                return
+            }
+            val perspective =
+                if (_selectedTab.value == OffersTab.SENT) OfferPerspective.Sent else OfferPerspective.Received
+            val now = Instant.now()
+            val rows =
+                items.map { dto ->
+                    row(
+                        dto = dto,
+                        perspective = perspective,
+                        now = now,
+                    ) { rowTapHandler(dto) }
+                }
+            _state.value =
+                ListOfRowsUiState.Loaded(
+                    sections = listOf(RowSection(id = _selectedTab.value, rows = rows)),
+                    hasMore = false,
+                )
+        }
+
+        private fun emptyState(): ListOfRowsUiState.Empty =
+            when (_selectedTab.value) {
+                OffersTab.SENT ->
+                    ListOfRowsUiState.Empty(
+                        icon = PantopusIcon.HandCoins,
+                        headline = "No offers sent yet",
+                        subcopy =
+                            "Browse listings and gigs you'd like to buy or help " +
+                                "with — your offers will show up here.",
+                        ctaTitle = "Browse listings",
+                        onCta = { browseHandler() },
+                    )
+                else ->
+                    ListOfRowsUiState.Empty(
+                        icon = PantopusIcon.HandCoins,
+                        headline = "No offers yet",
+                        subcopy =
+                            "When a neighbor offers a price on one of your listings, " +
+                                "it’ll land here. Listings with photos and a fair ask tend " +
+                                "to draw offers within a day.",
+                        ctaTitle = "Post a task",
+                        onCta = { postTaskHandler() },
+                    )
+            }
+
+        companion object {
+            /**
+             * Pure projection from a [BidDto] to a [RowModel]. Public so
+             * the test suite can assert the mapping (status derivation,
+             * perspective subtitle, price stack) without standing up the
+             * ViewModel.
+             */
+            fun row(
+                dto: BidDto,
+                perspective: OfferPerspective,
+                now: Instant = Instant.now(),
+                onTap: () -> Unit = {},
+            ): RowModel {
+                val status = derivedStatus(dto = dto, now = now)
+                val category = OffersCategory.fromRaw(dto.gig?.category)
+                val amount = formatPrice(dto.bidAmount)
+                val askingSublabel = formatAskingSublabel(dto.gig?.price)
+                val title = dto.gig?.title?.takeIf { it.isNotBlank() } ?: "Offer"
+                return RowModel(
+                    id = dto.id,
+                    title = title,
+                    subtitle = subtitle(dto = dto, perspective = perspective, now = now),
+                    template = RowTemplate.StatusChip,
+                    leading =
+                        RowLeading.CategoryGradientIcon(
+                            icon = category.icon,
+                            gradient = category.gradient(),
+                        ),
+                    trailing =
+                        RowTrailing.PriceStack(
+                            amount = amount,
+                            sublabel = askingSublabel,
+                        ),
+                    onTap = onTap,
+                    chips =
+                        listOf(
+                            RowChip(
+                                text = status.label,
+                                icon = status.icon,
+                                tint = RowChip.Tint.Status(status.chipVariant),
+                            ),
+                        ),
+                    metaTail = metaTail(dto = dto, status = status, perspective = perspective),
+                )
+            }
+
+            /** Map a backend bid to one of the eight design statuses. Pure + time-deterministic. */
+            fun derivedStatus(
+                dto: BidDto,
+                now: Instant,
+            ): OfferStatus {
+                val hasLiveCounter =
+                    (dto.counterAmount ?: 0.0) > 0 || (dto.counterStatus?.isNotEmpty() == true)
+                if (hasLiveCounter && isPending(dto.status)) return OfferStatus.Countered
+
+                return when ((dto.status ?: "").lowercase(Locale.ROOT)) {
+                    "accepted", "assigned" -> OfferStatus.Accepted
+                    "rejected", "declined" -> OfferStatus.Declined
+                    "withdrawn" -> OfferStatus.Withdrawn
+                    "expired" -> OfferStatus.Expired
+                    "pending" -> {
+                        val expires = parseInstant(dto.expiresAt)
+                        if (expires != null) {
+                            val timeLeft = ChronoUnit.SECONDS.between(now, expires)
+                            if (timeLeft in 1 until OfferStatus.EXPIRING_WINDOW_SECONDS) {
+                                return OfferStatus.Expiring
+                            }
+                            if (timeLeft <= 0) return OfferStatus.Expired
+                        }
+                        val created = parseInstant(dto.createdAt)
+                        if (created != null &&
+                            ChronoUnit.SECONDS.between(created, now) < OfferStatus.NEW_WINDOW_SECONDS
+                        ) {
+                            return OfferStatus.New
+                        }
+                        OfferStatus.Pending
+                    }
+                    else -> OfferStatus.Pending
+                }
+            }
+
+            /** Render the row subtitle: counterparty + city + relative time. */
+            fun subtitle(
+                dto: BidDto,
+                perspective: OfferPerspective,
+                now: Instant,
+            ): String {
+                val parts = mutableListOf<String>()
+                when (perspective) {
+                    OfferPerspective.Received -> {
+                        parts.add("From ${displayName(dto.bidder)}")
+                        dto.bidder?.city?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
+                    }
+                    OfferPerspective.Sent -> {
+                        parts.add("Your offer")
+                    }
+                }
+                formatRelativeTime(dto.createdAt, now)?.let { parts.add(it) }
+                return parts.joinToString(" · ")
+            }
+
+            /** Optional chip-row meta tail (counter amount when status is Countered). */
+            fun metaTail(
+                dto: BidDto,
+                status: OfferStatus,
+                perspective: OfferPerspective,
+            ): String? {
+                if (status != OfferStatus.Countered) return null
+                val counter = dto.counterAmount ?: return null
+                if (counter <= 0) return null
+                return when (perspective) {
+                    OfferPerspective.Received -> "you countered ${formatPrice(counter)}"
+                    OfferPerspective.Sent -> "counter ${formatPrice(counter)}"
+                }
+            }
+
+            fun isPending(raw: String?): Boolean = (raw ?: "").lowercase(Locale.ROOT) == "pending"
+
+            /** `12` → `"$12"`. Whole dollars to match the headline price geometry. */
+            fun formatPrice(amount: Double?): String {
+                if (amount == null) return "$—"
+                return "$${kotlin.math.round(amount).toInt()}"
+            }
+
+            /** Sub-label used by the price stack: `"asking $240"`. */
+            fun formatAskingSublabel(askingPrice: Double?): String? {
+                val price = askingPrice ?: return null
+                if (price <= 0) return null
+                return "asking ${formatPrice(price)}"
+            }
+
+            fun displayName(bidder: BidderUserDto?): String {
+                val name = bidder?.name?.takeIf { it.isNotBlank() }
+                if (name != null) return name
+                val first = bidder?.firstName?.takeIf { it.isNotBlank() }
+                if (first != null) return first
+                val username = bidder?.username?.takeIf { it.isNotBlank() }
+                if (username != null) return username
+                return "Someone"
+            }
+
+            fun parseInstant(raw: String?): Instant? {
+                if (raw.isNullOrEmpty()) return null
+                return runCatching { Instant.parse(raw) }.getOrNull()
+            }
+
+            /** "12m" / "3h" / "Yesterday" / "Tue" / "Mar 10" — mirrors iOS. */
+            fun formatRelativeTime(
+                raw: String?,
+                now: Instant,
+                zone: ZoneId = ZoneId.systemDefault(),
+            ): String? {
+                val date = parseInstant(raw) ?: return null
+                val seconds = ChronoUnit.SECONDS.between(date, now)
+                return when {
+                    seconds < 60 -> "now"
+                    seconds < 3600 -> "${seconds / 60}m"
+                    seconds < 86_400 -> "${seconds / 3600}h"
+                    else -> {
+                        val today = now.atZone(zone).toLocalDate()
+                        val createdDate = date.atZone(zone).toLocalDate()
+                        val days = ChronoUnit.DAYS.between(createdDate, today)
+                        when {
+                            days == 1L -> "Yesterday"
+                            days < 7L ->
+                                createdDate.dayOfWeek.getDisplayName(
+                                    TextStyle.SHORT,
+                                    Locale.US,
+                                )
+                            else ->
+                                DateTimeFormatter
+                                    .ofPattern("MMM d", Locale.US)
+                                    .withZone(zone)
+                                    .format(date)
+                        }
+                    }
+                }
+            }
+        }
+    }
