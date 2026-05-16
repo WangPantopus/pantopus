@@ -84,6 +84,7 @@ fun YouScreen(
     onOpenSettings: () -> Unit = {},
     onOpenOffers: () -> Unit = {},
     onOpenMyBids: () -> Unit = {},
+    onOpenMyTasks: () -> Unit = {},
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
     val signedIn = state as? AuthRepository.State.SignedIn
@@ -108,6 +109,7 @@ fun YouScreen(
             when (tile.routeKey) {
                 "me.mail" -> onOpenMailbox()
                 "me.bids" -> onOpenMyBids()
+                "me.gigs" -> onOpenMyTasks()
                 else -> onOpenPlaceholder(tile.label)
             }
         },

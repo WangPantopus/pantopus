@@ -553,9 +553,10 @@ private struct RowView: View {
             if let body = row.body {
                 metaLine(text: body, icon: row.bodyIcon, topPadding: 2)
             }
-            if let chips = row.chips, !chips.isEmpty {
+            if (row.chips?.isEmpty == false) || row.bidderStack != nil {
                 ChipRowView(
-                    chips: chips,
+                    bidderStack: row.bidderStack,
+                    chips: row.chips ?? [],
                     timeMeta: row.timeMeta,
                     metaTail: row.metaTail
                 )
@@ -825,12 +826,17 @@ private struct TrailingView: View {
 // MARK: - Chip row
 
 private struct ChipRowView: View {
+    let bidderStack: BidderStackData?
     let chips: [RowChip]
     let timeMeta: String?
     let metaTail: String?
 
     var body: some View {
         HStack(spacing: Spacing.s1) {
+            if let bidderStack, !bidderStack.bidders.isEmpty || bidderStack.overflow > 0 {
+                BidderStack(bidders: bidderStack.bidders, overflow: bidderStack.overflow)
+                    .padding(.trailing, 2)
+            }
             ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
                 ChipPill(chip: chip)
             }

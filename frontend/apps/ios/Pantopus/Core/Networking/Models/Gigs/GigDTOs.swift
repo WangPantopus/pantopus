@@ -91,6 +91,16 @@ public struct GigCreator: Decodable, Sendable, Hashable {
     }
 }
 
+/// Bidder thumbnail surfaced on the My tasks V2 row's bidder stack.
+/// Initials + tone are derived server-side (gigs.js) so iOS / Android /
+/// web all render identical avatars without each platform reinventing
+/// the derivation.
+public struct TopBidderDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let initials: String
+    public let color: String
+}
+
 /// Top-level envelope from `/api/gigs`.
 public struct GigsListResponse: Decodable, Sendable {
     public let gigs: [GigDTO]

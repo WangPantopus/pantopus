@@ -1,5 +1,8 @@
 package app.pantopus.android.data.api.services
 
+import app.pantopus.android.data.api.models.gigs.BoostGigResponse
+import app.pantopus.android.data.api.models.gigs.CancelGigBody
+import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
@@ -7,6 +10,7 @@ import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.gigs.GigsListResponse
 import app.pantopus.android.data.api.models.gigs.MarkCompletedBody
 import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
+import app.pantopus.android.data.api.models.gigs.MyGigsResponse
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
 import app.pantopus.android.data.api.models.gigs.PlaceBidResponse
 import retrofit2.http.Body
@@ -104,4 +108,45 @@ interface GigsApi {
         @Path("gigId") gigId: String,
         @Body body: MarkCompletedBody,
     ): MarkCompletedResponse
+
+    /**
+     * `GET /api/gigs/my-gigs` — list the caller's posted gigs with
+     * inlined `bid_count`, `top_bid_amount`, `top_bidders[≤3]`, and
+     * boost timestamps. Route `backend/routes/gigs.js:1169`.
+     */
+    @GET("api/gigs/my-gigs")
+    suspend fun myGigs(
+        @Query("limit") limit: Int = 100,
+        @Query("status") status: String? = null,
+    ): MyGigsResponse
+
+    /**
+     * `POST /api/gigs/:gigId/boost` — poster promotes their gig in the
+     * feed for 24h. Route added in T5.3.2.
+     */
+    @POST("api/gigs/{gigId}/boost")
+    suspend fun boostGig(
+        @Path("gigId") gigId: String,
+    ): BoostGigResponse
+
+    /**
+     * `POST /api/gigs/:gigId/complete` — poster confirms completion.
+     * Alias of `/confirm-completion`. Route `backend/routes/gigs.js:6170`.
+     * Distinct from `markCompleted(...)` which is the worker-only
+     * `/mark-completed` route.
+     */
+    @POST("api/gigs/{gigId}/complete")
+    suspend fun completeGigAsPoster(
+        @Path("gigId") gigId: String,
+    ): CompleteGigResponse
+
+    /**
+     * `POST /api/gigs/:gigId/cancel` — poster cancels the gig. Route
+     * `backend/routes/gigs.js:6233`.
+     */
+    @POST("api/gigs/{gigId}/cancel")
+    suspend fun cancelGig(
+        @Path("gigId") gigId: String,
+        @Body body: CancelGigBody,
+    ): CompleteGigResponse
 }
