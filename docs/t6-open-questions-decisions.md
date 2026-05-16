@@ -521,55 +521,69 @@ is filed as a backend follow-up to confirm before P16.5.
 
 ---
 
-## Q17 — Web parity scope ⚠️
+## Q17 — Web parity scope ✅
 
-**Decision**: **Required for ALL 46 new screens.** (Diverges from
-recommendation.)
+**Decision**: **Required only where web route exists today; defer the
+10 home-pillar deep screens to T7.** (Matches Recommendation, after
+revisit.)
 
-Every T6-new mobile screen gets a web companion at parity. The 10
-home-pillar deep screens that have no web route today
-(Maintenance, Calendar, Documents, Polls, Members, Access codes,
-Emergency, Packages, Vault, Owners) gain new web routes alongside
-their mobile counterparts.
+> **Note**: this entry was initially decided as "Required for ALL 46
+> new screens" and revisited later in the session. The revisit pulled
+> back the scope expansion. The 10-screen web scope expansion is
+> **cancelled**.
+
+Web companion required for:
+- All 12 T5-original re-issues (already have web routes from T5.4.3)
+- All refresh PRs whose mobile screens have existing web routes —
+  Auth (`/auth`), Hub (`/app/hub`), Me (`/app/profile`), Settings
+  (`/app/settings`), Chat (`/app/chat`), Marketplace
+  (`/app/marketplace`), Pulse (`/app/feed`), Gigs (`/app/gigs`),
+  Mailbox-A17 root (`/app/mailbox`), MyHomes (`/app/homes`),
+  MyBusinesses (`/app/businesses`), MyListings (`/app/my-listings`),
+  MapListHybrid (`/app/map`), Bills (`/app/homes/[id]/bills`), Pets
+  (`/app/homes/[id]/pets`), Discover Hub (`/app/discover-hub`),
+  Discover Businesses (`/app/discover`), Connections
+  (`/app/connections`), Notifications (`/app/notifications`), Offers
+  (`/app/offers`), Listing offers (`/app/listing-offers`), My bids
+  (`/app/my-bids`), My tasks (`/app/my-gigs`), My posts
+  (`/app/my-pulse`), Support trains (`/app/support-trains`).
+
+Web companion **deferred to T7** (no existing web route today;
+mobile-only for T6):
+- Maintenance (`/app/homes/[id]/maintenance` — to add in T7)
+- Calendar (`/app/homes/[id]/calendar`)
+- Documents (`/app/homes/[id]/docs`)
+- Vault (`/app/mailbox/vault`)
+- Members (`/app/homes/[id]/members`)
+- Owners (`/app/homes/[id]/owners`)
+- Access codes (`/app/homes/[id]/access`)
+- Emergency info (`/app/homes/[id]/emergency`)
+- Polls (`/app/homes/[id]/polls`)
+- Packages (`/app/homes/[id]/packages`)
+- Household tasks (`/app/homes/[id]/tasks`)
 
 **Scope impact**:
-- 10 additional new web pages, each a fresh implementation under
-  `frontend/apps/web/src/app/(app)/app/homes/[id]/<feature>/page.tsx`
-  (or equivalent) using the shared `<ListOfRowsShell />` web mirror
-  from T5.0.
-- Per-PR scope grows: each home-pillar feature PR (P10–P15, P15.5)
-  now ships iOS + Android + web in the same commit.
-- The T6 ship date moves out — estimate 30-50% additional PR labor
-  for the home-pillar tier.
+- T6 keeps a mobile-first cadence for the home-pillar deep screens.
+- Per-PR scope: each home-pillar feature PR (P10–P15, P15.5) ships
+  iOS + Android only in the same commit; web sweep is a separate T7
+  effort.
+- Document each deferral in `docs/mobile-parity-audit.md` with
+  `(mobile-only this tier — T7 web sweep)` annotation.
 
-**Mitigation**:
-- The shared `<ListOfRowsShell />` web mirror (shipped in T5.0) takes
-  most of the chrome boilerplate off. Each new web page is
-  effectively a row-mapper + endpoint hook + a thin page wrapper.
-- Web routes for home-pillar screens are mostly admin/desktop
-  power-user surfaces — full keyboard support, no need to optimize
-  for narrow phone viewport.
-- Auth, Hub, Me, Settings, Chat, Marketplace, Pulse, Gigs, Mailbox
-  refresh PRs already had implicit web parity (existing routes); the
-  new burden is just the 10 home-pillar deep screens.
+**Why this matters**: these screens are household-internal admin
+surfaces (chore logs, code rotations, member rosters). Desktop usage
+is rare compared to mobile (the user is at home, opening the app
+when they remember to log something). Shipping mobile-first this
+tier lets the team move faster; the T7 web sweep can collapse the 11
+pages into a single multi-PR effort using the shared
+`<ListOfRowsShell />` web mirror.
 
-**Per-PR acceptance gate** (`docs/mobile-screen-definition-of-done.md`
-already requires this for shipped-on-web screens; now extended to
-T6-new home-pillar):
-- iOS + Android + web land in the same commit.
-- Web route added to `frontend/apps/web/src/app/(app)/app/...`.
-- Web test (`*.test.tsx`) at minimum covers the row-mapping projection.
-- Parity audit row records the new web route.
-
-**Why this divergence**: the user wants triple-platform parity to be
-the *invariant* for T6, same as it was for T5. Mobile-first cadence
-was the wrong framing — the platforms should ship together so users
-who switch between web and mobile see the same surfaces.
-
-**Open follow-up**: confirm with the web team that the 10 new
-home-pillar pages can be staffed in parallel with the mobile PRs, or
-plan to sequence them serially (mobile leads by 1-2 PRs, web
-catches up the same week).
+**Per-PR acceptance gate** (unchanged from T5):
+- iOS + Android land in the same commit.
+- Web companion ships in the same commit ONLY for screens with an
+  existing web route.
+- Parity audit row records the new web route OR the `(mobile-only)`
+  deferral note.
 
 ---
 
@@ -593,10 +607,10 @@ catches up the same week).
 | 14 | Mailbox-A17 root replaces T1.3 | Replaces | ✅ |
 | 15 | MyHomes refresh replaces T1.4 row | Replaces | ✅ |
 | 16 | Beacon backend mapping | /api/personas/:handle | ✅ |
-| 17 | Web parity scope | Required for ALL 46 new screens | ⚠️ Diverged |
+| 17 | Web parity scope | Existing-route only; defer 10 to T7 | ✅ (after revisit) |
 
-**Aligned**: 13 / 17. **Diverged**: 4 — Q2 (Bills), Q11 (trains tone),
-Q12 (Hub flag), Q17 (web parity).
+**Aligned**: 14 / 17. **Diverged**: 3 — Q2 (Bills), Q11 (trains tone),
+Q12 (Hub flag).
 
 ## Cross-cutting follow-ups surfaced by the decisions
 
@@ -622,9 +636,12 @@ Q12 (Hub flag), Q17 (web parity).
    - PATCH/DELETE for Documents + Emergencies at `home.js`.
    - Maintenance CRUD (4 new routes).
 
-3. **Scope expansion**:
-   - Q17: 10 additional new web pages for home-pillar deep screens.
-     Re-baseline T6 ship date with the web team.
+3. **Deferred to T7**:
+   - Q17: 10 home-pillar deep screens stay mobile-only this tier
+     (Maintenance / Calendar / Documents / Vault / Members / Owners /
+     Access codes / Emergency / Polls / Packages / Household tasks).
+     T7 will run a single web-sweep effort to collapse these into web
+     routes using the shared `<ListOfRowsShell />` mirror.
 
 4. **Flag debt avoided**: no feature flags introduced (Q6 / Q12 / Q15
    all rejected flag-gating). Hub cutover relies on pre-flight snapshot
