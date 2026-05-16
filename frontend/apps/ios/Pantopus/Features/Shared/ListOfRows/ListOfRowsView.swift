@@ -93,6 +93,7 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource>: View {
                 sections: sections,
                 hasMore: hasMore,
                 banner: dataSource.banner,
+                listingContext: dataSource.listingContext,
                 onEndReached: { Task { await dataSource.loadMoreIfNeeded() } },
                 onRefresh: { await dataSource.refresh() }
             )
@@ -279,11 +280,20 @@ private struct LoadedList: View {
     let sections: [RowSection]
     let hasMore: Bool
     let banner: BannerConfig?
+    let listingContext: ListingContextConfig?
     let onEndReached: () -> Void
     let onRefresh: () async -> Void
 
     var body: some View {
         List {
+            if let listingContext {
+                Section {
+                    ListingContextHeader(config: listingContext)
+                        .listRowInsets(EdgeInsets(top: Spacing.s3, leading: Spacing.s4, bottom: 0, trailing: Spacing.s4))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
+            }
             if let banner {
                 Section {
                     BannerCard(config: banner)
@@ -413,6 +423,148 @@ private struct BannerCard: View {
                 .buttonStyle(.plain)
         } else {
             content
+        }
+    }
+}
+
+private struct ListingContextHeader: View {
+    let config: ListingContextConfig
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            card
+            if config.offerCount != nil || config.sortLabel != nil {
+                sortStrip
+                    .padding(.top, Spacing.s3)
+            }
+        }
+    }
+
+    private var card: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(alignment: .center, spacing: Spacing.s3) {
+                thumbnail
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {
+                        Text(config.title)
+                            .pantopusTextStyle(.body)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Theme.Color.appText)
+                            .lineLimit(1)
+                        Spacer(minLength: Spacing.s1)
+                        Text(config.askPrice)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(Theme.Color.appText)
+                    }
+                    if !config.meta.isEmpty {
+                        metaRow
+                    }
+                    StatusChip(
+                        config.statusChip.label,
+                        variant: config.statusChip.variant,
+                        icon: config.statusChip.icon
+                    )
+                    .padding(.top, 2)
+                }
+            }
+        }
+        .padding(Spacing.s3)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .accessibilityIdentifier("listingContextHeader")
+    }
+
+    private var thumbnail: some View {
+        ZStack {
+            switch config.thumbnail {
+            case let .icon(icon, gradient):
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [gradient.start, gradient.end],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                Icon(icon, size: 28, color: Theme.Color.appTextInverse)
+            case let .url(url, fallback, gradient):
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [gradient.start, gradient.end],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case let .success(image):
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    default:
+                        Icon(fallback, size: 28, color: Theme.Color.appTextInverse)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+        }
+        .frame(width: 64, height: 64)
+    }
+
+    private var metaRow: some View {
+        HStack(spacing: Spacing.s2) {
+            ForEach(Array(config.meta.enumerated()), id: \.offset) { index, item in
+                if index > 0 {
+                    Text("·")
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                }
+                HStack(spacing: 3) {
+                    if let icon = item.icon {
+                        Icon(icon, size: 11, color: Theme.Color.appTextSecondary)
+                    }
+                    Text(item.text)
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+            }
+        }
+    }
+
+    private var sortStrip: some View {
+        HStack(alignment: .center) {
+            if let count = config.offerCount {
+                Text("\(count) \(count == 1 ? "offer" : "offers")")
+                    .pantopusTextStyle(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .accessibilityIdentifier("listingContextOfferCount")
+            }
+            Spacer()
+            if let sortLabel = config.sortLabel {
+                if let onSort = config.onSort {
+                    Button(action: onSort) {
+                        sortLabelView(sortLabel)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("listingContextSort")
+                } else {
+                    sortLabelView(sortLabel)
+                }
+            }
+        }
+    }
+
+    private func sortLabelView(_ label: String) -> some View {
+        HStack(spacing: 4) {
+            Icon(.arrowsRepeat, size: 12, color: Theme.Color.appTextSecondary)
+            Text(label)
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            Icon(.chevronDown, size: 12, color: Theme.Color.appTextSecondary)
         }
     }
 }

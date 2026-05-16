@@ -59,6 +59,9 @@ public enum HubRoute: Hashable {
     /// My bids — outgoing bids on neighbour gigs (T5.3.1). Reached from
     /// the You / Me action grid or from Hub's marketplace pillar shelf.
     case myBids
+    /// T5.3.4 — per-listing offers panel reached from a listing detail
+    /// "View offers" affordance (only the listing's owner sees it).
+    case listingOffers(listingId: String, title: String?)
     /// Discover hub — typed-section discovery list (T5.4.1 / P11).
     /// Reached from the Hub Discovery rail's "See all" CTA or via the
     /// `pantopus://discover-hub` deep link.
@@ -445,7 +448,34 @@ public struct HubTabRoot: View {
             ListingDetailView(
                 viewModel: ListingDetailViewModel(listingId: listingId),
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onMessage: { _ in Task { @MainActor in push(.placeholder(label: "Messages")) } }
+                onMessage: { _ in Task { @MainActor in push(.placeholder(label: "Messages")) } },
+                onViewOffers: { dto in
+                    Task { @MainActor in
+                        push(.listingOffers(listingId: dto.id, title: dto.title))
+                    }
+                }
+            )
+        case let .listingOffers(listingId, titleHint):
+            ListingOffersView(
+                viewModel: ListingOffersViewModel(
+                    listingId: listingId,
+                    listingTitleHint: titleHint,
+                    onShareListing: {
+                        Task { @MainActor in push(.placeholder(label: "Share listing")) }
+                    },
+                    onOpenBuyer: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Buyer profile")) }
+                    },
+                    onOpenTransaction: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Transaction detail")) }
+                    },
+                    onEditPrice: {
+                        Task { @MainActor in push(.placeholder(label: "Edit listing")) }
+                    },
+                    onSort: {
+                        Task { @MainActor in push(.placeholder(label: "Sort offers")) }
+                    }
+                )
             )
         case .composeListing:
             NotYetAvailableView(tabName: "Snap & sell", icon: .camera)
