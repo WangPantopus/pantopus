@@ -1,12 +1,14 @@
 package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.feed.FeedResponse
+import app.pantopus.android.data.api.models.posts.MyPostsResponse
 import app.pantopus.android.data.api.models.posts.PostCommentCreateResponse
 import app.pantopus.android.data.api.models.posts.PostCommentRequest
 import app.pantopus.android.data.api.models.posts.PostCommentsResponse
 import app.pantopus.android.data.api.models.posts.PostDetailResponse
 import app.pantopus.android.data.api.models.posts.PostLikeResponse
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
@@ -57,4 +59,24 @@ interface PostsApi {
         @Path("id") id: String,
         @Body body: PostCommentRequest,
     ): PostCommentCreateResponse
+
+    /**
+     * `GET /api/posts/user/:userId` — paged list of posts authored by a
+     * user. Backend filters `archived_at IS NULL`, so the response only
+     * carries active posts today. Route `backend/routes/posts.js:3016`.
+     * Used by the My posts screen with the signed-in user's id.
+     */
+    @GET("api/posts/user/{userId}")
+    suspend fun userPosts(
+        @Path("userId") userId: String,
+        @Query("limit") limit: Int = 50,
+        @Query("cursorCreatedAt") cursorCreatedAt: String? = null,
+        @Query("cursorId") cursorId: String? = null,
+    ): MyPostsResponse
+
+    /** `DELETE /api/posts/:id` — author-only. Route `backend/routes/posts.js:2483`. */
+    @DELETE("api/posts/{id}")
+    suspend fun deletePost(
+        @Path("id") id: String,
+    )
 }

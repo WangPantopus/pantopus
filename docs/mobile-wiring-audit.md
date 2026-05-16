@@ -262,6 +262,24 @@ iOS:
 
 Android: same set under `data/api/services/RelationshipsApi.kt`, `data/api/services/BlocksApi.kt`, `ui/screens/root/RootTabScreen.kt` route additions, `ui/screens/hub/HubUiState.kt` discovery-kind enum.
 
+---
+
+## Me-tab action tiles (T5.3.x)
+
+The "Me" action grid (`MeViewModel.swift` / `MeViewModel.kt`) emits `routeKey`
+strings. Each one resolves to a concrete destination on the You tab — no
+`NotYetAvailableView` for the action tiles below.
+
+| Tile | routeKey | iOS destination | Android destination | Notes |
+|---|---|---|---|---|
+| My bids | `me.bids` | `YouRoute.myBids` → `MyBidsView` | `ChildRoutes.MY_BIDS` → `MyBidsScreen` | T5.3.1. Bidder side. `GET /api/gigs/my-bids`. |
+| My gigs | `me.gigs` | `YouRoute.myTasks` → `MyTasksView` | `ChildRoutes.MY_TASKS` → `MyTasksScreen` | **T5.3.2 (this PR).** Poster side. `GET /api/gigs/my-gigs` (now joined with `top_bidders[≤3]` for the BidderStack). FAB → `YouRoute.composeTask` / `ChildRoutes.COMPOSE_TASK` (placeholder until T2.3 lands a real composer). |
+
+The `composeTask` placeholder route is a `NotYetAvailableView("Post a task")`
+on both platforms — replaces the previous "Post a task" `placeholder`
+route used by HubTabRoot. Replace with the dedicated Post-a-task screen
+when T2.3 (Gigs) lands its composer flow.
+
 ## Tier links
 
 - Notifications screen → **T4.1**
@@ -270,3 +288,4 @@ Android: same set under `data/api/services/RelationshipsApi.kt`, `data/api/servi
 - Gigs → **T2.3**
 - Marketplace / Snap & Sell → **T2.5**
 - Pulse feed → **T1.2**
+- Post-a-task composer → **T2.3 (replaces `composeTask` placeholder)**

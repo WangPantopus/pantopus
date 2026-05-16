@@ -86,6 +86,8 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScre
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
 import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
 import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
+import app.pantopus.android.ui.screens.my_posts.MyPostsScreen
+import app.pantopus.android.ui.screens.my_tasks.MyTasksScreen
 import app.pantopus.android.ui.screens.nearby.map.MapEntity
 import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
 import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
@@ -149,6 +151,16 @@ private object ChildRoutes {
 
     /** My bids (T5.3.1). Reached from the You tab "My bids" action tile. */
     const val MY_BIDS = "my-bids"
+
+    /** My tasks V2 (T5.3.2). Reached from the You tab "My gigs" action tile. */
+    const val MY_TASKS = "my-tasks"
+
+    /** Compose-task placeholder (T5.3.2). Replaced when T2.3 lands the
+     *  dedicated composer. */
+    const val COMPOSE_TASK = "compose-task"
+
+    /** My posts (T5.3.3). Reached from the You / Me Activity-section row. */
+    const val MY_POSTS = "my-posts"
 
     /** Hub menu icon target. Replaced by Settings in T3.1. */
     const val MENU = "settings"
@@ -560,6 +572,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenSettings = { navController.navigate(ChildRoutes.MENU) },
                     onOpenOffers = { navController.navigate(ChildRoutes.OFFERS) },
                     onOpenMyBids = { navController.navigate(ChildRoutes.MY_BIDS) },
+                    onOpenMyTasks = { navController.navigate(ChildRoutes.MY_TASKS) },
+                    onOpenMyPosts = { navController.navigate(ChildRoutes.MY_POSTS) },
                 )
             }
 
@@ -975,6 +989,31 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.navigate(ChildRoutes.gigDetail(gigId))
                         }
                     },
+                )
+            }
+            composable(ChildRoutes.MY_TASKS) {
+                MyTasksScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenTask = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
+                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Filter tasks")) },
+                    onOpenBids = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
+                    onEditTask = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
+                    onMessageWorker = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
+                    onLeaveReview = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
+                    onPostTask = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
+                    onRepost = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
+                )
+            }
+            composable(ChildRoutes.COMPOSE_TASK) {
+                NotYetAvailableView(tabName = "Post a task", icon = PantopusIcon.Pencil)
+            }
+            composable(ChildRoutes.MY_POSTS) {
+                MyPostsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPost = { navController.navigate(ChildRoutes.placeholder("Post detail")) },
+                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Filter posts")) },
+                    onCompose = { navController.navigate(ChildRoutes.placeholder("Write a post")) },
+                    onEditPost = { navController.navigate(ChildRoutes.placeholder("Edit post")) },
                 )
             }
             composable(ChildRoutes.MENU) {

@@ -24,6 +24,10 @@ export type {
   RowFooter,
   RowFooterAction,
   RowHighlight,
+  RowEngagement,
+  RowEngagementItem,
+  RowEngagementCTA,
+  RowBodyEmphasis,
   // Primitives
   Bidder,
   BidderTone,

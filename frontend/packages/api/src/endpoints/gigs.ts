@@ -517,6 +517,14 @@ export async function completeGig(
 }
 
 /**
+ * T5.3.2 — poster promotes their gig in the feed for 24h. Sets
+ * `boosted_at = now()` and `boost_expires_at = now() + 24h` on the Gig.
+ */
+export async function boostGig(gigId: string): Promise<{ boost_expires_at: string | null }> {
+  return post<{ boost_expires_at: string | null }>(`/api/gigs/${gigId}/boost`, {});
+}
+
+/**
  * Cancel a gig (poster or worker)
  */
 export async function cancelGig(

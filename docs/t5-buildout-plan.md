@@ -543,6 +543,147 @@ all three platforms; legacy 7-status web filter is rebucketed to the
 
 ---
 
+## My tasks V2 implementation notes (T5.3.2 / P8)
+
+Canonical record of how the My tasks V2 screen maps backend gig state →
+4-tab grouping → design chip → footer action. **This section is the
+source of truth — when iOS, Android, and web disagree, this is what
+wins.**
+
+### Backend prep (lands with this PR)
+
+P8 was blocked on two prerequisites that were never satisfied by P3:
+
+1. **`/api/gigs/my-gigs` did not return bidder thumbnails per task.**
+   The design requires 3 inline 22pt avatars + a `+N` overflow tile on
+   every row, and the prompt's universal-convention explicitly forbids
+   N+1 fetches at list scale. **Fix:** extend the route with a
+   `top_bidders[≤3]: [{id, initials, color}]` array derived from the
+   GigBid → User join (single round-trip), tone hash on the user_id
+   for deterministic colour parity across iOS / Android / web.
+2. **No `POST /api/gigs/:gigId/boost` endpoint existed.** The design's
+   "Boost in feed" footer on `no-bids` rows had no backend target.
+   **Fix:** new endpoint sets `boosted_at = now()` +
+   `boost_expires_at = now() + 24h` on the Gig (added to the schema in
+   migration `149_gig_boost.sql`, also pushed onto GIG_LIST so future
+   feed ranking can read it).
+
+These both landed in this PR rather than as a separate prep — the
+backend additions are small and isolated, and bundling them keeps the
+mobile screens shippable on a single review pass.
+
+### Tab grouping
+
+Four equal-width tabs in this exact order. The 5 backend gig statuses
+(`open`, `assigned`, `in_progress`, `completed`, `cancelled`) plus
+derived `expired` bucket as follows:
+
+| Tab      | Membership                                                                 |
+| -------- | -------------------------------------------------------------------------- |
+| `Open`   | `open` (any bid count) — chip differentiates Reviewing / Urgent / No bids  |
+| `Active` | `in_progress`, `assigned`                                                  |
+| `Done`   | `completed`                                                                |
+| `Closed` | `cancelled`, plus `open` with `deadline` in the past (rendered as Expired) |
+
+Implementation: `MyTasksViewModel.tabFor(status)` on iOS + Android.
+`derivedStatus(dto, now)` is the upstream projection that decides which
+status the gig renders as; `tabFor` is a pure function from status to
+tab. Web mirrors both in `app/(app)/app/my-gigs/page.tsx`.
+
+### Chip variant per design
+
+Nine chip variants from the design's STATUS map
+(`mytasks-frames.jsx:36-46`). Derivation:
+
+| Chip                | Tab      | Derivation                                                                | Chip variant |
+| ------------------- | -------- | ------------------------------------------------------------------------- | ------------ |
+| `Reviewing bids`    | Open     | `gig.status == 'open'` && `bid_count > 0` && deadline > 4h (or no deadline) | info       |
+| `Closes in Xh`      | Open     | `gig.status == 'open'` && `deadline` within 4h (and > now)                  | error      |
+| `No bids yet`       | Open     | `gig.status == 'open'` && `bid_count == 0` && deadline > 4h (or no deadline)| neutral    |
+| `In progress`       | Active   | `gig.status == 'in_progress'` (or `'assigned'` w/o future `scheduled_start`)| success    |
+| `Starts {weekday}`  | Active   | `gig.status == 'assigned'` && `scheduled_start` in the future               | info       |
+| `Leave a review`    | Done     | `gig.status == 'completed'` (chip is default until a backend `poster_review_left` signal lands) | info |
+| `Completed`         | Done     | reserved for the post-`poster_review_left` state — not emitted yet         | success    |
+| `Cancelled`         | Closed   | `gig.status == 'cancelled'`                                                | neutral    |
+| `Expired`           | Closed   | `gig.status == 'open'` && `deadline` <= now                                | neutral    |
+
+### Footer per status
+
+Footer archetypes map straight from the design's `actions` prop:
+
+| Footer       | Status                       | Buttons                                                                              |
+| ------------ | ---------------------------- | ------------------------------------------------------------------------------------ |
+| `open`       | Reviewing                    | `[Edit (ghost), Review N bids (primary 2× flex)]`                                     |
+| `urgent`     | Closes in Xh                 | `[Extend 24h (ghost), Review N bids (primary 2× flex)]`                                |
+| `boost`      | No bids yet                  | `[Edit details (ghost), Boost in feed (primary)]`                                     |
+| `inprogress` | In progress / Starts weekday | `[Message (ghost), Mark complete (primary)]`                                          |
+| `review`     | Leave a review               | `[Leave a review (primary)]` — full-width                                              |
+| `repost`     | Cancelled / Expired          | `[Repost task (primary)]` — full-width                                                 |
+| `none`       | Completed                    | no footer                                                                              |
+
+### BidderStack
+
+Rendered inline on the chip row, before the status chip, when
+`top_bidders` is non-empty. Up to 3 22pt overlapping avatars with a
+`+N` overflow tile where `N = bid_count − top_bidders.count` (clamped
+to ≥0). The avatar primitive itself lives in the shared shell
+(`Core/Design/Components/BidderStack.swift` on iOS, inline in
+`ListOfRowsScreen.kt` on Android) — feature code only emits the
+`BidderStackData` payload on the `RowModel` and the shell handles the
+visual.
+
+Tone palette is canonical: `sky · teal · amber · rose · violet · slate`.
+Unknown tone strings fall back to `slate` so a future backend palette
+expansion never crashes a decoder.
+
+### Endpoints
+
+| Action            | Method  | Path                                       | Backend file:line                |
+| ----------------- | ------- | ------------------------------------------ | -------------------------------- |
+| List my tasks     | GET     | `/api/gigs/my-gigs`                        | `backend/routes/gigs.js:1169`    |
+| Boost a task      | POST    | `/api/gigs/:gigId/boost`                   | `backend/routes/gigs.js` (new)   |
+| Mark complete     | POST    | `/api/gigs/:gigId/complete`                | `backend/routes/gigs.js:6170`    |
+| Cancel a task     | POST    | `/api/gigs/:gigId/cancel`                  | `backend/routes/gigs.js:6233`    |
+| Create a task     | POST    | `/api/gigs`                                | `backend/routes/gigs.js:749`     |
+
+Note: `/api/gigs/:gigId/complete` is the **poster's** confirmation
+route — distinct from the worker-only `/api/gigs/:gigId/mark-completed`
+that the My bids screen uses. Don't conflate the two; the auth checks
+will 403 if a worker hits `/complete` or a poster hits `/mark-completed`.
+
+### Web canonicalization
+
+- `(app)/app/my-gigs/page.tsx` is the canonical V2 design (rewritten in
+  this PR with the 4-tab + bidder stack + footer-action layout).
+- `(app)/app/my-gigs-v2/page.tsx` is **deleted**. No external links
+  pointed at it (grep confirmed). The `AppShell` sidebar, dashboard
+  ActionQueueCard, and profile page already targeted `/app/my-gigs`
+  before this PR landed.
+- No redirect needed — the staging route was dogfood-only.
+
+### Muted highlight
+
+Terminal rows (cancelled / expired) render at 0.78 opacity via the
+shared `RowHighlight.muted` case (already present from T5.3.1). Same
+behaviour as My bids' rejected / withdrawn rows.
+
+### Optimistic mutations
+
+- **Boost**: row's `boosted_at` + `boost_expires_at` flip in-cache
+  immediately so feed-rank UI can react without waiting for the round
+  trip. The cache is restored on API failure.
+- **Mark complete**: row's `gig.status` flips to `completed`
+  immediately, moving it from Active → Done with the "Leave a review"
+  chip. Backend rolls back on failure.
+
+### Parity audit
+
+Updated `docs/mobile-parity-audit.md` Tier 2 row — My tasks V2 is now
+live on all three platforms. The legacy `my-gigs-v2` web staging route
+is removed; `/app/my-gigs` is the only `my-gigs` route.
+
+---
+
 ## Open-question summary (for the next session)
 
 Before T5.0a (P1) starts, the following need a yes/no/edit from the

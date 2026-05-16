@@ -62,6 +62,28 @@ public enum PostsEndpoints {
     public static func createComment(id: String, body: PostCommentRequest) -> Endpoint {
         Endpoint(method: .post, path: "/api/posts/\(id)/comments", body: body)
     }
+
+    /// `GET /api/posts/user/:userId` — paged list of posts authored by a
+    /// user, filtered to the active set (`archived_at IS NULL`) on the
+    /// backend. Route `backend/routes/posts.js:3016`. Use the signed-in
+    /// user's id to power the "My posts" screen.
+    public static func userPosts(
+        userId: String,
+        limit: Int = 50,
+        cursorCreatedAt: String? = nil,
+        cursorId: String? = nil
+    ) -> Endpoint {
+        var query: [String: String] = ["limit": String(limit)]
+        if let cursorCreatedAt { query["cursorCreatedAt"] = cursorCreatedAt }
+        if let cursorId { query["cursorId"] = cursorId }
+        return Endpoint(method: .get, path: "/api/posts/user/\(userId)", query: query)
+    }
+
+    /// `DELETE /api/posts/:id` — author-only delete. Route
+    /// `backend/routes/posts.js:2483`.
+    public static func deletePost(id: String) -> Endpoint {
+        Endpoint(method: .delete, path: "/api/posts/\(id)")
+    }
 }
 
 /// Endpoint builders for public profile fetch. Lives alongside posts

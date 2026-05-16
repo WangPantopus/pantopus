@@ -387,6 +387,132 @@ class ListOfRowsScreenSnapshotTest {
         }
     }
 
+    @Test fun row_myPosts_headerChips_with_engagement_active() {
+        paparazzi.snapshot {
+            Frame {
+                RowView(
+                    row =
+                        RowModel(
+                            id = "post-active",
+                            title = "",
+                            template = RowTemplate.StatusChip,
+                            leading = RowLeading.None,
+                            trailing = RowTrailing.Kebab,
+                            onTap = {},
+                            onSecondary = {},
+                            body =
+                                "Anyone know a good chimney sweep for a 1920s flue? " +
+                                    "Want someone with old-house experience, not just a tech with a vacuum.",
+                            bodyEmphasis = RowBodyEmphasis.Primary,
+                            headerChips =
+                                listOf(
+                                    RowChip(
+                                        text = "Ask",
+                                        icon = PantopusIcon.HelpCircle,
+                                        tint =
+                                            RowChip.Tint.Custom(
+                                                background = PantopusColors.warningBg,
+                                                foreground = PantopusColors.warning,
+                                            ),
+                                    ),
+                                ),
+                            timeMeta = "2h · Elm Park",
+                            engagement =
+                                RowEngagement(
+                                    items =
+                                        listOf(
+                                            RowEngagementItem(
+                                                id = "replies",
+                                                icon = PantopusIcon.MessageCircle,
+                                                label = "8 replies",
+                                            ),
+                                            RowEngagementItem(
+                                                id = "likes",
+                                                icon = PantopusIcon.ThumbsUp,
+                                                label = "3 likes",
+                                            ),
+                                        ),
+                                    cta =
+                                        RowEngagementCta(
+                                            label = "Edit",
+                                            icon = PantopusIcon.Pencil,
+                                            onClick = {},
+                                        ),
+                                ),
+                        ),
+                )
+            }
+        }
+    }
+
+    @Test fun row_myPosts_headerChips_with_engagement_archived() {
+        paparazzi.snapshot {
+            Frame {
+                RowView(
+                    row =
+                        RowModel(
+                            id = "post-archived",
+                            title = "",
+                            template = RowTemplate.StatusChip,
+                            leading = RowLeading.None,
+                            trailing = RowTrailing.Kebab,
+                            onTap = {},
+                            onSecondary = {},
+                            body =
+                                "Stoop coffee Saturday 9am. BYO mug, " +
+                                    "I'll do a big pot of the good stuff.",
+                            bodyEmphasis = RowBodyEmphasis.Primary,
+                            headerChips =
+                                listOf(
+                                    RowChip(
+                                        text = "Event",
+                                        icon = PantopusIcon.Calendar,
+                                        tint =
+                                            RowChip.Tint.Custom(
+                                                background = PantopusColors.appSurfaceSunken,
+                                                foreground = PantopusColors.appTextSecondary,
+                                            ),
+                                    ),
+                                    RowChip(
+                                        text = "ARCHIVED",
+                                        icon = PantopusIcon.Archive,
+                                        tint =
+                                            RowChip.Tint.Custom(
+                                                background = PantopusColors.appSurfaceSunken,
+                                                foreground = PantopusColors.appTextSecondary,
+                                            ),
+                                    ),
+                                ),
+                            timeMeta = "3d · Elm Park",
+                            highlight = RowHighlight.Archived,
+                            engagement =
+                                RowEngagement(
+                                    items =
+                                        listOf(
+                                            RowEngagementItem(
+                                                id = "going",
+                                                icon = PantopusIcon.CheckCircle,
+                                                label = "12 going",
+                                            ),
+                                            RowEngagementItem(
+                                                id = "replies",
+                                                icon = PantopusIcon.MessageCircle,
+                                                label = "5 replies",
+                                            ),
+                                        ),
+                                    cta =
+                                        RowEngagementCta(
+                                            label = "Restore",
+                                            icon = PantopusIcon.ArrowsRepeat,
+                                            onClick = {},
+                                        ),
+                                ),
+                        ),
+                )
+            }
+        }
+    }
+
     @Composable
     private fun Frame(content: @Composable () -> Unit) {
         PantopusTheme {

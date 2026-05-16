@@ -165,6 +165,96 @@ function summarizeGigBids(bids) {
   return byGigId;
 }
 
+// ─── Bidder-stack helpers (T5.3.2 My tasks V2) ────────────────────────
+//
+// The My tasks V2 row design renders a 3-avatar "bidder stack" with a
+// `+N` overflow tile next to the status chip. To avoid an N+1 fetch
+// from the client, the `/api/gigs/my-gigs` handler inlines the top-3
+// bidders per gig as a `top_bidders[≤3]: {id, initials, color}` array
+// derived from the GigBid → User join. Initials and tone are computed
+// server-side so iOS, Android, and web all render identical avatars
+// without each platform reinventing the derivation.
+
+const BIDDER_TONES = ['sky', 'teal', 'amber', 'rose', 'violet', 'slate'];
+
+function bidderInitialsFromUser(user) {
+  if (!user) return '?';
+  const first = (user.first_name || '').trim();
+  const last = (user.last_name || '').trim();
+  if (first && last) {
+    return `${first[0]}${last[0]}`.toUpperCase();
+  }
+  const name = (user.name || '').trim();
+  if (name) {
+    const parts = name.split(/\s+/);
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  }
+  const username = (user.username || '').trim();
+  if (username) {
+    return username.slice(0, 2).toUpperCase();
+  }
+  return '?';
+}
+
+function bidderToneFromId(userId) {
+  if (!userId) return BIDDER_TONES[0];
+  const raw = String(userId);
+  let hash = 0;
+  for (let i = 0; i < raw.length; i += 1) {
+    hash = (hash * 31 + raw.charCodeAt(i)) | 0;
+  }
+  const idx = Math.abs(hash) % BIDDER_TONES.length;
+  return BIDDER_TONES[idx];
+}
+
+/**
+ * Fetch up to 3 most-recent unique bidders per gig and return them in
+ * `{ gigId: [{ id, initials, color }] }` shape. Sequencing the user
+ * join inside this helper keeps the my-gigs handler to a single extra
+ * round-trip regardless of list size.
+ */
+async function topBiddersByGig(gigIds) {
+  if (!Array.isArray(gigIds) || gigIds.length === 0) return {};
+
+  // Pull every bid for these gigs (typically <10s per task; capped by
+  // the bid limit on the backend). We need `created_at` to order
+  // before truncating to 3 per gig.
+  const { data: bidRows, error: bidsError } = await supabaseAdmin
+    .from('GigBid')
+    .select('gig_id, user_id, created_at, User:user_id(id, first_name, last_name, name, username)')
+    .in('gig_id', gigIds)
+    .order('created_at', { ascending: false });
+
+  if (bidsError) {
+    logger.warn('Failed to load top bidders for my gigs', {
+      error: bidsError.message,
+      gigCount: gigIds.length,
+    });
+    return {};
+  }
+
+  const byGigId = {};
+  for (const row of bidRows || []) {
+    const gigId = String(row?.gig_id || '');
+    if (!gigId) continue;
+    if (!byGigId[gigId]) byGigId[gigId] = [];
+    if (byGigId[gigId].length >= 3) continue;
+    // De-dupe by user_id — a single bidder can re-bid via counters,
+    // and the avatar stack should reflect distinct people.
+    const userId = String(row?.user_id || '');
+    if (!userId) continue;
+    if (byGigId[gigId].some((b) => b.id === userId)) continue;
+    const user = row.User || {};
+    byGigId[gigId].push({
+      id: userId,
+      initials: bidderInitialsFromUser(user),
+      color: bidderToneFromId(userId),
+    });
+  }
+  return byGigId;
+}
+
 function serializeGigForViewer(gig) {
   if (!gig) return null;
   const { creator, acceptedBy, ...safe } = gig;
@@ -1203,6 +1293,7 @@ router.get('/my-gigs', verifyToken, async (req, res) => {
     const safeGigs = gigs || [];
     const gigIds = safeGigs.map((gig) => gig.id).filter(Boolean);
     let bidStatsByGigId = {};
+    let topBiddersByGigId = {};
 
     if (gigIds.length > 0) {
       const { data: bidRows, error: bidsError } = await supabaseAdmin
@@ -1219,6 +1310,10 @@ router.get('/my-gigs', verifyToken, async (req, res) => {
       } else {
         bidStatsByGigId = summarizeGigBids(bidRows);
       }
+
+      // T5.3.2 — inline the top-3 bidder identities per gig so the
+      // mobile My tasks V2 BidderStack renders without an N+1 fetch.
+      topBiddersByGigId = await topBiddersByGig(gigIds);
     }
 
     const enrichedGigs = safeGigs.map((gig) => {
@@ -1226,12 +1321,14 @@ router.get('/my-gigs', verifyToken, async (req, res) => {
         bid_count: 0,
         top_bid_amount: null,
       };
+      const topBidders = topBiddersByGigId[String(gig.id)] || [];
 
       return {
         ...gig,
         bid_count: bidStats.bid_count,
         bidsCount: bidStats.bid_count,
         top_bid_amount: bidStats.top_bid_amount,
+        top_bidders: topBidders,
         first_image: extractFirstImage(gig.attachments),
       };
     });
@@ -1243,6 +1340,70 @@ router.get('/my-gigs', verifyToken, async (req, res) => {
   } catch (err) {
     logger.error('My gigs fetch error', { error: err.message, userId: req.user.id });
     res.status(500).json({ error: 'Failed to fetch your gigs' });
+  }
+});
+
+/**
+ * POST /api/gigs/:gigId/boost
+ * T5.3.2 My tasks V2 — poster promotes their gig in the feed.
+ *
+ * Sets `boosted_at = now()` and `boost_expires_at = now() + 24h`.
+ * Re-boosting an already-boosted gig simply extends the window. Only
+ * the gig poster (or a teammate with `gigs.manage` on the owning
+ * business) can call this; open gigs only — once a gig is assigned,
+ * boosting it would mislead bidders.
+ */
+router.post('/:gigId/boost', verifyToken, async (req, res) => {
+  try {
+    const { gigId } = req.params;
+    const userId = req.user.id;
+
+    const { data: gig, error: gigError } = await supabaseAdmin
+      .from('Gig')
+      .select('id, user_id, status')
+      .eq('id', gigId)
+      .single();
+
+    if (gigError || !gig) return res.status(404).json({ error: 'Gig not found' });
+
+    const ownerAccess = await getGigOwnerAccess(gig.user_id, userId, 'gigs.manage');
+    if (!ownerAccess.allowed) {
+      return res.status(403).json({ error: 'Only the gig poster can boost this task' });
+    }
+
+    if (gig.status !== 'open') {
+      return res
+        .status(400)
+        .json({ error: `Only open gigs can be boosted (current: ${gig.status})` });
+    }
+
+    const now = new Date();
+    const expires = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('Gig')
+      .update({
+        boosted_at: now.toISOString(),
+        boost_expires_at: expires.toISOString(),
+        updated_at: now.toISOString(),
+      })
+      .eq('id', gigId)
+      .select('id, boosted_at, boost_expires_at')
+      .single();
+
+    if (updateError) {
+      logger.error('Boost gig update failed', { gigId, userId, error: updateError.message });
+      return res.status(500).json({ error: 'Failed to boost gig' });
+    }
+
+    logger.info('Gig boosted', { gigId, userId });
+    return res.json({
+      gig: updated,
+      boost_expires_at: updated.boost_expires_at,
+    });
+  } catch (err) {
+    logger.error('Boost gig error', { error: err.message, gigId: req.params.gigId });
+    return res.status(500).json({ error: 'Failed to boost gig' });
   }
 });
 

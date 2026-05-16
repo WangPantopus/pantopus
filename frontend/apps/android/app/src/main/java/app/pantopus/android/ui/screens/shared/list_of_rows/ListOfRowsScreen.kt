@@ -858,6 +858,9 @@ internal fun RowView(
         if (row.note != null) {
             NoteBlock(row.note)
         }
+        if (row.engagement != null) {
+            EngagementStrip(row.engagement)
+        }
         if (row.footer != null) {
             FooterStack(row.footer)
         }
@@ -870,36 +873,47 @@ private fun ContentColumn(
     modifier: Modifier,
 ) {
     Column(modifier = modifier) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-        ) {
-            Text(
-                text = row.title,
-                style = PantopusTextStyle.body,
-                fontWeight =
-                    if (row.highlight is RowHighlight.Unread) {
-                        FontWeight.Bold
-                    } else {
-                        FontWeight.SemiBold
-                    },
-                color = PantopusColors.appText,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
+        if (!row.headerChips.isNullOrEmpty()) {
+            ChipRowView(
+                bidderStack = null,
+                chips = row.headerChips,
+                timeMeta = row.timeMeta,
+                metaTail = null,
             )
-            if (row.inlineChip != null) {
-                ChipPill(row.inlineChip)
-            }
-            if (row.highlight is RowHighlight.Unread) {
-                Spacer(Modifier.weight(1f))
-                Box(
-                    modifier =
-                        Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(PantopusColors.primary600),
+            Spacer(Modifier.height(2.dp))
+        }
+        if (row.title.isNotEmpty()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                Text(
+                    text = row.title,
+                    style = PantopusTextStyle.body,
+                    fontWeight =
+                        if (row.highlight is RowHighlight.Unread) {
+                            FontWeight.Bold
+                        } else {
+                            FontWeight.SemiBold
+                        },
+                    color = PantopusColors.appText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
+                if (row.inlineChip != null) {
+                    ChipPill(row.inlineChip)
+                }
+                if (row.highlight is RowHighlight.Unread) {
+                    Spacer(Modifier.weight(1f))
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(PantopusColors.primary600),
+                    )
+                }
             }
         }
         if (row.subtitle != null) {
@@ -908,12 +922,49 @@ private fun ContentColumn(
         }
         if (row.body != null) {
             Spacer(Modifier.height(Spacing.s1))
-            MetaLine(text = row.body, icon = row.bodyIcon)
+            BodyLine(text = row.body, icon = row.bodyIcon, emphasis = row.bodyEmphasis)
         }
-        if (!row.chips.isNullOrEmpty()) {
+        if (!row.chips.isNullOrEmpty() || row.bidderStack != null) {
             Spacer(Modifier.height(Spacing.s1))
-            ChipRowView(chips = row.chips, timeMeta = row.timeMeta, metaTail = row.metaTail)
+            ChipRowView(
+                bidderStack = row.bidderStack,
+                chips = row.chips.orEmpty(),
+                timeMeta = if (row.headerChips == null) row.timeMeta else null,
+                metaTail = row.metaTail,
+            )
         }
+    }
+}
+
+@Composable
+private fun BodyLine(
+    text: String,
+    icon: PantopusIcon?,
+    emphasis: RowBodyEmphasis,
+) {
+    when (emphasis) {
+        RowBodyEmphasis.Secondary -> MetaLine(text = text, icon = icon)
+        RowBodyEmphasis.Primary ->
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                if (icon != null) {
+                    PantopusIconImage(
+                        icon = icon,
+                        contentDescription = null,
+                        size = 13.dp,
+                        tint = PantopusColors.appText,
+                    )
+                }
+                Text(
+                    text = text,
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.appText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
     }
 }
 
@@ -1277,6 +1328,7 @@ private fun TrailingView(
 
 @Composable
 private fun ChipRowView(
+    bidderStack: BidderStackData?,
     chips: List<RowChip>,
     timeMeta: String?,
     metaTail: String?,
@@ -1286,6 +1338,10 @@ private fun ChipRowView(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         modifier = Modifier.fillMaxWidth(),
     ) {
+        if (bidderStack != null && (bidderStack.bidders.isNotEmpty() || bidderStack.overflow > 0)) {
+            InlineBidderStack(bidderStack)
+            Spacer(Modifier.width(Spacing.s1))
+        }
         chips.forEach { chip -> ChipPill(chip) }
         if (metaTail != null) {
             Text(
@@ -1303,6 +1359,54 @@ private fun ChipRowView(
                 style = PantopusTextStyle.caption,
                 color = PantopusColors.appTextMuted,
             )
+        }
+    }
+}
+
+@Composable
+private fun InlineBidderStack(data: BidderStackData) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        data.bidders.forEachIndexed { index, bidder ->
+            val tileSize = 22.dp
+            val offset = if (index == 0) 0.dp else (-8).dp
+            Box(
+                modifier =
+                    Modifier
+                        .offset(x = offset)
+                        .size(tileSize)
+                        .clip(CircleShape)
+                        .background(toneBackground(bidder.tone))
+                        .border(2.dp, PantopusColors.appSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = bidder.initials.take(2).uppercase(),
+                    color = toneForeground(bidder.tone),
+                    fontSize = (tileSize.value * 0.36f).sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+        if (data.overflow > 0) {
+            val tileSize = 22.dp
+            val offset = if (data.bidders.isEmpty()) 0.dp else (-8).dp
+            Box(
+                modifier =
+                    Modifier
+                        .offset(x = offset)
+                        .size(tileSize)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appSurfaceSunken)
+                        .border(2.dp, PantopusColors.appSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "+${data.overflow}",
+                    color = PantopusColors.appTextStrong,
+                    fontSize = (tileSize.value * 0.36f).sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
     }
 }
@@ -1389,6 +1493,71 @@ private fun FooterStack(footer: RowFooter) {
                     onClick = action.onClick,
                     modifier = Modifier.weight(action.flex.toFloat()),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Hairline-separated engagement footer — display-only icon+label items
+ * on the left, optional CTA text-button on the right. Used by My posts.
+ */
+@Composable
+private fun EngagementStrip(engagement: RowEngagement) {
+    Column {
+        HorizontalDivider(color = PantopusColors.appBorder, modifier = Modifier.padding(top = Spacing.s2))
+        Spacer(Modifier.height(Spacing.s2))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s4),
+        ) {
+            engagement.items.forEach { item ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    PantopusIconImage(
+                        icon = item.icon,
+                        contentDescription = null,
+                        size = 13.dp,
+                        tint = PantopusColors.appTextSecondary,
+                    )
+                    Text(
+                        text = item.label,
+                        style = PantopusTextStyle.caption,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            val cta = engagement.cta
+            if (cta != null) {
+                Row(
+                    modifier =
+                        Modifier
+                            .clickable(onClick = cta.onClick)
+                            .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
+                            .testTag("rowEngagementCTA")
+                            .semantics { contentDescription = cta.accessibilityLabel },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (cta.icon != null) {
+                        PantopusIconImage(
+                            icon = cta.icon,
+                            contentDescription = null,
+                            size = 12.dp,
+                            tint = PantopusColors.primary600,
+                        )
+                    }
+                    Text(
+                        text = cta.label,
+                        style = PantopusTextStyle.caption,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.primary600,
+                    )
+                }
             }
         }
     }
