@@ -64,6 +64,11 @@ export const queryKeys = {
   // ── Homes ─────────────────────────────────────────────────
   homeDetail: (id: string) => ['homes', 'detail', id] as const,
 
+  // ── Admin ─────────────────────────────────────────────────
+  adminClaims: (bucket: 'pending' | 'approved' | 'rejected') =>
+    ['admin', 'claims', bucket] as const,
+  adminClaimCounts: () => ['admin', 'claims', 'counts'] as const,
+
   // ── Businesses ────────────────────────────────────────────
   businessDetail: (id: string) =>
     ['businesses', 'detail', id] as const,

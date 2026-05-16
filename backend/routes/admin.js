@@ -54,9 +54,69 @@ router.use(verifyToken, requireAdmin);
 // PENDING CLAIMS — List all claims awaiting review
 // ============================================================
 
+// Maps the three Review-claims tabs (Pending / Approved / Rejected) to
+// the underlying HomeOwnershipClaim.state values. Pending matches the
+// historical /pending-claims set so the existing tab keeps the same
+// payload after the bucket-based query is introduced.
+const BUCKET_STATES = {
+  pending: ['submitted', 'pending_review', 'needs_more_info', 'disputed'],
+  approved: ['approved'],
+  rejected: ['rejected'],
+};
+
+async function enrichClaims(claims) {
+  const list = claims || [];
+  if (list.length === 0) return [];
+
+  const homeIds = [...new Set(list.map(c => c.home_id))];
+  const userIds = [...new Set(list.map(c => c.claimant_user_id))];
+
+  let homesMap = {};
+  if (homeIds.length > 0) {
+    const { data: homes } = await supabaseAdmin
+      .from('Home')
+      .select('id, address, city, state, zipcode, name')
+      .in('id', homeIds);
+    for (const h of (homes || [])) {
+      homesMap[h.id] = h;
+    }
+  }
+
+  let usersMap = {};
+  if (userIds.length > 0) {
+    const { data: users } = await supabaseAdmin
+      .from('User')
+      .select('id, username, name, email, created_at, profile_picture_url')
+      .in('id', userIds);
+    for (const u of (users || [])) {
+      usersMap[u.id] = u;
+    }
+  }
+
+  const claimIds = list.map(c => c.id);
+  let evidenceCountMap = {};
+  if (claimIds.length > 0) {
+    const { data: evidenceCounts } = await supabaseAdmin
+      .from('HomeVerificationEvidence')
+      .select('claim_id')
+      .in('claim_id', claimIds);
+    for (const e of (evidenceCounts || [])) {
+      evidenceCountMap[e.claim_id] = (evidenceCountMap[e.claim_id] || 0) + 1;
+    }
+  }
+
+  return list.map(c => ({
+    ...c,
+    home: homesMap[c.home_id] || null,
+    claimant: usersMap[c.claimant_user_id] || null,
+    evidence_count: evidenceCountMap[c.id] || 0,
+  }));
+}
+
 /**
  * GET /api/admin/pending-claims
  * Returns all ownership/residency claims in reviewable states across all homes.
+ * Kept as an alias for /claims?bucket=pending so existing clients keep working.
  */
 router.get('/pending-claims', async (req, res) => {
   try {
@@ -75,61 +135,120 @@ router.get('/pending-claims', async (req, res) => {
         created_at,
         updated_at
       `)
-      .in('state', ['submitted', 'pending_review', 'needs_more_info', 'disputed'])
+      .in('state', BUCKET_STATES.pending)
       .order('created_at', { ascending: true });
 
     if (error) throw error;
 
-    // Enrich with home address + claimant info
-    const homeIds = [...new Set((claims || []).map(c => c.home_id))];
-    const userIds = [...new Set((claims || []).map(c => c.claimant_user_id))];
-
-    let homesMap = {};
-    if (homeIds.length > 0) {
-      const { data: homes } = await supabaseAdmin
-        .from('Home')
-        .select('id, address, city, state, zipcode, name')
-        .in('id', homeIds);
-      for (const h of (homes || [])) {
-        homesMap[h.id] = h;
-      }
-    }
-
-    let usersMap = {};
-    if (userIds.length > 0) {
-      const { data: users } = await supabaseAdmin
-        .from('User')
-        .select('id, username, name, email, created_at, profile_picture_url')
-        .in('id', userIds);
-      for (const u of (users || [])) {
-        usersMap[u.id] = u;
-      }
-    }
-
-    // Count evidence per claim
-    const claimIds = (claims || []).map(c => c.id);
-    let evidenceCountMap = {};
-    if (claimIds.length > 0) {
-      const { data: evidenceCounts } = await supabaseAdmin
-        .from('HomeVerificationEvidence')
-        .select('claim_id')
-        .in('claim_id', claimIds);
-      for (const e of (evidenceCounts || [])) {
-        evidenceCountMap[e.claim_id] = (evidenceCountMap[e.claim_id] || 0) + 1;
-      }
-    }
-
-    const enrichedClaims = (claims || []).map(c => ({
-      ...c,
-      home: homesMap[c.home_id] || null,
-      claimant: usersMap[c.claimant_user_id] || null,
-      evidence_count: evidenceCountMap[c.id] || 0,
-    }));
-
+    const enrichedClaims = await enrichClaims(claims);
     res.json({ claims: enrichedClaims, total: enrichedClaims.length });
   } catch (err) {
     logger.error('Admin: Failed to fetch pending claims', { error: err.message });
     res.status(500).json({ error: 'Failed to fetch pending claims' });
+  }
+});
+
+// ============================================================
+// ALL CLAIMS — Tabbed admin queue (pending / approved / rejected)
+// ============================================================
+
+/**
+ * GET /api/admin/claims
+ * Returns claims filtered by `bucket` (pending|approved|rejected) or by
+ * a single legacy `state` value. Pending claims are ordered oldest-first
+ * (FIFO triage); approved/rejected are ordered newest-first. The
+ * response is enriched with home + claimant + evidence_count so the
+ * Review-claims admin queue can render rows directly.
+ *
+ * Query params:
+ *   bucket:  pending | approved | rejected (preferred)
+ *   state:   raw state value (legacy escape hatch; ignored when bucket set)
+ *   limit:   default 50
+ *   offset:  default 0
+ */
+router.get('/claims', async (req, res) => {
+  try {
+    const { bucket, state, limit = 50, offset = 0 } = req.query;
+    const lim = Math.max(1, Math.min(parseInt(limit, 10) || 50, 200));
+    const off = Math.max(0, parseInt(offset, 10) || 0);
+
+    const bucketStates = bucket ? BUCKET_STATES[bucket] : null;
+    if (bucket && !bucketStates) {
+      return res.status(400).json({ error: `Unknown bucket "${bucket}". Expected one of: pending, approved, rejected` });
+    }
+
+    let query = supabaseAdmin
+      .from('HomeOwnershipClaim')
+      .select(`
+        id,
+        home_id,
+        claimant_user_id,
+        claim_type,
+        state,
+        claim_phase_v2,
+        challenge_state,
+        method,
+        risk_score,
+        created_at,
+        updated_at
+      `, { count: 'exact' })
+      .order('created_at', { ascending: bucket === 'pending' })
+      .range(off, off + lim - 1);
+
+    if (bucketStates) {
+      query = query.in('state', bucketStates);
+    } else if (state) {
+      query = query.eq('state', state);
+    }
+
+    const { data: claims, error, count } = await query;
+    if (error) throw error;
+
+    const enrichedClaims = await enrichClaims(claims);
+
+    // For the Pending queue banner: surface the age of the oldest claim
+    // in the bucket. Claims are ordered ascending for pending so [0] is
+    // the oldest; for other buckets it's not surfaced.
+    let oldestAgeSeconds = null;
+    if (bucket === 'pending' && enrichedClaims.length > 0) {
+      const oldestCreatedAt = new Date(enrichedClaims[0].created_at);
+      oldestAgeSeconds = Math.max(0, Math.floor((Date.now() - oldestCreatedAt.getTime()) / 1000));
+    }
+
+    res.json({
+      claims: enrichedClaims,
+      total: count || enrichedClaims.length,
+      oldest_age_seconds: oldestAgeSeconds,
+    });
+  } catch (err) {
+    logger.error('Admin: Failed to fetch claims', { error: err.message });
+    res.status(500).json({ error: 'Failed to fetch claims' });
+  }
+});
+
+/**
+ * GET /api/admin/claims/counts
+ * Returns the per-bucket totals used by the Review-claims tab strip.
+ * Declared before /claims/:claimId so "counts" isn't matched as an id.
+ */
+router.get('/claims/counts', async (_req, res) => {
+  try {
+    const counts = { pending: 0, approved: 0, rejected: 0 };
+
+    for (const [bucket, states] of Object.entries(BUCKET_STATES)) {
+      const { count, error } = await supabaseAdmin
+        .from('HomeOwnershipClaim')
+        .select('id', { count: 'exact', head: true })
+        .in('state', states);
+
+      if (error) throw error;
+      counts[bucket] = count || 0;
+    }
+
+    res.json(counts);
+  } catch (err) {
+    logger.error('Admin: Failed to fetch claim counts', { error: err.message });
+    res.status(500).json({ error: 'Failed to fetch claim counts' });
   }
 });
 
@@ -480,38 +599,6 @@ router.post('/claims/:claimId/review', async (req, res) => {
   } catch (err) {
     logger.error('Admin: Failed to review claim', { error: err.message });
     res.status(500).json({ error: 'Failed to review claim' });
-  }
-});
-
-// ============================================================
-// ALL CLAIMS — Overview including resolved
-// ============================================================
-
-/**
- * GET /api/admin/claims
- * Returns all claims with optional state filter.
- */
-router.get('/claims', async (req, res) => {
-  try {
-    const { state, limit = 50, offset = 0 } = req.query;
-
-    let query = supabaseAdmin
-      .from('HomeOwnershipClaim')
-      .select('id, home_id, claimant_user_id, claim_type, state, method, risk_score, created_at, updated_at', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
-
-    if (state) {
-      query = query.eq('state', state);
-    }
-
-    const { data: claims, error, count } = await query;
-    if (error) throw error;
-
-    res.json({ claims: claims || [], total: count || 0 });
-  } catch (err) {
-    logger.error('Admin: Failed to fetch claims', { error: err.message });
-    res.status(500).json({ error: 'Failed to fetch claims' });
   }
 });
 
