@@ -270,6 +270,17 @@ data class RowModel(
     // ─── T5 additions ──────────────────────────────────────────
     /** Multiline body rendered below the subtitle (notifications, my posts). */
     val body: String? = null,
+    /**
+     * Optional small icon prefix for the subtitle line. Used by Connections
+     * (map-pin in front of locality).
+     */
+    val subtitleIcon: PantopusIcon? = null,
+    /**
+     * Optional small icon prefix for the body line. Used by Connections
+     * (per-row interaction-type icon: message-circle / wrench / megaphone /
+     * user-plus / sparkles).
+     */
+    val bodyIcon: PantopusIcon? = null,
     /** Chip rendered inline with the title (Pets species pill). */
     val inlineChip: RowChip? = null,
     /** Chip row beneath the body (intent / status / counter chips). */

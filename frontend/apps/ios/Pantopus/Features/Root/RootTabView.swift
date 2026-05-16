@@ -109,9 +109,14 @@ public struct RootTabView: View {
         case let .invite(token):
             pendingInviteToken = token
             _ = router.consume()
-        case .feed, .post, .supportTrain, .user, .connections:
+        case .feed, .post, .supportTrain, .user:
             model.selected = .hub
             _ = router.consume()
+        case .connections:
+            // Switch to Hub but leave the destination pending — `HubTabRoot`
+            // consumes it from there and pushes the Connections screen
+            // onto the Hub navigation stack.
+            model.selected = .hub
         case .gig, .listing, .homeDetail, .homeDashboard, .homeMemberRequests:
             model.selected = .hub
             _ = router.consume()
