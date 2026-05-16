@@ -511,7 +511,8 @@ class BillsListViewModel
                             totalDue = totalDue + bill.displayAmount
                         }
                         if (!due.isBefore(now)) {
-                            if (nextDue == null || due.isBefore(nextDue.first)) {
+                            val current = nextDue
+                            if (current == null || due.isBefore(current.first)) {
                                 nextDue = due to bill
                             }
                         }
