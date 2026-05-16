@@ -1,6 +1,7 @@
 package app.pantopus.android.data.posts
 
 import app.pantopus.android.data.api.models.feed.FeedResponse
+import app.pantopus.android.data.api.models.posts.MyPostsResponse
 import app.pantopus.android.data.api.models.posts.PostCommentCreateResponse
 import app.pantopus.android.data.api.models.posts.PostCommentRequest
 import app.pantopus.android.data.api.models.posts.PostCommentsResponse
@@ -55,4 +56,18 @@ class PostsRepository
             id: String,
             body: PostCommentRequest,
         ): NetworkResult<PostCommentCreateResponse> = safeApiCall { api.createComment(id, body) }
+
+        /**
+         * `GET /api/posts/user/:userId` — paged list of posts authored by a
+         * user. T5.3.3 My posts uses the signed-in user's id. Backend filters
+         * archived posts out today; the Archived tab is fed by local
+         * optimistic state until a `?status=archived` filter ships.
+         */
+        suspend fun userPosts(
+            userId: String,
+            limit: Int = 50,
+        ): NetworkResult<MyPostsResponse> = safeApiCall { api.userPosts(userId, limit) }
+
+        /** `DELETE /api/posts/:id`. */
+        suspend fun deletePost(id: String): NetworkResult<Unit> = safeApiCall { api.deletePost(id) }
     }

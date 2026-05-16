@@ -101,6 +101,9 @@ class IconTest {
             "clock-plus",
             "circle-slash",
             "play",
+            // T5.3.3 — My posts
+            "archive",
+            "message-square-plus",
         )
 
     @Test

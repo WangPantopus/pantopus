@@ -8,7 +8,7 @@
 //  with three identity bindings (Personal / Home / Business).
 //
 
-// swiftlint:disable cyclomatic_complexity function_body_length type_body_length
+// swiftlint:disable cyclomatic_complexity file_length function_body_length type_body_length
 
 import SwiftUI
 
@@ -30,6 +30,8 @@ public enum YouRoute: Hashable {
     /// `docs/mobile-wiring-audit.md`; replaces with the real composer
     /// when T2.3 lands the dedicated screen.
     case composeTask
+    /// T5.3.3 — My posts. The "me.posts" Activity-section row pushes here.
+    case myPosts
     /// Gig detail destination for an offer-row tap. Reuses the existing
     /// Transactional Detail shell.
     case gigDetail(gigId: String)
@@ -243,6 +245,12 @@ public struct YouTabRoot: View {
     }
 
     private func handleSection(_ row: MeSectionRow) {
+        // T5.3.3 — My posts is reachable from the Activity section row.
+        // Wired in both DEBUG and release configurations.
+        if row.routeKey == "me.posts" {
+            path.append(.myPosts)
+            return
+        }
         #if DEBUG
         switch row.routeKey {
         case "me.editProfile":
@@ -358,6 +366,23 @@ public struct YouTabRoot: View {
                 onMessage: { _ in
                     Task { @MainActor in path.append(.placeholder(label: "Messages")) }
                 }
+            )
+        case .myPosts:
+            MyPostsView(
+                viewModel: MyPostsViewModel(
+                    onOpenPost: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Post detail")) }
+                    },
+                    onOpenFilters: {
+                        Task { @MainActor in path.append(.placeholder(label: "Filter posts")) }
+                    },
+                    onCompose: {
+                        Task { @MainActor in path.append(.placeholder(label: "Write a post")) }
+                    },
+                    onEditPost: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Edit post")) }
+                    }
+                )
             )
         case .myBids:
             MyBidsView(

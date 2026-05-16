@@ -85,6 +85,7 @@ fun YouScreen(
     onOpenOffers: () -> Unit = {},
     onOpenMyBids: () -> Unit = {},
     onOpenMyTasks: () -> Unit = {},
+    onOpenMyPosts: () -> Unit = {},
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
     val signedIn = state as? AuthRepository.State.SignedIn
@@ -115,6 +116,7 @@ fun YouScreen(
         },
         onSection = { row ->
             when (row.routeKey) {
+                "me.posts" -> onOpenMyPosts()
                 "me.editProfile" -> onOpenEditProfile()
                 "me.settings" -> onOpenSettings()
                 "me.debug.openProfile" -> if (BuildConfig.DEBUG) debugProfileDialog = true

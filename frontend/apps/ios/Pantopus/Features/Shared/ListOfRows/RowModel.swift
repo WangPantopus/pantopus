@@ -22,7 +22,7 @@
 
 import SwiftUI
 
-// swiftlint:disable enum_case_associated_values_count
+// swiftlint:disable enum_case_associated_values_count file_length
 
 /// Visual template for a list row.
 public enum RowTemplate: Sendable {
@@ -299,6 +299,72 @@ public struct RowFooter: Sendable {
     }
 }
 
+// MARK: - Engagement footer
+
+/// One display-only stat (icon + label) inside a [`RowEngagement`] strip.
+/// Used by My posts for `8 replies`, `142 views`, `12 going`, etc. The
+/// items are not interactive — they're a compact summary of the row's
+/// engagement counters. Taps on the row still route to `RowModel.onTap`.
+public struct RowEngagementItem: Sendable, Hashable, Identifiable {
+    public let id: String
+    public let icon: PantopusIcon
+    public let label: String
+
+    public init(id: String, icon: PantopusIcon, label: String) {
+        self.id = id
+        self.icon = icon
+        self.label = label
+    }
+}
+
+/// Single trailing text-button for the engagement footer (e.g. My posts
+/// "Edit" / "Restore" link). Rendered in primary tint at the right of the
+/// hairline-separated engagement row.
+public struct RowEngagementCTA: Sendable {
+    public let icon: PantopusIcon?
+    public let label: String
+    public let accessibilityLabel: String
+    public let handler: @Sendable () -> Void
+
+    public init(
+        label: String,
+        icon: PantopusIcon? = nil,
+        accessibilityLabel: String? = nil,
+        handler: @escaping @Sendable () -> Void
+    ) {
+        self.label = label
+        self.icon = icon
+        self.accessibilityLabel = accessibilityLabel ?? label
+        self.handler = handler
+    }
+}
+
+/// Hairline-separated engagement footer for a row. Renders display-only
+/// items on the left + an optional CTA text-button on the right. Used by
+/// My posts — `[8 replies] [142 views] ↳ Edit`.
+public struct RowEngagement: Sendable {
+    public let items: [RowEngagementItem]
+    public let cta: RowEngagementCTA?
+
+    public init(items: [RowEngagementItem], cta: RowEngagementCTA? = nil) {
+        self.items = items
+        self.cta = cta
+    }
+}
+
+// MARK: - Body emphasis
+
+/// Render emphasis for the `body` field on a row. Default `.secondary`
+/// matches Notifications V2 (small dim text below the title); `.primary`
+/// renders the body as the row's headline content — used by My posts
+/// where the post's body IS the main thing the user reads.
+public enum RowBodyEmphasis: Sendable, Hashable {
+    /// 12pt caption, secondary text colour (default — Notifications V2).
+    case secondary
+    /// 14pt small, primary text colour (My posts).
+    case primary
+}
+
 // MARK: - Highlight
 
 /// Optional visual highlight wrapping the whole card. Layered with the
@@ -356,15 +422,28 @@ public struct RowModel: Identifiable, Sendable {
     /// user-plus / sparkles).
     public let bodyIcon: PantopusIcon?
 
+    /// Render emphasis for `body`. Default `.secondary` keeps the existing
+    /// Notifications V2 / Connections behaviour; `.primary` is used by My
+    /// posts where the body is the row's headline content.
+    public let bodyEmphasis: RowBodyEmphasis
+
     /// Chip rendered inline with the title (Pets "Dog" pill).
     public let inlineChip: RowChip?
 
-    /// Chip row below the body (My posts intent chip; My bids / My tasks
-    /// status chip; Offers counter pill). Renders left-to-right.
+    /// Chip row below the body (My bids / My tasks status chip; Offers
+    /// counter pill). Renders left-to-right.
     public let chips: [RowChip]?
 
+    /// Chip row rendered as a header **above** the title/body, in the same
+    /// row as the kebab (when present). Used by My posts — `[intent chip]
+    /// [time meta]  …  [kebab]`. Mutually compatible with `chips`: when
+    /// both are set, `headerChips` renders above the body and `chips`
+    /// below (rare; only My posts uses `headerChips` today).
+    public let headerChips: [RowChip]?
+
     /// Small dim text on the far-right of the chip row (My posts "2h",
-    /// Notifications "12m").
+    /// Notifications "12m"). When `headerChips` is set, this renders on
+    /// the same header row instead of with the chips below the body.
     public let timeMeta: String?
 
     /// Text appended after the chip row, separated from chips with a "·"
@@ -381,6 +460,10 @@ public struct RowModel: Identifiable, Sendable {
 
     /// Optional in-card footer with 1–3 compact buttons.
     public let footer: RowFooter?
+
+    /// Optional hairline-separated engagement strip (display-only items +
+    /// optional trailing CTA text-button). Used by My posts.
+    public let engagement: RowEngagement?
 
     /// Optional bidder stack rendered inline on the chip line before
     /// the `chips`. Used by My tasks V2 — 22pt overlapping avatars with
@@ -399,13 +482,16 @@ public struct RowModel: Identifiable, Sendable {
         body: String? = nil,
         subtitleIcon: PantopusIcon? = nil,
         bodyIcon: PantopusIcon? = nil,
+        bodyEmphasis: RowBodyEmphasis = .secondary,
         inlineChip: RowChip? = nil,
         chips: [RowChip]? = nil,
+        headerChips: [RowChip]? = nil,
         timeMeta: String? = nil,
         metaTail: String? = nil,
         note: String? = nil,
         highlight: RowHighlight? = nil,
         footer: RowFooter? = nil,
+        engagement: RowEngagement? = nil,
         bidderStack: BidderStackData? = nil
     ) {
         self.id = id
@@ -419,13 +505,16 @@ public struct RowModel: Identifiable, Sendable {
         self.body = body
         self.subtitleIcon = subtitleIcon
         self.bodyIcon = bodyIcon
+        self.bodyEmphasis = bodyEmphasis
         self.inlineChip = inlineChip
         self.chips = chips
+        self.headerChips = headerChips
         self.timeMeta = timeMeta
         self.metaTail = metaTail
         self.note = note
         self.highlight = highlight
         self.footer = footer
+        self.engagement = engagement
         self.bidderStack = bidderStack
     }
 }

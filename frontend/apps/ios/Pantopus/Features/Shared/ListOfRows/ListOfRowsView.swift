@@ -534,9 +534,12 @@ private struct RowView: View {
                 Spacer(minLength: Spacing.s2)
                 TrailingView(trailing: row.trailing, onSecondary: row.onSecondary, rowTitle: row.title)
             }
-            .frame(minHeight: 60)
+            .frame(minHeight: row.title.isEmpty && row.body != nil ? 0 : 60)
             if let note = row.note {
                 NoteBlock(text: note)
+            }
+            if let engagement = row.engagement {
+                EngagementStrip(engagement: engagement)
             }
             if let footer = row.footer {
                 FooterStack(footer: footer)
@@ -546,18 +549,29 @@ private struct RowView: View {
 
     private var contentColumn: some View {
         VStack(alignment: .leading, spacing: 2) {
-            titleLine
+            if let headerChips = row.headerChips, !headerChips.isEmpty {
+                ChipRowView(
+                    bidderStack: nil,
+                    chips: headerChips,
+                    timeMeta: row.timeMeta,
+                    metaTail: nil
+                )
+                .padding(.bottom, 2)
+            }
+            if !row.title.isEmpty {
+                titleLine
+            }
             if let subtitle = row.subtitle {
                 metaLine(text: subtitle, icon: row.subtitleIcon)
             }
             if let body = row.body {
-                metaLine(text: body, icon: row.bodyIcon, topPadding: 2)
+                bodyLine(text: body, icon: row.bodyIcon, emphasis: row.bodyEmphasis)
             }
             if (row.chips?.isEmpty == false) || row.bidderStack != nil {
                 ChipRowView(
                     bidderStack: row.bidderStack,
                     chips: row.chips ?? [],
-                    timeMeta: row.timeMeta,
+                    timeMeta: row.headerChips == nil ? row.timeMeta : nil,
                     metaTail: row.metaTail
                 )
                 .padding(.top, 4)
@@ -580,6 +594,31 @@ private struct RowView: View {
                 .lineLimit(2)
         }
         .padding(.top, topPadding)
+    }
+
+    @ViewBuilder
+    private func bodyLine(
+        text: String,
+        icon: PantopusIcon?,
+        emphasis: RowBodyEmphasis
+    ) -> some View {
+        switch emphasis {
+        case .secondary:
+            metaLine(text: text, icon: icon, topPadding: 2)
+        case .primary:
+            HStack(alignment: .top, spacing: Spacing.s1) {
+                if let icon {
+                    Icon(icon, size: 13, color: Theme.Color.appText)
+                        .padding(.top, 2)
+                }
+                Text(text)
+                    .pantopusTextStyle(.small)
+                    .foregroundStyle(Theme.Color.appText)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.top, 2)
+        }
     }
 
     private var titleLine: some View {
@@ -957,6 +996,48 @@ private struct FooterStack: View {
                         action: action.handler
                     )
                     .layoutPriority(Double(action.flex))
+                }
+            }
+        }
+    }
+}
+
+/// Hairline-separated engagement footer — display-only icon+label items
+/// on the left, optional CTA text-button on the right. Used by My posts
+/// (`[8 replies] [142 views] ↳ Edit`).
+private struct EngagementStrip: View {
+    let engagement: RowEngagement
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Divider().background(Theme.Color.appBorder)
+                .padding(.top, Spacing.s2)
+                .padding(.bottom, Spacing.s2)
+            HStack(spacing: Spacing.s4) {
+                ForEach(engagement.items) { item in
+                    HStack(spacing: 4) {
+                        Icon(item.icon, size: 13, color: Theme.Color.appTextSecondary)
+                        Text(item.label)
+                            .pantopusTextStyle(.caption)
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                    }
+                }
+                Spacer(minLength: Spacing.s1)
+                if let cta = engagement.cta {
+                    Button(action: cta.handler) {
+                        HStack(spacing: 4) {
+                            if let icon = cta.icon {
+                                Icon(icon, size: 12, color: Theme.Color.primary600)
+                            }
+                            Text(cta.label)
+                                .pantopusTextStyle(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Theme.Color.primary600)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(cta.accessibilityLabel)
+                    .accessibilityIdentifier("rowEngagementCTA")
                 }
             }
         }

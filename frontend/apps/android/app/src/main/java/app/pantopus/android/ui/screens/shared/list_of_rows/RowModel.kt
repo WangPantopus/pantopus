@@ -247,6 +247,48 @@ data class RowFooter(
     val actions: List<RowFooterAction>,
 )
 
+// MARK: - Engagement footer
+
+/** One display-only stat (icon + label) inside a [RowEngagement] strip. */
+data class RowEngagementItem(
+    val id: String,
+    val icon: PantopusIcon,
+    val label: String,
+)
+
+/** Trailing text-button on a [RowEngagement] strip (My posts Edit / Restore). */
+data class RowEngagementCta(
+    val label: String,
+    val icon: PantopusIcon? = null,
+    val accessibilityLabel: String = label,
+    val onClick: () -> Unit,
+)
+
+/**
+ * Hairline-separated engagement footer for a row — display-only counters
+ * on the left + optional trailing CTA on the right. Used by My posts
+ * (`[8 replies] [142 views] ↳ Edit`).
+ */
+data class RowEngagement(
+    val items: List<RowEngagementItem>,
+    val cta: RowEngagementCta? = null,
+)
+
+// MARK: - Body emphasis
+
+/**
+ * Render emphasis for the `body` field on a row. Default `Secondary`
+ * matches Notifications V2 (small dim text below the title); `Primary`
+ * renders the body as the row's headline content (My posts).
+ */
+enum class RowBodyEmphasis {
+    /** 12sp caption, secondary text colour (default — Notifications V2). */
+    Secondary,
+
+    /** 14sp small, primary text colour (My posts). */
+    Primary,
+}
+
 // MARK: - Highlight
 
 /** Optional visual highlight wrapping the whole card. */
@@ -302,10 +344,21 @@ data class RowModel(
      * user-plus / sparkles).
      */
     val bodyIcon: PantopusIcon? = null,
+    /**
+     * Render emphasis for `body`. Default `Secondary` keeps the existing
+     * Notifications V2 / Connections behaviour; `Primary` is used by My
+     * posts where the body is the row's headline content.
+     */
+    val bodyEmphasis: RowBodyEmphasis = RowBodyEmphasis.Secondary,
     /** Chip rendered inline with the title (Pets species pill). */
     val inlineChip: RowChip? = null,
     /** Chip row beneath the body (intent / status / counter chips). */
     val chips: List<RowChip>? = null,
+    /**
+     * Chip row rendered as a header **above** the title/body, in the same
+     * row as the kebab. Used by My posts; mutually compatible with [chips].
+     */
+    val headerChips: List<RowChip>? = null,
     /** Small far-right time text on the chip row. */
     val timeMeta: String? = null,
     /** Text appended after the chip row, separated with "·". */
@@ -316,6 +369,8 @@ data class RowModel(
     val highlight: RowHighlight? = null,
     /** Optional in-card footer with 1–3 compact buttons. */
     val footer: RowFooter? = null,
+    /** Optional hairline-separated engagement strip (My posts). */
+    val engagement: RowEngagement? = null,
     /**
      * Optional bidder stack rendered inline on the chip line before
      * the [chips]. Used by My tasks V2 — 22dp overlapping avatars
