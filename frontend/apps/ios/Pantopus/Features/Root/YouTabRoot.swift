@@ -51,6 +51,9 @@ public enum YouRoute: Hashable {
     /// T6.3d — Log a package sheet target. Presented modally from the
     /// Packages list FAB and the empty-state CTA.
     case logPackage(homeId: String)
+    /// T6.3b / P10 — Maintenance. The home-context "me.maintenance"
+    /// action tile pushes here.
+    case homeMaintenance(homeId: String)
     /// P15 / T6.3g — Owners (legal-title roster). The "me.owners"
     /// Household-section row pushes here with the primary home id
     /// resolved by `MeViewModel.homeSections(...)`.
@@ -302,6 +305,12 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.maintenance":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeMaintenance(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         case "me.members":
             if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeMembers(homeId: homeId))
@@ -344,6 +353,11 @@ public struct YouTabRoot: View {
         case "me.packages":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homePackages(homeId: homeId))
+                return
+            }
+        case "me.maintenance":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeMaintenance(homeId: homeId))
                 return
             }
         case "me.owners":
@@ -682,6 +696,18 @@ public struct YouTabRoot: View {
                         path.append(.packageDetail(homeId: homeId, packageId: packageId))
                     }
                 }
+            )
+        case let .homeMaintenance(homeId):
+            MaintenanceListView(
+                viewModel: MaintenanceListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Maintenance detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in path.append(.placeholder(label: "Log maintenance")) }
+                    }
+                )
             )
         case let .homeOwners(homeId):
             let currentUserId: String? = {

@@ -27,6 +27,8 @@ public enum HubRoute: Hashable {
     case packageDetail(homeId: String, packageId: String)
     /// Log-a-package sheet target.
     case logPackage(homeId: String)
+    /// Maintenance sub-screen for a specific home (T6.3b / P10).
+    case homeMaintenance(homeId: String)
     /// Members sub-screen for a specific home (T6.3a / P9).
     case homeMembers(homeId: String)
     case publicProfile(userId: String)
@@ -315,9 +317,24 @@ public struct HubTabRoot: View {
                 onOpenPackages: { id in
                     Task { @MainActor in push(.homePackages(homeId: id)) }
                 },
+                onOpenMaintenance: { id in
+                    Task { @MainActor in push(.homeMaintenance(homeId: id)) }
+                },
                 onOpenMembers: { id in
                     Task { @MainActor in push(.homeMembers(homeId: id)) }
                 }
+            )
+        case let .homeMaintenance(homeId):
+            MaintenanceListView(
+                viewModel: MaintenanceListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Maintenance detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in push(.placeholder(label: "Log maintenance")) }
+                    }
+                )
             )
         case let .homeBills(homeId):
             BillsListView(

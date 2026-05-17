@@ -63,6 +63,8 @@ import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.homes.maintenance.MAINTENANCE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.maintenance.MaintenanceListScreen
 import app.pantopus.android.ui.screens.homes.members.MEMBERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.members.MembersListScreen
 import app.pantopus.android.ui.screens.homes.owners.OWNERS_LIST_HOME_ID_KEY
@@ -177,6 +179,12 @@ private object ChildRoutes {
 
     /** Build the concrete path for the Log Package form. */
     fun logPackage(homeId: String): String = "homes/$homeId/packages/new"
+
+    /** Maintenance list per home (T6.3b / P10). */
+    const val HOME_MAINTENANCE = "homes/{$MAINTENANCE_HOME_ID_KEY}/maintenance"
+
+    /** Build the concrete path for a home maintenance list. */
+    fun homeMaintenance(homeId: String): String = "homes/$homeId/maintenance"
 
     /** Owners list per home (P15 / T6.3g). The Owners VM pulls the
      *  viewer's id from [AuthRepository] internally, so no extra arg
@@ -687,6 +695,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenHomePackages = { homeId ->
                         navController.navigate(ChildRoutes.homePackages(homeId))
                     },
+                    onOpenHomeMaintenance = { homeId ->
+                        navController.navigate(ChildRoutes.homeMaintenance(homeId))
+                    },
                     onOpenHomeOwners = { homeId -> navController.navigate(ChildRoutes.homeOwners(homeId)) },
                     onOpenHomeMembers = { homeId -> navController.navigate(ChildRoutes.homeMembers(homeId)) },
                 )
@@ -723,6 +734,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenPackages = { homeId ->
                         navController.navigate(ChildRoutes.homePackages(homeId))
+                    },
+                    onOpenMaintenance = { homeId ->
+                        navController.navigate(ChildRoutes.homeMaintenance(homeId))
                     },
                     onOpenMembers = { homeId ->
                         navController.navigate(ChildRoutes.homeMembers(homeId))
@@ -787,6 +801,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.packageDetail(homeId, packageId))
                     },
                     onLogPackage = { navController.navigate(ChildRoutes.logPackage(homeId)) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.HOME_MAINTENANCE,
+                arguments = listOf(navArgument(MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                MaintenanceListScreen(
+                    onOpenTask = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Maintenance detail"))
+                    },
+                    onAddTask = {
+                        navController.navigate(ChildRoutes.placeholder("Log maintenance"))
+                    },
                     onBack = { navController.popBackStack() },
                 )
             }

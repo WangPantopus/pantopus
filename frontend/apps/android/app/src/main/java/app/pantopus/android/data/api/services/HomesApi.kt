@@ -6,12 +6,15 @@ import app.pantopus.android.data.api.models.homes.CheckAddressResponse
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
+import app.pantopus.android.data.api.models.homes.CreateMaintenanceRequest
 import app.pantopus.android.data.api.models.homes.CreatePackageRequest
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.GetHomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.GetHomePackagesResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.HomeDetailResponse
+import app.pantopus.android.data.api.models.homes.HomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.HomePackageResponse
 import app.pantopus.android.data.api.models.homes.HomePublicProfileResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
@@ -24,6 +27,7 @@ import app.pantopus.android.data.api.models.homes.RemoveOwnerResponse
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
+import app.pantopus.android.data.api.models.homes.UpdateMaintenanceRequest
 import app.pantopus.android.data.api.models.homes.UpdatePackageRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
@@ -191,4 +195,36 @@ interface HomesApi {
         @Path("packageId") packageId: String,
         @Body body: UpdatePackageRequest,
     ): HomePackageResponse
+
+    // ─── Maintenance (T6.3b / P10) ─────────────────────────────
+
+    /** `GET /api/homes/:id/maintenance` — route `backend/routes/home.js`
+     *  (added in T6.3b / P10). */
+    @GET("api/homes/{id}/maintenance")
+    suspend fun getHomeMaintenance(
+        @Path("id") homeId: String,
+        @Query("status") status: String? = null,
+    ): GetHomeMaintenanceResponse
+
+    /** `POST /api/homes/:id/maintenance` — route `backend/routes/home.js`. */
+    @POST("api/homes/{id}/maintenance")
+    suspend fun createHomeMaintenance(
+        @Path("id") homeId: String,
+        @Body body: CreateMaintenanceRequest,
+    ): HomeMaintenanceResponse
+
+    /** `PUT /api/homes/:id/maintenance/:taskId` — route `backend/routes/home.js`. */
+    @PUT("api/homes/{id}/maintenance/{taskId}")
+    suspend fun updateHomeMaintenance(
+        @Path("id") homeId: String,
+        @Path("taskId") taskId: String,
+        @Body body: UpdateMaintenanceRequest,
+    ): HomeMaintenanceResponse
+
+    /** `DELETE /api/homes/:id/maintenance/:taskId` — route `backend/routes/home.js`. */
+    @DELETE("api/homes/{id}/maintenance/{taskId}")
+    suspend fun deleteHomeMaintenance(
+        @Path("id") homeId: String,
+        @Path("taskId") taskId: String,
+    ): retrofit2.Response<Unit>
 }
