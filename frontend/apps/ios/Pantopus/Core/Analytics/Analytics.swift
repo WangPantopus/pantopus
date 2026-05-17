@@ -37,6 +37,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenPollsViewed
     case screenPollDetailViewed
     case ctaPollVoteSubmit(result: AnalyticsResult)
+    case screenHouseholdTasksViewed
     case screenOwnersListViewed
     case screenMembersListViewed
     case screenMembersWizardStepViewed(stepNumber: Int, stepName: String)
@@ -73,6 +74,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenPollsViewed: "screen.polls.viewed"
         case .screenPollDetailViewed: "screen.poll_detail.viewed"
         case .ctaPollVoteSubmit: "cta.poll_vote.submit"
+        case .screenHouseholdTasksViewed: "screen.household_tasks.viewed"
         case .screenOwnersListViewed: "screen.owners_list.viewed"
         case .screenMembersListViewed: "screen.members_list.viewed"
         case .screenMembersWizardStepViewed: "screen.members_wizard.step_viewed"
@@ -131,6 +133,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenPetsListViewed,
              .screenPollsViewed,
              .screenPollDetailViewed,
+             .screenHouseholdTasksViewed,
              .screenOwnersListViewed,
              .screenMembersListViewed,
              .screenEditProfileViewed,

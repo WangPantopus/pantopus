@@ -5,6 +5,7 @@ import app.pantopus.android.data.api.models.homes.CastVoteResponse
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
+import app.pantopus.android.data.api.models.homes.CreateHomeTaskRequest
 import app.pantopus.android.data.api.models.homes.CreateMaintenanceRequest
 import app.pantopus.android.data.api.models.homes.CreatePollRequest
 import app.pantopus.android.data.api.models.homes.FileUploadResponse
@@ -12,9 +13,11 @@ import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.GetHomePollsResponse
+import app.pantopus.android.data.api.models.homes.GetHomeTasksResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.HomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.HomePollResponse
+import app.pantopus.android.data.api.models.homes.HomeTaskResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
@@ -22,6 +25,7 @@ import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
+import app.pantopus.android.data.api.models.homes.UpdateHomeTaskRequest
 import app.pantopus.android.data.api.models.homes.UpdateMaintenanceRequest
 import app.pantopus.android.data.api.models.homes.UpdatePollRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
@@ -29,6 +33,7 @@ import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.FilesApi
+import app.pantopus.android.data.api.services.HomeTasksApi
 import app.pantopus.android.data.api.services.HomesApi
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -46,6 +51,7 @@ open class HomesRepository
     @Inject
     constructor(
         private val api: HomesApi,
+        private val tasksApi: HomeTasksApi,
         private val filesApi: FilesApi,
     ) {
         /** `GET /api/homes/my-homes`. */
@@ -135,6 +141,30 @@ open class HomesRepository
             pollId: String,
             request: UpdatePollRequest,
         ): NetworkResult<HomePollResponse> = safeApiCall { api.updateHomePoll(homeId, pollId, request) }
+
+        // MARK: - Household tasks (T6.3c / P11)
+
+        /** `GET /api/homes/:id/tasks`. */
+        open suspend fun getHomeTasks(homeId: String): NetworkResult<GetHomeTasksResponse> = safeApiCall { tasksApi.getHomeTasks(homeId) }
+
+        /** `POST /api/homes/:id/tasks`. */
+        open suspend fun createHomeTask(
+            homeId: String,
+            request: CreateHomeTaskRequest,
+        ): NetworkResult<HomeTaskResponse> = safeApiCall { tasksApi.createHomeTask(homeId, request) }
+
+        /** `PUT /api/homes/:id/tasks/:taskId`. */
+        open suspend fun updateHomeTask(
+            homeId: String,
+            taskId: String,
+            request: UpdateHomeTaskRequest,
+        ): NetworkResult<HomeTaskResponse> = safeApiCall { tasksApi.updateHomeTask(homeId, taskId, request) }
+
+        /** `DELETE /api/homes/:id/tasks/:taskId`. */
+        open suspend fun deleteHomeTask(
+            homeId: String,
+            taskId: String,
+        ): NetworkResult<Unit> = safeApiCall { tasksApi.deleteHomeTask(homeId, taskId) }
 
         // ─── Maintenance (T6.3b / P10) ─────────────────────────
 

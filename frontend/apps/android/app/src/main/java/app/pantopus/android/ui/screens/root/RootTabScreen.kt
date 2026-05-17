@@ -76,6 +76,8 @@ import app.pantopus.android.ui.screens.homes.polls.POLL_DETAIL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.polls.POLL_DETAIL_POLL_ID_KEY
 import app.pantopus.android.ui.screens.homes.polls.PollDetailScreen
 import app.pantopus.android.ui.screens.homes.polls.PollsListScreen
+import app.pantopus.android.ui.screens.homes.tasks.HOUSEHOLD_TASKS_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.tasks.HouseholdTasksListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
@@ -170,6 +172,12 @@ private object ChildRoutes {
         homeId: String,
         pollId: String,
     ): String = "homes/$homeId/polls/$pollId"
+
+    /** Household tasks list per home (T6.3c / P11). */
+    const val HOME_TASKS = "homes/{$HOUSEHOLD_TASKS_HOME_ID_KEY}/tasks"
+
+    /** Build the concrete path for a home household tasks list. */
+    fun homeTasks(homeId: String): String = "homes/$homeId/tasks"
 
     /** Maintenance list per home (T6.3b / P10). */
     const val HOME_MAINTENANCE = "homes/{$MAINTENANCE_HOME_ID_KEY}/maintenance"
@@ -685,6 +693,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
                     onOpenHomePolls = { homeId -> navController.navigate(ChildRoutes.homePolls(homeId)) },
+                    onOpenHomeTasks = { homeId -> navController.navigate(ChildRoutes.homeTasks(homeId)) },
                     onOpenHomeMaintenance = { homeId ->
                         navController.navigate(ChildRoutes.homeMaintenance(homeId))
                     },
@@ -724,6 +733,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenPets = { homeId ->
                         navController.navigate(ChildRoutes.homePets(homeId))
+                    },
+                    onOpenTasks = { homeId ->
+                        navController.navigate(ChildRoutes.homeTasks(homeId))
                     },
                     onOpenMaintenance = { homeId ->
                         navController.navigate(ChildRoutes.homeMaintenance(homeId))
@@ -803,6 +815,23 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     ),
             ) {
                 PollDetailScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.HOME_TASKS,
+                arguments = listOf(navArgument(HOUSEHOLD_TASKS_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                HouseholdTasksListScreen(
+                    onOpenTask = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Task detail"))
+                    },
+                    onAddTask = {
+                        navController.navigate(ChildRoutes.placeholder("Add a task"))
+                    },
+                    onEditRecurring = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Edit recurring task"))
+                    },
                     onBack = { navController.popBackStack() },
                 )
             }
