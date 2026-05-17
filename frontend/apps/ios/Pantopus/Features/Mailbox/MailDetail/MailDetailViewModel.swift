@@ -231,7 +231,7 @@ public final class MailDetailViewModel {
             ?? item.senderBusinessName
             ?? item.senderAddress
             ?? "Unknown sender"
-        let senderMeta = detail.sender?.username.map { "@\($0)" } ?? item.senderAddress
+        let senderMeta = detail.sender.map { "@\($0.username)" } ?? item.senderAddress
         let title = item.displayTitle ?? item.subject ?? "Mail"
         let excerpt = item.previewText
         let createdAtLabel = formatLongDate(item.createdAt)

@@ -51,13 +51,11 @@ class MailboxRepository
 
         /** `GET /api/mailbox/:id` — V1 detail route used by the new
          *  generic A17.1 detail screen (T6.5b / P20). */
-        suspend fun detail(mailId: String): NetworkResult<MailDetailResponse> =
-            safeApiCall { mailboxApi.detail(mailId) }
+        suspend fun detail(mailId: String): NetworkResult<MailDetailResponse> = safeApiCall { mailboxApi.detail(mailId) }
 
         /** `PATCH /api/mailbox/:id/ack` — used by the generic A17.1
          *  detail screen's primary Acknowledge action. */
-        suspend fun acknowledge(mailId: String): NetworkResult<AckResponse> =
-            safeApiCall { mailboxApi.acknowledge(mailId) }
+        suspend fun acknowledge(mailId: String): NetworkResult<AckResponse> = safeApiCall { mailboxApi.acknowledge(mailId) }
 
         /** `GET /api/mailbox/v2/drawers`. */
         suspend fun drawers(): NetworkResult<DrawerListResponse> = safeApiCall { v2Api.drawers() }

@@ -125,6 +125,7 @@ class HomeCalendarViewModel
         val banner: StateFlow<BannerConfig?> = _banner.asStateFlow()
 
         private var events: List<CalendarEventDto> = emptyList()
+
         /** First (Sunday) day of the visible week. */
         private var weekAnchor: LocalDate = weekAnchorFor(clock().atZone(zone).toLocalDate())
         private var selectedIsoDate: String? = null
@@ -406,28 +407,29 @@ class HomeCalendarViewModel
                     "$timeRangeLabel · ${metaParts.joinToString(" · ")}"
                 }
             val attendeeCount = event.dto.assignedTo?.size ?: 0
-            val chips = buildList {
-                add(
-                    RowChip(
-                        text = category.label,
-                        icon = category.icon,
-                        tint =
-                            RowChip.Tint.Custom(
-                                background = category.background,
-                                foreground = category.foreground,
-                            ),
-                    ),
-                )
-                if (attendeeCount > 0) {
+            val chips =
+                buildList {
                     add(
                         RowChip(
-                            text = if (attendeeCount == 1) "1 attendee" else "$attendeeCount attendees",
-                            icon = PantopusIcon.Users,
-                            tint = RowChip.Tint.Status(StatusChipVariant.Neutral),
+                            text = category.label,
+                            icon = category.icon,
+                            tint =
+                                RowChip.Tint.Custom(
+                                    background = category.background,
+                                    foreground = category.foreground,
+                                ),
                         ),
                     )
+                    if (attendeeCount > 0) {
+                        add(
+                            RowChip(
+                                text = if (attendeeCount == 1) "1 attendee" else "$attendeeCount attendees",
+                                icon = PantopusIcon.Users,
+                                tint = RowChip.Tint.Status(StatusChipVariant.Neutral),
+                            ),
+                        )
+                    }
                 }
-            }
             return RowModel(
                 id = event.dto.id,
                 title = event.dto.title,
@@ -449,11 +451,9 @@ class HomeCalendarViewModel
 
         // MARK: - Date helpers
 
-        private fun isoDay(instant: Instant): String =
-            instant.atZone(zone).toLocalDate().format(DateTimeFormatter.ISO_DATE)
+        private fun isoDay(instant: Instant): String = instant.atZone(zone).toLocalDate().format(DateTimeFormatter.ISO_DATE)
 
-        private fun parseIsoDate(iso: String): LocalDate? =
-            runCatching { LocalDate.parse(iso) }.getOrNull()
+        private fun parseIsoDate(iso: String): LocalDate? = runCatching { LocalDate.parse(iso) }.getOrNull()
 
         /** First day of the week (Sunday) containing [date]. */
         private fun weekAnchorFor(date: LocalDate): LocalDate {
@@ -493,8 +493,7 @@ class HomeCalendarViewModel
             return "$startLabel – ${fmt.format(end)}"
         }
 
-        private fun isAllDay(zoned: ZonedDateTime): Boolean =
-            zoned.hour == 0 && zoned.minute == 0 && zoned.second == 0
+        private fun isAllDay(zoned: ZonedDateTime): Boolean = zoned.hour == 0 && zoned.minute == 0 && zoned.second == 0
 
         private fun dayHeader(iso: String): String {
             val parsed = parseIsoDate(iso) ?: return iso

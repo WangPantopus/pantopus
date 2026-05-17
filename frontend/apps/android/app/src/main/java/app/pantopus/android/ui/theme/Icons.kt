@@ -84,7 +84,6 @@ import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
@@ -304,6 +303,7 @@ enum class PantopusIcon(
     Stethoscope("stethoscope"),
     CalendarDays("calendar-days"),
     Link("link"),
+
     // T6.4b — Emergency info: per-category tile glyphs (shutoff / contact /
     // evac / medical) + row action icons (phoneCall / image / mapPin) +
     // banner CTA + pinned marker + empty-state quick-prompt.

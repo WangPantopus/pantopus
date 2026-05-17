@@ -368,7 +368,10 @@ private fun CertifiedKeyFactRow(row: CertifiedKeyFact) {
 // ─── Hero + chain helpers ─────────────────────────────────────
 
 @Composable
-private fun HeroCard(content: MailDetailContent, certified: CertifiedDetailDto) {
+private fun HeroCard(
+    content: MailDetailContent,
+    certified: CertifiedDetailDto,
+) {
     Row(
         modifier =
             Modifier
@@ -533,8 +536,9 @@ private fun makeChainEvents(certified: CertifiedDetailDto): List<ChainOfCustodyE
             label = step.label,
             meta = null,
             timestamp = step.occurredAt?.let(::formatChainTimestamp),
-            isPantopusEvent = step.id.lowercase()
-                .let { it.contains("ack") || it.contains("pantopus") },
+            isPantopusEvent =
+                step.id.lowercase()
+                    .let { it.contains("ack") || it.contains("pantopus") },
             isComplete = step.isComplete,
         )
     }

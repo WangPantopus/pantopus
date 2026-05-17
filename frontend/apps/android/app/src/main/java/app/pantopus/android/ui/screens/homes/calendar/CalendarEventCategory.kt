@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "MatchingDeclarationName", "TooManyFunctions")
+@file:Suppress("PackageNaming", "MagicNumber", "MatchingDeclarationName", "TooManyFunctions", "ComplexCondition")
 
 package app.pantopus.android.ui.screens.homes.calendar
 
@@ -10,7 +10,7 @@ import java.util.Locale
  * T6.4c — Per-event-type visual tokens for the Home calendar row.
  * Lifted from the design at `calendar-frames.jsx:53-66`. Feature code
  * (HomeCalendarViewModel, etc.) references these typed swatches; no
-     * hex literal appears in the calendar feature package outside this
+ * hex literal appears in the calendar feature package outside this
  * file.
  *
  * Mirrors `UtilityCategoryPalette` for Bills — per-feature palette is

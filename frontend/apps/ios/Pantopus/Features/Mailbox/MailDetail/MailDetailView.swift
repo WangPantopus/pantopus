@@ -10,7 +10,7 @@
 
 import SwiftUI
 
-// swiftlint:disable multiple_closures_with_trailing_closure trailing_closure
+// swiftlint:disable file_length multiple_closures_with_trailing_closure trailing_closure
 
 public struct MailDetailView: View {
     @State private var viewModel: MailDetailViewModel

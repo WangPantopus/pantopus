@@ -10,6 +10,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable force_try force_unwrapping
+
 @MainActor
 final class MailDetailViewModelTests: XCTestCase {
     override func setUp() {

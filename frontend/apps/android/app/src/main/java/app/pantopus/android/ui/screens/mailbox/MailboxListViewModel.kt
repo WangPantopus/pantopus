@@ -19,13 +19,13 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.theme.PantopusIcon
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
 /** Tabs surfaced by the V1 mailbox list. */
@@ -231,10 +231,11 @@ class MailboxListViewModel
                     seconds < 7 * 86_400 -> "${seconds / 86_400}d"
                     else -> {
                         val zoned = instant.atZone(java.time.ZoneId.systemDefault())
-                        val month = zoned.month.getDisplayName(
-                            java.time.format.TextStyle.SHORT,
-                            java.util.Locale.US,
-                        )
+                        val month =
+                            zoned.month.getDisplayName(
+                                java.time.format.TextStyle.SHORT,
+                                java.util.Locale.US,
+                            )
                         "$month ${zoned.dayOfMonth}"
                     }
                 }

@@ -4,6 +4,7 @@
     "LongMethod",
     "TooManyFunctions",
     "LongParameterList",
+    "MatchingDeclarationName",
     "ModifierMissing",
 )
 
@@ -36,14 +37,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -82,9 +81,10 @@ fun BookletPager(
 ) {
     if (pages.isEmpty()) return
     var mode by rememberSaveable { mutableStateOf(initialMode) }
-    val pagerState = rememberPagerState(
-        initialPage = initialPage.coerceIn(0, pages.size - 1),
-    ) { pages.size }
+    val pagerState =
+        rememberPagerState(
+            initialPage = initialPage.coerceIn(0, pages.size - 1),
+        ) { pages.size }
     val scope = rememberCoroutineScope()
 
     Column(
@@ -270,7 +270,10 @@ private fun CircularIconButton(
 }
 
 @Composable
-private fun Scrubber(currentPage: Int, totalPages: Int) {
+private fun Scrubber(
+    currentPage: Int,
+    totalPages: Int,
+) {
     val ratio =
         if (totalPages <= 1) 1f else currentPage.coerceAtMost(totalPages - 1).toFloat() / (totalPages - 1)
     Box(
@@ -391,7 +394,10 @@ private fun GridMode(
 }
 
 @Composable
-private fun BookletPageImage(url: String, modifier: Modifier = Modifier) {
+private fun BookletPageImage(
+    url: String,
+    modifier: Modifier = Modifier,
+) {
     AsyncImage(
         model = url,
         contentDescription = "Booklet page",

@@ -259,4 +259,3 @@ private fun StatusCircle(event: ChainOfCustodyEvent) {
         )
     }
 }
-

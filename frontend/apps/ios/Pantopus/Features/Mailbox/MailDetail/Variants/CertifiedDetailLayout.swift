@@ -17,6 +17,8 @@
 import Foundation
 import SwiftUI
 
+// swiftlint:disable file_length type_body_length multiple_closures_with_trailing_closure
+
 @MainActor
 struct CertifiedDetailLayout: View {
     let content: MailDetailContent
@@ -94,7 +96,6 @@ struct CertifiedDetailLayout: View {
 
     // MARK: - Key facts (emphasised Deadline + Amount)
 
-    @ViewBuilder
     private var keyFactsCard: some View {
         CertifiedKeyFactsCard(rows: makeKeyFacts())
     }
@@ -216,7 +217,6 @@ struct CertifiedDetailLayout: View {
 
     // MARK: - Sender card
 
-    @ViewBuilder
     private var senderCard: some View {
         CombinedSenderCarrierCard(
             senderName: content.senderDisplayName,
@@ -244,7 +244,6 @@ struct CertifiedDetailLayout: View {
 
     // MARK: - Actions
 
-    @ViewBuilder
     private var actionsRow: some View {
         VStack(spacing: Spacing.s2) {
             acknowledgeButton
@@ -443,7 +442,7 @@ private struct HeroCard: View {
                 .clipShape(Circle())
             (
                 Text("Acknowledged").bold()
-                + Text(" · receipt on file").foregroundColor(Theme.Color.success.opacity(0.85))
+                    + Text(" · receipt on file").foregroundColor(Theme.Color.success.opacity(0.85))
             )
             .font(.system(size: 12))
             .foregroundColor(Theme.Color.success)
@@ -481,13 +480,13 @@ private struct CategoryBadge: View {
 
 // MARK: - Certified key facts card (emphasis treatment)
 
-struct CertifiedKeyFactTag: Hashable, Sendable {
+struct CertifiedKeyFactTag: Hashable {
     let text: String
     let background: Color
     let foreground: Color
 }
 
-struct CertifiedKeyFact: Identifiable, Hashable, Sendable {
+struct CertifiedKeyFact: Identifiable, Hashable {
     let id: String
     let icon: PantopusIcon
     let label: String

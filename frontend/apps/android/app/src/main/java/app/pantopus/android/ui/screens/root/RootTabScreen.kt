@@ -179,6 +179,7 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home calendar. */
     fun homeCalendar(homeId: String): String = "homes/$homeId/calendar"
+
     /** Emergency info per home (T6.4b / P17). */
     const val HOME_EMERGENCY = "homes/{$EMERGENCY_HOME_ID_KEY}/emergency"
 

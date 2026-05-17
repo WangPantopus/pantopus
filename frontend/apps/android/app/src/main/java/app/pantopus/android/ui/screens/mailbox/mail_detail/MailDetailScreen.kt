@@ -31,10 +31,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -175,7 +172,8 @@ private fun LoadedLayout(
                         MailOverflowItem("report", PantopusIcon.Info, "Report") {},
                     ),
             ),
-        aiElf = null, // V1 detail does not expose ai_summary today
+        // V1 detail does not expose ai_summary today.
+        aiElf = null,
         attachments = buildAttachments(content.attachments),
         hero = { HeroCard(content = content) },
         keyFacts = { KeyFactsCard(rows = content.keyFacts()) },
@@ -666,4 +664,3 @@ private fun ErrorLayout(
         )
     }
 }
-

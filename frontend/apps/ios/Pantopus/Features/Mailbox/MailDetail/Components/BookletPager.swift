@@ -328,13 +328,13 @@ private struct ThumbnailCell: View {
 
 #Preview {
     BookletPager(pages: [
-        URL(string: "https://placehold.co/360x480")!,
-        URL(string: "https://placehold.co/360x480/orange/white")!,
-        URL(string: "https://placehold.co/360x480/blue/white")!,
-        URL(string: "https://placehold.co/360x480/green/white")!,
-        URL(string: "https://placehold.co/360x480/red/white")!,
-        URL(string: "https://placehold.co/360x480/purple/white")!
-    ])
-    .padding()
-    .background(Theme.Color.appBg)
+        "https://placehold.co/360x480",
+        "https://placehold.co/360x480/orange/white",
+        "https://placehold.co/360x480/blue/white",
+        "https://placehold.co/360x480/green/white",
+        "https://placehold.co/360x480/red/white",
+        "https://placehold.co/360x480/purple/white"
+    ].compactMap(URL.init(string:)))
+        .padding()
+        .background(Theme.Color.appBg)
 }

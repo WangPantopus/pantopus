@@ -111,7 +111,7 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         onAddEvent: @escaping @Sendable () -> Void = {},
         onOpenEvent: @escaping @Sendable (String) -> Void = { _ in },
         now: @escaping @Sendable () -> Date = { Date() },
-        calendar: Calendar = Self.utcCalendar,
+        calendar: Calendar = HomeCalendarViewModel.utcCalendar,
         timeZone: TimeZone = TimeZone(identifier: "UTC") ?? .current
     ) {
         self.homeId = homeId

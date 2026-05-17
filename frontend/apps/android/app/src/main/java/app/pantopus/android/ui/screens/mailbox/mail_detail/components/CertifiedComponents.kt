@@ -250,7 +250,10 @@ private fun SenderRow(
 }
 
 @Composable
-private fun SenderAvatar(initials: String, tint: Color) {
+private fun SenderAvatar(
+    initials: String,
+    tint: Color,
+) {
     Box(modifier = Modifier.size(46.dp)) {
         Box(
             modifier =

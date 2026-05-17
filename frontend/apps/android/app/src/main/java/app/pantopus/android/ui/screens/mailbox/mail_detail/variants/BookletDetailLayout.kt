@@ -40,10 +40,10 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailContent
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailKeyFact
 import app.pantopus.android.ui.screens.mailbox.mail_detail.components.BookletPager
+import app.pantopus.android.ui.screens.shared.mail_item_detail.AIElfStripContent
 import app.pantopus.android.ui.screens.shared.mail_item_detail.AttachmentItem
 import app.pantopus.android.ui.screens.shared.mail_item_detail.AttachmentKind
 import app.pantopus.android.ui.screens.shared.mail_item_detail.AttachmentsRowContent
-import app.pantopus.android.ui.screens.shared.mail_item_detail.AIElfStripContent
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailItemDetailShell
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailOverflowItem
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailTopBarConfig
@@ -81,7 +81,10 @@ fun BookletDetailLayout(
     }
 }
 
-private fun makeTopBar(content: MailDetailContent, onBack: () -> Unit): MailTopBarConfig =
+private fun makeTopBar(
+    content: MailDetailContent,
+    onBack: () -> Unit,
+): MailTopBarConfig =
     MailTopBarConfig(
         eyebrow = content.category.label,
         trust = content.detailTrust,
@@ -101,13 +104,17 @@ private fun makeTopBar(content: MailDetailContent, onBack: () -> Unit): MailTopB
             ),
     )
 
-private fun makeAIElf(content: MailDetailContent, booklet: BookletDetailDto): AIElfStripContent? {
+private fun makeAIElf(
+    content: MailDetailContent,
+    booklet: BookletDetailDto,
+): AIElfStripContent? {
     val summary = content.aiSummary?.takeIf { it.isNotEmpty() } ?: return null
-    val readMinutes = if (booklet.pageCount > 0) {
-        ceil(booklet.pageCount / 3.0).toInt().coerceAtLeast(1)
-    } else {
-        null
-    }
+    val readMinutes =
+        if (booklet.pageCount > 0) {
+            ceil(booklet.pageCount / 3.0).toInt().coerceAtLeast(1)
+        } else {
+            null
+        }
     return AIElfStripContent(
         headline = "Pantopus read the whole booklet",
         summary = summary,
@@ -300,7 +307,10 @@ private fun KeyFactsCard(rows: List<MailDetailKeyFact>) {
 }
 
 @Composable
-private fun SenderCard(content: MailDetailContent, onOpenProfile: (String) -> Unit) {
+private fun SenderCard(
+    content: MailDetailContent,
+    onOpenProfile: (String) -> Unit,
+) {
     Column(
         modifier =
             Modifier

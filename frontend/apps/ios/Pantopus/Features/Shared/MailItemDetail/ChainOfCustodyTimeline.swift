@@ -226,26 +226,44 @@ private struct EventRow: View {
     }
 
     @ViewBuilder private var statusCircle: some View {
-        let (background, border, glyphColor) = colors(for: event)
+        let colors = colors(for: event)
         ZStack {
             Circle()
-                .fill(background)
+                .fill(colors.background)
             Circle()
-                .strokeBorder(border, lineWidth: event.isComplete ? 2 : 1.5)
-            Icon(event.icon, size: 12, color: glyphColor)
+                .strokeBorder(colors.border, lineWidth: event.isComplete ? 2 : 1.5)
+            Icon(event.icon, size: 12, color: colors.glyph)
         }
         .frame(width: 24, height: 24)
         .accessibilityHidden(true)
     }
 
-    private func colors(for event: ChainOfCustodyEvent) -> (Color, Color, Color) {
+    private struct EventColors {
+        let background: Color
+        let border: Color
+        let glyph: Color
+    }
+
+    private func colors(for event: ChainOfCustodyEvent) -> EventColors {
         if event.isComplete {
             if event.isPantopusEvent {
-                return (Theme.Color.primary600, Theme.Color.primary700, Theme.Color.appTextInverse)
+                return EventColors(
+                    background: Theme.Color.primary600,
+                    border: Theme.Color.primary700,
+                    glyph: Theme.Color.appTextInverse
+                )
             }
-            return (Theme.Color.success, Theme.Color.success, Theme.Color.appTextInverse)
+            return EventColors(
+                background: Theme.Color.success,
+                border: Theme.Color.success,
+                glyph: Theme.Color.appTextInverse
+            )
         }
-        return (Theme.Color.appSurface, Theme.Color.appBorderStrong, Theme.Color.appTextSecondary)
+        return EventColors(
+            background: Theme.Color.appSurface,
+            border: Theme.Color.appBorderStrong,
+            glyph: Theme.Color.appTextSecondary
+        )
     }
 }
 

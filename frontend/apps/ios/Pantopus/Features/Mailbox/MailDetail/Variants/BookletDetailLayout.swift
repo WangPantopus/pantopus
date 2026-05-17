@@ -16,6 +16,8 @@
 
 import SwiftUI
 
+// swiftlint:disable multiple_closures_with_trailing_closure
+
 /// Standalone variant layout. Exposed to `MailDetailView`'s dispatcher.
 @MainActor
 struct BookletDetailLayout: View {

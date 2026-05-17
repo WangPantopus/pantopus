@@ -129,8 +129,11 @@ fun MailItemDetailShell(
                 }
                 Box(modifier = Modifier.testTag("mailItemDetail_sender")) { sender() }
                 // Leave room for the sticky actions shelf.
-                if (actions != null) Spacer(Modifier.height(96.dp))
-                else Spacer(Modifier.height(Spacing.s4))
+                if (actions != null) {
+                    Spacer(Modifier.height(96.dp))
+                } else {
+                    Spacer(Modifier.height(Spacing.s4))
+                }
             }
         }
         if (actions != null) {
