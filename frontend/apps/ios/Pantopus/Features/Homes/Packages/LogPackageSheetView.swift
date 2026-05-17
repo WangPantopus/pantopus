@@ -188,7 +188,7 @@ struct LogPackageSheetView: View {
                 .foregroundStyle(Theme.Color.appTextSecondary)
             TextField(placeholder, text: text)
                 .focused($focused, equals: focus)
-                .pantopusTextStyle(.body)
+                .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.appText)
                 .textInputAutocapitalization(.sentences)
                 .autocorrectionDisabled(false)
@@ -205,5 +205,5 @@ struct LogPackageSheetView: View {
 }
 
 #Preview {
-    LogPackageSheetView(homeId: "preview", onClose: {}) { _ in }
+    LogPackageSheetView(homeId: "preview", onClose: {}, onCreated: { _ in })
 }

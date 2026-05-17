@@ -26,8 +26,6 @@ import Foundation
 import Observation
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length
-
 private struct PackagesTabCounts {
     let expected: Int?
     let delivered: Int?
@@ -90,10 +88,12 @@ public final class PackagesListViewModel: ListOfRowsDataSource {
     /// No top-bar action in T6.3d. The design's right-side filter glyph
     /// isn't wired to a sheet yet (the 3 tabs cover the filter intent)
     /// and the FAB owns the canonical "Log a package" action.
-    public var topBarAction: TopBarAction? { nil }
+    public var topBarAction: TopBarAction? {
+        nil
+    }
 
     public var tabs: [ListOfRowsTab] {
-        let counts = packages.map(self.counts) ??
+        let counts = packages.map(counts) ??
             PackagesTabCounts(expected: nil, delivered: nil, archived: nil)
         return [
             ListOfRowsTab(id: PackagesTab.expected.rawValue, label: "Expected", count: counts.expected),
@@ -146,14 +146,14 @@ public final class PackagesListViewModel: ListOfRowsDataSource {
     private let onLogPackage: @Sendable () -> Void
     private let now: @Sendable () -> Date
 
-    public init(
+    init(
         homeId: String,
         api: APIClient = .shared,
         currentUserId: String? = nil,
         memberLookup: @escaping @Sendable (String) -> String? = { _ in nil },
         onOpenPackage: @escaping @Sendable (String) -> Void = { _ in },
         onLogPackage: @escaping @Sendable () -> Void = {},
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.homeId = homeId
         self.api = api
@@ -407,12 +407,12 @@ public final class PackagesListViewModel: ListOfRowsDataSource {
     private func emptySubcopy(for tab: PackagesTab) -> String {
         switch tab {
         case .expected:
-            return "Log incoming deliveries so the household can see what's arriving — " +
+            "Log incoming deliveries so the household can see what's arriving — " +
                 "tracking, drop instructions, and who it's for."
         case .delivered:
-            return "Delivered packages show up here once a carrier marks them dropped off."
+            "Delivered packages show up here once a carrier marks them dropped off."
         case .archived:
-            return "Returned or missing packages move to Archived after their lifecycle closes."
+            "Returned or missing packages move to Archived after their lifecycle closes."
         }
     }
 
@@ -421,7 +421,7 @@ public final class PackagesListViewModel: ListOfRowsDataSource {
     static func shortTracking(_ raw: String) -> String {
         let stripped = raw.replacingOccurrences(of: " ", with: "")
         if stripped.count <= 8 { return raw }
-        return "…" + String(stripped.suffix(6))
+        return "…" + String(stripped.suffix(7))
     }
 
     static func parseDate(_ iso: String) -> Date? {
@@ -440,5 +440,7 @@ public final class PackagesListViewModel: ListOfRowsDataSource {
 }
 
 private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }
