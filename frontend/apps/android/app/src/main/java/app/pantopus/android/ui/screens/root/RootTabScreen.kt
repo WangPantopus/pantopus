@@ -154,7 +154,10 @@ private object ChildRoutes {
         "homes/{$ACCESS_CODES_HOME_ID_KEY}/access?$ACCESS_CODES_HOME_NAME_KEY={$ACCESS_CODES_HOME_NAME_KEY}"
 
     /** Build the concrete path for the access codes screen. */
-    fun accessCodes(homeId: String, homeName: String?): String {
+    fun accessCodes(
+        homeId: String,
+        homeName: String?,
+    ): String {
         val encoded = homeName?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
         return "homes/$homeId/access?$ACCESS_CODES_HOME_NAME_KEY=$encoded"
     }

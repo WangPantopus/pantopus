@@ -6,11 +6,11 @@ import app.pantopus.android.data.api.models.homes.CheckAddressResponse
 import app.pantopus.android.data.api.models.homes.CreateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
-import app.pantopus.android.data.api.models.homes.HomeAccessSecretResponse
-import app.pantopus.android.data.api.models.homes.HomeAccessSecretsResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.HomeAccessSecretResponse
+import app.pantopus.android.data.api.models.homes.HomeAccessSecretsResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.HomeDetailResponse
 import app.pantopus.android.data.api.models.homes.HomePublicProfileResponse
@@ -21,8 +21,8 @@ import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
-import app.pantopus.android.data.api.models.homes.UpdateBillRequest
 import app.pantopus.android.data.api.models.homes.UpdateAccessSecretRequest
+import app.pantopus.android.data.api.models.homes.UpdateBillRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import retrofit2.http.Body

@@ -617,21 +617,20 @@ public struct YouTabRoot: View {
             AccessCodesView(
                 viewModel: AccessCodesViewModel(
                     homeId: homeId,
-                    homeName: homeName,
-                    onSelect: { target in
-                        Task { @MainActor in
-                            switch target {
-                            case let .addCode(_, category):
-                                let label = category.map { "Add \($0.label) code" } ?? "Add access code"
-                                path.append(.placeholder(label: label))
-                            case .editCode:
-                                path.append(.placeholder(label: "Edit access code"))
-                            case .search:
-                                path.append(.placeholder(label: "Search access codes"))
-                            }
+                    homeName: homeName
+                ) { target in
+                    Task { @MainActor in
+                        switch target {
+                        case let .addCode(_, category):
+                            let label = category.map { "Add \($0.label) code" } ?? "Add access code"
+                            path.append(.placeholder(label: label))
+                        case .editCode:
+                            path.append(.placeholder(label: "Edit access code"))
+                        case .search:
+                            path.append(.placeholder(label: "Search access codes"))
                         }
                     }
-                )
+                }
             )
         #if DEBUG
         case let .publicProfile(userId):

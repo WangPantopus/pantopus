@@ -19,29 +19,29 @@ import SwiftUI
 import UIKit
 
 /// Stable chip ids. "all" is the default + matches the design's `key: 'all'`.
-public enum AccessCodesChip {
-    public static let all = "all"
+enum AccessCodesChip {
+    static let all = "all"
 
     /// Per-category chip id == category raw value, so callers can map
     /// chip id ↔ enum without a side table.
-    public static func id(for category: AccessCategory) -> String {
+    static func id(for category: AccessCategory) -> String {
         category.rawValue
     }
 }
 
 /// Stable a11y identifiers used by the screen + tests on both platforms.
-public enum AccessCodesA11y {
-    public static let screen = "accessCodes_screen"
-    public static let row = "accessCodes_row"
-    public static let copyAction = "accessCodes_copyAction"
-    public static let kebabAction = "accessCodes_kebabAction"
-    public static let toast = "accessCodes_toast"
-    public static let fab = "accessCodes_fab"
+enum AccessCodesA11y {
+    static let screen = "accessCodes_screen"
+    static let row = "accessCodes_row"
+    static let copyAction = "accessCodes_copyAction"
+    static let kebabAction = "accessCodes_kebabAction"
+    static let toast = "accessCodes_toast"
+    static let fab = "accessCodes_fab"
 }
 
 /// Outbound routing target. The host (`YouTabRoot`) maps these onto the
 /// appropriate `YouRoute.*` push or a sheet present.
-public enum AccessCodesTarget: Sendable, Hashable {
+enum AccessCodesTarget: Hashable {
     case addCode(homeId: String, category: AccessCategory?)
     case editCode(homeId: String, secretId: String)
     case search(homeId: String)
@@ -49,19 +49,19 @@ public enum AccessCodesTarget: Sendable, Hashable {
 
 @Observable
 @MainActor
-public final class AccessCodesViewModel: ListOfRowsDataSource {
+final class AccessCodesViewModel: ListOfRowsDataSource {
     // MARK: - Public state
 
-    public let homeId: String
-    public let homeName: String?
+    let homeId: String
+    let homeName: String?
 
-    public let title = "Access codes"
+    let title = "Access codes"
 
-    public var topBarSubtitle: String? {
+    var topBarSubtitle: String? {
         homeName
     }
 
-    public var topBarAction: TopBarAction? {
+    var topBarAction: TopBarAction? {
         TopBarAction(
             icon: .search,
             accessibilityLabel: "Search access codes"
@@ -71,15 +71,15 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
         }
     }
 
-    public var tabs: [ListOfRowsTab] {
+    var tabs: [ListOfRowsTab] {
         []
     }
 
-    public var selectedTab: String = "" {
+    var selectedTab: String = "" {
         didSet { /* unused — chip strip drives filtering */ }
     }
 
-    public var fab: FABAction? {
+    var fab: FABAction? {
         FABAction(
             icon: .plus,
             accessibilityLabel: "Add access code",
@@ -91,13 +91,13 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
         }
     }
 
-    public private(set) var state: ListOfRowsState = .loading
+    private(set) var state: ListOfRowsState = .loading
 
     /// Ephemeral toast message (e.g. "Code copied"). Observed by the
     /// view; cleared after a short window. Public so tests can assert.
-    public private(set) var toastMessage: String?
+    private(set) var toastMessage: String?
 
-    public var chipStrip: ChipStripConfig? {
+    var chipStrip: ChipStripConfig? {
         ChipStripConfig(
             chips: chipConfig(),
             selectedId: selectedChip
@@ -107,10 +107,10 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
     }
 
     /// Currently-selected filter chip id ("all" or a category raw value).
-    public private(set) var selectedChip: String = AccessCodesChip.all
+    private(set) var selectedChip: String = AccessCodesChip.all
 
     /// Ids of secrets currently in their revealed state.
-    public private(set) var revealedIds: Set<String> = []
+    private(set) var revealedIds: Set<String> = []
 
     // MARK: - Dependencies
 
@@ -122,7 +122,7 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
     private var loadedOnce = false
     private var toastTask: Task<Void, Never>?
 
-    public init(
+    init(
         homeId: String,
         homeName: String? = nil,
         api: APIClient = .shared,
@@ -140,23 +140,23 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
 
     // MARK: - ListOfRowsDataSource
 
-    public func load() async {
+    func load() async {
         if loadedOnce { return }
         state = .loading
         await fetch()
     }
 
-    public func refresh() async {
+    func refresh() async {
         await fetch()
     }
 
-    public func loadMoreIfNeeded() async {
+    func loadMoreIfNeeded() async {
         // Single page — no pagination on the access-secrets endpoint.
     }
 
     // MARK: - Chip selection
 
-    public func selectChip(_ id: String) {
+    func selectChip(_ id: String) {
         guard selectedChip != id else { return }
         selectedChip = id
         rebuild()
@@ -166,7 +166,7 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
 
     /// Toggle redaction for a specific secret. Re-renders the row's
     /// subtitle as the literal value or the masked placeholder.
-    public func toggleReveal(_ secretId: String) {
+    func toggleReveal(_ secretId: String) {
         if revealedIds.contains(secretId) {
             revealedIds.remove(secretId)
         } else {
@@ -177,7 +177,7 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
 
     /// Copy the secret's literal value to the system clipboard. Fires the
     /// "Code copied" toast on success — the toast clears after ~2 seconds.
-    public func copyValue(for secretId: String) {
+    func copyValue(for secretId: String) {
         guard let secret = secrets.first(where: { $0.id == secretId }) else { return }
         clipboard(secret.secretValue)
         showToast("Code copied")
@@ -186,13 +186,13 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
     /// Wrapped by the kebab action — for now, treats the kebab as an
     /// "Edit code" entry-point. A follow-up PR will swap this for a
     /// real action-sheet (Edit / Rotate / Delete).
-    public func openKebab(for secretId: String) {
+    func openKebab(for secretId: String) {
         onSelect(.editCode(homeId: homeId, secretId: secretId))
     }
 
     /// Quick-start CTA from the empty state — opens Add Code pre-set to
     /// the selected category (or no category when "all" is active).
-    public func startAddCode(in category: AccessCategory?) {
+    func startAddCode(in category: AccessCategory?) {
         onSelect(.addCode(homeId: homeId, category: category))
     }
 
@@ -260,13 +260,12 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
     /// When no codes match the filter, fall back to the whole-screen
     /// empty state.
     func rebuild() {
-        let visibleCategories: [AccessCategory]
-        if selectedChip == AccessCodesChip.all {
-            visibleCategories = AccessCategory.displayOrder
+        let visibleCategories: [AccessCategory] = if selectedChip == AccessCodesChip.all {
+            AccessCategory.displayOrder
         } else if let category = AccessCategory(rawValue: selectedChip) {
-            visibleCategories = [category]
+            [category]
         } else {
-            visibleCategories = AccessCategory.displayOrder
+            AccessCategory.displayOrder
         }
 
         var sections: [RowSection] = []
@@ -309,7 +308,8 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
         return ListOfRowsState.EmptyContent(
             icon: .keyRound,
             headline: "No access codes yet",
-            subcopy: "One vault for every code at this address. Codes are encrypted, masked by default, and only shared with members you choose.",
+            subcopy: "One vault for every code at this address. Codes are encrypted, masked by default, " +
+                "and only shared with members you choose.",
             ctaTitle: "Add your first code"
         ) { [weak self] in
             guard let self else { return }
@@ -322,7 +322,7 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
     /// Build a single `RowModel` for a secret. The subtitle is the
     /// masked or revealed code value; the trailing slot carries the
     /// copy + kebab icon pair. Notes ride in `body` when present.
-    public func rowFor(_ secret: HomeAccessSecretDTO) -> RowModel {
+    func rowFor(_ secret: HomeAccessSecretDTO) -> RowModel {
         let category = AccessCategory.from(accessType: secret.accessType)
         let revealed = revealedIds.contains(secret.id)
         let display = revealed ? secret.secretValue : Self.mask(for: secret.secretValue)
@@ -340,20 +340,18 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
             trailing: .iconActions(
                 primary: RowIconAction(
                     icon: .copy,
-                    accessibilityLabel: "Copy \(secret.label)",
-                    handler: { [weak self] in
-                        guard let self else { return }
-                        MainActor.assumeIsolated { self.copyValue(for: secretId) }
-                    }
-                ),
+                    accessibilityLabel: "Copy \(secret.label)"
+                ) { [weak self] in
+                    guard let self else { return }
+                    MainActor.assumeIsolated { self.copyValue(for: secretId) }
+                },
                 secondary: RowIconAction(
                     icon: .moreHorizontal,
-                    accessibilityLabel: "More actions for \(secret.label)",
-                    handler: { [weak self] in
-                        guard let self else { return }
-                        MainActor.assumeIsolated { self.openKebab(for: secretId) }
-                    }
-                )
+                    accessibilityLabel: "More actions for \(secret.label)"
+                ) { [weak self] in
+                    guard let self else { return }
+                    MainActor.assumeIsolated { self.openKebab(for: secretId) }
+                }
             ),
             onTap: { [weak self] in
                 guard let self else { return }
@@ -366,7 +364,7 @@ public final class AccessCodesViewModel: ListOfRowsDataSource {
     /// Mask a code value as a row of round bullet dots, capped at 12 to
     /// keep the row geometry stable. Empty strings render as 4 dots so
     /// the placeholder is always visible.
-    public static func mask(for value: String) -> String {
+    static func mask(for value: String) -> String {
         let length = max(1, min(12, value.count))
         return String(repeating: "•", count: max(length, 4))
     }

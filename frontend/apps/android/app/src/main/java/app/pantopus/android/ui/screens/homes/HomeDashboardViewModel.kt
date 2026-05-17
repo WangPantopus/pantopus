@@ -98,8 +98,7 @@ class HomeDashboardViewModel
          * subtitle on the Access codes destination. Returns null while
          * the dashboard is still loading.
          */
-        fun currentHomeName(): String? =
-            (_state.value as? HomeDashboardUiState.Loaded)?.content?.address
+        fun currentHomeName(): String? = (_state.value as? HomeDashboardUiState.Loaded)?.content?.address
 
         /** Initial load; no-op when already loaded. */
         fun load() {

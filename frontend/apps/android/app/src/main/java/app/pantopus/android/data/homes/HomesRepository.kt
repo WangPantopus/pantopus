@@ -110,9 +110,8 @@ open class HomesRepository
         // ─── Access codes (T6.4a) ──────────────────────────────────
 
         /** `GET /api/homes/:id/access`. */
-        open suspend fun getHomeAccessSecrets(
-            homeId: String,
-        ): NetworkResult<HomeAccessSecretsResponse> = safeApiCall { api.getHomeAccessSecrets(homeId) }
+        open suspend fun getHomeAccessSecrets(homeId: String): NetworkResult<HomeAccessSecretsResponse> =
+            safeApiCall { api.getHomeAccessSecrets(homeId) }
 
         /** `POST /api/homes/:id/access`. */
         open suspend fun createHomeAccessSecret(

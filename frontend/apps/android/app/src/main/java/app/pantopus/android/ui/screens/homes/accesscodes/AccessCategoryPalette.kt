@@ -11,7 +11,7 @@ import app.pantopus.android.ui.theme.PantopusIcon
  * `SmartLock` category called out in the T6.4a brief.
  *
  * Feature code (AccessCodesViewModel, etc.) references these typed
- * swatches; no hex literal appears in `ui/screens/**` outside this file.
+ * swatches; no hex literal appears elsewhere in the feature screen tree.
  * Same rationale as `UtilityCategoryPalette`: per-category chip pairs
  * don't fit `PantopusColors`'s single-color semantic-token model.
  */

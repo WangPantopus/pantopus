@@ -11,14 +11,14 @@
 
 import SwiftUI
 
-public struct AccessCodesView: View {
+struct AccessCodesView: View {
     @State private var viewModel: AccessCodesViewModel
 
-    public init(viewModel: AccessCodesViewModel) {
+    init(viewModel: AccessCodesViewModel) {
         _viewModel = State(initialValue: viewModel)
     }
 
-    public var body: some View {
+    var body: some View {
         ListOfRowsView(dataSource: viewModel)
             .accessibilityIdentifier(AccessCodesA11y.screen)
             .overlay(alignment: .bottom) {

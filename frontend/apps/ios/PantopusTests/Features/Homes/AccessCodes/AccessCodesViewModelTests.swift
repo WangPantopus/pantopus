@@ -86,14 +86,14 @@ final class AccessCodesViewModelTests: XCTestCase {
             "category-wifi",
             "category-alarm",
             "category-lockbox",
-            "category-smart_lock",
+            "category-smart_lock"
         ])
         XCTAssertEqual(sections.first?.rows.count, 1)
         XCTAssertEqual(sections.first?.rows.first?.title, "Main network")
         // Card-style rendering keeps the rows in a single rounded
         // container, matching Discover hub.
-        sections.forEach { section in
-            if case .card = section.style { return } else {
+        for section in sections {
+            if case .card = section.style { continue } else {
                 XCTFail("Expected .card section style, got \(section.style)")
             }
         }
@@ -172,7 +172,9 @@ final class AccessCodesViewModelTests: XCTestCase {
     func testCopyValueWritesToClipboardAndShowsToast() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.mixedJSON)]
         var copied: String?
-        let vm = makeVM(clipboard: { value in copied = value })
+        let vm = makeVM { value in
+            copied = value
+        }
         await vm.load()
 
         vm.copyValue(for: "s2")
@@ -184,7 +186,9 @@ final class AccessCodesViewModelTests: XCTestCase {
     func testCopyForUnknownIdIsANoop() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.mixedJSON)]
         var copied: String?
-        let vm = makeVM(clipboard: { value in copied = value })
+        let vm = makeVM { value in
+            copied = value
+        }
         await vm.load()
 
         vm.copyValue(for: "does-not-exist")
