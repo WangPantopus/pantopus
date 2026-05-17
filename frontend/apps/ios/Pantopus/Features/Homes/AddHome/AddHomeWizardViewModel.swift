@@ -133,6 +133,12 @@ final class AddHomeWizardViewModel: WizardModel {
         Task { await advance() }
     }
 
+    #if DEBUG
+    func advanceForTesting() async {
+        await advance()
+    }
+    #endif
+
     func secondaryTapped() {
         // Success step's "Back to Hub" — no other step uses the secondary.
         if currentStep == .success { pendingEvent = .dismiss }

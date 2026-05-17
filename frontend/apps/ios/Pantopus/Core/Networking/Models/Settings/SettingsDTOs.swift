@@ -53,12 +53,31 @@ public struct PrivacyBlocksResponse: Decodable, Sendable {
 public struct PrivacyBlock: Decodable, Sendable, Hashable, Identifiable {
     public let id: String
     public let blockedUserId: String?
+    public let blockScope: String?
+    public let reason: String?
     public let createdAt: String?
+    public let blocked: BlockedUserSummary?
 
     enum CodingKeys: String, CodingKey {
         case id
         case blockedUserId = "blocked_user_id"
+        case blockScope = "block_scope"
+        case reason
         case createdAt = "created_at"
+        case blocked
+    }
+}
+
+/// Nested user summary returned by `privacy.js:154` join.
+public struct BlockedUserSummary: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let username: String?
+    public let name: String?
+    public let profilePictureUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, username, name
+        case profilePictureUrl = "profile_picture_url"
     }
 }
 

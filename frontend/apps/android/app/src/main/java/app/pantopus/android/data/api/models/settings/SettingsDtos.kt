@@ -54,7 +54,19 @@ data class PrivacyBlocksResponse(
 data class PrivacyBlockDto(
     val id: String,
     @Json(name = "blocked_user_id") val blockedUserId: String? = null,
+    @Json(name = "block_scope") val blockScope: String? = null,
+    val reason: String? = null,
     @Json(name = "created_at") val createdAt: String? = null,
+    val blocked: BlockedUserSummaryDto? = null,
+)
+
+/** Nested user summary returned by `privacy.js:154` join. */
+@JsonClass(generateAdapter = true)
+data class BlockedUserSummaryDto(
+    val id: String,
+    val username: String? = null,
+    val name: String? = null,
+    @Json(name = "profile_picture_url") val profilePictureUrl: String? = null,
 )
 
 /** Body for `POST /api/notifications/push-token`. */
@@ -64,11 +76,21 @@ data class PushTokenBody(
     val platform: String = "android",
 )
 
-/** Body for `POST /api/users/password`. */
+/** Body for `POST /api/users/password`. The Joi schema at
+ *  `backend/routes/users.js:736` uses camelCase, so the field names
+ *  go on the wire unchanged. `currentPassword` is optional (omit for
+ *  OAuth-only accounts setting an initial password). */
 @JsonClass(generateAdapter = true)
 data class PasswordUpdateBody(
-    @Json(name = "current_password") val currentPassword: String,
-    @Json(name = "new_password") val newPassword: String,
+    val currentPassword: String?,
+    val newPassword: String,
+)
+
+/** Body for `POST /api/users/resend-verification`
+ *  (`backend/routes/users.js:3049`). */
+@JsonClass(generateAdapter = true)
+data class ResendVerificationBody(
+    val email: String,
 )
 
 /** Envelope from `GET /api/users/auth-methods`. */

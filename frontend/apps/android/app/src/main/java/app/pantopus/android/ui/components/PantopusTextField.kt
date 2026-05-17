@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -114,7 +115,7 @@ fun PantopusTextField(
                 singleLine = true,
                 interactionSource = interactionSource,
                 visualTransformation =
-                    if (isSecure) VisualTransformation.None else VisualTransformation.None,
+                    if (isSecure) PasswordVisualTransformation() else VisualTransformation.None,
                 keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
                 // Test tag must land directly on BasicTextField — that's the
                 // node that owns the editable's RequestFocus / SetText

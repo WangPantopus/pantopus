@@ -2,10 +2,11 @@
 //  SettingsView.swift
 //  Pantopus
 //
-//  Entry point for T3.1. Hosts the three Settings surfaces in a
-//  NavigationStack — main index, notification preferences, privacy.
-//  Each frame is a thin wrapper around `GroupedListView` with the
-//  matching data source.
+//  Settings hub. Hosts the index (`GroupedListView`) plus every
+//  sub-route. P8 / T6.2c wired six previously-placeholder rows to
+//  real screens (Blocked users, Password, Verification, Help, Legal,
+//  About). Data export + Payments & payouts stay on
+//  `NotYetAvailableView` per Q7's "park until P8.5" decision.
 //
 
 import SwiftUI
@@ -16,6 +17,15 @@ public enum SettingsStackRoute: Hashable {
     case privacy
     case identityCenter
     case audienceProfile
+    case blockedUsers
+    case password
+    case verification
+    case help
+    case legal
+    case legalContent(LegalDocument)
+    case about
+    /// Two routes intentionally parked until P8.5: data export wizard,
+    /// payments & payouts. See `docs/t6-open-questions-decisions.md` Q7.
     case placeholder(label: String)
 }
 
@@ -57,17 +67,11 @@ public struct SettingsView: View {
 
     @ViewBuilder private func destination(for route: SettingsStackRoute) -> some View {
         switch route {
-        case .notifications:
-            GroupedListView(
-                dataSource: NotificationSettingsViewModel()
-            ) { if !path.isEmpty { path.removeLast() } }
-        case .privacy:
-            GroupedListView(
-                dataSource: PrivacySettingsViewModel()
-            ) { if !path.isEmpty { path.removeLast() } }
+        case .notifications, .privacy:
+            groupedDestination(for: route)
         case .identityCenter:
             IdentityCenterView(
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { popLast() },
                 onOpenIdentity: { card in
                     if card.kind == .publicProfile {
                         path.append(.audienceProfile)
@@ -75,10 +79,46 @@ public struct SettingsView: View {
                 }
             )
         case .audienceProfile:
-            AudienceProfileView { if !path.isEmpty { path.removeLast() } }
+            AudienceProfileView { popLast() }
+        case .blockedUsers:
+            BlockedUsersView { popLast() }
+        case .password:
+            PasswordChangeView { popLast() }
+        case .verification:
+            VerificationCenterView { popLast() }
+        case .help:
+            HelpCenterView { popLast() }
+        case .legal:
+            LegalIndexView(
+                onBack: { popLast() },
+                onSelect: { doc in path.append(.legalContent(doc)) }
+            )
+        case let .legalContent(doc):
+            LegalContentView(document: doc) { popLast() }
+        case .about:
+            AboutView { popLast() }
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
         }
+    }
+
+    @ViewBuilder private func groupedDestination(for route: SettingsStackRoute) -> some View {
+        switch route {
+        case .notifications:
+            GroupedListView(
+                dataSource: NotificationSettingsViewModel()
+            ) { popLast() }
+        case .privacy:
+            GroupedListView(
+                dataSource: PrivacySettingsViewModel()
+            ) { popLast() }
+        default:
+            EmptyView()
+        }
+    }
+
+    private func popLast() {
+        if !path.isEmpty { path.removeLast() }
     }
 
     private func handle(route: SettingsRoute) {
@@ -86,14 +126,16 @@ public struct SettingsView: View {
         case .editProfile: onEditProfile()
         case .notifications: path.append(.notifications)
         case .privacy: path.append(.identityCenter) // Profiles & Privacy is the unified destination.
-        case .blocks: path.append(.placeholder(label: "Blocked users"))
-        case .password: path.append(.placeholder(label: "Password"))
-        case .verification: path.append(.placeholder(label: "Verification"))
+        case .blocks: path.append(.blockedUsers)
+        case .password: path.append(.password)
+        case .verification: path.append(.verification)
+        // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
         case .dataExport: path.append(.placeholder(label: "Data export"))
+        // Parked until P8.5 — depends on Stripe Connect wallet UX.
         case .paymentsPayouts: path.append(.placeholder(label: "Payments & payouts"))
-        case .help: path.append(.placeholder(label: "Help"))
-        case .legal: path.append(.placeholder(label: "Legal"))
-        case .about: path.append(.placeholder(label: "About"))
+        case .help: path.append(.help)
+        case .legal: path.append(.legal)
+        case .about: path.append(.about)
         case .didSignOut: onSignedOut()
         }
     }

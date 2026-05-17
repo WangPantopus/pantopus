@@ -105,6 +105,14 @@ import app.pantopus.android.ui.screens.settings.NotificationSettingsScreen
 import app.pantopus.android.ui.screens.settings.PrivacySettingsScreen
 import app.pantopus.android.ui.screens.settings.SettingsIndexScreen
 import app.pantopus.android.ui.screens.settings.SettingsRoute
+import app.pantopus.android.ui.screens.settings.about.AboutScreen
+import app.pantopus.android.ui.screens.settings.blocks.BlockedUsersScreen
+import app.pantopus.android.ui.screens.settings.help.HelpCenterScreen
+import app.pantopus.android.ui.screens.settings.legal.LegalContentScreen
+import app.pantopus.android.ui.screens.settings.legal.LegalDocument
+import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
+import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
+import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.you.YouScreen
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -182,6 +190,30 @@ private object ChildRoutes {
 
     /** Privacy preferences (T3.1). */
     const val SETTINGS_PRIVACY = "settings/privacy"
+
+    /** P8 / T6.2c — Settings → Blocked users. */
+    const val SETTINGS_BLOCKED_USERS = "settings/blocks"
+
+    /** P8 / T6.2c — Settings → Password. */
+    const val SETTINGS_PASSWORD = "settings/password"
+
+    /** P8 / T6.2c — Settings → Verification (status grid). */
+    const val SETTINGS_VERIFICATION = "settings/verification"
+
+    /** P8 / T6.2c — Settings → Help (static FAQ + contact CTA). */
+    const val SETTINGS_HELP = "settings/help"
+
+    /** P8 / T6.2c — Settings → Legal (TOC). */
+    const val SETTINGS_LEGAL = "settings/legal"
+
+    /** P8 / T6.2c — Settings → Legal → :doc (markdown viewer). */
+    const val SETTINGS_LEGAL_DOC_KEY = "doc"
+    const val SETTINGS_LEGAL_CONTENT = "settings/legal/{$SETTINGS_LEGAL_DOC_KEY}"
+
+    fun settingsLegalContent(doc: String): String = "settings/legal/${java.net.URLEncoder.encode(doc, "UTF-8")}"
+
+    /** P8 / T6.2c — Settings → About. */
+    const val SETTINGS_ABOUT = "settings/about"
 
     /** Profiles & Privacy / Identity Center (T3.2). */
     const val IDENTITY_CENTER = "identity-center"
@@ -1103,14 +1135,16 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             SettingsRoute.Privacy -> navController.navigate(ChildRoutes.SETTINGS_PRIVACY)
                             SettingsRoute.IdentityCenter -> navController.navigate(ChildRoutes.IDENTITY_CENTER)
                             SettingsRoute.EditProfile -> navController.navigate(ChildRoutes.placeholder("Edit profile"))
-                            SettingsRoute.Password -> navController.navigate(ChildRoutes.placeholder("Password"))
-                            SettingsRoute.Verification -> navController.navigate(ChildRoutes.placeholder("Verification"))
-                            SettingsRoute.Blocks -> navController.navigate(ChildRoutes.placeholder("Blocked users"))
+                            SettingsRoute.Password -> navController.navigate(ChildRoutes.SETTINGS_PASSWORD)
+                            SettingsRoute.Verification -> navController.navigate(ChildRoutes.SETTINGS_VERIFICATION)
+                            SettingsRoute.Blocks -> navController.navigate(ChildRoutes.SETTINGS_BLOCKED_USERS)
+                            // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
                             SettingsRoute.DataExport -> navController.navigate(ChildRoutes.placeholder("Data export"))
+                            // Parked until P8.5 — depends on Stripe Connect wallet UX.
                             SettingsRoute.PaymentsPayouts -> navController.navigate(ChildRoutes.placeholder("Payments & payouts"))
-                            SettingsRoute.Help -> navController.navigate(ChildRoutes.placeholder("Help"))
-                            SettingsRoute.Legal -> navController.navigate(ChildRoutes.placeholder("Legal"))
-                            SettingsRoute.About -> navController.navigate(ChildRoutes.placeholder("About"))
+                            SettingsRoute.Help -> navController.navigate(ChildRoutes.SETTINGS_HELP)
+                            SettingsRoute.Legal -> navController.navigate(ChildRoutes.SETTINGS_LEGAL)
+                            SettingsRoute.About -> navController.navigate(ChildRoutes.SETTINGS_ABOUT)
                             SettingsRoute.DidSignOut -> navController.popBackStack()
                         }
                     },
@@ -1121,6 +1155,57 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(ChildRoutes.SETTINGS_PRIVACY) {
                 PrivacySettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.SETTINGS_BLOCKED_USERS) {
+                BlockedUsersScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.SETTINGS_PASSWORD) {
+                PasswordChangeScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.SETTINGS_VERIFICATION) {
+                VerificationCenterScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.SETTINGS_HELP) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                HelpCenterScreen(
+                    onBack = { navController.popBackStack() },
+                    onEmailSupport = {
+                        val intent =
+                            android.content.Intent(
+                                android.content.Intent.ACTION_SENDTO,
+                                android.net.Uri.parse("mailto:support@pantopus.app?subject=Help"),
+                            )
+                        context.startActivity(intent)
+                    },
+                )
+            }
+            composable(ChildRoutes.SETTINGS_LEGAL) {
+                LegalIndexScreen(
+                    onBack = { navController.popBackStack() },
+                    onSelectDocument = { doc ->
+                        navController.navigate(ChildRoutes.settingsLegalContent(doc.rowId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.SETTINGS_LEGAL_CONTENT,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.SETTINGS_LEGAL_DOC_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) { entry ->
+                val docId = entry.arguments?.getString(ChildRoutes.SETTINGS_LEGAL_DOC_KEY).orEmpty()
+                val doc = LegalDocument.entries.firstOrNull { it.rowId == docId }
+                if (doc != null) {
+                    LegalContentScreen(document = doc, onBack = { navController.popBackStack() })
+                } else {
+                    NotYetAvailableView(tabName = "Legal", icon = PantopusIcon.FileText)
+                }
+            }
+            composable(ChildRoutes.SETTINGS_ABOUT) {
+                AboutScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.PRIVACY_HANDSHAKE,
