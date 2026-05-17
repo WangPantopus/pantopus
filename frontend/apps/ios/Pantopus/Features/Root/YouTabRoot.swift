@@ -43,6 +43,10 @@ public enum YouRoute: Hashable {
     case homeBills(homeId: String)
     /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
     case homePets(homeId: String)
+    /// P15 / T6.3g — Owners (legal-title roster). The "me.owners"
+    /// Household-section row pushes here with the primary home id
+    /// resolved by `MeViewModel.homeSections(...)`.
+    case homeOwners(homeId: String)
     /// T5.3.4 — per-listing offers panel. Pushed from a listing detail
     /// "View offers" affordance (visible when the current user owns the
     /// listing). The optional `title` is a hint rendered as the
@@ -307,6 +311,11 @@ public struct YouTabRoot: View {
         case "me.bills":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
+                return
+            }
+        case "me.owners":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeOwners(homeId: homeId))
                 return
             }
         case "me.editProfile":
@@ -599,6 +608,15 @@ public struct YouTabRoot: View {
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homeOwners(homeId):
+            let currentUserId: String? = {
+                if case let .signedIn(user) = auth.state { return user.id }
+                return nil
+            }()
+            OwnersListView(
+                homeId: homeId,
+                currentUserId: currentUserId
+            )
         #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(

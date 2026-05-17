@@ -63,6 +63,8 @@ import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.homes.owners.OWNERS_LIST_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.owners.OwnersListScreen
 import app.pantopus.android.ui.screens.homes.pets.PETS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.pets.PetsListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
@@ -144,6 +146,14 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home pets list. */
     fun homePets(homeId: String): String = "homes/$homeId/pets"
+
+    /** Owners list per home (P15 / T6.3g). The Owners VM pulls the
+     *  viewer's id from [AuthRepository] internally, so no extra arg
+     *  needs to ride on the route. */
+    const val HOME_OWNERS = "homes/{$OWNERS_LIST_HOME_ID_KEY}/owners"
+
+    /** Build the concrete path for a home owners list. */
+    fun homeOwners(homeId: String): String = "homes/$homeId/owners"
 
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
@@ -637,6 +647,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
+                    onOpenHomeOwners = { homeId -> navController.navigate(ChildRoutes.homeOwners(homeId)) },
                 )
             }
 
@@ -716,6 +727,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
                 PetsListScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.HOME_OWNERS,
+                arguments = listOf(navArgument(OWNERS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                OwnersListScreen(
+                    onOpenInvite = { homeId ->
+                        navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(ChildRoutes.MAILBOX_LIST) {
                 MailboxListScreen(
