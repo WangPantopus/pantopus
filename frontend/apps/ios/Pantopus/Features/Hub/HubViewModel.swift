@@ -93,17 +93,29 @@ final class HubViewModel {
         discovery: HubDiscoveryResponse?
     ) {
         let todaySummary = Self.projectToday(today)
+        let identity = Self.primaryIdentity(for: hub)
         let isFirstRun = Self.isFirstRun(hub: hub)
+        let discoveryCards = discovery?.items.prefix(10).map(Self.projectDiscovery(_:)) ?? []
         if isFirstRun {
+            let steps = hub.setup.steps.map {
+                SetupStep(id: $0.key, title: Self.setupTitle($0.key), done: $0.done)
+            }
+            let doneCount = steps.filter(\.done).count
             state = .firstRun(
                 HubState.FirstRunContent(
                     greeting: Self.greeting(),
                     name: hub.user.firstName ?? hub.user.name,
                     avatarInitials: Self.initials(from: hub.user.name),
+                    identity: identity,
                     ringProgress: hub.setup.profileCompleteness.score,
                     profileCompleteness: hub.setup.profileCompleteness.score,
-                    steps: hub.setup.steps.map { SetupStep(id: $0.key, title: Self.setupTitle($0.key), done: $0.done) },
-                    today: todaySummary
+                    stepsDone: doneCount,
+                    stepsTotal: steps.count,
+                    steps: steps,
+                    // Setup-mode pillars + discovery rail, per the design's
+                    // first-run frame.
+                    pillars: Self.pillars(from: hub, setupMode: true),
+                    discovery: discoveryCards
                 )
             )
             return
@@ -120,20 +132,29 @@ final class HubViewModel {
                     greeting: Self.greeting(),
                     name: hub.user.firstName ?? hub.user.name,
                     avatarInitials: Self.initials(from: hub.user.name),
+                    identity: identity,
                     ringProgress: hub.setup.profileCompleteness.score,
                     unreadCount: hub.statusItems.count
                 ),
                 actionChips: Self.defaultActionChips(),
                 setupBanner: banner,
                 today: todaySummary,
-                pillars: Self.pillars(from: hub),
-                discovery: discovery?.items.prefix(10).map(Self.projectDiscovery(_:)) ?? [],
-                jumpBackIn: hub.jumpBackIn.prefix(2).map {
+                pillars: Self.pillars(from: hub, setupMode: false),
+                discovery: discoveryCards,
+                jumpBackIn: hub.jumpBackIn.prefix(2).enumerated().map { index, raw in
                     JumpBackItem(
-                        id: $0.title,
-                        title: $0.title,
-                        icon: Self.icon(from: $0.icon),
-                        route: $0.route
+                        id: raw.title,
+                        title: raw.title,
+                        icon: Self.icon(from: raw.icon),
+                        route: raw.route,
+                        tint: Self.tint(forRoute: raw.route),
+                        // Backend doesn't carry kicker / progress for jump
+                        // tiles yet — first slot reads "In progress",
+                        // second reads "Draft" so the design's two-card
+                        // visual lands without a backend change.
+                        kicker: index == 0 ? "In progress" : "Draft",
+                        progressLabel: nil,
+                        progressFraction: nil
                     )
                 },
                 activity: hub.activity.prefix(3).map {
@@ -175,54 +196,104 @@ final class HubViewModel {
     }
 
     private static func projectDiscovery(_ item: HubDiscoveryResponse.Item) -> DiscoveryCardContent {
-        DiscoveryCardContent(
+        let kind = DiscoveryKind(rawType: item.type)
+        return DiscoveryCardContent(
             id: item.id,
             title: item.title,
             meta: item.meta,
             category: item.category ?? "",
             avatarInitials: initials(from: item.title),
-            kind: DiscoveryKind(rawType: item.type)
+            kind: kind,
+            tint: tint(forDiscoveryKind: kind)
         )
     }
 
-    private static func pillars(from hub: HubResponse) -> [PillarTile] {
+    private static func tint(forDiscoveryKind kind: DiscoveryKind) -> IdentityPillar {
+        switch kind {
+        case .business: .business
+        case .person, .post, .gig, .unknown: .personal
+        }
+    }
+
+    private static func pillars(from hub: HubResponse, setupMode: Bool) -> [PillarTile] {
         let personal = hub.cards.personal
         let home = hub.cards.home
         let business = hub.cards.business
+
+        func pillar(
+            _ kind: PillarTile.Pillar,
+            label: String,
+            icon: PantopusIcon,
+            tint: IdentityPillar,
+            chip: String?,
+            chipSetupState: Bool,
+            populatedCaption: String,
+            setupCaption: String
+        ) -> PillarTile {
+            PillarTile(
+                pillar: kind,
+                label: label,
+                icon: icon,
+                tint: tint,
+                chip: setupMode ? "Set up" : chip,
+                chipSetupState: setupMode ? true : chipSetupState,
+                caption: setupMode ? setupCaption : populatedCaption
+            )
+        }
+
         return [
-            PillarTile(
-                pillar: .pulse,
-                label: "Pulse",
-                icon: .megaphone,
-                tint: .personal,
-                chip: personal.unreadChats > 0 ? "\(personal.unreadChats)" : nil,
-                chipSetupState: false
+            pillar(
+                .pulse, label: "Pulse", icon: .megaphone, tint: .personal,
+                chip: personal.unreadChats > 0 ? "\(personal.unreadChats) new" : nil,
+                chipSetupState: false,
+                populatedCaption: personal.unreadChats > 0
+                    ? "\(personal.unreadChats) new in your feed"
+                    : "Neighborhood feed",
+                setupCaption: "Neighborhood feed"
             ),
-            PillarTile(
-                pillar: .marketplace,
-                label: "Marketplace",
-                icon: .shoppingBag,
-                tint: .business,
-                chip: business.map { $0.newOrders > 0 ? "\($0.newOrders)" : nil } ?? "Set up",
-                chipSetupState: business == nil
+            pillar(
+                .marketplace, label: "Marketplace", icon: .shoppingBag, tint: .business,
+                chip: business.map { $0.newOrders > 0 ? "\($0.newOrders)" : nil } ?? nil,
+                chipSetupState: business == nil,
+                populatedCaption: business.map { "\($0.newOrders) new orders" } ?? "Local buy & sell",
+                setupCaption: "Local buy & sell"
             ),
-            PillarTile(
-                pillar: .gigs,
-                label: "Gigs",
-                icon: .hammer,
-                tint: .personal,
-                chip: personal.gigsNearby > 0 ? "\(personal.gigsNearby)" : nil,
-                chipSetupState: false
+            pillar(
+                .gigs, label: "Gigs", icon: .hammer, tint: .personal,
+                chip: personal.gigsNearby > 0 ? "\(personal.gigsNearby) matches" : nil,
+                chipSetupState: false,
+                populatedCaption: personal.gigsNearby > 0
+                    ? "\(personal.gigsNearby) tasks near you"
+                    : "Earn & post tasks",
+                setupCaption: "Earn & post tasks"
             ),
-            PillarTile(
-                pillar: .mail,
-                label: "Mail",
-                icon: .mailbox,
-                tint: .home,
-                chip: home.map { $0.newMail > 0 ? "\($0.newMail)" : nil } ?? "Set up",
-                chipSetupState: home == nil
+            pillar(
+                .mail, label: "Mail", icon: .mailbox, tint: .home,
+                chip: home.map { $0.newMail > 0 ? "\($0.newMail)" : nil } ?? nil,
+                chipSetupState: home == nil,
+                populatedCaption: home.map { "\($0.newMail) need pickup" } ?? "Scan & forward",
+                setupCaption: "Scan & forward"
             )
         ]
+    }
+
+    /// Maps a `/app/…` jump route to the pillar tint that owns it. Falls
+    /// back to `.personal` for routes that don't carry a pillar (the
+    /// design's default).
+    private static func tint(forRoute route: String) -> IdentityPillar {
+        switch true {
+        case route.contains("gigs"), route.contains("post"): .personal
+        case route.contains("marketplace"), route.contains("listings"): .business
+        case route.contains("mail"), route.contains("homes"): .home
+        default: .personal
+        }
+    }
+
+    /// Which identity tints the avatar ring + section accents. Default to
+    /// `.home` if the user has any home claimed, else `.personal` (matches
+    /// the design's most-common populated frame).
+    private static func primaryIdentity(for hub: HubResponse) -> IdentityPillar {
+        hub.homes.isEmpty ? .personal : .home
     }
 
     private static func defaultActionChips() -> [ActionChipContent] {

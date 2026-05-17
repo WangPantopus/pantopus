@@ -21,10 +21,14 @@ public enum HubState: Sendable {
         public let greeting: String
         public let name: String
         public let avatarInitials: String
+        public let identity: IdentityPillar
         public let ringProgress: Double
         public let profileCompleteness: Double
+        public let stepsDone: Int
+        public let stepsTotal: Int
         public let steps: [SetupStep]
-        public let today: TodaySummary?
+        public let pillars: [PillarTile]
+        public let discovery: [DiscoveryCardContent]
     }
 
     /// The fully-assembled hub bundle.
@@ -58,6 +62,9 @@ public struct TopBarContent: Sendable {
     public let greeting: String
     public let name: String
     public let avatarInitials: String
+    /// Identity pillar that tints the avatar ring. The design uses the
+    /// user's primary identity scope (personal / home / business).
+    public let identity: IdentityPillar
     public let ringProgress: Double
     public let unreadCount: Int
 
@@ -65,12 +72,14 @@ public struct TopBarContent: Sendable {
         greeting: String,
         name: String,
         avatarInitials: String,
+        identity: IdentityPillar = .personal,
         ringProgress: Double,
         unreadCount: Int
     ) {
         self.greeting = greeting
         self.name = name
         self.avatarInitials = avatarInitials
+        self.identity = identity
         self.ringProgress = ringProgress
         self.unreadCount = unreadCount
     }
@@ -139,9 +148,13 @@ public struct PillarTile: Identifiable, Sendable {
     public let label: String
     public let icon: PantopusIcon
     public let tint: IdentityPillar
-    /// Either a numeric count ("3") or a string cue ("Set up").
+    /// Either a numeric count ("3 new") or a string cue ("Set up").
     public let chip: String?
     public let chipSetupState: Bool
+    /// 10.5pt fg3 caption beneath the label — design's per-tile context
+    /// line (e.g. "Jorge left a rec" / "3 saved · 9 nearby"). Optional;
+    /// when nil the label sits alone.
+    public let caption: String?
 
     public init(
         pillar: Pillar,
@@ -149,7 +162,8 @@ public struct PillarTile: Identifiable, Sendable {
         icon: PantopusIcon,
         tint: IdentityPillar,
         chip: String?,
-        chipSetupState: Bool
+        chipSetupState: Bool,
+        caption: String? = nil
     ) {
         id = pillar.rawValue
         self.pillar = pillar
@@ -158,6 +172,7 @@ public struct PillarTile: Identifiable, Sendable {
         self.tint = tint
         self.chip = chip
         self.chipSetupState = chipSetupState
+        self.caption = caption
     }
 }
 
@@ -179,6 +194,9 @@ public struct DiscoveryCardContent: Identifiable, Sendable {
     public let category: String
     public let avatarInitials: String
     public let kind: DiscoveryKind
+    /// Pillar tint that drives the top-half gradient + the trailing chip
+    /// color (per the design's per-card tint).
+    public let tint: IdentityPillar
 
     public init(
         id: String,
@@ -186,7 +204,8 @@ public struct DiscoveryCardContent: Identifiable, Sendable {
         meta: String,
         category: String,
         avatarInitials: String,
-        kind: DiscoveryKind
+        kind: DiscoveryKind,
+        tint: IdentityPillar = .personal
     ) {
         self.id = id
         self.title = title
@@ -194,6 +213,7 @@ public struct DiscoveryCardContent: Identifiable, Sendable {
         self.category = category
         self.avatarInitials = avatarInitials
         self.kind = kind
+        self.tint = tint
     }
 }
 
@@ -205,12 +225,38 @@ public struct JumpBackItem: Identifiable, Sendable {
     public let title: String
     public let icon: PantopusIcon
     public let route: String
+    /// Pillar tint that drives the icon disk + progress bar fill. Backend
+    /// doesn't carry this today; the VM derives it from the resolved
+    /// route's pillar.
+    public let tint: IdentityPillar
+    /// Small uppercase overline above the title — design uses "In progress"
+    /// or "Draft".
+    public let kicker: String
+    /// Progress-text line below the bar (e.g. "Step 2 of 3 · Budget").
+    /// Optional; when nil the bar is hidden entirely.
+    public let progressLabel: String?
+    /// 0..1 fraction for the progress bar. Optional; when nil the bar
+    /// is hidden.
+    public let progressFraction: Double?
 
-    public init(id: String, title: String, icon: PantopusIcon, route: String) {
+    public init(
+        id: String,
+        title: String,
+        icon: PantopusIcon,
+        route: String,
+        tint: IdentityPillar = .personal,
+        kicker: String = "In progress",
+        progressLabel: String? = nil,
+        progressFraction: Double? = nil
+    ) {
         self.id = id
         self.title = title
         self.icon = icon
         self.route = route
+        self.tint = tint
+        self.kicker = kicker
+        self.progressLabel = progressLabel
+        self.progressFraction = progressFraction
     }
 }
 
