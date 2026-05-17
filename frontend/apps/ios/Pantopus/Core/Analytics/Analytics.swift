@@ -39,6 +39,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenMembersListViewed
     case screenMembersWizardStepViewed(stepNumber: Int, stepName: String)
     case screenPulseFeedViewed(intent: String)
+    /// T6.3f / P14 — My listings index (the seller's tabbed list).
+    case screenMyListingsViewed
+    /// T6.3f / P14 — My businesses index (owner/staff roster).
+    case screenMyBusinessesViewed
     case ctaHubActionStripTapped(label: String)
     case ctaHubPillarTapped(pillar: String)
     case ctaMailboxItemLogReceived
@@ -73,6 +77,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenMembersListViewed: "screen.members_list.viewed"
         case .screenMembersWizardStepViewed: "screen.members_wizard.step_viewed"
         case .screenPulseFeedViewed: "screen.pulse_feed.viewed"
+        case .screenMyListingsViewed: "screen.my_listings.viewed"
+        case .screenMyBusinessesViewed: "screen.my_businesses.viewed"
         case .ctaHubActionStripTapped: "cta.hub.action_strip_tapped"
         case .ctaHubPillarTapped: "cta.hub.pillar_tapped"
         case .ctaMailboxItemLogReceived: "cta.mailbox_item.log_received"
@@ -123,6 +129,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenBillDetailViewed,
              .screenHomeMaintenanceViewed,
              .screenPetsListViewed,
+             .screenMyListingsViewed,
+             .screenMyBusinessesViewed,
              .screenHouseholdTasksViewed,
              .screenOwnersListViewed,
              .screenMembersListViewed,

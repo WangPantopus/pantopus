@@ -8,7 +8,7 @@ import app.pantopus.android.data.api.models.homes.HomeTaskDto
 import app.pantopus.android.data.api.models.homes.HomeTaskResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
-import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.homes.HomeTasksRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabTint
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
@@ -52,7 +52,7 @@ import java.time.Instant
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HouseholdTasksListViewModelTest {
-    private val repo: HomesRepository = mockk()
+    private val repo: HomeTasksRepository = mockk()
 
     /** Fixed clock so chip derivation and subtitle formatting are
      *  deterministic — 2026-05-15T12:00:00Z. */
