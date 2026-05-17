@@ -141,10 +141,8 @@ struct HubSetupBanner: View {
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s2)
-        // iOS `warningBg` is the pale #FFFBEB; `warningLight` is the
-        // medium #FDE68A. The design's H.warningBgSoft maps to our
-        // warningBg, and H.warningBg maps to our warningLight (names
-        // differ; hex values match exactly).
+        // The design's H.warningBgSoft maps to our warningBg, and
+        // H.warningBg maps to our warningLight (names differ; values match).
         .background(Theme.Color.warningBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
         .overlay(
