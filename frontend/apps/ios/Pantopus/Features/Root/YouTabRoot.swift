@@ -56,6 +56,10 @@ public enum YouRoute: Hashable {
     case homeBills(homeId: String)
     /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
     case homePets(homeId: String)
+    /// T6.4c (P18) — Home calendar. The home-context "me.calendar"
+    /// action tile + Home Dashboard "calendar" quick-action push here
+    /// with the primary home id resolved by the VM.
+    case homeCalendar(homeId: String)
     /// T6.4b — Emergency info. The home-context "me.emergency" Activity
     /// row pushes here with the primary home id resolved by the VM.
     case homeEmergency(homeId: String)
@@ -341,6 +345,12 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.calendar":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeCalendar(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         case "me.docs":
             if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeDocs(homeId: homeId))
@@ -538,7 +548,10 @@ public struct YouTabRoot: View {
                 )
             )
         case let .mailItemDetail(mailId):
-            MailboxItemDetailView(
+            // T6.5b (P20) — Generic A17.1 mail detail. P21–P23 will
+            // extend this with package / coupon / booklet / certified
+            // variants that compose the same shell with their own slots.
+            MailDetailView(
                 mailId: mailId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onOpenSenderProfile: { _ in
@@ -761,6 +774,22 @@ public struct YouTabRoot: View {
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homeCalendar(homeId):
+            HomeCalendarView(
+                viewModel: HomeCalendarViewModel(
+                    homeId: homeId,
+                    onAddEvent: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Add event"))
+                        }
+                    },
+                    onOpenEvent: { _ in
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Event detail"))
+                        }
+                    }
+                )
+            )
         case let .homeEmergency(homeId):
             EmergencyInfoView(
                 viewModel: EmergencyInfoViewModel(

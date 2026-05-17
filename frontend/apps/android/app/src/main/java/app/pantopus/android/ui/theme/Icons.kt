@@ -30,10 +30,14 @@ import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BorderColor
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Checklist
@@ -67,6 +71,7 @@ import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
@@ -78,12 +83,13 @@ import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MarkunreadMailbox
+import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -111,6 +117,7 @@ import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sell
@@ -218,6 +225,7 @@ enum class PantopusIcon(
     Tag("tag"),
     ShieldAlert("shield-alert"),
     CheckCheck("check-check"),
+    Bookmark("bookmark"),
     History("history"),
     Receipt("receipt"),
     Clock("clock"),
@@ -288,6 +296,16 @@ enum class PantopusIcon(
     WandSparkles("wand-sparkles"),
     ArrowUpRight("arrow-up-right"),
 
+    // T6.4c — Home calendar event-type palette + banner illustration.
+    Wrench("wrench"),
+    UsersRound("users-round"),
+    Gift("gift"),
+    PartyPopper("party-popper"),
+    GraduationCap("graduation-cap"),
+    Stethoscope("stethoscope"),
+    CalendarDays("calendar-days"),
+    Link("link"),
+
     // T6.4b — Emergency info: per-category tile glyphs (shutoff / contact /
     // evac / medical) + row action icons (phoneCall / image / mapPin) +
     // banner CTA + pinned marker + empty-state quick-prompt.
@@ -298,7 +316,6 @@ enum class PantopusIcon(
     Navigation("navigation"),
     HeartPulse("heart-pulse"),
     Siren("siren"),
-    Stethoscope("stethoscope"),
     Cross("cross"),
     Flag("flag"),
     UserRound("user-round"),
@@ -338,7 +355,6 @@ enum class PantopusIcon(
     // vector (documented inline below). Visual signal is reinforced by
     // the per-category background tint in
     // [app.pantopus.android.ui.screens.homes.maintenance.MaintenanceCategoryPalette].
-    Wrench("wrench"),
     Fan("fan"),
     CloudRain("cloud-rain"),
     Refrigerator("refrigerator"),
@@ -443,6 +459,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Tag -> IconSource.Material(Icons.Filled.Sell)
         PantopusIcon.ShieldAlert -> IconSource.Material(Icons.Filled.Warning)
         PantopusIcon.CheckCheck -> IconSource.Material(Icons.Filled.DoneAll)
+        PantopusIcon.Bookmark -> IconSource.Material(Icons.Filled.Bookmark)
         PantopusIcon.History -> IconSource.Material(Icons.Filled.History)
         PantopusIcon.Receipt -> IconSource.Material(Icons.Filled.Receipt)
         PantopusIcon.Clock -> IconSource.Material(Icons.Filled.Schedule)
@@ -495,6 +512,18 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Shuffle -> IconSource.Material(Icons.Filled.Shuffle)
         PantopusIcon.WandSparkles -> IconSource.Material(Icons.Filled.AutoFixHigh)
         PantopusIcon.ArrowUpRight -> IconSource.Material(Icons.Filled.NorthEast)
+        // T6.4c — Home calendar event-type palette. Material lacks
+        // direct equivalents for Lucide `wrench`, `gift`, `party-popper`,
+        // `graduation-cap`, `stethoscope`, `calendar-days`; fall back to
+        // the closest visually-similar Material vector.
+        PantopusIcon.Wrench -> IconSource.Material(Icons.Filled.Build)
+        PantopusIcon.UsersRound -> IconSource.Material(Icons.Filled.Groups)
+        PantopusIcon.Gift -> IconSource.Material(Icons.Filled.CardGiftcard)
+        PantopusIcon.PartyPopper -> IconSource.Material(Icons.Filled.Celebration)
+        PantopusIcon.GraduationCap -> IconSource.Material(Icons.Filled.School)
+        PantopusIcon.Stethoscope -> IconSource.Material(Icons.Filled.MedicalServices)
+        PantopusIcon.CalendarDays -> IconSource.Material(Icons.Filled.CalendarMonth)
+        PantopusIcon.Link -> IconSource.Material(Icons.Filled.Link)
 
         // T6.4b — Emergency info. Material doesn't ship 1:1 Lucide
         // equivalents for `siren`, `heart-pulse`, `flask-conical`,
@@ -507,7 +536,6 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Navigation -> IconSource.Material(Icons.Filled.Navigation)
         PantopusIcon.HeartPulse -> IconSource.Material(Icons.Filled.MonitorHeart)
         PantopusIcon.Siren -> IconSource.Material(Icons.Filled.EmergencyShare)
-        PantopusIcon.Stethoscope -> IconSource.Material(Icons.Filled.LocalHospital)
         PantopusIcon.Cross -> IconSource.Material(Icons.Filled.Healing)
         PantopusIcon.Flag -> IconSource.Material(Icons.Filled.Flag)
         PantopusIcon.UserRound -> IconSource.Material(Icons.Filled.PersonPin)
@@ -551,7 +579,6 @@ internal fun PantopusIcon.source(): IconSource =
         // each falls back to the closest visually-similar Material
         // vector. `bug` maps to PestControl; `wrench` to Build (which
         // ships a wrench glyph).
-        PantopusIcon.Wrench -> IconSource.Material(Icons.Filled.Build)
         PantopusIcon.Fan -> IconSource.Material(Icons.Filled.Air)
         PantopusIcon.CloudRain -> IconSource.Material(Icons.Filled.Grain)
         PantopusIcon.Refrigerator -> IconSource.Material(Icons.Filled.Kitchen)

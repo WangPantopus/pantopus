@@ -62,6 +62,7 @@ fun HomeDashboardScreen(
     onOpenPolls: ((String) -> Unit)? = null,
     onOpenPlaceholder: ((String) -> Unit)? = null,
     onOpenPets: ((String) -> Unit)? = null,
+    onOpenCalendar: ((String) -> Unit)? = null,
     onOpenDocs: ((String) -> Unit)? = null,
     onOpenEmergency: ((String) -> Unit)? = null,
     onOpenPackages: ((String) -> Unit)? = null,
@@ -99,6 +100,7 @@ fun HomeDashboardScreen(
             "view_tasks" -> "Tasks"
             "view_maintenance" -> "Maintenance"
             "pets" -> "Pets"
+            "calendar" -> "Calendar"
             "access_codes" -> "Access codes"
             else -> actionId.replace('_', ' ').replaceFirstChar(Char::uppercase)
         }
@@ -150,6 +152,10 @@ fun HomeDashboardScreen(
             "pets" ->
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenPets?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "calendar" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenCalendar?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
             "view_docs" ->
                 viewModel.currentHomeId()?.let { homeId ->

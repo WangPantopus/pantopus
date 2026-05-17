@@ -1,0 +1,230 @@
+//
+//  CalendarEventCategory.swift
+//  Pantopus
+//
+//  T6.4c — Per-event-type visual tokens for the Home calendar row.
+//  Lifted from the design at `calendar-frames.jsx:53-66`. Feature code
+//  (HomeCalendarViewModel, etc.) references these typed swatches; no
+//  hex literal appears anywhere else in `Features/Homes/Calendar/**`.
+//
+//  Per the buildout-plan convention (CLAUDE.md "Token discipline"),
+//  per-feature category palettes are an explicit exception to the
+//  "no hex outside Theme" rule — same pattern as `UtilityCategoryPalette`
+//  for Bills and `SpeciesPalette` for Pets.
+//
+//  Category is **client-derived from the backend `event_type` string**.
+//  `CalendarEventCategory.from(eventType:)` is the canonical inference
+//  helper, used by iOS, Android, and web in parallel.
+//
+
+import SwiftUI
+
+/// The 11 designed event categories + a `generic` fallback for any
+/// `event_type` the inference helper can't classify.
+public enum CalendarEventCategory: String, CaseIterable, Sendable {
+    case chore
+    case maintenance
+    case delivery
+    case family
+    case birthday
+    case social
+    case school
+    case pet
+    case bill
+    case medical
+    case trash
+    case generic
+
+    /// User-facing label rendered in the inline event-type chip.
+    public var label: String {
+        switch self {
+        case .chore: "Chore"
+        case .maintenance: "Repair"
+        case .delivery: "Delivery"
+        case .family: "Family"
+        case .birthday: "Birthday"
+        case .social: "Social"
+        case .school: "School"
+        case .pet: "Pet"
+        case .bill: "Bill"
+        case .medical: "Medical"
+        case .trash: "Trash day"
+        case .generic: "Event"
+        }
+    }
+
+    /// Lucide icon glyph for the 40pt category tile.
+    public var icon: PantopusIcon {
+        switch self {
+        case .chore: .sparkles
+        case .maintenance: .wrench
+        case .delivery: .package
+        case .family: .usersRound
+        case .birthday: .gift
+        case .social: .partyPopper
+        case .school: .graduationCap
+        case .pet: .pawPrint
+        case .bill: .receipt
+        case .medical: .stethoscope
+        case .trash: .trash2
+        case .generic: .calendar
+        }
+    }
+
+    /// Soft-tinted background for the 40pt category tile.
+    public var background: Color {
+        switch self {
+        case .chore:
+            // CSS fef3c7
+            Color(red: 0xFE / 255.0, green: 0xF3 / 255.0, blue: 0xC7 / 255.0)
+        case .maintenance:
+            // CSS ffedd5
+            Color(red: 0xFF / 255.0, green: 0xED / 255.0, blue: 0xD5 / 255.0)
+        case .delivery:
+            // CSS e2e8f0
+            Color(red: 0xE2 / 255.0, green: 0xE8 / 255.0, blue: 0xF0 / 255.0)
+        case .family:
+            // CSS dbeafe
+            Color(red: 0xDB / 255.0, green: 0xEA / 255.0, blue: 0xFE / 255.0)
+        case .birthday:
+            // CSS fce7f3
+            Color(red: 0xFC / 255.0, green: 0xE7 / 255.0, blue: 0xF3 / 255.0)
+        case .social:
+            // CSS ede9fe
+            Color(red: 0xED / 255.0, green: 0xE9 / 255.0, blue: 0xFE / 255.0)
+        case .school:
+            // CSS cffafe
+            Color(red: 0xCF / 255.0, green: 0xFA / 255.0, blue: 0xFE / 255.0)
+        case .pet:
+            // CSS dcfce7 — same as homeBg, matches the Pet pillar.
+            Color(red: 0xDC / 255.0, green: 0xFC / 255.0, blue: 0xE7 / 255.0)
+        case .bill:
+            // CSS f0fdf4
+            Color(red: 0xF0 / 255.0, green: 0xFD / 255.0, blue: 0xF4 / 255.0)
+        case .medical:
+            // CSS fee2e2
+            Color(red: 0xFE / 255.0, green: 0xE2 / 255.0, blue: 0xE2 / 255.0)
+        case .trash:
+            // CSS e2e8f0
+            Color(red: 0xE2 / 255.0, green: 0xE8 / 255.0, blue: 0xF0 / 255.0)
+        case .generic:
+            // primary50
+            Color(red: 0xF0 / 255.0, green: 0xF9 / 255.0, blue: 0xFF / 255.0)
+        }
+    }
+
+    /// Foreground tint for the icon glyph inside the 40pt tile.
+    public var foreground: Color {
+        switch self {
+        case .chore:
+            // CSS a16207
+            Color(red: 0xA1 / 255.0, green: 0x62 / 255.0, blue: 0x07 / 255.0)
+        case .maintenance:
+            // CSS c2410c
+            Color(red: 0xC2 / 255.0, green: 0x41 / 255.0, blue: 0x0C / 255.0)
+        case .delivery:
+            // CSS 334155
+            Color(red: 0x33 / 255.0, green: 0x41 / 255.0, blue: 0x55 / 255.0)
+        case .family:
+            // CSS 1d4ed8
+            Color(red: 0x1D / 255.0, green: 0x4E / 255.0, blue: 0xD8 / 255.0)
+        case .birthday:
+            // CSS be185d
+            Color(red: 0xBE / 255.0, green: 0x18 / 255.0, blue: 0x5D / 255.0)
+        case .social:
+            // CSS 6d28d9
+            Color(red: 0x6D / 255.0, green: 0x28 / 255.0, blue: 0xD9 / 255.0)
+        case .school:
+            // CSS 0e7490
+            Color(red: 0x0E / 255.0, green: 0x74 / 255.0, blue: 0x90 / 255.0)
+        case .pet:
+            // CSS 15803d — pairs with .home for the pet pillar.
+            Color(red: 0x15 / 255.0, green: 0x80 / 255.0, blue: 0x3D / 255.0)
+        case .bill:
+            // CSS 15803d
+            Color(red: 0x15 / 255.0, green: 0x80 / 255.0, blue: 0x3D / 255.0)
+        case .medical:
+            // CSS b91c1c
+            Color(red: 0xB9 / 255.0, green: 0x1C / 255.0, blue: 0x1C / 255.0)
+        case .trash:
+            // CSS 334155
+            Color(red: 0x33 / 255.0, green: 0x41 / 255.0, blue: 0x55 / 255.0)
+        case .generic:
+            // primary600
+            Color(red: 0x02 / 255.0, green: 0x84 / 255.0, blue: 0xC7 / 255.0)
+        }
+    }
+
+    // MARK: - Inference
+
+    /// Map a backend `event_type` string to one of the 12 designed
+    /// categories. Case-insensitive substring match — unknown strings
+    /// fall back to `.generic`. Mirrors the iOS / Android / web inference
+    /// pattern documented in `docs/t6-buildout-plan.md`.
+    public static func from(eventType: String?) -> CalendarEventCategory {
+        guard let raw = eventType?.lowercased(), !raw.isEmpty else {
+            return .generic
+        }
+        return rawTypeMap[raw] ?? heuristicCategory(for: raw)
+    }
+
+    /// Exact-match table. Tries the wire string verbatim first.
+    private static let rawTypeMap: [String: CalendarEventCategory] = [
+        "chore": .chore,
+        "cleaning": .chore,
+        "task": .chore,
+        "maintenance": .maintenance,
+        "repair": .maintenance,
+        "service": .maintenance,
+        "delivery": .delivery,
+        "package": .delivery,
+        "amazon": .delivery,
+        "family": .family,
+        "kids": .family,
+        "birthday": .birthday,
+        "anniversary": .birthday,
+        "social": .social,
+        "party": .social,
+        "school": .school,
+        "education": .school,
+        "pet": .pet,
+        "vet": .pet,
+        "bill": .bill,
+        "payment": .bill,
+        "medical": .medical,
+        "doctor": .medical,
+        "appointment": .medical,
+        "trash": .trash,
+        "garbage": .trash,
+        "recycling": .trash,
+        "general": .generic
+    ]
+
+    /// Fallback heuristics for noisier backend strings (`"vet_appt"`,
+    /// `"birthday_party"`, etc.). First substring match wins.
+    private static func heuristicCategory(for raw: String) -> CalendarEventCategory {
+        if raw.contains("birthday") || raw.contains("anniversary") { return .birthday }
+        if raw.contains("vet") || raw.contains("pet") { return .pet }
+        if raw.contains("bill") || raw.contains("payment") { return .bill }
+        if raw.contains("doctor") || raw.contains("medical") || raw.contains("dentist") {
+            return .medical
+        }
+        if raw.contains("trash") || raw.contains("garbage") || raw.contains("recycling") {
+            return .trash
+        }
+        if raw.contains("school") || raw.contains("class") { return .school }
+        if raw.contains("delivery") || raw.contains("package") || raw.contains("amazon") {
+            return .delivery
+        }
+        if raw.contains("party") || raw.contains("dinner") || raw.contains("social") {
+            return .social
+        }
+        if raw.contains("repair") || raw.contains("maintenance") || raw.contains("plumber") ||
+            raw.contains("electrician") || raw.contains("hvac") {
+            return .maintenance
+        }
+        if raw.contains("chore") || raw.contains("clean") { return .chore }
+        if raw.contains("family") || raw.contains("kids") { return .family }
+        return .generic
+    }
+}

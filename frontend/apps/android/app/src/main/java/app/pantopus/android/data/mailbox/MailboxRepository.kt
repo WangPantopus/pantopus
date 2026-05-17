@@ -1,5 +1,7 @@
 package app.pantopus.android.data.mailbox
 
+import app.pantopus.android.data.api.models.mailbox.AckResponse
+import app.pantopus.android.data.api.models.mailbox.MailDetailResponse
 import app.pantopus.android.data.api.models.mailbox.MailboxListResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerListResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionRequest
@@ -46,6 +48,14 @@ class MailboxRepository
                     offset = offset,
                 )
             }
+
+        /** `GET /api/mailbox/:id` — V1 detail route used by the new
+         *  generic A17.1 detail screen (T6.5b / P20). */
+        suspend fun detail(mailId: String): NetworkResult<MailDetailResponse> = safeApiCall { mailboxApi.detail(mailId) }
+
+        /** `PATCH /api/mailbox/:id/ack` — used by the generic A17.1
+         *  detail screen's primary Acknowledge action. */
+        suspend fun acknowledge(mailId: String): NetworkResult<AckResponse> = safeApiCall { mailboxApi.acknowledge(mailId) }
 
         /** `GET /api/mailbox/v2/drawers`. */
         suspend fun drawers(): NetworkResult<DrawerListResponse> = safeApiCall { v2Api.drawers() }

@@ -43,6 +43,8 @@ public enum HubRoute: Hashable {
     case pulsePost(postId: String)
     /// Bills list for a home (T5.2.2 / P13).
     case homeBills(homeId: String)
+    /// Home calendar list (T6.4c / P18).
+    case homeCalendar(homeId: String)
     /// Bill detail (read-mostly summary with mark-paid / remove).
     case billDetail(homeId: String, billId: String)
     /// Add Bill wizard.
@@ -327,6 +329,9 @@ public struct HubTabRoot: View {
                 onOpenPets: { id in
                     Task { @MainActor in push(.homePets(homeId: id)) }
                 },
+                onOpenCalendar: { id in
+                    Task { @MainActor in push(.homeCalendar(homeId: id)) }
+                },
                 onOpenDocs: { id in
                     Task { @MainActor in push(.homeDocs(homeId: id)) }
                 },
@@ -397,6 +402,18 @@ public struct HubTabRoot: View {
             }
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homeCalendar(homeId):
+            HomeCalendarView(
+                viewModel: HomeCalendarViewModel(
+                    homeId: homeId,
+                    onAddEvent: {
+                        Task { @MainActor in push(.placeholder(label: "Add event")) }
+                    },
+                    onOpenEvent: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Event detail")) }
+                    }
+                )
+            )
         case let .homeEmergency(homeId):
             EmergencyInfoView(
                 viewModel: EmergencyInfoViewModel(
@@ -522,7 +539,10 @@ public struct HubTabRoot: View {
                 )
             )
         case let .mailItemDetail(mailId):
-            MailboxItemDetailView(
+            // T6.5b (P20) — Generic A17.1 mail detail. P21–P23 will
+            // extend this with package / coupon / booklet / certified
+            // variants that compose the same shell with their own slots.
+            MailDetailView(
                 mailId: mailId,
                 onBack: {
                     if !path.isEmpty { path.removeLast() }

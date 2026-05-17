@@ -59,6 +59,8 @@ import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_BILL_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.BillDetailScreen
 import app.pantopus.android.ui.screens.homes.bills.BillsListScreen
+import app.pantopus.android.ui.screens.homes.calendar.HOME_CALENDAR_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.calendar.HomeCalendarScreen
 import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
@@ -114,7 +116,7 @@ import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
-import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
+import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
 import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
 import app.pantopus.android.ui.screens.my_posts.MyPostsScreen
@@ -171,6 +173,12 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home pets list. */
     fun homePets(homeId: String): String = "homes/$homeId/pets"
+
+    /** Home calendar per home (T6.4c / P18). */
+    const val HOME_CALENDAR = "homes/{$HOME_CALENDAR_HOME_ID_KEY}/calendar"
+
+    /** Build the concrete path for a home calendar. */
+    fun homeCalendar(homeId: String): String = "homes/$homeId/calendar"
 
     /** Emergency info per home (T6.4b / P17). */
     const val HOME_EMERGENCY = "homes/{$EMERGENCY_HOME_ID_KEY}/emergency"
@@ -761,6 +769,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
+                    onOpenHomeCalendar = { homeId ->
+                        navController.navigate(ChildRoutes.homeCalendar(homeId))
+                    },
                     onOpenHomePackages = { homeId ->
                         navController.navigate(ChildRoutes.homePackages(homeId))
                     },
@@ -825,6 +836,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenPets = { homeId ->
                         navController.navigate(ChildRoutes.homePets(homeId))
+                    },
+                    onOpenCalendar = { homeId ->
+                        navController.navigate(ChildRoutes.homeCalendar(homeId))
                     },
                     onOpenDocs = { homeId ->
                         navController.navigate(ChildRoutes.homeDocs(homeId))
@@ -894,6 +908,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
                 PetsListScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.HOME_CALENDAR,
+                arguments =
+                    listOf(navArgument(HOME_CALENDAR_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                HomeCalendarScreen(
+                    onAddEvent = { navController.navigate(ChildRoutes.placeholder("Add event")) },
+                    onOpenEvent = {
+                        navController.navigate(ChildRoutes.placeholder("Event detail"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(
                 route = ChildRoutes.HOME_EMERGENCY,
@@ -1083,7 +1110,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.MAILBOX_ITEM_DETAIL,
                 arguments = listOf(navArgument(MAILBOX_ITEM_DETAIL_MAIL_ID_KEY) { type = NavType.StringType }),
             ) {
-                MailboxItemDetailScreen(
+                // T6.5b (P20) — generic A17.1 mail detail. P21-P23 will
+                // add package / coupon / booklet / certified variants on
+                // top of the same shared shell.
+                MailDetailScreen(
                     onBack = { navController.popBackStack() },
                     onOpenSenderProfile = { userId ->
                         navController.navigate(ChildRoutes.publicProfile(userId))

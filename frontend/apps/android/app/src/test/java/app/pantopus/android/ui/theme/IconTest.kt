@@ -71,6 +71,7 @@ class IconTest {
             "tag",
             "shield-alert",
             "check-check",
+            "bookmark",
             "history",
             "receipt",
             "clock",
@@ -121,6 +122,14 @@ class IconTest {
             "shuffle",
             "wand-sparkles",
             "arrow-up-right",
+            // T6.4c — Home calendar event types.
+            "wrench",
+            "users-round",
+            "gift",
+            "party-popper",
+            "graduation-cap",
+            "calendar-days",
+            "link",
             // T6.4a — Access codes
             "eye-off",
             "key-round",
@@ -158,7 +167,6 @@ class IconTest {
             "utensils",
             "baby",
             // T6.3b — Maintenance category glyphs.
-            "wrench",
             "fan",
             "cloud-rain",
             "refrigerator",

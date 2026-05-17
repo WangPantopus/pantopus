@@ -117,6 +117,13 @@ fun ListOfRowsScreen(
     banner: BannerConfig? = null,
     listingContext: ListingContextConfig? = null,
     subtitle: String? = null,
+    /**
+     * T6.4c — optional feature-local chrome rendered between the tab /
+     * chip / search strip and the state body. Used by the Home calendar
+     * to host its `MonthStripHeader`. The shell is agnostic to the
+     * slot's contents; concrete screens drop in arbitrary composables.
+     */
+    customHeader: (@Composable () -> Unit)? = null,
 ) {
     val pullState =
         rememberPullRefreshState(
@@ -188,6 +195,9 @@ fun ListOfRowsScreen(
             } else if (tabs.isNotEmpty()) {
                 TabStrip(tabs = tabs, selectedId = selectedTab, onSelect = onSelectTab)
                 HorizontalDivider(color = PantopusColors.appBorderSubtle)
+            }
+            if (customHeader != null) {
+                customHeader()
             }
             Box(modifier = Modifier.fillMaxSize().pullRefresh(pullState)) {
                 when (state) {

@@ -9,6 +9,7 @@ import app.pantopus.android.data.api.models.homes.CreateDocumentRequest
 import app.pantopus.android.data.api.models.homes.CreateDocumentResponse
 import app.pantopus.android.data.api.models.homes.CreateEmergencyRequest
 import app.pantopus.android.data.api.models.homes.CreateEmergencyResponse
+import app.pantopus.android.data.api.models.homes.CreateHomeEventRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeTaskRequest
 import app.pantopus.android.data.api.models.homes.CreateMaintenanceRequest
@@ -19,6 +20,7 @@ import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeDocumentsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeEmergenciesResponse
+import app.pantopus.android.data.api.models.homes.GetHomeEventsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.GetHomePackagesResponse
 import app.pantopus.android.data.api.models.homes.GetHomePollsResponse
@@ -26,6 +28,7 @@ import app.pantopus.android.data.api.models.homes.GetHomeTasksResponse
 import app.pantopus.android.data.api.models.homes.HomeAccessSecretResponse
 import app.pantopus.android.data.api.models.homes.HomeAccessSecretsResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
+import app.pantopus.android.data.api.models.homes.HomeEventResponse
 import app.pantopus.android.data.api.models.homes.HomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.HomePackageResponse
 import app.pantopus.android.data.api.models.homes.HomePollResponse
@@ -134,6 +137,24 @@ open class HomesRepository
             billId: String,
         ): NetworkResult<GetBillSplitsResponse> = safeApiCall { api.getHomeBillSplits(homeId, billId) }
 
+        /** `GET /api/homes/:id/events`. */
+        open suspend fun getHomeEvents(
+            homeId: String,
+            startAfter: String? = null,
+            startBefore: String? = null,
+        ): NetworkResult<GetHomeEventsResponse> = safeApiCall { api.getHomeEvents(homeId, startAfter, startBefore) }
+
+        /** `POST /api/homes/:id/events`. */
+        open suspend fun createHomeEvent(
+            homeId: String,
+            request: CreateHomeEventRequest,
+        ): NetworkResult<HomeEventResponse> = safeApiCall { api.createHomeEvent(homeId, request) }
+
+        /** `DELETE /api/homes/:id/events/:eventId`. */
+        open suspend fun deleteHomeEvent(
+            homeId: String,
+            eventId: String,
+        ): NetworkResult<Unit> = safeApiCall { api.deleteHomeEvent(homeId, eventId) }
         // ─── Emergency info (T6.4b / P17) ─────────────────────────
 
         /** `GET /api/homes/:id/emergencies`. */

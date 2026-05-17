@@ -140,28 +140,70 @@ final class MailboxListViewModel: ListOfRowsDataSource {
         }
     }
 
-    private func row(for mail: MailItem) -> RowModel {
-        let chip = Self.statusChip(for: mail)
+    /// Map one mail DTO to the design's row anatomy (T6.5b / P20 re-skin):
+    ///   - leading: 40pt category typeIcon (per `mailbox.jsx:4-16` accent
+    ///     palette),
+    ///   - sender as uppercase overline-style subtitle,
+    ///   - title (display_title || subject),
+    ///   - body (preview_text, 2 lines),
+    ///   - chips: trust + category,
+    ///   - `timeMeta`: relative time,
+    ///   - `unread` highlight when `!viewed`.
+    func row(for mail: MailItem) -> RowModel {
+        let category = MailItemCategory.fromRaw(mail.mailType ?? mail.type)
+        let trust = MailTrust.fromRaw(nil) // V1 list endpoint doesn't surface sender_trust.
+        let chips: [RowChip] = [
+            RowChip(
+                text: category.label,
+                icon: category.icon,
+                tint: .custom(background: category.rowBackground, foreground: category.accent)
+            ),
+            RowChip(
+                text: trust.label,
+                icon: trust.icon,
+                tint: .custom(background: trust.background, foreground: trust.foreground)
+            )
+        ]
+        let mailId = mail.id
         return RowModel(
             id: mail.id,
             title: mail.displayTitle ?? mail.subject ?? mail.senderBusinessName ?? "Mail",
-            subtitle: mail.previewText ?? mail.senderBusinessName ?? mail.senderAddress,
+            subtitle: mail.senderBusinessName ?? mail.senderAddress,
             template: .statusChip,
-            leading: .icon(.mailbox, tint: Theme.Color.primary600),
-            trailing: chip
-        ) { @Sendable in Task { @MainActor in self.onOpenMail(mail.id) } }
+            leading: .typeIcon(
+                category.icon,
+                background: category.rowBackground,
+                foreground: category.accent
+            ),
+            trailing: .none,
+            onTap: { @Sendable in Task { @MainActor in self.onOpenMail(mailId) } },
+            body: mail.previewText,
+            chips: chips,
+            timeMeta: Self.formatRelativeTime(mail.createdAt),
+            highlight: mail.viewed ? nil : .unread
+        )
     }
 
-    private static func statusChip(for mail: MailItem) -> RowTrailing {
-        if mail.priority == "urgent" {
-            return .statusChip(text: "Urgent", variant: .error)
-        }
-        if !mail.viewed {
-            return .statusChip(text: "Unread", variant: .info)
-        }
-        if mail.starred {
-            return .statusChip(text: "Starred", variant: .warning)
-        }
-        return .statusChip(text: "Read", variant: .neutral)
+    /// Lightweight relative-time formatter for the mail-row meta. Matches
+    /// the Notifications V2 convention — `<1m → "now"`, `<1h → "Nm"`,
+    /// `<24h → "Nh"`, `<7d → "Nd"`, else "MMM d".
+    static func formatRelativeTime(_ iso: String) -> String? {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = f.date(from: iso) ?? {
+            let plain = ISO8601DateFormatter()
+            plain.formatOptions = [.withInternetDateTime]
+            return plain.date(from: iso)
+        }()
+        guard let date else { return nil }
+        let interval = Date().timeIntervalSince(date)
+        if interval < 60 { return "now" }
+        if interval < 3600 { return "\(Int(interval / 60))m" }
+        if interval < 86400 { return "\(Int(interval / 3600))h" }
+        if interval < 7 * 86400 { return "\(Int(interval / 86400))d" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
     }
 }

@@ -11,6 +11,7 @@ import app.pantopus.android.data.api.models.homes.CreateDocumentRequest
 import app.pantopus.android.data.api.models.homes.CreateDocumentResponse
 import app.pantopus.android.data.api.models.homes.CreateEmergencyRequest
 import app.pantopus.android.data.api.models.homes.CreateEmergencyResponse
+import app.pantopus.android.data.api.models.homes.CreateHomeEventRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.CreateMaintenanceRequest
@@ -20,6 +21,7 @@ import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeDocumentsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeEmergenciesResponse
+import app.pantopus.android.data.api.models.homes.GetHomeEventsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.GetHomePackagesResponse
 import app.pantopus.android.data.api.models.homes.GetHomePollsResponse
@@ -27,6 +29,7 @@ import app.pantopus.android.data.api.models.homes.HomeAccessSecretResponse
 import app.pantopus.android.data.api.models.homes.HomeAccessSecretsResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.HomeDetailResponse
+import app.pantopus.android.data.api.models.homes.HomeEventResponse
 import app.pantopus.android.data.api.models.homes.HomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.HomePackageResponse
 import app.pantopus.android.data.api.models.homes.HomePollResponse
@@ -189,6 +192,28 @@ interface HomesApi {
         @Path("billId") billId: String,
     ): GetBillSplitsResponse
 
+    /** `GET /api/homes/:id/events` — route `backend/routes/home.js:4793`. */
+    @GET("api/homes/{id}/events")
+    suspend fun getHomeEvents(
+        @Path("id") homeId: String,
+        @Query("start_after") startAfter: String? = null,
+        @Query("start_before") startBefore: String? = null,
+    ): GetHomeEventsResponse
+
+    /** `POST /api/homes/:id/events` — route `backend/routes/home.js:4827`. */
+    @POST("api/homes/{id}/events")
+    suspend fun createHomeEvent(
+        @Path("id") homeId: String,
+        @Body body: CreateHomeEventRequest,
+    ): HomeEventResponse
+
+    /** `DELETE /api/homes/:id/events/:eventId` — route
+     *  `backend/routes/home.js:4912`. */
+    @DELETE("api/homes/{id}/events/{eventId}")
+    suspend fun deleteHomeEvent(
+        @Path("id") homeId: String,
+        @Path("eventId") eventId: String,
+    )
     // ─── Emergency info (T6.4b / P17) ─────────────────────────
 
     /** `GET /api/homes/:id/emergencies` — route `backend/routes/home.js:5406`. */

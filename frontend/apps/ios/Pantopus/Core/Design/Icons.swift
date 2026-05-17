@@ -14,6 +14,8 @@
 
 import SwiftUI
 
+// swiftlint:disable type_body_length
+
 /// Every icon the Pantopus design language uses. Cases are the raw Lucide
 /// token names (kebab-case preserved in `rawValue`).
 public enum PantopusIcon: String, CaseIterable, Sendable {
@@ -143,6 +145,15 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case wandSparkles = "wand-sparkles"
     case arrowUpRight = "arrow-up-right"
 
+    // T6.4c Home calendar — event-type palette + banner illustration.
+    case wrench
+    case usersRound = "users-round"
+    case gift
+    case partyPopper = "party-popper"
+    case graduationCap = "graduation-cap"
+    case stethoscope
+    case calendarDays = "calendar-days"
+    case link
     // T6.4b Emergency info — per-category tile glyphs (shutoff / contact /
     // evac / medical) + row action icons (phoneCall / image / mapPin) +
     // banner CTA + pinned marker + empty-state quick-prompt.
@@ -153,7 +164,6 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case navigation
     case heartPulse = "heart-pulse"
     case siren
-    case stethoscope
     case cross
     case flag
     case userRound = "user-round"
@@ -191,7 +201,6 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     // category-tinted leading tiles need glyphs that aren't on the
     // existing icon menu. Fallbacks are documented inline in
     // `sfSymbolName` for icons SF Symbols doesn't ship 1:1.
-    case wrench
     case fan
     case cloudRain = "cloud-rain"
     case refrigerator
@@ -311,6 +320,14 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .shuffle: "shuffle"
         case .wandSparkles: "wand.and.stars"
         case .arrowUpRight: "arrow.up.right"
+        case .wrench: "wrench.adjustable"
+        case .usersRound: "person.3"
+        case .gift: "gift"
+        case .partyPopper: "party.popper"
+        case .graduationCap: "graduationcap"
+        case .stethoscope: "stethoscope"
+        case .calendarDays: "calendar"
+        case .link: "link"
         // T6.4b Emergency info
         case .pin: "pin"
         case .power: "power"
@@ -319,7 +336,6 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .navigation: "location.north.fill"
         case .heartPulse: "waveform.path.ecg"
         case .siren: "exclamationmark.octagon.fill"
-        case .stethoscope: "stethoscope"
         case .cross: "cross.fill"
         case .flag: "flag.fill"
         case .userRound: "person.crop.circle.fill"
@@ -348,7 +364,6 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // T6.3b Maintenance. SF Symbols ships direct equivalents for most
         // — only `paint-roller` and `bell-ring` lack 1:1 glyphs, fall back
         // to `paintbrush.pointed` and `bell.badge` respectively.
-        case .wrench: "wrench.adjustable"
         case .fan: "fan"
         case .cloudRain: "cloud.rain"
         case .refrigerator: "refrigerator"

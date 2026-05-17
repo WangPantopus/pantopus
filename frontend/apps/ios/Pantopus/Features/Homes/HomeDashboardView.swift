@@ -24,6 +24,7 @@ struct HomeDashboardView: View {
         "view_polls": "Polls",
         "view_maintenance": "Maintenance",
         "pets": "Pets",
+        "calendar": "Calendar",
         "view_docs": "Documents",
         "view_emergency": "Emergency info",
         "view_tasks": "Tasks"
@@ -43,6 +44,9 @@ struct HomeDashboardView: View {
     /// Push onto the host stack when the user taps the Pets quick-action
     /// tile. Receives this home's id so the destination can pre-fetch.
     private let onOpenPets: ((String) -> Void)?
+    /// Push onto the host stack when the user taps the Calendar
+    /// quick-action tile (T6.4c / P18).
+    private let onOpenCalendar: ((String) -> Void)?
     /// Push onto the host stack when the user taps the Documents
     /// quick-action tile (T6.4b / P17).
     private let onOpenDocs: ((String) -> Void)?
@@ -73,6 +77,7 @@ struct HomeDashboardView: View {
         onOpenPolls: (() -> Void)? = nil,
         onOpenPlaceholder: ((String) -> Void)? = nil,
         onOpenPets: ((String) -> Void)? = nil,
+        onOpenCalendar: ((String) -> Void)? = nil,
         onOpenDocs: ((String) -> Void)? = nil,
         onOpenEmergency: ((String) -> Void)? = nil,
         onOpenPackages: ((String) -> Void)? = nil,
@@ -89,6 +94,7 @@ struct HomeDashboardView: View {
         self.onOpenPolls = onOpenPolls
         self.onOpenPlaceholder = onOpenPlaceholder
         self.onOpenPets = onOpenPets
+        self.onOpenCalendar = onOpenCalendar
         self.onOpenDocs = onOpenDocs
         self.onOpenEmergency = onOpenEmergency
         self.onOpenPackages = onOpenPackages
@@ -196,6 +202,8 @@ struct HomeDashboardView: View {
             onOpenMaintenance?(homeId)
         case "pets":
             onOpenPets?(homeId)
+        case "calendar":
+            onOpenCalendar?(homeId)
         case "view_docs":
             onOpenDocs?(homeId)
         case "view_emergency":

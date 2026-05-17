@@ -91,6 +91,7 @@ fun YouScreen(
     onOpenAudienceProfile: () -> Unit = {},
     onOpenHomeBills: (String) -> Unit = {},
     onOpenHomePets: (String) -> Unit = {},
+    onOpenHomeCalendar: (String) -> Unit = {},
     onOpenHomePackages: (String) -> Unit = {},
     onOpenHomePolls: (String) -> Unit = {},
     onOpenAccessCodes: (homeId: String, homeName: String?) -> Unit = { _, _ -> },
@@ -139,6 +140,14 @@ fun YouScreen(
                 "me.pets" -> {
                     val homeId = tile.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomePets(homeId) else onOpenPlaceholder(tile.label)
+                }
+                "me.calendar" -> {
+                    val homeId = tile.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) {
+                        onOpenHomeCalendar(homeId)
+                    } else {
+                        onOpenPlaceholder(tile.label)
+                    }
                 }
                 "me.packages" -> {
                     val homeId = tile.routeArgs["homeId"].orEmpty()
