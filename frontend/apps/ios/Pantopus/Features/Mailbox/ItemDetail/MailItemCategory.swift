@@ -128,7 +128,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
     /// kind used by the A17 shell's top-bar eyebrow.
     public var detailTrust: MailDetailTrust {
         switch self {
-        case .certified, .legal, .tax: .verified
+        case .certified, .community, .legal, .tax: .verified
         case .notice, .bill: .warning
         default: .neutral
         }

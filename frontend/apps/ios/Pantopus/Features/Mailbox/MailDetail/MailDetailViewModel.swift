@@ -316,11 +316,15 @@ public final class MailDetailViewModel {
         // payload too — backend can ship the chain with `is_acknowledged`
         // set even before `ack_status` on the item row updates.
         let resolvedAck = isAcknowledged || (certifiedDetail?.isAcknowledged ?? false)
+        let detailTrust: MailDetailTrust = switch category {
+        case .certified, .community, .legal, .tax: .verified
+        default: trust.detailTrust
+        }
         return MailDetailContent(
             mailId: item.id,
             category: category,
             trust: trust,
-            detailTrust: trust.detailTrust,
+            detailTrust: detailTrust,
             senderDisplayName: senderDisplayName,
             senderMeta: senderMeta,
             senderInitials: initials,
