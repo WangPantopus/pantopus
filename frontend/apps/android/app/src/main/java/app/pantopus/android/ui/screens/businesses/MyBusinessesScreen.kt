@@ -1,4 +1,4 @@
-package app.pantopus.android.ui.screens.homes
+package app.pantopus.android.ui.screens.businesses
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,36 +14,36 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
- * `GET /api/homes/my-homes` wrapped in the List-of-Rows archetype
- * (T6.3f / P14 refresh — `.SecondaryCreate` 52dp FAB tinted
- * [FabTint.Home], plus the home-tinted intro banner).
+ * `GET /api/businesses/my-businesses` wrapped in the List-of-Rows
+ * archetype (T6.3f / P14). Avatar-first rows tinted business-violet,
+ * intro banner, business-tinted secondary-create FAB.
  */
 @Composable
-fun MyHomesListScreen(
-    onOpenHome: (String) -> Unit,
-    onAddHome: () -> Unit,
+fun MyBusinessesScreen(
+    onOpenBusiness: (String) -> Unit,
+    onRegister: () -> Unit,
     onBack: (() -> Unit)? = null,
-    viewModel: MyHomesListViewModel = hiltViewModel(),
+    viewModel: MyBusinessesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val banner by viewModel.banner.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
-        viewModel.configureNavigation(onOpenHome = onOpenHome, onAddHome = onAddHome)
+        viewModel.configureNavigation(onOpenBusiness = onOpenBusiness, onRegister = onRegister)
         viewModel.load()
-        Analytics.track(AnalyticsEvent.ScreenMyHomesViewed)
+        Analytics.track(AnalyticsEvent.ScreenMyBusinessesViewed)
     }
     ListOfRowsScreen(
-        title = "My homes",
+        title = "My businesses",
         state = state,
         onRefresh = { viewModel.refresh() },
         onEndReached = { /* not paginated */ },
         fab =
             FabAction(
-                icon = PantopusIcon.PlusCircle,
-                contentDescription = "Claim a home",
+                icon = PantopusIcon.Building2,
+                contentDescription = "Register a business",
                 variant = FabVariant.SecondaryCreate,
-                tint = FabTint.Home,
-                onClick = onAddHome,
+                tint = FabTint.Business,
+                onClick = onRegister,
             ),
         onBack = onBack,
         banner = banner,

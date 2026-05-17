@@ -30,6 +30,7 @@ import app.pantopus.android.BuildConfig
 import app.pantopus.android.core.routing.DeepLinkRouter
 import app.pantopus.android.ui.screens._internal.TokenGalleryScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
+import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
 import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
@@ -95,6 +96,7 @@ import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationHost
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
 import app.pantopus.android.ui.screens.inbox.conversation.ChatThreadMode
 import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
+import app.pantopus.android.ui.screens.listings.MyListingsScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
@@ -351,6 +353,12 @@ private object ChildRoutes {
 
     /** Snap & sell — placeholder until the marketplace compose flow ships. */
     const val COMPOSE_LISTING = "listings/compose"
+
+    /** T6.3f / P14 — My listings (seller's tabbed roster). */
+    const val MY_LISTINGS = "listings/me"
+
+    /** T6.3f / P14 — My businesses (owner / staff roster). */
+    const val MY_BUSINESSES = "businesses/me"
 
     /** Invoice detail (T2.6 ContentDetailShell · invoice variant). */
     const val INVOICE_DETAIL_ID_KEY = "invoiceId"
@@ -699,6 +707,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenHomeOwners = { homeId -> navController.navigate(ChildRoutes.homeOwners(homeId)) },
                     onOpenHomeMembers = { homeId -> navController.navigate(ChildRoutes.homeMembers(homeId)) },
+                    onOpenMyHomes = { navController.navigate(ChildRoutes.MY_HOMES) },
+                    onOpenMyListings = { navController.navigate(ChildRoutes.MY_LISTINGS) },
+                    onOpenMyBusinesses = { navController.navigate(ChildRoutes.MY_BUSINESSES) },
                 )
             }
 
@@ -706,6 +717,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 MyHomesListScreen(
                     onOpenHome = { homeId -> navController.navigate(ChildRoutes.homeDashboard(homeId)) },
                     onAddHome = { navController.navigate(ChildRoutes.ADD_HOME) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.MY_LISTINGS) {
+                MyListingsScreen(
+                    onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
+                    onCompose = { navController.navigate(ChildRoutes.placeholder("List something")) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.MY_BUSINESSES) {
+                MyBusinessesScreen(
+                    onOpenBusiness = { _ -> navController.navigate(ChildRoutes.placeholder("Business dashboard")) },
+                    onRegister = { navController.navigate(ChildRoutes.placeholder("Register a business")) },
                     onBack = { navController.popBackStack() },
                 )
             }

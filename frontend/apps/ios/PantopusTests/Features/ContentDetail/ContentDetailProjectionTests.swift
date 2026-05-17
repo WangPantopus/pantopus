@@ -144,10 +144,14 @@ final class ContentDetailProjectionTests: XCTestCase {
             distanceMeters: 644,
             createdAt: nil,
             userHasSaved: false,
-            approxLocation: nil
+            approxLocation: nil,
+            viewCount: nil,
+            activeOfferCount: nil,
+            soldAt: nil,
+            archivedAt: nil
         )
         let content = ListingDetailViewModel.project(listing)
-        XCTAssertEqual(content.kind, .listing)
+        XCTAssertEqual(content.kind, ContentDetailKind.listing)
         XCTAssertNotNil(content.cover, "listing variant must carry a cover slot")
         XCTAssertEqual(content.hero.priceLine, "$320")
         XCTAssertNotNil(content.counterparty)
@@ -176,7 +180,11 @@ final class ContentDetailProjectionTests: XCTestCase {
             distanceMeters: nil,
             createdAt: nil,
             userHasSaved: nil,
-            approxLocation: nil
+            approxLocation: nil,
+            viewCount: nil,
+            activeOfferCount: nil,
+            soldAt: nil,
+            archivedAt: nil
         )
         let content = ListingDetailViewModel.project(listing)
         XCTAssertEqual(content.hero.priceLine, "Free")

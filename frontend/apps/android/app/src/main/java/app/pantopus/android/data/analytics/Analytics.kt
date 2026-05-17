@@ -62,6 +62,12 @@ sealed class AnalyticsEvent(
         override val properties = mapOf("result" to result.value)
     }
 
+    /** T6.3f / P14 — My listings index (the seller's tabbed list). */
+    data object ScreenMyListingsViewed : AnalyticsEvent("screen.my_listings.viewed")
+
+    /** T6.3f / P14 — My businesses index (owner / staff roster). */
+    data object ScreenMyBusinessesViewed : AnalyticsEvent("screen.my_businesses.viewed")
+
     data object ScreenHouseholdTasksViewed : AnalyticsEvent("screen.household_tasks.viewed")
 
     data object ScreenOwnersListViewed : AnalyticsEvent("screen.owners_list.viewed")
