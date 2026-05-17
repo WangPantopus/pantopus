@@ -64,6 +64,10 @@ import app.pantopus.android.ui.screens.homes.calendar.HomeCalendarScreen
 import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
+import app.pantopus.android.ui.screens.homes.documents.DOCUMENTS_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.documents.DocumentsScreen
+import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
@@ -175,6 +179,18 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home calendar. */
     fun homeCalendar(homeId: String): String = "homes/$homeId/calendar"
+    /** Emergency info per home (T6.4b / P17). */
+    const val HOME_EMERGENCY = "homes/{$EMERGENCY_HOME_ID_KEY}/emergency"
+
+    /** Build the concrete path for a home emergency info screen. */
+    fun homeEmergency(homeId: String): String = "homes/$homeId/emergency"
+
+    /** Documents per home (T6.4b / P17). */
+    const val HOME_DOCS = "homes/{$DOCUMENTS_HOME_ID_KEY}/docs"
+
+    /** Build the concrete path for a home documents screen. */
+    fun homeDocs(homeId: String): String = "homes/$homeId/docs"
+
     /** Packages list per home (T6.3d / P14). */
     const val HOME_PACKAGES = "homes/{$PACKAGES_HOME_ID_KEY}/packages"
 
@@ -823,6 +839,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenCalendar = { homeId ->
                         navController.navigate(ChildRoutes.homeCalendar(homeId))
                     },
+                    onOpenDocs = { homeId ->
+                        navController.navigate(ChildRoutes.homeDocs(homeId))
+                    },
+                    onOpenEmergency = { homeId ->
+                        navController.navigate(ChildRoutes.homeEmergency(homeId))
+                    },
                     onOpenPackages = { homeId ->
                         navController.navigate(ChildRoutes.homePackages(homeId))
                     },
@@ -900,6 +922,22 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(
+                route = ChildRoutes.HOME_EMERGENCY,
+                arguments = listOf(navArgument(EMERGENCY_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                EmergencyInfoScreen(
+                    onAction = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Emergency item"))
+                    },
+                    onAdd = { navController.navigate(ChildRoutes.placeholder("Add emergency info")) },
+                    onShare = { navController.navigate(ChildRoutes.placeholder("Share emergency info")) },
+                    onPrintCard = {
+                        navController.navigate(ChildRoutes.placeholder("Print emergency card"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
                 route = ChildRoutes.HOME_PACKAGES,
                 arguments = listOf(navArgument(PACKAGES_HOME_ID_KEY) { type = NavType.StringType }),
             ) { entry ->
@@ -925,6 +963,23 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onStartPoll = {
                         navController.navigate(ChildRoutes.placeholder("Start a poll"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.HOME_DOCS,
+                arguments = listOf(navArgument(DOCUMENTS_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                DocumentsScreen(
+                    onOpenDocument = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Document detail"))
+                    },
+                    onUpload = { navController.navigate(ChildRoutes.placeholder("Upload document")) },
+                    onSearch = { navController.navigate(ChildRoutes.placeholder("Search documents")) },
+                    onExport = { navController.navigate(ChildRoutes.placeholder("Export documents")) },
+                    onDocumentAction = { _, _ ->
+                        navController.navigate(ChildRoutes.placeholder("Document action"))
                     },
                     onBack = { navController.popBackStack() },
                 )

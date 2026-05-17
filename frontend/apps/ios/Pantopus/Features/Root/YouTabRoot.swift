@@ -60,6 +60,12 @@ public enum YouRoute: Hashable {
     /// action tile + Home Dashboard "calendar" quick-action push here
     /// with the primary home id resolved by the VM.
     case homeCalendar(homeId: String)
+    /// T6.4b — Emergency info. The home-context "me.emergency" Activity
+    /// row pushes here with the primary home id resolved by the VM.
+    case homeEmergency(homeId: String)
+    /// T6.4b — Documents. The home-context "me.docs" action tile pushes
+    /// here with the primary home id resolved by the VM.
+    case homeDocs(homeId: String)
     /// T6.3d — Packages. The home-context "me.packages" Activity row +
     /// the Home Dashboard "view_packages" quick action push here.
     case homePackages(homeId: String)
@@ -345,6 +351,18 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.docs":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeDocs(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
+        case "me.emergency":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeEmergency(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         case "me.packages":
             if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homePackages(homeId: homeId))
@@ -415,6 +433,16 @@ public struct YouTabRoot: View {
         case "me.bills":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
+                return
+            }
+        case "me.docs":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeDocs(homeId: homeId))
+                return
+            }
+        case "me.emergency":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeEmergency(homeId: homeId))
                 return
             }
         case "me.packages":
@@ -759,6 +787,63 @@ public struct YouTabRoot: View {
                     }
                 )
             )
+        case let .homeEmergency(homeId):
+            EmergencyInfoView(
+                viewModel: EmergencyInfoViewModel(
+                    homeId: homeId,
+                    onAction: { _ in
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Emergency item"))
+                        }
+                    },
+                    onAdd: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Add emergency info"))
+                        }
+                    },
+                    onShare: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Share emergency info"))
+                        }
+                    },
+                    onPrintCard: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Print emergency card"))
+                        }
+                    }
+                )
+            )
+        case let .homeDocs(homeId):
+            DocumentsView(
+                viewModel: DocumentsViewModel(
+                    homeId: homeId,
+                    onOpenDocument: { _ in
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Document detail"))
+                        }
+                    },
+                    onUpload: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Upload document"))
+                        }
+                    },
+                    onSearch: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Search documents"))
+                        }
+                    },
+                    onExport: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Export documents"))
+                        }
+                    },
+                    onDocumentAction: { _, _ in
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Document action"))
+                        }
+                    }
+                )
+            )
         case let .homePackages(homeId):
             PackagesListView(
                 viewModel: PackagesListViewModel(
@@ -888,6 +973,12 @@ public struct YouTabRoot: View {
                 },
                 onOpenPets: { petHomeId in
                     Task { @MainActor in path.append(.homePets(homeId: petHomeId)) }
+                },
+                onOpenDocs: { docsHomeId in
+                    Task { @MainActor in path.append(.homeDocs(homeId: docsHomeId)) }
+                },
+                onOpenEmergency: { emergencyHomeId in
+                    Task { @MainActor in path.append(.homeEmergency(homeId: emergencyHomeId)) }
                 },
                 onOpenPackages: { packagesHomeId in
                     Task { @MainActor in path.append(.homePackages(homeId: packagesHomeId)) }

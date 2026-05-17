@@ -6,6 +6,10 @@ import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CreateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeEventRequest
+import app.pantopus.android.data.api.models.homes.CreateDocumentRequest
+import app.pantopus.android.data.api.models.homes.CreateDocumentResponse
+import app.pantopus.android.data.api.models.homes.CreateEmergencyRequest
+import app.pantopus.android.data.api.models.homes.CreateEmergencyResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.GetHomeEventsResponse
 import app.pantopus.android.data.api.models.homes.HomeEventResponse
@@ -16,6 +20,8 @@ import app.pantopus.android.data.api.models.homes.CreatePollRequest
 import app.pantopus.android.data.api.models.homes.FileUploadResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.GetHomeDocumentsResponse
+import app.pantopus.android.data.api.models.homes.GetHomeEmergenciesResponse
 import app.pantopus.android.data.api.models.homes.GetHomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.GetHomePackagesResponse
 import app.pantopus.android.data.api.models.homes.GetHomePollsResponse
@@ -150,6 +156,30 @@ open class HomesRepository
             homeId: String,
             eventId: String,
         ): NetworkResult<Unit> = safeApiCall { api.deleteHomeEvent(homeId, eventId) }
+        // ─── Emergency info (T6.4b / P17) ─────────────────────────
+
+        /** `GET /api/homes/:id/emergencies`. */
+        open suspend fun getHomeEmergencies(homeId: String): NetworkResult<GetHomeEmergenciesResponse> =
+            safeApiCall { api.getHomeEmergencies(homeId) }
+
+        /** `POST /api/homes/:id/emergencies`. */
+        open suspend fun createHomeEmergency(
+            homeId: String,
+            request: CreateEmergencyRequest,
+        ): NetworkResult<CreateEmergencyResponse> = safeApiCall { api.createHomeEmergency(homeId, request) }
+
+        // ─── Documents (T6.4b / P17) ──────────────────────────────
+
+        /** `GET /api/homes/:id/documents`. */
+        open suspend fun getHomeDocuments(homeId: String): NetworkResult<GetHomeDocumentsResponse> =
+            safeApiCall { api.getHomeDocuments(homeId) }
+
+        /** `POST /api/homes/:id/documents`. */
+        open suspend fun createHomeDocument(
+            homeId: String,
+            request: CreateDocumentRequest,
+        ): NetworkResult<CreateDocumentResponse> = safeApiCall { api.createHomeDocument(homeId, request) }
+
         /** `GET /api/homes/:id/packages`. */
         open suspend fun getHomePackages(
             homeId: String,

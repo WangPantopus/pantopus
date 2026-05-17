@@ -313,6 +313,9 @@ the tiles deep-link with the resolved home id.
 | Members | `me.home.members` | placeholder | Home dashboard "Members" quick-action | follow-up |
 | Calendar | `me.calendar` | **real** (T6.4c / P18) | Me-tab `.calendar` action tile + Home Dashboard "Calendar" quick-action tile → `HomeCalendarView(homeId)` / `HomeCalendarScreen(homeId)` | iOS `YouRoute.homeCalendar(homeId)` / `HubRoute.homeCalendar(homeId)` · Android `ChildRoutes.HOME_CALENDAR` |
 | Docs | `me.home.docs` | placeholder | n/a (no screen built yet) | follow-up |
+| Calendar | `me.home.calendar` | placeholder | n/a (no screen built yet) | follow-up |
+
+**T6.4b / P17 (this PR):** the `me.docs` and `me.emergency` route keys flip from `placeholder` to real `homeDocs(homeId:)` / `homeEmergency(homeId:)` destinations on both iOS (`YouRoute` + `HubRoute`) and Android (`ChildRoutes.HOME_DOCS` / `ChildRoutes.HOME_EMERGENCY`). The Home dashboard's quick-action grid also picks up two new tiles (`view_docs`, `view_emergency`) that hit the same destinations — both Me-tab and Home-dashboard entry points route to the same view-model.
 
 ## T5 — screen-by-screen wiring (P5–P16)
 

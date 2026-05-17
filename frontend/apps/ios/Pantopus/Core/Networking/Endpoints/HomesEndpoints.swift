@@ -2,6 +2,7 @@
 //  HomesEndpoints.swift
 //  Pantopus
 //
+// swiftlint:disable file_length
 
 import Foundation
 
@@ -263,6 +264,36 @@ public enum HomesEndpoints {
     /// `DELETE /api/homes/:id/pets/:petId` — route `backend/routes/home.js:6926`.
     public static func deletePet(homeId: String, petId: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/homes/\(homeId)/pets/\(petId)")
+    }
+
+    // MARK: - Emergency info (T6.4b / P17)
+
+    /// `GET /api/homes/:id/emergencies` — route `backend/routes/home.js:5406`.
+    public static func emergencies(homeId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/homes/\(homeId)/emergencies")
+    }
+
+    /// `POST /api/homes/:id/emergencies` — route `backend/routes/home.js:5442`.
+    public static func createEmergency(
+        homeId: String,
+        request: CreateEmergencyRequest
+    ) -> Endpoint {
+        Endpoint(method: .post, path: "/api/homes/\(homeId)/emergencies", body: request)
+    }
+
+    // MARK: - Documents (T6.4b / P17)
+
+    /// `GET /api/homes/:id/documents` — route `backend/routes/home.js:4944`.
+    public static func documents(homeId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/homes/\(homeId)/documents")
+    }
+
+    /// `POST /api/homes/:id/documents` — route `backend/routes/home.js:4985`.
+    public static func createDocument(
+        homeId: String,
+        request: CreateDocumentRequest
+    ) -> Endpoint {
+        Endpoint(method: .post, path: "/api/homes/\(homeId)/documents", body: request)
     }
 
     // MARK: - Packages (T6.3d / P14)

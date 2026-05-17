@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddBox
@@ -20,16 +21,19 @@ import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Apartment
+import androidx.compose.material.icons.filled.Approval
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Autorenew
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.BorderColor
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Celebration
@@ -41,13 +45,17 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EditCalendar
+import androidx.compose.material.icons.filled.EmergencyShare
 import androidx.compose.material.icons.filled.EnergySavingsLeaf
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
@@ -55,15 +63,19 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FilterAlt
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.FolderShared
 import androidx.compose.material.icons.filled.FormatPaint
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Inventory2
@@ -72,14 +84,17 @@ import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MarkunreadMailbox
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreTime
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -87,16 +102,23 @@ import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PersonPin
 import androidx.compose.material.icons.filled.PestControl
 import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Share
@@ -105,6 +127,7 @@ import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Timer
@@ -118,6 +141,7 @@ import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.Work
@@ -280,13 +304,46 @@ enum class PantopusIcon(
     Stethoscope("stethoscope"),
     CalendarDays("calendar-days"),
     Link("link"),
+    // T6.4b — Emergency info: per-category tile glyphs (shutoff / contact /
+    // evac / medical) + row action icons (phoneCall / image / mapPin) +
+    // banner CTA + pinned marker + empty-state quick-prompt.
+    Pin("pin"),
+    Power("power"),
+    PhoneCall("phone-call"),
+    Phone("phone"),
+    Navigation("navigation"),
+    HeartPulse("heart-pulse"),
+    Siren("siren"),
+    Cross("cross"),
+    Flag("flag"),
+    UserRound("user-round"),
+    FlaskConical("flask-conical"),
+    FlameKindling("flame-kindling"),
+    Printer("printer"),
+    ListChecks("list-checks"),
+    AlertTriangle("alert-triangle"),
+
+    // T6.4b — Documents: file-type tile glyphs (pdf / image / doc / sheet /
+    // archive / scan) + category section icons (lease / insurance /
+    // warranty / tax / permit / hoa / id) + banner / row chip glyphs.
+    Image("image"),
+    FileType("file-type"),
+    FileSpreadsheet("file-spreadsheet"),
+    FileSignature("file-signature"),
+    Landmark("landmark"),
+    Stamp("stamp"),
+    IdCard("id-card"),
+    FolderLock("folder-lock"),
+    UploadCloud("upload-cloud"),
+    CalendarClock("calendar-clock"),
+    Download("download"),
+
     // T6.4a — Access codes: tap-to-reveal hide icon + empty-state key disc.
     EyeOff("eye-off"),
     KeyRound("key-round"),
 
     // T6.3c — Household tasks chore-category iconography + banner glyph.
     Leaf("leaf"),
-    ListChecks("list-checks"),
     Utensils("utensils"),
     Baby("baby"),
 
@@ -464,6 +521,42 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Stethoscope -> IconSource.Material(Icons.Filled.MedicalServices)
         PantopusIcon.CalendarDays -> IconSource.Material(Icons.Filled.CalendarMonth)
         PantopusIcon.Link -> IconSource.Material(Icons.Filled.Link)
+
+        // T6.4b — Emergency info. Material doesn't ship 1:1 Lucide
+        // equivalents for `siren`, `heart-pulse`, `flask-conical`,
+        // `flame-kindling`, `user-round`; fall back to the closest
+        // visually-similar Material vector.
+        PantopusIcon.Pin -> IconSource.Material(Icons.Filled.PushPin)
+        PantopusIcon.Power -> IconSource.Material(Icons.Filled.PowerSettingsNew)
+        PantopusIcon.PhoneCall -> IconSource.Material(Icons.Filled.Call)
+        PantopusIcon.Phone -> IconSource.Material(Icons.Filled.Phone)
+        PantopusIcon.Navigation -> IconSource.Material(Icons.Filled.Navigation)
+        PantopusIcon.HeartPulse -> IconSource.Material(Icons.Filled.MonitorHeart)
+        PantopusIcon.Siren -> IconSource.Material(Icons.Filled.EmergencyShare)
+        PantopusIcon.Cross -> IconSource.Material(Icons.Filled.Healing)
+        PantopusIcon.Flag -> IconSource.Material(Icons.Filled.Flag)
+        PantopusIcon.UserRound -> IconSource.Material(Icons.Filled.PersonPin)
+        PantopusIcon.FlaskConical -> IconSource.Material(Icons.Filled.Science)
+        PantopusIcon.FlameKindling -> IconSource.Material(Icons.Filled.Whatshot)
+        PantopusIcon.Printer -> IconSource.Material(Icons.Filled.Print)
+        PantopusIcon.ListChecks -> IconSource.Material(Icons.Filled.Checklist)
+        PantopusIcon.AlertTriangle -> IconSource.Material(Icons.Filled.Warning)
+
+        // T6.4b — Documents. Material ships strong document iconography;
+        // the only non-obvious mappings are `landmark` → `AccountBalance`
+        // (Material's classic government-building glyph) and `stamp` →
+        // `Approval` (the closest "official seal" vector).
+        PantopusIcon.Image -> IconSource.Material(Icons.Filled.Image)
+        PantopusIcon.FileType -> IconSource.Material(Icons.Filled.InsertDriveFile)
+        PantopusIcon.FileSpreadsheet -> IconSource.Material(Icons.Filled.TableChart)
+        PantopusIcon.FileSignature -> IconSource.Material(Icons.Filled.PictureAsPdf)
+        PantopusIcon.Landmark -> IconSource.Material(Icons.Filled.AccountBalance)
+        PantopusIcon.Stamp -> IconSource.Material(Icons.Filled.Approval)
+        PantopusIcon.IdCard -> IconSource.Material(Icons.Filled.Badge)
+        PantopusIcon.FolderLock -> IconSource.Material(Icons.Filled.FolderShared)
+        PantopusIcon.UploadCloud -> IconSource.Material(Icons.Filled.CloudUpload)
+        PantopusIcon.CalendarClock -> IconSource.Material(Icons.Filled.EditCalendar)
+        PantopusIcon.Download -> IconSource.Material(Icons.Filled.Download)
         // T6.4a — Access codes glyphs.
         PantopusIcon.EyeOff -> IconSource.Material(Icons.Filled.VisibilityOff)
         PantopusIcon.KeyRound -> IconSource.Material(Icons.Filled.VpnKey)
@@ -474,7 +567,6 @@ internal fun PantopusIcon.source(): IconSource =
         // Material vector. Visual signal is reinforced by the
         // per-category background tint in `HouseholdTaskCategoryPalette`.
         PantopusIcon.Leaf -> IconSource.Material(Icons.Filled.EnergySavingsLeaf)
-        PantopusIcon.ListChecks -> IconSource.Material(Icons.Filled.Checklist)
         PantopusIcon.Utensils -> IconSource.Material(Icons.Filled.Restaurant)
         PantopusIcon.Baby -> IconSource.Material(Icons.Filled.ChildCare)
 

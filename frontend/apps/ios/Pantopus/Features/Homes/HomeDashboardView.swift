@@ -13,6 +13,22 @@ struct HomeDashboardView: View {
     @Environment(AuthManager.self) private var auth
     @State private var viewModel: HomeDashboardViewModel
     @State private var showsInviteOwner = false
+
+    private static let actionLabels: [String: String] = [
+        "log_package": "Log a package",
+        "view_packages": "Packages",
+        "add_member": "Add member",
+        "add_mail": "Add mail",
+        "verify": "Verify home",
+        "view_bills": "Bills",
+        "view_polls": "Polls",
+        "view_maintenance": "Maintenance",
+        "pets": "Pets",
+        "calendar": "Calendar",
+        "view_docs": "Documents",
+        "view_emergency": "Emergency info",
+        "view_tasks": "Tasks"
+    ]
     private let homeId: String
     private let onBack: (() -> Void)?
     private let onClaimOwnership: (() -> Void)?
@@ -31,6 +47,12 @@ struct HomeDashboardView: View {
     /// Push onto the host stack when the user taps the Calendar
     /// quick-action tile (T6.4c / P18).
     private let onOpenCalendar: ((String) -> Void)?
+    /// Push onto the host stack when the user taps the Documents
+    /// quick-action tile (T6.4b / P17).
+    private let onOpenDocs: ((String) -> Void)?
+    /// Push onto the host stack when the user taps the Emergency info
+    /// quick-action tile (T6.4b / P17).
+    private let onOpenEmergency: ((String) -> Void)?
     /// Push onto the host stack when the user taps the Packages
     /// quick-action tile. Receives this home's id (T6.3d / P14).
     private let onOpenPackages: ((String) -> Void)?
@@ -56,6 +78,8 @@ struct HomeDashboardView: View {
         onOpenPlaceholder: ((String) -> Void)? = nil,
         onOpenPets: ((String) -> Void)? = nil,
         onOpenCalendar: ((String) -> Void)? = nil,
+        onOpenDocs: ((String) -> Void)? = nil,
+        onOpenEmergency: ((String) -> Void)? = nil,
         onOpenPackages: ((String) -> Void)? = nil,
         onOpenTasks: ((String) -> Void)? = nil,
         onOpenMaintenance: ((String) -> Void)? = nil,
@@ -71,6 +95,8 @@ struct HomeDashboardView: View {
         self.onOpenPlaceholder = onOpenPlaceholder
         self.onOpenPets = onOpenPets
         self.onOpenCalendar = onOpenCalendar
+        self.onOpenDocs = onOpenDocs
+        self.onOpenEmergency = onOpenEmergency
         self.onOpenPackages = onOpenPackages
         self.onOpenTasks = onOpenTasks
         self.onOpenMaintenance = onOpenMaintenance
@@ -156,14 +182,7 @@ struct HomeDashboardView: View {
     private func handleFabAction(_ action: String) {
         switch action {
         case "add_member":
-            // Prefer the dedicated Members screen when its host wired
-            // the callback (T6.3a). Falls back to the legacy
-            // InviteOwnerForm sheet for older hosts.
-            if let onOpenMembers {
-                onOpenMembers(homeId)
-            } else {
-                showsInviteOwner = true
-            }
+            openMembersOrInvite()
         default:
             onOpenPlaceholder?(actionLabel(action))
         }
@@ -174,11 +193,7 @@ struct HomeDashboardView: View {
         case "verify":
             onClaimOwnership?()
         case "add_member":
-            if let onOpenMembers {
-                onOpenMembers(homeId)
-            } else {
-                showsInviteOwner = true
-            }
+            openMembersOrInvite()
         case "view_bills":
             onOpenBills?()
         case "view_polls":
@@ -189,6 +204,10 @@ struct HomeDashboardView: View {
             onOpenPets?(homeId)
         case "calendar":
             onOpenCalendar?(homeId)
+        case "view_docs":
+            onOpenDocs?(homeId)
+        case "view_emergency":
+            onOpenEmergency?(homeId)
         case "view_packages":
             onOpenPackages?(homeId)
         case "view_tasks":
@@ -198,21 +217,18 @@ struct HomeDashboardView: View {
         }
     }
 
-    private func actionLabel(_ id: String) -> String {
-        switch id {
-        case "log_package": "Log a package"
-        case "view_packages": "Packages"
-        case "add_member": "Add member"
-        case "add_mail": "Add mail"
-        case "verify": "Verify home"
-        case "view_bills": "Bills"
-        case "view_polls": "Polls"
-        case "view_maintenance": "Maintenance"
-        case "pets": "Pets"
-        case "calendar": "Calendar"
-        case "view_tasks": "Tasks"
-        default: id.replacingOccurrences(of: "_", with: " ").capitalized
+    private func openMembersOrInvite() {
+        // Prefer the dedicated Members screen when its host wired the
+        // callback. Falls back to the legacy InviteOwnerForm sheet.
+        if let onOpenMembers {
+            onOpenMembers(homeId)
+        } else {
+            showsInviteOwner = true
         }
+    }
+
+    private func actionLabel(_ id: String) -> String {
+        Self.actionLabels[id] ?? id.replacingOccurrences(of: "_", with: " ").capitalized
     }
 }
 

@@ -63,6 +63,8 @@ fun HomeDashboardScreen(
     onOpenPlaceholder: ((String) -> Unit)? = null,
     onOpenPets: ((String) -> Unit)? = null,
     onOpenCalendar: ((String) -> Unit)? = null,
+    onOpenDocs: ((String) -> Unit)? = null,
+    onOpenEmergency: ((String) -> Unit)? = null,
     onOpenPackages: ((String) -> Unit)? = null,
     onOpenAccessCodes: ((homeId: String, homeName: String?) -> Unit)? = null,
     onOpenTasks: ((String) -> Unit)? = null,
@@ -92,6 +94,8 @@ fun HomeDashboardScreen(
             "add_member" -> "Add member"
             "verify" -> "Verify home"
             "view_bills" -> "Bills"
+            "view_docs" -> "Documents"
+            "view_emergency" -> "Emergency info"
             "view_polls" -> "Polls"
             "view_tasks" -> "Tasks"
             "view_maintenance" -> "Maintenance"
@@ -152,6 +156,14 @@ fun HomeDashboardScreen(
             "calendar" ->
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenCalendar?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "view_docs" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenDocs?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "view_emergency" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenEmergency?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
             "view_packages" ->
                 viewModel.currentHomeId()?.let { homeId ->
