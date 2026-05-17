@@ -56,6 +56,11 @@ public enum YouRoute: Hashable {
     case homeBills(homeId: String)
     /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
     case homePets(homeId: String)
+    /// T6.3c / P11 — Household tasks (per-home chore list). The
+    /// "me.tasks" Activity-section row pushes here with the primary
+    /// home id resolved by the Me VM. Distinct from `.myTasks` which is
+    /// the posted-to-neighbours gig list.
+    case homeTasks(homeId: String)
     /// T6.3b / P10 — Maintenance. The home-context "me.maintenance"
     /// action tile pushes here.
     case homeMaintenance(homeId: String)
@@ -305,6 +310,12 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.tasks":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeTasks(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         case "me.maintenance":
             if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeMaintenance(homeId: homeId))
@@ -357,6 +368,11 @@ public struct YouTabRoot: View {
         case "me.bills":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
+                return
+            }
+        case "me.tasks":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeTasks(homeId: homeId))
                 return
             }
         case "me.maintenance":
@@ -719,6 +735,21 @@ public struct YouTabRoot: View {
                 onOpenMembers: { membersHomeId in
                     Task { @MainActor in path.append(.homeMembers(homeId: membersHomeId)) }
                 }
+            )
+        case let .homeTasks(homeId):
+            HouseholdTasksListView(
+                viewModel: HouseholdTasksListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Task detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in path.append(.placeholder(label: "Add a task")) }
+                    },
+                    onEditRecurring: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Edit recurring task")) }
+                    }
+                )
             )
         case let .homeMaintenance(homeId):
             MaintenanceListView(

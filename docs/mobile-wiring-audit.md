@@ -307,6 +307,7 @@ the tiles deep-link with the resolved home id.
 | Tile | routeKey | Current dispatch | Primary entry today | Future home-tab dispatch |
 |---|---|---|---|---|
 | Bills | `me.home.bills` | placeholder | Home dashboard "Bills" quick-action tile → `BillsListView(homeId)` | `YouRoute.billsList(homeId)` / `ChildRoutes.billsList(homeId)` |
+| Household tasks | `me.tasks` | **wired (T6.3c / P11)** — `YouRoute.homeTasks(homeId)` (iOS) / `ChildRoutes.homeTasks(homeId)` (Android) → `HouseholdTasksListView` / `HouseholdTasksListScreen`; also reached from the Home Dashboard "Tasks" quick-action tile (`view_tasks`). | Me-tab `me.tasks` Activity row + Home Dashboard "Tasks" quick action | n/a — wired |
 | Access | `me.home.access` | placeholder | n/a (no screen built yet) | follow-up |
 | Packages | `me.home.packages` | placeholder | Mailbox → drawers | follow-up |
 | Members | `me.home.members` | placeholder | Home dashboard "Members" quick-action | follow-up |

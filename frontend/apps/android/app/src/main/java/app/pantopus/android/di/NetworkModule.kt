@@ -15,6 +15,7 @@ import app.pantopus.android.data.api.services.FilesApi
 import app.pantopus.android.data.api.services.GigsApi
 import app.pantopus.android.data.api.services.HomeMembersApi
 import app.pantopus.android.data.api.services.HomePetsApi
+import app.pantopus.android.data.api.services.HomeTasksApi
 import app.pantopus.android.data.api.services.HomesApi
 import app.pantopus.android.data.api.services.HubApi
 import app.pantopus.android.data.api.services.IdentityCenterApi
@@ -154,6 +155,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideHomePetsApi(retrofit: Retrofit): HomePetsApi = retrofit.create(HomePetsApi::class.java)
+
+    @Provides @Singleton
+    fun provideHomeTasksApi(retrofit: Retrofit): HomeTasksApi = retrofit.create(HomeTasksApi::class.java)
 
     @Provides @Singleton
     fun provideHomeMembersApi(retrofit: Retrofit): HomeMembersApi = retrofit.create(HomeMembersApi::class.java)

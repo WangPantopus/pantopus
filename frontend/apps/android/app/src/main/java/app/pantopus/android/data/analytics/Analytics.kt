@@ -58,6 +58,8 @@ sealed class AnalyticsEvent(
     /** T6.3f / P14 — My businesses index (owner / staff roster). */
     data object ScreenMyBusinessesViewed : AnalyticsEvent("screen.my_businesses.viewed")
 
+    data object ScreenHouseholdTasksViewed : AnalyticsEvent("screen.household_tasks.viewed")
+
     data object ScreenOwnersListViewed : AnalyticsEvent("screen.owners_list.viewed")
 
     data class ScreenPetsWizardStepViewed(

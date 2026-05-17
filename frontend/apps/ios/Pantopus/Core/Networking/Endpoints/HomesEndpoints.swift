@@ -221,6 +221,45 @@ public enum HomesEndpoints {
         Endpoint(method: .delete, path: "/api/homes/\(homeId)/pets/\(petId)")
     }
 
+    // MARK: - Household tasks (T6.3c / P11)
+
+    /// `GET /api/homes/:id/tasks` — route `backend/routes/home.js:4170`.
+    /// Returns the per-home chore list (HOUSEHOLD tasks — distinct from
+    /// `me.gigs` / My tasks which is the posted-to-neighbours gig list).
+    public static func tasks(homeId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/homes/\(homeId)/tasks")
+    }
+
+    /// `POST /api/homes/:id/tasks` — route `backend/routes/home.js:4238`.
+    public static func createTask(
+        homeId: String,
+        request: CreateHomeTaskRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/tasks",
+            body: request
+        )
+    }
+
+    /// `PUT /api/homes/:id/tasks/:taskId` — route `backend/routes/home.js:4308`.
+    public static func updateTask(
+        homeId: String,
+        taskId: String,
+        request: UpdateHomeTaskRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .put,
+            path: "/api/homes/\(homeId)/tasks/\(taskId)",
+            body: request
+        )
+    }
+
+    /// `DELETE /api/homes/:id/tasks/:taskId` — route `backend/routes/home.js:4354`.
+    public static func deleteTask(homeId: String, taskId: String) -> Endpoint {
+        Endpoint(method: .delete, path: "/api/homes/\(homeId)/tasks/\(taskId)")
+    }
+
     // MARK: - Members (T6.3a / P9)
 
     /// `GET /api/homes/:id/occupants` — route `backend/routes/home.js:3705`.
