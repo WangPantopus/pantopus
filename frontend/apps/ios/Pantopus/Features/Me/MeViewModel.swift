@@ -312,7 +312,14 @@ public final class MeViewModel {
             MeSection(id: "help_legal", header: "Help & Legal", rows: [
                 MeSectionRow(id: "help", icon: .helpCircle, label: "Help", routeKey: "me.help"),
                 MeSectionRow(id: "terms", icon: .file, label: "Terms", routeKey: "me.legal"),
-                MeSectionRow(id: "privacy", icon: .shield, label: "Privacy", value: privacyValue, routeKey: "me.home.privacy", routeArgs: args)
+                MeSectionRow(
+                    id: "privacy",
+                    icon: .shield,
+                    label: "Privacy",
+                    value: privacyValue,
+                    routeKey: "me.home.privacy",
+                    routeArgs: args
+                )
             ])
         ]
     }

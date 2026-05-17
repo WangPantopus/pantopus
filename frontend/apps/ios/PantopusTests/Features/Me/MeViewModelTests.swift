@@ -119,7 +119,7 @@ final class MeViewModelTests: XCTestCase {
         XCTAssertEqual(personal.actionTiles.count, 6)
         // T6.2b action grid is { posts, bids, gigs, offers, listings, connections }.
         XCTAssertEqual(
-            personal.actionTiles.map { $0.routeKey },
+            personal.actionTiles.map(\.routeKey),
             ["me.posts", "me.bids", "me.gigs", "me.offers", "me.listings", "me.connections"]
         )
         // T6.2b — sections grouped as Profile & Privacy, Activity, Help & Legal
@@ -128,7 +128,7 @@ final class MeViewModelTests: XCTestCase {
         XCTAssertTrue(personal.sections.contains { $0.header == "Activity" })
         XCTAssertTrue(personal.sections.contains { $0.header == "Help & Legal" })
         XCTAssertEqual(
-            personal.sections.first { $0.header == "Profile & Privacy" }?.rows.map { $0.routeKey },
+            personal.sections.first { $0.header == "Profile & Privacy" }?.rows.map(\.routeKey),
             ["me.editProfile", "me.identityCenter", "me.audience"]
         )
 
@@ -138,14 +138,14 @@ final class MeViewModelTests: XCTestCase {
         // T6.2b home action grid is { bills, pets, members, polls, calendar, docs }.
         XCTAssertEqual(home.actionTiles.count, 6)
         XCTAssertEqual(
-            home.actionTiles.map { $0.routeKey },
+            home.actionTiles.map(\.routeKey),
             ["me.bills", "me.pets", "me.members", "me.polls", "me.calendar", "me.docs"]
         )
         // Home tiles carry the primary home id so the host can build
         // BillsListView / PetsListView without re-introspecting the VM.
         XCTAssertEqual(home.actionTiles.first?.routeArgs["homeId"], "h1")
         // Stats reflect home context.
-        XCTAssertEqual(home.stats.map { $0.id }, ["bills", "tasks", "members"])
+        XCTAssertEqual(home.stats.map(\.id), ["bills", "tasks", "members"])
 
         XCTAssertEqual(business.identity, .business)
         XCTAssertTrue(business.isUnbound, "business stays unbound until mobile business read APIs land")
