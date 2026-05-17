@@ -50,16 +50,30 @@ public final class CeremonialMailOpenViewModel {
 
     /// Step the seal-break ceremony forward. View calls this once
     /// the user taps the envelope; the breaking phase animates and
-    /// then transitions to `.open` after `~600ms`.
-    public func startBreakingSeal() async {
+    /// then transitions to `.open` after `~750ms` (300ms envelope
+    /// lift + 450ms flap rotate). Per T6.5d the total time from
+    /// `.sealed` → `.open` stays under 2 seconds so users can
+    /// dismiss quickly.
+    ///
+    /// When `skipAnimation` is true (reduce-motion enabled, or user
+    /// tapped the Skip button) we jump straight to `.open` without
+    /// the intermediate `.breaking` frame.
+    public func startBreakingSeal(skipAnimation: Bool = false) async {
         guard case let .loaded(letter, phase) = state, phase == .sealed else { return }
+        if skipAnimation {
+            state = .loaded(letter, phase: .open)
+            return
+        }
         state = .loaded(letter, phase: .breaking)
-        try? await Task.sleep(nanoseconds: 600_000_000)
+        try? await Task.sleep(nanoseconds: 750_000_000)
         if case .loaded = state {
             state = .loaded(letter, phase: .open)
         }
     }
 
+    /// Skip the seal-break animation entirely and jump to the reading
+    /// frame. Wired to the Skip button (visible in `.sealed` /
+    /// `.breaking`) and used automatically when reduce-motion is on.
     public func openImmediately() {
         guard case let .loaded(letter, _) = state else { return }
         state = .loaded(letter, phase: .open)

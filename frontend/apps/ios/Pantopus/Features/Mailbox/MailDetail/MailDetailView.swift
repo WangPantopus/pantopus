@@ -81,6 +81,15 @@ public struct MailDetailView: View {
                 onAcknowledge: { Task { await viewModel.acknowledge() } },
                 onOpenSenderProfile: onOpenSenderProfile
             )
+        } else if content.category == .community, let community = content.communityDetail {
+            CommunityDetailLayout(
+                content: content,
+                community: community,
+                rsvpInFlight: viewModel.rsvpInFlight,
+                onBack: { onBack() },
+                onRsvp: { status in Task { await viewModel.setRsvp(status) } },
+                onOpenSenderProfile: onOpenSenderProfile
+            )
         } else {
             MailItemDetailShell(
                 topBar: makeTopBar(for: content),

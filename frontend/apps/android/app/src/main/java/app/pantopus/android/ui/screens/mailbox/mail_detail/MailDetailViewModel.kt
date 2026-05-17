@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.mailbox.MailDetail
 import app.pantopus.android.data.api.models.mailbox.v2.BookletDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
@@ -65,6 +67,7 @@ data class MailDetailContent(
     val isAcknowledged: Boolean,
     val bookletDetail: BookletDetailDto? = null,
     val certifiedDetail: CertifiedDetailDto? = null,
+    val communityDetail: CommunityDetailDto? = null,
 ) {
     /** Build a typed key-facts row list for the shell's KeyFacts slot. */
     fun keyFacts(): List<MailDetailKeyFact> =
@@ -121,6 +124,9 @@ class MailDetailViewModel
         private val _ackInFlight = MutableStateFlow(false)
         val ackInFlight: StateFlow<Boolean> = _ackInFlight.asStateFlow()
 
+        private val _rsvpInFlight = MutableStateFlow(false)
+        val rsvpInFlight: StateFlow<Boolean> = _rsvpInFlight.asStateFlow()
+
         fun load() {
             if (_state.value is MailDetailUiState.Loaded) return
             refresh()
@@ -166,6 +172,57 @@ class MailDetailViewModel
             _toast.value = null
         }
 
+        /**
+         * Set the user's RSVP status on a Community mail item.
+         * Optimistic — flips local state then rolls back on transport
+         * failure. "Going" wires to the existing `POST /community/rsvp`
+         * route (backend stores it as a `will_attend` reaction); other
+         * states are stored locally until the backend exposes a typed
+         * per-status route (P22 scope note in the parity audit).
+         */
+        fun setRsvp(status: CommunityRsvpStatus) {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            val community = current.content.communityDetail ?: return
+            if (_rsvpInFlight.value) return
+            _rsvpInFlight.value = true
+            val optimistic = current.content.copy(
+                communityDetail = community.copy(
+                    rsvp = status,
+                    attendeeCount = when {
+                        status == CommunityRsvpStatus.Going && community.rsvp != CommunityRsvpStatus.Going ->
+                            community.attendeeCount + 1
+                        status != CommunityRsvpStatus.Going && community.rsvp == CommunityRsvpStatus.Going ->
+                            (community.attendeeCount - 1).coerceAtLeast(0)
+                        else -> community.attendeeCount
+                    },
+                ),
+            )
+            _state.value = MailDetailUiState.Loaded(optimistic)
+            if (status != CommunityRsvpStatus.Going) {
+                _toast.value = rsvpToast(status)
+                _rsvpInFlight.value = false
+                return
+            }
+            viewModelScope.launch {
+                when (val result = repo.communityRsvp(community.communityItemId)) {
+                    is NetworkResult.Success -> _toast.value = "You're going"
+                    is NetworkResult.Failure -> {
+                        _state.value = MailDetailUiState.Loaded(current.content)
+                        _toast.value = result.error.message
+                    }
+                }
+                _rsvpInFlight.value = false
+            }
+        }
+
+        private fun rsvpToast(status: CommunityRsvpStatus): String =
+            when (status) {
+                CommunityRsvpStatus.Going -> "You're going"
+                CommunityRsvpStatus.Maybe -> "Saved as maybe"
+                CommunityRsvpStatus.NotGoing -> "Marked as can't make it"
+                CommunityRsvpStatus.Undecided -> "RSVP cleared"
+            }
+
         companion object {
             /**
              * Pure projection from the backend [MailDetail] envelope to
@@ -195,7 +252,7 @@ class MailDetailViewModel
                         ?: emptyList()
                 val ackRequired = detail.ackRequired == true
                 val ackStatus = detail.ackStatus?.lowercase() == "acknowledged"
-                // T6.5c — decode the per-variant payloads from
+                // T6.5c–d — decode the per-variant payloads from
                 // `mail.object`. Each decoder returns null unless the
                 // payload carries its required shape.
                 val bookletDetail =
@@ -207,6 +264,12 @@ class MailDetailViewModel
                 val certifiedDetail =
                     if (category == MailItemCategory.Certified) {
                         CertifiedDetailDto.decodeFromObjectPayload(detail.`object`)
+                    } else {
+                        null
+                    }
+                val communityDetail =
+                    if (category == MailItemCategory.Community) {
+                        CommunityDetailDto.decodeFromObjectPayload(detail.`object`)
                     } else {
                         null
                     }
@@ -231,6 +294,7 @@ class MailDetailViewModel
                     isAcknowledged = resolvedAck,
                     bookletDetail = bookletDetail,
                     certifiedDetail = certifiedDetail,
+                    communityDetail = communityDetail,
                 )
             }
 

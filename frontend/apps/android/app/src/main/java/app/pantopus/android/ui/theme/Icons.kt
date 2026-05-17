@@ -107,6 +107,7 @@ import androidx.compose.material.icons.filled.PestControl
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PowerSettingsNew
@@ -268,6 +269,9 @@ enum class PantopusIcon(
     ClockPlus("clock-plus"),
     CircleSlash("circle-slash"),
     Play("play"),
+
+    /** T6.5d — voice-postscript player toggle (play / pause). */
+    Pause("pause"),
 
     // T5.3.3 — My posts: archive chip + empty-state compose icon.
     Archive("archive"),
@@ -489,6 +493,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.ClockPlus -> IconSource.Material(Icons.Filled.MoreTime)
         PantopusIcon.CircleSlash -> IconSource.Material(Icons.Filled.Block)
         PantopusIcon.Play -> IconSource.Material(Icons.Filled.PlayArrow)
+        PantopusIcon.Pause -> IconSource.Material(Icons.Filled.Pause)
         PantopusIcon.Archive -> IconSource.Material(Icons.Filled.Archive)
         PantopusIcon.MessageSquarePlus -> IconSource.Material(Icons.Filled.BorderColor)
         // T6.0a — Bills utility-category iconography. Material lacks

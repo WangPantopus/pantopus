@@ -55,6 +55,14 @@ enum class MailItemCategory(
         label = "Certified",
         detailTrust = MailDetailTrust.Verified,
     ),
+    Community(
+        raw = "community",
+        accent = PantopusColors.cleaning,
+        icon = PantopusIcon.Users,
+        rowBackground = PantopusColors.successBg,
+        label = "Community",
+        detailTrust = MailDetailTrust.Verified,
+    ),
     Notice(
         raw = "notice",
         accent = PantopusColors.warning,

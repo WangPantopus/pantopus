@@ -38,9 +38,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.BookletDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.CertifiedDetailLayout
+import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.CommunityDetailLayout
 import app.pantopus.android.ui.screens.shared.mail_item_detail.AttachmentItem
 import app.pantopus.android.ui.screens.shared.mail_item_detail.AttachmentKind
 import app.pantopus.android.ui.screens.shared.mail_item_detail.AttachmentsRowContent
@@ -68,6 +70,7 @@ fun MailDetailScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
     val ackInFlight by viewModel.ackInFlight.collectAsStateWithLifecycle()
+    val rsvpInFlight by viewModel.rsvpInFlight.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
     LaunchedEffect(toast) {
@@ -84,8 +87,10 @@ fun MailDetailScreen(
                 LoadedLayout(
                     content = current.content,
                     ackInFlight = ackInFlight,
+                    rsvpInFlight = rsvpInFlight,
                     onBack = onBack,
                     onAcknowledge = viewModel::acknowledge,
+                    onRsvp = viewModel::setRsvp,
                     onOpenSenderProfile = onOpenSenderProfile,
                 )
             is MailDetailUiState.Error ->
@@ -118,16 +123,19 @@ fun MailDetailScreen(
 private fun LoadedLayout(
     content: MailDetailContent,
     ackInFlight: Boolean,
+    rsvpInFlight: Boolean,
     onBack: () -> Unit,
     onAcknowledge: () -> Unit,
+    onRsvp: (CommunityRsvpStatus) -> Unit,
     onOpenSenderProfile: (String) -> Unit,
 ) {
-    // T6.5c (P21) — dispatch to variant layouts when the projected
-    // content carries decoded payloads. Variants sit on the same
+    // T6.5c–d — dispatch to variant layouts when the projected content
+    // carries decoded payloads. Variants sit on the same
     // `MailItemDetailShell` and override only the slots their design
     // diverges on; generic A17.1 is the fall-through.
     val booklet = content.bookletDetail
     val certified = content.certifiedDetail
+    val community = content.communityDetail
     when {
         content.category == MailItemCategory.Booklet && booklet != null -> {
             BookletDetailLayout(
@@ -145,6 +153,17 @@ private fun LoadedLayout(
                 ackInFlight = ackInFlight,
                 onBack = onBack,
                 onAcknowledge = onAcknowledge,
+                onOpenSenderProfile = onOpenSenderProfile,
+            )
+            return
+        }
+        content.category == MailItemCategory.Community && community != null -> {
+            CommunityDetailLayout(
+                content = content,
+                community = community,
+                rsvpInFlight = rsvpInFlight,
+                onBack = onBack,
+                onRsvp = onRsvp,
                 onOpenSenderProfile = onOpenSenderProfile,
             )
             return

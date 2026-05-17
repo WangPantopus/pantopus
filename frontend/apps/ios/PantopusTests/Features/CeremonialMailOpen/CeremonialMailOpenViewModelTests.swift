@@ -126,7 +126,7 @@ final class CeremonialMailOpenViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [.status(200, body: Self.fullItemJSON)]
         let vm = CeremonialMailOpenViewModel(mailId: "mail_demo", api: makeAPI())
         await vm.load()
-        await vm.startBreakingSeal() // 600ms internal sleep, then .open
+        await vm.startBreakingSeal() // 750ms internal sleep, then .open
         XCTAssertEqual(vm.phase, .open)
     }
 
@@ -136,6 +136,56 @@ final class CeremonialMailOpenViewModelTests: XCTestCase {
         await vm.load()
         vm.openImmediately()
         XCTAssertEqual(vm.phase, .open)
+    }
+
+    // T6.5d (P22) — reduce-motion + skip animation behavior.
+    func testStartBreakingSealWithSkipJumpsStraightToOpen() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.fullItemJSON)]
+        let vm = CeremonialMailOpenViewModel(mailId: "mail_demo", api: makeAPI())
+        await vm.load()
+        // Reduce-motion path — the screen passes `skipAnimation: true`
+        // so we never enter the `.breaking` intermediate frame.
+        await vm.startBreakingSeal(skipAnimation: true)
+        XCTAssertEqual(vm.phase, .open)
+    }
+
+    func testTotalSealToOpenDurationStaysUnderTwoSeconds() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.fullItemJSON)]
+        let vm = CeremonialMailOpenViewModel(mailId: "mail_demo", api: makeAPI())
+        await vm.load()
+        let start = Date()
+        await vm.startBreakingSeal()
+        let elapsed = Date().timeIntervalSince(start)
+        XCTAssertLessThan(elapsed, 2.0,
+                          "Animation budget exceeded (P22 cap: ≤ 2s).")
+        XCTAssertEqual(vm.phase, .open)
+    }
+
+    func testStartBreakingSealNoOpAfterAlreadyOpen() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.fullItemJSON)]
+        let vm = CeremonialMailOpenViewModel(mailId: "mail_demo", api: makeAPI())
+        await vm.load()
+        vm.openImmediately()
+        XCTAssertEqual(vm.phase, .open)
+        await vm.startBreakingSeal(skipAnimation: true)
+        // We're past .sealed so the call is a no-op.
+        XCTAssertEqual(vm.phase, .open)
+    }
+
+    func testSeasonalStationeryTonesDecode() {
+        XCTAssertEqual(CeremonialMailStationeryTone(wire: "fall"), .fall)
+        XCTAssertEqual(CeremonialMailStationeryTone(wire: "winter"), .winter)
+        XCTAssertEqual(CeremonialMailStationeryTone(wire: "spring"), .spring)
+        XCTAssertEqual(CeremonialMailStationeryTone(wire: "summer"), .summer)
+        XCTAssertEqual(CeremonialMailStationeryTone(wire: "evergreen"), .evergreen)
+    }
+
+    func testSeasonalSealTonesDecode() {
+        XCTAssertEqual(CeremonialMailSealTone(wire: "fall"), .fall)
+        XCTAssertEqual(CeremonialMailSealTone(wire: "winter"), .winter)
+        XCTAssertEqual(CeremonialMailSealTone(wire: "spring"), .spring)
+        XCTAssertEqual(CeremonialMailSealTone(wire: "summer"), .summer)
+        XCTAssertEqual(CeremonialMailSealTone(wire: "evergreen"), .evergreen)
     }
 
     func testEnterReplyingPhase() async {
