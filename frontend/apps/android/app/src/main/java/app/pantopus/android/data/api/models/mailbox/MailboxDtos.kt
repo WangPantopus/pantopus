@@ -60,10 +60,28 @@ data class MailDetailResponse(
     val mail: MailDetail,
 )
 
+/**
+ * Detail payload returned by `GET /api/mailbox/:id`. The backend response
+ * inlines every [MailItem] field plus the typed sender + object + links.
+ * The DTO captures the per-detail extras explicitly; T6.5b adds the
+ * full per-item field set so the generic A17.1 detail can wire every
+ * shell slot without a second round-trip.
+ */
 @JsonClass(generateAdapter = true)
 data class MailDetail(
     val id: String,
     val type: String,
+    @Json(name = "mail_type") val mailType: String? = null,
+    @Json(name = "display_title") val displayTitle: String? = null,
+    @Json(name = "preview_text") val previewText: String? = null,
+    val subject: String? = null,
+    val content: String? = null,
+    @Json(name = "sender_business_name") val senderBusinessName: String? = null,
+    @Json(name = "sender_address") val senderAddress: String? = null,
+    @Json(name = "ack_required") val ackRequired: Boolean? = null,
+    @Json(name = "ack_status") val ackStatus: String? = null,
+    val attachments: List<String>? = null,
+    @Json(name = "expires_at") val expiresAt: String? = null,
     @Json(name = "created_at") val createdAt: String,
     val sender: Sender?,
     val `object`: JsonValue?,

@@ -50,6 +50,85 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         }
     }
 
+    /// Lucide icon for the 40pt category tile rendered on the list row's
+    /// `RowLeading.typeIcon` slot. Per `mailbox.jsx:4-16` per-category
+    /// accents; icons picked to mirror the design's row imagery.
+    public var icon: PantopusIcon {
+        switch self {
+        case .package: .package
+        case .coupon: .tag
+        case .booklet: .fileText
+        case .certified: .badgeCheck
+        case .notice: .alertCircle
+        case .bill: .receipt
+        case .statement: .fileText
+        case .insurance: .shield
+        case .tax: .receipt
+        case .subscription: .arrowsRepeat
+        case .legal: .gavel
+        case .healthcare: .heartPulse
+        case .membership: .badgeCheck
+        case .delivery: .package
+        case .social: .users
+        case .general: .mailbox
+        }
+    }
+
+    /// Soft-tinted background for the 40pt list-row tile.
+    public var rowBackground: Color {
+        switch self {
+        case .package: Theme.Color.appSurfaceSunken
+        case .coupon: Theme.Color.businessBg
+        case .booklet: Theme.Color.personalBg
+        case .certified: Theme.Color.primary50
+        case .notice: Theme.Color.warningBg
+        case .bill: Theme.Color.errorBg
+        case .statement: Theme.Color.personalBg
+        case .insurance: Theme.Color.infoBg
+        case .tax: Theme.Color.warningBg
+        case .subscription: Theme.Color.businessBg
+        case .legal: Theme.Color.businessBg
+        case .healthcare: Theme.Color.errorBg
+        case .membership: Theme.Color.personalBg
+        case .delivery: Theme.Color.appSurfaceSunken
+        case .social: Theme.Color.homeBg
+        case .general: Theme.Color.appSurfaceSunken
+        }
+    }
+
+    /// User-facing label (Capitalised) for the chip on the row + the
+    /// eyebrow on the detail top bar.
+    public var label: String {
+        switch self {
+        case .package: "Package"
+        case .coupon: "Coupon"
+        case .booklet: "Booklet"
+        case .certified: "Certified"
+        case .notice: "Notice"
+        case .bill: "Bill"
+        case .statement: "Statement"
+        case .insurance: "Insurance"
+        case .tax: "Tax"
+        case .subscription: "Subscription"
+        case .legal: "Legal"
+        case .healthcare: "Healthcare"
+        case .membership: "Membership"
+        case .delivery: "Delivery"
+        case .social: "Social"
+        case .general: "Mail"
+        }
+    }
+
+    /// Maps a [`MailTrust`] / DTO to the design's `MailDetailTrust` dot
+    /// kind used by the A17 shell's top-bar eyebrow.
+    public var detailTrust: MailDetailTrust {
+        switch self {
+        case .certified, .legal, .tax: .verified
+        case .notice, .bill: .warning
+        default: .neutral
+        }
+    }
+
     /// Matches a backend `mail_type` / `type` string onto a typed case.
     public static func fromRaw(_ raw: String?) -> MailItemCategory {
         guard let raw = raw?.lowercased() else { return .general }
@@ -121,6 +200,17 @@ public enum MailTrust: String, Sendable, CaseIterable {
         case "pantopus_user": .chain
         case "partial": .partial
         default: .unverified
+        }
+    }
+
+    /// Conversion to the [`MailDetailTrust`] enum the A17 shell expects.
+    /// `chain` / `certifiedChain` collapse to `.verified`; `unverified`
+    /// collapses to `.neutral` (the dot is informational, not a warning).
+    public var detailTrust: MailDetailTrust {
+        switch self {
+        case .verified, .chain, .certifiedChain: .verified
+        case .partial: .warning
+        case .unverified: .neutral
         }
     }
 }

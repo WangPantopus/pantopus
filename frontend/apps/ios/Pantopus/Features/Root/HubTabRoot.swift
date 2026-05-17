@@ -539,7 +539,10 @@ public struct HubTabRoot: View {
                 )
             )
         case let .mailItemDetail(mailId):
-            MailboxItemDetailView(
+            // T6.5b (P20) — Generic A17.1 mail detail. P21–P23 will
+            // extend this with package / coupon / booklet / certified
+            // variants that compose the same shell with their own slots.
+            MailDetailView(
                 mailId: mailId,
                 onBack: {
                     if !path.isEmpty { path.removeLast() }

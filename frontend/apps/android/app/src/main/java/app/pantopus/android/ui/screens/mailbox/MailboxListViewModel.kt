@@ -7,16 +7,20 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.mailbox.MailItem
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
-import app.pantopus.android.ui.components.StatusChipVariant
+import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
+import app.pantopus.android.ui.screens.mailbox.item_detail.MailTrust
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsTab
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowHighlight
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowModel
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
-import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -158,25 +162,82 @@ class MailboxListViewModel
             }
         }
 
-        private fun rowFor(mail: MailItem): RowModel {
-            val title = mail.displayTitle ?: mail.subject ?: mail.senderBusinessName ?: "Mail"
-            val subtitle = mail.previewText ?: mail.senderBusinessName ?: mail.senderAddress
-            val chip =
-                when {
-                    mail.priority == "urgent" -> RowTrailing.Status("Urgent", StatusChipVariant.ErrorVariant)
-                    !mail.viewed -> RowTrailing.Status("Unread", StatusChipVariant.Info)
-                    mail.starred -> RowTrailing.Status("Starred", StatusChipVariant.Warning)
-                    else -> RowTrailing.Status("Read", StatusChipVariant.Neutral)
-                }
+        /**
+         * T6.5b (P20) — Map one mail DTO to the design's row anatomy:
+         *  - leading: 40dp category typeIcon (per `mailbox.jsx:4-16`
+         *    accent palette),
+         *  - sender as subtitle,
+         *  - title (display_title || subject),
+         *  - body (preview_text),
+         *  - chips: category + trust,
+         *  - `timeMeta`: relative time,
+         *  - `unread` highlight when `!viewed`.
+         */
+        internal fun rowFor(mail: MailItem): RowModel {
+            val category = MailItemCategory.fromRaw(mail.mailType ?: mail.type)
+            val trust = MailTrust.fromRaw(null) // V1 list doesn't surface sender_trust
+            val chips =
+                listOf(
+                    RowChip(
+                        text = category.label,
+                        icon = category.icon,
+                        tint = RowChip.Tint.Custom(category.rowBackground, category.accent),
+                    ),
+                    RowChip(
+                        text = trust.label,
+                        icon = trust.icon,
+                        tint = RowChip.Tint.Custom(trust.background, trust.foreground),
+                    ),
+                )
             return RowModel(
                 id = mail.id,
-                title = title,
-                subtitle = subtitle,
+                title = mail.displayTitle ?: mail.subject ?: mail.senderBusinessName ?: "Mail",
+                subtitle = mail.senderBusinessName ?: mail.senderAddress,
                 template = RowTemplate.StatusChip,
                 leading =
-                    RowLeading.Icon(icon = PantopusIcon.Mailbox, tint = PantopusColors.primary600),
-                trailing = chip,
+                    RowLeading.TypeIcon(
+                        icon = category.icon,
+                        background = category.rowBackground,
+                        foreground = category.accent,
+                    ),
+                trailing = RowTrailing.None,
                 onTap = { onOpenMail(mail.id) },
+                body = mail.previewText,
+                chips = chips,
+                timeMeta = formatRelativeTime(mail.createdAt),
+                highlight = if (!mail.viewed) RowHighlight.Unread else null,
             )
+        }
+
+        companion object {
+            /**
+             * Mirrors iOS `MailboxListViewModel.formatRelativeTime`:
+             *   < 1m  → "now"
+             *   < 1h  → "Nm"
+             *   < 24h → "Nh"
+             *   < 7d  → "Nd"
+             *   else  → "MMM d"
+             */
+            @JvmStatic
+            fun formatRelativeTime(iso: String?): String? {
+                if (iso.isNullOrBlank()) return null
+                val instant = runCatching { Instant.parse(iso) }.getOrNull() ?: return null
+                val now = Instant.now()
+                val seconds = ChronoUnit.SECONDS.between(instant, now)
+                return when {
+                    seconds < 60 -> "now"
+                    seconds < 3_600 -> "${seconds / 60}m"
+                    seconds < 86_400 -> "${seconds / 3_600}h"
+                    seconds < 7 * 86_400 -> "${seconds / 86_400}d"
+                    else -> {
+                        val zoned = instant.atZone(java.time.ZoneId.systemDefault())
+                        val month = zoned.month.getDisplayName(
+                            java.time.format.TextStyle.SHORT,
+                            java.util.Locale.US,
+                        )
+                        "$month ${zoned.dayOfMonth}"
+                    }
+                }
+            }
         }
     }

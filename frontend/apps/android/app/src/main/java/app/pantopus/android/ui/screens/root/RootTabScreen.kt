@@ -116,7 +116,7 @@ import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
-import app.pantopus.android.ui.screens.mailbox.item_detail.MailboxItemDetailScreen
+import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
 import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
 import app.pantopus.android.ui.screens.my_posts.MyPostsScreen
@@ -1109,7 +1109,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.MAILBOX_ITEM_DETAIL,
                 arguments = listOf(navArgument(MAILBOX_ITEM_DETAIL_MAIL_ID_KEY) { type = NavType.StringType }),
             ) {
-                MailboxItemDetailScreen(
+                // T6.5b (P20) — generic A17.1 mail detail. P21-P23 will
+                // add package / coupon / booklet / certified variants on
+                // top of the same shared shell.
+                MailDetailScreen(
                     onBack = { navController.popBackStack() },
                     onOpenSenderProfile = { userId ->
                         navController.navigate(ChildRoutes.publicProfile(userId))
