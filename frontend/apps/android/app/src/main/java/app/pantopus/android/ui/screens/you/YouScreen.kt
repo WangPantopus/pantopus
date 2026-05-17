@@ -92,6 +92,7 @@ fun YouScreen(
     onOpenHomeBills: (String) -> Unit = {},
     onOpenHomePets: (String) -> Unit = {},
     onOpenAccessCodes: (homeId: String, homeName: String?) -> Unit = { _, _ -> },
+    onOpenHomeOwners: (String) -> Unit = {},
     onOpenHomeMembers: (String) -> Unit = {},
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
@@ -157,6 +158,10 @@ fun YouScreen(
                     } else {
                         onOpenPlaceholder(row.label)
                     }
+                }
+                "me.owners" -> {
+                    val homeId = row.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeOwners(homeId) else onOpenPlaceholder(row.label)
                 }
                 "me.members" -> {
                     val homeId = row.routeArgs["homeId"].orEmpty()

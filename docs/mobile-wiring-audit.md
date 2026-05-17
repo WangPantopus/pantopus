@@ -356,6 +356,17 @@ controls + interactive rows hit when tapped) for each new screen. No
 | FAB (52pt) | `PetsRoute.addEdit(homeId, nil)` → wizard |
 | Wizard submit | `POST /api/homes/:id/pets` or `PUT /api/homes/:id/pets/:petId` |
 
+### Owners list (P15 / T6.3g)
+
+| Element | Wiring |
+|---|---|
+| First-appear / pull-to-refresh | `GET /api/homes/:id/owners` (homeOwnership.js:1381) |
+| Row tap | no-op (V1; reserved for future "View claim" destination once `claim_id` lands on the owner row) |
+| Row kebab → Remove (confirm) | `DELETE /api/homes/:id/owners/:ownerId` (homeOwnership.js:1614) — optimistic; quorum response keeps the row dropped + surfaces "Removal pending" toast; 4xx / 5xx rolls back |
+| FAB (52pt `secondaryCreate` user-plus, `.home` tint) | iOS: presents `InviteOwnerFormView` sheet · Android: `navController.navigate(ChildRoutes.inviteOwner(homeId, ""))` · Web: `router.push('/app/homes/${homeId}/owners/invite')` — all three hit `POST /api/homes/:id/owners/invite` (homeOwnership.js:1434) on submit |
+| Empty-state CTA | Same as FAB |
+| Entry from Me / You | `me.owners` Household-section row → iOS `YouRoute.homeOwners(homeId:)` / Android `ChildRoutes.HOME_OWNERS` / Web `/app/homes/[id]/owners`; primary home id resolved by `MeViewModel.homeSections(...)` |
+
 ### Offers V2 — cross-listing (T5.2.4 / P9)
 
 | Element | Wiring |

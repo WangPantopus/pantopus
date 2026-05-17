@@ -51,6 +51,10 @@ public enum YouRoute: Hashable {
     /// rendered under the title while the underlying home payload is
     /// in flight or unavailable.
     case accessCodes(homeId: String, homeName: String?)
+    /// P15 / T6.3g — Owners (legal-title roster). The "me.owners"
+    /// Household-section row pushes here with the primary home id
+    /// resolved by `MeViewModel.homeSections(...)`.
+    case homeOwners(homeId: String)
     /// T6.3a / P9 — Members. The home-context "me.members" action tile +
     /// "Household" section row both push here with the resolved home id.
     case homeMembers(homeId: String)
@@ -330,6 +334,11 @@ public struct YouTabRoot: View {
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 let homeName = row.routeArgs["homeName"]
                 path.append(.accessCodes(homeId: homeId, homeName: homeName))
+                return
+            }
+        case "me.owners":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeOwners(homeId: homeId))
                 return
             }
         case "me.members":
@@ -631,21 +640,29 @@ public struct YouTabRoot: View {
             AccessCodesView(
                 viewModel: AccessCodesViewModel(
                     homeId: homeId,
-                    homeName: homeName,
-                    onSelect: { target in
-                        Task { @MainActor in
-                            switch target {
-                            case let .addCode(_, category):
-                                let label = category.map { "Add \($0.label) code" } ?? "Add access code"
-                                path.append(.placeholder(label: label))
-                            case .editCode:
-                                path.append(.placeholder(label: "Edit access code"))
-                            case .search:
-                                path.append(.placeholder(label: "Search access codes"))
-                            }
+                    homeName: homeName
+                ) { target in
+                    Task { @MainActor in
+                        switch target {
+                        case let .addCode(_, category):
+                            let label = category.map { "Add \($0.label) code" } ?? "Add access code"
+                            path.append(.placeholder(label: label))
+                        case .editCode:
+                            path.append(.placeholder(label: "Edit access code"))
+                        case .search:
+                            path.append(.placeholder(label: "Search access codes"))
                         }
                     }
-                )
+                }
+            )
+        case let .homeOwners(homeId):
+            let currentUserId: String? = {
+                if case let .signedIn(user) = auth.state { return user.id }
+                return nil
+            }()
+            OwnersListView(
+                homeId: homeId,
+                currentUserId: currentUserId
             )
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId)
