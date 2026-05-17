@@ -3,8 +3,11 @@ package app.pantopus.android.data.api.services
 import app.pantopus.android.data.api.models.common.JsonValue
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CheckAddressResponse
+import app.pantopus.android.data.api.models.homes.CreateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
+import app.pantopus.android.data.api.models.homes.HomeAccessSecretResponse
+import app.pantopus.android.data.api.models.homes.HomeAccessSecretsResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
@@ -19,9 +22,11 @@ import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
+import app.pantopus.android.data.api.models.homes.UpdateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -138,4 +143,34 @@ interface HomesApi {
         @Path("id") homeId: String,
         @Path("billId") billId: String,
     ): GetBillSplitsResponse
+
+    // ─── Access codes (T6.4a) ──────────────────────────────────────
+
+    /** `GET /api/homes/:id/access` — route `backend/routes/home.js:5487`. */
+    @GET("api/homes/{id}/access")
+    suspend fun getHomeAccessSecrets(
+        @Path("id") homeId: String,
+    ): HomeAccessSecretsResponse
+
+    /** `POST /api/homes/:id/access` — route `backend/routes/home.js:5527`. */
+    @POST("api/homes/{id}/access")
+    suspend fun createHomeAccessSecret(
+        @Path("id") homeId: String,
+        @Body body: CreateAccessSecretRequest,
+    ): HomeAccessSecretResponse
+
+    /** `PUT /api/homes/:id/access/:secretId` — route `backend/routes/home.js:5586`. */
+    @PUT("api/homes/{id}/access/{secretId}")
+    suspend fun updateHomeAccessSecret(
+        @Path("id") homeId: String,
+        @Path("secretId") secretId: String,
+        @Body body: UpdateAccessSecretRequest,
+    ): HomeAccessSecretResponse
+
+    /** `DELETE /api/homes/:id/access/:secretId` — route `backend/routes/home.js:5624`. */
+    @DELETE("api/homes/{id}/access/{secretId}")
+    suspend fun deleteHomeAccessSecret(
+        @Path("id") homeId: String,
+        @Path("secretId") secretId: String,
+    )
 }

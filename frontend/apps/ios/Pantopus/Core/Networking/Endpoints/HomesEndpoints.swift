@@ -146,4 +146,113 @@ public enum HomesEndpoints {
     public static func deletePet(homeId: String, petId: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/homes/\(homeId)/pets/\(petId)")
     }
+
+    // MARK: - Access codes (T6.4a)
+
+    /// `GET /api/homes/:id/access` — route `backend/routes/home.js:5487`.
+    /// Returns `{ secrets: [HomeAccessSecretDTO] }` filtered by the
+    /// caller's visibility scope (members / managers / sensitive).
+    public static func accessSecrets(homeId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/homes/\(homeId)/access")
+    }
+
+    /// `POST /api/homes/:id/access` — route `backend/routes/home.js:5527`.
+    public static func createAccessSecret(
+        homeId: String,
+        request: CreateAccessSecretRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/access",
+            body: request
+        )
+    }
+
+    /// `PUT /api/homes/:id/access/:secretId` — route `backend/routes/home.js:5586`.
+    public static func updateAccessSecret(
+        homeId: String,
+        secretId: String,
+        request: UpdateAccessSecretRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .put,
+            path: "/api/homes/\(homeId)/access/\(secretId)",
+            body: request
+        )
+    }
+
+    /// `DELETE /api/homes/:id/access/:secretId` — route `backend/routes/home.js:5624`.
+    public static func deleteAccessSecret(homeId: String, secretId: String) -> Endpoint {
+        Endpoint(
+            method: .delete,
+            path: "/api/homes/\(homeId)/access/\(secretId)"
+        )
+    }
+}
+
+// MARK: - Access codes request bodies
+
+/// POST body for `createAccessSecret`. Mirrors the destructure at
+/// `backend/routes/home.js:5535`.
+public struct CreateAccessSecretRequest: Encodable, Sendable {
+    public let accessType: String
+    public let label: String
+    public let secretValue: String
+    public let notes: String?
+    public let visibility: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case accessType = "access_type"
+        case label
+        case secretValue = "secret_value"
+        case notes
+        case visibility
+    }
+
+    public init(
+        accessType: String,
+        label: String,
+        secretValue: String,
+        notes: String? = nil,
+        visibility: String? = nil
+    ) {
+        self.accessType = accessType
+        self.label = label
+        self.secretValue = secretValue
+        self.notes = notes
+        self.visibility = visibility
+    }
+}
+
+/// PUT body for `updateAccessSecret`. All fields optional (server-side
+/// applies only present keys per the allow-list at
+/// `backend/routes/home.js:5594`).
+public struct UpdateAccessSecretRequest: Encodable, Sendable {
+    public let accessType: String?
+    public let label: String?
+    public let secretValue: String?
+    public let notes: String?
+    public let visibility: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case accessType = "access_type"
+        case label
+        case secretValue = "secret_value"
+        case notes
+        case visibility
+    }
+
+    public init(
+        accessType: String? = nil,
+        label: String? = nil,
+        secretValue: String? = nil,
+        notes: String? = nil,
+        visibility: String? = nil
+    ) {
+        self.accessType = accessType
+        self.label = label
+        self.secretValue = secretValue
+        self.notes = notes
+        self.visibility = visibility
+    }
 }

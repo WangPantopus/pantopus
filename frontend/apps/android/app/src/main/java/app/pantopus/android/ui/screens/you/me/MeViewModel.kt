@@ -207,7 +207,7 @@ class MeViewModel
                             MeStat("members", "—", "Members"),
                         ),
                     actionTiles = homeActionTiles(homeId = null),
-                    sections = withDebug(homeSections(homeId = null, privacyValue = null)),
+                    sections = withDebug(homeSections(homeId = null, homeName = null, privacyValue = null)),
                     isUnbound = true,
                 )
             }
@@ -238,7 +238,14 @@ class MeViewModel
                         MeStat("members", "$memberCount", "Members"),
                     ),
                 actionTiles = homeActionTiles(homeId = primary.id),
-                sections = withDebug(homeSections(homeId = primary.id, privacyValue = "Neighbors")),
+                sections =
+                    withDebug(
+                        homeSections(
+                            homeId = primary.id,
+                            homeName = displayName,
+                            privacyValue = "Neighbors",
+                        ),
+                    ),
             )
         }
 
@@ -312,9 +319,19 @@ class MeViewModel
 
         private fun homeSections(
             homeId: String?,
+            homeName: String?,
             privacyValue: String?,
         ): List<MeSection> {
             val args = if (homeId != null) mapOf("homeId" to homeId) else emptyMap()
+            // T6.4a — access codes additionally carry homeName so the
+            // access screen's 2-line top bar can render the designed
+            // "412 Birch Ln" subtitle without an extra fetch.
+            val accessArgs =
+                if (homeId != null && !homeName.isNullOrEmpty()) {
+                    args + ("homeName" to homeName)
+                } else {
+                    args
+                }
             return listOf(
                 MeSection(
                     id = "household",
@@ -323,7 +340,13 @@ class MeViewModel
                         listOf(
                             MeSectionRow("members", PantopusIcon.UserPlus, "Members", routeKey = "me.members", routeArgs = args),
                             MeSectionRow("owners", PantopusIcon.Shield, "Owners", routeKey = "me.owners", routeArgs = args),
-                            MeSectionRow("access", PantopusIcon.Lock, "Access codes", routeKey = "me.access", routeArgs = args),
+                            MeSectionRow(
+                                "access",
+                                PantopusIcon.Lock,
+                                "Access codes",
+                                routeKey = "me.access",
+                                routeArgs = accessArgs,
+                            ),
                         ),
                 ),
                 MeSection(

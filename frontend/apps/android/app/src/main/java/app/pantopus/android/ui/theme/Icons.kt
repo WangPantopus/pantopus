@@ -94,6 +94,8 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
@@ -249,6 +251,10 @@ enum class PantopusIcon(
     Shuffle("shuffle"),
     WandSparkles("wand-sparkles"),
     ArrowUpRight("arrow-up-right"),
+
+    // T6.4a — Access codes: tap-to-reveal hide icon + empty-state key disc.
+    EyeOff("eye-off"),
+    KeyRound("key-round"),
     ;
 
     companion object {
@@ -398,6 +404,9 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Shuffle -> IconSource.Material(Icons.Filled.Shuffle)
         PantopusIcon.WandSparkles -> IconSource.Material(Icons.Filled.AutoFixHigh)
         PantopusIcon.ArrowUpRight -> IconSource.Material(Icons.Filled.NorthEast)
+        // T6.4a — Access codes glyphs.
+        PantopusIcon.EyeOff -> IconSource.Material(Icons.Filled.VisibilityOff)
+        PantopusIcon.KeyRound -> IconSource.Material(Icons.Filled.VpnKey)
     }
 
 /**

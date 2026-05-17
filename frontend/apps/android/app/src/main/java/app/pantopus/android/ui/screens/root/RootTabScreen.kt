@@ -49,6 +49,7 @@ import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
+import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
 import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
 import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.AddBillWizardScreen
@@ -144,6 +145,19 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home pets list. */
     fun homePets(homeId: String): String = "homes/$homeId/pets"
+
+    /** Access codes per home (T6.4a). `homeName` rides as a query so the
+     *  designed 2-line top bar can render without a second fetch. */
+    const val ACCESS_CODES_HOME_ID_KEY = "homeId"
+    const val ACCESS_CODES_HOME_NAME_KEY = "homeName"
+    const val ACCESS_CODES =
+        "homes/{$ACCESS_CODES_HOME_ID_KEY}/access?$ACCESS_CODES_HOME_NAME_KEY={$ACCESS_CODES_HOME_NAME_KEY}"
+
+    /** Build the concrete path for the access codes screen. */
+    fun accessCodes(homeId: String, homeName: String?): String {
+        val encoded = homeName?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
+        return "homes/$homeId/access?$ACCESS_CODES_HOME_NAME_KEY=$encoded"
+    }
 
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
@@ -637,6 +651,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
+                    onOpenAccessCodes = { homeId, homeName ->
+                        navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
+                    },
                 )
             }
 
@@ -668,6 +685,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenPets = { homeId ->
                         navController.navigate(ChildRoutes.homePets(homeId))
+                    },
+                    onOpenAccessCodes = { homeId, homeName ->
+                        navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
                     },
                 )
             }
@@ -716,6 +736,32 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
                 PetsListScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.ACCESS_CODES,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.ACCESS_CODES_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(ChildRoutes.ACCESS_CODES_HOME_NAME_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                    ),
+            ) {
+                AccessCodesScreen(
+                    onAddCode = { category ->
+                        val label = category?.let { "Add ${it.label} code" } ?: "Add access code"
+                        navController.navigate(ChildRoutes.placeholder(label))
+                    },
+                    onEditCode = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Edit access code"))
+                    },
+                    onSearch = {
+                        navController.navigate(ChildRoutes.placeholder("Search access codes"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(ChildRoutes.MAILBOX_LIST) {
                 MailboxListScreen(

@@ -91,6 +91,7 @@ fun YouScreen(
     onOpenAudienceProfile: () -> Unit = {},
     onOpenHomeBills: (String) -> Unit = {},
     onOpenHomePets: (String) -> Unit = {},
+    onOpenAccessCodes: (homeId: String, homeName: String?) -> Unit = { _, _ -> },
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
     val signedIn = state as? AuthRepository.State.SignedIn
@@ -142,6 +143,15 @@ fun YouScreen(
                 "me.bills" -> {
                     val homeId = row.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomeBills(homeId) else onOpenPlaceholder(row.label)
+                }
+                "me.access" -> {
+                    val homeId = row.routeArgs["homeId"].orEmpty()
+                    val homeName = row.routeArgs["homeName"]
+                    if (homeId.isNotEmpty()) {
+                        onOpenAccessCodes(homeId, homeName)
+                    } else {
+                        onOpenPlaceholder(row.label)
+                    }
                 }
                 "me.editProfile" -> onOpenEditProfile()
                 "me.settings" -> onOpenSettings()

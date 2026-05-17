@@ -1,11 +1,14 @@
 package app.pantopus.android.data.homes
 
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
+import app.pantopus.android.data.api.models.homes.CreateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.FileUploadResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.HomeAccessSecretResponse
+import app.pantopus.android.data.api.models.homes.HomeAccessSecretsResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
@@ -13,6 +16,7 @@ import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
+import app.pantopus.android.data.api.models.homes.UpdateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
@@ -102,6 +106,32 @@ open class HomesRepository
             homeId: String,
             billId: String,
         ): NetworkResult<GetBillSplitsResponse> = safeApiCall { api.getHomeBillSplits(homeId, billId) }
+
+        // ─── Access codes (T6.4a) ──────────────────────────────────
+
+        /** `GET /api/homes/:id/access`. */
+        open suspend fun getHomeAccessSecrets(
+            homeId: String,
+        ): NetworkResult<HomeAccessSecretsResponse> = safeApiCall { api.getHomeAccessSecrets(homeId) }
+
+        /** `POST /api/homes/:id/access`. */
+        open suspend fun createHomeAccessSecret(
+            homeId: String,
+            request: CreateAccessSecretRequest,
+        ): NetworkResult<HomeAccessSecretResponse> = safeApiCall { api.createHomeAccessSecret(homeId, request) }
+
+        /** `PUT /api/homes/:id/access/:secretId`. */
+        open suspend fun updateHomeAccessSecret(
+            homeId: String,
+            secretId: String,
+            request: UpdateAccessSecretRequest,
+        ): NetworkResult<HomeAccessSecretResponse> = safeApiCall { api.updateHomeAccessSecret(homeId, secretId, request) }
+
+        /** `DELETE /api/homes/:id/access/:secretId`. */
+        open suspend fun deleteHomeAccessSecret(
+            homeId: String,
+            secretId: String,
+        ): NetworkResult<Unit> = safeApiCall { api.deleteHomeAccessSecret(homeId, secretId) }
 
         /**
          * Upload one binary file to `POST /api/files/upload` and return

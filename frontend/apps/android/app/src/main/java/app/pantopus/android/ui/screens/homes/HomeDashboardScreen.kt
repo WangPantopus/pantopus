@@ -61,6 +61,7 @@ fun HomeDashboardScreen(
     onOpenBills: ((String) -> Unit)? = null,
     onOpenPlaceholder: ((String) -> Unit)? = null,
     onOpenPets: ((String) -> Unit)? = null,
+    onOpenAccessCodes: ((homeId: String, homeName: String?) -> Unit)? = null,
     viewModel: HomeDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -81,6 +82,7 @@ fun HomeDashboardScreen(
             "verify" -> "Verify home"
             "view_bills" -> "Bills"
             "pets" -> "Pets"
+            "access_codes" -> "Access codes"
             else -> actionId.replace('_', ' ').replaceFirstChar(Char::uppercase)
         }
 
@@ -116,6 +118,11 @@ fun HomeDashboardScreen(
             "pets" ->
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenPets?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "access_codes" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenAccessCodes?.invoke(homeId, viewModel.currentHomeName())
+                        ?: openPlaceholder(actionId)
                 }
             else -> openPlaceholder(actionId)
         }

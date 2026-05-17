@@ -43,6 +43,14 @@ public enum YouRoute: Hashable {
     case homeBills(homeId: String)
     /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
     case homePets(homeId: String)
+    /// T6.4a — Access codes. Per-home roster of Wi-Fi / Alarm / Gate /
+    /// Lockbox / Garage / Smart lock codes. The "me.access" Household-
+    /// section row pushes here with the primary home id resolved by
+    /// the VM; the Home Dashboard quick-action shares the same screen.
+    /// `homeName` is an optional pre-resolved subtitle ("412 Birch Ln")
+    /// rendered under the title while the underlying home payload is
+    /// in flight or unavailable.
+    case accessCodes(homeId: String, homeName: String?)
     /// T5.3.4 — per-listing offers panel. Pushed from a listing detail
     /// "View offers" affordance (visible when the current user owns the
     /// listing). The optional `title` is a hint rendered as the
@@ -307,6 +315,12 @@ public struct YouTabRoot: View {
         case "me.bills":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
+                return
+            }
+        case "me.access":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                let homeName = row.routeArgs["homeName"]
+                path.append(.accessCodes(homeId: homeId, homeName: homeName))
                 return
             }
         case "me.editProfile":
@@ -599,6 +613,26 @@ public struct YouTabRoot: View {
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .accessCodes(homeId, homeName):
+            AccessCodesView(
+                viewModel: AccessCodesViewModel(
+                    homeId: homeId,
+                    homeName: homeName,
+                    onSelect: { target in
+                        Task { @MainActor in
+                            switch target {
+                            case let .addCode(_, category):
+                                let label = category.map { "Add \($0.label) code" } ?? "Add access code"
+                                path.append(.placeholder(label: label))
+                            case .editCode:
+                                path.append(.placeholder(label: "Edit access code"))
+                            case .search:
+                                path.append(.placeholder(label: "Search access codes"))
+                            }
+                        }
+                    }
+                )
+            )
         #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(
