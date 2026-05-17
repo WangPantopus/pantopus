@@ -45,6 +45,7 @@ import javax.inject.Singleton
  * they can expose a single error surface to the UI.
  */
 @Singleton
+@Suppress("TooManyFunctions")
 open class HomesRepository
     @Inject
     constructor(
