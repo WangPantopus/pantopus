@@ -36,6 +36,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenPollsViewed
     case screenPollDetailViewed
     case ctaPollVoteSubmit(result: AnalyticsResult)
+    case screenMembersListViewed
+    case screenMembersWizardStepViewed(stepNumber: Int, stepName: String)
     case screenPulseFeedViewed(intent: String)
     case ctaHubActionStripTapped(label: String)
     case ctaHubPillarTapped(pillar: String)
@@ -68,6 +70,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenPollsViewed: "screen.polls.viewed"
         case .screenPollDetailViewed: "screen.poll_detail.viewed"
         case .ctaPollVoteSubmit: "cta.poll_vote.submit"
+        case .screenMembersListViewed: "screen.members_list.viewed"
+        case .screenMembersWizardStepViewed: "screen.members_wizard.step_viewed"
         case .screenPulseFeedViewed: "screen.pulse_feed.viewed"
         case .ctaHubActionStripTapped: "cta.hub.action_strip_tapped"
         case .ctaHubPillarTapped: "cta.hub.pillar_tapped"
@@ -88,6 +92,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case let .screenAddHomeWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .screenPetsWizardStepViewed(stepNumber, stepName):
+            ["step_number": "\(stepNumber)", "step_name": stepName]
+        case let .screenMembersWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .screenClaimOwnershipStepViewed(stepName):
             ["step_name": stepName]
@@ -120,6 +126,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenPetsListViewed,
              .screenPollsViewed,
              .screenPollDetailViewed,
+             .screenMembersListViewed,
              .screenEditProfileViewed,
              .ctaMailboxItemLogReceived,
              .ctaAddHomeSubmit:
