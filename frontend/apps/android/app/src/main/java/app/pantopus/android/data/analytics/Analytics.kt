@@ -52,6 +52,16 @@ sealed class AnalyticsEvent(
 
     data object ScreenPetsListViewed : AnalyticsEvent("screen.pets_list.viewed")
 
+    data object ScreenPollsViewed : AnalyticsEvent("screen.polls.viewed")
+
+    data object ScreenPollDetailViewed : AnalyticsEvent("screen.poll_detail.viewed")
+
+    data class CtaPollVoteSubmit(
+        val result: AnalyticsResult,
+    ) : AnalyticsEvent("cta.poll_vote.submit") {
+        override val properties = mapOf("result" to result.value)
+    }
+
     /** T6.3f / P14 — My listings index (the seller's tabbed list). */
     data object ScreenMyListingsViewed : AnalyticsEvent("screen.my_listings.viewed")
 

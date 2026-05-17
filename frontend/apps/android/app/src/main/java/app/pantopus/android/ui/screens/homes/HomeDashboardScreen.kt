@@ -59,6 +59,7 @@ fun HomeDashboardScreen(
     onClaimOwnership: ((String) -> Unit)? = null,
     onOpenClaimsList: (() -> Unit)? = null,
     onOpenBills: ((String) -> Unit)? = null,
+    onOpenPolls: ((String) -> Unit)? = null,
     onOpenPlaceholder: ((String) -> Unit)? = null,
     onOpenPets: ((String) -> Unit)? = null,
     onOpenPackages: ((String) -> Unit)? = null,
@@ -90,6 +91,7 @@ fun HomeDashboardScreen(
             "add_member" -> "Add member"
             "verify" -> "Verify home"
             "view_bills" -> "Bills"
+            "view_polls" -> "Polls"
             "view_tasks" -> "Tasks"
             "view_maintenance" -> "Maintenance"
             "pets" -> "Pets"
@@ -132,6 +134,10 @@ fun HomeDashboardScreen(
             "view_bills" ->
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenBills?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "view_polls" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenPolls?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
             "view_maintenance" ->
                 viewModel.currentHomeId()?.let { homeId ->

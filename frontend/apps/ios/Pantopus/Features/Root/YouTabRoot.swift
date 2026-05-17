@@ -64,6 +64,10 @@ public enum YouRoute: Hashable {
     /// T6.3d — Log a package sheet target. Presented modally from the
     /// Packages list FAB and the empty-state CTA.
     case logPackage(homeId: String)
+    /// T6.3e — Polls. The home-context "me.polls" action tile pushes here.
+    case homePolls(homeId: String)
+    /// T6.3e — Poll detail. Pushed from a Polls list row.
+    case pollDetail(homeId: String, pollId: String)
     /// T6.4a — Access codes. Per-home roster of Wi-Fi / Alarm / Gate /
     /// Lockbox / Garage / Smart lock codes. The "me.access" Household-
     /// section row pushes here with the primary home id resolved by
@@ -337,6 +341,12 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.polls":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homePolls(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         case "me.tasks":
             if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeTasks(homeId: homeId))
@@ -400,6 +410,11 @@ public struct YouTabRoot: View {
         case "me.packages":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homePackages(homeId: homeId))
+                return
+            }
+        case "me.polls":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homePolls(homeId: homeId))
                 return
             }
         case "me.access":
@@ -755,6 +770,25 @@ public struct YouTabRoot: View {
                     }
                 }
             )
+        case let .homePolls(homeId):
+            PollsListView(
+                viewModel: PollsListViewModel(
+                    homeId: homeId,
+                    onOpenPoll: { pollId in
+                        Task { @MainActor in path.append(.pollDetail(homeId: homeId, pollId: pollId)) }
+                    },
+                    onStartPoll: {
+                        Task { @MainActor in path.append(.placeholder(label: "Start a poll")) }
+                    }
+                )
+            )
+        case let .pollDetail(homeId, pollId):
+            PollDetailView(
+                homeId: homeId,
+                pollId: pollId
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case let .accessCodes(homeId, homeName):
             AccessCodesView(
                 viewModel: AccessCodesViewModel(
@@ -819,6 +853,9 @@ public struct YouTabRoot: View {
                 },
                 onOpenBills: {
                     Task { @MainActor in path.append(.homeBills(homeId: homeId)) }
+                },
+                onOpenPolls: {
+                    Task { @MainActor in path.append(.homePolls(homeId: homeId)) }
                 },
                 onOpenPlaceholder: { label in
                     Task { @MainActor in path.append(.placeholder(label: label)) }

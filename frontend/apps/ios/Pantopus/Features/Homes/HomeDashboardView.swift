@@ -19,6 +19,8 @@ struct HomeDashboardView: View {
     private let onOpenClaimsList: (() -> Void)?
     /// Route to the Bills list for this home (T5.2.2).
     private let onOpenBills: (() -> Void)?
+    /// Route to the Polls list for this home (T6.3e).
+    private let onOpenPolls: (() -> Void)?
     /// Host-supplied navigation for actions whose dedicated screen
     /// isn't built yet (Log package, Add mail, etc). Receives the
     /// human-readable action label.
@@ -47,6 +49,7 @@ struct HomeDashboardView: View {
         onClaimOwnership: (() -> Void)? = nil,
         onOpenClaimsList: (() -> Void)? = nil,
         onOpenBills: (() -> Void)? = nil,
+        onOpenPolls: (() -> Void)? = nil,
         onOpenPlaceholder: ((String) -> Void)? = nil,
         onOpenPets: ((String) -> Void)? = nil,
         onOpenPackages: ((String) -> Void)? = nil,
@@ -60,6 +63,7 @@ struct HomeDashboardView: View {
         self.onClaimOwnership = onClaimOwnership
         self.onOpenClaimsList = onOpenClaimsList
         self.onOpenBills = onOpenBills
+        self.onOpenPolls = onOpenPolls
         self.onOpenPlaceholder = onOpenPlaceholder
         self.onOpenPets = onOpenPets
         self.onOpenPackages = onOpenPackages
@@ -172,6 +176,8 @@ struct HomeDashboardView: View {
             }
         case "view_bills":
             onOpenBills?()
+        case "view_polls":
+            onOpenPolls?()
         case "view_maintenance":
             onOpenMaintenance?(homeId)
         case "pets":
@@ -193,6 +199,7 @@ struct HomeDashboardView: View {
         case "add_mail": "Add mail"
         case "verify": "Verify home"
         case "view_bills": "Bills"
+        case "view_polls": "Polls"
         case "view_maintenance": "Maintenance"
         case "pets": "Pets"
         case "view_tasks": "Tasks"

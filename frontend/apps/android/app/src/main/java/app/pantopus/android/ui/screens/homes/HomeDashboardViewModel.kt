@@ -197,6 +197,7 @@ class HomeDashboardViewModel
                     listOf(
                         QuickActionTile("view_bills", "Bills", PantopusIcon.Receipt, IdentityPillar.Home),
                         QuickActionTile("view_packages", "Packages", PantopusIcon.Package, IdentityPillar.Home),
+                        QuickActionTile("view_polls", "Polls", PantopusIcon.CheckCircle, IdentityPillar.Home),
                         QuickActionTile("access_codes", "Access codes", PantopusIcon.Lock, IdentityPillar.Home),
                         QuickActionTile("view_tasks", "Tasks", PantopusIcon.ListChecks, IdentityPillar.Home),
                         QuickActionTile("view_maintenance", "Maintenance", PantopusIcon.Hammer, IdentityPillar.Home),
