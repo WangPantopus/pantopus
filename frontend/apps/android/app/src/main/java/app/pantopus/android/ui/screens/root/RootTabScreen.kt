@@ -50,6 +50,7 @@ import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
+import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
 import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
 import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.AddBillWizardScreen
@@ -155,6 +156,22 @@ private object ChildRoutes {
     /** Build the concrete path for a home pets list. */
     fun homePets(homeId: String): String = "homes/$homeId/pets"
 
+    /** Access codes per home (T6.4a). `homeName` rides as a query so the
+     *  designed 2-line top bar can render without a second fetch. */
+    const val ACCESS_CODES_HOME_ID_KEY = "homeId"
+    const val ACCESS_CODES_HOME_NAME_KEY = "homeName"
+    const val ACCESS_CODES =
+        "homes/{$ACCESS_CODES_HOME_ID_KEY}/access?$ACCESS_CODES_HOME_NAME_KEY={$ACCESS_CODES_HOME_NAME_KEY}"
+
+    /** Build the concrete path for the access codes screen. */
+    fun accessCodes(
+        homeId: String,
+        homeName: String?,
+    ): String {
+        val encoded = homeName?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
+        return "homes/$homeId/access?$ACCESS_CODES_HOME_NAME_KEY=$encoded"
+    }
+
     /** Household tasks list per home (T6.3c / P11). */
     const val HOME_TASKS = "homes/{$HOUSEHOLD_TASKS_HOME_ID_KEY}/tasks"
 
@@ -167,10 +184,9 @@ private object ChildRoutes {
     /** Build the concrete path for a home maintenance list. */
     fun homeMaintenance(homeId: String): String = "homes/$homeId/maintenance"
 
-    /**
-     * Owners list per home (P15 / T6.3g). The Owners VM pulls the viewer's id
-     * from [AuthRepository] internally, so no extra arg needs to ride on the route.
-     */
+    /** Owners list per home (P15 / T6.3g). The Owners VM pulls the
+     *  viewer's id from [AuthRepository] internally, so no extra arg
+     *  needs to ride on the route. */
     const val HOME_OWNERS = "homes/{$OWNERS_LIST_HOME_ID_KEY}/owners"
 
     /** Build the concrete path for a home owners list. */
@@ -680,6 +696,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
+                    onOpenAccessCodes = { homeId, homeName ->
+                        navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
+                    },
                     onOpenHomeTasks = { homeId -> navController.navigate(ChildRoutes.homeTasks(homeId)) },
                     onOpenHomeMaintenance = { homeId ->
                         navController.navigate(ChildRoutes.homeMaintenance(homeId))
@@ -734,6 +753,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenPets = { homeId ->
                         navController.navigate(ChildRoutes.homePets(homeId))
+                    },
+                    onOpenAccessCodes = { homeId, homeName ->
+                        navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
                     },
                     onOpenTasks = { homeId ->
                         navController.navigate(ChildRoutes.homeTasks(homeId))
@@ -791,6 +813,32 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
                 PetsListScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.ACCESS_CODES,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.ACCESS_CODES_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(ChildRoutes.ACCESS_CODES_HOME_NAME_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                    ),
+            ) {
+                AccessCodesScreen(
+                    onAddCode = { category ->
+                        val label = category?.let { "Add ${it.label} code" } ?: "Add access code"
+                        navController.navigate(ChildRoutes.placeholder(label))
+                    },
+                    onEditCode = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Edit access code"))
+                    },
+                    onSearch = {
+                        navController.navigate(ChildRoutes.placeholder("Search access codes"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(
                 route = ChildRoutes.HOME_TASKS,

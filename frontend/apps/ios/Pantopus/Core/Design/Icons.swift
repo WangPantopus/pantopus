@@ -143,6 +143,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case wandSparkles = "wand-sparkles"
     case arrowUpRight = "arrow-up-right"
 
+    // T6.4a Access codes — tap-to-reveal hide icon + empty-state key disc.
+    case eyeOff = "eye-off"
+    case keyRound = "key-round"
+
     // T6.3c Household tasks — chore-category iconography + banner glyph.
     case leaf
     case listChecks = "list-checks"
@@ -274,6 +278,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .shuffle: "shuffle"
         case .wandSparkles: "wand.and.stars"
         case .arrowUpRight: "arrow.up.right"
+        case .eyeOff: "eye.slash"
+        case .keyRound: "key"
         case .leaf: "leaf"
         case .listChecks: "checklist"
         case .utensils: "fork.knife"
