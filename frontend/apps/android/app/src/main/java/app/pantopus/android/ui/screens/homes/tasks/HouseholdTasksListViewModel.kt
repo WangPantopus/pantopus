@@ -8,7 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.HomeTaskDto
 import app.pantopus.android.data.api.models.homes.UpdateHomeTaskRequest
 import app.pantopus.android.data.api.net.NetworkResult
-import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.homes.HomeTasksRepository
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
@@ -139,13 +139,13 @@ const val HOUSEHOLD_TASKS_HOME_ID_KEY = "homeId"
 @HiltViewModel
 class HouseholdTasksListViewModel
     internal constructor(
-        private val repo: HomesRepository,
+        private val repo: HomeTasksRepository,
         savedStateHandle: SavedStateHandle,
         private val clock: () -> Instant = Instant::now,
     ) : ViewModel() {
         @Inject
         constructor(
-            repo: HomesRepository,
+            repo: HomeTasksRepository,
             savedStateHandle: SavedStateHandle,
         ) : this(repo, savedStateHandle, Instant::now)
 
