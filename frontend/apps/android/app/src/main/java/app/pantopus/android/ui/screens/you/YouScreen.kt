@@ -92,6 +92,7 @@ fun YouScreen(
     onOpenHomeBills: (String) -> Unit = {},
     onOpenHomePets: (String) -> Unit = {},
     onOpenHomeCalendar: (String) -> Unit = {},
+    onOpenHomeMembers: (String) -> Unit = {},
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
     val signedIn = state as? AuthRepository.State.SignedIn
@@ -136,6 +137,10 @@ fun YouScreen(
                         onOpenPlaceholder(tile.label)
                     }
                 }
+                "me.members" -> {
+                    val homeId = tile.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeMembers(homeId) else onOpenPlaceholder(tile.label)
+                }
                 else -> onOpenPlaceholder(tile.label)
             }
         },
@@ -151,6 +156,10 @@ fun YouScreen(
                 "me.bills" -> {
                     val homeId = row.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomeBills(homeId) else onOpenPlaceholder(row.label)
+                }
+                "me.members" -> {
+                    val homeId = row.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeMembers(homeId) else onOpenPlaceholder(row.label)
                 }
                 "me.editProfile" -> onOpenEditProfile()
                 "me.settings" -> onOpenSettings()
