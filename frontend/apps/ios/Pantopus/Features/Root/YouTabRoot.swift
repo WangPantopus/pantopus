@@ -48,6 +48,9 @@ public enum YouRoute: Hashable {
     /// home id resolved by the Me VM. Distinct from `.myTasks` which is
     /// the posted-to-neighbours gig list.
     case homeTasks(homeId: String)
+    /// T6.3a / P9 — Members. The home-context "me.members" action tile +
+    /// "Household" section row both push here with the resolved home id.
+    case homeMembers(homeId: String)
     /// T5.3.4 — per-listing offers panel. Pushed from a listing detail
     /// "View offers" affordance (visible when the current user owns the
     /// listing). The optional `title` is a hint rendered as the
@@ -287,6 +290,12 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.members":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeMembers(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         default:
             path.append(.placeholder(label: tile.label))
         }
@@ -323,6 +332,11 @@ public struct YouTabRoot: View {
         case "me.tasks":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeTasks(homeId: homeId))
+                return
+            }
+        case "me.members":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeMembers(homeId: homeId))
                 return
             }
         case "me.editProfile":
@@ -630,6 +644,8 @@ public struct YouTabRoot: View {
                     }
                 )
             )
+        case let .homeMembers(homeId):
+            MembersListView(homeId: homeId)
         #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(
