@@ -16,10 +16,10 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Paparazzi snapshots for the Me tab (T1.3). One baseline per identity
- * binding — Personal, Home, and unbound-Business — proves the
- * identity-rebind chrome stays put while header gradient, action
- * accent, stats, and section labels swap.
+ * Paparazzi snapshots for the Me tab (T6.2b re-skin). One baseline
+ * per identity binding — Personal, Home, and unbound-Business —
+ * proves the identity-rebind chrome stays put while the gradient
+ * header, accent, stats, action grid, and section labels swap.
  */
 class MeSnapshotTest {
     @get:Rule
@@ -60,42 +60,43 @@ class MeSnapshotTest {
             initials = "MK",
             handle = "@maria",
             locality = "Elm Park",
-            bio = "Neighborhood cleanup organiser; coffee enthusiast.",
+            tagline = "Neighborhood cleanup organiser; coffee enthusiast.",
             verified = true,
             stats =
                 listOf(
-                    MeStat(id = "posts", value = "24", label = "Posts"),
-                    MeStat(id = "helpful", value = "108", label = "Helpful"),
-                    MeStat(id = "saved", value = "12", label = "Saved"),
+                    MeStat("activity", "12", "Activity"),
+                    MeStat("trust", "Verified", "Trust"),
+                    MeStat("reputation", "4.9", "Reputation"),
                 ),
             actionTiles =
                 listOf(
-                    MeActionTile(id = "mail", icon = PantopusIcon.Mailbox, label = "Mail", routeKey = "me.mail", badge = 3),
-                    MeActionTile(id = "posts", icon = PantopusIcon.Star, label = "My posts", routeKey = "me.posts"),
-                    MeActionTile(id = "saved", icon = PantopusIcon.Heart, label = "Saved", routeKey = "me.saved"),
-                    MeActionTile(id = "wallet", icon = PantopusIcon.ShoppingBag, label = "Wallet", routeKey = "me.wallet"),
-                    MeActionTile(id = "verify", icon = PantopusIcon.ShieldCheck, label = "Verify", routeKey = "me.verify"),
-                    MeActionTile(id = "settings", icon = PantopusIcon.MoreHorizontal, label = "Settings", routeKey = "me.settings"),
+                    MeActionTile("posts", PantopusIcon.File, "My posts", routeKey = "me.posts"),
+                    MeActionTile("bids", PantopusIcon.Hammer, "My bids", routeKey = "me.bids"),
+                    MeActionTile("gigs", PantopusIcon.ClipboardList, "My tasks", routeKey = "me.gigs"),
+                    MeActionTile("offers", PantopusIcon.HandCoins, "Offers", routeKey = "me.offers"),
+                    MeActionTile("listings", PantopusIcon.ShoppingBag, "Listings", routeKey = "me.listings"),
+                    MeActionTile("connections", PantopusIcon.UserPlus, "Connections", routeKey = "me.connections"),
                 ),
             sections =
                 listOf(
                     MeSection(
-                        id = "account",
-                        header = "Account",
+                        id = "profile_privacy",
+                        header = "Profile & Privacy",
                         rows =
                             listOf(
-                                MeSectionRow(
-                                    id = "editProfile",
-                                    icon = PantopusIcon.User,
-                                    label = "Edit profile",
-                                    routeKey = "me.editProfile",
-                                ),
-                                MeSectionRow(
-                                    id = "notifications",
-                                    icon = PantopusIcon.Bell,
-                                    label = "Notifications",
-                                    routeKey = "me.notifications",
-                                ),
+                                MeSectionRow("edit", PantopusIcon.Edit2, "Edit profile", routeKey = "me.editProfile"),
+                                MeSectionRow("identityCenter", PantopusIcon.Shield, "Identity Center", routeKey = "me.identityCenter"),
+                                MeSectionRow("audience", PantopusIcon.Megaphone, "Audience profile", routeKey = "me.audience"),
+                            ),
+                    ),
+                    MeSection(
+                        id = "help_legal",
+                        header = "Help & Legal",
+                        rows =
+                            listOf(
+                                MeSectionRow("help", PantopusIcon.HelpCircle, "Help", routeKey = "me.help"),
+                                MeSectionRow("terms", PantopusIcon.File, "Terms", routeKey = "me.legal"),
+                                MeSectionRow("privacy", PantopusIcon.Shield, "Privacy", value = "Neighbors", routeKey = "me.privacy"),
                             ),
                     ),
                 ),
@@ -106,24 +107,42 @@ class MeSnapshotTest {
             identity = MeIdentity.Home,
             displayName = "12 Rose Court",
             initials = "RC",
-            handle = "Rose Court, Unit 4B",
+            handle = "Household · 2 members",
             locality = "Elm Park",
-            bio = "Two-person household. Hosts the block potluck.",
+            tagline = "12 Rose Court, Unit 4B",
             verified = true,
             stats =
                 listOf(
-                    MeStat(id = "members", value = "2", label = "Members"),
-                    MeStat(id = "mail", value = "7", label = "Mail"),
-                    MeStat(id = "claims", value = "1", label = "Claim"),
+                    MeStat("bills", "—", "Bills due"),
+                    MeStat("tasks", "—", "Open tasks"),
+                    MeStat("members", "2", "Members"),
                 ),
             actionTiles =
                 listOf(
-                    MeActionTile(id = "dashboard", icon = PantopusIcon.Home, label = "Dashboard", routeKey = "home.dashboard"),
-                    MeActionTile(id = "mail", icon = PantopusIcon.Mailbox, label = "Mail", routeKey = "home.mail", badge = 7),
-                    MeActionTile(id = "members", icon = PantopusIcon.UserPlus, label = "Members", routeKey = "home.members"),
-                    MeActionTile(id = "invite", icon = PantopusIcon.Send, label = "Invite owner", routeKey = "home.invite"),
-                    MeActionTile(id = "claims", icon = PantopusIcon.ShieldCheck, label = "Claims", routeKey = "home.claims"),
-                    MeActionTile(id = "settings", icon = PantopusIcon.MoreHorizontal, label = "Settings", routeKey = "home.settings"),
+                    MeActionTile("bills", PantopusIcon.File, "Bills", routeKey = "me.bills", routeArgs = mapOf("homeId" to "h1")),
+                    MeActionTile("pets", PantopusIcon.Heart, "Pets", routeKey = "me.pets", routeArgs = mapOf("homeId" to "h1")),
+                    MeActionTile(
+                        "members",
+                        PantopusIcon.UserPlus,
+                        "Members",
+                        routeKey = "me.members",
+                        routeArgs = mapOf("homeId" to "h1"),
+                    ),
+                    MeActionTile(
+                        "polls",
+                        PantopusIcon.CheckCircle,
+                        "Polls",
+                        routeKey = "me.polls",
+                        routeArgs = mapOf("homeId" to "h1"),
+                    ),
+                    MeActionTile(
+                        "calendar",
+                        PantopusIcon.Calendar,
+                        "Calendar",
+                        routeKey = "me.calendar",
+                        routeArgs = mapOf("homeId" to "h1"),
+                    ),
+                    MeActionTile("docs", PantopusIcon.File, "Documents", routeKey = "me.docs", routeArgs = mapOf("homeId" to "h1")),
                 ),
             sections =
                 listOf(
@@ -132,13 +151,9 @@ class MeSnapshotTest {
                         header = "Household",
                         rows =
                             listOf(
-                                MeSectionRow(
-                                    id = "address",
-                                    icon = PantopusIcon.MapPin,
-                                    label = "Address",
-                                    value = "Verified",
-                                    routeKey = "home.address",
-                                ),
+                                MeSectionRow("members", PantopusIcon.UserPlus, "Members", routeKey = "me.members"),
+                                MeSectionRow("owners", PantopusIcon.Shield, "Owners", routeKey = "me.owners"),
+                                MeSectionRow("access", PantopusIcon.Lock, "Access codes", routeKey = "me.access"),
                             ),
                     ),
                 ),
@@ -151,12 +166,12 @@ class MeSnapshotTest {
             initials = "B",
             handle = "Tap to register your business",
             locality = null,
-            bio = null,
+            tagline = null,
             verified = false,
             stats = emptyList(),
             actionTiles =
                 listOf(
-                    MeActionTile(id = "register", icon = PantopusIcon.PlusSquare, label = "Register", routeKey = "business.register"),
+                    MeActionTile("register", PantopusIcon.PlusSquare, "Register", routeKey = "business.register"),
                 ),
             sections = emptyList(),
             isUnbound = true,

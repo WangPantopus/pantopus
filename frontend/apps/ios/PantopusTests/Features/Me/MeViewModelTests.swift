@@ -112,16 +112,40 @@ final class MeViewModelTests: XCTestCase {
         XCTAssertEqual(personal.identity, .personal)
         XCTAssertEqual(personal.displayName, "Alice Doe")
         XCTAssertTrue(personal.verified)
-        XCTAssertEqual(personal.stats.count, 4)
-        XCTAssertEqual(personal.stats.first { $0.id == "rating" }?.value, "4.9")
+        // T6.2b — 3-tile stats row (Activity / Trust / Reputation).
+        XCTAssertEqual(personal.stats.count, 3)
+        XCTAssertEqual(personal.stats.first { $0.id == "trust" }?.value, "Verified")
+        XCTAssertEqual(personal.stats.first { $0.id == "reputation" }?.value, "4.9")
         XCTAssertEqual(personal.actionTiles.count, 6)
-        XCTAssertEqual(personal.actionTiles.first { $0.id == "mail" }?.routeKey, "me.mail")
+        // T6.2b action grid is { posts, bids, gigs, offers, listings, connections }.
+        XCTAssertEqual(
+            personal.actionTiles.map(\.routeKey),
+            ["me.posts", "me.bids", "me.gigs", "me.offers", "me.listings", "me.connections"]
+        )
+        // T6.2b — sections grouped as Profile & Privacy, Activity, Help & Legal
+        // (+ Debug appended in DEBUG builds; assert by header prefix).
+        XCTAssertEqual(personal.sections.first?.header, "Profile & Privacy")
+        XCTAssertTrue(personal.sections.contains { $0.header == "Activity" })
+        XCTAssertTrue(personal.sections.contains { $0.header == "Help & Legal" })
+        XCTAssertEqual(
+            personal.sections.first { $0.header == "Profile & Privacy" }?.rows.map(\.routeKey),
+            ["me.editProfile", "me.identityCenter", "me.audience"]
+        )
 
         XCTAssertEqual(home.identity, .home)
         XCTAssertEqual(home.displayName, "412 Birch Ln")
         XCTAssertFalse(home.isUnbound)
+        // T6.2b home action grid is { bills, pets, members, polls, calendar, docs }.
         XCTAssertEqual(home.actionTiles.count, 6)
-        XCTAssertEqual(home.actionTiles.first?.routeKey, "me.home.access")
+        XCTAssertEqual(
+            home.actionTiles.map(\.routeKey),
+            ["me.bills", "me.pets", "me.members", "me.polls", "me.calendar", "me.docs"]
+        )
+        // Home tiles carry the primary home id so the host can build
+        // BillsListView / PetsListView without re-introspecting the VM.
+        XCTAssertEqual(home.actionTiles.first?.routeArgs["homeId"], "h1")
+        // Stats reflect home context.
+        XCTAssertEqual(home.stats.map(\.id), ["bills", "tasks", "members"])
 
         XCTAssertEqual(business.identity, .business)
         XCTAssertTrue(business.isUnbound, "business stays unbound until mobile business read APIs land")

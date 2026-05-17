@@ -86,6 +86,21 @@ geometry, same row spec).
 | `connections-v2-android-empty.png` | Same | Same |
 | `connections-v2-web-empty.png` | Same | Same |
 
+### T6.2b Me re-skin (design-reference)
+
+Re-skin of the T2.1 Me tab — identity-switcher pill row on top of a
+3-stop gradient header card, 72pt verification-ring avatar + name +
+tagline, 3-tile stats card, 2×3 action grid, three section groups,
+and a destructive sign-out card. Rendered via
+`tools/t5-screenshots/me-frames.mjs` (sister script to `render.mjs`).
+
+| File | Frame | Notes |
+|---|---|---|
+| `me-personal-ios.png` | Personal identity (sky tinted) | Visual ground truth for iOS / Android. Header gradient `primary600 → primary500 → primary700`. Stats `Activity / Trust / Reputation`. Action grid `My posts · My bids · My tasks · Offers · Listings · Connections`. Sections `Profile & Privacy / Activity / Help & Legal`. |
+| `me-personal-android.png` | Same | Mirrors iOS. Android system bar at the top differs by platform convention. |
+| `me-home-ios.png` | Home identity (green tinted) | Same scaffolding, home palette. Stats `Bills due / Open tasks / Members`. Action grid `Bills · Pets · Members · Polls · Calendar · Documents`. Sections `Household / Activity / Help & Legal`. Destructive card swaps to `Switch identity → Personal`. |
+| `me-home-android.png` | Same | Mirrors iOS. |
+
 ### T6.0a Bills V2 re-skin (design-reference)
 
 Re-skin of the T5.2.2 Bills list — utility-tinted leading + 6-status

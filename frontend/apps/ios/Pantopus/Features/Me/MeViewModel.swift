@@ -142,32 +142,48 @@ public final class MeViewModel {
             : profile.name
         let displayName = name.isEmpty ? "Pantopus user" : name
         let locality = localityString(profile)
+        let tagline = (profile.tagline?.isEmpty == false ? profile.tagline : nil) ?? profile.bio
+        let activityValue = "\(stats?.totalGigsCompleted ?? profile.gigsCompleted ?? 0)"
+        let trustValue = profile.verified ? "Verified" : "Pending"
+        let reputationValue = ratingString(stats?.averageRating ?? profile.averageRating ?? 0)
         return MeIdentityContent(
             identity: .personal,
             displayName: displayName,
             initials: initials(from: displayName),
             handle: "@\(profile.username)",
             locality: locality,
-            bio: profile.bio,
+            tagline: tagline,
             verified: profile.verified,
             stats: [
-                MeStat(id: "posts", value: "\(profile.gigsPosted ?? 0)", label: "Posts"),
-                MeStat(id: "gigs_done", value: "\(stats?.totalGigsCompleted ?? profile.gigsCompleted ?? 0)", label: "Gigs done"),
-                MeStat(id: "listings", value: "\(stats?.totalGigsPosted ?? 0)", label: "Listings"),
-                MeStat(id: "rating", value: Self.ratingString(stats?.averageRating ?? profile.averageRating ?? 0), label: "Rating")
+                MeStat(id: "activity", value: activityValue, label: "Activity"),
+                MeStat(id: "trust", value: trustValue, label: "Trust"),
+                MeStat(id: "reputation", value: reputationValue, label: "Reputation")
             ],
             actionTiles: [
-                MeActionTile(id: "bids", icon: .file, label: "My bids", badge: nil, routeKey: "me.bids"),
-                MeActionTile(id: "gigs", icon: .hammer, label: "My gigs", badge: nil, routeKey: "me.gigs"),
-                MeActionTile(id: "listings", icon: .shoppingBag, label: "My listings", badge: nil, routeKey: "me.listings"),
-                MeActionTile(id: "saved", icon: .star, label: "Saved", badge: nil, routeKey: "me.saved"),
-                MeActionTile(id: "wallet", icon: .shield, label: "Wallet", badge: nil, routeKey: "me.wallet"),
-                MeActionTile(id: "mail", icon: .mailbox, label: "Mail", badge: nil, routeKey: "me.mail")
+                MeActionTile(id: "posts", icon: .file, label: "My posts", routeKey: "me.posts"),
+                MeActionTile(id: "bids", icon: .hammer, label: "My bids", routeKey: "me.bids"),
+                MeActionTile(id: "gigs", icon: .clipboardList, label: "My tasks", routeKey: "me.gigs"),
+                MeActionTile(id: "offers", icon: .handCoins, label: "Offers", routeKey: "me.offers"),
+                MeActionTile(id: "listings", icon: .shoppingBag, label: "Listings", routeKey: "me.listings"),
+                MeActionTile(id: "connections", icon: .userPlus, label: "Connections", routeKey: "me.connections")
             ],
             sections: withDebug([
-                MeSection(id: "account", header: "Account", rows: [
+                MeSection(id: "profile_privacy", header: "Profile & Privacy", rows: [
                     MeSectionRow(id: "edit", icon: .edit2, label: "Edit profile", routeKey: "me.editProfile"),
-                    MeSectionRow(id: "settings", icon: .menu, label: "Settings", routeKey: "me.settings"),
+                    MeSectionRow(id: "identityCenter", icon: .shield, label: "Identity Center", routeKey: "me.identityCenter"),
+                    MeSectionRow(id: "audience", icon: .megaphone, label: "Audience profile", routeKey: "me.audience")
+                ]),
+                MeSection(id: "activity", header: "Activity", rows: [
+                    MeSectionRow(id: "posts", icon: .file, label: "My posts", routeKey: "me.posts"),
+                    MeSectionRow(id: "bids", icon: .hammer, label: "My bids", routeKey: "me.bids"),
+                    MeSectionRow(id: "gigs", icon: .clipboardList, label: "My tasks", routeKey: "me.gigs"),
+                    MeSectionRow(id: "offers", icon: .handCoins, label: "Offers", routeKey: "me.offers"),
+                    MeSectionRow(id: "homes", icon: .home, label: "My homes", routeKey: "me.homes"),
+                    MeSectionRow(id: "businesses", icon: .shoppingBag, label: "My businesses", routeKey: "me.businesses")
+                ]),
+                MeSection(id: "help_legal", header: "Help & Legal", rows: [
+                    MeSectionRow(id: "help", icon: .helpCircle, label: "Help", routeKey: "me.help"),
+                    MeSectionRow(id: "terms", icon: .file, label: "Terms", routeKey: "me.legal"),
                     MeSectionRow(
                         id: "privacy",
                         icon: .shield,
@@ -175,16 +191,6 @@ public final class MeViewModel {
                         value: privacyValue(profile.profileVisibility),
                         routeKey: "me.privacy"
                     )
-                ]),
-                MeSection(id: "activity", header: "Activity", rows: [
-                    MeSectionRow(id: "posts", icon: .file, label: "My posts", routeKey: "me.posts"),
-                    MeSectionRow(id: "homes", icon: .home, label: "My homes", routeKey: "me.homes"),
-                    MeSectionRow(id: "businesses", icon: .shoppingBag, label: "My businesses", routeKey: "me.businesses")
-                ]),
-                MeSection(id: "support", header: "Support", rows: [
-                    MeSectionRow(id: "help", icon: .helpCircle, label: "Help", routeKey: "me.help"),
-                    MeSectionRow(id: "legal", icon: .file, label: "Legal", routeKey: "me.legal"),
-                    MeSectionRow(id: "about", icon: .info, label: "About", value: appVersion(), routeKey: "me.about")
                 ])
             ])
         )
@@ -198,16 +204,15 @@ public final class MeViewModel {
                 initials: "H",
                 handle: "No home yet",
                 locality: profileLocality,
-                bio: "Add a home from the Hub to unlock household tools.",
+                tagline: "Add a home from the Hub to unlock household tools.",
                 verified: false,
                 stats: [
-                    MeStat(id: "packages", value: "—", label: "Packages"),
-                    MeStat(id: "bills", value: "—", label: "Bills"),
-                    MeStat(id: "members", value: "—", label: "Members"),
-                    MeStat(id: "codes", value: "—", label: "Codes")
+                    MeStat(id: "bills", value: "—", label: "Bills due"),
+                    MeStat(id: "tasks", value: "—", label: "Open tasks"),
+                    MeStat(id: "members", value: "—", label: "Members")
                 ],
-                actionTiles: homeActionTiles(),
-                sections: withDebug(homeSections(privacyValue: nil)),
+                actionTiles: homeActionTiles(homeId: nil),
+                sections: withDebug(homeSections(homeId: nil, privacyValue: nil)),
                 isUnbound: true
             )
         }
@@ -215,22 +220,26 @@ public final class MeViewModel {
         let address = home.address ?? "Your home"
         let displayName = home.name?.isEmpty == false ? home.name ?? address : address
         let locality = [home.city, home.state].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
+        let memberCount = homes.count
+        // Only surface the address as a tagline when the display name is
+        // a separate household name (e.g. "Cozy Hideout") — otherwise
+        // the tagline would just repeat the title.
+        let homeTagline: String? = (home.name?.isEmpty == false) ? home.address : nil
         return MeIdentityContent(
             identity: .home,
             displayName: displayName,
             initials: initials(from: displayName),
-            handle: "Household · \(homes.count) member\(homes.count == 1 ? "" : "s")",
+            handle: "Household · \(memberCount) member\(memberCount == 1 ? "" : "s")",
             locality: locality.isEmpty ? profileLocality : locality,
-            bio: nil,
+            tagline: homeTagline,
             verified: primary.ownershipStatus == "verified",
             stats: [
-                MeStat(id: "packages", value: "—", label: "Packages"),
-                MeStat(id: "bills", value: "—", label: "Bills"),
-                MeStat(id: "members", value: "\(homes.count)", label: "Members"),
-                MeStat(id: "codes", value: "—", label: "Codes")
+                MeStat(id: "bills", value: "—", label: "Bills due"),
+                MeStat(id: "tasks", value: "—", label: "Open tasks"),
+                MeStat(id: "members", value: "\(memberCount)", label: "Members")
             ],
-            actionTiles: homeActionTiles(),
-            sections: withDebug(homeSections(privacyValue: "Neighbors"))
+            actionTiles: homeActionTiles(homeId: home.id),
+            sections: withDebug(homeSections(homeId: home.id, privacyValue: "Neighbors"))
         )
     }
 
@@ -244,11 +253,10 @@ public final class MeViewModel {
             initials: "B",
             handle: "No business yet",
             locality: localityString(profile),
-            bio: "Business identity is set up in the web app today; mobile read APIs land later.",
+            tagline: "Business identity is set up in the web app today; mobile read APIs land later.",
             verified: false,
             stats: [
                 MeStat(id: "orders", value: "—", label: "Orders"),
-                MeStat(id: "earnings", value: "—", label: "Earnings"),
                 MeStat(id: "products", value: "—", label: "Products"),
                 MeStat(id: "rating", value: "—", label: "Rating")
             ],
@@ -261,46 +269,57 @@ public final class MeViewModel {
                 MeActionTile(id: "promo", icon: .megaphone, label: "Promo", routeKey: "me.business.promo")
             ],
             sections: withDebug([
-                MeSection(id: "account", header: "Business", rows: [
+                MeSection(id: "business", header: "Business", rows: [
                     MeSectionRow(id: "profile", icon: .edit2, label: "Edit business profile", routeKey: "me.business.editProfile"),
-                    MeSectionRow(id: "settings", icon: .menu, label: "Settings", routeKey: "me.business.settings")
+                    MeSectionRow(id: "settings", icon: .menu, label: "Settings", routeKey: "me.settings")
                 ]),
-                MeSection(id: "support", header: "Support", rows: [
+                MeSection(id: "help_legal", header: "Help & Legal", rows: [
                     MeSectionRow(id: "help", icon: .helpCircle, label: "Help", routeKey: "me.help"),
-                    MeSectionRow(id: "legal", icon: .file, label: "Legal", routeKey: "me.legal"),
-                    MeSectionRow(id: "about", icon: .info, label: "About", value: appVersion(), routeKey: "me.about")
+                    MeSectionRow(id: "terms", icon: .file, label: "Terms", routeKey: "me.legal"),
+                    MeSectionRow(id: "privacy", icon: .shield, label: "Privacy", routeKey: "me.privacy")
                 ])
             ]),
             isUnbound: true
         )
     }
 
-    private static func homeActionTiles() -> [MeActionTile] {
-        [
-            MeActionTile(id: "access", icon: .lock, label: "Access", routeKey: "me.home.access"),
-            MeActionTile(id: "bills", icon: .file, label: "Bills", routeKey: "me.home.bills"),
-            MeActionTile(id: "packages", icon: .shoppingBag, label: "Packages", routeKey: "me.home.packages"),
-            MeActionTile(id: "members", icon: .userPlus, label: "Members", routeKey: "me.home.members"),
-            MeActionTile(id: "docs", icon: .file, label: "Docs", routeKey: "me.home.docs"),
-            MeActionTile(id: "calendar", icon: .calendar, label: "Calendar", routeKey: "me.home.calendar")
+    private static func homeActionTiles(homeId: String?) -> [MeActionTile] {
+        let args = homeId.map { ["homeId": $0] } ?? [:]
+        return [
+            MeActionTile(id: "bills", icon: .file, label: "Bills", routeKey: "me.bills", routeArgs: args),
+            MeActionTile(id: "pets", icon: .heart, label: "Pets", routeKey: "me.pets", routeArgs: args),
+            MeActionTile(id: "members", icon: .userPlus, label: "Members", routeKey: "me.members", routeArgs: args),
+            MeActionTile(id: "polls", icon: .checkCircle, label: "Polls", routeKey: "me.polls", routeArgs: args),
+            MeActionTile(id: "calendar", icon: .calendar, label: "Calendar", routeKey: "me.calendar", routeArgs: args),
+            MeActionTile(id: "docs", icon: .file, label: "Documents", routeKey: "me.docs", routeArgs: args)
         ]
     }
 
-    private static func homeSections(privacyValue: String?) -> [MeSection] {
-        [
+    private static func homeSections(homeId: String?, privacyValue: String?) -> [MeSection] {
+        let args = homeId.map { ["homeId": $0] } ?? [:]
+        return [
             MeSection(id: "household", header: "Household", rows: [
-                MeSectionRow(id: "address", icon: .home, label: "Edit address", routeKey: "me.home.editAddress"),
-                MeSectionRow(id: "invite", icon: .userPlus, label: "Invite member", routeKey: "me.home.invite"),
-                MeSectionRow(id: "privacy", icon: .shield, label: "Privacy", value: privacyValue, routeKey: "me.home.privacy")
+                MeSectionRow(id: "members", icon: .userPlus, label: "Members", routeKey: "me.members", routeArgs: args),
+                MeSectionRow(id: "owners", icon: .shield, label: "Owners", routeKey: "me.owners", routeArgs: args),
+                MeSectionRow(id: "access", icon: .lock, label: "Access codes", routeKey: "me.access", routeArgs: args)
             ]),
             MeSection(id: "activity", header: "Activity", rows: [
-                MeSectionRow(id: "delivery", icon: .mailbox, label: "Delivery log", routeKey: "me.home.deliveryLog"),
-                MeSectionRow(id: "maintenance", icon: .hammer, label: "Maintenance", routeKey: "me.home.maintenance"),
-                MeSectionRow(id: "utilities", icon: .info, label: "Utilities", routeKey: "me.home.utilities")
+                MeSectionRow(id: "bills", icon: .file, label: "Bills", routeKey: "me.bills", routeArgs: args),
+                MeSectionRow(id: "tasks", icon: .hammer, label: "Household tasks", routeKey: "me.tasks", routeArgs: args),
+                MeSectionRow(id: "packages", icon: .mailbox, label: "Packages", routeKey: "me.packages", routeArgs: args),
+                MeSectionRow(id: "emergency", icon: .shield, label: "Emergency info", routeKey: "me.emergency", routeArgs: args)
             ]),
-            MeSection(id: "support", header: "Support", rows: [
+            MeSection(id: "help_legal", header: "Help & Legal", rows: [
                 MeSectionRow(id: "help", icon: .helpCircle, label: "Help", routeKey: "me.help"),
-                MeSectionRow(id: "about", icon: .info, label: "About", value: appVersion(), routeKey: "me.about")
+                MeSectionRow(id: "terms", icon: .file, label: "Terms", routeKey: "me.legal"),
+                MeSectionRow(
+                    id: "privacy",
+                    icon: .shield,
+                    label: "Privacy",
+                    value: privacyValue,
+                    routeKey: "me.home.privacy",
+                    routeArgs: args
+                )
             ])
         ]
     }
@@ -329,11 +348,5 @@ public final class MeViewModel {
         case "private": "Strict"
         default: nil
         }
-    }
-
-    private static func appVersion() -> String {
-        let dict = Bundle.main.infoDictionary
-        let version = dict?["CFBundleShortVersionString"] as? String ?? "—"
-        return "v\(version)"
     }
 }

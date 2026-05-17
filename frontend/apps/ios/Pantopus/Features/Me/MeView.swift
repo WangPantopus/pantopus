@@ -3,9 +3,10 @@
 //  Pantopus
 //
 //  Designed Me tab — one chrome, three identity bindings. Hosts the
-//  identity-switcher pill row, the gradient header (sky / green /
-//  violet), the stats row, the 2×3 action grid, the section groups,
-//  and the destructive card at the bottom.
+//  identity-switcher pill row (top of the gradient header), the
+//  72pt verification-ring avatar + name + tagline, the 3-tile stats
+//  card, the 2×3 action grid, the section groups, and the
+//  destructive card at the bottom. T6.2b re-skin.
 //
 
 import SwiftUI
@@ -173,34 +174,34 @@ private struct MeHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
+            identityPillRow
             HStack(alignment: .center, spacing: 14) {
                 avatar
                 VStack(alignment: .leading, spacing: 2) {
                     Text(content.displayName)
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(Theme.Color.appText)
+                        .foregroundStyle(Theme.Color.appTextInverse)
                         .lineLimit(1)
                     Text(content.handle)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .foregroundStyle(Theme.Color.appTextInverse.opacity(0.85))
                         .lineLimit(1)
                     if let locality = content.locality, !locality.isEmpty {
                         HStack(spacing: 4) {
-                            Icon(.mapPin, size: 11, color: Theme.Color.appTextSecondary)
+                            Icon(.mapPin, size: 11, color: Theme.Color.appTextInverse.opacity(0.85))
                             Text(locality)
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(Theme.Color.appTextSecondary)
+                                .foregroundStyle(Theme.Color.appTextInverse.opacity(0.85))
                                 .lineLimit(1)
                         }
                     }
                 }
                 Spacer(minLength: 0)
             }
-            identityPillRow
-            if let bio = content.bio, !bio.isEmpty {
-                Text(bio)
+            if let tagline = content.tagline, !tagline.isEmpty {
+                Text(tagline)
                     .font(.system(size: 13.5))
-                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .foregroundStyle(Theme.Color.appTextInverse.opacity(0.9))
                     .lineLimit(2)
             }
         }
@@ -210,7 +211,7 @@ private struct MeHeader: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             LinearGradient(
-                colors: [content.identity.accentBg, Theme.Color.appSurface],
+                colors: content.identity.headerGradient,
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -218,6 +219,9 @@ private struct MeHeader: View {
         .accessibilityIdentifier("meHeader_\(content.identity.rawValue)")
     }
 
+    /// 72pt avatar with the verification ring + 22pt verified badge.
+    /// Ring colour stays white-on-gradient so it reads as an outline
+    /// against the identity-tinted header card.
     private var avatar: some View {
         ZStack(alignment: .topTrailing) {
             ZStack {
@@ -234,16 +238,19 @@ private struct MeHeader: View {
                     .foregroundStyle(Theme.Color.appTextInverse)
             }
             .frame(width: 72, height: 72)
-            .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 3))
-            .shadow(color: Theme.Color.appText.opacity(0.1), radius: 4, x: 0, y: 4)
+            .overlay(
+                Circle().stroke(Theme.Color.appSurface, lineWidth: 3)
+            )
+            .shadow(color: Theme.Color.appText.opacity(0.18), radius: 6, x: 0, y: 4)
             if content.verified {
-                Icon(.check, size: 11, strokeWidth: 3.5, color: Theme.Color.appTextInverse)
+                Icon(.check, size: 11, strokeWidth: 3.5, color: Theme.Color.primary600)
                     .frame(width: 22, height: 22)
-                    .background(Theme.Color.primary600)
+                    .background(Theme.Color.appSurface)
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
+                    .overlay(Circle().stroke(content.identity.accent, lineWidth: 2))
                     .offset(x: 2, y: -2)
                     .accessibilityLabel("Verified")
+                    .accessibilityIdentifier("meVerificationBadge")
             }
         }
         .frame(width: 76, height: 76)

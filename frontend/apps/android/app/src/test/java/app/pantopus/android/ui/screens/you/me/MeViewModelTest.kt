@@ -113,15 +113,38 @@ class MeViewModelTest {
             val loaded = vm.state.value as MeUiState.Loaded
             assertEquals("Alice Doe", loaded.personal.displayName)
             assertTrue(loaded.personal.verified)
-            assertEquals(4, loaded.personal.stats.size)
-            assertEquals("4.9", loaded.personal.stats.first { it.id == "rating" }.value)
+            // T6.2b — 3-tile stats row (Activity / Trust / Reputation).
+            assertEquals(3, loaded.personal.stats.size)
+            assertEquals("Verified", loaded.personal.stats.first { it.id == "trust" }.value)
+            assertEquals("4.9", loaded.personal.stats.first { it.id == "reputation" }.value)
             assertEquals(6, loaded.personal.actionTiles.size)
-            assertEquals("me.mail", loaded.personal.actionTiles.first { it.id == "mail" }.routeKey)
+            // T6.2b action grid is { posts, bids, gigs, offers, listings, connections }.
+            assertEquals(
+                listOf("me.posts", "me.bids", "me.gigs", "me.offers", "me.listings", "me.connections"),
+                loaded.personal.actionTiles.map { it.routeKey },
+            )
+            // T6.2b sections — Profile & Privacy / Activity / Help & Legal
+            // (+ optional Debug appended in DEBUG builds).
+            assertEquals("Profile & Privacy", loaded.personal.sections.first().header)
+            assertTrue(loaded.personal.sections.any { it.header == "Activity" })
+            assertTrue(loaded.personal.sections.any { it.header == "Help & Legal" })
+            assertEquals(
+                listOf("me.editProfile", "me.identityCenter", "me.audience"),
+                loaded.personal.sections.first { it.header == "Profile & Privacy" }.rows.map { it.routeKey },
+            )
 
             assertEquals("412 Birch Ln", loaded.home.displayName)
             assertFalse(loaded.home.isUnbound)
             assertEquals(6, loaded.home.actionTiles.size)
-            assertEquals("me.home.access", loaded.home.actionTiles.first().routeKey)
+            // T6.2b home action grid is { bills, pets, members, polls, calendar, docs }.
+            assertEquals(
+                listOf("me.bills", "me.pets", "me.members", "me.polls", "me.calendar", "me.docs"),
+                loaded.home.actionTiles.map { it.routeKey },
+            )
+            // Home tiles carry the primary home id so the host can build
+            // BillsListScreen / PetsListScreen without re-introspecting the VM.
+            assertEquals("h1", loaded.home.actionTiles.first().routeArgs["homeId"])
+            assertEquals(listOf("bills", "tasks", "members"), loaded.home.stats.map { it.id })
 
             assertTrue(loaded.business.isUnbound)
         }

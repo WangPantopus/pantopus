@@ -86,6 +86,11 @@ fun YouScreen(
     onOpenMyBids: () -> Unit = {},
     onOpenMyTasks: () -> Unit = {},
     onOpenMyPosts: () -> Unit = {},
+    onOpenConnections: () -> Unit = {},
+    onOpenIdentityCenter: () -> Unit = {},
+    onOpenAudienceProfile: () -> Unit = {},
+    onOpenHomeBills: (String) -> Unit = {},
+    onOpenHomePets: (String) -> Unit = {},
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
     val signedIn = state as? AuthRepository.State.SignedIn
@@ -111,12 +116,33 @@ fun YouScreen(
                 "me.mail" -> onOpenMailbox()
                 "me.bids" -> onOpenMyBids()
                 "me.gigs" -> onOpenMyTasks()
+                "me.posts" -> onOpenMyPosts()
+                "me.offers" -> onOpenOffers()
+                "me.connections" -> onOpenConnections()
+                "me.bills" -> {
+                    val homeId = tile.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeBills(homeId) else onOpenPlaceholder(tile.label)
+                }
+                "me.pets" -> {
+                    val homeId = tile.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomePets(homeId) else onOpenPlaceholder(tile.label)
+                }
                 else -> onOpenPlaceholder(tile.label)
             }
         },
         onSection = { row ->
             when (row.routeKey) {
                 "me.posts" -> onOpenMyPosts()
+                "me.bids" -> onOpenMyBids()
+                "me.gigs" -> onOpenMyTasks()
+                "me.offers" -> onOpenOffers()
+                "me.connections" -> onOpenConnections()
+                "me.identityCenter" -> onOpenIdentityCenter()
+                "me.audience" -> onOpenAudienceProfile()
+                "me.bills" -> {
+                    val homeId = row.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeBills(homeId) else onOpenPlaceholder(row.label)
+                }
                 "me.editProfile" -> onOpenEditProfile()
                 "me.settings" -> onOpenSettings()
                 "me.debug.openProfile" -> if (BuildConfig.DEBUG) debugProfileDialog = true

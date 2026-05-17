@@ -61,9 +61,6 @@ class MeViewModel
 
         private fun fetch() {
             viewModelScope.launch {
-                // Run profile + homes in parallel; their types differ so we
-                // keep two `async` handles rather than `awaitAll` on a
-                // common-supertype list.
                 val profileDeferred = async { profileRepo.ownProfile() }
                 val homesDeferred = async { homesRepo.myHomes() }
                 val profileResult = profileDeferred.await()
@@ -105,46 +102,53 @@ class MeViewModel
                         .joinToString(" ")
                 }
             val displayName = name.ifEmpty { "Pantopus user" }
+            val tagline = profile.tagline?.takeIf { it.isNotEmpty() } ?: profile.bio
+            val activityValue = "${stats?.totalGigsCompleted ?: profile.gigsCompleted ?: 0}"
+            val trustValue = if (profile.verified) "Verified" else "Pending"
+            val reputationValue = ratingString(stats?.averageRating ?: profile.averageRating ?: 0.0)
             return MeIdentityContent(
                 identity = MeIdentity.Personal,
                 displayName = displayName,
                 initials = initials(displayName),
                 handle = "@${profile.username}",
                 locality = localityOf(profile),
-                bio = profile.bio,
+                tagline = tagline,
                 verified = profile.verified,
                 stats =
                     listOf(
-                        MeStat("posts", "${profile.gigsPosted ?: 0}", "Posts"),
-                        MeStat("gigs_done", "${stats?.totalGigsCompleted ?: profile.gigsCompleted ?: 0}", "Gigs done"),
-                        MeStat("listings", "${stats?.totalGigsPosted ?: 0}", "Listings"),
-                        MeStat("rating", ratingString(stats?.averageRating ?: profile.averageRating ?: 0.0), "Rating"),
+                        MeStat("activity", activityValue, "Activity"),
+                        MeStat("trust", trustValue, "Trust"),
+                        MeStat("reputation", reputationValue, "Reputation"),
                     ),
                 actionTiles =
                     listOf(
-                        MeActionTile("bids", PantopusIcon.File, "My bids", routeKey = "me.bids"),
-                        MeActionTile("gigs", PantopusIcon.Hammer, "My gigs", routeKey = "me.gigs"),
-                        MeActionTile("listings", PantopusIcon.ShoppingBag, "My listings", routeKey = "me.listings"),
-                        MeActionTile("saved", PantopusIcon.Star, "Saved", routeKey = "me.saved"),
-                        MeActionTile("wallet", PantopusIcon.Shield, "Wallet", routeKey = "me.wallet"),
-                        MeActionTile("mail", PantopusIcon.Mailbox, "Mail", routeKey = "me.mail"),
+                        MeActionTile("posts", PantopusIcon.File, "My posts", routeKey = "me.posts"),
+                        MeActionTile("bids", PantopusIcon.Hammer, "My bids", routeKey = "me.bids"),
+                        MeActionTile("gigs", PantopusIcon.ClipboardList, "My tasks", routeKey = "me.gigs"),
+                        MeActionTile("offers", PantopusIcon.HandCoins, "Offers", routeKey = "me.offers"),
+                        MeActionTile("listings", PantopusIcon.ShoppingBag, "Listings", routeKey = "me.listings"),
+                        MeActionTile("connections", PantopusIcon.UserPlus, "Connections", routeKey = "me.connections"),
                     ),
                 sections =
                     withDebug(
                         listOf(
                             MeSection(
-                                id = "account",
-                                header = "Account",
+                                id = "profile_privacy",
+                                header = "Profile & Privacy",
                                 rows =
                                     listOf(
                                         MeSectionRow("edit", PantopusIcon.Edit2, "Edit profile", routeKey = "me.editProfile"),
-                                        MeSectionRow("settings", PantopusIcon.Menu, "Settings", routeKey = "me.settings"),
                                         MeSectionRow(
-                                            "privacy",
+                                            "identityCenter",
                                             PantopusIcon.Shield,
-                                            "Privacy",
-                                            value = privacyValue(profile.profileVisibility),
-                                            routeKey = "me.privacy",
+                                            "Identity Center",
+                                            routeKey = "me.identityCenter",
+                                        ),
+                                        MeSectionRow(
+                                            "audience",
+                                            PantopusIcon.Megaphone,
+                                            "Audience profile",
+                                            routeKey = "me.audience",
                                         ),
                                     ),
                             ),
@@ -154,18 +158,27 @@ class MeViewModel
                                 rows =
                                     listOf(
                                         MeSectionRow("posts", PantopusIcon.File, "My posts", routeKey = "me.posts"),
+                                        MeSectionRow("bids", PantopusIcon.Hammer, "My bids", routeKey = "me.bids"),
+                                        MeSectionRow("gigs", PantopusIcon.ClipboardList, "My tasks", routeKey = "me.gigs"),
+                                        MeSectionRow("offers", PantopusIcon.HandCoins, "Offers", routeKey = "me.offers"),
                                         MeSectionRow("homes", PantopusIcon.Home, "My homes", routeKey = "me.homes"),
                                         MeSectionRow("businesses", PantopusIcon.ShoppingBag, "My businesses", routeKey = "me.businesses"),
                                     ),
                             ),
                             MeSection(
-                                id = "support",
-                                header = "Support",
+                                id = "help_legal",
+                                header = "Help & Legal",
                                 rows =
                                     listOf(
                                         MeSectionRow("help", PantopusIcon.HelpCircle, "Help", routeKey = "me.help"),
-                                        MeSectionRow("legal", PantopusIcon.File, "Legal", routeKey = "me.legal"),
-                                        MeSectionRow("about", PantopusIcon.Info, "About", value = appVersion(), routeKey = "me.about"),
+                                        MeSectionRow("terms", PantopusIcon.File, "Terms", routeKey = "me.legal"),
+                                        MeSectionRow(
+                                            "privacy",
+                                            PantopusIcon.Shield,
+                                            "Privacy",
+                                            value = privacyValue(profile.profileVisibility),
+                                            routeKey = "me.privacy",
+                                        ),
                                     ),
                             ),
                         ),
@@ -185,17 +198,16 @@ class MeViewModel
                     initials = "H",
                     handle = "No home yet",
                     locality = profileLocality,
-                    bio = "Add a home from the Hub to unlock household tools.",
+                    tagline = "Add a home from the Hub to unlock household tools.",
                     verified = false,
                     stats =
                         listOf(
-                            MeStat("packages", "—", "Packages"),
-                            MeStat("bills", "—", "Bills"),
+                            MeStat("bills", "—", "Bills due"),
+                            MeStat("tasks", "—", "Open tasks"),
                             MeStat("members", "—", "Members"),
-                            MeStat("codes", "—", "Codes"),
                         ),
-                    actionTiles = homeActionTiles(),
-                    sections = withDebug(homeSections(privacyValue = null)),
+                    actionTiles = homeActionTiles(homeId = null),
+                    sections = withDebug(homeSections(homeId = null, privacyValue = null)),
                     isUnbound = true,
                 )
             }
@@ -206,23 +218,27 @@ class MeViewModel
                     .filter { it.isNotEmpty() }
                     .joinToString(", ")
                     .takeIf { it.isNotEmpty() }
+            val memberCount = homes.size
+            // Only surface the address as a tagline when the display name
+            // is a separate household name (e.g. "Cozy Hideout") —
+            // otherwise the tagline would just repeat the title.
+            val homeTagline = if (!primary.name.isNullOrEmpty()) primary.address else null
             return MeIdentityContent(
                 identity = MeIdentity.Home,
                 displayName = displayName,
                 initials = initials(displayName),
-                handle = "Household · ${homes.size} member${if (homes.size == 1) "" else "s"}",
+                handle = "Household · $memberCount member${if (memberCount == 1) "" else "s"}",
                 locality = locality ?: profileLocality,
-                bio = null,
+                tagline = homeTagline,
                 verified = primary.ownershipStatus == "verified",
                 stats =
                     listOf(
-                        MeStat("packages", "—", "Packages"),
-                        MeStat("bills", "—", "Bills"),
-                        MeStat("members", "${homes.size}", "Members"),
-                        MeStat("codes", "—", "Codes"),
+                        MeStat("bills", "—", "Bills due"),
+                        MeStat("tasks", "—", "Open tasks"),
+                        MeStat("members", "$memberCount", "Members"),
                     ),
-                actionTiles = homeActionTiles(),
-                sections = withDebug(homeSections(privacyValue = "Neighbors")),
+                actionTiles = homeActionTiles(homeId = primary.id),
+                sections = withDebug(homeSections(homeId = primary.id, privacyValue = "Neighbors")),
             )
         }
 
@@ -233,12 +249,11 @@ class MeViewModel
                 initials = "B",
                 handle = "No business yet",
                 locality = localityOf(profile),
-                bio = "Business identity is set up in the web app today; mobile read APIs land later.",
+                tagline = "Business identity is set up in the web app today; mobile read APIs land later.",
                 verified = false,
                 stats =
                     listOf(
                         MeStat("orders", "—", "Orders"),
-                        MeStat("earnings", "—", "Earnings"),
                         MeStat("products", "—", "Products"),
                         MeStat("rating", "—", "Rating"),
                     ),
@@ -255,7 +270,7 @@ class MeViewModel
                     withDebug(
                         listOf(
                             MeSection(
-                                id = "account",
+                                id = "business",
                                 header = "Business",
                                 rows =
                                     listOf(
@@ -265,17 +280,17 @@ class MeViewModel
                                             "Edit business profile",
                                             routeKey = "me.business.editProfile",
                                         ),
-                                        MeSectionRow("settings", PantopusIcon.Menu, "Settings", routeKey = "me.business.settings"),
+                                        MeSectionRow("settings", PantopusIcon.Menu, "Settings", routeKey = "me.settings"),
                                     ),
                             ),
                             MeSection(
-                                id = "support",
-                                header = "Support",
+                                id = "help_legal",
+                                header = "Help & Legal",
                                 rows =
                                     listOf(
                                         MeSectionRow("help", PantopusIcon.HelpCircle, "Help", routeKey = "me.help"),
-                                        MeSectionRow("legal", PantopusIcon.File, "Legal", routeKey = "me.legal"),
-                                        MeSectionRow("about", PantopusIcon.Info, "About", value = appVersion(), routeKey = "me.about"),
+                                        MeSectionRow("terms", PantopusIcon.File, "Terms", routeKey = "me.legal"),
+                                        MeSectionRow("privacy", PantopusIcon.Shield, "Privacy", routeKey = "me.privacy"),
                                     ),
                             ),
                         ),
@@ -283,26 +298,32 @@ class MeViewModel
                 isUnbound = true,
             )
 
-        private fun homeActionTiles(): List<MeActionTile> =
-            listOf(
-                MeActionTile("access", PantopusIcon.Lock, "Access", routeKey = "me.home.access"),
-                MeActionTile("bills", PantopusIcon.File, "Bills", routeKey = "me.home.bills"),
-                MeActionTile("packages", PantopusIcon.ShoppingBag, "Packages", routeKey = "me.home.packages"),
-                MeActionTile("members", PantopusIcon.UserPlus, "Members", routeKey = "me.home.members"),
-                MeActionTile("docs", PantopusIcon.File, "Docs", routeKey = "me.home.docs"),
-                MeActionTile("calendar", PantopusIcon.Calendar, "Calendar", routeKey = "me.home.calendar"),
+        private fun homeActionTiles(homeId: String?): List<MeActionTile> {
+            val args = if (homeId != null) mapOf("homeId" to homeId) else emptyMap()
+            return listOf(
+                MeActionTile("bills", PantopusIcon.File, "Bills", routeKey = "me.bills", routeArgs = args),
+                MeActionTile("pets", PantopusIcon.Heart, "Pets", routeKey = "me.pets", routeArgs = args),
+                MeActionTile("members", PantopusIcon.UserPlus, "Members", routeKey = "me.members", routeArgs = args),
+                MeActionTile("polls", PantopusIcon.CheckCircle, "Polls", routeKey = "me.polls", routeArgs = args),
+                MeActionTile("calendar", PantopusIcon.Calendar, "Calendar", routeKey = "me.calendar", routeArgs = args),
+                MeActionTile("docs", PantopusIcon.File, "Documents", routeKey = "me.docs", routeArgs = args),
             )
+        }
 
-        private fun homeSections(privacyValue: String?): List<MeSection> =
-            listOf(
+        private fun homeSections(
+            homeId: String?,
+            privacyValue: String?,
+        ): List<MeSection> {
+            val args = if (homeId != null) mapOf("homeId" to homeId) else emptyMap()
+            return listOf(
                 MeSection(
                     id = "household",
                     header = "Household",
                     rows =
                         listOf(
-                            MeSectionRow("address", PantopusIcon.Home, "Edit address", routeKey = "me.home.editAddress"),
-                            MeSectionRow("invite", PantopusIcon.UserPlus, "Invite member", routeKey = "me.home.invite"),
-                            MeSectionRow("privacy", PantopusIcon.Shield, "Privacy", value = privacyValue, routeKey = "me.home.privacy"),
+                            MeSectionRow("members", PantopusIcon.UserPlus, "Members", routeKey = "me.members", routeArgs = args),
+                            MeSectionRow("owners", PantopusIcon.Shield, "Owners", routeKey = "me.owners", routeArgs = args),
+                            MeSectionRow("access", PantopusIcon.Lock, "Access codes", routeKey = "me.access", routeArgs = args),
                         ),
                 ),
                 MeSection(
@@ -310,21 +331,37 @@ class MeViewModel
                     header = "Activity",
                     rows =
                         listOf(
-                            MeSectionRow("delivery", PantopusIcon.Mailbox, "Delivery log", routeKey = "me.home.deliveryLog"),
-                            MeSectionRow("maintenance", PantopusIcon.Hammer, "Maintenance", routeKey = "me.home.maintenance"),
-                            MeSectionRow("utilities", PantopusIcon.Info, "Utilities", routeKey = "me.home.utilities"),
+                            MeSectionRow("bills", PantopusIcon.File, "Bills", routeKey = "me.bills", routeArgs = args),
+                            MeSectionRow("tasks", PantopusIcon.Hammer, "Household tasks", routeKey = "me.tasks", routeArgs = args),
+                            MeSectionRow("packages", PantopusIcon.Mailbox, "Packages", routeKey = "me.packages", routeArgs = args),
+                            MeSectionRow(
+                                "emergency",
+                                PantopusIcon.Shield,
+                                "Emergency info",
+                                routeKey = "me.emergency",
+                                routeArgs = args,
+                            ),
                         ),
                 ),
                 MeSection(
-                    id = "support",
-                    header = "Support",
+                    id = "help_legal",
+                    header = "Help & Legal",
                     rows =
                         listOf(
                             MeSectionRow("help", PantopusIcon.HelpCircle, "Help", routeKey = "me.help"),
-                            MeSectionRow("about", PantopusIcon.Info, "About", value = appVersion(), routeKey = "me.about"),
+                            MeSectionRow("terms", PantopusIcon.File, "Terms", routeKey = "me.legal"),
+                            MeSectionRow(
+                                "privacy",
+                                PantopusIcon.Shield,
+                                "Privacy",
+                                value = privacyValue,
+                                routeKey = "me.home.privacy",
+                                routeArgs = args,
+                            ),
                         ),
                 ),
             )
+        }
 
         private fun withDebug(sections: List<MeSection>): List<MeSection> {
             if (!BuildConfig.DEBUG) return sections
@@ -406,6 +443,4 @@ class MeViewModel
                 "private" -> "Strict"
                 else -> null
             }
-
-        private fun appVersion(): String = "v${BuildConfig.VERSION_NAME}"
     }
