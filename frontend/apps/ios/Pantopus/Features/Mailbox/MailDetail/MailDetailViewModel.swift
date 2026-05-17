@@ -69,6 +69,12 @@ public struct MailDetailContent: Sendable {
     /// custody timeline + combined sender/carrier card.
     public let certifiedDetail: CertifiedDetailDTO?
 
+    /// Decoded community payload — set when `category == .community` and
+    /// the detail response's `object` JSON carries a community item id.
+    /// The Community variant view consumes this through the badge +
+    /// event details + attendees strip + pulse thread cross-link.
+    public let communityDetail: CommunityDetailDTO?
+
     public init(
         mailId: String,
         category: MailItemCategory,
@@ -88,7 +94,8 @@ public struct MailDetailContent: Sendable {
         ackRequired: Bool,
         isAcknowledged: Bool,
         bookletDetail: BookletDetailDTO? = nil,
-        certifiedDetail: CertifiedDetailDTO? = nil
+        certifiedDetail: CertifiedDetailDTO? = nil,
+        communityDetail: CommunityDetailDTO? = nil
     ) {
         self.mailId = mailId
         self.category = category
@@ -109,6 +116,7 @@ public struct MailDetailContent: Sendable {
         self.isAcknowledged = isAcknowledged
         self.bookletDetail = bookletDetail
         self.certifiedDetail = certifiedDetail
+        self.communityDetail = communityDetail
     }
 
     /// Build a `KeyFactRow` list from the projected fields. Variants
@@ -154,6 +162,8 @@ public final class MailDetailViewModel {
     /// Transient banner; the view clears it after display.
     public var toast: String?
     public private(set) var ackInFlight: Bool = false
+    /// Community RSVP mutation is in-flight; disables the chip row.
+    public private(set) var rsvpInFlight: Bool = false
 
     private let mailId: String
     private let api: APIClient
@@ -215,6 +225,46 @@ public final class MailDetailViewModel {
         }
     }
 
+    /// Set the user's RSVP status on a Community mail item.
+    /// Optimistic — flips the local state and rolls back on transport
+    /// failure. "Going" wires to the existing `POST /community/rsvp`
+    /// route (backend stores it as a `will_attend` reaction); other
+    /// states are stored locally until the backend exposes a typed
+    /// per-status route (P22 scope note in the parity audit).
+    public func setRsvp(_ status: CommunityRsvpStatus) async {
+        guard case let .loaded(content) = state,
+              let community = content.communityDetail,
+              !rsvpInFlight else { return }
+        rsvpInFlight = true
+        defer { rsvpInFlight = false }
+        let previous = content
+        let optimistic = MailDetailContent.replacingRsvp(content, with: status)
+        state = .loaded(optimistic)
+        // Local-only states don't currently round-trip; just toast.
+        guard status == .going else {
+            toast = Self.rsvpToast(for: status)
+            return
+        }
+        do {
+            let _: CommunityRsvpResponse = try await api.request(
+                MailboxV2Endpoints.communityRsvp(communityItemId: community.communityItemId)
+            )
+            toast = "You're going"
+        } catch {
+            state = .loaded(previous)
+            toast = (error as? APIError)?.errorDescription ?? "Couldn't update RSVP"
+        }
+    }
+
+    private static func rsvpToast(for status: CommunityRsvpStatus) -> String {
+        switch status {
+        case .going: "You're going"
+        case .maybe: "Saved as maybe"
+        case .notGoing: "Marked as can't make it"
+        case .undecided: "RSVP cleared"
+        }
+    }
+
     // MARK: - Pure projection (exposed for tests)
 
     /// Map the backend `MailDetailResponse.MailDetail` envelope to the
@@ -249,8 +299,8 @@ public final class MailDetailViewModel {
         let ackRequired = item.ackRequired ?? false
         let isAcknowledged = (item.ackStatus ?? "").lowercased() == "acknowledged"
         let initials = makeInitials(from: senderDisplayName)
-        // T6.5c — decode the per-variant payloads from `mail.object`.
-        // Both decoders return nil unless the payload carries the
+        // T6.5c–d — decode the per-variant payloads from `mail.object`.
+        // Each decoder returns nil unless the payload carries the
         // required shape, so the generic projection still works when the
         // backend hasn't populated `object_payload` for this mail.
         let bookletDetail = category == .booklet
@@ -259,10 +309,17 @@ public final class MailDetailViewModel {
         let certifiedDetail = category == .certified
             ? CertifiedDetailDTO.decode(from: detail.object)
             : nil
+        let communityDetail = category == .community
+            ? CommunityDetailDTO.decode(from: detail.object)
+            : nil
         // Certified mail flips the acknowledgement state from its decoded
         // payload too — backend can ship the chain with `is_acknowledged`
         // set even before `ack_status` on the item row updates.
         let resolvedAck = isAcknowledged || (certifiedDetail?.isAcknowledged ?? false)
+        let detailTrust: MailDetailTrust = switch category {
+        case .certified, .community, .legal, .tax: .verified
+        default: trust.detailTrust
+        }
         return MailDetailContent(
             mailId: item.id,
             category: category,
@@ -282,7 +339,8 @@ public final class MailDetailViewModel {
             ackRequired: ackRequired,
             isAcknowledged: resolvedAck,
             bookletDetail: bookletDetail,
-            certifiedDetail: certifiedDetail
+            certifiedDetail: certifiedDetail,
+            communityDetail: communityDetail
         )
     }
 
@@ -331,7 +389,53 @@ private extension MailDetailContent {
             ackRequired: content.ackRequired,
             isAcknowledged: value,
             bookletDetail: content.bookletDetail,
-            certifiedDetail: content.certifiedDetail
+            certifiedDetail: content.certifiedDetail,
+            communityDetail: content.communityDetail
+        )
+    }
+
+    /// Return a copy of `content` with the community detail's RSVP
+    /// status flipped. Used by the optimistic `setRsvp` mutation.
+    static func replacingRsvp(
+        _ content: MailDetailContent,
+        with status: CommunityRsvpStatus
+    ) -> MailDetailContent {
+        guard let community = content.communityDetail else { return content }
+        let updatedCommunity = CommunityDetailDTO(
+            communityItemId: community.communityItemId,
+            group: community.group,
+            event: community.event,
+            attendees: community.attendees,
+            attendeeCount: status == .going && community.rsvp != .going
+                ? community.attendeeCount + 1
+                : (status != .going && community.rsvp == .going
+                    ? max(0, community.attendeeCount - 1)
+                    : community.attendeeCount),
+            attendeesFromBlock: community.attendeesFromBlock,
+            pulseThread: community.pulseThread,
+            rsvp: status
+        )
+        return MailDetailContent(
+            mailId: content.mailId,
+            category: content.category,
+            trust: content.trust,
+            detailTrust: content.detailTrust,
+            senderDisplayName: content.senderDisplayName,
+            senderMeta: content.senderMeta,
+            senderInitials: content.senderInitials,
+            senderUserId: content.senderUserId,
+            title: content.title,
+            excerpt: content.excerpt,
+            createdAtLabel: content.createdAtLabel,
+            expiresAtLabel: content.expiresAtLabel,
+            bodyParagraphs: content.bodyParagraphs,
+            attachments: content.attachments,
+            aiSummary: content.aiSummary,
+            ackRequired: content.ackRequired,
+            isAcknowledged: content.isAcknowledged,
+            bookletDetail: content.bookletDetail,
+            certifiedDetail: content.certifiedDetail,
+            communityDetail: updatedCommunity
         )
     }
 }

@@ -48,14 +48,25 @@ class CeremonialMailOpenViewModel
             }
         }
 
-        /** Step the seal-break ceremony forward. The view triggers
-         *  this when the user taps the envelope. */
-        fun startBreakingSeal() {
+        /**
+         * Step the seal-break ceremony forward. The view triggers
+         * this when the user taps the envelope. Pass
+         * [skipAnimation] = true to jump straight to `Open` without
+         * the intermediate `Breaking` frame — used automatically when
+         * the system has reduce-motion enabled, or when the user taps
+         * the "Skip animation" affordance. Total time from `Sealed`
+         * to `Open` is capped at 750 ms (T6.5d).
+         */
+        fun startBreakingSeal(skipAnimation: Boolean = false) {
             val current = _state.value as? CeremonialMailOpenUiState.Loaded ?: return
             if (current.phase != CeremonialMailPhase.Sealed) return
+            if (skipAnimation) {
+                _state.value = current.copy(phase = CeremonialMailPhase.Open)
+                return
+            }
             _state.value = current.copy(phase = CeremonialMailPhase.Breaking)
             viewModelScope.launch {
-                delay(600)
+                delay(750)
                 val now = _state.value as? CeremonialMailOpenUiState.Loaded ?: return@launch
                 if (now.phase == CeremonialMailPhase.Breaking) {
                     _state.value = now.copy(phase = CeremonialMailPhase.Open)

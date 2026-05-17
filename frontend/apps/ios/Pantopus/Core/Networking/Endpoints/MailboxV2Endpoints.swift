@@ -70,4 +70,34 @@ public enum MailboxV2Endpoints {
             body: request
         )
     }
+
+    /// `POST /api/mailbox/v2/community/rsvp` — route
+    /// `backend/routes/mailboxV2Phase3.js:746`. Adds a `will_attend`
+    /// reaction to the `CommunityMailItem` and returns the updated
+    /// RSVP count. The backend treats RSVP as idempotent.
+    public static func communityRsvp(communityItemId: String) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/mailbox/v2/community/rsvp",
+            body: CommunityRsvpRequest(communityItemId: communityItemId)
+        )
+    }
+}
+
+/// Wire body for `POST /api/mailbox/v2/community/rsvp`. The backend
+/// validator (`backend/routes/mailboxV2Phase3.js:56`) requires
+/// `communityItemId` as a UUID string.
+public struct CommunityRsvpRequest: Encodable, Sendable {
+    public let communityItemId: String
+
+    public init(communityItemId: String) {
+        self.communityItemId = communityItemId
+    }
+}
+
+/// Wire response for `POST /api/mailbox/v2/community/rsvp` —
+/// `{ message, rsvpCount }`.
+public struct CommunityRsvpResponse: Decodable, Sendable {
+    public let message: String?
+    public let rsvpCount: Int?
 }

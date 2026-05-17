@@ -31,7 +31,7 @@ final class IconTests: XCTestCase {
         // T5.3.1 My bids — bid lifecycle chips + footer.
         "crown", "trending-down", "ban", "file-text",
         // T5.3.2 My tasks — poster-side chips + footer.
-        "plus", "rocket", "clipboard-list", "clock-plus", "circle-slash", "play",
+        "plus", "rocket", "clipboard-list", "clock-plus", "circle-slash", "play", "pause",
         // T5.3.3 My posts — archive chip + empty-state compose icon.
         "archive", "message-square-plus",
         // T5.3.4 Listing offers — listing-context header icons.

@@ -145,10 +145,42 @@ class CeremonialMailOpenViewModelTest {
             vm.startBreakingSeal()
             val mid = vm.state.value as CeremonialMailOpenUiState.Loaded
             assertEquals(CeremonialMailPhase.Breaking, mid.phase)
-            advanceUntilIdle() // resolves the 600ms delay
+            advanceUntilIdle() // resolves the 750ms delay
             val finished = vm.state.value as CeremonialMailOpenUiState.Loaded
             assertEquals(CeremonialMailPhase.Open, finished.phase)
         }
+
+    // T6.5d (P22) — reduce-motion + skip-animation behavior.
+    @Test fun start_breaking_seal_with_skip_jumps_straight_to_open() =
+        runTest(dispatcher) {
+            stubItem()
+            val vm = CeremonialMailOpenViewModel(repository, savedState())
+            vm.load()
+            advanceUntilIdle()
+            // Reduce-motion path — the screen passes `skipAnimation = true`
+            // so we never enter the `.breaking` intermediate frame.
+            vm.startBreakingSeal(skipAnimation = true)
+            assertEquals(
+                CeremonialMailPhase.Open,
+                (vm.state.value as CeremonialMailOpenUiState.Loaded).phase,
+            )
+        }
+
+    @Test fun seasonal_stationery_tones_decode() {
+        assertEquals(CeremonialMailStationeryTone.Fall, CeremonialMailStationeryTone.fromWire("fall"))
+        assertEquals(CeremonialMailStationeryTone.Winter, CeremonialMailStationeryTone.fromWire("winter"))
+        assertEquals(CeremonialMailStationeryTone.Spring, CeremonialMailStationeryTone.fromWire("spring"))
+        assertEquals(CeremonialMailStationeryTone.Summer, CeremonialMailStationeryTone.fromWire("summer"))
+        assertEquals(CeremonialMailStationeryTone.Evergreen, CeremonialMailStationeryTone.fromWire("evergreen"))
+    }
+
+    @Test fun seasonal_seal_tones_decode() {
+        assertEquals(CeremonialMailSealTone.Fall, CeremonialMailSealTone.fromWire("fall"))
+        assertEquals(CeremonialMailSealTone.Winter, CeremonialMailSealTone.fromWire("winter"))
+        assertEquals(CeremonialMailSealTone.Spring, CeremonialMailSealTone.fromWire("spring"))
+        assertEquals(CeremonialMailSealTone.Summer, CeremonialMailSealTone.fromWire("summer"))
+        assertEquals(CeremonialMailSealTone.Evergreen, CeremonialMailSealTone.fromWire("evergreen"))
+    }
 
     @Test fun start_breaking_seal_ignored_when_not_sealed() =
         runTest(dispatcher) {
