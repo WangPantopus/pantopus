@@ -449,17 +449,11 @@ class HouseholdTasksListViewModel
             return listOf(RowChip(text = text, icon = projection.chipIcon, tint = RowChip.Tint.Status(variant)))
         }
 
-        private fun passes(
-            task: HomeTaskDto,
-            tab: HouseholdTasksTab,
-            now: Instant,
-        ): Boolean = HouseholdTasksListViewModel.passes(task, tab, now)
-
         private fun tabsWithCounts(loaded: List<HomeTaskDto>): List<ListOfRowsTab> {
             val now = clock()
-            val active = loaded.count { passes(it, HouseholdTasksTab.Active, now) }
-            val done = loaded.count { passes(it, HouseholdTasksTab.Done, now) }
-            val recurring = loaded.count { passes(it, HouseholdTasksTab.Recurring, now) }
+            val active = loaded.count { HouseholdTasksListViewModel.passes(it, HouseholdTasksTab.Active, now) }
+            val done = loaded.count { HouseholdTasksListViewModel.passes(it, HouseholdTasksTab.Done, now) }
+            val recurring = loaded.count { HouseholdTasksListViewModel.passes(it, HouseholdTasksTab.Recurring, now) }
             return listOf(
                 ListOfRowsTab(HouseholdTasksTab.Active.id, "Active", active),
                 ListOfRowsTab(HouseholdTasksTab.Done.id, "Done", done),

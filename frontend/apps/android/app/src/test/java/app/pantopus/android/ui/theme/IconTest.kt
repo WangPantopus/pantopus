@@ -121,6 +121,11 @@ class IconTest {
             "shuffle",
             "wand-sparkles",
             "arrow-up-right",
+            // T6.3c — Household tasks chore categories.
+            "leaf",
+            "list-checks",
+            "utensils",
+            "baby",
         )
 
     @Test
