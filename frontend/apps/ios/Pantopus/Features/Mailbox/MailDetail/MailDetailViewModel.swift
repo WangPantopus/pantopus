@@ -28,11 +28,9 @@
 import Foundation
 import Observation
 
-// swiftlint:disable type_body_length
-
 /// Lifecycle state for the generic mail detail screen.
 @MainActor
-public enum MailDetailState: Sendable {
+public enum MailDetailState {
     case loading
     case loaded(MailDetailContent)
     case error(message: String)
@@ -106,10 +104,10 @@ public final class MailDetailViewModel {
     private let api: APIClient
     private let now: @Sendable () -> Date
 
-    public init(
+    init(
         mailId: String,
         api: APIClient = .shared,
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.mailId = mailId
         self.api = api
@@ -169,7 +167,7 @@ public final class MailDetailViewModel {
     /// without standing the VM up.
     public static func project(
         detail: MailDetailResponse.MailDetail,
-        now: Date = Date()
+        now _: Date = Date()
     ) -> MailDetailContent {
         let item = detail.item
         let category = MailItemCategory.fromRaw(item.mailType ?? item.type)
@@ -178,7 +176,7 @@ public final class MailDetailViewModel {
             ?? item.senderBusinessName
             ?? item.senderAddress
             ?? "Unknown sender"
-        let senderMeta = detail.sender?.username.flatMap { "@\($0)" } ?? item.senderAddress
+        let senderMeta = detail.sender?.username.map { "@\($0)" } ?? item.senderAddress
         let title = item.displayTitle ?? item.subject ?? "Mail"
         let excerpt = item.previewText
         let createdAtLabel = formatLongDate(item.createdAt)

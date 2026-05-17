@@ -638,7 +638,7 @@ private fun AttachmentTile(kind: AttachmentKind) {
 
 /**
  * Per-kind tile colors. Documented per-feature palette exception so the
- * shell file is the only place these hex literals appear in `ui/screens/**`.
+ * shell file is the only place these hex literals appear in screen code.
  */
 private object AttachmentTileTokens {
     data class Tokens(

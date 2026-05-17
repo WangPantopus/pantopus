@@ -22,7 +22,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length function_body_length
+// swiftlint:disable file_length type_body_length cyclomatic_complexity multiline_function_chains
 
 @Observable
 @MainActor
@@ -37,9 +37,14 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
 
     /// No tabs on the calendar — the chip-strip slot stays nil too;
     /// filtering happens via month-strip day taps.
-    public var tabs: [ListOfRowsTab] { [] }
+    public var tabs: [ListOfRowsTab] {
+        []
+    }
+
     public var selectedTab: String = ""
-    public var topBarAction: TopBarAction? { nil }
+    public var topBarAction: TopBarAction? {
+        nil
+    }
 
     public var fab: FABAction? {
         FABAction(
@@ -99,18 +104,18 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     /// User-selected day filter. `nil` means "show full agenda".
     private var selectedIsoDate: String?
 
-    public init(
+    init(
         homeId: String,
         homeSubtitle: String? = nil,
         api: APIClient = .shared,
         onAddEvent: @escaping @Sendable () -> Void = {},
         onOpenEvent: @escaping @Sendable (String) -> Void = { _ in },
-        now: @escaping @Sendable () -> Date = Date.init,
+        now: @escaping @Sendable () -> Date = { Date() },
         calendar: Calendar = Self.utcCalendar,
         timeZone: TimeZone = TimeZone(identifier: "UTC") ?? .current
     ) {
         self.homeId = homeId
-        self.subtitle = homeSubtitle
+        subtitle = homeSubtitle
         self.api = api
         self.onAddEvent = onAddEvent
         self.onOpenEvent = onOpenEvent
@@ -119,7 +124,7 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         self.timeZone = timeZone
         var cal = calendar
         cal.timeZone = timeZone
-        self.weekAnchorIsoDate = Self.weekAnchor(for: now(), calendar: cal)
+        weekAnchorIsoDate = Self.weekAnchor(for: now(), calendar: cal)
     }
 
     // MARK: - Lifecycle
@@ -159,10 +164,9 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         var cal = calendar
         cal.timeZone = timeZone
         guard let anchor = Self.parseIso(weekAnchorIsoDate, calendar: cal) else { return }
-        let days: Int
-        switch direction {
-        case .previous: days = -7
-        case .next: days = 7
+        let days: Int = switch direction {
+        case .previous: -7
+        case .next: 7
         }
         guard let shifted = cal.date(byAdding: .day, value: days, to: anchor) else { return }
         weekAnchorIsoDate = Self.weekAnchor(for: shifted, calendar: cal)
@@ -216,7 +220,7 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
                     icon: .calendarDays,
                     headline: "No events scheduled",
                     subcopy:
-                        "Plan chores, repairs, birthdays, and household milestones. " +
+                    "Plan chores, repairs, birthdays, and household milestones. " +
                         "Members get notified automatically.",
                     ctaTitle: "Add event"
                 ) { [onAddEvent] in onAddEvent() }
@@ -283,7 +287,9 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         dayFmt.dateFormat = "d"
 
         var dotCounts: [String: Int] = [:]
-        for ev in parsed { dotCounts[ev.isoDate, default: 0] += 1 }
+        for ev in parsed {
+            dotCounts[ev.isoDate, default: 0] += 1
+        }
 
         var days: [MonthStripState.Day] = []
         for offset in 0..<7 {
@@ -459,10 +465,12 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     public struct BannerSummary: Sendable, Equatable {
         public let count: Int
         public let nextLabel: String?
-        public var hasContent: Bool { count > 0 || nextLabel != nil }
+        public var hasContent: Bool {
+            count >= 1 || nextLabel != nil
+        }
 
         public var title: String {
-            if count == 0 { return "Nothing scheduled this week" }
+            if count < 1 { return "Nothing scheduled this week" }
             return count == 1 ? "1 event this week" : "\(count) events this week"
         }
 

@@ -47,9 +47,8 @@ final class MailItemDetailShellTests: XCTestCase {
                 AIElfBullet(icon: .calendar, label: "Hearing Tue Jun 3", text: "6:00 PM"),
                 AIElfBullet(icon: .pencil, label: "Comments by May 30", text: "optional")
             ],
-            trailingBadge: "2 min summary",
-            onRedo: {}
-        )
+            trailingBadge: "2 min summary"
+        ) {}
     }
 
     private func makeAttachments() -> AttachmentsRowContent {
@@ -130,7 +129,9 @@ final class MailItemDetailShellTests: XCTestCase {
                 Text("Excerpt")
             }
         } keyFacts: {
-            HStack { Text("Date"); Text("Value") }
+            HStack { Text("Date")
+                Text("Value")
+            }
         } body: {
             VStack(alignment: .leading) {
                 Text("Paragraph 1")
@@ -139,7 +140,9 @@ final class MailItemDetailShellTests: XCTestCase {
         } sender: {
             HStack {
                 Circle().frame(width: 40, height: 40)
-                VStack { Text("Sender name"); Text("Sender dept") }
+                VStack { Text("Sender name")
+                    Text("Sender dept")
+                }
             }
         } actions: {
             Button("Acknowledge") {}

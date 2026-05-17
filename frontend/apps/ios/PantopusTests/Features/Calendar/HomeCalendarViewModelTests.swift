@@ -13,6 +13,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable type_body_length
+
 @MainActor
 final class HomeCalendarViewModelTests: XCTestCase {
     override func setUp() {
@@ -314,7 +316,7 @@ final class HomeCalendarViewModelTests: XCTestCase {
 
     // MARK: - Row mapping
 
-    func testRowProjectionUsesCategoryPaletteAndChip() {
+    func testRowProjectionUsesCategoryPaletteAndChip() throws {
         let cal = HomeCalendarViewModel.utcCalendar
         let dto = event(
             id: "soccer",
@@ -325,9 +327,9 @@ final class HomeCalendarViewModelTests: XCTestCase {
             location: "Riverside Field 3",
             attendees: ["m1", "m2", "m3"]
         )
-        let parsed = HomeCalendarViewModel.ParsedEvent(
+        let parsed = try HomeCalendarViewModel.ParsedEvent(
             dto: dto,
-            start: HomeCalendarViewModel.parseIsoInstant("2025-10-12T16:00:00Z")!,
+            start: XCTUnwrap(HomeCalendarViewModel.parseIsoInstant("2025-10-12T16:00:00Z")),
             isoDate: "2025-10-12"
         )
         let row = HomeCalendarViewModel.row(for: parsed, calendar: cal) { _ in }

@@ -153,7 +153,9 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource, Header: View>: Vi
 /// Swift infers `Header == EmptyView` from this overload.
 public extension ListOfRowsView where Header == EmptyView {
     init(dataSource: DataSource) {
-        self.init(dataSource: dataSource, customHeader: { EmptyView() })
+        self.init(dataSource: dataSource) {
+            EmptyView()
+        }
     }
 }
 

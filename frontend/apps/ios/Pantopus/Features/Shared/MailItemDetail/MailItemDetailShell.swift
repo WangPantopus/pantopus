@@ -34,7 +34,7 @@
 
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length function_body_length
+// swiftlint:disable file_length multiple_closures_with_trailing_closure
 
 /// Archetype shell. Generic over five View slots so concrete screens can
 /// drop in arbitrary hero / key-facts / body / sender / actions designs
@@ -114,22 +114,22 @@ public struct MailItemDetailShell<
     /// SwiftUI's @ViewBuilder doesn't have a clean way to ask "is this
     /// view EmptyView?" so we ship the slot unconditionally — EmptyView
     /// renders nothing, costs nothing.
-    @ViewBuilder private var keyFactsSection: some View {
+    private var keyFactsSection: some View {
         keyFactsContent
             .accessibilityIdentifier("mailItemDetail_keyFacts")
     }
 
-    @ViewBuilder private var bodySection: some View {
+    private var bodySection: some View {
         bodyContent
             .accessibilityIdentifier("mailItemDetail_body")
     }
 
-    @ViewBuilder private var senderSection: some View {
+    private var senderSection: some View {
         senderContent
             .accessibilityIdentifier("mailItemDetail_sender")
     }
 
-    @ViewBuilder private var actionsShelf: some View {
+    private var actionsShelf: some View {
         actionsContent
             .accessibilityIdentifier("mailItemDetail_actions")
             .padding(.horizontal, Spacing.s4)
@@ -252,7 +252,7 @@ public struct MailItemDetailTopBar: View {
         }
     }
 
-    @ViewBuilder private var trailingCluster: some View {
+    private var trailingCluster: some View {
         HStack(spacing: 2) {
             if let trailing = config.trailingAction {
                 Button(action: { trailing.handler() }) {
@@ -510,7 +510,7 @@ private enum AttachmentTileTokens {
         switch kind {
         case .pdf:
             // CSS fee2e2 / b91c1c / fecaca
-            return Tokens(
+            Tokens(
                 label: "PDF",
                 background: Color(red: 0xFE / 255.0, green: 0xE2 / 255.0, blue: 0xE2 / 255.0),
                 foreground: Color(red: 0xB9 / 255.0, green: 0x1C / 255.0, blue: 0x1C / 255.0),
@@ -518,7 +518,7 @@ private enum AttachmentTileTokens {
             )
         case .image:
             // CSS dbeafe / 1d4ed8 / bfdbfe
-            return Tokens(
+            Tokens(
                 label: "IMG",
                 background: Color(red: 0xDB / 255.0, green: 0xEA / 255.0, blue: 0xFE / 255.0),
                 foreground: Color(red: 0x1D / 255.0, green: 0x4E / 255.0, blue: 0xD8 / 255.0),
@@ -526,7 +526,7 @@ private enum AttachmentTileTokens {
             )
         case .video:
             // CSS fce7f3 / be185d / fbcfe8
-            return Tokens(
+            Tokens(
                 label: "VID",
                 background: Color(red: 0xFC / 255.0, green: 0xE7 / 255.0, blue: 0xF3 / 255.0),
                 foreground: Color(red: 0xBE / 255.0, green: 0x18 / 255.0, blue: 0x5D / 255.0),
@@ -534,7 +534,7 @@ private enum AttachmentTileTokens {
             )
         case .audio:
             // CSS ede9fe / 6d28d9 / ddd6fe
-            return Tokens(
+            Tokens(
                 label: "AUD",
                 background: Color(red: 0xED / 255.0, green: 0xE9 / 255.0, blue: 0xFE / 255.0),
                 foreground: Color(red: 0x6D / 255.0, green: 0x28 / 255.0, blue: 0xD9 / 255.0),
@@ -542,14 +542,14 @@ private enum AttachmentTileTokens {
             )
         case .link:
             // CSS f3f4f6 / 374151 / e5e7eb
-            return Tokens(
+            Tokens(
                 label: "URL",
                 background: Color(red: 0xF3 / 255.0, green: 0xF4 / 255.0, blue: 0xF6 / 255.0),
                 foreground: Color(red: 0x37 / 255.0, green: 0x41 / 255.0, blue: 0x51 / 255.0),
                 border: Color(red: 0xE5 / 255.0, green: 0xE7 / 255.0, blue: 0xEB / 255.0)
             )
         case .other:
-            return Tokens(
+            Tokens(
                 label: "FILE",
                 background: Color(red: 0xF3 / 255.0, green: 0xF4 / 255.0, blue: 0xF6 / 255.0),
                 foreground: Color(red: 0x37 / 255.0, green: 0x41 / 255.0, blue: 0x51 / 255.0),

@@ -10,6 +10,8 @@
 
 import SwiftUI
 
+// swiftlint:disable multiple_closures_with_trailing_closure trailing_closure
+
 public struct MailDetailView: View {
     @State private var viewModel: MailDetailViewModel
     private let onBack: () -> Void
@@ -55,7 +57,6 @@ public struct MailDetailView: View {
         .animation(.easeInOut(duration: 0.2), value: viewModel.toast)
     }
 
-    @ViewBuilder
     private func loaded(_ content: MailDetailContent) -> some View {
         MailItemDetailShell(
             topBar: makeTopBar(for: content),
@@ -65,9 +66,13 @@ public struct MailDetailView: View {
             keyFacts: { KeyFactsCard(rows: content.keyFacts()) },
             body: { BodyCard(paragraphs: content.bodyParagraphs) },
             sender: { SenderCard(content: content, onOpenProfile: onOpenSenderProfile) },
-            actions: { ActionsRow(content: content, ackInFlight: viewModel.ackInFlight) {
-                Task { await viewModel.acknowledge() }
-            } }
+            actions: {
+                ActionsRow(
+                    content: content,
+                    ackInFlight: viewModel.ackInFlight,
+                    onAck: { Task { await viewModel.acknowledge() } }
+                )
+            }
         )
     }
 
@@ -329,7 +334,7 @@ private struct SenderCard: View {
         }
     }
 
-    @ViewBuilder private var avatar: some View {
+    private var avatar: some View {
         Text(content.senderInitials)
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(Theme.Color.appTextInverse)

@@ -220,7 +220,7 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
             return .social
         }
         if raw.contains("repair") || raw.contains("maintenance") || raw.contains("plumber") ||
-           raw.contains("electrician") || raw.contains("hvac") {
+            raw.contains("electrician") || raw.contains("hvac") {
             return .maintenance
         }
         if raw.contains("chore") || raw.contains("clean") { return .chore }

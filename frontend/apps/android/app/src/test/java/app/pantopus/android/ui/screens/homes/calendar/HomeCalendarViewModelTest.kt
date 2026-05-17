@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "LongParameterList")
 
 package app.pantopus.android.ui.screens.homes.calendar
 

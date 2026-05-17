@@ -199,8 +199,8 @@ final class MailboxListViewModel: ListOfRowsDataSource {
         let interval = Date().timeIntervalSince(date)
         if interval < 60 { return "now" }
         if interval < 3600 { return "\(Int(interval / 60))m" }
-        if interval < 86_400 { return "\(Int(interval / 3600))h" }
-        if interval < 7 * 86_400 { return "\(Int(interval / 86_400))d" }
+        if interval < 86400 { return "\(Int(interval / 3600))h" }
+        if interval < 7 * 86400 { return "\(Int(interval / 86400))d" }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "MMM d"

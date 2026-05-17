@@ -14,6 +14,8 @@
 
 import SwiftUI
 
+// swiftlint:disable type_body_length
+
 /// Every icon the Pantopus design language uses. Cases are the raw Lucide
 /// token names (kebab-case preserved in `rawValue`).
 public enum PantopusIcon: String, CaseIterable, Sendable {
