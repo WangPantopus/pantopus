@@ -41,7 +41,9 @@ final class IconTests: XCTestCase {
         // T6.0b My tasks V2 — Magic Task archetype + task-format icons.
         "tv", "laptop", "monitor", "shuffle", "wand-sparkles", "arrow-up-right",
         // T6.3c Household tasks — chore-category iconography + banner glyph.
-        "leaf", "list-checks", "utensils", "baby"
+        "leaf", "list-checks", "utensils", "baby",
+        // T6.3b Maintenance — task category iconography.
+        "wrench", "fan", "cloud-rain", "refrigerator", "bug", "trees", "paint-roller", "bell-ring"
     ]
 
     func testInventoryMatches() {

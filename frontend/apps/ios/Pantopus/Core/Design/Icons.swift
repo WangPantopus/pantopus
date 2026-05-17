@@ -149,6 +149,20 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case utensils
     case baby
 
+    // T6.3b Maintenance — per-home maintenance task category iconography.
+    // Same rationale as the Bills T6.0a additions: the design's
+    // category-tinted leading tiles need glyphs that aren't on the
+    // existing icon menu. Fallbacks are documented inline in
+    // `sfSymbolName` for icons SF Symbols doesn't ship 1:1.
+    case wrench
+    case fan
+    case cloudRain = "cloud-rain"
+    case refrigerator
+    case bug
+    case trees
+    case paintRoller = "paint-roller"
+    case bellRing = "bell-ring"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -264,6 +278,17 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .listChecks: "checklist"
         case .utensils: "fork.knife"
         case .baby: "figure.child"
+        // T6.3b Maintenance. SF Symbols ships direct equivalents for most
+        // — only `paint-roller` and `bell-ring` lack 1:1 glyphs, fall back
+        // to `paintbrush.pointed` and `bell.badge` respectively.
+        case .wrench: "wrench.adjustable"
+        case .fan: "fan"
+        case .cloudRain: "cloud.rain"
+        case .refrigerator: "refrigerator"
+        case .bug: "ant"
+        case .trees: "tree"
+        case .paintRoller: "paintbrush.pointed"
+        case .bellRing: "bell.badge"
         }
     }
 }

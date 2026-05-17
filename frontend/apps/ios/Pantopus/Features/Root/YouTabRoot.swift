@@ -48,6 +48,9 @@ public enum YouRoute: Hashable {
     /// home id resolved by the Me VM. Distinct from `.myTasks` which is
     /// the posted-to-neighbours gig list.
     case homeTasks(homeId: String)
+    /// T6.3b / P10 — Maintenance. The home-context "me.maintenance"
+    /// action tile pushes here.
+    case homeMaintenance(homeId: String)
     /// P15 / T6.3g — Owners (legal-title roster). The "me.owners"
     /// Household-section row pushes here with the primary home id
     /// resolved by `MeViewModel.homeSections(...)`.
@@ -294,6 +297,12 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.maintenance":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeMaintenance(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         case "me.members":
             if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeMembers(homeId: homeId))
@@ -336,6 +345,11 @@ public struct YouTabRoot: View {
         case "me.tasks":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeTasks(homeId: homeId))
+                return
+            }
+        case "me.maintenance":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeMaintenance(homeId: homeId))
                 return
             }
         case "me.owners":
@@ -650,6 +664,18 @@ public struct YouTabRoot: View {
                     },
                     onEditRecurring: { _ in
                         Task { @MainActor in path.append(.placeholder(label: "Edit recurring task")) }
+                    }
+                )
+            )
+        case let .homeMaintenance(homeId):
+            MaintenanceListView(
+                viewModel: MaintenanceListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Maintenance detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in path.append(.placeholder(label: "Log maintenance")) }
                     }
                 )
             )

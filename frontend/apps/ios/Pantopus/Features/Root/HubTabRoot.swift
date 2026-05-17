@@ -25,6 +25,8 @@ public enum HubRoute: Hashable {
     /// (T6.3c / P11). Distinct from `.myBids` / `.myTasks` (the gig
     /// surfaces in the You tab).
     case homeTasks(homeId: String)
+    /// Maintenance sub-screen for a specific home (T6.3b / P10).
+    case homeMaintenance(homeId: String)
     /// Members sub-screen for a specific home (T6.3a / P9).
     case homeMembers(homeId: String)
     case publicProfile(userId: String)
@@ -313,9 +315,24 @@ public struct HubTabRoot: View {
                 onOpenTasks: { id in
                     Task { @MainActor in push(.homeTasks(homeId: id)) }
                 },
+                onOpenMaintenance: { id in
+                    Task { @MainActor in push(.homeMaintenance(homeId: id)) }
+                },
                 onOpenMembers: { id in
                     Task { @MainActor in push(.homeMembers(homeId: id)) }
                 }
+            )
+        case let .homeMaintenance(homeId):
+            MaintenanceListView(
+                viewModel: MaintenanceListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Maintenance detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in push(.placeholder(label: "Log maintenance")) }
+                    }
+                )
             )
         case let .homeBills(homeId):
             BillsListView(

@@ -126,6 +126,15 @@ class IconTest {
             "list-checks",
             "utensils",
             "baby",
+            // T6.3b — Maintenance category glyphs.
+            "wrench",
+            "fan",
+            "cloud-rain",
+            "refrigerator",
+            "bug",
+            "trees",
+            "paint-roller",
+            "bell-ring",
         )
 
     @Test

@@ -135,10 +135,10 @@ class MeViewModelTest {
 
             assertEquals("412 Birch Ln", loaded.home.displayName)
             assertFalse(loaded.home.isUnbound)
-            assertEquals(6, loaded.home.actionTiles.size)
-            // T6.2b home action grid is { bills, pets, members, polls, calendar, docs }.
+            assertEquals(7, loaded.home.actionTiles.size)
+            // T6.2b/T6.3b home action grid adds maintenance after bills.
             assertEquals(
-                listOf("me.bills", "me.pets", "me.members", "me.polls", "me.calendar", "me.docs"),
+                listOf("me.bills", "me.maintenance", "me.pets", "me.members", "me.polls", "me.calendar", "me.docs"),
                 loaded.home.actionTiles.map { it.routeKey },
             )
             // Home tiles carry the primary home id so the host can build
