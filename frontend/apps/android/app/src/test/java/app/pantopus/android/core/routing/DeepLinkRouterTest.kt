@@ -182,6 +182,73 @@ class DeepLinkRouterTest {
         assertEquals(DeepLinkRouter.Destination.Connections, DeepLinkRouter.resolveString("pantopus://connections"))
     }
 
+    // MARK: - T6.1c P5 — Auth deep links
+
+    @Test
+    fun reset_password_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.ResetPassword("hashed-recovery"),
+            DeepLinkRouter.resolveString("pantopus://auth/reset-password?token=hashed-recovery"),
+        )
+    }
+
+    @Test
+    fun reset_password_https_host() {
+        assertEquals(
+            DeepLinkRouter.Destination.ResetPassword("abc-123"),
+            DeepLinkRouter.resolveString("https://pantopus.app/auth/reset-password?token=abc-123"),
+        )
+    }
+
+    @Test
+    fun reset_password_without_token_falls_back() {
+        assertTrue(
+            DeepLinkRouter.resolveString("pantopus://auth/reset-password") is DeepLinkRouter.Destination.Unknown,
+        )
+    }
+
+    @Test
+    fun reset_password_accepts_token_hash_param() {
+        assertEquals(
+            DeepLinkRouter.Destination.ResetPassword("hash-shape"),
+            DeepLinkRouter.resolveString("pantopus://auth/reset-password?token_hash=hash-shape"),
+        )
+    }
+
+    @Test
+    fun reset_password_accepts_bare_shape_without_auth_prefix() {
+        // Backend's older recovery template emits `/reset-password?token=…`.
+        assertEquals(
+            DeepLinkRouter.Destination.ResetPassword("bare-shape-tok"),
+            DeepLinkRouter.resolveString("pantopus://reset-password?token=bare-shape-tok"),
+        )
+    }
+
+    @Test
+    fun verify_email_custom_scheme() {
+        assertEquals(
+            DeepLinkRouter.Destination.VerifyEmail(token = "hashed-otp", email = "alice@example.com"),
+            DeepLinkRouter.resolveString(
+                "pantopus://auth/verify-email?token=hashed-otp&email=alice@example.com",
+            ),
+        )
+    }
+
+    @Test
+    fun verify_email_https_host_without_email() {
+        assertEquals(
+            DeepLinkRouter.Destination.VerifyEmail(token = "tok", email = null),
+            DeepLinkRouter.resolveString("https://pantopus.app/auth/verify-email?token=tok"),
+        )
+    }
+
+    @Test
+    fun verify_email_without_token_falls_back() {
+        assertTrue(
+            DeepLinkRouter.resolveString("pantopus://auth/verify-email") is DeepLinkRouter.Destination.Unknown,
+        )
+    }
+
     // MARK: - Path-form (notification payload) entry point
 
     @Test

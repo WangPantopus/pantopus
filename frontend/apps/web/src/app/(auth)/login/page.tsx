@@ -101,12 +101,16 @@ export default function LoginPage() {
           <PantopusBadge />
         </div>
 
-        <h2 className="mt-6 text-center text-3xl font-bold text-app-text dark:text-white">
+        <p className="mt-6 text-center text-xs font-bold tracking-widest uppercase text-primary-600 dark:text-primary-400">
           Welcome back
+        </p>
+
+        <h2 className="mt-2 text-center text-3xl font-bold text-app-text dark:text-white">
+          Log in to Pantopus
         </h2>
 
         <p className="mt-2 text-center text-sm text-app-text-secondary">
-          Sign in to your neighborhood
+          Pick up where you left off on your block.
         </p>
       </div>
 
@@ -212,9 +216,28 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-2.5 px-4 rounded-lg shadow-sm text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400/40 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl shadow-md shadow-primary-600/30 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400/40 disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
-                {loading ? 'Signing in...' : 'Sign in'}
+                {loading ? (
+                  'Logging in…'
+                ) : (
+                  <>
+                    Log in
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
+                    </svg>
+                  </>
+                )}
               </button>
             </div>
 
@@ -275,11 +298,28 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-sm text-app-text-secondary dark:text-app-text-muted">
-          Don&apos;t have an account?{' '}
-          <Link href="/register" className="font-medium text-primary-700 dark:text-primary-300 hover:opacity-90">
-            Sign up
+          New to Pantopus?{' '}
+          <Link href="/register" className="font-semibold text-primary-700 dark:text-primary-300 hover:opacity-90">
+            Create account
           </Link>
         </p>
+
+        <div className="mt-8 flex items-center justify-center gap-1.5 text-xs text-app-text-secondary dark:text-app-text-muted">
+          <svg
+            className="h-3 w-3"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            <path d="m9 12 2 2 4-4" />
+          </svg>
+          <span>Verified by address</span>
+        </div>
       </div>
     </div>
   );

@@ -31,7 +31,7 @@ public struct AddPetWizardView: View {
         WizardShell(model: viewModel) {
             stepBody
             if let error = viewModel.errorMessage {
-                ErrorBanner(message: error)
+                AddPetErrorBanner(message: error)
             }
         }
         .onChange(of: viewModel.pendingEvent) { _, event in
@@ -216,7 +216,7 @@ private struct DetailsStep: View {
 
 // MARK: - Helpers
 
-private struct ErrorBanner: View {
+private struct AddPetErrorBanner: View {
     let message: String
 
     var body: some View {

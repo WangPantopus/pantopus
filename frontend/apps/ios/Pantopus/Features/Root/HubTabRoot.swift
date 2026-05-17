@@ -163,6 +163,11 @@ public struct HubTabRoot: View {
             case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
             case .openDiscoverHub: path.append(.discoverHub)
             case let .jumpBackIn(item): path.append(Self.route(forJumpBackIn: item))
+            // `openToday` taps the weather/today card. The design's tap
+            // destination is "home calendar", scheduled for P11 — until
+            // then this is a no-op so the chevron-right feels live but
+            // doesn't push to a stub.
+            case .openToday: break
             }
         }
         .overlay(alignment: .topLeading) { debugTapTarget }

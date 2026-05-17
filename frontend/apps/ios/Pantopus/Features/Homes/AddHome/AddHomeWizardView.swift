@@ -30,7 +30,7 @@ public struct AddHomeWizardView: View {
         WizardShell(model: viewModel) {
             stepContent
             if let error = viewModel.errorMessage {
-                ErrorBanner(message: error)
+                AddHomeErrorBanner(message: error)
             }
         }
         .onAppear {
@@ -458,7 +458,7 @@ private struct RoleRow: View {
     }
 }
 
-private struct ErrorBanner: View {
+private struct AddHomeErrorBanner: View {
     let message: String
 
     var body: some View {

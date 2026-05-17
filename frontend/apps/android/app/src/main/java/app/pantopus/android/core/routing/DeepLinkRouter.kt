@@ -53,6 +53,21 @@ object DeepLinkRouter {
 
         data class Invite(val token: String) : Destination
 
+        /**
+         * `pantopus://auth/reset-password?token=…` — hashed recovery
+         * token from the password-reset email. The caller invokes
+         * `AuthRepository.resetPassword` on submit.
+         */
+        data class ResetPassword(val token: String) : Destination
+
+        /**
+         * `pantopus://auth/verify-email?token=…&email=…` — hashed Supabase
+         * OTP from the verification email. `email` is optional but the
+         * link from the resend / signup flow carries it so the surface
+         * can render the recipient.
+         */
+        data class VerifyEmail(val token: String, val email: String?) : Destination
+
         data class Unknown(val uri: String) : Destination
     }
 
@@ -118,6 +133,19 @@ object DeepLinkRouter {
             }
         if (segments.isEmpty()) return Destination.Unknown(raw)
         val tabQuery = parseQueryParam(queryPart, "tab")
+        // Auth deep links carry `token` / `token_hash` (Supabase's two
+        // recovery-link param names) and an optional `email`. Auth-callback
+        // emails sometimes encode params in the fragment instead of the
+        // query string, so parse both.
+        val fragmentPart =
+            rest.substringAfter('#', missingDelimiterValue = "")
+        val tokenQuery =
+            parseQueryParam(queryPart, "token")
+                ?: parseQueryParam(queryPart, "token_hash")
+                ?: parseQueryParam(fragmentPart, "token")
+                ?: parseQueryParam(fragmentPart, "token_hash")
+        val emailQuery =
+            parseQueryParam(queryPart, "email") ?: parseQueryParam(fragmentPart, "email")
 
         return when (segments.first()) {
             "feed" -> Destination.Feed
@@ -164,6 +192,38 @@ object DeepLinkRouter {
                 val token = segments.getOrNull(1)
                 if (token.isNullOrBlank()) Destination.Unknown(raw) else Destination.Invite(token)
             }
+            "auth" -> {
+                when (segments.getOrNull(1)) {
+                    "reset-password", "reset_password" ->
+                        if (tokenQuery.isNullOrEmpty()) {
+                            Destination.Unknown(raw)
+                        } else {
+                            Destination.ResetPassword(tokenQuery)
+                        }
+                    "verify-email", "verify_email" ->
+                        if (tokenQuery.isNullOrEmpty()) {
+                            Destination.Unknown(raw)
+                        } else {
+                            Destination.VerifyEmail(token = tokenQuery, email = emailQuery)
+                        }
+                    else -> Destination.Unknown(raw)
+                }
+            }
+            // Tolerate the bare `/reset-password?token=…` / `/verify-email?token=…`
+            // shape that the backend's older recovery template emits (no
+            // `/auth/` prefix).
+            "reset-password", "reset_password" ->
+                if (tokenQuery.isNullOrEmpty()) {
+                    Destination.Unknown(raw)
+                } else {
+                    Destination.ResetPassword(tokenQuery)
+                }
+            "verify-email", "verify_email" ->
+                if (tokenQuery.isNullOrEmpty()) {
+                    Destination.Unknown(raw)
+                } else {
+                    Destination.VerifyEmail(token = tokenQuery, email = emailQuery)
+                }
             else -> Destination.Unknown(raw)
         }
     }

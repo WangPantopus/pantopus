@@ -1,7 +1,7 @@
 package app.pantopus.android
 
-import app.cash.turbine.test
 import app.pantopus.android.data.api.models.users.UserDto
+import app.pantopus.android.data.auth.AuthError
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.ui.screens.auth.LoginViewModel
 import io.mockk.coEvery
@@ -15,6 +15,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,6 +24,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import retrofit2.HttpException
+import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LoginViewModelTest {
@@ -42,13 +46,11 @@ class LoginViewModelTest {
     fun `canSubmit requires valid email and 6+ char password`() =
         runTest {
             val vm = LoginViewModel(repoReturning(Result.success(sampleUser)))
-            vm.uiState.test {
-                assertFalse(awaitItem().canSubmit)
-                vm.onEmailChange("foo@bar.com")
-                awaitItem()
-                vm.onPasswordChange("secret123")
-                assertTrue(awaitItem().canSubmit)
-            }
+            assertFalse(vm.uiState.value.canSubmit)
+            vm.onEmailChange("foo@bar.com")
+            assertFalse(vm.uiState.value.canSubmit)
+            vm.onPasswordChange("secret123")
+            assertTrue(vm.uiState.value.canSubmit)
         }
 
     @Test
@@ -70,9 +72,17 @@ class LoginViewModelTest {
         }
 
     @Test
-    fun `signIn sets errorMessage on failure`() =
+    fun `signIn maps HttpException 401 to AuthError InvalidCredentials`() =
         runTest {
-            val repo = repoReturning(Result.failure(IllegalStateException("bad credentials")))
+            val http401 =
+                HttpException(
+                    Response.error<Any>(
+                        401,
+                        "{\"error\":\"Invalid email or password\"}"
+                            .toResponseBody("application/json".toMediaTypeOrNull()),
+                    ),
+                )
+            val repo = repoReturning(Result.failure(http401))
             val vm = LoginViewModel(repo)
 
             vm.onEmailChange("alice@example.com")
@@ -83,7 +93,22 @@ class LoginViewModelTest {
 
             val final = vm.uiState.value
             assertFalse(final.isLoading)
-            assertEquals("bad credentials", final.errorMessage)
+            assertEquals(AuthError.InvalidCredentials, final.errorMessage)
+        }
+
+    @Test
+    fun `signIn maps IOException to AuthError NetworkError`() =
+        runTest {
+            val repo = repoReturning(Result.failure(java.io.IOException("offline")))
+            val vm = LoginViewModel(repo)
+
+            vm.onEmailChange("alice@example.com")
+            vm.onPasswordChange("hunter22")
+            vm.signIn()
+
+            advanceUntilIdle()
+
+            assertEquals(AuthError.NetworkError, vm.uiState.value.errorMessage)
         }
 
     @Test
@@ -101,14 +126,14 @@ class LoginViewModelTest {
     @Test
     fun `typing email after error clears errorMessage`() =
         runTest {
-            val repo = repoReturning(Result.failure(RuntimeException("oops")))
+            val repo = repoReturning(Result.failure(java.io.IOException("oops")))
             val vm = LoginViewModel(repo)
 
             vm.onEmailChange("a@b.com")
             vm.onPasswordChange("hunter22")
             vm.signIn()
             advanceUntilIdle()
-            assertEquals("oops", vm.uiState.value.errorMessage)
+            assertEquals(AuthError.NetworkError, vm.uiState.value.errorMessage)
 
             vm.onEmailChange("a@b.com ")
             assertNull(vm.uiState.value.errorMessage)

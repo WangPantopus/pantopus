@@ -36,10 +36,14 @@ data class FirstRunContent(
     val greeting: String,
     val name: String,
     val avatarInitials: String,
+    val identity: IdentityPillar,
     val ringProgress: Float,
     val profileCompleteness: Float,
+    val stepsDone: Int,
+    val stepsTotal: Int,
     val steps: List<SetupStep>,
-    val today: TodaySummary?,
+    val pillars: List<PillarTile>,
+    val discovery: List<DiscoveryCardContent>,
 )
 
 /** Assembled hub bundle. */
@@ -69,6 +73,8 @@ data class TopBarContent(
     val greeting: String,
     val name: String,
     val avatarInitials: String,
+    /** Identity pillar that tints the avatar ring. */
+    val identity: IdentityPillar = IdentityPillar.Personal,
     val ringProgress: Float,
     val unreadCount: Int,
 )
@@ -110,6 +116,8 @@ data class PillarTile(
     val tint: IdentityPillar,
     val chip: String?,
     val chipSetupState: Boolean,
+    /** 10.5pt fg3 caption below the label (design's per-tile context). */
+    val caption: String? = null,
 ) {
     enum class Pillar { Pulse, Marketplace, Gigs, Mail }
 }
@@ -147,6 +155,8 @@ data class DiscoveryCardContent(
     val category: String,
     val avatarInitials: String,
     val kind: DiscoveryKind,
+    /** Pillar tint that drives the top-half gradient + chip color. */
+    val tint: IdentityPillar = IdentityPillar.Personal,
 )
 
 /**
@@ -160,6 +170,14 @@ data class JumpBackItem(
     val title: String,
     val icon: PantopusIcon,
     val route: String,
+    /** Pillar tint that drives the icon disk + progress bar fill. */
+    val tint: IdentityPillar = IdentityPillar.Personal,
+    /** Uppercase overline above the title — design uses "In progress" / "Draft". */
+    val kicker: String = "In progress",
+    /** Progress text line below the bar; optional. */
+    val progressLabel: String? = null,
+    /** 0..1 fraction for the progress bar; optional (hides when nil). */
+    val progressFraction: Float? = null,
 )
 
 /** Recent-activity row. */
@@ -199,4 +217,10 @@ sealed interface HubNavigationIntent {
     data class JumpBackTapped(
         val item: JumpBackItem,
     ) : HubNavigationIntent
+
+    /**
+     * Today-card tap. Design destination is home calendar (P11), so this
+     * is a no-op at the host until that lands.
+     */
+    data object OpenToday : HubNavigationIntent
 }

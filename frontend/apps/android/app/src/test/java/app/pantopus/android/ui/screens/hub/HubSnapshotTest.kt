@@ -46,14 +46,18 @@ class HubSnapshotTest {
                             greeting = "Good morning",
                             name = "Alice",
                             avatarInitials = "A",
+                            identity = IdentityPillar.Personal,
                             ringProgress = 0.25f,
                             profileCompleteness = 0.25f,
+                            stepsDone = 1,
+                            stepsTotal = 4,
                             steps =
                                 listOf(
                                     SetupStep("name", "Set your name", done = true),
                                     SetupStep("address", "Claim your home", done = false),
                                 ),
-                            today = null,
+                            pillars = emptyList(),
+                            discovery = emptyList(),
                         ),
                     onStart = {},
                 )

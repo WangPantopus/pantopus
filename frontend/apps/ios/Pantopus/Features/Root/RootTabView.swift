@@ -129,7 +129,7 @@ public struct RootTabView: View {
         case .home:
             model.selected = .hub
             _ = router.consume()
-        case .unknown:
+        case .resetPassword, .verifyEmail, .unknown:
             _ = router.consume()
         }
     }

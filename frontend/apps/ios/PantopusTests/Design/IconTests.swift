@@ -18,7 +18,7 @@ final class IconTests: XCTestCase {
         "plus-circle", "camera", "scan-line", "plus-square", "sun",
         "chevron-right", "chevron-left", "megaphone", "shopping-bag", "hammer",
         "mailbox", "search", "user-plus", "file", "copy", "check",
-        "more-horizontal", "arrow-left", "send", "chevron-down", "chevron-up",
+        "more-horizontal", "arrow-left", "arrow-right", "send", "chevron-down", "chevron-up",
         "trash-2", "edit-2", "upload", "shield", "lock", "check-circle",
         "alert-circle", "circle", "info", "wifi-off", "heart", "thumbs-up", "star",
         "help-circle", "calendar", "lightbulb", "eye", "share", "radio", "map-pin",

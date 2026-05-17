@@ -2,7 +2,7 @@
 //  HubView.swift
 //  Pantopus
 //
-//  Designed hub screen. Wires the 10 sections to `HubViewModel` state.
+//  Designed hub screen. Wires the 11 sections to `HubViewModel` state.
 //
 
 import SwiftUI
@@ -59,7 +59,7 @@ struct HubView: View {
                     )
                 }
                 if let today = content.today {
-                    HubTodayCard(summary: today)
+                    HubTodayCard(summary: today) { onNavigate(.openToday) }
                 }
                 HubPillarGrid(tiles: content.pillars) { onNavigate(.pillar($0)) }
                 if !content.discovery.isEmpty {
@@ -73,6 +73,10 @@ struct HubView: View {
                     HubJumpBackIn(items: content.jumpBackIn) { onNavigate(.jumpBackIn($0)) }
                 }
                 if !content.activity.isEmpty {
+                    // `See all` on Recent activity is documented as a P-future
+                    // wire-up (MeRoute.recentActivity not implemented yet — see
+                    // PR description "Wiring gaps"). Render without the link
+                    // until the destination lands.
                     HubRecentActivity(entries: content.activity)
                 }
                 Spacer(minLength: Spacing.s10)
@@ -89,6 +93,7 @@ struct HubView: View {
                             greeting: content.greeting,
                             name: content.name,
                             avatarInitials: content.avatarInitials,
+                            identity: content.identity,
                             ringProgress: content.ringProgress,
                             unreadCount: 0
                         ),
@@ -96,11 +101,24 @@ struct HubView: View {
                         onMenuTap: {}
                     )
                     HubFirstRunHero(content: content) { onNavigate(.startVerification) }
-                    if let today = content.today { HubTodayCard(summary: today) }
-                    Spacer(minLength: Spacing.s12)
+                    HubPillarGrid(tiles: content.pillars) { onNavigate(.pillar($0)) }
+                    if !content.discovery.isEmpty {
+                        HubDiscoveryRail(
+                            items: content.discovery,
+                            onTap: { onNavigate(.openDiscovery($0)) },
+                            onSeeAll: { onNavigate(.openDiscoverHub) }
+                        )
+                    }
+                    // Bottom padding leaves room for the floating progress
+                    // card pinned below by the ZStack alignment.
+                    Spacer(minLength: 96)
                 }
             }
-            HubFloatingProgress(fraction: content.profileCompleteness)
+            HubFloatingProgress(
+                fraction: content.profileCompleteness,
+                stepsDone: content.stepsDone,
+                stepsTotal: content.stepsTotal
+            ) { onNavigate(.startVerification) }
                 .padding(.bottom, Spacing.s6)
         }
     }
@@ -116,6 +134,10 @@ enum HubNavigationIntent {
     case openDiscovery(DiscoveryCardContent)
     case openDiscoverHub
     case jumpBackIn(JumpBackItem)
+    /// Today-card tap — currently a no-op host-side (the design's tap
+    /// destination is "home calendar" but P11 hasn't shipped the native
+    /// route yet). Wired in P11.
+    case openToday
 }
 
 private struct ErrorView: View {
@@ -147,8 +169,5 @@ private struct ErrorView: View {
 
 #Preview("First-run fixture") {
     let vm = HubViewModel()
-    // Fixtures swap via the real load() — for a pure preview, skeleton stays
-    // on screen unless the network is stubbed. This preview is best seen
-    // when running the simulator connected to a seeded backend.
     return HubView(viewModel: vm)
 }

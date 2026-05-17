@@ -88,8 +88,22 @@ class HubViewModel
             discoveryItems: List<app.pantopus.android.data.api.models.hub.DiscoveryItem>,
         ) {
             val todaySummary = projectToday(today)
+            val identity = primaryIdentity(hub)
+            val discoveryCards =
+                discoveryItems.take(10).map {
+                    val kind = DiscoveryKind.fromRawType(it.type)
+                    DiscoveryCardContent(
+                        id = it.id,
+                        title = it.title,
+                        meta = it.meta,
+                        category = it.category.orEmpty(),
+                        avatarInitials = initials(it.title),
+                        kind = kind,
+                        tint = tintForDiscoveryKind(kind),
+                    )
+                }
             if (isFirstRun(hub)) {
-                _state.value = firstRunState(hub, todaySummary)
+                _state.value = firstRunState(hub, identity, discoveryCards)
                 return
             }
 
@@ -104,6 +118,7 @@ class HubViewModel
                                 greeting = greeting(),
                                 name = hub.user.firstName ?: hub.user.name,
                                 avatarInitials = initials(hub.user.name),
+                                identity = identity,
                                 ringProgress =
                                     hub.setup.profileCompleteness.score
                                         .toFloat(),
@@ -118,25 +133,17 @@ class HubViewModel
                             ),
                         setupBanner = setupBanner,
                         today = todaySummary,
-                        pillars = pillars(hub),
-                        discovery =
-                            discoveryItems.take(10).map {
-                                DiscoveryCardContent(
-                                    id = it.id,
-                                    title = it.title,
-                                    meta = it.meta,
-                                    category = it.category.orEmpty(),
-                                    avatarInitials = initials(it.title),
-                                    kind = DiscoveryKind.fromRawType(it.type),
-                                )
-                            },
+                        pillars = pillars(hub, setupMode = false),
+                        discovery = discoveryCards,
                         jumpBackIn =
-                            hub.jumpBackIn.take(2).map {
+                            hub.jumpBackIn.take(2).mapIndexed { index, raw ->
                                 JumpBackItem(
-                                    id = it.title,
-                                    title = it.title,
-                                    icon = iconFromRaw(it.icon),
-                                    route = it.route,
+                                    id = raw.title,
+                                    title = raw.title,
+                                    icon = iconFromRaw(raw.icon),
+                                    route = raw.route,
+                                    tint = tintForRoute(raw.route),
+                                    kicker = if (index == 0) "In progress" else "Draft",
                                 )
                             },
                         activity =
@@ -155,30 +162,38 @@ class HubViewModel
 
         private fun firstRunState(
             hub: HubResponse,
-            todaySummary: TodaySummary?,
-        ): HubUiState.FirstRun =
-            HubUiState.FirstRun(
+            identity: IdentityPillar,
+            discoveryCards: List<DiscoveryCardContent>,
+        ): HubUiState.FirstRun {
+            val steps =
+                hub.setup.steps.map {
+                    SetupStep(
+                        id = it.key,
+                        title = it.key.replace('_', ' ').replaceFirstChar { c -> c.uppercase() },
+                        done = it.done,
+                    )
+                }
+            val doneCount = steps.count { it.done }
+            return HubUiState.FirstRun(
                 FirstRunContent(
                     greeting = greeting(),
                     name = hub.user.firstName ?: hub.user.name,
                     avatarInitials = initials(hub.user.name),
+                    identity = identity,
                     ringProgress =
                         hub.setup.profileCompleteness.score
                             .toFloat(),
                     profileCompleteness =
                         hub.setup.profileCompleteness.score
                             .toFloat(),
-                    steps =
-                        hub.setup.steps.map {
-                            SetupStep(
-                                id = it.key,
-                                title = it.key.replace('_', ' ').replaceFirstChar { c -> c.uppercase() },
-                                done = it.done,
-                            )
-                        },
-                    today = todaySummary,
+                    stepsDone = doneCount,
+                    stepsTotal = steps.size,
+                    steps = steps,
+                    pillars = pillars(hub, setupMode = true),
+                    discovery = discoveryCards,
                 ),
             )
+        }
 
         private fun isFirstRun(hub: HubResponse): Boolean =
             !hub.setup.allDone &&
@@ -201,59 +216,96 @@ class HubViewModel
             )
         }
 
-        private fun pillars(hub: HubResponse): List<PillarTile> {
+        private fun pillars(
+            hub: HubResponse,
+            setupMode: Boolean,
+        ): List<PillarTile> {
             val personal = hub.cards.personal
             val home = hub.cards.home
             val business = hub.cards.business
+
+            fun tile(
+                kind: PillarTile.Pillar,
+                label: String,
+                icon: PantopusIcon,
+                tint: IdentityPillar,
+                chip: String?,
+                chipSetupState: Boolean,
+                populatedCaption: String,
+                setupCaption: String,
+            ) = PillarTile(
+                pillar = kind,
+                label = label,
+                icon = icon,
+                tint = tint,
+                chip = if (setupMode) "Set up" else chip,
+                chipSetupState = if (setupMode) true else chipSetupState,
+                caption = if (setupMode) setupCaption else populatedCaption,
+            )
+
             return listOf(
-                PillarTile(
-                    pillar = PillarTile.Pillar.Pulse,
-                    label = "Pulse",
-                    icon = PantopusIcon.Megaphone,
-                    tint = IdentityPillar.Personal,
-                    chip = if (personal.unreadChats > 0) "${personal.unreadChats}" else null,
-                    chipSetupState = false,
+                tile(
+                    PillarTile.Pillar.Pulse,
+                    "Pulse",
+                    PantopusIcon.Megaphone,
+                    IdentityPillar.Personal,
+                    if (personal.unreadChats > 0) "${personal.unreadChats} new" else null,
+                    false,
+                    if (personal.unreadChats > 0) "${personal.unreadChats} new in your feed" else "Neighborhood feed",
+                    "Neighborhood feed",
                 ),
-                PillarTile(
-                    pillar = PillarTile.Pillar.Marketplace,
-                    label = "Marketplace",
-                    icon = PantopusIcon.ShoppingBag,
-                    tint = IdentityPillar.Business,
-                    chip =
-                        if (business == null) {
-                            "Set up"
-                        } else if (business.newOrders > 0) {
-                            "${business.newOrders}"
-                        } else {
-                            null
-                        },
-                    chipSetupState = business == null,
+                tile(
+                    PillarTile.Pillar.Marketplace,
+                    "Marketplace",
+                    PantopusIcon.ShoppingBag,
+                    IdentityPillar.Business,
+                    if (business != null && business.newOrders > 0) "${business.newOrders}" else null,
+                    business == null,
+                    if (business != null) "${business.newOrders} new orders" else "Local buy & sell",
+                    "Local buy & sell",
                 ),
-                PillarTile(
-                    pillar = PillarTile.Pillar.Gigs,
-                    label = "Gigs",
-                    icon = PantopusIcon.Hammer,
-                    tint = IdentityPillar.Personal,
-                    chip = if (personal.gigsNearby > 0) "${personal.gigsNearby}" else null,
-                    chipSetupState = false,
+                tile(
+                    PillarTile.Pillar.Gigs,
+                    "Gigs",
+                    PantopusIcon.Hammer,
+                    IdentityPillar.Personal,
+                    if (personal.gigsNearby > 0) "${personal.gigsNearby} matches" else null,
+                    false,
+                    if (personal.gigsNearby > 0) "${personal.gigsNearby} tasks near you" else "Earn & post tasks",
+                    "Earn & post tasks",
                 ),
-                PillarTile(
-                    pillar = PillarTile.Pillar.Mail,
-                    label = "Mail",
-                    icon = PantopusIcon.Mailbox,
-                    tint = IdentityPillar.Home,
-                    chip =
-                        if (home == null) {
-                            "Set up"
-                        } else if (home.newMail > 0) {
-                            "${home.newMail}"
-                        } else {
-                            null
-                        },
-                    chipSetupState = home == null,
+                tile(
+                    PillarTile.Pillar.Mail,
+                    "Mail",
+                    PantopusIcon.Mailbox,
+                    IdentityPillar.Home,
+                    if (home != null && home.newMail > 0) "${home.newMail}" else null,
+                    home == null,
+                    if (home != null) "${home.newMail} need pickup" else "Scan & forward",
+                    "Scan & forward",
                 ),
             )
         }
+
+        /** Which identity tints the avatar ring. Defaults to home when
+         *  the user has any claimed home; else personal. */
+        private fun primaryIdentity(hub: HubResponse): IdentityPillar =
+            if (hub.homes.isEmpty()) IdentityPillar.Personal else IdentityPillar.Home
+
+        /** Maps a jump-back-in route to its pillar tint. */
+        private fun tintForRoute(route: String): IdentityPillar =
+            when {
+                route.contains("gigs") || route.contains("post") -> IdentityPillar.Personal
+                route.contains("marketplace") || route.contains("listings") -> IdentityPillar.Business
+                route.contains("mail") || route.contains("homes") -> IdentityPillar.Home
+                else -> IdentityPillar.Personal
+            }
+
+        private fun tintForDiscoveryKind(kind: DiscoveryKind): IdentityPillar =
+            when (kind) {
+                DiscoveryKind.Business -> IdentityPillar.Business
+                else -> IdentityPillar.Personal
+            }
 
         private fun pillarTint(value: String): IdentityPillar =
             when (value) {

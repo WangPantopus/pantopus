@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.PrimaryButton
@@ -122,7 +123,9 @@ private fun PopulatedLayout(
             }
         }
         content.today?.let {
-            item(key = "today") { HubTodayCard(it) }
+            item(key = "today") {
+                HubTodayCard(it, onTap = { onIntent(HubNavigationIntent.OpenToday) })
+            }
         }
         item(key = "pillars") {
             HubPillarGrid(content.pillars) { onIntent(HubNavigationIntent.PillarTapped(it)) }
@@ -164,6 +167,7 @@ private fun FirstRunLayout(
                         greeting = content.greeting,
                         name = content.name,
                         avatarInitials = content.avatarInitials,
+                        identity = content.identity,
                         ringProgress = content.ringProgress,
                         unreadCount = 0,
                     ),
@@ -171,13 +175,26 @@ private fun FirstRunLayout(
                 onMenuTap = {},
             )
             HubFirstRunHero(content = content) { onIntent(HubNavigationIntent.StartVerification) }
-            content.today?.let { HubTodayCard(it) }
-            Spacer(Modifier.height(Spacing.s12))
+            HubPillarGrid(content.pillars) { onIntent(HubNavigationIntent.PillarTapped(it)) }
+            if (content.discovery.isNotEmpty()) {
+                HubDiscoveryRail(
+                    items = content.discovery,
+                    onTap = { onIntent(HubNavigationIntent.DiscoveryTapped(it)) },
+                    onSeeAll = { onIntent(HubNavigationIntent.OpenDiscoverHub) },
+                )
+            }
+            // Bottom padding leaves room for the floating progress card.
+            Spacer(Modifier.height(96.dp))
         }
         Box(
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.s6),
         ) {
-            HubFloatingProgress(fraction = content.profileCompleteness)
+            HubFloatingProgress(
+                fraction = content.profileCompleteness,
+                stepsDone = content.stepsDone,
+                stepsTotal = content.stepsTotal,
+                onContinue = { onIntent(HubNavigationIntent.StartVerification) },
+            )
         }
     }
 }
@@ -224,14 +241,18 @@ private fun HubScreenFirstRunPreview() {
                 greeting = "Good morning",
                 name = "Alice",
                 avatarInitials = "A",
+                identity = app.pantopus.android.ui.components.IdentityPillar.Personal,
                 ringProgress = 0.2f,
                 profileCompleteness = 0.25f,
+                stepsDone = 1,
+                stepsTotal = 4,
                 steps =
                     listOf(
                         SetupStep("name", "Set your name", done = true),
                         SetupStep("address", "Claim your home", done = false),
                     ),
-                today = TodaySummary(temperatureFahrenheit = 71, conditions = "Clear", aqiLabel = "Good"),
+                pillars = sampleContent().pillars.map { it.copy(chip = "Set up", chipSetupState = true) },
+                discovery = sampleContent().discovery,
             ),
         onIntent = {},
     )

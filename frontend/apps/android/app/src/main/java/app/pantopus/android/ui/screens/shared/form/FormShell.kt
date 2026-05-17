@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,6 +39,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
+import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /** Test tag on the shell root. */
@@ -47,6 +50,9 @@ const val FORM_CLOSE_BUTTON_TAG = "formCloseButton"
 
 /** Test tag on the right-action commit button. */
 const val FORM_COMMIT_BUTTON_TAG = "formCommitButton"
+
+/** Test tag on the sticky bottom-CTA button (`bottomActionLabel` mode). */
+const val FORM_BOTTOM_COMMIT_BUTTON_TAG = "formBottomCommitButton"
 
 /**
  * Scaffold for every Form screen — mirrors the iOS `FormShell`.
@@ -77,7 +83,8 @@ fun FormShell(
     isDirty: Boolean,
     onClose: () -> Unit,
     onCommit: () -> Unit,
-    rightActionLabel: String = "Save",
+    rightActionLabel: String? = "Save",
+    bottomActionLabel: String? = null,
     isSaving: Boolean = false,
     body: @Composable () -> Unit,
 ) {
@@ -86,6 +93,8 @@ fun FormShell(
     val handleClose = {
         if (isDirty) showDiscardConfirm = true else onClose()
     }
+
+    val showsTopRightAction = bottomActionLabel == null && rightActionLabel != null
 
     Column(
         modifier =
@@ -96,21 +105,30 @@ fun FormShell(
     ) {
         FormTopBar(
             title = title,
-            rightActionLabel = rightActionLabel,
+            rightActionLabel = if (showsTopRightAction) rightActionLabel else null,
             rightActionEnabled = isValid && isDirty && !isSaving,
-            isSaving = isSaving,
+            isSaving = isSaving && bottomActionLabel == null,
             onClose = handleClose,
             onCommit = onCommit,
         )
         Column(
             modifier =
                 Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(vertical = Spacing.s4),
             verticalArrangement = Arrangement.spacedBy(Spacing.s5),
         ) {
             body()
+        }
+        if (bottomActionLabel != null) {
+            FormBottomCTA(
+                label = bottomActionLabel,
+                isEnabled = isValid && !isSaving,
+                isSaving = isSaving,
+                onCommit = onCommit,
+            )
         }
     }
 
@@ -137,7 +155,7 @@ fun FormShell(
 @Composable
 private fun FormTopBar(
     title: String,
-    rightActionLabel: String,
+    rightActionLabel: String?,
     rightActionEnabled: Boolean,
     isSaving: Boolean,
     onClose: () -> Unit,
@@ -180,36 +198,94 @@ private fun FormTopBar(
                         tint = PantopusColors.appText,
                     )
                 }
-                Box(modifier = Modifier.fillMaxWidth().sizeIn(minHeight = 44.dp))
-                Box(
-                    modifier =
-                        Modifier
-                            .sizeIn(minWidth = 60.dp, minHeight = 44.dp)
-                            .clickable(enabled = rightActionEnabled, onClick = onCommit)
-                            .testTag(FORM_COMMIT_BUTTON_TAG)
-                            .semantics { contentDescription = rightActionLabel },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (isSaving) {
-                        CircularProgressIndicator(
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    } else {
-                        Text(
-                            text = rightActionLabel,
-                            style = PantopusTextStyle.body,
-                            color =
-                                if (rightActionEnabled) {
-                                    PantopusColors.primary600
-                                } else {
-                                    PantopusColors.appTextMuted
-                                },
-                        )
+                Box(modifier = Modifier.fillMaxWidth().sizeIn(minHeight = 44.dp).weight(1f))
+                if (rightActionLabel != null) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .sizeIn(minWidth = 60.dp, minHeight = 44.dp)
+                                .clickable(enabled = rightActionEnabled, onClick = onCommit)
+                                .testTag(FORM_COMMIT_BUTTON_TAG)
+                                .semantics { contentDescription = rightActionLabel },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        } else {
+                            Text(
+                                text = rightActionLabel,
+                                style = PantopusTextStyle.body,
+                                color =
+                                    if (rightActionEnabled) {
+                                        PantopusColors.primary600
+                                    } else {
+                                        PantopusColors.appTextMuted
+                                    },
+                            )
+                        }
                     }
+                } else {
+                    // Reserve 60dp so the centered title stays optically
+                    // centered against the leading X button.
+                    Box(modifier = Modifier.size(width = 60.dp, height = 44.dp))
                 }
             }
         }
         HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
+    }
+}
+
+/**
+ * Sticky full-width primary CTA used when `bottomActionLabel` is set.
+ * Mirrors the iOS `FormBottomCTA`.
+ */
+@Composable
+private fun FormBottomCTA(
+    label: String,
+    isEnabled: Boolean,
+    isSaving: Boolean,
+    onCommit: () -> Unit,
+) {
+    Column {
+        HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(PantopusColors.appSurface)
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .background(
+                            color =
+                                if (isEnabled) PantopusColors.primary600 else PantopusColors.appBorderStrong,
+                            shape = RoundedCornerShape(Radii.lg),
+                        ).clickable(enabled = isEnabled, onClick = onCommit)
+                        .testTag(FORM_BOTTOM_COMMIT_BUTTON_TAG)
+                        .semantics { contentDescription = label },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        color = PantopusColors.appTextInverse,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp),
+                    )
+                } else {
+                    Text(
+                        text = label,
+                        style = PantopusTextStyle.body,
+                        color = PantopusColors.appTextInverse,
+                    )
+                }
+            }
+        }
     }
 }
