@@ -40,6 +40,8 @@ final class IconTests: XCTestCase {
         "zap", "flame", "droplet", "wifi", "building-2", "smartphone", "wallet", "hash",
         // T6.0b My tasks V2 — Magic Task archetype + task-format icons.
         "tv", "laptop", "monitor", "shuffle", "wand-sparkles", "arrow-up-right",
+        // T6.4a Access codes — reveal toggle + empty state.
+        "eye-off", "key-round",
         // T6.3c Household tasks — chore-category iconography + banner glyph.
         "leaf", "list-checks", "utensils", "baby",
         // T6.3b Maintenance — task category iconography.

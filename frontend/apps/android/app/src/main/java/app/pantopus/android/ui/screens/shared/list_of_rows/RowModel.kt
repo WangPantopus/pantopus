@@ -5,6 +5,7 @@ package app.pantopus.android.ui.screens.shared.list_of_rows
 import androidx.compose.ui.graphics.Color
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.components.StatusChipVariant
+import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 
 // MARK: - Templates
@@ -266,7 +267,34 @@ sealed interface RowTrailing {
         val amount: String,
         val sublabel: String? = null,
     ) : RowTrailing
+
+    /**
+     * Two small (32dp) icon-only buttons rendered side by side. Used by
+     * Access codes for the copy + kebab pair on each row — every other
+     * existing trailing case is either a single button or non-button
+     * content, so this slot fills the gap without conflating with
+     * [Kebab] (which reads `onSecondary`) or [CircularAction] (single
+     * primary). Both handlers are explicit so the kebab and copy can
+     * each carry their own a11y label.
+     */
+    data class IconActions(
+        val primary: RowIconAction,
+        val secondary: RowIconAction,
+    ) : RowTrailing
 }
+
+/**
+ * Single icon-only action used by [RowTrailing.IconActions]. Renders as a
+ * 32dp rounded-square button with a sunken neutral background and a 15dp
+ * glyph in the foreground tint.
+ */
+data class RowIconAction(
+    val icon: PantopusIcon,
+    val accessibilityLabel: String,
+    val background: Color = PantopusColors.appSurfaceSunken,
+    val foreground: Color = PantopusColors.appTextSecondary,
+    val onClick: () -> Unit,
+)
 
 // MARK: - Chip
 

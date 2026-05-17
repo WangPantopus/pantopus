@@ -513,6 +513,48 @@ class ListOfRowsScreenSnapshotTest {
         }
     }
 
+    @Test fun row_typeIcon_with_iconActions_trailing() {
+        // T6.4a — Access codes row variant. Validates the new
+        // `RowTrailing.IconActions` pair (copy + kebab) sits next to a
+        // tinted `TypeIcon` leading and a masked monospace subtitle.
+        paparazzi.snapshot {
+            Frame {
+                RowView(
+                    row =
+                        RowModel(
+                            id = "access-wifi",
+                            title = "Main network",
+                            subtitle = "••••••••••••",
+                            template = RowTemplate.FileChevron,
+                            leading =
+                                RowLeading.TypeIcon(
+                                    icon = PantopusIcon.Wifi,
+                                    background = androidx.compose.ui.graphics.Color(0xFFDBEAFE),
+                                    foreground = androidx.compose.ui.graphics.Color(0xFF1D4ED8),
+                                ),
+                            trailing =
+                                RowTrailing.IconActions(
+                                    primary =
+                                        RowIconAction(
+                                            icon = PantopusIcon.Copy,
+                                            accessibilityLabel = "Copy Main network",
+                                            onClick = {},
+                                        ),
+                                    secondary =
+                                        RowIconAction(
+                                            icon = PantopusIcon.MoreHorizontal,
+                                            accessibilityLabel = "More actions for Main network",
+                                            onClick = {},
+                                        ),
+                                ),
+                            onTap = {},
+                            body = "Household · 4 members",
+                        ),
+                )
+            }
+        }
+    }
+
     @Composable
     private fun Frame(content: @Composable () -> Unit) {
         PantopusTheme {

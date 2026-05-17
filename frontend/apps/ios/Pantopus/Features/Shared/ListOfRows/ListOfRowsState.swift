@@ -317,6 +317,14 @@ public extension ListOfRowsDataSource {
     var listingContext: ListingContextConfig? {
         nil
     }
+
+    /// T6.4a — optional small subtitle rendered beneath the navigation
+    /// title (e.g. Access codes screen shows "412 Birch Ln · Maria's
+    /// household" under "Access codes"). When `nil`, the shell renders
+    /// a single-line title — preserving every existing call site.
+    var topBarSubtitle: String? {
+        nil
+    }
 }
 
 /// Top-bar trailing action payload.
