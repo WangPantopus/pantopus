@@ -702,7 +702,7 @@ public struct YouTabRoot: View {
                 ) { target in
                     Task { @MainActor in
                         switch target {
-                        case let .addCode(_, category):
+                        case let .addCode(homeId: _, category: category):
                             let label = category.map { "Add \($0.label) code" } ?? "Add access code"
                             path.append(.placeholder(label: label))
                         case .editCode:
@@ -765,14 +765,14 @@ public struct YouTabRoot: View {
                 onOpenPets: { petHomeId in
                     Task { @MainActor in path.append(.homePets(homeId: petHomeId)) }
                 },
-                onOpenMembers: { membersHomeId in
-                    Task { @MainActor in path.append(.homeMembers(homeId: membersHomeId)) }
-                },
                 onOpenTasks: { tasksHomeId in
                     Task { @MainActor in path.append(.homeTasks(homeId: tasksHomeId)) }
                 },
                 onOpenMaintenance: { maintenanceHomeId in
                     Task { @MainActor in path.append(.homeMaintenance(homeId: maintenanceHomeId)) }
+                },
+                onOpenMembers: { membersHomeId in
+                    Task { @MainActor in path.append(.homeMembers(homeId: membersHomeId)) }
                 }
             )
         case let .homeTasks(homeId):
