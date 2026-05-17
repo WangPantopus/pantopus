@@ -34,6 +34,19 @@ public enum YouRoute: Hashable {
     case myPosts
     /// T5.2.3 — Connections. The "me.connections" Personal action tile pushes here.
     case connections
+    /// T6.3f / P14 — My homes (avatar-first roster). The "me.homes"
+    /// Activity-section row pushes here; tapping a row drills into the
+    /// home dashboard via `homeDashboard(homeId:)`.
+    case myHomes
+    /// T6.3f / P14 — My listings (Active / Sold / Drafts tabs). The
+    /// "me.listings" Personal action tile pushes here.
+    case myListings
+    /// T6.3f / P14 — My businesses (avatar-first roster). The
+    /// "me.businesses" Activity-section row pushes here.
+    case myBusinesses
+    /// T6.3f / P14 — Home dashboard for a specific home, reached from
+    /// the My homes row tap inside the You stack.
+    case homeDashboard(homeId: String)
     /// T3.2 — Identity Center. The "me.identityCenter" Personal section row pushes here.
     case identityCenter
     /// T3.3 — Audience profile. The "me.audience" Personal section row pushes here.
@@ -49,6 +62,38 @@ public enum YouRoute: Hashable {
     /// T6.4b — Documents. The home-context "me.docs" action tile pushes
     /// here with the primary home id resolved by the VM.
     case homeDocs(homeId: String)
+    /// T6.3d — Packages. The home-context "me.packages" Activity row +
+    /// the Home Dashboard "view_packages" quick action push here.
+    case homePackages(homeId: String)
+    /// T6.3d — Package detail. Pushed from a row tap on the Packages list.
+    case packageDetail(homeId: String, packageId: String)
+    /// T6.3d — Log a package sheet target. Presented modally from the
+    /// Packages list FAB and the empty-state CTA.
+    case logPackage(homeId: String)
+    /// T6.3e — Polls. The home-context "me.polls" action tile pushes here.
+    case homePolls(homeId: String)
+    /// T6.3e — Poll detail. Pushed from a Polls list row.
+    case pollDetail(homeId: String, pollId: String)
+    /// T6.4a — Access codes. Per-home roster of Wi-Fi / Alarm / Gate /
+    /// Lockbox / Garage / Smart lock codes. The "me.access" Household-
+    /// section row pushes here with the primary home id resolved by
+    /// the VM; the Home Dashboard quick-action shares the same screen.
+    /// `homeName` is an optional pre-resolved subtitle ("412 Birch Ln")
+    /// rendered under the title while the underlying home payload is
+    /// in flight or unavailable.
+    case accessCodes(homeId: String, homeName: String?)
+    /// T6.3c / P11 — Household tasks (per-home chore list). The
+    /// "me.tasks" Activity-section row pushes here with the primary
+    /// home id resolved by the Me VM. Distinct from `.myTasks` which is
+    /// the posted-to-neighbours gig list.
+    case homeTasks(homeId: String)
+    /// T6.3b / P10 — Maintenance. The home-context "me.maintenance"
+    /// action tile pushes here.
+    case homeMaintenance(homeId: String)
+    /// P15 / T6.3g — Owners (legal-title roster). The "me.owners"
+    /// Household-section row pushes here with the primary home id
+    /// resolved by `MeViewModel.homeSections(...)`.
+    case homeOwners(homeId: String)
     /// T6.3a / P9 — Members. The home-context "me.members" action tile +
     /// "Household" section row both push here with the resolved home id.
     case homeMembers(homeId: String)
@@ -107,6 +152,11 @@ public struct YouTabRoot: View {
     @State private var debugInviteFormHomeId: String?
     @State private var debugDisambiguateFormMailId: String?
     #endif
+
+    private var currentUserId: String? {
+        if case let .signedIn(user) = auth.state { return user.id }
+        return nil
+    }
 
     public init() {}
 
@@ -273,6 +323,12 @@ public struct YouTabRoot: View {
             path.append(.offers)
         case "me.connections":
             path.append(.connections)
+        case "me.listings":
+            path.append(.myListings)
+        case "me.businesses":
+            path.append(.myBusinesses)
+        case "me.homes":
+            path.append(.myHomes)
         case "me.bills":
             if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
@@ -294,6 +350,30 @@ public struct YouTabRoot: View {
         case "me.emergency":
             if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeEmergency(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
+        case "me.packages":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homePackages(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
+        case "me.polls":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homePolls(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
+        case "me.tasks":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeTasks(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
+        case "me.maintenance":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeMaintenance(homeId: homeId))
             } else {
                 path.append(.placeholder(label: tile.label))
             }
@@ -325,6 +405,15 @@ public struct YouTabRoot: View {
         case "me.connections":
             path.append(.connections)
             return
+        case "me.homes":
+            path.append(.myHomes)
+            return
+        case "me.listings":
+            path.append(.myListings)
+            return
+        case "me.businesses":
+            path.append(.myBusinesses)
+            return
         case "me.identityCenter":
             path.append(.identityCenter)
             return
@@ -344,6 +433,37 @@ public struct YouTabRoot: View {
         case "me.emergency":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeEmergency(homeId: homeId))
+                return
+            }
+        case "me.packages":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homePackages(homeId: homeId))
+                return
+            }
+        case "me.polls":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homePolls(homeId: homeId))
+                return
+            }
+        case "me.access":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                let homeName = row.routeArgs["homeName"]
+                path.append(.accessCodes(homeId: homeId, homeName: homeName))
+                return
+            }
+        case "me.tasks":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeTasks(homeId: homeId))
+                return
+            }
+        case "me.maintenance":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeMaintenance(homeId: homeId))
+                return
+            }
+        case "me.owners":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeOwners(homeId: homeId))
                 return
             }
         case "me.members":
@@ -697,6 +817,191 @@ public struct YouTabRoot: View {
                         }
                     }
                 )
+            )
+        case let .homePackages(homeId):
+            PackagesListView(
+                viewModel: PackagesListViewModel(
+                    homeId: homeId,
+                    currentUserId: currentUserId,
+                    onOpenPackage: { packageId in
+                        Task { @MainActor in
+                            path.append(.packageDetail(homeId: homeId, packageId: packageId))
+                        }
+                    },
+                    onLogPackage: {
+                        Task { @MainActor in path.append(.logPackage(homeId: homeId)) }
+                    }
+                )
+            )
+        case let .packageDetail(homeId, packageId):
+            PackageDetailView(
+                homeId: homeId,
+                packageId: packageId
+            ) { if !path.isEmpty { path.removeLast() } }
+        case let .logPackage(homeId):
+            LogPackageSheetView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCreated: { packageId in
+                    Task { @MainActor in
+                        // Replace the log-package destination with the
+                        // new package's detail so Back returns to the
+                        // Packages list, not the form.
+                        path.removeAll { route in
+                            if case .logPackage = route { return true }
+                            return false
+                        }
+                        path.append(.packageDetail(homeId: homeId, packageId: packageId))
+                    }
+                }
+            )
+        case let .homePolls(homeId):
+            PollsListView(
+                viewModel: PollsListViewModel(
+                    homeId: homeId,
+                    onOpenPoll: { pollId in
+                        Task { @MainActor in path.append(.pollDetail(homeId: homeId, pollId: pollId)) }
+                    },
+                    onStartPoll: {
+                        Task { @MainActor in path.append(.placeholder(label: "Start a poll")) }
+                    }
+                )
+            )
+        case let .pollDetail(homeId, pollId):
+            PollDetailView(
+                homeId: homeId,
+                pollId: pollId
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
+        case let .accessCodes(homeId, homeName):
+            AccessCodesView(
+                viewModel: AccessCodesViewModel(
+                    homeId: homeId,
+                    homeName: homeName
+                ) { target in
+                    Task { @MainActor in
+                        switch target {
+                        case let .addCode(homeId: _, category: category):
+                            let label = category.map { "Add \($0.label) code" } ?? "Add access code"
+                            path.append(.placeholder(label: label))
+                        case .editCode:
+                            path.append(.placeholder(label: "Edit access code"))
+                        case .search:
+                            path.append(.placeholder(label: "Search access codes"))
+                        }
+                    }
+                }
+            )
+        case .myHomes:
+            MyHomesListView(
+                viewModel: MyHomesListViewModel(
+                    onOpenHome: { homeId in
+                        Task { @MainActor in path.append(.homeDashboard(homeId: homeId)) }
+                    },
+                    onAddHome: {
+                        Task { @MainActor in path.append(.placeholder(label: "Claim a home")) }
+                    }
+                )
+            )
+        case .myListings:
+            MyListingsView(
+                viewModel: MyListingsViewModel(
+                    onOpenListing: { listingId in
+                        Task { @MainActor in path.append(.listingDetail(listingId: listingId)) }
+                    },
+                    onCompose: {
+                        Task { @MainActor in path.append(.placeholder(label: "List something")) }
+                    }
+                )
+            )
+        case .myBusinesses:
+            MyBusinessesView(
+                viewModel: MyBusinessesViewModel(
+                    onOpenBusiness: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Business dashboard")) }
+                    },
+                    onRegister: {
+                        Task { @MainActor in path.append(.placeholder(label: "Register a business")) }
+                    }
+                )
+            )
+        case let .homeDashboard(homeId):
+            HomeDashboardView(
+                homeId: homeId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onClaimOwnership: {
+                    Task { @MainActor in path.append(.placeholder(label: "Claim ownership")) }
+                },
+                onOpenClaimsList: {
+                    Task { @MainActor in path.append(.placeholder(label: "My claims")) }
+                },
+                onOpenBills: {
+                    Task { @MainActor in path.append(.homeBills(homeId: homeId)) }
+                },
+                onOpenPolls: {
+                    Task { @MainActor in path.append(.homePolls(homeId: homeId)) }
+                },
+                onOpenPlaceholder: { label in
+                    Task { @MainActor in path.append(.placeholder(label: label)) }
+                },
+                onOpenPets: { petHomeId in
+                    Task { @MainActor in path.append(.homePets(homeId: petHomeId)) }
+                },
+                onOpenDocs: { docsHomeId in
+                    Task { @MainActor in path.append(.homeDocs(homeId: docsHomeId)) }
+                },
+                onOpenEmergency: { emergencyHomeId in
+                    Task { @MainActor in path.append(.homeEmergency(homeId: emergencyHomeId)) }
+                },
+                onOpenPackages: { packagesHomeId in
+                    Task { @MainActor in path.append(.homePackages(homeId: packagesHomeId)) }
+                },
+                onOpenTasks: { tasksHomeId in
+                    Task { @MainActor in path.append(.homeTasks(homeId: tasksHomeId)) }
+                },
+                onOpenMaintenance: { maintenanceHomeId in
+                    Task { @MainActor in path.append(.homeMaintenance(homeId: maintenanceHomeId)) }
+                },
+                onOpenMembers: { membersHomeId in
+                    Task { @MainActor in path.append(.homeMembers(homeId: membersHomeId)) }
+                }
+            )
+        case let .homeTasks(homeId):
+            HouseholdTasksListView(
+                viewModel: HouseholdTasksListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Task detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in path.append(.placeholder(label: "Add a task")) }
+                    },
+                    onEditRecurring: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Edit recurring task")) }
+                    }
+                )
+            )
+        case let .homeMaintenance(homeId):
+            MaintenanceListView(
+                viewModel: MaintenanceListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Maintenance detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in path.append(.placeholder(label: "Log maintenance")) }
+                    }
+                )
+            )
+        case let .homeOwners(homeId):
+            let currentUserId: String? = {
+                if case let .signedIn(user) = auth.state { return user.id }
+                return nil
+            }()
+            OwnersListView(
+                homeId: homeId,
+                currentUserId: currentUserId
             )
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId)

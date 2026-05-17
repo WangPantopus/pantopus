@@ -207,7 +207,7 @@ class MeViewModel
                             MeStat("members", "—", "Members"),
                         ),
                     actionTiles = homeActionTiles(homeId = null),
-                    sections = withDebug(homeSections(homeId = null, privacyValue = null)),
+                    sections = withDebug(homeSections(homeId = null, homeName = null, privacyValue = null)),
                     isUnbound = true,
                 )
             }
@@ -238,7 +238,14 @@ class MeViewModel
                         MeStat("members", "$memberCount", "Members"),
                     ),
                 actionTiles = homeActionTiles(homeId = primary.id),
-                sections = withDebug(homeSections(homeId = primary.id, privacyValue = "Neighbors")),
+                sections =
+                    withDebug(
+                        homeSections(
+                            homeId = primary.id,
+                            homeName = displayName,
+                            privacyValue = "Neighbors",
+                        ),
+                    ),
             )
         }
 
@@ -302,6 +309,13 @@ class MeViewModel
             val args = if (homeId != null) mapOf("homeId" to homeId) else emptyMap()
             return listOf(
                 MeActionTile("bills", PantopusIcon.File, "Bills", routeKey = "me.bills", routeArgs = args),
+                MeActionTile(
+                    "maintenance",
+                    PantopusIcon.Hammer,
+                    "Maintenance",
+                    routeKey = "me.maintenance",
+                    routeArgs = args,
+                ),
                 MeActionTile("pets", PantopusIcon.Heart, "Pets", routeKey = "me.pets", routeArgs = args),
                 MeActionTile("members", PantopusIcon.UserPlus, "Members", routeKey = "me.members", routeArgs = args),
                 MeActionTile("polls", PantopusIcon.CheckCircle, "Polls", routeKey = "me.polls", routeArgs = args),
@@ -312,9 +326,19 @@ class MeViewModel
 
         private fun homeSections(
             homeId: String?,
+            homeName: String?,
             privacyValue: String?,
         ): List<MeSection> {
             val args = if (homeId != null) mapOf("homeId" to homeId) else emptyMap()
+            // T6.4a — access codes additionally carry homeName so the
+            // access screen's 2-line top bar can render the designed
+            // "412 Birch Ln" subtitle without an extra fetch.
+            val accessArgs =
+                if (homeId != null && !homeName.isNullOrEmpty()) {
+                    args + ("homeName" to homeName)
+                } else {
+                    args
+                }
             return listOf(
                 MeSection(
                     id = "household",
@@ -323,7 +347,13 @@ class MeViewModel
                         listOf(
                             MeSectionRow("members", PantopusIcon.UserPlus, "Members", routeKey = "me.members", routeArgs = args),
                             MeSectionRow("owners", PantopusIcon.Shield, "Owners", routeKey = "me.owners", routeArgs = args),
-                            MeSectionRow("access", PantopusIcon.Lock, "Access codes", routeKey = "me.access", routeArgs = args),
+                            MeSectionRow(
+                                "access",
+                                PantopusIcon.Lock,
+                                "Access codes",
+                                routeKey = "me.access",
+                                routeArgs = accessArgs,
+                            ),
                         ),
                 ),
                 MeSection(
@@ -332,6 +362,13 @@ class MeViewModel
                     rows =
                         listOf(
                             MeSectionRow("bills", PantopusIcon.File, "Bills", routeKey = "me.bills", routeArgs = args),
+                            MeSectionRow(
+                                "maintenance",
+                                PantopusIcon.Hammer,
+                                "Maintenance",
+                                routeKey = "me.maintenance",
+                                routeArgs = args,
+                            ),
                             MeSectionRow("tasks", PantopusIcon.Hammer, "Household tasks", routeKey = "me.tasks", routeArgs = args),
                             MeSectionRow("packages", PantopusIcon.Mailbox, "Packages", routeKey = "me.packages", routeArgs = args),
                             MeSectionRow(

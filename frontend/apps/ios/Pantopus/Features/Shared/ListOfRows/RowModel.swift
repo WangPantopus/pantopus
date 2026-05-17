@@ -293,6 +293,40 @@ public enum RowTrailing: Sendable {
     /// Price stack — amount on top, optional sublabel below. Used by My
     /// bids (bid amount + budget). The bid-card title sits to the left.
     case priceStack(amount: String, sublabel: String? = nil)
+
+    /// Two small (32pt) icon-only buttons rendered side by side. Used by
+    /// Access codes for the copy + kebab pair on each row — every other
+    /// existing trailing case is either a single button or non-button
+    /// content, so this slot fills the gap without conflating with
+    /// `.kebab` (`onSecondary`) or `.circularAction` (single primary).
+    /// Both handlers are explicit so the kebab and copy can each have
+    /// their own a11y label.
+    case iconActions(primary: RowIconAction, secondary: RowIconAction)
+}
+
+/// Single icon-only action used by `RowTrailing.iconActions`. Renders as a
+/// 32pt rounded-square button with a sunken neutral background and a
+/// 15pt glyph in the foreground tint.
+public struct RowIconAction: Sendable {
+    public let icon: PantopusIcon
+    public let accessibilityLabel: String
+    public let background: Color
+    public let foreground: Color
+    public let handler: @Sendable () -> Void
+
+    public init(
+        icon: PantopusIcon,
+        accessibilityLabel: String,
+        background: Color = Theme.Color.appSurfaceSunken,
+        foreground: Color = Theme.Color.appTextSecondary,
+        handler: @escaping @Sendable () -> Void
+    ) {
+        self.icon = icon
+        self.accessibilityLabel = accessibilityLabel
+        self.background = background
+        self.foreground = foreground
+        self.handler = handler
+    }
 }
 
 // MARK: - Chip

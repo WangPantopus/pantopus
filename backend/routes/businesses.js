@@ -689,11 +689,12 @@ router.get('/my-businesses', verifyToken, async (req, res) => {
 
     let memberships;
     if (seats.length > 0) {
-      // Map seat data to the shape expected downstream
+      // Map seat data to the shape expected downstream. T6.3f added city/state
+      // so My businesses can render the locality body without a second hop.
       const bizIds = seats.map(s => s.business_user_id);
       const { data: bizUsers } = await supabaseAdmin
         .from('User')
-        .select('id, username, name, email, profile_picture_url, account_type')
+        .select('id, username, name, email, profile_picture_url, account_type, city, state')
         .in('id', bizIds);
       const bizMap = {};
       for (const u of (bizUsers || [])) bizMap[u.id] = u;
@@ -707,7 +708,7 @@ router.get('/my-businesses', verifyToken, async (req, res) => {
         business: bizMap[s.business_user_id] || { id: s.business_user_id, username: s.business_username, name: s.business_name },
       }));
     } else {
-      // Fallback to legacy BusinessTeam
+      // Fallback to legacy BusinessTeam. T6.3f added city/state on the join.
       const { data, error } = await supabaseAdmin
         .from('BusinessTeam')
         .select(`
@@ -717,7 +718,7 @@ router.get('/my-businesses', verifyToken, async (req, res) => {
           joined_at,
           business_user_id,
           business:business_user_id (
-            id, username, name, email, profile_picture_url, account_type
+            id, username, name, email, profile_picture_url, account_type, city, state
           )
         `)
         .eq('user_id', userId)

@@ -45,6 +45,9 @@ sealed class AnalyticsEvent(
         override val properties = mapOf("result" to result.value)
     }
 
+    /** T6.3b / P10 — Maintenance list view. */
+    data object ScreenHomeMaintenanceViewed : AnalyticsEvent("screen.home_maintenance.viewed")
+
     data object ScreenNotificationsViewed : AnalyticsEvent("screen.notifications.viewed")
 
     data object ScreenPetsListViewed : AnalyticsEvent("screen.pets_list.viewed")
@@ -52,6 +55,25 @@ sealed class AnalyticsEvent(
     data object ScreenEmergencyInfoViewed : AnalyticsEvent("screen.emergency_info.viewed")
 
     data object ScreenDocumentsViewed : AnalyticsEvent("screen.documents.viewed")
+    data object ScreenPollsViewed : AnalyticsEvent("screen.polls.viewed")
+
+    data object ScreenPollDetailViewed : AnalyticsEvent("screen.poll_detail.viewed")
+
+    data class CtaPollVoteSubmit(
+        val result: AnalyticsResult,
+    ) : AnalyticsEvent("cta.poll_vote.submit") {
+        override val properties = mapOf("result" to result.value)
+    }
+
+    /** T6.3f / P14 — My listings index (the seller's tabbed list). */
+    data object ScreenMyListingsViewed : AnalyticsEvent("screen.my_listings.viewed")
+
+    /** T6.3f / P14 — My businesses index (owner / staff roster). */
+    data object ScreenMyBusinessesViewed : AnalyticsEvent("screen.my_businesses.viewed")
+
+    data object ScreenHouseholdTasksViewed : AnalyticsEvent("screen.household_tasks.viewed")
+
+    data object ScreenOwnersListViewed : AnalyticsEvent("screen.owners_list.viewed")
 
     data class ScreenPetsWizardStepViewed(
         val stepNumber: Int,
@@ -59,6 +81,16 @@ sealed class AnalyticsEvent(
     ) : AnalyticsEvent("screen.pets_wizard.step_viewed") {
         override val properties =
             mapOf("step_number" to stepNumber.toString(), "step_name" to stepName)
+    }
+
+    data object ScreenPackagesViewed : AnalyticsEvent("screen.packages.viewed")
+
+    data object ScreenPackageDetailViewed : AnalyticsEvent("screen.package_detail.viewed")
+
+    data class CtaLogPackageSubmit(
+        val result: AnalyticsResult,
+    ) : AnalyticsEvent("cta.log_package.submit") {
+        override val properties = mapOf("result" to result.value)
     }
 
     data object ScreenMembersListViewed : AnalyticsEvent("screen.members_list.viewed")

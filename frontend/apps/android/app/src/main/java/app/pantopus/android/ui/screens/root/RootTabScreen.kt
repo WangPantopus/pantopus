@@ -30,6 +30,7 @@ import app.pantopus.android.BuildConfig
 import app.pantopus.android.core.routing.DeepLinkRouter
 import app.pantopus.android.ui.screens._internal.TokenGalleryScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
+import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
 import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
@@ -49,6 +50,7 @@ import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
+import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
 import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
 import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.AddBillWizardScreen
@@ -67,10 +69,28 @@ import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.homes.maintenance.MAINTENANCE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.maintenance.MaintenanceListScreen
 import app.pantopus.android.ui.screens.homes.members.MEMBERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.members.MembersListScreen
+import app.pantopus.android.ui.screens.homes.owners.OWNERS_LIST_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.owners.OwnersListScreen
+import app.pantopus.android.ui.screens.homes.packages.LOG_PACKAGE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.packages.LogPackageScreen
+import app.pantopus.android.ui.screens.homes.packages.PACKAGES_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.packages.PACKAGE_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.packages.PACKAGE_DETAIL_PACKAGE_ID_KEY
+import app.pantopus.android.ui.screens.homes.packages.PackageDetailScreen
+import app.pantopus.android.ui.screens.homes.packages.PackagesListScreen
 import app.pantopus.android.ui.screens.homes.pets.PETS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.pets.PetsListScreen
+import app.pantopus.android.ui.screens.homes.polls.POLLS_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.polls.POLL_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.polls.POLL_DETAIL_POLL_ID_KEY
+import app.pantopus.android.ui.screens.homes.polls.PollDetailScreen
+import app.pantopus.android.ui.screens.homes.polls.PollsListScreen
+import app.pantopus.android.ui.screens.homes.tasks.HOUSEHOLD_TASKS_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.tasks.HouseholdTasksListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
@@ -88,6 +108,7 @@ import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationHost
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
 import app.pantopus.android.ui.screens.inbox.conversation.ChatThreadMode
 import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
+import app.pantopus.android.ui.screens.listings.MyListingsScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
@@ -162,6 +183,78 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home documents screen. */
     fun homeDocs(homeId: String): String = "homes/$homeId/docs"
+    /** Packages list per home (T6.3d / P14). */
+    const val HOME_PACKAGES = "homes/{$PACKAGES_HOME_ID_KEY}/packages"
+
+    /** Package detail (read-mostly summary, mark-picked-up / remove). */
+    const val PACKAGE_DETAIL =
+        "homes/{$PACKAGE_DETAIL_HOME_ID_KEY}/packages/{$PACKAGE_DETAIL_PACKAGE_ID_KEY}"
+
+    /** Log a package — single-page form (T6.3d). */
+    const val LOG_PACKAGE = "homes/{$LOG_PACKAGE_HOME_ID_KEY}/packages/new"
+
+    /** Build the concrete path for a home packages list. */
+    fun homePackages(homeId: String): String = "homes/$homeId/packages"
+
+    /** Build the concrete path for a package detail. */
+    fun packageDetail(
+        homeId: String,
+        packageId: String,
+    ): String = "homes/$homeId/packages/$packageId"
+
+    /** Build the concrete path for the Log Package form. */
+    fun logPackage(homeId: String): String = "homes/$homeId/packages/new"
+
+    /** Polls list per home (T6.3e / P13). */
+    const val HOME_POLLS = "homes/{$POLLS_HOME_ID_KEY}/polls"
+
+    /** Poll detail (T6.3e / P13). */
+    const val POLL_DETAIL = "homes/{$POLL_DETAIL_HOME_ID_KEY}/polls/{$POLL_DETAIL_POLL_ID_KEY}"
+
+    /** Build the concrete path for a home polls list. */
+    fun homePolls(homeId: String): String = "homes/$homeId/polls"
+
+    /** Build the concrete path for a poll detail. */
+    fun pollDetail(
+        homeId: String,
+        pollId: String,
+    ): String = "homes/$homeId/polls/$pollId"
+
+    /** Access codes per home (T6.4a). `homeName` rides as a query so the
+     *  designed 2-line top bar can render without a second fetch. */
+    const val ACCESS_CODES_HOME_ID_KEY = "homeId"
+    const val ACCESS_CODES_HOME_NAME_KEY = "homeName"
+    const val ACCESS_CODES =
+        "homes/{$ACCESS_CODES_HOME_ID_KEY}/access?$ACCESS_CODES_HOME_NAME_KEY={$ACCESS_CODES_HOME_NAME_KEY}"
+
+    /** Build the concrete path for the access codes screen. */
+    fun accessCodes(
+        homeId: String,
+        homeName: String?,
+    ): String {
+        val encoded = homeName?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
+        return "homes/$homeId/access?$ACCESS_CODES_HOME_NAME_KEY=$encoded"
+    }
+
+    /** Household tasks list per home (T6.3c / P11). */
+    const val HOME_TASKS = "homes/{$HOUSEHOLD_TASKS_HOME_ID_KEY}/tasks"
+
+    /** Build the concrete path for a home household tasks list. */
+    fun homeTasks(homeId: String): String = "homes/$homeId/tasks"
+
+    /** Maintenance list per home (T6.3b / P10). */
+    const val HOME_MAINTENANCE = "homes/{$MAINTENANCE_HOME_ID_KEY}/maintenance"
+
+    /** Build the concrete path for a home maintenance list. */
+    fun homeMaintenance(homeId: String): String = "homes/$homeId/maintenance"
+
+    /** Owners list per home (P15 / T6.3g). The Owners VM pulls the
+     *  viewer's id from [AuthRepository] internally, so no extra arg
+     *  needs to ride on the route. */
+    const val HOME_OWNERS = "homes/{$OWNERS_LIST_HOME_ID_KEY}/owners"
+
+    /** Build the concrete path for a home owners list. */
+    fun homeOwners(homeId: String): String = "homes/$homeId/owners"
 
     /** Members list per home (T6.3a / P9). */
     const val HOME_MEMBERS = "homes/{$MEMBERS_LIST_HOME_ID_KEY}/members"
@@ -320,6 +413,12 @@ private object ChildRoutes {
 
     /** Snap & sell — placeholder until the marketplace compose flow ships. */
     const val COMPOSE_LISTING = "listings/compose"
+
+    /** T6.3f / P14 — My listings (seller's tabbed roster). */
+    const val MY_LISTINGS = "listings/me"
+
+    /** T6.3f / P14 — My businesses (owner / staff roster). */
+    const val MY_BUSINESSES = "businesses/me"
 
     /** Invoice detail (T2.6 ContentDetailShell · invoice variant). */
     const val INVOICE_DETAIL_ID_KEY = "invoiceId"
@@ -661,7 +760,22 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
+                    onOpenHomePackages = { homeId ->
+                        navController.navigate(ChildRoutes.homePackages(homeId))
+                    },
+                    onOpenHomePolls = { homeId -> navController.navigate(ChildRoutes.homePolls(homeId)) },
+                    onOpenAccessCodes = { homeId, homeName ->
+                        navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
+                    },
+                    onOpenHomeTasks = { homeId -> navController.navigate(ChildRoutes.homeTasks(homeId)) },
+                    onOpenHomeMaintenance = { homeId ->
+                        navController.navigate(ChildRoutes.homeMaintenance(homeId))
+                    },
+                    onOpenHomeOwners = { homeId -> navController.navigate(ChildRoutes.homeOwners(homeId)) },
                     onOpenHomeMembers = { homeId -> navController.navigate(ChildRoutes.homeMembers(homeId)) },
+                    onOpenMyHomes = { navController.navigate(ChildRoutes.MY_HOMES) },
+                    onOpenMyListings = { navController.navigate(ChildRoutes.MY_LISTINGS) },
+                    onOpenMyBusinesses = { navController.navigate(ChildRoutes.MY_BUSINESSES) },
                 )
             }
 
@@ -669,6 +783,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 MyHomesListScreen(
                     onOpenHome = { homeId -> navController.navigate(ChildRoutes.homeDashboard(homeId)) },
                     onAddHome = { navController.navigate(ChildRoutes.ADD_HOME) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.MY_LISTINGS) {
+                MyListingsScreen(
+                    onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
+                    onCompose = { navController.navigate(ChildRoutes.placeholder("List something")) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.MY_BUSINESSES) {
+                MyBusinessesScreen(
+                    onOpenBusiness = { _ -> navController.navigate(ChildRoutes.placeholder("Business dashboard")) },
+                    onRegister = { navController.navigate(ChildRoutes.placeholder("Register a business")) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -688,6 +816,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenBills = { homeId ->
                         navController.navigate(ChildRoutes.homeBills(homeId))
                     },
+                    onOpenPolls = { homeId ->
+                        navController.navigate(ChildRoutes.homePolls(homeId))
+                    },
                     onOpenPlaceholder = { label ->
                         navController.navigate(ChildRoutes.placeholder(label))
                     },
@@ -699,6 +830,18 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenEmergency = { homeId ->
                         navController.navigate(ChildRoutes.homeEmergency(homeId))
+                    },
+                    onOpenPackages = { homeId ->
+                        navController.navigate(ChildRoutes.homePackages(homeId))
+                    },
+                    onOpenAccessCodes = { homeId, homeName ->
+                        navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
+                    },
+                    onOpenTasks = { homeId ->
+                        navController.navigate(ChildRoutes.homeTasks(homeId))
+                    },
+                    onOpenMaintenance = { homeId ->
+                        navController.navigate(ChildRoutes.homeMaintenance(homeId))
                     },
                     onOpenMembers = { homeId ->
                         navController.navigate(ChildRoutes.homeMembers(homeId))
@@ -768,6 +911,36 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(
+                route = ChildRoutes.HOME_PACKAGES,
+                arguments = listOf(navArgument(PACKAGES_HOME_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(PACKAGES_HOME_ID_KEY).orEmpty()
+                PackagesListScreen(
+                    currentUserId = null,
+                    memberLookup = { null },
+                    onOpenPackage = { packageId ->
+                        navController.navigate(ChildRoutes.packageDetail(homeId, packageId))
+                    },
+                    onLogPackage = { navController.navigate(ChildRoutes.logPackage(homeId)) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.HOME_POLLS,
+                arguments = listOf(navArgument(POLLS_HOME_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(POLLS_HOME_ID_KEY).orEmpty()
+                PollsListScreen(
+                    onOpenPoll = { pollId ->
+                        navController.navigate(ChildRoutes.pollDetail(homeId, pollId))
+                    },
+                    onStartPoll = {
+                        navController.navigate(ChildRoutes.placeholder("Start a poll"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
                 route = ChildRoutes.HOME_DOCS,
                 arguments = listOf(navArgument(DOCUMENTS_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
@@ -782,6 +955,112 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.placeholder("Document action"))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.POLL_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(POLL_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(POLL_DETAIL_POLL_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                PollDetailScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.ACCESS_CODES,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.ACCESS_CODES_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(ChildRoutes.ACCESS_CODES_HOME_NAME_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                    ),
+            ) {
+                AccessCodesScreen(
+                    onAddCode = { category ->
+                        val label = category?.let { "Add ${it.label} code" } ?: "Add access code"
+                        navController.navigate(ChildRoutes.placeholder(label))
+                    },
+                    onEditCode = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Edit access code"))
+                    },
+                    onSearch = {
+                        navController.navigate(ChildRoutes.placeholder("Search access codes"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.HOME_TASKS,
+                arguments = listOf(navArgument(HOUSEHOLD_TASKS_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                HouseholdTasksListScreen(
+                    onOpenTask = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Task detail"))
+                    },
+                    onAddTask = {
+                        navController.navigate(ChildRoutes.placeholder("Add a task"))
+                    },
+                    onEditRecurring = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Edit recurring task"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.HOME_MAINTENANCE,
+                arguments = listOf(navArgument(MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                MaintenanceListScreen(
+                    onOpenTask = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Maintenance detail"))
+                    },
+                    onAddTask = {
+                        navController.navigate(ChildRoutes.placeholder("Log maintenance"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.HOME_OWNERS,
+                arguments = listOf(navArgument(OWNERS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                OwnersListScreen(
+                    onOpenInvite = { homeId ->
+                        navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.PACKAGE_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(PACKAGE_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(PACKAGE_DETAIL_PACKAGE_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                PackageDetailScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.LOG_PACKAGE,
+                arguments = listOf(navArgument(LOG_PACKAGE_HOME_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(LOG_PACKAGE_HOME_ID_KEY).orEmpty()
+                LogPackageScreen(
+                    onClose = { navController.popBackStack() },
+                    onCreated = { packageId ->
+                        // Replace the log-package destination with the
+                        // new package's detail so Back returns to the
+                        // Packages list, not the form.
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.packageDetail(homeId, packageId))
+                    },
                 )
             }
             composable(

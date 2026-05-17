@@ -148,6 +148,10 @@ final class HomeDashboardViewModel {
                 QuickActionTile(id: "view_docs", label: "Documents", icon: .folderLock, tint: .home),
                 QuickActionTile(id: "view_emergency", label: "Emergency", icon: .shieldCheck, tint: .home),
                 QuickActionTile(id: "pets", label: "Pets", icon: .pawPrint, tint: .home),
+                QuickActionTile(id: "view_packages", label: "Packages", icon: .package, tint: .home),
+                QuickActionTile(id: "view_polls", label: "Polls", icon: .checkCircle, tint: .home),
+                QuickActionTile(id: "view_tasks", label: "Tasks", icon: .listChecks, tint: .home),
+                QuickActionTile(id: "view_maintenance", label: "Maintenance", icon: .hammer, tint: .home),
                 QuickActionTile(id: "add_mail", label: "Add mail", icon: .mailbox, tint: .home),
                 QuickActionTile(id: "add_member", label: "Add member", icon: .userPlus, tint: .personal)
             ],

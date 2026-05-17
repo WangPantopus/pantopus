@@ -31,13 +31,26 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenBillDetailViewed
     case screenAddBillWizardStepViewed(stepNumber: Int, stepName: String)
     case ctaAddBillSubmit(result: AnalyticsResult)
+    case screenHomeMaintenanceViewed
     case screenPetsListViewed
     case screenPetsWizardStepViewed(stepNumber: Int, stepName: String)
     case screenEmergencyInfoViewed
     case screenDocumentsViewed
+    case screenPackagesViewed
+    case screenPackageDetailViewed
+    case ctaLogPackageSubmit(result: AnalyticsResult)
+    case screenPollsViewed
+    case screenPollDetailViewed
+    case ctaPollVoteSubmit(result: AnalyticsResult)
+    case screenHouseholdTasksViewed
+    case screenOwnersListViewed
     case screenMembersListViewed
     case screenMembersWizardStepViewed(stepNumber: Int, stepName: String)
     case screenPulseFeedViewed(intent: String)
+    /// T6.3f / P14 — My listings index (the seller's tabbed list).
+    case screenMyListingsViewed
+    /// T6.3f / P14 — My businesses index (owner/staff roster).
+    case screenMyBusinessesViewed
     case ctaHubActionStripTapped(label: String)
     case ctaHubPillarTapped(pillar: String)
     case ctaMailboxItemLogReceived
@@ -64,13 +77,24 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenBillDetailViewed: "screen.bill_detail.viewed"
         case .screenAddBillWizardStepViewed: "screen.add_bill_wizard.step_viewed"
         case .ctaAddBillSubmit: "cta.add_bill.submit"
+        case .screenHomeMaintenanceViewed: "screen.home_maintenance.viewed"
         case .screenPetsListViewed: "screen.pets_list.viewed"
         case .screenPetsWizardStepViewed: "screen.pets_wizard.step_viewed"
         case .screenEmergencyInfoViewed: "screen.emergency_info.viewed"
         case .screenDocumentsViewed: "screen.documents.viewed"
+        case .screenPackagesViewed: "screen.packages.viewed"
+        case .screenPackageDetailViewed: "screen.package_detail.viewed"
+        case .ctaLogPackageSubmit: "cta.log_package.submit"
+        case .screenPollsViewed: "screen.polls.viewed"
+        case .screenPollDetailViewed: "screen.poll_detail.viewed"
+        case .ctaPollVoteSubmit: "cta.poll_vote.submit"
+        case .screenHouseholdTasksViewed: "screen.household_tasks.viewed"
+        case .screenOwnersListViewed: "screen.owners_list.viewed"
         case .screenMembersListViewed: "screen.members_list.viewed"
         case .screenMembersWizardStepViewed: "screen.members_wizard.step_viewed"
         case .screenPulseFeedViewed: "screen.pulse_feed.viewed"
+        case .screenMyListingsViewed: "screen.my_listings.viewed"
+        case .screenMyBusinessesViewed: "screen.my_businesses.viewed"
         case .ctaHubActionStripTapped: "cta.hub.action_strip_tapped"
         case .ctaHubPillarTapped: "cta.hub.pillar_tapped"
         case .ctaMailboxItemLogReceived: "cta.mailbox_item.log_received"
@@ -111,6 +135,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .ctaAddBillSubmit(result):
             ["result": result.rawValue]
+        case let .ctaLogPackageSubmit(result):
+            ["result": result.rawValue]
+        case let .ctaPollVoteSubmit(result):
+            ["result": result.rawValue]
         case .screenHubViewed,
              .screenMailboxListViewed,
              .screenMailboxDrawersViewed,
@@ -119,7 +147,16 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenMyClaimsViewed,
              .screenBillsViewed,
              .screenBillDetailViewed,
+             .screenHomeMaintenanceViewed,
              .screenPetsListViewed,
+             .screenPackagesViewed,
+             .screenPackageDetailViewed,
+             .screenPollsViewed,
+             .screenPollDetailViewed,
+             .screenMyListingsViewed,
+             .screenMyBusinessesViewed,
+             .screenHouseholdTasksViewed,
+             .screenOwnersListViewed,
              .screenMembersListViewed,
              .screenEmergencyInfoViewed,
              .screenDocumentsViewed,

@@ -93,6 +93,13 @@ class HomeDashboardViewModel
         /** Expose the home id so the screen can build outbound nav routes. */
         fun currentHomeId(): String? = homeId
 
+        /**
+         * Display name of the loaded home, used as the 2-line top-bar
+         * subtitle on the Access codes destination. Returns null while
+         * the dashboard is still loading.
+         */
+        fun currentHomeName(): String? = (_state.value as? HomeDashboardUiState.Loaded)?.content?.address
+
         /** Initial load; no-op when already loaded. */
         fun load() {
             if (_state.value is HomeDashboardUiState.Loaded) return
@@ -192,6 +199,11 @@ class HomeDashboardViewModel
                         QuickActionTile("view_docs", "Documents", PantopusIcon.FolderLock, IdentityPillar.Home),
                         QuickActionTile("view_emergency", "Emergency", PantopusIcon.ShieldCheck, IdentityPillar.Home),
                         QuickActionTile("pets", "Pets", PantopusIcon.PawPrint, IdentityPillar.Home),
+                        QuickActionTile("view_packages", "Packages", PantopusIcon.Package, IdentityPillar.Home),
+                        QuickActionTile("view_polls", "Polls", PantopusIcon.CheckCircle, IdentityPillar.Home),
+                        QuickActionTile("access_codes", "Access codes", PantopusIcon.Lock, IdentityPillar.Home),
+                        QuickActionTile("view_tasks", "Tasks", PantopusIcon.ListChecks, IdentityPillar.Home),
+                        QuickActionTile("view_maintenance", "Maintenance", PantopusIcon.Hammer, IdentityPillar.Home),
                         QuickActionTile("add_mail", "Add mail", PantopusIcon.Mailbox, IdentityPillar.Home),
                         QuickActionTile("add_member", "Add member", PantopusIcon.UserPlus, IdentityPillar.Personal),
                     ),
