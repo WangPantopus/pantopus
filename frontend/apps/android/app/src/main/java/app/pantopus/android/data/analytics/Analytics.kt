@@ -57,6 +57,16 @@ sealed class AnalyticsEvent(
             mapOf("step_number" to stepNumber.toString(), "step_name" to stepName)
     }
 
+    data object ScreenPackagesViewed : AnalyticsEvent("screen.packages.viewed")
+
+    data object ScreenPackageDetailViewed : AnalyticsEvent("screen.package_detail.viewed")
+
+    data class CtaLogPackageSubmit(
+        val result: AnalyticsResult,
+    ) : AnalyticsEvent("cta.log_package.submit") {
+        override val properties = mapOf("result" to result.value)
+    }
+
     data class ScreenPulseFeedViewed(
         val intent: String,
     ) : AnalyticsEvent("screen.pulse_feed.viewed") {

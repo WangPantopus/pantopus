@@ -61,6 +61,7 @@ fun HomeDashboardScreen(
     onOpenBills: ((String) -> Unit)? = null,
     onOpenPlaceholder: ((String) -> Unit)? = null,
     onOpenPets: ((String) -> Unit)? = null,
+    onOpenPackages: ((String) -> Unit)? = null,
     viewModel: HomeDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -76,6 +77,7 @@ fun HomeDashboardScreen(
     fun actionLabel(actionId: String): String =
         when (actionId) {
             "log_package" -> "Log a package"
+            "view_packages" -> "Packages"
             "add_mail" -> "Add mail"
             "add_member" -> "Add member"
             "verify" -> "Verify home"
@@ -116,6 +118,10 @@ fun HomeDashboardScreen(
             "pets" ->
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenPets?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "view_packages" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenPackages?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
             else -> openPlaceholder(actionId)
         }

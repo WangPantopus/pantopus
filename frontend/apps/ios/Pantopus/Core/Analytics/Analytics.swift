@@ -33,6 +33,9 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case ctaAddBillSubmit(result: AnalyticsResult)
     case screenPetsListViewed
     case screenPetsWizardStepViewed(stepNumber: Int, stepName: String)
+    case screenPackagesViewed
+    case screenPackageDetailViewed
+    case ctaLogPackageSubmit(result: AnalyticsResult)
     case screenPulseFeedViewed(intent: String)
     case ctaHubActionStripTapped(label: String)
     case ctaHubPillarTapped(pillar: String)
@@ -62,6 +65,9 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .ctaAddBillSubmit: "cta.add_bill.submit"
         case .screenPetsListViewed: "screen.pets_list.viewed"
         case .screenPetsWizardStepViewed: "screen.pets_wizard.step_viewed"
+        case .screenPackagesViewed: "screen.packages.viewed"
+        case .screenPackageDetailViewed: "screen.package_detail.viewed"
+        case .ctaLogPackageSubmit: "cta.log_package.submit"
         case .screenPulseFeedViewed: "screen.pulse_feed.viewed"
         case .ctaHubActionStripTapped: "cta.hub.action_strip_tapped"
         case .ctaHubPillarTapped: "cta.hub.pillar_tapped"
@@ -101,6 +107,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .ctaAddBillSubmit(result):
             ["result": result.rawValue]
+        case let .ctaLogPackageSubmit(result):
+            ["result": result.rawValue]
         case .screenHubViewed,
              .screenMailboxListViewed,
              .screenMailboxDrawersViewed,
@@ -110,6 +118,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenBillsViewed,
              .screenBillDetailViewed,
              .screenPetsListViewed,
+             .screenPackagesViewed,
+             .screenPackageDetailViewed,
              .screenEditProfileViewed,
              .ctaMailboxItemLogReceived,
              .ctaAddHomeSubmit:

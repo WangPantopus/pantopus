@@ -146,4 +146,46 @@ public enum HomesEndpoints {
     public static func deletePet(homeId: String, petId: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/homes/\(homeId)/pets/\(petId)")
     }
+
+    // MARK: - Packages (T6.3d / P14)
+
+    /// `GET /api/homes/:id/packages` — route `backend/routes/home.js:4673`.
+    /// Optional `status` filter mirrors the backend query param; tab
+    /// filtering on the client side projects backend statuses into the
+    /// design's Expected / Delivered / Archived buckets.
+    public static func packages(homeId: String, status: String? = nil) -> Endpoint {
+        var query: [String: String] = [:]
+        if let status { query["status"] = status }
+        return Endpoint(
+            method: .get,
+            path: "/api/homes/\(homeId)/packages",
+            query: query
+        )
+    }
+
+    /// `POST /api/homes/:id/packages` — route `backend/routes/home.js:4706`.
+    public static func createPackage(
+        homeId: String,
+        request: CreatePackageRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/packages",
+            body: request
+        )
+    }
+
+    /// `PUT /api/homes/:id/packages/:packageId` — route
+    /// `backend/routes/home.js:4746`.
+    public static func updatePackage(
+        homeId: String,
+        packageId: String,
+        request: UpdatePackageRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .put,
+            path: "/api/homes/\(homeId)/packages/\(packageId)",
+            body: request
+        )
+    }
 }

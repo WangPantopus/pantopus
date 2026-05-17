@@ -26,6 +26,9 @@ struct HomeDashboardView: View {
     /// Push onto the host stack when the user taps the Pets quick-action
     /// tile. Receives this home's id so the destination can pre-fetch.
     private let onOpenPets: ((String) -> Void)?
+    /// Push onto the host stack when the user taps the Packages
+    /// quick-action tile. Receives this home's id (T6.3d / P14).
+    private let onOpenPackages: ((String) -> Void)?
 
     init(
         homeId: String,
@@ -34,7 +37,8 @@ struct HomeDashboardView: View {
         onOpenClaimsList: (() -> Void)? = nil,
         onOpenBills: (() -> Void)? = nil,
         onOpenPlaceholder: ((String) -> Void)? = nil,
-        onOpenPets: ((String) -> Void)? = nil
+        onOpenPets: ((String) -> Void)? = nil,
+        onOpenPackages: ((String) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
         self.homeId = homeId
@@ -44,6 +48,7 @@ struct HomeDashboardView: View {
         self.onOpenBills = onOpenBills
         self.onOpenPlaceholder = onOpenPlaceholder
         self.onOpenPets = onOpenPets
+        self.onOpenPackages = onOpenPackages
     }
 
     /// Current signed-in user's email — used by the Invite Owner form
@@ -141,6 +146,8 @@ struct HomeDashboardView: View {
             onOpenBills?()
         case "pets":
             onOpenPets?(homeId)
+        case "view_packages":
+            onOpenPackages?(homeId)
         default:
             onOpenPlaceholder?(actionLabel(action))
         }
@@ -149,6 +156,7 @@ struct HomeDashboardView: View {
     private func actionLabel(_ id: String) -> String {
         switch id {
         case "log_package": "Log a package"
+        case "view_packages": "Packages"
         case "add_member": "Add member"
         case "add_mail": "Add mail"
         case "verify": "Verify home"

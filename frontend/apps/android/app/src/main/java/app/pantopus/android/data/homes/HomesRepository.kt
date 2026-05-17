@@ -3,10 +3,13 @@ package app.pantopus.android.data.homes
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
+import app.pantopus.android.data.api.models.homes.CreatePackageRequest
 import app.pantopus.android.data.api.models.homes.FileUploadResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.GetHomePackagesResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
+import app.pantopus.android.data.api.models.homes.HomePackageResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
@@ -14,6 +17,7 @@ import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
+import app.pantopus.android.data.api.models.homes.UpdatePackageRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import app.pantopus.android.data.api.net.NetworkResult
@@ -102,6 +106,25 @@ open class HomesRepository
             homeId: String,
             billId: String,
         ): NetworkResult<GetBillSplitsResponse> = safeApiCall { api.getHomeBillSplits(homeId, billId) }
+
+        /** `GET /api/homes/:id/packages`. */
+        open suspend fun getHomePackages(
+            homeId: String,
+            status: String? = null,
+        ): NetworkResult<GetHomePackagesResponse> = safeApiCall { api.getHomePackages(homeId, status) }
+
+        /** `POST /api/homes/:id/packages`. */
+        open suspend fun createHomePackage(
+            homeId: String,
+            request: CreatePackageRequest,
+        ): NetworkResult<HomePackageResponse> = safeApiCall { api.createHomePackage(homeId, request) }
+
+        /** `PUT /api/homes/:id/packages/:packageId`. */
+        open suspend fun updateHomePackage(
+            homeId: String,
+            packageId: String,
+            request: UpdatePackageRequest,
+        ): NetworkResult<HomePackageResponse> = safeApiCall { api.updateHomePackage(homeId, packageId, request) }
 
         /**
          * Upload one binary file to `POST /api/files/upload` and return

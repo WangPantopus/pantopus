@@ -6,9 +6,12 @@ import app.pantopus.android.data.api.models.homes.CheckAddressResponse
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
+import app.pantopus.android.data.api.models.homes.CreatePackageRequest
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.GetHomePackagesResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
+import app.pantopus.android.data.api.models.homes.HomePackageResponse
 import app.pantopus.android.data.api.models.homes.HomeDetailResponse
 import app.pantopus.android.data.api.models.homes.HomePublicProfileResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
@@ -19,6 +22,7 @@ import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
+import app.pantopus.android.data.api.models.homes.UpdatePackageRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import retrofit2.http.Body
@@ -138,4 +142,27 @@ interface HomesApi {
         @Path("id") homeId: String,
         @Path("billId") billId: String,
     ): GetBillSplitsResponse
+
+    /** `GET /api/homes/:id/packages` — route `backend/routes/home.js:4673`. */
+    @GET("api/homes/{id}/packages")
+    suspend fun getHomePackages(
+        @Path("id") homeId: String,
+        @Query("status") status: String? = null,
+    ): GetHomePackagesResponse
+
+    /** `POST /api/homes/:id/packages` — route `backend/routes/home.js:4706`. */
+    @POST("api/homes/{id}/packages")
+    suspend fun createHomePackage(
+        @Path("id") homeId: String,
+        @Body body: CreatePackageRequest,
+    ): HomePackageResponse
+
+    /** `PUT /api/homes/:id/packages/:packageId` — route
+     *  `backend/routes/home.js:4746`. */
+    @PUT("api/homes/{id}/packages/{packageId}")
+    suspend fun updateHomePackage(
+        @Path("id") homeId: String,
+        @Path("packageId") packageId: String,
+        @Body body: UpdatePackageRequest,
+    ): HomePackageResponse
 }
