@@ -64,9 +64,9 @@ final class MyListingsViewModelTests: XCTestCase {
         let vm = MyListingsViewModel(api: makeAPI())
         await vm.load()
         // Tab counts: Active bucket includes both `active` + `pending_pickup`.
-        XCTAssertEqual(vm.tabs.first(where: { $0.id == "active" })?.count, 2)
-        XCTAssertEqual(vm.tabs.first(where: { $0.id == "sold" })?.count, 1)
-        XCTAssertEqual(vm.tabs.first(where: { $0.id == "drafts" })?.count, 1)
+        XCTAssertEqual(vm.tabs.first { $0.id == "active" }?.count, 2)
+        XCTAssertEqual(vm.tabs.first { $0.id == "sold" }?.count, 1)
+        XCTAssertEqual(vm.tabs.first { $0.id == "drafts" }?.count, 1)
         // Active tab renders 2 rows (l1 active + l2 pending_pickup).
         guard case let .loaded(sections, _) = vm.state,
               let rows = sections.first?.rows else {

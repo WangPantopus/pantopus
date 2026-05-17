@@ -52,7 +52,9 @@ public enum MyListingsTab: String, Hashable, CaseIterable, Sendable {
 @MainActor
 final class MyListingsViewModel: ListOfRowsDataSource {
     let title = "My listings"
-    var topBarAction: TopBarAction? { nil }
+    var topBarAction: TopBarAction? {
+        nil
+    }
 
     var tabs: [ListOfRowsTab] {
         MyListingsTab.allCases.map { tab in
@@ -89,7 +91,7 @@ final class MyListingsViewModel: ListOfRowsDataSource {
         onCompose: @escaping @Sendable () -> Void = {}
     ) {
         self.api = api
-        self.selectedTab = initialTab.rawValue
+        selectedTab = initialTab.rawValue
         self.onOpenListing = onOpenListing
         self.onCompose = onCompose
     }
@@ -145,7 +147,7 @@ final class MyListingsViewModel: ListOfRowsDataSource {
     private func emptyContent(for tab: MyListingsTab) -> ListOfRowsState.EmptyContent {
         switch tab {
         case .active:
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .camera,
                 headline: "No active listings",
                 subcopy: "Post your first item to start hearing from neighbors.",
@@ -153,7 +155,7 @@ final class MyListingsViewModel: ListOfRowsDataSource {
                 onCTA: onCompose
             )
         case .sold:
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .checkCircle,
                 headline: "Nothing sold yet",
                 subcopy: "Items move here automatically once you mark them sold.",
@@ -161,7 +163,7 @@ final class MyListingsViewModel: ListOfRowsDataSource {
                 onCTA: nil
             )
         case .drafts:
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .file,
                 headline: "No drafts",
                 subcopy: "Saved drafts will appear here so you can finish them later.",
@@ -251,37 +253,37 @@ final class MyListingsViewModel: ListOfRowsDataSource {
     private func statusChip(for status: String) -> RowChip {
         switch status {
         case "active":
-            return RowChip(
+            RowChip(
                 text: "Active",
                 icon: .circle,
                 tint: .custom(background: Theme.Color.successBg, foreground: Theme.Color.success)
             )
         case "pending_pickup":
-            return RowChip(
+            RowChip(
                 text: "Pickup pending",
                 icon: .clock,
                 tint: .custom(background: Theme.Color.warningBg, foreground: Theme.Color.warning)
             )
         case "sold":
-            return RowChip(
+            RowChip(
                 text: "Sold",
                 icon: .checkCircle,
                 tint: .custom(background: Theme.Color.successBg, foreground: Theme.Color.success)
             )
         case "archived":
-            return RowChip(
+            RowChip(
                 text: "Archived",
                 icon: .file,
                 tint: .custom(background: Theme.Color.appSurfaceSunken, foreground: Theme.Color.appTextSecondary)
             )
         case "draft":
-            return RowChip(
+            RowChip(
                 text: "Draft",
                 icon: .pencil,
                 tint: .custom(background: Theme.Color.infoBg, foreground: Theme.Color.info)
             )
         default:
-            return RowChip(
+            RowChip(
                 text: status.capitalized,
                 icon: nil,
                 tint: .custom(background: Theme.Color.appSurfaceSunken, foreground: Theme.Color.appTextSecondary)
@@ -319,5 +321,7 @@ final class MyListingsViewModel: ListOfRowsDataSource {
 }
 
 private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }

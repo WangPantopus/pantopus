@@ -4,7 +4,7 @@ import app.pantopus.android.data.api.models.businesses.MyBusinessesResponse
 import retrofit2.http.GET
 
 /**
- * Owner / staff endpoints under `/api/businesses/*`. Distinct from
+ * Owner / staff endpoints under the `/api/businesses/` namespace. Distinct from
  * [BusinessDiscoveryApi] which covers public search / nearby.
  *
  * T6.3f / P14 — `myBusinesses()` backs the My businesses screen.
