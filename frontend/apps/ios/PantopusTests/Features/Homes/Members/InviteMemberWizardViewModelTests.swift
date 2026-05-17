@@ -21,16 +21,21 @@ final class InviteMemberWizardViewModelTests: XCTestCase {
         SequencedURLProtocol.reset()
     }
 
-    private func makeAPI() -> APIClient {
+    private func makeAPI(
+        routeResponses: [String: [SequencedURLProtocol.Response]] = [:]
+    ) -> APIClient {
         APIClient(
             environment: .current,
-            session: SequencedURLProtocol.makeSession(),
+            session: SequencedURLProtocol.makeSession(routeResponses: routeResponses),
             retryPolicy: .none
         )
     }
 
-    private func makeVM(homeId: String = "home_1") -> InviteMemberWizardViewModel {
-        InviteMemberWizardViewModel(homeId: homeId, api: makeAPI())
+    private func makeVM(
+        homeId: String = "home_1",
+        routeResponses: [String: [SequencedURLProtocol.Response]] = [:]
+    ) -> InviteMemberWizardViewModel {
+        InviteMemberWizardViewModel(homeId: homeId, api: makeAPI(routeResponses: routeResponses))
     }
 
     // MARK: - Validation
@@ -90,22 +95,22 @@ final class InviteMemberWizardViewModelTests: XCTestCase {
     // MARK: - Submit
 
     func testSubmitSuccessEmitsInvitationEvent() async {
-        SequencedURLProtocol.sequence = [
-            .status(201, body: """
-            {"invitation":{
-              "id":"inv_new","home_id":"home_1","invited_by":"u_owner",
-              "invitee_email":"a@b.com","invitee_user_id":null,
-              "proposed_role":"member","created_at":"2026-05-15T12:00:00Z"
-            },"emailSent":true}
-            """)
-        ]
-        let vm = makeVM()
+        let vm = makeVM(routeResponses: [
+            "/api/homes/home_1/invite": [
+                .status(201, body: """
+                {"invitation":{
+                  "id":"inv_new","home_id":"home_1","invited_by":"u_owner",
+                  "invitee_email":"a@b.com","invitee_user_id":null,
+                  "proposed_role":"member","created_at":"2026-05-15T12:00:00Z"
+                },"emailSent":true}
+                """)
+            ]
+        ])
         vm.setEmail("a@b.com")
         vm.primaryTapped() // role → identify
         vm.primaryTapped() // identify → review
         vm.primaryTapped() // submit
-        // Allow the Task in primaryTapped to run.
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        await waitForSubmitToFinish(vm)
         guard case let .submitted(invitation) = vm.pendingEvent else {
             XCTFail("Expected .submitted, got \(String(describing: vm.pendingEvent))")
             return
@@ -116,15 +121,14 @@ final class InviteMemberWizardViewModelTests: XCTestCase {
     }
 
     func testSubmitFailureSurfacesErrorMessageAndStaysOnReview() async {
-        SequencedURLProtocol.sequence = [
-            .status(500, body: "{\"error\":\"oops\"}")
-        ]
-        let vm = makeVM()
+        let vm = makeVM(routeResponses: [
+            "/api/homes/home_1/invite": [.status(500, body: "{\"error\":\"oops\"}")]
+        ])
         vm.setEmail("a@b.com")
         vm.primaryTapped() // role → identify
         vm.primaryTapped() // identify → review
         vm.primaryTapped() // submit
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        await waitForSubmitToFinish(vm)
         XCTAssertNil(vm.pendingEvent)
         XCTAssertNotNil(vm.errorMessage)
         XCTAssertEqual(vm.currentStep, .review)
@@ -133,22 +137,23 @@ final class InviteMemberWizardViewModelTests: XCTestCase {
     // MARK: - Role → relationship mapping
 
     func testRoleGuestRequestsGuestRelationship() async {
-        SequencedURLProtocol.sequence = [
-            .status(201, body: """
-            {"invitation":{
-              "id":"inv_g","home_id":"home_1","invited_by":"u_owner",
-              "invitee_email":"g@e.com","invitee_user_id":null,
-              "proposed_role":"guest","created_at":"2026-05-15T12:00:00Z"
-            }}
-            """)
-        ]
-        let vm = makeVM()
+        let vm = makeVM(routeResponses: [
+            "/api/homes/home_1/invite": [
+                .status(201, body: """
+                {"invitation":{
+                  "id":"inv_g","home_id":"home_1","invited_by":"u_owner",
+                  "invitee_email":"g@e.com","invitee_user_id":null,
+                  "proposed_role":"guest","created_at":"2026-05-15T12:00:00Z"
+                }}
+                """)
+            ]
+        ])
         vm.setRole(.guest)
         vm.setEmail("g@e.com")
         vm.primaryTapped()
         vm.primaryTapped()
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        await waitForSubmitToFinish(vm)
         if case let .submitted(invitation) = vm.pendingEvent {
             XCTAssertEqual(invitation.proposedRole, "guest")
         } else {
@@ -173,5 +178,19 @@ final class InviteMemberWizardViewModelTests: XCTestCase {
         XCTAssertFalse(vm.chrome.dirty)
         vm.setEmail("anything")
         XCTAssertTrue(vm.chrome.dirty)
+    }
+
+    private func waitForSubmitToFinish(
+        _ vm: InviteMemberWizardViewModel,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        for _ in 0..<40 {
+            if vm.pendingEvent != nil || vm.errorMessage != nil {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTFail("Timed out waiting for invite submission", file: file, line: line)
     }
 }

@@ -16,19 +16,24 @@ final class InviteOwnerFormViewModelTests: XCTestCase {
         SequencedURLProtocol.reset()
     }
 
-    private func makeAPI() -> APIClient {
+    private func makeAPI(
+        routeResponses: [String: [SequencedURLProtocol.Response]] = [:]
+    ) -> APIClient {
         APIClient(
             environment: .current,
-            session: SequencedURLProtocol.makeSession(),
+            session: SequencedURLProtocol.makeSession(routeResponses: routeResponses),
             retryPolicy: .none
         )
     }
 
-    private func makeVM(currentEmail: String = "me@example.com") -> InviteOwnerFormViewModel {
+    private func makeVM(
+        currentEmail: String = "me@example.com",
+        routeResponses: [String: [SequencedURLProtocol.Response]] = [:]
+    ) -> InviteOwnerFormViewModel {
         InviteOwnerFormViewModel(
             homeId: "home-1",
             currentUserEmail: currentEmail,
-            api: makeAPI()
+            api: makeAPI(routeResponses: routeResponses)
         )
     }
 
@@ -81,10 +86,11 @@ final class InviteOwnerFormViewModelTests: XCTestCase {
     // MARK: - Submit
 
     func testSubmitHappyPathSetsToastAndDismiss() async {
-        SequencedURLProtocol.sequence = [
-            .status(201, body: "{\"message\":\"Co-owner invitation sent.\",\"claim_id\":\"c-1\"}")
-        ]
-        let vm = makeVM()
+        let vm = makeVM(routeResponses: [
+            "/api/homes/home-1/owners/invite": [
+                .status(201, body: "{\"message\":\"Co-owner invitation sent.\",\"claim_id\":\"c-1\"}")
+            ]
+        ])
         vm.update(.email, to: "alex@pantopus.app")
         let ok = await vm.submit()
         XCTAssertTrue(ok)
@@ -93,10 +99,14 @@ final class InviteOwnerFormViewModelTests: XCTestCase {
     }
 
     func testSubmitConflictMapsToInlineEmailError() async {
-        SequencedURLProtocol.sequence = [
-            .status(409, body: "{\"error\":\"An ownership claim is already active for this home.\",\"code\":\"DUPLICATE_CLAIM\"}")
-        ]
-        let vm = makeVM()
+        let vm = makeVM(routeResponses: [
+            "/api/homes/home-1/owners/invite": [
+                .status(
+                    409,
+                    body: "{\"error\":\"An ownership claim is already active for this home.\",\"code\":\"DUPLICATE_CLAIM\"}"
+                )
+            ]
+        ])
         vm.update(.email, to: "alex@pantopus.app")
         let ok = await vm.submit()
         XCTAssertFalse(ok)
@@ -108,10 +118,14 @@ final class InviteOwnerFormViewModelTests: XCTestCase {
     }
 
     func testSubmitNotFoundMapsToFriendlyMessage() async {
-        SequencedURLProtocol.sequence = [
-            .status(400, body: "{\"error\":\"Could not find user. They may need to create an account first.\"}")
-        ]
-        let vm = makeVM()
+        let vm = makeVM(routeResponses: [
+            "/api/homes/home-1/owners/invite": [
+                .status(
+                    400,
+                    body: "{\"error\":\"Could not find user. They may need to create an account first.\"}"
+                )
+            ]
+        ])
         vm.update(.email, to: "alex@pantopus.app")
         _ = await vm.submit()
         XCTAssertEqual(
