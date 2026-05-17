@@ -13,8 +13,6 @@
 //    .replying  → Frame 4 (reply compose handoff to A25)
 //
 
-// swiftlint:disable file_length
-
 import SwiftUI
 
 public enum CeremonialMailPhase: String, Sendable, Hashable {

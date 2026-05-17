@@ -11,6 +11,7 @@ package app.pantopus.android.ui.screens.ceremonial_mail_open
 
 import android.provider.Settings
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -20,13 +21,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -88,20 +89,22 @@ fun CeremonialMailOpenScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val isVoicePlaying by viewModel.isVoicePlaying.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val reduceMotion = reduceMotionOverride ?: remember(context) {
-        Settings.Global.getFloat(
-            context.contentResolver,
-            Settings.Global.TRANSITION_ANIMATION_SCALE,
-            1f,
-        ) == 0f
-    }
+    val reduceMotion =
+        reduceMotionOverride ?: remember(context) {
+            Settings.Global.getFloat(
+                context.contentResolver,
+                Settings.Global.TRANSITION_ANIMATION_SCALE,
+                1f,
+            ) == 0f
+        }
     LaunchedEffect(Unit) { viewModel.load() }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PantopusColors.appBg)
-            .testTag("ceremonialMailOpen"),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(PantopusColors.appBg)
+                .testTag("ceremonialMailOpen"),
     ) {
         when (val current = state) {
             is CeremonialMailOpenUiState.Loading -> LoadingFrame(onBack = onBack)
@@ -206,13 +209,18 @@ private fun LoadingFrame(onBack: () -> Unit) {
 }
 
 @Composable
-private fun ErrorFrame(message: String, onBack: () -> Unit, onRetry: () -> Unit) {
+private fun ErrorFrame(
+    message: String,
+    onBack: () -> Unit,
+    onRetry: () -> Unit,
+) {
     Column(modifier = Modifier.fillMaxSize().testTag("ceremonialMailOpenError")) {
         GeneralTopBar(onBack = onBack)
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(20.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -233,13 +241,14 @@ private fun ErrorFrame(message: String, onBack: () -> Unit, onRetry: () -> Unit)
             Text(text = message, fontSize = 13.sp, color = PantopusColors.appTextSecondary)
             Spacer(modifier = Modifier.height(16.dp))
             Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(PantopusColors.primary600)
-                    .clickable(onClick = onRetry)
-                    .padding(horizontal = 16.dp)
-                    .height(36.dp)
-                    .testTag("ceremonialMailOpenRetry"),
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(PantopusColors.primary600)
+                        .clickable(onClick = onRetry)
+                        .padding(horizontal = 16.dp)
+                        .height(36.dp)
+                        .testTag("ceremonialMailOpenRetry"),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -261,11 +270,12 @@ private fun GeneralTopBar(onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onBack)
-                    .testTag("ceremonialMailOpenBackButton"),
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onBack)
+                        .testTag("ceremonialMailOpenBackButton"),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
@@ -305,10 +315,11 @@ private fun PorchFrame(
     val glow by infinite.animateFloat(
         initialValue = 0.85f,
         targetValue = if (reduceMotion) 0.85f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200),
-            repeatMode = RepeatMode.Reverse,
-        ),
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 1200),
+                repeatMode = RepeatMode.Reverse,
+            ),
         label = "glow",
     )
     val lift by animateFloatAsState(
@@ -322,36 +333,40 @@ private fun PorchFrame(
         label = "envelopeScale",
     )
 
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(letter.stationery.porchTopColor, letter.stationery.porchBottomColor),
-                ),
-            )
-            .testTag("ceremonialMail_frame_${phase.key}"),
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(letter.stationery.porchTopColor, letter.stationery.porchBottomColor),
+                    ),
+                )
+                .testTag("ceremonialMail_frame_${phase.key}"),
     ) {
         // Vignette
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.18f)),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.18f)),
         )
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp),
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
                 Spacer(modifier = Modifier.weight(1f))
                 Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.18f))
-                        .clickable(onClick = onClose)
-                        .testTag("ceremonialMail_close"),
+                    modifier =
+                        Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.18f))
+                            .clickable(onClick = onClose)
+                            .testTag("ceremonialMail_close"),
                     contentAlignment = Alignment.Center,
                 ) {
                     PantopusIconImage(
@@ -384,10 +399,11 @@ private fun PorchFrame(
             )
             Spacer(modifier = Modifier.height(32.dp))
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onTapOpen)
-                    .testTag("ceremonialMail_envelope_tap"),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onTapOpen)
+                        .testTag("ceremonialMail_envelope_tap"),
                 contentAlignment = Alignment.Center,
             ) {
                 EnvelopeHero(
@@ -421,30 +437,34 @@ private fun EnvelopeHero(
     scale: Float,
 ) {
     Box(
-        modifier = Modifier
-            .size(width = 280.dp, height = 200.dp),
+        modifier =
+            Modifier
+                .size(width = 280.dp, height = 200.dp),
         contentAlignment = Alignment.Center,
     ) {
         // Glow
         Box(
-            modifier = Modifier
-                .size(320.dp)
-                .alpha(glow * 0.55f)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            Color(0xFFFFE4A0).copy(alpha = 0.55f),
-                            Color(0xFFFFB06C).copy(alpha = 0.18f),
-                            Color.Transparent,
+            modifier =
+                Modifier
+                    .size(320.dp)
+                    .alpha(glow * 0.55f)
+                    .background(
+                        Brush.radialGradient(
+                            colors =
+                                listOf(
+                                    Color(0xFFFFE4A0).copy(alpha = 0.55f),
+                                    Color(0xFFFFB06C).copy(alpha = 0.18f),
+                                    Color.Transparent,
+                                ),
                         ),
                     ),
-                ),
         )
         Box(
-            modifier = Modifier
-                .size(width = 240.dp, height = 158.dp)
-                .scale(scale)
-                .background(Color.Transparent),
+            modifier =
+                Modifier
+                    .size(width = 240.dp, height = 158.dp)
+                    .scale(scale)
+                    .background(Color.Transparent),
             contentAlignment = Alignment.Center,
         ) {
             EnvelopeShape(
@@ -457,28 +477,34 @@ private fun EnvelopeHero(
 }
 
 @Composable
-private fun EnvelopeShape(letter: CeremonialMailLetter, phase: CeremonialMailPhase, liftDp: androidx.compose.ui.unit.Dp) {
+private fun EnvelopeShape(
+    letter: CeremonialMailLetter,
+    phase: CeremonialMailPhase,
+    liftDp: androidx.compose.ui.unit.Dp,
+) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = liftDp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(letter.stationery.paperColor, letter.stationery.paperEdgeColor),
-                ),
-            )
-            .border(1.dp, Color.Black.copy(alpha = 0.22f), RoundedCornerShape(8.dp)),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .offset(y = liftDp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(letter.stationery.paperColor, letter.stationery.paperEdgeColor),
+                    ),
+                )
+                .border(1.dp, Color.Black.copy(alpha = 0.22f), RoundedCornerShape(8.dp)),
     ) {
         // Letter peeking up in breaking phase
         if (phase == CeremonialMailPhase.Breaking) {
             Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = (-30).dp)
-                    .size(width = 196.dp, height = 96.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(Color(0xFFFAEFD7)),
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = (-30).dp)
+                        .size(width = 196.dp, height = 96.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color(0xFFFAEFD7)),
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -486,10 +512,11 @@ private fun EnvelopeShape(letter: CeremonialMailLetter, phase: CeremonialMailPha
                 ) {
                     repeat(4) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(Color(0xFF3C2814).copy(alpha = 0.25f)),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(Color(0xFF3C2814).copy(alpha = 0.25f)),
                         )
                     }
                 }
@@ -497,13 +524,14 @@ private fun EnvelopeShape(letter: CeremonialMailLetter, phase: CeremonialMailPha
         }
         // Seal medallion
         Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(letter.seal.color)
-                .border(0.6.dp, Color.Black.copy(alpha = 0.28f), CircleShape)
-                .alpha(if (phase == CeremonialMailPhase.Sealed) 1f else 0.85f),
+            modifier =
+                Modifier
+                    .align(Alignment.Center)
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(letter.seal.color)
+                    .border(0.6.dp, Color.Black.copy(alpha = 0.28f), CircleShape)
+                    .alpha(if (phase == CeremonialMailPhase.Sealed) 1f else 0.85f),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -520,24 +548,26 @@ private fun EnvelopeShape(letter: CeremonialMailLetter, phase: CeremonialMailPha
 @Composable
 private fun SenderStamp(letter: CeremonialMailLetter) {
     Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(Color.White.copy(alpha = 0.14f))
-            .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
-            .padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(Color.White.copy(alpha = 0.14f))
+                .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
+                .padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(Color(0xFFC29230), Color(0xFF7A4F1B)),
-                    ),
-                )
-                .border(2.dp, Color.White.copy(alpha = 0.85f), CircleShape),
+            modifier =
+                Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(Color(0xFFC29230), Color(0xFF7A4F1B)),
+                        ),
+                    )
+                    .border(2.dp, Color.White.copy(alpha = 0.85f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -568,13 +598,14 @@ private fun SenderStamp(letter: CeremonialMailLetter) {
 @Composable
 private fun OpenEnvelopeCta(onTap: () -> Unit) {
     Box(
-        modifier = Modifier
-            .padding(top = 8.dp)
-            .clip(RoundedCornerShape(999.dp))
-            .background(Color(0xFFF6ECD8).copy(alpha = 0.96f))
-            .clickable(onClick = onTap)
-            .padding(horizontal = 28.dp, vertical = 14.dp)
-            .testTag("ceremonialMail_openEnvelope"),
+        modifier =
+            Modifier
+                .padding(top = 8.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(Color(0xFFF6ECD8).copy(alpha = 0.96f))
+                .clickable(onClick = onTap)
+                .padding(horizontal = 28.dp, vertical = 14.dp)
+                .testTag("ceremonialMail_openEnvelope"),
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -625,12 +656,13 @@ private fun ProgressDots() {
 @Composable
 private fun SkipAnimationButton(onSkip: () -> Unit) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp)
-            .clickable(onClick = onSkip)
-            .testTag("ceremonialMail_skipAnimation")
-            .semantics { contentDescription = "Skip animation and open the letter" },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp)
+                .clickable(onClick = onSkip)
+                .testTag("ceremonialMail_skipAnimation")
+                .semantics { contentDescription = "Skip animation and open the letter" },
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -646,9 +678,10 @@ private fun SkipAnimationButton(onSkip: () -> Unit) {
 @Composable
 private fun PantopusFooter() {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 14.dp, bottom = 12.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp, bottom = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.22f)))
@@ -692,10 +725,11 @@ private fun ReadingFrame(
         label = "paperOpacity",
     )
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(letter.stationery.paperColor)
-            .testTag("ceremonialMail_frame_open"),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(letter.stationery.paperColor)
+                .testTag("ceremonialMail_frame_open"),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             ReadingTopBar(letter = letter, onClose = onClose, onArchive = {
@@ -709,12 +743,13 @@ private fun ReadingFrame(
                 )
             })
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 22.dp, vertical = 16.dp)
-                    .alpha(opacity)
-                    .testTag("ceremonialMailOpenContent"),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 22.dp, vertical = 16.dp)
+                        .alpha(opacity)
+                        .testTag("ceremonialMailOpenContent"),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 SenderRow(letter = letter)
@@ -775,17 +810,27 @@ private fun ReadingFrame(
 }
 
 @Composable
-private fun ReadingTopBar(letter: CeremonialMailLetter, onClose: () -> Unit, onArchive: () -> Unit) {
+private fun ReadingTopBar(
+    letter: CeremonialMailLetter,
+    onClose: () -> Unit,
+    onArchive: () -> Unit,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(letter.stationery.paperColor.copy(alpha = 0.55f))
-            .padding(horizontal = 12.dp)
-            .height(44.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(letter.stationery.paperColor.copy(alpha = 0.55f))
+                .padding(horizontal = 12.dp)
+                .height(44.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconChip(icon = PantopusIcon.X, ink = letter.ink.color, paper = letter.stationery.paperColor,
-            id = "ceremonialMailReading_close", label = "Close", onClick = onClose)
+        IconChip(
+            icon = PantopusIcon.X,
+            ink = letter.ink.color,
+            id = "ceremonialMailReading_close",
+            label = "Close",
+            onClick = onClose,
+        )
         Spacer(Modifier.weight(1f))
         Text(
             text = letter.sender.displayName,
@@ -794,11 +839,21 @@ private fun ReadingTopBar(letter: CeremonialMailLetter, onClose: () -> Unit, onA
             color = letter.ink.color,
         )
         Spacer(Modifier.weight(1f))
-        IconChip(icon = PantopusIcon.Share, ink = letter.ink.color, paper = letter.stationery.paperColor,
-            id = "ceremonialMailReading_share", label = "Share", onClick = {})
+        IconChip(
+            icon = PantopusIcon.Share,
+            ink = letter.ink.color,
+            id = "ceremonialMailReading_share",
+            label = "Share",
+            onClick = {},
+        )
         Spacer(modifier = Modifier.width(6.dp))
-        IconChip(icon = PantopusIcon.Archive, ink = letter.ink.color, paper = letter.stationery.paperColor,
-            id = "ceremonialMailReading_archive", label = "Archive", onClick = onArchive)
+        IconChip(
+            icon = PantopusIcon.Archive,
+            ink = letter.ink.color,
+            id = "ceremonialMailReading_archive",
+            label = "Archive",
+            onClick = onArchive,
+        )
     }
     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(letter.ink.color.copy(alpha = 0.1f)))
 }
@@ -807,20 +862,20 @@ private fun ReadingTopBar(letter: CeremonialMailLetter, onClose: () -> Unit, onA
 private fun IconChip(
     icon: PantopusIcon,
     ink: Color,
-    paper: Color,
     id: String,
     label: String,
     onClick: () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .size(30.dp)
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.55f))
-            .border(1.dp, ink.copy(alpha = 0.14f), CircleShape)
-            .clickable(onClick = onClick)
-            .testTag(id)
-            .semantics { contentDescription = label },
+        modifier =
+            Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.55f))
+                .border(1.dp, ink.copy(alpha = 0.14f), CircleShape)
+                .clickable(onClick = onClick)
+                .testTag(id)
+                .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(icon = icon, contentDescription = null, size = 13.dp, tint = ink)
@@ -836,15 +891,16 @@ private fun SenderRow(letter: CeremonialMailLetter) {
     ) {
         Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
             Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(Color(0xFFC29230), Color(0xFF7A4F1B)),
-                        ),
-                    )
-                    .border(2.dp, Color.White.copy(alpha = 0.55f), CircleShape),
+                modifier =
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(Color(0xFFC29230), Color(0xFF7A4F1B)),
+                            ),
+                        )
+                        .border(2.dp, Color.White.copy(alpha = 0.55f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -855,12 +911,13 @@ private fun SenderRow(letter: CeremonialMailLetter) {
                 )
             }
             Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .size(16.dp)
-                    .clip(CircleShape)
-                    .background(PantopusColors.success)
-                    .border(2.dp, letter.stationery.paperColor, CircleShape),
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(16.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.success)
+                        .border(2.dp, letter.stationery.paperColor, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
@@ -893,10 +950,11 @@ private fun SenderRow(letter: CeremonialMailLetter) {
 @Composable
 private fun PostmarkStamp(letter: CeremonialMailLetter) {
     Box(
-        modifier = Modifier
-            .size(56.dp)
-            .clip(CircleShape)
-            .border(1.2.dp, letter.seal.color, CircleShape),
+        modifier =
+            Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .border(1.2.dp, letter.seal.color, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -957,11 +1015,16 @@ private fun Signature(letter: CeremonialMailLetter) {
 }
 
 @Composable
-private fun VoicePostscriptCard(letter: CeremonialMailLetter, isPlaying: Boolean, onToggle: () -> Unit) {
+private fun VoicePostscriptCard(
+    letter: CeremonialMailLetter,
+    isPlaying: Boolean,
+    onToggle: () -> Unit,
+) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 14.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(letter.ink.color.copy(alpha = 0.2f)))
@@ -973,17 +1036,18 @@ private fun VoicePostscriptCard(letter: CeremonialMailLetter, isPlaying: Boolean
             color = letter.seal.color,
         )
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(999.dp))
-                .background(letter.stationery.paperColor.copy(alpha = 0.7f))
-                .border(1.dp, letter.ink.color.copy(alpha = 0.13f), RoundedCornerShape(999.dp))
-                .clickable(onClick = onToggle)
-                .padding(horizontal = 14.dp, vertical = 6.dp)
-                .testTag("ceremonialMailVoicePostscript")
-                .semantics {
-                    contentDescription = if (isPlaying) "Pause voice postscript" else "Play voice postscript"
-                },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(letter.stationery.paperColor.copy(alpha = 0.7f))
+                    .border(1.dp, letter.ink.color.copy(alpha = 0.13f), RoundedCornerShape(999.dp))
+                    .clickable(onClick = onToggle)
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                    .testTag("ceremonialMailVoicePostscript")
+                    .semantics {
+                        contentDescription = if (isPlaying) "Pause voice postscript" else "Play voice postscript"
+                    },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -1002,11 +1066,12 @@ private fun VoicePostscriptCard(letter: CeremonialMailLetter, isPlaying: Boolean
                 val heights = listOf(7, 13, 9, 18, 14, 21, 11, 16, 8, 13)
                 heights.forEachIndexed { idx, h ->
                     Box(
-                        modifier = Modifier
-                            .width(2.4.dp)
-                            .height(h.dp)
-                            .clip(RoundedCornerShape(1.5.dp))
-                            .background(if (idx < 5) letter.seal.color else letter.ink.color.copy(alpha = 0.4f)),
+                        modifier =
+                            Modifier
+                                .width(2.4.dp)
+                                .height(h.dp)
+                                .clip(RoundedCornerShape(1.5.dp))
+                                .background(if (idx < 5) letter.seal.color else letter.ink.color.copy(alpha = 0.4f)),
                     )
                 }
             }
@@ -1031,10 +1096,11 @@ private fun EndOrnament(letter: CeremonialMailLetter) {
         Box(modifier = Modifier.width(24.dp).height(1.dp).background(letter.seal.color.copy(alpha = 0.55f)))
         Spacer(modifier = Modifier.width(8.dp))
         Box(
-            modifier = Modifier
-                .size(12.dp)
-                .clip(CircleShape)
-                .border(0.9.dp, letter.seal.color.copy(alpha = 0.55f), CircleShape),
+            modifier =
+                Modifier
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .border(0.9.dp, letter.seal.color.copy(alpha = 0.55f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(letter.seal.color.copy(alpha = 0.55f)))
@@ -1053,26 +1119,28 @@ private fun StickyBottomBar(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, letter.stationery.paperColor),
-                ),
-            )
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .padding(bottom = 14.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, letter.stationery.paperColor),
+                    ),
+                )
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(bottom = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(999.dp))
-                .background(PantopusColors.primary600)
-                .clickable(onClick = onReply)
-                .padding(vertical = 12.dp)
-                .testTag("ceremonialMailOutcome_write_back"),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(PantopusColors.primary600)
+                    .clickable(onClick = onReply)
+                    .padding(vertical = 12.dp)
+                    .testTag("ceremonialMailOutcome_write_back"),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
@@ -1081,13 +1149,14 @@ private fun StickyBottomBar(
             Text(text = "Reply", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
         }
         Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(Color.White.copy(alpha = 0.65f))
-                .border(1.dp, letter.ink.color.copy(alpha = 0.13f), RoundedCornerShape(999.dp))
-                .clickable(onClick = onSave)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .testTag("ceremonialMailOutcome_save"),
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color.White.copy(alpha = 0.65f))
+                    .border(1.dp, letter.ink.color.copy(alpha = 0.13f), RoundedCornerShape(999.dp))
+                    .clickable(onClick = onSave)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .testTag("ceremonialMailOutcome_save"),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -1095,14 +1164,15 @@ private fun StickyBottomBar(
             Text(text = "Save", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = letter.ink.color)
         }
         Box(
-            modifier = Modifier
-                .size(46.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.65f))
-                .border(1.dp, letter.ink.color.copy(alpha = 0.13f), CircleShape)
-                .clickable(onClick = onArchive)
-                .testTag("ceremonialMailOutcome_archive")
-                .semantics { contentDescription = "Archive letter" },
+            modifier =
+                Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.65f))
+                    .border(1.dp, letter.ink.color.copy(alpha = 0.13f), CircleShape)
+                    .clickable(onClick = onArchive)
+                    .testTag("ceremonialMailOutcome_archive")
+                    .semantics { contentDescription = "Archive letter" },
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(icon = PantopusIcon.Archive, contentDescription = null, size = 15.dp, tint = letter.ink.color)
@@ -1119,18 +1189,20 @@ private fun ReplyHandoffFrame(
     onContinue: () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(letter.stationery.paperColor)
-            .testTag("ceremonialMailWriteBackBanner"),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(letter.stationery.paperColor)
+                .testTag("ceremonialMailWriteBackBanner"),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             ReplyTopBar(letter = letter, onBack = onBack, onContinue = onContinue)
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 LetterPreviewCard(letter = letter)
@@ -1143,25 +1215,36 @@ private fun ReplyHandoffFrame(
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.2.sp,
             color = letter.ink.color.copy(alpha = 0.5f),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 18.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 18.dp),
         )
     }
 }
 
 @Composable
-private fun ReplyTopBar(letter: CeremonialMailLetter, onBack: () -> Unit, onContinue: () -> Unit) {
+private fun ReplyTopBar(
+    letter: CeremonialMailLetter,
+    onBack: () -> Unit,
+    onContinue: () -> Unit,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(letter.stationery.paperColor.copy(alpha = 0.55f))
-            .padding(horizontal = 12.dp)
-            .height(44.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(letter.stationery.paperColor.copy(alpha = 0.55f))
+                .padding(horizontal = 12.dp)
+                .height(44.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconChip(icon = PantopusIcon.ChevronLeft, ink = letter.ink.color, paper = letter.stationery.paperColor,
-            id = "ceremonialMailReply_back", label = "Back to letter", onClick = onBack)
+        IconChip(
+            icon = PantopusIcon.ChevronLeft,
+            ink = letter.ink.color,
+            id = "ceremonialMailReply_back",
+            label = "Back to letter",
+            onClick = onBack,
+        )
         Spacer(Modifier.weight(1f))
         Text(
             text = "WRITE BACK",
@@ -1172,13 +1255,14 @@ private fun ReplyTopBar(letter: CeremonialMailLetter, onBack: () -> Unit, onCont
         )
         Spacer(Modifier.weight(1f))
         Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(PantopusColors.primary600)
-                .clickable(onClick = onContinue)
-                .padding(horizontal = 12.dp)
-                .height(30.dp)
-                .testTag("ceremonialMailReply_continue"),
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(PantopusColors.primary600)
+                    .clickable(onClick = onContinue)
+                    .padding(horizontal = 12.dp)
+                    .height(30.dp)
+                    .testTag("ceremonialMailReply_continue"),
             contentAlignment = Alignment.Center,
         ) {
             Text(text = "Continue →", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
@@ -1190,24 +1274,26 @@ private fun ReplyTopBar(letter: CeremonialMailLetter, onBack: () -> Unit, onCont
 @Composable
 private fun LetterPreviewCard(letter: CeremonialMailLetter) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(letter.stationery.paperColor)
-            .border(1.dp, letter.ink.color.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
-            .padding(14.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(letter.stationery.paperColor)
+                .border(1.dp, letter.ink.color.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
+                .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(Color(0xFFC29230), Color(0xFF7A4F1B)),
+                modifier =
+                    Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(Color(0xFFC29230), Color(0xFF7A4F1B)),
+                            ),
                         ),
-                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -1246,12 +1332,13 @@ private fun LetterPreviewCard(letter: CeremonialMailLetter) {
 @Composable
 private fun ComposeSurface(letter: CeremonialMailLetter) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(letter.stationery.paperColor)
-            .border(1.dp, letter.ink.color.copy(alpha = 0.12f), RoundedCornerShape(18.dp))
-            .padding(18.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(letter.stationery.paperColor)
+                .border(1.dp, letter.ink.color.copy(alpha = 0.12f), RoundedCornerShape(18.dp))
+                .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1311,26 +1398,31 @@ private fun ComposeSurface(letter: CeremonialMailLetter) {
 }
 
 @Composable
-private fun PaperSwatchRow(letter: CeremonialMailLetter, modifier: Modifier = Modifier) {
-    val swatches = listOf(
-        letter.stationery,
-        CeremonialMailStationeryTone.Winter,
-        CeremonialMailStationeryTone.Spring,
-        CeremonialMailStationeryTone.Summer,
-        CeremonialMailStationeryTone.Evergreen,
-    )
+private fun PaperSwatchRow(
+    letter: CeremonialMailLetter,
+    modifier: Modifier = Modifier,
+) {
+    val swatches =
+        listOf(
+            letter.stationery,
+            CeremonialMailStationeryTone.Winter,
+            CeremonialMailStationeryTone.Spring,
+            CeremonialMailStationeryTone.Summer,
+            CeremonialMailStationeryTone.Evergreen,
+        )
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         swatches.forEachIndexed { idx, tone ->
             Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(tone.paperColor)
-                    .border(
-                        width = if (idx == 0) 2.dp else 1.dp,
-                        color = if (idx == 0) letter.ink.color else letter.ink.color.copy(alpha = 0.2f),
-                        shape = CircleShape,
-                    ),
+                modifier =
+                    Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(tone.paperColor)
+                        .border(
+                            width = if (idx == 0) 2.dp else 1.dp,
+                            color = if (idx == 0) letter.ink.color else letter.ink.color.copy(alpha = 0.2f),
+                            shape = CircleShape,
+                        ),
             )
         }
     }
@@ -1342,28 +1434,33 @@ private fun InkSwatchRow(letter: CeremonialMailLetter) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         swatches.forEachIndexed { idx, tone ->
             Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(tone.color)
-                    .border(
-                        width = if (idx == 0) 2.dp else 1.dp,
-                        color = if (idx == 0) letter.ink.color else letter.ink.color.copy(alpha = 0.2f),
-                        shape = CircleShape,
-                    ),
+                modifier =
+                    Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(tone.color)
+                        .border(
+                            width = if (idx == 0) 2.dp else 1.dp,
+                            color = if (idx == 0) letter.ink.color else letter.ink.color.copy(alpha = 0.2f),
+                            shape = CircleShape,
+                        ),
             )
         }
     }
 }
 
 @Composable
-private fun ComposeIcon(letter: CeremonialMailLetter, icon: PantopusIcon) {
+private fun ComposeIcon(
+    letter: CeremonialMailLetter,
+    icon: PantopusIcon,
+) {
     Box(
-        modifier = Modifier
-            .size(34.dp)
-            .clip(RoundedCornerShape(9.dp))
-            .background(Color.White.copy(alpha = 0.45f))
-            .border(1.dp, letter.ink.color.copy(alpha = 0.13f), RoundedCornerShape(9.dp)),
+        modifier =
+            Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(Color.White.copy(alpha = 0.45f))
+                .border(1.dp, letter.ink.color.copy(alpha = 0.13f), RoundedCornerShape(9.dp)),
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(icon = icon, contentDescription = null, size = 15.dp, tint = letter.ink.color)

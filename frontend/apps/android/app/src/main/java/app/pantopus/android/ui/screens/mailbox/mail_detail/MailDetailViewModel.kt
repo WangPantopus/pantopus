@@ -185,18 +185,21 @@ class MailDetailViewModel
             val community = current.content.communityDetail ?: return
             if (_rsvpInFlight.value) return
             _rsvpInFlight.value = true
-            val optimistic = current.content.copy(
-                communityDetail = community.copy(
-                    rsvp = status,
-                    attendeeCount = when {
-                        status == CommunityRsvpStatus.Going && community.rsvp != CommunityRsvpStatus.Going ->
-                            community.attendeeCount + 1
-                        status != CommunityRsvpStatus.Going && community.rsvp == CommunityRsvpStatus.Going ->
-                            (community.attendeeCount - 1).coerceAtLeast(0)
-                        else -> community.attendeeCount
-                    },
-                ),
-            )
+            val optimistic =
+                current.content.copy(
+                    communityDetail =
+                        community.copy(
+                            rsvp = status,
+                            attendeeCount =
+                                when {
+                                    status == CommunityRsvpStatus.Going && community.rsvp != CommunityRsvpStatus.Going ->
+                                        community.attendeeCount + 1
+                                    status != CommunityRsvpStatus.Going && community.rsvp == CommunityRsvpStatus.Going ->
+                                        (community.attendeeCount - 1).coerceAtLeast(0)
+                                    else -> community.attendeeCount
+                                },
+                        ),
+                )
             _state.value = MailDetailUiState.Loaded(optimistic)
             if (status != CommunityRsvpStatus.Going) {
                 _toast.value = rsvpToast(status)

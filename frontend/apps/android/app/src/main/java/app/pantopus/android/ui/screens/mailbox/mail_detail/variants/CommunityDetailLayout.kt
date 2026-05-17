@@ -147,7 +147,10 @@ private fun makeTopBar(onBack: () -> Unit): MailTopBarConfig =
             ),
     )
 
-private fun makeAIElf(content: MailDetailContent, community: CommunityDetailDto): AIElfStripContent {
+private fun makeAIElf(
+    content: MailDetailContent,
+    community: CommunityDetailDto,
+): AIElfStripContent {
     val going = community.rsvp == CommunityRsvpStatus.Going
     val summary = content.aiSummary ?: defaultElfSummary(community = community, going = going)
     val bullets = if (going) makeGoingBullets(community) else makeOpenBullets(community)
@@ -158,7 +161,10 @@ private fun makeAIElf(content: MailDetailContent, community: CommunityDetailDto)
     )
 }
 
-private fun defaultElfSummary(community: CommunityDetailDto, going: Boolean): String {
+private fun defaultElfSummary(
+    community: CommunityDetailDto,
+    going: Boolean,
+): String {
     if (going) {
         return "Saved to your calendar with a reminder. The organizer was notified you're coming."
     }
@@ -230,22 +236,27 @@ private fun makeGoingBullets(community: CommunityDetailDto): List<AIElfBullet> {
 
 private fun buildAttachments(names: List<String>): AttachmentsRowContent? {
     if (names.isEmpty()) return null
-    val items = names.mapIndexed { idx, name ->
-        AttachmentItem(id = "att-$idx", kind = AttachmentKind.Other, name = name)
-    }
+    val items =
+        names.mapIndexed { idx, name ->
+            AttachmentItem(id = "att-$idx", kind = AttachmentKind.Other, name = name)
+        }
     return AttachmentsRowContent(items = items)
 }
 
 // ─── Hero ───────────────────────────────────────────────
 
 @Composable
-private fun CommunityHeroCard(content: MailDetailContent, community: CommunityDetailDto) {
+private fun CommunityHeroCard(
+    content: MailDetailContent,
+    community: CommunityDetailDto,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(PantopusColors.appSurface)
-            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
     ) {
         Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(content.category.accent))
         Column(
@@ -286,21 +297,23 @@ private fun CommunityHeroCard(content: MailDetailContent, community: CommunityDe
 @Composable
 private fun GoingChip() {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(PantopusColors.successBg)
-            .border(1.dp, PantopusColors.successLight, RoundedCornerShape(10.dp))
-            .padding(horizontal = Spacing.s2, vertical = 8.dp)
-            .testTag("mailDetail_community_goingChip"),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(PantopusColors.successBg)
+                .border(1.dp, PantopusColors.successLight, RoundedCornerShape(10.dp))
+                .padding(horizontal = Spacing.s2, vertical = 8.dp)
+                .testTag("mailDetail_community_goingChip"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Box(
-            modifier = Modifier
-                .size(20.dp)
-                .clip(CircleShape)
-                .background(PantopusColors.success),
+            modifier =
+                Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.success),
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
@@ -322,10 +335,11 @@ private fun GoingChip() {
 @Composable
 private fun CategoryBadge(category: MailItemCategory) {
     Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(Radii.pill))
-            .background(category.rowBackground)
-            .padding(horizontal = Spacing.s2, vertical = 3.dp),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(category.rowBackground)
+                .padding(horizontal = Spacing.s2, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -350,27 +364,29 @@ private fun CategoryBadge(category: MailItemCategory) {
 @Composable
 private fun CommunityBadgeCard(community: CommunityDetailDto) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(PantopusColors.successBg, PantopusColors.appSurface),
-                ),
-            )
-            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-            .padding(Spacing.s3)
-            .testTag("mailDetail_community_badge"),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(PantopusColors.successBg, PantopusColors.appSurface),
+                    ),
+                )
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3)
+                .testTag("mailDetail_community_badge"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {
             Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(PantopusColors.appSurface)
-                    .border(2.dp, PantopusColors.success, CircleShape),
+                modifier =
+                    Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appSurface)
+                        .border(2.dp, PantopusColors.success, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
@@ -382,12 +398,13 @@ private fun CommunityBadgeCard(community: CommunityDetailDto) {
             }
             if (community.group.isVerified) {
                 Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(PantopusColors.success)
-                        .border(2.dp, PantopusColors.appSurface, CircleShape),
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.success)
+                            .border(2.dp, PantopusColors.appSurface, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     PantopusIconImage(
@@ -412,10 +429,11 @@ private fun CommunityBadgeCard(community: CommunityDetailDto) {
                 )
                 if (community.group.isVerified) {
                     Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(Radii.pill))
-                            .background(PantopusColors.successBg)
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(Radii.pill))
+                                .background(PantopusColors.successBg)
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
                         Text(
                             text = "VERIFIED HOA",
@@ -473,20 +491,25 @@ private fun CommunityBadgeCard(community: CommunityDetailDto) {
 // ─── Event details ──────────────────────────────────────
 
 @Composable
-private fun CommunityEventCard(event: CommunityEventInfo, accent: Color) {
+private fun CommunityEventCard(
+    event: CommunityEventInfo,
+    accent: Color,
+) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(PantopusColors.appSurface)
-            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-            .testTag("mailDetail_community_eventCard"),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .testTag("mailDetail_community_eventCard"),
     ) {
         Text(
             text = "EVENT DETAILS",
-            modifier = Modifier
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
-                .semantics { heading() },
+            modifier =
+                Modifier
+                    .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                    .semantics { heading() },
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.5.sp,
@@ -514,7 +537,14 @@ private fun CommunityEventCard(event: CommunityEventInfo, accent: Color) {
 }
 
 @Composable
-private fun WhenRow(event: CommunityEventInfo, accent: Color) {
+private fun WhenRow(
+    event: CommunityEventInfo,
+    accent: Color,
+) {
+    val dateText =
+        listOfNotNull(event.dayLabel, event.dateLabel)
+            .joinToString(", ")
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -529,7 +559,7 @@ private fun WhenRow(event: CommunityEventInfo, accent: Color) {
                 color = PantopusColors.appTextSecondary,
             )
             Text(
-                text = "${event.dayLabel ?: ""}${if (event.dayLabel != null && event.dateLabel != null) ", " else ""}${event.dateLabel ?: ""}",
+                text = dateText,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.appText,
@@ -542,7 +572,10 @@ private fun WhenRow(event: CommunityEventInfo, accent: Color) {
 }
 
 @Composable
-private fun WhereRow(event: CommunityEventInfo, accent: Color) {
+private fun WhereRow(
+    event: CommunityEventInfo,
+    accent: Color,
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -592,12 +625,13 @@ private fun WhereRow(event: CommunityEventInfo, accent: Color) {
 @Composable
 private fun BringList(items: List<String>) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(PantopusColors.appSurfaceSunken)
-            .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(10.dp))
-            .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(PantopusColors.appSurfaceSunken)
+                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(10.dp))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
@@ -630,14 +664,18 @@ private fun BringList(items: List<String>) {
 }
 
 @Composable
-private fun WeatherStrip(temp: Int?, summary: String) {
+private fun WeatherStrip(
+    temp: Int?,
+    summary: String,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(PantopusColors.infoBg)
-            .border(1.dp, PantopusColors.infoLight, RoundedCornerShape(10.dp))
-            .padding(horizontal = Spacing.s3, vertical = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(PantopusColors.infoBg)
+                .border(1.dp, PantopusColors.infoLight, RoundedCornerShape(10.dp))
+                .padding(horizontal = Spacing.s3, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
@@ -664,20 +702,26 @@ private fun WeatherStrip(temp: Int?, summary: String) {
 }
 
 @Composable
-private fun DateChip(day: String?, date: String?, accent: Color) {
+private fun DateChip(
+    day: String?,
+    date: String?,
+    accent: Color,
+) {
     val monthAbbr = date?.split(" ")?.firstOrNull().orEmpty()
     val dayNum = date?.split(" ")?.getOrNull(1).orEmpty()
     Column(
-        modifier = Modifier
-            .size(width = 52.dp, height = 56.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp)),
+        modifier =
+            Modifier
+                .size(width = 52.dp, height = 56.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp)),
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(accent)
-                .padding(vertical = 3.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(accent)
+                    .padding(vertical = 3.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -689,10 +733,11 @@ private fun DateChip(day: String?, date: String?, accent: Color) {
             )
         }
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(PantopusColors.appSurface)
-                .padding(vertical = 6.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(PantopusColors.appSurface)
+                    .padding(vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
@@ -718,11 +763,12 @@ private fun DateChip(day: String?, date: String?, accent: Color) {
 @Composable
 private fun MapChip(accent: Color) {
     Box(
-        modifier = Modifier
-            .size(width = 52.dp, height = 56.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(PantopusColors.successBg)
-            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp)),
+        modifier =
+            Modifier
+                .size(width = 52.dp, height = 56.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(PantopusColors.successBg)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp)),
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(
@@ -747,17 +793,19 @@ private fun CommunityAttendeesStrip(
     val visible = attendees.take(visibleSlots)
     val remaining = (attendeeCount - visibleSlots - if (going) 1 else 0).coerceAtLeast(0)
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(PantopusColors.appSurface)
-            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-            .testTag("mailDetail_community_attendees"),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .testTag("mailDetail_community_attendees"),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
@@ -801,9 +849,10 @@ private fun CommunityAttendeesStrip(
         }
         HorizontalDivider(color = PantopusColors.appBorderSubtle)
         Row(
-            modifier = Modifier
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
+            modifier =
+                Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             verticalAlignment = Alignment.Top,
         ) {
@@ -816,14 +865,15 @@ private fun CommunityAttendeesStrip(
 
 @Composable
 private fun AvatarBubble(attendee: CommunityAttendee) {
-    val palette = listOf(
-        PantopusColors.home,
-        PantopusColors.tutoring,
-        PantopusColors.business,
-        PantopusColors.handyman,
-        PantopusColors.error,
-        PantopusColors.cleaning,
-    )
+    val palette =
+        listOf(
+            PantopusColors.home,
+            PantopusColors.tutoring,
+            PantopusColors.business,
+            PantopusColors.handyman,
+            PantopusColors.error,
+            PantopusColors.cleaning,
+        )
     val hash = attendee.initials.sumOf { it.code }
     val bg = palette[hash % palette.size]
     Column(
@@ -833,10 +883,11 @@ private fun AvatarBubble(attendee: CommunityAttendee) {
     ) {
         Box(modifier = Modifier.size(36.dp)) {
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(bg),
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(bg),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -848,12 +899,13 @@ private fun AvatarBubble(attendee: CommunityAttendee) {
             }
             if (attendee.isVerified) {
                 Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(PantopusColors.success)
-                        .border(2.dp, PantopusColors.appSurface, CircleShape),
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.success)
+                            .border(2.dp, PantopusColors.appSurface, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     PantopusIconImage(
@@ -883,15 +935,16 @@ private fun YouAvatar() {
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(PantopusColors.primary500, PantopusColors.primary700),
-                    ),
-                )
-                .border(2.5.dp, PantopusColors.primary300, CircleShape),
+            modifier =
+                Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(PantopusColors.primary500, PantopusColors.primary700),
+                        ),
+                    )
+                    .border(2.5.dp, PantopusColors.primary300, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -918,11 +971,12 @@ private fun OverflowBubble(count: Int) {
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(PantopusColors.appSurfaceSunken)
-                .border(1.5.dp, PantopusColors.appBorderStrong, CircleShape),
+            modifier =
+                Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.appSurfaceSunken)
+                    .border(1.5.dp, PantopusColors.appBorderStrong, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -944,14 +998,19 @@ private fun OverflowBubble(count: Int) {
 // ─── Body card ──────────────────────────────────────────
 
 @Composable
-private fun CommunityBodyCard(paragraphs: List<String>, authorName: String, authorInitials: String) {
+private fun CommunityBodyCard(
+    paragraphs: List<String>,
+    authorName: String,
+    authorInitials: String,
+) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(PantopusColors.appSurface)
-            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-            .padding(Spacing.s3),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Row(
@@ -959,10 +1018,11 @@ private fun CommunityBodyCard(paragraphs: List<String>, authorName: String, auth
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(PantopusColors.business),
+                modifier =
+                    Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.business),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -1000,14 +1060,18 @@ private fun CommunityBodyCard(paragraphs: List<String>, authorName: String, auth
 // ─── Pulse thread cross-link ────────────────────────────
 
 @Composable
-private fun CommunityPulseThreadCard(thread: CommunityPulseThread, going: Boolean) {
+private fun CommunityPulseThreadCard(
+    thread: CommunityPulseThread,
+    going: Boolean,
+) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(PantopusColors.appSurface)
-            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-            .padding(Spacing.s3),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Row(
@@ -1015,10 +1079,11 @@ private fun CommunityPulseThreadCard(thread: CommunityPulseThread, going: Boolea
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(PantopusColors.primary100),
+                modifier =
+                    Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(PantopusColors.primary100),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
@@ -1042,27 +1107,30 @@ private fun CommunityPulseThreadCard(thread: CommunityPulseThread, going: Boolea
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
         )
-        val meta = buildString {
-            append("${thread.replyCount} replies")
-            if (thread.lastReplyAuthor != null && thread.lastReplyAge != null) {
-                append(" · last from ${thread.lastReplyAuthor} ${thread.lastReplyAge} ago")
+        val meta =
+            buildString {
+                append("${thread.replyCount} replies")
+                if (thread.lastReplyAuthor != null && thread.lastReplyAge != null) {
+                    append(" · last from ${thread.lastReplyAuthor} ${thread.lastReplyAge} ago")
+                }
             }
-        }
         Text(text = meta, fontSize = 12.sp, color = PantopusColors.appTextSecondary)
         if (thread.lastReplyPreview != null && thread.lastReplyAuthor != null) {
             Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(PantopusColors.appSurfaceSunken)
-                    .padding(horizontal = Spacing.s2, vertical = 8.dp),
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(PantopusColors.appSurfaceSunken)
+                        .padding(horizontal = Spacing.s2, vertical = 8.dp),
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(PantopusColors.success),
+                    modifier =
+                        Modifier
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.success),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -1080,14 +1148,15 @@ private fun CommunityPulseThreadCard(thread: CommunityPulseThread, going: Boolea
             }
         }
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(PantopusColors.appSurface)
-                .border(1.5.dp, PantopusColors.primary200, RoundedCornerShape(10.dp))
-                .clickable {}
-                .padding(vertical = 9.dp)
-                .testTag("mailDetail_community_pulseThread"),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(PantopusColors.appSurface)
+                    .border(1.5.dp, PantopusColors.primary200, RoundedCornerShape(10.dp))
+                    .clickable {}
+                    .padding(vertical = 9.dp)
+                    .testTag("mailDetail_community_pulseThread"),
             contentAlignment = Alignment.Center,
         ) {
             Row(
@@ -1114,14 +1183,18 @@ private fun CommunityPulseThreadCard(thread: CommunityPulseThread, going: Boolea
 // ─── Sender ─────────────────────────────────────────────
 
 @Composable
-private fun CommunitySenderCard(content: MailDetailContent, onOpenProfile: (String) -> Unit) {
+private fun CommunitySenderCard(
+    content: MailDetailContent,
+    onOpenProfile: (String) -> Unit,
+) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(PantopusColors.appSurface)
-            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-            .padding(Spacing.s3),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Text(
@@ -1133,19 +1206,21 @@ private fun CommunitySenderCard(content: MailDetailContent, onOpenProfile: (Stri
             color = PantopusColors.appTextSecondary,
         )
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = content.senderUserId != null) {
-                    content.senderUserId?.let(onOpenProfile)
-                },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = content.senderUserId != null) {
+                        content.senderUserId?.let(onOpenProfile)
+                    },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(content.category.accent),
+                modifier =
+                    Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(content.category.accent),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -1215,18 +1290,22 @@ fun CommunityRsvpActions(
 }
 
 @Composable
-private fun GoingPill(inFlight: Boolean, onChange: () -> Unit) {
+private fun GoingPill(
+    inFlight: Boolean,
+    onChange: () -> Unit,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(PantopusColors.appSurface)
-            .border(1.5.dp, PantopusColors.successLight, RoundedCornerShape(14.dp))
-            .clickable(enabled = !inFlight, onClick = onChange)
-            .padding(vertical = 14.dp)
-            .alpha(if (inFlight) 0.6f else 1f)
-            .semantics { contentDescription = "You're going. Tap to change." }
-            .testTag("mailDetail_community_goingPill"),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(PantopusColors.appSurface)
+                .border(1.5.dp, PantopusColors.successLight, RoundedCornerShape(14.dp))
+                .clickable(enabled = !inFlight, onClick = onChange)
+                .padding(vertical = 14.dp)
+                .alpha(if (inFlight) 0.6f else 1f)
+                .semantics { contentDescription = "You're going. Tap to change." }
+                .testTag("mailDetail_community_goingPill"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
@@ -1247,7 +1326,10 @@ private fun GoingPill(inFlight: Boolean, onChange: () -> Unit) {
 }
 
 @Composable
-private fun RsvpChipRow(inFlight: Boolean, onSelect: (CommunityRsvpStatus) -> Unit) {
+private fun RsvpChipRow(
+    inFlight: Boolean,
+    onSelect: (CommunityRsvpStatus) -> Unit,
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         RsvpChip(
             status = CommunityRsvpStatus.Going,
@@ -1292,21 +1374,22 @@ private fun RsvpChip(
     val bg = if (isPrimary) PantopusColors.primary600 else PantopusColors.appSurface
     val fg = if (isPrimary) PantopusColors.appTextInverse else PantopusColors.appText
     Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(bg)
-            .then(
-                if (isPrimary) {
-                    Modifier
-                } else {
-                    Modifier.border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
-                },
-            )
-            .clickable(enabled = !inFlight) { onSelect(status) }
-            .padding(vertical = 12.dp)
-            .alpha(if (inFlight) 0.6f else 1f)
-            .semantics { contentDescription = label }
-            .testTag("mailDetail_community_rsvp_${status.wire}"),
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(bg)
+                .then(
+                    if (isPrimary) {
+                        Modifier
+                    } else {
+                        Modifier.border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                    },
+                )
+                .clickable(enabled = !inFlight) { onSelect(status) }
+                .padding(vertical = 12.dp)
+                .alpha(if (inFlight) 0.6f else 1f)
+                .semantics { contentDescription = label }
+                .testTag("mailDetail_community_rsvp_${status.wire}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
@@ -1348,14 +1431,15 @@ private fun SecondaryChip(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(PantopusColors.appSurface)
-            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
-            .clickable {}
-            .padding(vertical = 10.dp)
-            .semantics { contentDescription = label }
-            .testTag(id),
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .clickable {}
+                .padding(vertical = 10.dp)
+                .semantics { contentDescription = label }
+                .testTag(id),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {

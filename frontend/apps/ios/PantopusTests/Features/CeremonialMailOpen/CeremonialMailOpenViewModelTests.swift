@@ -138,7 +138,7 @@ final class CeremonialMailOpenViewModelTests: XCTestCase {
         XCTAssertEqual(vm.phase, .open)
     }
 
-    // T6.5d (P22) — reduce-motion + skip animation behavior.
+    /// T6.5d (P22) — reduce-motion + skip animation behavior.
     func testStartBreakingSealWithSkipJumpsStraightToOpen() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.fullItemJSON)]
         let vm = CeremonialMailOpenViewModel(mailId: "mail_demo", api: makeAPI())
@@ -156,8 +156,11 @@ final class CeremonialMailOpenViewModelTests: XCTestCase {
         let start = Date()
         await vm.startBreakingSeal()
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertLessThan(elapsed, 2.0,
-                          "Animation budget exceeded (P22 cap: ≤ 2s).")
+        XCTAssertLessThan(
+            elapsed,
+            2.0,
+            "Animation budget exceeded (P22 cap: ≤ 2s)."
+        )
         XCTAssertEqual(vm.phase, .open)
     }
 

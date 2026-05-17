@@ -90,86 +90,108 @@ data class CommunityDetailDto(
         @Suppress("UNCHECKED_CAST", "LongMethod", "CyclomaticComplexMethod")
         fun decodeFromObjectPayload(payload: JsonValue?): CommunityDetailDto? {
             if (payload == null) return null
-            val itemId = (payload["community_item_id"] as? String)
-                ?: (payload["id"] as? String) ?: return null
+            val itemId =
+                (payload["community_item_id"] as? String)
+                    ?: (payload["id"] as? String) ?: return null
             if (itemId.isEmpty()) return null
-            val groupRaw = (payload["group"] as? Map<String, Any?>)
-                ?: (payload["community"] as? Map<String, Any?>)
-                ?: emptyMap<String, Any?>()
-            val group = CommunityGroupInfo(
-                name = (groupRaw["name"] as? String) ?: "Neighborhood group",
-                tagline = groupRaw["tagline"] as? String,
-                founded = groupRaw["founded"] as? String,
-                role = (groupRaw["role"] as? String)
-                    ?: (groupRaw["membership_role"] as? String),
-                membershipSince = (groupRaw["membership_since"] as? String)
-                    ?: (groupRaw["since"] as? String),
-                memberCount = (groupRaw["member_count"] as? Number)?.toInt(),
-                isVerified = (groupRaw["verified"] as? Boolean) ?: false,
-            )
+            val groupRaw =
+                (payload["group"] as? Map<String, Any?>)
+                    ?: (payload["community"] as? Map<String, Any?>)
+                    ?: emptyMap<String, Any?>()
+            val group =
+                CommunityGroupInfo(
+                    name = (groupRaw["name"] as? String) ?: "Neighborhood group",
+                    tagline = groupRaw["tagline"] as? String,
+                    founded = groupRaw["founded"] as? String,
+                    role =
+                        (groupRaw["role"] as? String)
+                            ?: (groupRaw["membership_role"] as? String),
+                    membershipSince =
+                        (groupRaw["membership_since"] as? String)
+                            ?: (groupRaw["since"] as? String),
+                    memberCount = (groupRaw["member_count"] as? Number)?.toInt(),
+                    isVerified = (groupRaw["verified"] as? Boolean) ?: false,
+                )
             val eventRaw = payload["event"] as? Map<String, Any?>
-            val event = eventRaw?.let { evt ->
-                val weather = evt["weather"] as? Map<String, Any?>
-                val whenMap = evt["when"] as? Map<String, Any?>
-                val whereStr = (evt["location"] as? String)
-                    ?: (evt["where"] as? String)
-                val bring = (evt["bring"] as? List<*>)
-                    ?.mapNotNull { it as? String } ?: emptyList()
-                CommunityEventInfo(
-                    dayLabel = (evt["day_label"] as? String)
-                        ?: (whenMap?.get("day") as? String),
-                    dateLabel = (evt["date_label"] as? String)
-                        ?: (whenMap?.get("date") as? String),
-                    timeRange = (evt["time_range"] as? String)
-                        ?: (whenMap?.get("range") as? String),
-                    location = whereStr,
-                    locationNote = (evt["location_note"] as? String)
-                        ?: (evt["where_note"] as? String),
-                    distanceLabel = evt["distance_label"] as? String,
-                    bringItems = bring,
-                    weatherSummary = weather?.get("summary") as? String,
-                    weatherTemperatureF = (weather?.get("temperature_f") as? Number)?.toInt()
-                        ?: (weather?.get("temp") as? Number)?.toInt(),
-                )
-            }
+            val event =
+                eventRaw?.let { evt ->
+                    val weather = evt["weather"] as? Map<String, Any?>
+                    val whenMap = evt["when"] as? Map<String, Any?>
+                    val whereStr =
+                        (evt["location"] as? String)
+                            ?: (evt["where"] as? String)
+                    val bring =
+                        (evt["bring"] as? List<*>)
+                            ?.mapNotNull { it as? String } ?: emptyList()
+                    CommunityEventInfo(
+                        dayLabel =
+                            (evt["day_label"] as? String)
+                                ?: (whenMap?.get("day") as? String),
+                        dateLabel =
+                            (evt["date_label"] as? String)
+                                ?: (whenMap?.get("date") as? String),
+                        timeRange =
+                            (evt["time_range"] as? String)
+                                ?: (whenMap?.get("range") as? String),
+                        location = whereStr,
+                        locationNote =
+                            (evt["location_note"] as? String)
+                                ?: (evt["where_note"] as? String),
+                        distanceLabel = evt["distance_label"] as? String,
+                        bringItems = bring,
+                        weatherSummary = weather?.get("summary") as? String,
+                        weatherTemperatureF =
+                            (weather?.get("temperature_f") as? Number)?.toInt()
+                                ?: (weather?.get("temp") as? Number)?.toInt(),
+                    )
+                }
             val attendeesRaw = payload["attendees"] as? List<*> ?: emptyList<Any?>()
-            val attendees = attendeesRaw.mapNotNull { entry ->
-                val map = entry as? Map<String, Any?> ?: return@mapNotNull null
-                val name = (map["display_name"] as? String)
-                    ?: (map["name"] as? String) ?: return@mapNotNull null
-                if (name.isEmpty()) return@mapNotNull null
-                val initials = (map["initials"] as? String) ?: makeInitials(name)
-                CommunityAttendee(
-                    id = (map["id"] as? String) ?: java.util.UUID.randomUUID().toString(),
-                    displayName = name,
-                    initials = initials,
-                    blockLabel = (map["block_label"] as? String)
-                        ?: (map["block"] as? String),
-                    isVerified = (map["verified"] as? Boolean) ?: true,
-                )
-            }
-            val attendeeCount = (payload["attendee_count"] as? Number)?.toInt()
-                ?: (payload["rsvp_count"] as? Number)?.toInt()
-                ?: attendees.size
+            val attendees =
+                attendeesRaw.mapNotNull { entry ->
+                    val map = entry as? Map<String, Any?> ?: return@mapNotNull null
+                    val name =
+                        (map["display_name"] as? String)
+                            ?: (map["name"] as? String) ?: return@mapNotNull null
+                    if (name.isEmpty()) return@mapNotNull null
+                    val initials = (map["initials"] as? String) ?: makeInitials(name)
+                    CommunityAttendee(
+                        id = (map["id"] as? String) ?: java.util.UUID.randomUUID().toString(),
+                        displayName = name,
+                        initials = initials,
+                        blockLabel =
+                            (map["block_label"] as? String)
+                                ?: (map["block"] as? String),
+                        isVerified = (map["verified"] as? Boolean) ?: true,
+                    )
+                }
+            val attendeeCount =
+                (payload["attendee_count"] as? Number)?.toInt()
+                    ?: (payload["rsvp_count"] as? Number)?.toInt()
+                    ?: attendees.size
             val attendeesFromBlock = (payload["attendees_from_block"] as? Number)?.toInt()
             val threadRaw = payload["pulse_thread"] as? Map<String, Any?>
-            val pulseThread = threadRaw?.let { td ->
-                val threadId = (td["thread_id"] as? String)
-                    ?: (td["id"] as? String) ?: return@let null
-                val title = td["title"] as? String ?: return@let null
-                val last = td["last_reply"] as? Map<String, Any?>
-                CommunityPulseThread(
-                    threadId = threadId,
-                    title = title,
-                    replyCount = (td["reply_count"] as? Number)?.toInt()
-                        ?: (td["count"] as? Number)?.toInt() ?: 0,
-                    lastReplyAuthor = (last?.get("author") as? String)
-                        ?: (last?.get("who") as? String),
-                    lastReplyPreview = last?.get("preview") as? String,
-                    lastReplyAge = (last?.get("age") as? String)
-                        ?: (last?.get("when") as? String),
-                )
-            }
+            val pulseThread =
+                threadRaw?.let { td ->
+                    val threadId =
+                        (td["thread_id"] as? String)
+                            ?: (td["id"] as? String) ?: return@let null
+                    val title = td["title"] as? String ?: return@let null
+                    val last = td["last_reply"] as? Map<String, Any?>
+                    CommunityPulseThread(
+                        threadId = threadId,
+                        title = title,
+                        replyCount =
+                            (td["reply_count"] as? Number)?.toInt()
+                                ?: (td["count"] as? Number)?.toInt() ?: 0,
+                        lastReplyAuthor =
+                            (last?.get("author") as? String)
+                                ?: (last?.get("who") as? String),
+                        lastReplyPreview = last?.get("preview") as? String,
+                        lastReplyAge =
+                            (last?.get("age") as? String)
+                                ?: (last?.get("when") as? String),
+                    )
+                }
             return CommunityDetailDto(
                 communityItemId = itemId,
                 group = group,

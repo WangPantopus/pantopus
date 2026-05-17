@@ -165,14 +165,22 @@ public struct CeremonialMailOpenView: View {
                 onClose: { onBack() },
                 onSave: {
                     onOutcome(
-                        CeremonialOutcomeCTA(id: "save", label: "Save to records",
-                                             icon: .check, style: .ghost)
+                        CeremonialOutcomeCTA(
+                            id: "save",
+                            label: "Save to records",
+                            icon: .check,
+                            style: .ghost
+                        )
                     )
                 },
                 onArchive: {
                     onOutcome(
-                        CeremonialOutcomeCTA(id: "archive", label: "Archive",
-                                             icon: .archive, style: .ghost)
+                        CeremonialOutcomeCTA(
+                            id: "archive",
+                            label: "Archive",
+                            icon: .archive,
+                            style: .ghost
+                        )
                     )
                 }
             )
@@ -377,7 +385,7 @@ private struct PorchFrame: View {
                     .offset(y: -42)
                     .overlay(
                         VStack(spacing: 8) {
-                            ForEach(0 ..< 4, id: \.self) { _ in
+                            ForEach(0..<4, id: \.self) { _ in
                                 Rectangle()
                                     .fill(Color(red: 60 / 255, green: 40 / 255, blue: 20 / 255).opacity(0.25))
                                     .frame(height: 1)
@@ -770,7 +778,7 @@ private struct ReadingFrame: View {
                             )
                         )
                     HStack(spacing: 2) {
-                        ForEach(0 ..< 10, id: \.self) { i in
+                        ForEach(0..<10, id: \.self) { i in
                             Rectangle()
                                 .fill(i < 5 ? letter.seal.color : letter.ink.color.opacity(0.4))
                                 .frame(width: 2.4)
@@ -1068,8 +1076,10 @@ private struct ReplyHandoffFrame: View {
                     .frame(width: 18, height: 18)
                     .overlay(
                         Circle()
-                            .stroke(idx == 0 ? letter.ink.color : letter.ink.color.opacity(0.2),
-                                    lineWidth: idx == 0 ? 2 : 1)
+                            .stroke(
+                                idx == 0 ? letter.ink.color : letter.ink.color.opacity(0.2),
+                                lineWidth: idx == 0 ? 2 : 1
+                            )
                     )
             }
         }
@@ -1077,14 +1087,16 @@ private struct ReplyHandoffFrame: View {
 
     private var inkSwatches: some View {
         HStack(spacing: 6) {
-            ForEach(Array(inkSwatches.enumerated()), id: \.offset) { idx, tone in
+            ForEach(Array(inkToneOptions.enumerated()), id: \.offset) { idx, tone in
                 Circle()
                     .fill(tone.color)
                     .frame(width: 18, height: 18)
                     .overlay(
                         Circle()
-                            .stroke(idx == 0 ? letter.ink.color : letter.ink.color.opacity(0.2),
-                                    lineWidth: idx == 0 ? 2 : 1)
+                            .stroke(
+                                idx == 0 ? letter.ink.color : letter.ink.color.opacity(0.2),
+                                lineWidth: idx == 0 ? 2 : 1
+                            )
                     )
             }
         }
@@ -1094,7 +1106,7 @@ private struct ReplyHandoffFrame: View {
         [letter.stationery, .winter, .spring, .summer, .evergreen]
     }
 
-    private var inkSwatches: [CeremonialMailInkTone] {
+    private var inkToneOptions: [CeremonialMailInkTone] {
         [letter.ink, .iron, .ivory]
     }
 

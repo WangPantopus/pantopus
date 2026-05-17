@@ -36,9 +36,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.Shimmer
-import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.BookletDetailLayout
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.CertifiedDetailLayout

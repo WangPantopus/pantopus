@@ -180,76 +180,14 @@ public struct CommunityDetailDTO: Sendable, Hashable {
             ?? dict["id"]?.stringValue, !itemId.isEmpty else {
             return nil
         }
-        let groupDict = dict["group"]?.dictValue ?? dict["community"]?.dictValue ?? [:]
-        let group = CommunityGroupInfo(
-            name: groupDict["name"]?.stringValue ?? "Neighborhood group",
-            tagline: groupDict["tagline"]?.stringValue,
-            founded: groupDict["founded"]?.stringValue,
-            role: groupDict["role"]?.stringValue ?? groupDict["membership_role"]?.stringValue,
-            membershipSince: groupDict["membership_since"]?.stringValue
-                ?? groupDict["since"]?.stringValue,
-            memberCount: groupDict["member_count"]?.numberValue.map { Int($0) },
-            isVerified: groupDict["verified"]?.boolValue ?? false
-        )
-        let eventDict = dict["event"]?.dictValue
-        let event = eventDict.map { evt -> CommunityEventInfo in
-            let weatherDict = evt["weather"]?.dictValue
-            let bring = (evt["bring"]?.arrayValue ?? []).compactMap(\.stringValue)
-            return CommunityEventInfo(
-                dayLabel: evt["day_label"]?.stringValue
-                    ?? evt["when"]?.dictValue?["day"]?.stringValue,
-                dateLabel: evt["date_label"]?.stringValue
-                    ?? evt["when"]?.dictValue?["date"]?.stringValue,
-                timeRange: evt["time_range"]?.stringValue
-                    ?? evt["when"]?.dictValue?["range"]?.stringValue,
-                location: evt["location"]?.stringValue ?? evt["where"]?.stringValue,
-                locationNote: evt["location_note"]?.stringValue
-                    ?? evt["where_note"]?.stringValue,
-                distanceLabel: evt["distance_label"]?.stringValue,
-                bringItems: bring,
-                weatherSummary: weatherDict?["summary"]?.stringValue,
-                weatherTemperatureF: weatherDict?["temperature_f"]?.numberValue.map { Int($0) }
-                    ?? weatherDict?["temp"]?.numberValue.map { Int($0) }
-            )
-        }
-        let attendees: [CommunityAttendee] = (dict["attendees"]?.arrayValue ?? [])
-            .compactMap { attn -> CommunityAttendee? in
-                guard let a = attn.dictValue,
-                      let name = a["display_name"]?.stringValue ?? a["name"]?.stringValue,
-                      !name.isEmpty else { return nil }
-                let id = a["id"]?.stringValue ?? UUID().uuidString
-                let initials = a["initials"]?.stringValue
-                    ?? Self.makeInitials(from: name)
-                return CommunityAttendee(
-                    id: id,
-                    displayName: name,
-                    initials: initials,
-                    blockLabel: a["block_label"]?.stringValue ?? a["block"]?.stringValue,
-                    isVerified: a["verified"]?.boolValue ?? true
-                )
-            }
+        let group = decodeGroup(from: dict)
+        let event = decodeEvent(from: dict["event"]?.dictValue)
+        let attendees = decodeAttendees(from: dict["attendees"]?.arrayValue)
         let attendeeCount = dict["attendee_count"]?.numberValue.map { Int($0) }
             ?? dict["rsvp_count"]?.numberValue.map { Int($0) }
             ?? attendees.count
         let attendeesFromBlock = dict["attendees_from_block"]?.numberValue.map { Int($0) }
-        let threadDict = dict["pulse_thread"]?.dictValue
-        let pulseThread = threadDict.flatMap { td -> CommunityPulseThread? in
-            guard let threadId = td["thread_id"]?.stringValue ?? td["id"]?.stringValue,
-                  let title = td["title"]?.stringValue else { return nil }
-            let lastReply = td["last_reply"]?.dictValue
-            return CommunityPulseThread(
-                threadId: threadId,
-                title: title,
-                replyCount: td["reply_count"]?.numberValue.map { Int($0) }
-                    ?? td["count"]?.numberValue.map { Int($0) }
-                    ?? 0,
-                lastReplyAuthor: lastReply?["author"]?.stringValue
-                    ?? lastReply?["who"]?.stringValue,
-                lastReplyPreview: lastReply?["preview"]?.stringValue,
-                lastReplyAge: lastReply?["age"]?.stringValue
-                    ?? lastReply?["when"]?.stringValue
-            )
-        }
+        let pulseThread = decodePulseThread(from: dict["pulse_thread"]?.dictValue)
         return CommunityDetailDTO(
             communityItemId: itemId,
             group: group,
@@ -259,6 +197,78 @@ public struct CommunityDetailDTO: Sendable, Hashable {
             attendeesFromBlock: attendeesFromBlock,
             pulseThread: pulseThread,
             rsvp: CommunityRsvpStatus(wire: dict["rsvp_status"]?.stringValue)
+        )
+    }
+
+    private static func decodeGroup(from dict: [String: JSONValue]) -> CommunityGroupInfo {
+        let groupDict = dict["group"]?.dictValue ?? dict["community"]?.dictValue ?? [:]
+        return CommunityGroupInfo(
+            name: groupDict["name"]?.stringValue ?? "Neighborhood group",
+            tagline: groupDict["tagline"]?.stringValue,
+            founded: groupDict["founded"]?.stringValue,
+            role: groupDict["role"]?.stringValue ?? groupDict["membership_role"]?.stringValue,
+            membershipSince: groupDict["membership_since"]?.stringValue
+                ?? groupDict["since"]?.stringValue,
+            memberCount: groupDict["member_count"]?.numberValue.map { Int($0) },
+            isVerified: groupDict["verified"]?.boolValue ?? false
+        )
+    }
+
+    private static func decodeEvent(from eventDict: [String: JSONValue]?) -> CommunityEventInfo? {
+        guard let evt = eventDict else { return nil }
+        let weatherDict = evt["weather"]?.dictValue
+        let bring = (evt["bring"]?.arrayValue ?? []).compactMap(\.stringValue)
+        return CommunityEventInfo(
+            dayLabel: evt["day_label"]?.stringValue
+                ?? evt["when"]?.dictValue?["day"]?.stringValue,
+            dateLabel: evt["date_label"]?.stringValue
+                ?? evt["when"]?.dictValue?["date"]?.stringValue,
+            timeRange: evt["time_range"]?.stringValue
+                ?? evt["when"]?.dictValue?["range"]?.stringValue,
+            location: evt["location"]?.stringValue ?? evt["where"]?.stringValue,
+            locationNote: evt["location_note"]?.stringValue
+                ?? evt["where_note"]?.stringValue,
+            distanceLabel: evt["distance_label"]?.stringValue,
+            bringItems: bring,
+            weatherSummary: weatherDict?["summary"]?.stringValue,
+            weatherTemperatureF: weatherDict?["temperature_f"]?.numberValue.map { Int($0) }
+                ?? weatherDict?["temp"]?.numberValue.map { Int($0) }
+        )
+    }
+
+    private static func decodeAttendees(from values: [JSONValue]?) -> [CommunityAttendee] {
+        (values ?? []).compactMap { attn -> CommunityAttendee? in
+            guard let a = attn.dictValue,
+                  let name = a["display_name"]?.stringValue ?? a["name"]?.stringValue,
+                  !name.isEmpty else { return nil }
+            let id = a["id"]?.stringValue ?? UUID().uuidString
+            let initials = a["initials"]?.stringValue ?? Self.makeInitials(from: name)
+            return CommunityAttendee(
+                id: id,
+                displayName: name,
+                initials: initials,
+                blockLabel: a["block_label"]?.stringValue ?? a["block"]?.stringValue,
+                isVerified: a["verified"]?.boolValue ?? true
+            )
+        }
+    }
+
+    private static func decodePulseThread(from threadDict: [String: JSONValue]?) -> CommunityPulseThread? {
+        guard let td = threadDict,
+              let threadId = td["thread_id"]?.stringValue ?? td["id"]?.stringValue,
+              let title = td["title"]?.stringValue else { return nil }
+        let lastReply = td["last_reply"]?.dictValue
+        return CommunityPulseThread(
+            threadId: threadId,
+            title: title,
+            replyCount: td["reply_count"]?.numberValue.map { Int($0) }
+                ?? td["count"]?.numberValue.map { Int($0) }
+                ?? 0,
+            lastReplyAuthor: lastReply?["author"]?.stringValue
+                ?? lastReply?["who"]?.stringValue,
+            lastReplyPreview: lastReply?["preview"]?.stringValue,
+            lastReplyAge: lastReply?["age"]?.stringValue
+                ?? lastReply?["when"]?.stringValue
         )
     }
 

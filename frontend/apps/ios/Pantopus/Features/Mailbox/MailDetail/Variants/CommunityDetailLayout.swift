@@ -26,7 +26,7 @@
 
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length multiple_closures_with_trailing_closure
+// swiftlint:disable file_length multiple_closures_with_trailing_closure
 
 @MainActor
 struct CommunityDetailLayout: View {
@@ -71,9 +71,8 @@ struct CommunityDetailLayout: View {
             actions: {
                 CommunityRsvpActions(
                     rsvp: community.rsvp,
-                    inFlight: rsvpInFlight,
-                    onSelect: { onRsvp($0) }
-                )
+                    inFlight: rsvpInFlight
+                ) { onRsvp($0) }
             }
         )
         .accessibilityIdentifier("mailDetail_community")
@@ -880,7 +879,7 @@ private struct CommunityPulseThreadCard: View {
     }
 
     private var metaLine: String {
-        var parts: [String] = ["\(thread.replyCount) replies"]
+        var parts = ["\(thread.replyCount) replies"]
         if let author = thread.lastReplyAuthor, let age = thread.lastReplyAge {
             parts.append("last from \(author) \(age) ago")
         }
@@ -997,14 +996,19 @@ struct CommunityRsvpActions: View {
         }
     }
 
-    private func rsvpChip(_ status: CommunityRsvpStatus,
-                          icon: PantopusIcon,
-                          label: String,
-                          isPrimary: Bool) -> some View {
+    private func rsvpChip(
+        _ status: CommunityRsvpStatus,
+        icon: PantopusIcon,
+        label: String,
+        isPrimary: Bool
+    ) -> some View {
         Button(action: { onSelect(status) }) {
             HStack(spacing: 5) {
-                Icon(icon, size: 14,
-                     color: isPrimary ? Theme.Color.appTextInverse : Theme.Color.appText)
+                Icon(
+                    icon,
+                    size: 14,
+                    color: isPrimary ? Theme.Color.appTextInverse : Theme.Color.appText
+                )
                 Text(label)
                     .font(.system(size: 12.5, weight: .bold))
                     .foregroundColor(isPrimary ? Theme.Color.appTextInverse : Theme.Color.appText)
@@ -1027,12 +1031,9 @@ struct CommunityRsvpActions: View {
 
     private var secondaryRow: some View {
         HStack(spacing: Spacing.s2) {
-            secondaryChip(icon: .messageSquarePlus, label: "Ask a question",
-                          id: "mailDetail_community_ask")
-            secondaryChip(icon: .users, label: "Add housemate",
-                          id: "mailDetail_community_addHousemate")
-            secondaryChip(icon: .bell, label: "Mute thread",
-                          id: "mailDetail_community_mute")
+            secondaryChip(icon: .messageSquarePlus, label: "Ask a question", id: "mailDetail_community_ask")
+            secondaryChip(icon: .users, label: "Add housemate", id: "mailDetail_community_addHousemate")
+            secondaryChip(icon: .bell, label: "Mute thread", id: "mailDetail_community_mute")
         }
     }
 

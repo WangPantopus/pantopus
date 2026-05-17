@@ -278,32 +278,36 @@ class MailDetailVariantsTest {
     private val communityObject: Map<String, Any?> =
         mapOf(
             "community_item_id" to "ci-elm-cleanup",
-            "group" to mapOf(
-                "name" to "Elm Park HOA",
-                "tagline" to "40 households",
-                "role" to "Resident",
-                "membership_since" to "Mar 2024",
-                "member_count" to 87,
-                "verified" to true,
-            ),
-            "event" to mapOf(
-                "when" to mapOf("day" to "Sat", "date" to "May 24", "range" to "9:00 – 11:00 AM"),
-                "where" to "Elm Park playground",
-                "where_note" to "Gather at the gazebo",
-                "bring" to listOf("Work gloves", "A reusable mug"),
-                "weather" to mapOf("summary" to "Partly sunny", "temperature_f" to 64),
-            ),
+            "group" to
+                mapOf(
+                    "name" to "Elm Park HOA",
+                    "tagline" to "40 households",
+                    "role" to "Resident",
+                    "membership_since" to "Mar 2024",
+                    "member_count" to 87,
+                    "verified" to true,
+                ),
+            "event" to
+                mapOf(
+                    "when" to mapOf("day" to "Sat", "date" to "May 24", "range" to "9:00 – 11:00 AM"),
+                    "where" to "Elm Park playground",
+                    "where_note" to "Gather at the gazebo",
+                    "bring" to listOf("Work gloves", "A reusable mug"),
+                    "weather" to mapOf("summary" to "Partly sunny", "temperature_f" to 64),
+                ),
             "attendee_count" to 12,
             "attendees_from_block" to 3,
-            "attendees" to listOf(
-                mapOf("id" to "u1", "display_name" to "Jamal T.", "verified" to true),
-            ),
-            "pulse_thread" to mapOf(
-                "thread_id" to "pt-elm",
-                "title" to "Talk about Saturday cleanup",
-                "reply_count" to 12,
-                "last_reply" to mapOf("author" to "Jamal T.", "when" to "12m", "preview" to "I'll bring the blower"),
-            ),
+            "attendees" to
+                listOf(
+                    mapOf("id" to "u1", "display_name" to "Jamal T.", "verified" to true),
+                ),
+            "pulse_thread" to
+                mapOf(
+                    "thread_id" to "pt-elm",
+                    "title" to "Talk about Saturday cleanup",
+                    "reply_count" to 12,
+                    "last_reply" to mapOf("author" to "Jamal T.", "when" to "12m", "preview" to "I'll bring the blower"),
+                ),
             "rsvp_status" to "undecided",
         )
 
