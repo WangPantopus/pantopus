@@ -49,6 +49,12 @@ sealed class AnalyticsEvent(
 
     data object ScreenPetsListViewed : AnalyticsEvent("screen.pets_list.viewed")
 
+    /** T6.3f / P14 — My listings index (the seller's tabbed list). */
+    data object ScreenMyListingsViewed : AnalyticsEvent("screen.my_listings.viewed")
+
+    /** T6.3f / P14 — My businesses index (owner / staff roster). */
+    data object ScreenMyBusinessesViewed : AnalyticsEvent("screen.my_businesses.viewed")
+
     data class ScreenPetsWizardStepViewed(
         val stepNumber: Int,
         val stepName: String,

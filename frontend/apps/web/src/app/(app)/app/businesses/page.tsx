@@ -1,15 +1,82 @@
+// T6.3f / P14 — My businesses (web). Refactored onto `<ListOfRowsShell />`
+// so the iOS / Android avatar-first business roster has identity parity
+// on web. Row tap drills into the business dashboard; the FAB pushes
+// to the existing create flow at `/app/businesses/new`.
+//
+// Backend: `GET /api/businesses/my-businesses` —
+//          `backend/routes/businesses.js:682`.
+
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2 } from 'lucide-react';
 import * as api from '@pantopus/api';
 import { getAuthToken } from '@pantopus/api';
+import ListOfRowsShell from '@/components/list-of-rows/ListOfRowsShell';
+import type {
+  ListOfRowsState,
+  RowModel,
+} from '@/components/list-of-rows/types';
+
+type BusinessUser = {
+  id: string;
+  username?: string | null;
+  name?: string | null;
+  profile_picture_url?: string | null;
+  city?: string | null;
+  state?: string | null;
+};
+
+type BusinessProfile = {
+  business_type?: string | null;
+  categories?: string[] | null;
+  is_published?: boolean | null;
+  description?: string | null;
+};
+
+type Membership = {
+  id: string;
+  role_base?: string | null;
+  business_user_id: string;
+  business: BusinessUser;
+  profile?: BusinessProfile | null;
+};
+
+function categoryLabel(profile?: BusinessProfile | null): string | null {
+  const cats = profile?.categories;
+  if (cats && cats.length > 0 && cats[0]) {
+    return cats[0].replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+  }
+  if (profile?.business_type) {
+    return profile.business_type.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+  }
+  return null;
+}
+
+function roleLabel(roleBase?: string | null): string | null {
+  if (!roleBase) return null;
+  switch (roleBase) {
+    case 'owner':
+      return 'Owner';
+    case 'admin':
+      return 'Admin';
+    case 'manager':
+      return 'Manager';
+    case 'staff':
+      return 'Staff';
+    case 'viewer':
+      return 'Viewer';
+    case 'editor':
+      return 'Editor';
+    default:
+      return roleBase.charAt(0).toUpperCase() + roleBase.slice(1);
+  }
+}
 
 export default function BusinessesPage() {
   const router = useRouter();
-  const [businesses, setBusinesses] = useState<api.BusinessMembership[]>([]);
+  const [businesses, setBusinesses] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -18,8 +85,11 @@ export default function BusinessesPage() {
     setError('');
     try {
       const token = getAuthToken();
-      if (!token) { router.push('/login'); return; }
-      const res = await api.businesses.getMyBusinesses();
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+      const res = (await api.businesses.getMyBusinesses()) as { businesses?: Membership[] };
       setBusinesses(res.businesses ?? []);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load businesses');
@@ -28,101 +98,83 @@ export default function BusinessesPage() {
     }
   }, [router]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const ROLE_LABELS: Record<string, string> = {
-    owner: 'Owner',
-    admin: 'Admin',
-    editor: 'Editor',
-    staff: 'Staff',
-    viewer: 'Viewer',
-  };
+  const state = useMemo<ListOfRowsState>(() => {
+    if (loading) return { kind: 'loading' };
+    if (error) return { kind: 'error', message: error };
+    if (businesses.length === 0) {
+      return {
+        kind: 'empty',
+        config: {
+          icon: Building2,
+          headline: 'No businesses yet',
+          subcopy:
+            'Create a business profile to take quotes inside Pantopus and earn the violet verified mark.',
+          ctaTitle: 'Register a business',
+          onCta: () => router.push('/app/businesses/new'),
+        },
+      };
+    }
+    const rows: RowModel[] = businesses.map((m) => {
+      const title = m.business.name || m.business.username || 'Untitled business';
+      const category = categoryLabel(m.profile);
+      const role = roleLabel(m.role_base);
+      const subtitle = [category, role].filter(Boolean).join(' · ');
+      const locality = [m.business.city, m.business.state].filter(Boolean).join(', ');
+      const body = locality || 'Online only';
+      return {
+        id: m.business_user_id,
+        title,
+        subtitle: subtitle || null,
+        template: 'avatarKebab',
+        leading: {
+          kind: 'avatarWithBadge',
+          name: title,
+          imageURL: m.business.profile_picture_url ?? null,
+          background: {
+            kind: 'gradient',
+            gradient: { start: '#7c3aed', end: '#6d28d9' },
+          },
+          size: 'large',
+          verified: m.profile?.is_published === true,
+        },
+        trailing: { kind: 'chevron' },
+        body,
+        onTap: () => router.push(`/app/businesses/${m.business_user_id}/dashboard`),
+      };
+    });
+    return { kind: 'loaded', sections: [{ id: 'my-businesses', rows }] };
+  }, [loading, error, businesses, router]);
+
+  const banner = useMemo(() => {
+    if (businesses.length === 0) return undefined;
+    return {
+      icon: Building2,
+      title:
+        businesses.length === 1
+          ? '1 verified business'
+          : `${businesses.length} verified businesses`,
+      subtitle: 'Tap any business to manage its inbox, gigs, and reviews',
+      tint: 'business' as const,
+    };
+  }, [businesses.length]);
 
   return (
-    <div className="bg-app-surface-raised">
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-semibold text-app-text">My Businesses</h1>
-          <Link
-            href="/app/businesses/new"
-            className="px-3 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition"
-          >
-            Create business
-          </Link>
-        </div>
-
-        {loading ? (
-          <div className="text-app-text-secondary">Loading…</div>
-        ) : error ? (
-          <div className="text-red-600">{error}</div>
-        ) : businesses.length === 0 ? (
-          <div className="rounded-xl border border-app-border bg-app-surface p-8 text-center">
-            <div className="mb-3 flex justify-center"><Building2 className="w-8 h-8 text-app-text-muted" /></div>
-            <div className="text-lg font-semibold text-app-text">No businesses yet</div>
-            <p className="mt-1 text-app-text-secondary max-w-md mx-auto">
-              Create a business profile to showcase your services, manage locations, build custom pages, and connect with customers.
-            </p>
-            <Link
-              href="/app/businesses/new"
-              className="inline-block mt-4 px-4 py-2.5 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition"
-            >
-              Create your first business
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {businesses.map((m) => {
-              const biz = m.business;
-              const profile = m.profile;
-              const name = biz?.name || biz?.username || 'Untitled Business';
-              const categories = (profile?.categories || []).join(', ');
-              const isPublished = profile?.is_published;
-
-              return (
-                <div
-                  key={m.business_user_id}
-                  className="rounded-xl border border-app-border bg-app-surface p-5 flex items-start justify-between gap-4 hover:border-app-border transition"
-                >
-                  <div
-                    className="cursor-pointer flex-1 min-w-0"
-                    onClick={() => router.push(`/app/businesses/${m.business_user_id}/dashboard`)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-base font-semibold text-app-text truncate">{name}</span>
-                      {isPublished ? (
-                        <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-700 border border-green-200">
-                          Published
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-200">
-                          Draft
-                        </span>
-                      )}
-                    </div>
-                    {categories && (
-                      <div className="text-sm text-app-text-secondary mt-0.5 truncate">{categories}</div>
-                    )}
-                    {profile?.description && (
-                      <div className="text-sm text-app-text-secondary mt-1 line-clamp-2">{profile.description}</div>
-                    )}
-                    <div className="mt-2 inline-flex items-center rounded-full border border-app-border px-2.5 py-1 text-xs font-semibold text-app-text-strong">
-                      {ROLE_LABELS[m.role_base] || m.role_base}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Link
-                      href={`/app/businesses/${m.business_user_id}/dashboard`}
-                      className="px-3 py-2 rounded-lg border border-app-border text-sm font-semibold text-app-text hover:bg-app-hover transition"
-                    >
-                      Dashboard
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </main>
-    </div>
+    <ListOfRowsShell
+      title="My businesses"
+      state={state}
+      onRefresh={load}
+      banner={banner}
+      fab={{
+        icon: Building2,
+        accessibilityLabel: 'Register a business',
+        variant: { kind: 'secondaryCreate' },
+        tint: 'business',
+        onClick: () => router.push('/app/businesses/new'),
+      }}
+    />
   );
 }

@@ -16,6 +16,12 @@ data class ListingApproxLocation(
 /**
  * One row from the marketplace endpoints. Mirrors `normalizeListingRow`
  * in `backend/services/marketplace/marketplaceService.js:82`.
+ *
+ * T6.3f / P14 — added `viewCount`, `activeOfferCount`, `soldAt`,
+ * `archivedAt` so the My listings chip-meta line can render views /
+ * offers / status without an extra request. The fields default to
+ * `null` for backwards compat with browse / nearby / detail call sites
+ * that don't need them.
  */
 @JsonClass(generateAdapter = true)
 data class ListingDto(
@@ -39,6 +45,21 @@ data class ListingDto(
     @Json(name = "created_at") val createdAt: String? = null,
     @Json(name = "userHasSaved") val userHasSaved: Boolean? = null,
     @Json(name = "approx_location") val approxLocation: ListingApproxLocation? = null,
+    @Json(name = "view_count") val viewCount: Int? = null,
+    @Json(name = "active_offer_count") val activeOfferCount: Int? = null,
+    @Json(name = "sold_at") val soldAt: String? = null,
+    @Json(name = "archived_at") val archivedAt: String? = null,
+)
+
+/**
+ * Envelope from `GET /api/listings/me` — the current user's own
+ * listings, optionally filtered by `status`. Route:
+ * `backend/routes/listings.js:1058`.
+ */
+@JsonClass(generateAdapter = true)
+data class MyListingsResponse(
+    val listings: List<ListingDto>,
+    val pagination: ListingsPagination? = null,
 )
 
 /** Pagination cursor returned by `/browse` and `/nearby`. */

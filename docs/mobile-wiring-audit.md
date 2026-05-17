@@ -53,14 +53,21 @@ States: skeleton, first-run, populated, error (with retry).
 
 ## 3. Homes — MyHomes (`Features/Homes/MyHomesListView.swift` / `ui/screens/homes/MyHomesListScreen.kt`)
 
+T6.3f / P14 refresh: row anatomy now exposes a home-tinted intro banner +
+role-chip subtitle + Active-home chip on the primary owner, with a 52pt
+`FabVariant.secondaryCreate` tinted `FabTint.home`. Behaviour identical
+to T1.4; below dispatch table is unchanged on the iOS+Hub stack and now
+also wired from the You stack via `YouRoute.myHomes` /
+`ChildRoutes.MY_HOMES` (flipped from `placeholder(label:)`).
+
 | Element | Action | Wiring |
 |---|---|---|
 | Pull-to-refresh | `viewModel.refresh()` | Endpoint: `GET /api/homes/my-homes` (home.js:1464) |
-| Home row tap | `onOpenHome(home.id)` | Intent → `HubRoute.homeDashboard(id)` |
+| Home row tap | `onOpenHome(home.id)` | Intent → `HubRoute.homeDashboard(id)` from the Hub stack; from You-tab entry the same id pushes `YouRoute.homeDashboard(homeId:)` so the back stack returns to MyHomes, not Hub. |
 | Row kebab | **Removed.** No bottom-sheet design exists; the secondary action slot is now `nil`. |
-| FAB "Claim a home" | `onAddHome` | Intent → `HubRoute.addHome` |
+| FAB "Claim a home" | `onAddHome` | Intent → `HubRoute.addHome` (Hub stack) or `YouRoute.placeholder("Claim a home")` (You stack) until the You-side claim wizard mounts. |
 
-States: loading, loaded, empty, error.
+States: loading, loaded, empty (with home-tinted CTA), error.
 
 ---
 
@@ -275,6 +282,9 @@ strings. Each one resolves to a concrete destination on the You tab — no
 | My bids | `me.bids` | `YouRoute.myBids` → `MyBidsView` | `ChildRoutes.MY_BIDS` → `MyBidsScreen` | T5.3.1. Bidder side. `GET /api/gigs/my-bids`. |
 | My gigs | `me.gigs` | `YouRoute.myTasks` → `MyTasksView` | `ChildRoutes.MY_TASKS` → `MyTasksScreen` | T5.3.2. Poster side. `GET /api/gigs/my-gigs` (joined with `top_bidders[≤3]` for the BidderStack). FAB → `YouRoute.composeTask` / `ChildRoutes.COMPOSE_TASK` (placeholder until T2.3 lands a real composer). |
 | My posts | `me.posts` | `YouRoute.myPosts` → `MyPostsView` | `ChildRoutes.MY_POSTS` → `MyPostsScreen` | T5.3.3. Activity-section row (not tile). `GET /api/posts/user/:userId` (active set). Archive / Restore are local-only optimistic; Delete uses real `DELETE /api/posts/:id`. |
+| My homes | `me.homes` | `YouRoute.myHomes` → `MyHomesListView` | `ChildRoutes.MY_HOMES` → `MyHomesListScreen` | T6.3f / P14. Activity-section row. `GET /api/homes/my-homes`. Tap pushes `YouRoute.homeDashboard(homeId:)` / `ChildRoutes.HOME_DASHBOARD` so the back stack returns to MyHomes. **Flipped from `placeholder(label:)` in P14.** |
+| My listings | `me.listings` | `YouRoute.myListings` → `MyListingsView` | `ChildRoutes.MY_LISTINGS` → `MyListingsScreen` | T6.3f / P14. Personal action tile. `GET /api/listings/me`. Three tabs bucket client-side (Active / Sold / Drafts). Row tap pushes `YouRoute.listingDetail(listingId:)` / `ChildRoutes.LISTING_DETAIL`. FAB pushes a placeholder until the Snap & Sell composer ships on mobile. **Flipped from `placeholder(label:)` in P14.** |
+| My businesses | `me.businesses` | `YouRoute.myBusinesses` → `MyBusinessesView` | `ChildRoutes.MY_BUSINESSES` → `MyBusinessesScreen` | T6.3f / P14. Activity-section row. `GET /api/businesses/my-businesses`. Row tap pushes a placeholder (`Business dashboard`) until the typed business-dashboard surface ships on mobile; FAB pushes a placeholder (`Register a business`) until the register-business wizard ships. **Flipped from `placeholder(label:)` in P14.** |
 | Mail | `me.mail` | `YouRoute.mailbox` → `MailboxListView` | `ChildRoutes.MAILBOX` → `MailboxListScreen` | Pre-T5; verified still wired. |
 | Edit profile | `me.editProfile` | Sheet → `EditProfileView` | Sheet → `EditProfileScreen` | Pre-T5. Android iOS-only this milestone — see parity audit §3 known-acceptable. |
 | Settings | `me.settings` | `YouRoute.settings` → `SettingsView` | `ChildRoutes.SETTINGS` → `SettingsScreen` | Pre-T5. |

@@ -2,8 +2,18 @@
 //  MyHomesListViewModel.swift
 //  Pantopus
 //
-//  Backs `MyHomesListView`. Fetches `GET /api/homes/my-homes` and maps
-//  each home to an `avatar_kebab` row.
+//  Backs `MyHomesListView`. Fetches `GET /api/homes/my-homes` and
+//  projects each home into the avatar-first List-of-Rows row shape
+//  defined for T6.3f / P14:
+//
+//    • Leading — identity-green avatar tile (initials from address)
+//    • Title   — nickname or formatted address
+//    • Subtitle — role chip + locality (joined via "·")
+//    • Body    — "Active home" home-tinted chip on the primary-owner row
+//    • Trailing — chevron (tap → home dashboard)
+//
+//  Plus a `BannerConfig` intro card ("homes you belong to") and a 60pt
+//  secondary-create FAB tinted home green.
 //
 
 import Foundation
@@ -22,7 +32,28 @@ final class MyHomesListViewModel: ListOfRowsDataSource {
     let tabs: [ListOfRowsTab] = []
     var selectedTab: String = ""
     var fab: FABAction? {
-        FABAction(icon: .plusCircle, accessibilityLabel: "Claim a home", handler: onAddHome)
+        FABAction(
+            icon: .plusCircle,
+            accessibilityLabel: "Claim a home",
+            variant: .secondaryCreate,
+            tint: .home,
+            handler: onAddHome
+        )
+    }
+
+    var banner: BannerConfig? {
+        guard case let .loaded(sections, _) = state,
+              let count = sections.first?.rows.count,
+              count > 0
+        else {
+            return nil
+        }
+        return BannerConfig(
+            icon: .home,
+            title: count == 1 ? "1 home you belong to" : "\(count) homes you belong to",
+            subtitle: "Tap any home to jump into that household",
+            tint: .home
+        )
     }
 
     private(set) var state: ListOfRowsState = .loading
@@ -61,8 +92,8 @@ final class MyHomesListViewModel: ListOfRowsDataSource {
                 state = .empty(
                     ListOfRowsState.EmptyContent(
                         icon: .home,
-                        headline: "No homes claimed yet",
-                        subcopy: "Claim your address to unlock neighborhood features.",
+                        headline: "You don't belong to any homes yet",
+                        subcopy: "Claim or join a verified home to unlock packages, bills, tasks, and member chat.",
                         ctaTitle: "Claim a home",
                         onCTA: onAddHome
                     )
@@ -75,25 +106,79 @@ final class MyHomesListViewModel: ListOfRowsDataSource {
         }
     }
 
-    private func row(for home: MyHome) -> RowModel {
-        let title = home.home.name?.nilIfEmpty ?? home.home.address ?? "Unnamed home"
-        let subtitleParts = [home.home.city, home.home.state]
-            .compactMap(\.self)
-            .filter { !$0.isEmpty }
+    private func row(for entry: MyHome) -> RowModel {
+        let home = entry.home
+        let displayTitle = home.name?.nilIfEmpty
+            ?? home.address?.nilIfEmpty
+            ?? "Unnamed home"
+        let locality = [home.city, home.state]
+            .compactMap { $0?.nilIfEmpty }
+            .joined(separator: ", ")
+            .nilIfEmpty
+        let role = roleLabel(for: entry)
+        let subtitleParts = [role, locality].compactMap { $0 }
+        let subtitle = subtitleParts.isEmpty ? nil : subtitleParts.joined(separator: " · ")
+
+        let chips: [RowChip]? = entry.isPrimaryOwner == true
+            ? [RowChip(
+                text: "Active home",
+                icon: .home,
+                tint: .custom(
+                    background: Theme.Color.homeBg,
+                    foreground: Theme.Color.home
+                )
+            )]
+            : nil
+
         return RowModel(
-            id: home.id,
-            title: title,
-            subtitle: subtitleParts.isEmpty ? nil : subtitleParts.joined(separator: ", "),
+            id: entry.id,
+            title: displayTitle,
+            subtitle: subtitle,
             template: .avatarKebab,
             leading: .avatar(
-                name: title,
+                name: displayTitle,
                 imageURL: nil,
                 identity: .home,
-                ringProgress: home.ownershipStatus == "verified" ? 1.0 : 0.3
+                ringProgress: entry.ownershipStatus == "verified" ? 1.0 : 0.3
             ),
-            trailing: .chevron
-        ) { @Sendable in
-            Task { @MainActor in self.onOpenHome(home.id) }
+            trailing: .chevron,
+            onTap: { @Sendable in
+                Task { @MainActor in self.onOpenHome(entry.id) }
+            },
+            chips: chips
+        )
+    }
+
+    /// Maps the backend's role enum onto the canonical four-role label
+    /// vocabulary the design uses: Owner / Tenant / Housemate / Guest.
+    /// Order: ownership_status wins; otherwise occupancy.role_base; final
+    /// fallback "Member".
+    private func roleLabel(for entry: MyHome) -> String? {
+        if let status = entry.ownershipStatus {
+            switch status {
+            case "verified":
+                return "Owner"
+            case "pending":
+                return "Owner (pending)"
+            default:
+                break
+            }
+        }
+        switch entry.occupancy?.roleBase {
+        case "lease_resident":
+            return "Tenant"
+        case "household_member":
+            return "Housemate"
+        case "guest":
+            return "Guest"
+        case "owner":
+            return "Owner"
+        case "admin", "manager":
+            return "Manager"
+        case nil:
+            return nil
+        default:
+            return entry.occupancy?.roleBase?.capitalized
         }
     }
 }

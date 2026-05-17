@@ -8,6 +8,7 @@ import app.pantopus.android.data.api.models.listings.ListingsInBoundsResponse
 import app.pantopus.android.data.api.models.listings.ListingsNearbyResponse
 import app.pantopus.android.data.api.models.listings.MessageListingBody
 import app.pantopus.android.data.api.models.listings.MessageListingResponse
+import app.pantopus.android.data.api.models.listings.MyListingsResponse
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -72,6 +73,19 @@ interface ListingsApi {
         @Query("layer") layer: String? = null,
         @Query("limit") limit: Int = 100,
     ): ListingsInBoundsResponse
+
+    /**
+     * `GET /api/listings/me` — the current user's own listings.
+     * Route `backend/routes/listings.js:1058`. Optional `status` filter
+     * matches the backend's `Listing.status` enum:
+     * `draft / active / pending_pickup / sold / archived`.
+     */
+    @GET("api/listings/me")
+    suspend fun myListings(
+        @Query("status") status: String? = null,
+        @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0,
+    ): MyListingsResponse
 
     /** `GET /api/listings/categories` — backend's canonical enums. */
     @GET("api/listings/categories")

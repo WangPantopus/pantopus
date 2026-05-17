@@ -113,6 +113,22 @@ public enum ListingsEndpoints {
         return Endpoint(method: .get, path: "/api/listings/in-bounds", query: query)
     }
 
+    /// `GET /api/listings/me` — the current user's own listings,
+    /// optionally filtered by `status`. Route
+    /// `backend/routes/listings.js:1058`.
+    public static func myListings(
+        status: String? = nil,
+        limit: Int = 50,
+        offset: Int = 0
+    ) -> Endpoint {
+        var query: [String: String] = [
+            "limit": String(limit),
+            "offset": String(offset)
+        ]
+        if let status, !status.isEmpty, status != "all" { query["status"] = status }
+        return Endpoint(method: .get, path: "/api/listings/me", query: query)
+    }
+
     /// `GET /api/listings/categories` — backend's canonical categories
     /// + conditions enums. Route `backend/routes/listings.js:1176`.
     public static let categories = Endpoint(method: .get, path: "/api/listings/categories")
