@@ -57,6 +57,67 @@ Connections, Discover hub, Bills, Pets, Offers, Listing offers, Review
 claims) project their DTOs straight into the contract above; no shell
 change should be required to ship them.
 
+## T6.5a — A17 Mailbox item detail archetype shell (P19)
+
+T6.5a stands up a NEW shared shell — `MailItemDetailShell` — analogous in
+spirit to `ListOfRows` but specialized for mail item detail screens.
+P20–P23 (Generic mail, Booklet, Certified mail, Community mail) will
+compose their detail surfaces on top of this scaffold; the Ceremonial
+mail open/compose flows (T3.7 / T3.8) keep their own bespoke wizard
+because the porch-arrival animation falls outside the A17 anatomy.
+
+The shell sits at:
+
+- iOS: `Pantopus/Features/Shared/MailItemDetail/MailItemDetailShell.swift`
+  (state types alongside in `MailItemDetailState.swift`).
+- Android: `ui/screens/shared/mail_item_detail/MailItemDetailShell.kt`
+  (state types in `MailItemDetailState.kt`).
+- Web: `frontend/apps/web/src/components/mail-item-detail/`.
+
+Slots in render order (top → bottom):
+
+1. **Top nav bar** — required. `MailTopBarConfig` carries the back
+   callback, the eyebrow trust dot (verified / neutral / warning), an
+   optional bookmark / pin trailing action, and an overflow menu list
+   (Forward / Archive / Mark unread / Delete / Report — variants add or
+   drop items).
+2. **Hero card** — generic `View` slot. Variants build the gradient
+   card (verified-green / neutral / warning-amber) with category badge,
+   sender, title, and excerpt.
+3. **AI elf strip** — optional. `AIElfStripContent` (sparkles disc +
+   headline + summary paragraph + bullet list + optional trailing badge
+   + optional redo). Shell-rendered so every variant gets the same
+   sky-gradient card.
+4. **Key facts** — generic `View` slot. Variants build the sunken-bg
+   key-value panel.
+5. **Body** — generic `View` slot. Variants build the full-text body
+   card (or replace it with a `BookletPager`-style page indicator).
+6. **Attachments** — optional. `AttachmentsRowContent` — list of PDF /
+   image / video / audio / link / other items with per-kind 36×44 tile
+   colors. Shell-rendered.
+7. **Sender card** — generic `View` slot.
+8. **Action buttons** — generic `View` slot, pinned at the bottom by
+   the shell when non-empty.
+
+**Test tag parity (root container).** Both platforms use the same
+identifier — `mailItemDetailShell` — plus child tags `mailItemDetail_topBar`,
+`mailItemDetail_eyebrow`, `mailItemDetail_back`, `mailItemDetail_trailingAction`,
+`mailItemDetail_overflow`, `mailItemDetail_overflowItem_<id>`,
+`mailItemDetail_hero`, `mailItemDetail_aiElf`, `mailItemDetail_aiElfBadge`,
+`mailItemDetail_aiElfRedo`, `mailItemDetail_keyFacts`, `mailItemDetail_body`,
+`mailItemDetail_attachments`, `mailItemDetail_attachment_<id>`,
+`mailItemDetail_sender`, `mailItemDetail_actions`. The same string lives
+on iOS (`accessibilityIdentifier`), Android (`Modifier.testTag`), and web
+(`data-testid`) so cross-platform UI tests can mirror.
+
+**P19 acceptance.** Shell-only — no variant views land in this tier.
+P20–P23 implement Generic / Booklet / Certified / Community.
+
+**Designer preview.** `/mail-item-detail-preview` on the web app
+renders three example configurations (every slot supplied · required
+slots only · nil-skipping) so the designer can sanity-check spacing,
+trust dot, AI elf, and attachments tiles before any variant ships.
+
 ## How to read this
 
 Each row lists:
