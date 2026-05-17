@@ -7,6 +7,7 @@ import app.pantopus.android.data.auth.AccountType
 import app.pantopus.android.data.auth.AuthError
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.auth.SignUpResult
+import io.mockk.captureNullable
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -196,7 +197,7 @@ class SignUpViewModelTest {
                     firstName = capture(firstNameSlot),
                     middleName = any(),
                     lastName = capture(lastNameSlot),
-                    dateOfBirth = capture(dobSlot),
+                    dateOfBirth = captureNullable(dobSlot),
                     address = any(),
                     city = any(),
                     state = any(),
