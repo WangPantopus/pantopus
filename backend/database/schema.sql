@@ -6409,7 +6409,16 @@ CREATE TABLE IF NOT EXISTS "public"."HomeMaintenanceLog" (
     "cost" numeric(12,2),
     "notes" "text",
     "document_id" "uuid",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "task" "text" DEFAULT ''::"text" NOT NULL,
+    "vendor" "text",
+    "recurrence" "text" DEFAULT 'one_time'::"text" NOT NULL,
+    "due_date" timestamp with time zone,
+    "status" "text" DEFAULT 'scheduled'::"text" NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_by" "uuid",
+    CONSTRAINT "HomeMaintenance_recurrence_chk" CHECK (("recurrence" = ANY (ARRAY['one_time'::"text", 'weekly'::"text", 'monthly'::"text", 'quarterly'::"text", 'yearly'::"text"]))),
+    CONSTRAINT "HomeMaintenance_status_chk" CHECK (("status" = ANY (ARRAY['scheduled'::"text", 'in_progress'::"text", 'completed'::"text", 'cancelled'::"text"])))
 );
 
 
@@ -10496,6 +10505,10 @@ CREATE INDEX "idx_home_maint_log_home" ON "public"."HomeMaintenanceLog" USING "b
 
 
 
+CREATE INDEX "idx_home_maint_log_status_due" ON "public"."HomeMaintenanceLog" USING "btree" ("home_id", "status", "due_date" ASC);
+
+
+
 CREATE INDEX "idx_home_maint_tpl_home" ON "public"."HomeMaintenanceTemplate" USING "btree" ("home_id");
 
 
@@ -12417,6 +12430,11 @@ ALTER TABLE ONLY "public"."HomeMaintenanceLog"
 
 ALTER TABLE ONLY "public"."HomeMaintenanceLog"
     ADD CONSTRAINT "HomeMaintenanceLog_vendor_id_fkey" FOREIGN KEY ("vendor_id") REFERENCES "public"."HomeVendor"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."HomeMaintenanceLog"
+    ADD CONSTRAINT "HomeMaintenanceLog_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."User"("id") ON DELETE SET NULL;
 
 
 
