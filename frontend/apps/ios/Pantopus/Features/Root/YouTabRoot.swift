@@ -43,6 +43,11 @@ public enum YouRoute: Hashable {
     case homeBills(homeId: String)
     /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
     case homePets(homeId: String)
+    /// T6.3c / P11 — Household tasks (per-home chore list). The
+    /// "me.tasks" Activity-section row pushes here with the primary
+    /// home id resolved by the Me VM. Distinct from `.myTasks` which is
+    /// the posted-to-neighbours gig list.
+    case homeTasks(homeId: String)
     /// T5.3.4 — per-listing offers panel. Pushed from a listing detail
     /// "View offers" affordance (visible when the current user owns the
     /// listing). The optional `title` is a hint rendered as the
@@ -276,6 +281,12 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.tasks":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeTasks(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         default:
             path.append(.placeholder(label: tile.label))
         }
@@ -307,6 +318,11 @@ public struct YouTabRoot: View {
         case "me.bills":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
+                return
+            }
+        case "me.tasks":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeTasks(homeId: homeId))
                 return
             }
         case "me.editProfile":
@@ -599,6 +615,21 @@ public struct YouTabRoot: View {
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homeTasks(homeId):
+            HouseholdTasksListView(
+                viewModel: HouseholdTasksListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Task detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in path.append(.placeholder(label: "Add a task")) }
+                    },
+                    onEditRecurring: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Edit recurring task")) }
+                    }
+                )
+            )
         #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(

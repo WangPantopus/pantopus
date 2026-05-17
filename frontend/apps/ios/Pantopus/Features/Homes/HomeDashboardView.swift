@@ -26,6 +26,10 @@ struct HomeDashboardView: View {
     /// Push onto the host stack when the user taps the Pets quick-action
     /// tile. Receives this home's id so the destination can pre-fetch.
     private let onOpenPets: ((String) -> Void)?
+    /// Push onto the host stack when the user taps the Tasks (T6.3c)
+    /// quick-action tile. Receives this home's id so the destination
+    /// can pre-fetch.
+    private let onOpenTasks: ((String) -> Void)?
 
     init(
         homeId: String,
@@ -34,7 +38,8 @@ struct HomeDashboardView: View {
         onOpenClaimsList: (() -> Void)? = nil,
         onOpenBills: (() -> Void)? = nil,
         onOpenPlaceholder: ((String) -> Void)? = nil,
-        onOpenPets: ((String) -> Void)? = nil
+        onOpenPets: ((String) -> Void)? = nil,
+        onOpenTasks: ((String) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
         self.homeId = homeId
@@ -44,6 +49,7 @@ struct HomeDashboardView: View {
         self.onOpenBills = onOpenBills
         self.onOpenPlaceholder = onOpenPlaceholder
         self.onOpenPets = onOpenPets
+        self.onOpenTasks = onOpenTasks
     }
 
     /// Current signed-in user's email — used by the Invite Owner form
@@ -141,6 +147,8 @@ struct HomeDashboardView: View {
             onOpenBills?()
         case "pets":
             onOpenPets?(homeId)
+        case "view_tasks":
+            onOpenTasks?(homeId)
         default:
             onOpenPlaceholder?(actionLabel(action))
         }
@@ -154,6 +162,7 @@ struct HomeDashboardView: View {
         case "verify": "Verify home"
         case "view_bills": "Bills"
         case "pets": "Pets"
+        case "view_tasks": "Tasks"
         default: id.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }

@@ -143,6 +143,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case wandSparkles = "wand-sparkles"
     case arrowUpRight = "arrow-up-right"
 
+    // T6.3c Household tasks — chore-category iconography + banner glyph.
+    case leaf
+    case listChecks = "list-checks"
+    case utensils
+    case baby
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -254,6 +260,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .shuffle: "shuffle"
         case .wandSparkles: "wand.and.stars"
         case .arrowUpRight: "arrow.up.right"
+        case .leaf: "leaf"
+        case .listChecks: "checklist"
+        case .utensils: "fork.knife"
+        case .baby: "figure.child"
         }
     }
 }

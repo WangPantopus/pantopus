@@ -49,6 +49,8 @@ sealed class AnalyticsEvent(
 
     data object ScreenPetsListViewed : AnalyticsEvent("screen.pets_list.viewed")
 
+    data object ScreenHouseholdTasksViewed : AnalyticsEvent("screen.household_tasks.viewed")
+
     data class ScreenPetsWizardStepViewed(
         val stepNumber: Int,
         val stepName: String,

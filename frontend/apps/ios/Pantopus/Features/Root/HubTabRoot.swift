@@ -21,6 +21,10 @@ public enum HubRoute: Hashable {
     case homeDashboard(homeId: String)
     /// Pets sub-screen for a specific home (T5.2.1).
     case homePets(homeId: String)
+    /// Household tasks (per-home chore list) for a specific home
+    /// (T6.3c / P11). Distinct from `.myBids` / `.myTasks` (the gig
+    /// surfaces in the You tab).
+    case homeTasks(homeId: String)
     case publicProfile(userId: String)
     case pulsePost(postId: String)
     /// Bills list for a home (T5.2.2 / P13).
@@ -303,6 +307,9 @@ public struct HubTabRoot: View {
                 },
                 onOpenPets: { id in
                     Task { @MainActor in push(.homePets(homeId: id)) }
+                },
+                onOpenTasks: { id in
+                    Task { @MainActor in push(.homeTasks(homeId: id)) }
                 }
             )
         case let .homeBills(homeId):
@@ -333,6 +340,21 @@ public struct HubTabRoot: View {
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homeTasks(homeId):
+            HouseholdTasksListView(
+                viewModel: HouseholdTasksListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Task detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in push(.placeholder(label: "Add a task")) }
+                    },
+                    onEditRecurring: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Edit recurring task")) }
+                    }
+                )
+            )
         case let .claimOwnership(homeId):
             ClaimOwnershipWizardView(
                 homeId: homeId,
