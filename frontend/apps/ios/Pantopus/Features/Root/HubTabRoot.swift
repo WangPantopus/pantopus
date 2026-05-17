@@ -23,6 +23,8 @@ public enum HubRoute: Hashable {
     case homePets(homeId: String)
     /// Maintenance sub-screen for a specific home (T6.3b / P10).
     case homeMaintenance(homeId: String)
+    /// Members sub-screen for a specific home (T6.3a / P9).
+    case homeMembers(homeId: String)
     case publicProfile(userId: String)
     case pulsePost(postId: String)
     /// Bills list for a home (T5.2.2 / P13).
@@ -308,6 +310,9 @@ public struct HubTabRoot: View {
                 },
                 onOpenMaintenance: { id in
                     Task { @MainActor in push(.homeMaintenance(homeId: id)) }
+                },
+                onOpenMembers: { id in
+                    Task { @MainActor in push(.homeMembers(homeId: id)) }
                 }
             )
         case let .homeMaintenance(homeId):
@@ -350,6 +355,8 @@ public struct HubTabRoot: View {
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homeMembers(homeId):
+            MembersListView(homeId: homeId)
         case let .claimOwnership(homeId):
             ClaimOwnershipWizardView(
                 homeId: homeId,

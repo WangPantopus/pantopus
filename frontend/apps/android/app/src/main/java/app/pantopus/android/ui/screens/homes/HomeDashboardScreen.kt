@@ -62,6 +62,11 @@ fun HomeDashboardScreen(
     onOpenPlaceholder: ((String) -> Unit)? = null,
     onOpenPets: ((String) -> Unit)? = null,
     onOpenMaintenance: ((String) -> Unit)? = null,
+    /** T6.3a / P9 — push to the per-home Members list. When wired, the
+     *  "Members" / "Add member" quick-actions navigate to the list
+     *  (which owns its own invite FAB) instead of opening the legacy
+     *  InviteOwner form. */
+    onOpenMembers: ((String) -> Unit)? = null,
     viewModel: HomeDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -94,7 +99,12 @@ fun HomeDashboardScreen(
         when (actionId) {
             "add_member" -> {
                 viewModel.currentHomeId()?.let { homeId ->
-                    onInviteOwner?.invoke(homeId) ?: openPlaceholder(actionId)
+                    // Prefer the dedicated Members screen when its host
+                    // wired the callback (T6.3a / P9). Falls back to
+                    // the legacy InviteOwner form for older hosts.
+                    onOpenMembers?.invoke(homeId)
+                        ?: onInviteOwner?.invoke(homeId)
+                        ?: openPlaceholder(actionId)
                 }
             }
             else -> openPlaceholder(actionId)
@@ -109,7 +119,9 @@ fun HomeDashboardScreen(
                 }
             "add_member" ->
                 viewModel.currentHomeId()?.let { homeId ->
-                    onInviteOwner?.invoke(homeId) ?: openPlaceholder(actionId)
+                    onOpenMembers?.invoke(homeId)
+                        ?: onInviteOwner?.invoke(homeId)
+                        ?: openPlaceholder(actionId)
                 }
             "view_bills" ->
                 viewModel.currentHomeId()?.let { homeId ->
