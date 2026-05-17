@@ -70,9 +70,10 @@ class LoginViewModel
             when {
                 error is AuthError -> error
                 error is HttpException && error.code() == 401 -> AuthError.InvalidCredentials
-                error is HttpException && error.code() == 403 -> AuthError.ServerError(
-                    "Please verify your email before signing in.",
-                )
+                error is HttpException && error.code() == 403 ->
+                    AuthError.ServerError(
+                        "Please verify your email before signing in.",
+                    )
                 error is HttpException && error.code() == 429 -> AuthError.RateLimited
                 error is HttpException && error.code() in 500..599 ->
                     AuthError.ServerError("Server error ${error.code()}.")

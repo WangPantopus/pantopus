@@ -94,7 +94,7 @@ final class AuthManagerTests: XCTestCase {
         stub("/api/users/login", status: 401, body: "{\"error\":\"Invalid email or password\"}")
         let manager = makeManager()
         await XCTAssertThrowsAsync(
-            try await manager.signIn(email: "x@y.com", password: "bad"),
+            { try await manager.signIn(email: "x@y.com", password: "bad") },
             expected: .invalidCredentials
         )
     }
@@ -158,22 +158,24 @@ final class AuthManagerTests: XCTestCase {
         stub("/api/users/register", status: 400, body: "{\"error\":\"Email already registered\"}")
         let manager = makeManager()
         await XCTAssertThrowsAsync(
-            try await manager.signUp(
-                email: "taken@example.com",
-                password: "verystrong123",
-                phoneNumber: nil,
-                username: "taken",
-                firstName: "T",
-                middleName: nil,
-                lastName: "U",
-                dateOfBirth: nil,
-                address: nil,
-                city: nil,
-                state: nil,
-                zipcode: nil,
-                accountType: .personal,
-                inviteCode: nil
-            ),
+            {
+                try await manager.signUp(
+                    email: "taken@example.com",
+                    password: "verystrong123",
+                    phoneNumber: nil,
+                    username: "taken",
+                    firstName: "T",
+                    middleName: nil,
+                    lastName: "U",
+                    dateOfBirth: nil,
+                    address: nil,
+                    city: nil,
+                    state: nil,
+                    zipcode: nil,
+                    accountType: .personal,
+                    inviteCode: nil
+                )
+            },
             expected: .emailAlreadyExists
         )
     }
@@ -311,8 +313,8 @@ final class AuthManagerTests: XCTestCase {
 
 // MARK: - Async throws helper
 
-func XCTAssertThrowsAsync<T>(
-    _ expression: @autoclosure () async throws -> T,
+func XCTAssertThrowsAsync(
+    _ expression: () async throws -> some Any,
     expected: AuthError,
     file: StaticString = #filePath,
     line: UInt = #line

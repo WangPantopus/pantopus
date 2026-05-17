@@ -22,7 +22,9 @@ public enum SignUpAccountTypeChoice: String, Hashable, Sendable, CaseIterable, I
     case personal
     case business
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Display label rendered in the segmented control.
     public var label: String {
@@ -94,6 +96,7 @@ public final class SignUpViewModel {
 
     // MARK: - Validation
 
+    // swiftlint:disable cyclomatic_complexity
     /// Validates a single field and returns the error message (or nil).
     /// Public so the view can render error states per-field on touch.
     public func validate(_ field: SignUpField) -> String? {
@@ -143,6 +146,8 @@ public final class SignUpViewModel {
         }
     }
 
+    // swiftlint:enable cyclomatic_complexity
+
     /// Aggregate validity — true when every required field passes and
     /// terms are accepted. Drives the bottom CTA's enabled state.
     public var isValid: Bool {
@@ -173,7 +178,7 @@ public final class SignUpViewModel {
 
     /// Runs validation, then submits to `AuthManager.signUp`. On success
     /// sets `didSucceed = true` so the caller pushes `AuthRoute.verifyEmail`.
-    public func submit(using auth: AuthManager) async {
+    func submit(using auth: AuthManager) async {
         hasAttemptedSubmit = true
         let errors = Self.validateAll(self)
         fieldErrors = errors

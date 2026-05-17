@@ -80,12 +80,12 @@ struct LoginView: View {
                             } else {
                                 HStack(spacing: Spacing.s1) {
                                     Text("Log in")
+                                        .pantopusTextStyle(.body)
                                         .fontWeight(.semibold)
                                     Icon(.arrowRight, size: 16, color: Theme.Color.appTextInverse)
                                 }
                             }
                         }
-                        .pantopusTextStyle(.body)
                         .foregroundStyle(Theme.Color.appTextInverse)
                         .frame(maxWidth: .infinity, minHeight: 48)
                     }
@@ -103,11 +103,15 @@ struct LoginView: View {
                         Text("New to Pantopus?")
                             .pantopusTextStyle(.small)
                             .foregroundStyle(Theme.Color.appTextSecondary)
-                        Button("Create account") { path.append(.signUp) }
-                            .pantopusTextStyle(.small)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Theme.Color.primary600)
-                            .accessibilityIdentifier("loginCreateAccountLink")
+                        Button {
+                            path.append(.signUp)
+                        } label: {
+                            Text("Create account")
+                                .pantopusTextStyle(.small)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Theme.Color.primary600)
+                        }
+                        .accessibilityIdentifier("loginCreateAccountLink")
                     }
                     .padding(.top, Spacing.s4)
 
@@ -144,9 +148,8 @@ struct LoginView: View {
                 case let .error(authError):
                     AuthErrorView(
                         error: authError,
-                        onRetry: nil,
-                        onBack: { if !path.isEmpty { path.removeLast() } }
-                    )
+                        onRetry: nil
+                    ) { if !path.isEmpty { path.removeLast() } }
                 }
             }
         }
@@ -198,11 +201,13 @@ struct PasswordField: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 Spacer()
                 if let trailingLink {
-                    Button(trailingLink.label, action: trailingLink.action)
-                        .pantopusTextStyle(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Theme.Color.primary600)
-                        .accessibilityIdentifier("loginForgotPasswordLink")
+                    Button(action: trailingLink.action) {
+                        Text(trailingLink.label)
+                            .pantopusTextStyle(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Theme.Color.primary600)
+                    }
+                    .accessibilityIdentifier("loginForgotPasswordLink")
                 }
             }
 

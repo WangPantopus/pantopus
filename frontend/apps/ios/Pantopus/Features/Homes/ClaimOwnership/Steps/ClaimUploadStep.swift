@@ -39,7 +39,7 @@ struct ClaimUploadStep: View {
             set: { viewModel.note = $0 }
         ))
         if let error = viewModel.submitError {
-            ErrorBanner(message: error)
+            ClaimUploadErrorBanner(message: error)
         }
         // Hidden anchor to host the PhotosPicker. Driving the sheet
         // directly off `photosPickerSlot` (rather than an intermediate
@@ -135,7 +135,7 @@ private struct ReviewerNoteField: View {
     }
 }
 
-private struct ErrorBanner: View {
+private struct ClaimUploadErrorBanner: View {
     let message: String
 
     var body: some View {

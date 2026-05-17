@@ -82,9 +82,13 @@ fun LoginScreen(
     // Suppress unused-parameter detekt — these are part of the nav contract
     // documented on `AuthNavHost`, even if Login itself wires only signup
     // / forgot / submit. P5 wires the remaining destinations.
-    @Suppress("UNUSED_PARAMETER") val _verify = onNavigateToVerifyEmail
-    @Suppress("UNUSED_PARAMETER") val _reset = onNavigateToResetPassword
-    @Suppress("UNUSED_PARAMETER") val _error = onNavigateToAuthError
+    @Suppress("UNUSED_VARIABLE")
+    val unusedNavCallbacks =
+        listOf(
+            onNavigateToVerifyEmail,
+            onNavigateToResetPassword,
+            onNavigateToAuthError,
+        )
 
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showPassword by remember { mutableStateOf(false) }

@@ -8,6 +8,8 @@
 //  models, surgical visual updates here.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 // MARK: - Top bar
@@ -352,8 +354,8 @@ private struct PillarTileBody: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
                         .fill(tile.chipSetupState
-                              ? Theme.Color.appSurfaceSunken
-                              : tile.tint.backgroundColor)
+                            ? Theme.Color.appSurfaceSunken
+                            : tile.tint.backgroundColor)
                     Icon(
                         tile.icon,
                         size: 17,

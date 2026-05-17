@@ -162,6 +162,7 @@ final class AuthManager {
 
     // MARK: - Sign up
 
+    // swiftlint:disable function_parameter_count
     /// `POST /api/users/register` (route `backend/routes/users.js:1177`).
     ///
     /// On 201, returns a `SignUpResult` with the freshly-created user. The
@@ -217,6 +218,8 @@ final class AuthManager {
             throw Self.mapRegisterError(apiError)
         }
     }
+
+    // swiftlint:enable function_parameter_count
 
     // MARK: - Forgot / reset password
 

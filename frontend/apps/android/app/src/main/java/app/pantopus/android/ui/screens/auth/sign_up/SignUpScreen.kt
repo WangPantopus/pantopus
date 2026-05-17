@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "MagicNumber")
+@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "MagicNumber", "MatchingDeclarationName")
 
 package app.pantopus.android.ui.screens.auth.sign_up
 
@@ -302,6 +302,7 @@ private fun fieldState(
 }
 
 @Composable
+@Suppress("UnusedParameter")
 private fun FieldWithLiveError(
     state: SignUpViewModel.UiState,
     field: SignUpField,
@@ -684,4 +685,3 @@ fun ErrorBanner(
         }
     }
 }
-

@@ -117,10 +117,9 @@ struct HubView: View {
             HubFloatingProgress(
                 fraction: content.profileCompleteness,
                 stepsDone: content.stepsDone,
-                stepsTotal: content.stepsTotal,
-                onContinue: { onNavigate(.startVerification) }
-            )
-            .padding(.bottom, Spacing.s6)
+                stepsTotal: content.stepsTotal
+            ) { onNavigate(.startVerification) }
+                .padding(.bottom, Spacing.s6)
         }
     }
 }

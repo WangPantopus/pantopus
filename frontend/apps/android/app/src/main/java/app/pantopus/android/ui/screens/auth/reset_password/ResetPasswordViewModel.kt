@@ -1,3 +1,5 @@
+@file:Suppress("PackageNaming")
+
 package app.pantopus.android.ui.screens.auth.reset_password
 
 import androidx.lifecycle.SavedStateHandle

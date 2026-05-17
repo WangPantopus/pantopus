@@ -62,11 +62,15 @@ final class SignUpViewModelTests: XCTestCase {
         vm.username = "ab"
         XCTAssertEqual(vm.validate(.username), "Username must be at least 3 characters.")
         vm.username = "Alice"
-        XCTAssertEqual(vm.validate(.username),
-                       "Use lowercase letters, numbers, or underscores only.")
+        XCTAssertEqual(
+            vm.validate(.username),
+            "Use lowercase letters, numbers, or underscores only."
+        )
         vm.username = "alice_kowalski-21"
-        XCTAssertEqual(vm.validate(.username),
-                       "Use lowercase letters, numbers, or underscores only.")
+        XCTAssertEqual(
+            vm.validate(.username),
+            "Use lowercase letters, numbers, or underscores only."
+        )
         vm.username = "alice_21"
         XCTAssertNil(vm.validate(.username))
     }
@@ -107,8 +111,10 @@ final class SignUpViewModelTests: XCTestCase {
         let vm = SignUpViewModel()
         XCTAssertNil(vm.validate(.phoneNumber)) // optional
         vm.phoneNumber = "555-1234"
-        XCTAssertEqual(vm.validate(.phoneNumber),
-                       "Phone must be in E.164 format, e.g. +15555550123.")
+        XCTAssertEqual(
+            vm.validate(.phoneNumber),
+            "Phone must be in E.164 format, e.g. +15555550123."
+        )
         vm.phoneNumber = "+15555550123"
         XCTAssertNil(vm.validate(.phoneNumber))
     }
@@ -171,7 +177,7 @@ final class SignUpViewModelTests: XCTestCase {
 
     // MARK: - Submit: success path
 
-    func test_submit_calls_AuthManager_signUp_with_right_payload() async throws {
+    func test_submit_calls_AuthManager_signUp_with_right_payload() async {
         let payload = """
         {
           "message": "Registration successful.",
@@ -218,7 +224,7 @@ final class SignUpViewModelTests: XCTestCase {
         // Verify outgoing payload reached the network with the right fields.
         let captured = SequencedURLProtocol.capturedRequests.last
         XCTAssertEqual(captured?.url?.path, "/api/users/register")
-        let body = captured?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let body = captured?.httpBodyData().flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         XCTAssertEqual(body?["email"] as? String, "alice@example.com")
         XCTAssertEqual(body?["username"] as? String, "alice_21")
         XCTAssertEqual(body?["firstName"] as? String, "Maria")
@@ -281,5 +287,28 @@ final class SignUpViewModelTests: XCTestCase {
         vm.zipcode = "02139"
         vm.accountType = .personal
         vm.agreedToTerms = true
+    }
+}
+
+private extension URLRequest {
+    /// Pull the body bytes regardless of whether URLSession exposes them on
+    /// `httpBody` or `httpBodyStream`.
+    func httpBodyData() -> Data? {
+        if let direct = httpBody { return direct }
+        guard let stream = httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        let bufferSize = 4096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
     }
 }

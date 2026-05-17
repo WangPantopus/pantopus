@@ -284,14 +284,10 @@ struct SignUpView: View {
         return nil
     }
 
-    private static let maxDate: Date = {
-        // Today minus 18 years.
+    private static let maxDate: Date = // Today minus 18 years.
         Calendar.current.date(byAdding: .year, value: -18, to: Date()) ?? Date()
-    }()
 
-    private static let defaultDate: Date = {
-        Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
-    }()
+    private static let defaultDate: Date = Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
 }
 
 // MARK: - Subcomponents

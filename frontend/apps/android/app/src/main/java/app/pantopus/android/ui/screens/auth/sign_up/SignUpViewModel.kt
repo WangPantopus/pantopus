@@ -1,4 +1,11 @@
-@file:Suppress("PackageNaming", "TooManyFunctions")
+@file:Suppress(
+    "CyclomaticComplexMethod",
+    "MagicNumber",
+    "PackageNaming",
+    "SwallowedException",
+    "TooGenericExceptionCaught",
+    "TooManyFunctions",
+)
 
 package app.pantopus.android.ui.screens.auth.sign_up
 
@@ -173,11 +180,30 @@ class SignUpViewModel
         }
 
         // Field setters used by the screen.
-        fun onEmailChange(value: String) = update { it.copy(email = value, fieldErrors = it.fieldErrors - SignUpField.Email, topLevelError = null) }
+        fun onEmailChange(value: String) =
+            update {
+                it.copy(
+                    email = value,
+                    fieldErrors = it.fieldErrors - SignUpField.Email,
+                    topLevelError = null,
+                )
+            }
 
-        fun onPasswordChange(value: String) = update { it.copy(password = value, fieldErrors = it.fieldErrors - SignUpField.Password) }
+        fun onPasswordChange(value: String) =
+            update {
+                it.copy(
+                    password = value,
+                    fieldErrors = it.fieldErrors - SignUpField.Password,
+                )
+            }
 
-        fun onConfirmPasswordChange(value: String) = update { it.copy(confirmPassword = value, fieldErrors = it.fieldErrors - SignUpField.ConfirmPassword) }
+        fun onConfirmPasswordChange(value: String) =
+            update {
+                it.copy(
+                    confirmPassword = value,
+                    fieldErrors = it.fieldErrors - SignUpField.ConfirmPassword,
+                )
+            }
 
         fun onUsernameChange(value: String) = update { it.copy(username = value, fieldErrors = it.fieldErrors - SignUpField.Username) }
 
@@ -187,7 +213,13 @@ class SignUpViewModel
 
         fun onLastNameChange(value: String) = update { it.copy(lastName = value, fieldErrors = it.fieldErrors - SignUpField.LastName) }
 
-        fun onDateOfBirthChange(value: LocalDate?) = update { it.copy(dateOfBirth = value, fieldErrors = it.fieldErrors - SignUpField.DateOfBirth) }
+        fun onDateOfBirthChange(value: LocalDate?) =
+            update {
+                it.copy(
+                    dateOfBirth = value,
+                    fieldErrors = it.fieldErrors - SignUpField.DateOfBirth,
+                )
+            }
 
         fun onPhoneChange(value: String) = update { it.copy(phoneNumber = value, fieldErrors = it.fieldErrors - SignUpField.PhoneNumber) }
 
@@ -249,4 +281,3 @@ class SignUpViewModel
             }
         }
     }
-

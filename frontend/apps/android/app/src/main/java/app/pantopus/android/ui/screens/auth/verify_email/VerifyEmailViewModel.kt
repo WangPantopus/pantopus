@@ -1,3 +1,5 @@
+@file:Suppress("PackageNaming")
+
 package app.pantopus.android.ui.screens.auth.verify_email
 
 import androidx.lifecycle.ViewModel

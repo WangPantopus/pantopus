@@ -1,3 +1,5 @@
+@file:Suppress("MagicNumber", "ReturnCount")
+
 package app.pantopus.android.ui.screens.auth
 
 import java.time.LocalDate

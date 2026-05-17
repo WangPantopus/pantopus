@@ -1,3 +1,5 @@
+@file:Suppress("PackageNaming", "MatchingDeclarationName")
+
 package app.pantopus.android.ui.screens.auth.reset_password
 
 import androidx.compose.foundation.layout.Box

@@ -1,3 +1,5 @@
+@file:Suppress("PackageNaming")
+
 package app.pantopus.android.ui.screens.auth.forgot_password
 
 import androidx.lifecycle.ViewModel

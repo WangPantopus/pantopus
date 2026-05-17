@@ -43,6 +43,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case check
     case moreHorizontal = "more-horizontal"
     case arrowLeft = "arrow-left"
+    case arrowRight = "arrow-right"
     case send
     case chevronDown = "chevron-down"
     case chevronUp = "chevron-up"
@@ -173,6 +174,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .check: "checkmark"
         case .moreHorizontal: "ellipsis"
         case .arrowLeft: "arrow.left"
+        case .arrowRight: "arrow.right"
         case .send: "paperplane"
         case .chevronDown: "chevron.down"
         case .chevronUp: "chevron.up"

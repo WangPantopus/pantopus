@@ -1,3 +1,5 @@
+@file:Suppress("PackageNaming", "MatchingDeclarationName")
+
 package app.pantopus.android.ui.screens.auth.verify_email
 
 import androidx.compose.foundation.layout.Box

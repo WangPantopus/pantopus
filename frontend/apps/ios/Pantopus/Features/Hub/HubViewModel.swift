@@ -172,6 +172,17 @@ final class HubViewModel {
 
     // MARK: - Projections
 
+    private struct PillarProjection {
+        let kind: PillarTile.Pillar
+        let label: String
+        let icon: PantopusIcon
+        let tint: IdentityPillar
+        let chip: String?
+        let chipSetupState: Bool
+        let populatedCaption: String
+        let setupCaption: String
+    }
+
     private static func isFirstRun(hub: HubResponse) -> Bool {
         !hub.setup.allDone
             && hub.setup.profileCompleteness.score < 0.5
@@ -220,59 +231,70 @@ final class HubViewModel {
         let home = hub.cards.home
         let business = hub.cards.business
 
-        func pillar(
-            _ kind: PillarTile.Pillar,
-            label: String,
-            icon: PantopusIcon,
-            tint: IdentityPillar,
-            chip: String?,
-            chipSetupState: Bool,
-            populatedCaption: String,
-            setupCaption: String
-        ) -> PillarTile {
+        func pillar(_ projection: PillarProjection) -> PillarTile {
             PillarTile(
-                pillar: kind,
-                label: label,
-                icon: icon,
-                tint: tint,
-                chip: setupMode ? "Set up" : chip,
-                chipSetupState: setupMode ? true : chipSetupState,
-                caption: setupMode ? setupCaption : populatedCaption
+                pillar: projection.kind,
+                label: projection.label,
+                icon: projection.icon,
+                tint: projection.tint,
+                chip: setupMode ? "Set up" : projection.chip,
+                chipSetupState: setupMode ? true : projection.chipSetupState,
+                caption: setupMode ? projection.setupCaption : projection.populatedCaption
             )
         }
 
         return [
             pillar(
-                .pulse, label: "Pulse", icon: .megaphone, tint: .personal,
-                chip: personal.unreadChats > 0 ? "\(personal.unreadChats) new" : nil,
-                chipSetupState: false,
-                populatedCaption: personal.unreadChats > 0
-                    ? "\(personal.unreadChats) new in your feed"
-                    : "Neighborhood feed",
-                setupCaption: "Neighborhood feed"
+                PillarProjection(
+                    kind: .pulse,
+                    label: "Pulse",
+                    icon: .megaphone,
+                    tint: .personal,
+                    chip: personal.unreadChats > 0 ? "\(personal.unreadChats) new" : nil,
+                    chipSetupState: false,
+                    populatedCaption: personal.unreadChats > 0
+                        ? "\(personal.unreadChats) new in your feed"
+                        : "Neighborhood feed",
+                    setupCaption: "Neighborhood feed"
+                )
             ),
             pillar(
-                .marketplace, label: "Marketplace", icon: .shoppingBag, tint: .business,
-                chip: business.map { $0.newOrders > 0 ? "\($0.newOrders)" : nil } ?? nil,
-                chipSetupState: business == nil,
-                populatedCaption: business.map { "\($0.newOrders) new orders" } ?? "Local buy & sell",
-                setupCaption: "Local buy & sell"
+                PillarProjection(
+                    kind: .marketplace,
+                    label: "Marketplace",
+                    icon: .shoppingBag,
+                    tint: .business,
+                    chip: business.flatMap { $0.newOrders > 0 ? "\($0.newOrders)" : nil },
+                    chipSetupState: business == nil,
+                    populatedCaption: business.map { "\($0.newOrders) new orders" } ?? "Local buy & sell",
+                    setupCaption: "Local buy & sell"
+                )
             ),
             pillar(
-                .gigs, label: "Gigs", icon: .hammer, tint: .personal,
-                chip: personal.gigsNearby > 0 ? "\(personal.gigsNearby) matches" : nil,
-                chipSetupState: false,
-                populatedCaption: personal.gigsNearby > 0
-                    ? "\(personal.gigsNearby) tasks near you"
-                    : "Earn & post tasks",
-                setupCaption: "Earn & post tasks"
+                PillarProjection(
+                    kind: .gigs,
+                    label: "Gigs",
+                    icon: .hammer,
+                    tint: .personal,
+                    chip: personal.gigsNearby > 0 ? "\(personal.gigsNearby) matches" : nil,
+                    chipSetupState: false,
+                    populatedCaption: personal.gigsNearby > 0
+                        ? "\(personal.gigsNearby) tasks near you"
+                        : "Earn & post tasks",
+                    setupCaption: "Earn & post tasks"
+                )
             ),
             pillar(
-                .mail, label: "Mail", icon: .mailbox, tint: .home,
-                chip: home.map { $0.newMail > 0 ? "\($0.newMail)" : nil } ?? nil,
-                chipSetupState: home == nil,
-                populatedCaption: home.map { "\($0.newMail) need pickup" } ?? "Scan & forward",
-                setupCaption: "Scan & forward"
+                PillarProjection(
+                    kind: .mail,
+                    label: "Mail",
+                    icon: .mailbox,
+                    tint: .home,
+                    chip: home.flatMap { $0.newMail > 0 ? "\($0.newMail)" : nil },
+                    chipSetupState: home == nil,
+                    populatedCaption: home.map { "\($0.newMail) need pickup" } ?? "Scan & forward",
+                    setupCaption: "Scan & forward"
+                )
             )
         ]
     }

@@ -139,8 +139,8 @@ public final class AuthErrorViewModel {
 struct AuthPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .pantopusTextStyle(.body)
-            .fontWeight(.semibold)
+            .font(.system(size: PantopusTextStyle.body.size, weight: .semibold))
+            .tracking(PantopusTextStyle.body.tracking)
             .foregroundStyle(Theme.Color.appTextInverse)
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(Theme.Color.primary600)
@@ -154,8 +154,8 @@ struct AuthPrimaryButtonStyle: ButtonStyle {
 struct AuthGhostButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .pantopusTextStyle(.body)
-            .fontWeight(.semibold)
+            .font(.system(size: PantopusTextStyle.body.size, weight: .semibold))
+            .tracking(PantopusTextStyle.body.tracking)
             .foregroundStyle(Theme.Color.appText)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(Theme.Color.appSurface)

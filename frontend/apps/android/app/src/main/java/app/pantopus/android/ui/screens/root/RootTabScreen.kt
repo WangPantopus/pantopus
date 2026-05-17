@@ -533,6 +533,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 navController.navigate(ChildRoutes.DISCOVER_HUB)
                             is HubNavigationIntent.JumpBackTapped ->
                                 routeForJumpBackIn(intent.item).also { navController.navigate(it) }
+                            HubNavigationIntent.OpenToday ->
+                                navController.navigate(ChildRoutes.placeholder("Today"))
                         }
                     })
                 }

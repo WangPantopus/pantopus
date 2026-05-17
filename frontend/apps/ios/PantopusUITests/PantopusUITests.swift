@@ -51,7 +51,7 @@ final class PantopusUITests: XCTestCase {
         let app = launchSignedOut()
 
         let email = element("loginEmailField", in: app)
-        let password = element("loginPasswordField", in: app)
+        let password = app.secureTextFields["loginPasswordField"]
         let button = element("loginSubmitButton", in: app)
 
         XCTAssertTrue(email.waitForExistence(timeout: 5))

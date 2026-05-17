@@ -108,7 +108,7 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource>: View {
                 }
             )
         case let .error(message):
-            ErrorBanner(message: message) { Task { await dataSource.load() } }
+            ListOfRowsErrorBanner(message: message) { Task { await dataSource.load() } }
         }
     }
 }
@@ -641,7 +641,7 @@ private struct ListingContextHeader: View {
     }
 }
 
-private struct ErrorBanner: View {
+private struct ListOfRowsErrorBanner: View {
     let message: String
     let retry: () -> Void
 
