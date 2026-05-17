@@ -280,7 +280,6 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .arrowUpRight: "arrow.up.right"
         case .eyeOff: "eye.slash"
         case .keyRound: "key"
-
         case .leaf: "leaf"
         case .listChecks: "checklist"
         case .utensils: "fork.knife"
