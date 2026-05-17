@@ -28,6 +28,9 @@ struct HomeDashboardView: View {
     /// Push onto the host stack when the user taps the Pets quick-action
     /// tile. Receives this home's id so the destination can pre-fetch.
     private let onOpenPets: ((String) -> Void)?
+    /// Push onto the host stack when the user taps the Packages
+    /// quick-action tile. Receives this home's id (T6.3d / P14).
+    private let onOpenPackages: ((String) -> Void)?
     /// Push onto the host stack when the user taps the Tasks (T6.3c)
     /// quick-action tile. Receives this home's id so the destination
     /// can pre-fetch.
@@ -49,6 +52,7 @@ struct HomeDashboardView: View {
         onOpenPolls: (() -> Void)? = nil,
         onOpenPlaceholder: ((String) -> Void)? = nil,
         onOpenPets: ((String) -> Void)? = nil,
+        onOpenPackages: ((String) -> Void)? = nil,
         onOpenTasks: ((String) -> Void)? = nil,
         onOpenMaintenance: ((String) -> Void)? = nil,
         onOpenMembers: ((String) -> Void)? = nil
@@ -62,6 +66,7 @@ struct HomeDashboardView: View {
         self.onOpenPolls = onOpenPolls
         self.onOpenPlaceholder = onOpenPlaceholder
         self.onOpenPets = onOpenPets
+        self.onOpenPackages = onOpenPackages
         self.onOpenTasks = onOpenTasks
         self.onOpenMaintenance = onOpenMaintenance
         self.onOpenMembers = onOpenMembers
@@ -177,6 +182,8 @@ struct HomeDashboardView: View {
             onOpenMaintenance?(homeId)
         case "pets":
             onOpenPets?(homeId)
+        case "view_packages":
+            onOpenPackages?(homeId)
         case "view_tasks":
             onOpenTasks?(homeId)
         default:
@@ -187,6 +194,7 @@ struct HomeDashboardView: View {
     private func actionLabel(_ id: String) -> String {
         switch id {
         case "log_package": "Log a package"
+        case "view_packages": "Packages"
         case "add_member": "Add member"
         case "add_mail": "Add mail"
         case "verify": "Verify home"

@@ -71,6 +71,13 @@ import app.pantopus.android.ui.screens.homes.members.MEMBERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.members.MembersListScreen
 import app.pantopus.android.ui.screens.homes.owners.OWNERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.owners.OwnersListScreen
+import app.pantopus.android.ui.screens.homes.packages.LOG_PACKAGE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.packages.LogPackageScreen
+import app.pantopus.android.ui.screens.homes.packages.PACKAGES_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.packages.PACKAGE_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.packages.PACKAGE_DETAIL_PACKAGE_ID_KEY
+import app.pantopus.android.ui.screens.homes.packages.PackageDetailScreen
+import app.pantopus.android.ui.screens.homes.packages.PackagesListScreen
 import app.pantopus.android.ui.screens.homes.pets.PETS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.pets.PetsListScreen
 import app.pantopus.android.ui.screens.homes.polls.POLLS_HOME_ID_KEY
@@ -160,6 +167,28 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home pets list. */
     fun homePets(homeId: String): String = "homes/$homeId/pets"
+
+    /** Packages list per home (T6.3d / P14). */
+    const val HOME_PACKAGES = "homes/{$PACKAGES_HOME_ID_KEY}/packages"
+
+    /** Package detail (read-mostly summary, mark-picked-up / remove). */
+    const val PACKAGE_DETAIL =
+        "homes/{$PACKAGE_DETAIL_HOME_ID_KEY}/packages/{$PACKAGE_DETAIL_PACKAGE_ID_KEY}"
+
+    /** Log a package — single-page form (T6.3d). */
+    const val LOG_PACKAGE = "homes/{$LOG_PACKAGE_HOME_ID_KEY}/packages/new"
+
+    /** Build the concrete path for a home packages list. */
+    fun homePackages(homeId: String): String = "homes/$homeId/packages"
+
+    /** Build the concrete path for a package detail. */
+    fun packageDetail(
+        homeId: String,
+        packageId: String,
+    ): String = "homes/$homeId/packages/$packageId"
+
+    /** Build the concrete path for the Log Package form. */
+    fun logPackage(homeId: String): String = "homes/$homeId/packages/new"
 
     /** Polls list per home (T6.3e / P13). */
     const val HOME_POLLS = "homes/{$POLLS_HOME_ID_KEY}/polls"
@@ -716,6 +745,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
+                    onOpenHomePackages = { homeId ->
+                        navController.navigate(ChildRoutes.homePackages(homeId))
+                    },
                     onOpenHomePolls = { homeId -> navController.navigate(ChildRoutes.homePolls(homeId)) },
                     onOpenAccessCodes = { homeId, homeName ->
                         navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
@@ -778,6 +810,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenPets = { homeId ->
                         navController.navigate(ChildRoutes.homePets(homeId))
                     },
+                    onOpenPackages = { homeId ->
+                        navController.navigate(ChildRoutes.homePackages(homeId))
+                    },
                     onOpenAccessCodes = { homeId, homeName ->
                         navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
                     },
@@ -837,6 +872,21 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
                 PetsListScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.HOME_PACKAGES,
+                arguments = listOf(navArgument(PACKAGES_HOME_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(PACKAGES_HOME_ID_KEY).orEmpty()
+                PackagesListScreen(
+                    currentUserId = null,
+                    memberLookup = { null },
+                    onOpenPackage = { packageId ->
+                        navController.navigate(ChildRoutes.packageDetail(homeId, packageId))
+                    },
+                    onLogPackage = { navController.navigate(ChildRoutes.logPackage(homeId)) },
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(
                 route = ChildRoutes.HOME_POLLS,
@@ -931,6 +981,32 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.PACKAGE_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(PACKAGE_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(PACKAGE_DETAIL_PACKAGE_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                PackageDetailScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.LOG_PACKAGE,
+                arguments = listOf(navArgument(LOG_PACKAGE_HOME_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(LOG_PACKAGE_HOME_ID_KEY).orEmpty()
+                LogPackageScreen(
+                    onClose = { navController.popBackStack() },
+                    onCreated = { packageId ->
+                        // Replace the log-package destination with the
+                        // new package's detail so Back returns to the
+                        // Packages list, not the form.
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.packageDetail(homeId, packageId))
+                    },
                 )
             }
             composable(

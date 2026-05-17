@@ -21,6 +21,12 @@ public enum HubRoute: Hashable {
     case homeDashboard(homeId: String)
     /// Pets sub-screen for a specific home (T5.2.1).
     case homePets(homeId: String)
+    /// Packages list for a home (T6.3d / P14).
+    case homePackages(homeId: String)
+    /// Package detail (read-mostly summary with mark-picked-up).
+    case packageDetail(homeId: String, packageId: String)
+    /// Log-a-package sheet target.
+    case logPackage(homeId: String)
     /// Household tasks (per-home chore list) for a specific home
     /// (T6.3c / P11). Distinct from `.myBids` / `.myTasks` (the gig
     /// surfaces in the You tab).
@@ -317,6 +323,9 @@ public struct HubTabRoot: View {
                 onOpenPets: { id in
                     Task { @MainActor in push(.homePets(homeId: id)) }
                 },
+                onOpenPackages: { id in
+                    Task { @MainActor in push(.homePackages(homeId: id)) }
+                },
                 onOpenTasks: { id in
                     Task { @MainActor in push(.homeTasks(homeId: id)) }
                 },
@@ -378,6 +387,33 @@ public struct HubTabRoot: View {
             }
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homePackages(homeId):
+            PackagesListView(
+                viewModel: Self.packagesListViewModel(
+                    homeId: homeId,
+                    currentUserId: currentUserId.isEmpty ? nil : currentUserId,
+                    push: push
+                )
+            )
+        case let .packageDetail(homeId, packageId):
+            PackageDetailView(
+                homeId: homeId,
+                packageId: packageId
+            ) { if !path.isEmpty { path.removeLast() } }
+        case let .logPackage(homeId):
+            LogPackageSheetView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCreated: { packageId in
+                    Task { @MainActor in
+                        path.removeAll { route in
+                            if case .logPackage = route { return true }
+                            return false
+                        }
+                        path.append(.packageDetail(homeId: homeId, packageId: packageId))
+                    }
+                }
+            )
         case let .homeTasks(homeId):
             HouseholdTasksListView(
                 viewModel: HouseholdTasksListViewModel(
@@ -715,6 +751,25 @@ public struct HubTabRoot: View {
             homeId: homeId,
             onOpenBill: openBill,
             onAddBill: addBill
+        )
+    }
+
+    private static func packagesListViewModel(
+        homeId: String,
+        currentUserId: String?,
+        push: @escaping (HubRoute) -> Void
+    ) -> PackagesListViewModel {
+        let openPackage: @Sendable (String) -> Void = { packageId in
+            Task { @MainActor in push(.packageDetail(homeId: homeId, packageId: packageId)) }
+        }
+        let logPackage: @Sendable () -> Void = {
+            Task { @MainActor in push(.logPackage(homeId: homeId)) }
+        }
+        return PackagesListViewModel(
+            homeId: homeId,
+            currentUserId: currentUserId,
+            onOpenPackage: openPackage,
+            onLogPackage: logPackage
         )
     }
 

@@ -62,6 +62,7 @@ fun HomeDashboardScreen(
     onOpenPolls: ((String) -> Unit)? = null,
     onOpenPlaceholder: ((String) -> Unit)? = null,
     onOpenPets: ((String) -> Unit)? = null,
+    onOpenPackages: ((String) -> Unit)? = null,
     onOpenAccessCodes: ((homeId: String, homeName: String?) -> Unit)? = null,
     onOpenTasks: ((String) -> Unit)? = null,
     onOpenMaintenance: ((String) -> Unit)? = null,
@@ -85,6 +86,7 @@ fun HomeDashboardScreen(
     fun actionLabel(actionId: String): String =
         when (actionId) {
             "log_package" -> "Log a package"
+            "view_packages" -> "Packages"
             "add_mail" -> "Add mail"
             "add_member" -> "Add member"
             "verify" -> "Verify home"
@@ -144,6 +146,10 @@ fun HomeDashboardScreen(
             "pets" ->
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenPets?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "view_packages" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenPackages?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
             "access_codes" ->
                 viewModel.currentHomeId()?.let { homeId ->

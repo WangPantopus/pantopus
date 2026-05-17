@@ -56,6 +56,14 @@ public enum YouRoute: Hashable {
     case homeBills(homeId: String)
     /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
     case homePets(homeId: String)
+    /// T6.3d — Packages. The home-context "me.packages" Activity row +
+    /// the Home Dashboard "view_packages" quick action push here.
+    case homePackages(homeId: String)
+    /// T6.3d — Package detail. Pushed from a row tap on the Packages list.
+    case packageDetail(homeId: String, packageId: String)
+    /// T6.3d — Log a package sheet target. Presented modally from the
+    /// Packages list FAB and the empty-state CTA.
+    case logPackage(homeId: String)
     /// T6.3e — Polls. The home-context "me.polls" action tile pushes here.
     case homePolls(homeId: String)
     /// T6.3e — Poll detail. Pushed from a Polls list row.
@@ -138,6 +146,11 @@ public struct YouTabRoot: View {
     @State private var debugInviteFormHomeId: String?
     @State private var debugDisambiguateFormMailId: String?
     #endif
+
+    private var currentUserId: String? {
+        if case let .signedIn(user) = auth.state { return user.id }
+        return nil
+    }
 
     public init() {}
 
@@ -322,6 +335,12 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.packages":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homePackages(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         case "me.polls":
             if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homePolls(homeId: homeId))
@@ -386,6 +405,11 @@ public struct YouTabRoot: View {
         case "me.bills":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
+                return
+            }
+        case "me.packages":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homePackages(homeId: homeId))
                 return
             }
         case "me.polls":
@@ -709,6 +733,43 @@ public struct YouTabRoot: View {
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homePackages(homeId):
+            PackagesListView(
+                viewModel: PackagesListViewModel(
+                    homeId: homeId,
+                    currentUserId: currentUserId,
+                    onOpenPackage: { packageId in
+                        Task { @MainActor in
+                            path.append(.packageDetail(homeId: homeId, packageId: packageId))
+                        }
+                    },
+                    onLogPackage: {
+                        Task { @MainActor in path.append(.logPackage(homeId: homeId)) }
+                    }
+                )
+            )
+        case let .packageDetail(homeId, packageId):
+            PackageDetailView(
+                homeId: homeId,
+                packageId: packageId
+            ) { if !path.isEmpty { path.removeLast() } }
+        case let .logPackage(homeId):
+            LogPackageSheetView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCreated: { packageId in
+                    Task { @MainActor in
+                        // Replace the log-package destination with the
+                        // new package's detail so Back returns to the
+                        // Packages list, not the form.
+                        path.removeAll { route in
+                            if case .logPackage = route { return true }
+                            return false
+                        }
+                        path.append(.packageDetail(homeId: homeId, packageId: packageId))
+                    }
+                }
+            )
         case let .homePolls(homeId):
             PollsListView(
                 viewModel: PollsListViewModel(
@@ -801,6 +862,9 @@ public struct YouTabRoot: View {
                 },
                 onOpenPets: { petHomeId in
                     Task { @MainActor in path.append(.homePets(homeId: petHomeId)) }
+                },
+                onOpenPackages: { packagesHomeId in
+                    Task { @MainActor in path.append(.homePackages(homeId: packagesHomeId)) }
                 },
                 onOpenTasks: { tasksHomeId in
                     Task { @MainActor in path.append(.homeTasks(homeId: tasksHomeId)) }
