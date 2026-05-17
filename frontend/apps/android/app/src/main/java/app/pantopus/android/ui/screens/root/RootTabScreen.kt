@@ -63,6 +63,8 @@ import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.homes.members.MEMBERS_LIST_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.members.MembersListScreen
 import app.pantopus.android.ui.screens.homes.pets.PETS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.pets.PetsListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
@@ -144,6 +146,12 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home pets list. */
     fun homePets(homeId: String): String = "homes/$homeId/pets"
+
+    /** Members list per home (T6.3a / P9). */
+    const val HOME_MEMBERS = "homes/{$MEMBERS_LIST_HOME_ID_KEY}/members"
+
+    /** Build the concrete path for a home members list. */
+    fun homeMembers(homeId: String): String = "homes/$homeId/members"
 
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
@@ -637,6 +645,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
+                    onOpenHomeMembers = { homeId -> navController.navigate(ChildRoutes.homeMembers(homeId)) },
                 )
             }
 
@@ -668,6 +677,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenPets = { homeId ->
                         navController.navigate(ChildRoutes.homePets(homeId))
+                    },
+                    onOpenMembers = { homeId ->
+                        navController.navigate(ChildRoutes.homeMembers(homeId))
                     },
                 )
             }
@@ -716,6 +728,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
                 PetsListScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.HOME_MEMBERS,
+                arguments = listOf(navArgument(MEMBERS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                MembersListScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.MAILBOX_LIST) {
                 MailboxListScreen(
