@@ -62,6 +62,7 @@ fun HomeDashboardScreen(
     onOpenPlaceholder: ((String) -> Unit)? = null,
     onOpenPets: ((String) -> Unit)? = null,
     onOpenAccessCodes: ((homeId: String, homeName: String?) -> Unit)? = null,
+    onOpenTasks: ((String) -> Unit)? = null,
     onOpenMaintenance: ((String) -> Unit)? = null,
     /** T6.3a / P9 — push to the per-home Members list. When wired, the
      *  "Members" / "Add member" quick-actions navigate to the list
@@ -87,6 +88,7 @@ fun HomeDashboardScreen(
             "add_member" -> "Add member"
             "verify" -> "Verify home"
             "view_bills" -> "Bills"
+            "view_tasks" -> "Tasks"
             "view_maintenance" -> "Maintenance"
             "pets" -> "Pets"
             "access_codes" -> "Access codes"
@@ -141,6 +143,10 @@ fun HomeDashboardScreen(
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenAccessCodes?.invoke(homeId, viewModel.currentHomeName())
                         ?: openPlaceholder(actionId)
+                }
+            "view_tasks" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenTasks?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
             else -> openPlaceholder(actionId)
         }

@@ -72,6 +72,8 @@ import app.pantopus.android.ui.screens.homes.owners.OWNERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.owners.OwnersListScreen
 import app.pantopus.android.ui.screens.homes.pets.PETS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.pets.PetsListScreen
+import app.pantopus.android.ui.screens.homes.tasks.HOUSEHOLD_TASKS_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.tasks.HouseholdTasksListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
@@ -167,6 +169,12 @@ private object ChildRoutes {
         val encoded = homeName?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
         return "homes/$homeId/access?$ACCESS_CODES_HOME_NAME_KEY=$encoded"
     }
+
+    /** Household tasks list per home (T6.3c / P11). */
+    const val HOME_TASKS = "homes/{$HOUSEHOLD_TASKS_HOME_ID_KEY}/tasks"
+
+    /** Build the concrete path for a home household tasks list. */
+    fun homeTasks(homeId: String): String = "homes/$homeId/tasks"
 
     /** Maintenance list per home (T6.3b / P10). */
     const val HOME_MAINTENANCE = "homes/{$MAINTENANCE_HOME_ID_KEY}/maintenance"
@@ -683,6 +691,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenAccessCodes = { homeId, homeName ->
                         navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
                     },
+                    onOpenHomeTasks = { homeId -> navController.navigate(ChildRoutes.homeTasks(homeId)) },
                     onOpenHomeMaintenance = { homeId ->
                         navController.navigate(ChildRoutes.homeMaintenance(homeId))
                     },
@@ -722,6 +731,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenAccessCodes = { homeId, homeName ->
                         navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
+                    },
+                    onOpenTasks = { homeId ->
+                        navController.navigate(ChildRoutes.homeTasks(homeId))
                     },
                     onOpenMaintenance = { homeId ->
                         navController.navigate(ChildRoutes.homeMaintenance(homeId))
@@ -799,6 +811,23 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onSearch = {
                         navController.navigate(ChildRoutes.placeholder("Search access codes"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.HOME_TASKS,
+                arguments = listOf(navArgument(HOUSEHOLD_TASKS_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                HouseholdTasksListScreen(
+                    onOpenTask = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Task detail"))
+                    },
+                    onAddTask = {
+                        navController.navigate(ChildRoutes.placeholder("Add a task"))
+                    },
+                    onEditRecurring = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Edit recurring task"))
                     },
                     onBack = { navController.popBackStack() },
                 )

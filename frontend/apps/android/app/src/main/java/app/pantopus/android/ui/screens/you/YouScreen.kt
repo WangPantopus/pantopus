@@ -92,6 +92,7 @@ fun YouScreen(
     onOpenHomeBills: (String) -> Unit = {},
     onOpenHomePets: (String) -> Unit = {},
     onOpenAccessCodes: (homeId: String, homeName: String?) -> Unit = { _, _ -> },
+    onOpenHomeTasks: (String) -> Unit = {},
     onOpenHomeMaintenance: (String) -> Unit = {},
     onOpenHomeOwners: (String) -> Unit = {},
     onOpenHomeMembers: (String) -> Unit = {},
@@ -131,6 +132,10 @@ fun YouScreen(
                     val homeId = tile.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomePets(homeId) else onOpenPlaceholder(tile.label)
                 }
+                "me.tasks" -> {
+                    val homeId = tile.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeTasks(homeId) else onOpenPlaceholder(tile.label)
+                }
                 "me.maintenance" -> {
                     val homeId = tile.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomeMaintenance(homeId) else onOpenPlaceholder(tile.label)
@@ -163,6 +168,10 @@ fun YouScreen(
                     } else {
                         onOpenPlaceholder(row.label)
                     }
+                }
+                "me.tasks" -> {
+                    val homeId = row.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeTasks(homeId) else onOpenPlaceholder(row.label)
                 }
                 "me.maintenance" -> {
                     val homeId = row.routeArgs["homeId"].orEmpty()
