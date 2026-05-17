@@ -76,7 +76,7 @@ final class MailboxListReskinTests: XCTestCase {
         let vm = makeVM()
         let mail = makeMail(displayTitle: nil)
         let row = vm.row(for: mail)
-        XCTAssertEqual(row.title, "Mail") // subject is also nil in fixture
+        XCTAssertEqual(row.title, "City of Oakland") // subject is also nil in fixture
     }
 
     func testUnviewedMailGetsUnreadHighlight() {

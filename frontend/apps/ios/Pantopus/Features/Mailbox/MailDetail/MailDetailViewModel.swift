@@ -267,7 +267,7 @@ public final class MailDetailViewModel {
             mailId: item.id,
             category: category,
             trust: trust,
-            detailTrust: trust.detailTrust,
+            detailTrust: category.detailTrust,
             senderDisplayName: senderDisplayName,
             senderMeta: senderMeta,
             senderInitials: initials,
