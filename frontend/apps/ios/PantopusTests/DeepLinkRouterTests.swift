@@ -185,7 +185,7 @@ final class DeepLinkRouterTests: XCTestCase {
         DeepLinkRouter.shared.handle(url: url)
         XCTAssertEqual(
             DeepLinkRouter.shared.pending,
-            .verifyEmail(token: "hashed-otp", email: "alice%40example.com")
+            .verifyEmail(token: "hashed-otp", email: "alice@example.com")
         )
     }
 

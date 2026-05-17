@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "TooManyFunctions")
+@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "MagicNumber", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.status
 

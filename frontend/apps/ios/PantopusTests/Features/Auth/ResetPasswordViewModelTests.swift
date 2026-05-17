@@ -78,7 +78,7 @@ final class ResetPasswordViewModelTests: XCTestCase {
         XCTAssertNil(vm.errorMessage)
         XCTAssertFalse(vm.isLoading)
 
-        let body = SequencedURLProtocol.capturedRequests.last?.httpBody
+        let body = SequencedURLProtocol.capturedRequests.last?.httpBodyData()
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         XCTAssertEqual(body?["token"] as? String, "deep-tok")
         XCTAssertEqual(body?["newPassword"] as? String, "strongpass1")
@@ -112,5 +112,26 @@ final class ResetPasswordViewModelTests: XCTestCase {
         // password missing — gate blocks submission
         await vm.submit(using: auth)
         XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 0)
+    }
+}
+
+private extension URLRequest {
+    func httpBodyData() -> Data? {
+        if let direct = httpBody { return direct }
+        guard let stream = httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        let bufferSize = 4096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
     }
 }

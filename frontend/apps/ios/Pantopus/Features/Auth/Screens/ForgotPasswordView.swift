@@ -218,7 +218,7 @@ final class ForgotPasswordViewModel {
 
 #Preview {
     NavigationStack {
-        ForgotPasswordView(onBack: {})
+        ForgotPasswordView {}
             .environment(AuthManager.previewSignedOut)
     }
 }

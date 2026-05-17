@@ -468,7 +468,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 navController.navigate(ChildRoutes.publicProfile(pending.id))
                 DeepLinkRouter.consume()
             }
-            is DeepLinkRouter.Destination.Unknown -> {
+            is DeepLinkRouter.Destination.ResetPassword,
+            is DeepLinkRouter.Destination.VerifyEmail,
+            is DeepLinkRouter.Destination.Unknown,
+            -> {
                 DeepLinkRouter.consume()
             }
         }

@@ -46,13 +46,13 @@ final class VerifyEmailViewModelTests: XCTestCase {
         ]
         let auth = makeAuth()
         let vm = VerifyEmailViewModel(email: "alice@example.com", token: nil, softGate: true)
-        let t0 = Date(timeIntervalSince1970: 5_000)
+        let t0 = Date(timeIntervalSince1970: 5000)
 
         await vm.resend(using: auth, now: t0)
 
         XCTAssertTrue(vm.didResend)
         XCTAssertNil(vm.errorMessage)
-        XCTAssertEqual(vm.resendCooldownUntil?.timeIntervalSince1970, 5_030)
+        XCTAssertEqual(vm.resendCooldownUntil?.timeIntervalSince1970, 5030)
         XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 1)
     }
 
@@ -62,7 +62,7 @@ final class VerifyEmailViewModelTests: XCTestCase {
         ]
         let auth = makeAuth()
         let vm = VerifyEmailViewModel(email: "alice@example.com", token: nil, softGate: true)
-        let t0 = Date(timeIntervalSince1970: 5_000)
+        let t0 = Date(timeIntervalSince1970: 5000)
 
         await vm.resend(using: auth, now: t0)
         XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 1)
@@ -81,7 +81,9 @@ final class VerifyEmailViewModelTests: XCTestCase {
         let t0 = Date(timeIntervalSince1970: 0)
         await vm.resend(using: auth, now: t0)
 
-        XCTAssertEqual(vm.cooldownRemaining(now: t0.addingTimeInterval(5)), 25, accuracy: 0.5)
+        let remaining = vm.cooldownRemaining(now: t0.addingTimeInterval(5))
+        XCTAssertNotNil(remaining)
+        XCTAssertEqual(remaining ?? 0, 25, accuracy: 0.5)
         XCTAssertNil(vm.cooldownRemaining(now: t0.addingTimeInterval(40)))
     }
 
@@ -112,7 +114,7 @@ final class VerifyEmailViewModelTests: XCTestCase {
         XCTAssertTrue(vm.didVerify)
         XCTAssertNil(vm.errorMessage)
         XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 1)
-        let body = SequencedURLProtocol.capturedRequests.last?.httpBody
+        let body = SequencedURLProtocol.capturedRequests.last?.httpBodyData()
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         XCTAssertEqual(body?["tokenHash"] as? String, "hashed-tok")
     }
@@ -134,5 +136,26 @@ final class VerifyEmailViewModelTests: XCTestCase {
         await vm.verifyOnAppearIfNeeded(using: auth)
         await vm.verifyOnAppearIfNeeded(using: auth)
         XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 1, "re-entry must not re-POST")
+    }
+}
+
+private extension URLRequest {
+    func httpBodyData() -> Data? {
+        if let direct = httpBody { return direct }
+        guard let stream = httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        let bufferSize = 4096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
     }
 }

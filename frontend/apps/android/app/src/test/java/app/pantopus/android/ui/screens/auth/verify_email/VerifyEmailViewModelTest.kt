@@ -44,13 +44,14 @@ class VerifyEmailViewModelTest {
         repo: AuthRepository = mockk(relaxed = true),
         clock: Clock = Clock.fixed(Instant.ofEpochSecond(5_000), ZoneOffset.UTC),
     ): VerifyEmailViewModel {
-        val handle = SavedStateHandle(
-            buildMap<String, Any?> {
-                if (email != null) put(VerifyEmailViewModel.EMAIL_KEY, email)
-                if (token != null) put(VerifyEmailViewModel.TOKEN_KEY, token)
-                put(VerifyEmailViewModel.SOFT_GATE_KEY, softGate)
-            },
-        )
+        val handle =
+            SavedStateHandle(
+                buildMap<String, Any?> {
+                    if (email != null) put(VerifyEmailViewModel.EMAIL_KEY, email)
+                    if (token != null) put(VerifyEmailViewModel.TOKEN_KEY, token)
+                    put(VerifyEmailViewModel.SOFT_GATE_KEY, softGate)
+                },
+            )
         return VerifyEmailViewModel(repo, handle).apply { this.clock = clock }
     }
 
@@ -98,11 +99,14 @@ class VerifyEmailViewModelTest {
             coEvery { repo.resendVerification(any()) } returns Unit
 
             var nowMs = 5_000_000L
-            val clock = object : Clock() {
-                override fun getZone() = ZoneOffset.UTC
-                override fun withZone(zone: java.time.ZoneId) = this
-                override fun instant(): Instant = Instant.ofEpochMilli(nowMs)
-            }
+            val clock =
+                object : Clock() {
+                    override fun getZone() = ZoneOffset.UTC
+
+                    override fun withZone(zone: java.time.ZoneId) = this
+
+                    override fun instant(): Instant = Instant.ofEpochMilli(nowMs)
+                }
             val vm = buildVm(repo = repo, clock = clock)
 
             vm.resend()

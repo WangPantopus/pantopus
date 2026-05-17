@@ -105,11 +105,14 @@ class ForgotPasswordViewModelTest {
 
             // Mutable clock so we can step through the cooldown window.
             var nowMs = 1_000_000L
-            val clock = object : Clock() {
-                override fun getZone() = ZoneOffset.UTC
-                override fun withZone(zone: java.time.ZoneId) = this
-                override fun instant(): Instant = Instant.ofEpochMilli(nowMs)
-            }
+            val clock =
+                object : Clock() {
+                    override fun getZone() = ZoneOffset.UTC
+
+                    override fun withZone(zone: java.time.ZoneId) = this
+
+                    override fun instant(): Instant = Instant.ofEpochMilli(nowMs)
+                }
             val vm = buildVm(repo, clock = clock)
 
             vm.onEmailChange("alice@example.com")

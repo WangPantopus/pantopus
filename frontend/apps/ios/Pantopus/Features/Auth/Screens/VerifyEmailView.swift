@@ -215,12 +215,15 @@ struct VerifyEmailView: View {
                 .accessibilityIdentifier("verifyEmailDoLaterButton")
             }
 
-            Button(action: { showChangeEmailSheet = true }) {
-                Text("Wrong email? Change it")
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                    .frame(maxWidth: .infinity, minHeight: 32)
-            }
+            Button(
+                action: { showChangeEmailSheet = true },
+                label: {
+                    Text("Wrong email? Change it")
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 32)
+                }
+            )
             .accessibilityIdentifier("verifyEmailChangeEmailButton")
         }
         .padding(.horizontal, Spacing.s4)
@@ -365,7 +368,11 @@ final class VerifyEmailViewModel {
     /// Re-sends the verification email. Honours the local cooldown so
     /// repeated taps don't pile on the backend rate limiter.
     func resend(using auth: AuthManager, now: Date = Date()) async {
-        guard canResend, let email else { return }
+        guard !isResending,
+              cooldownRemaining(now: now) == nil,
+              let email,
+              !email.isEmpty
+        else { return }
         clearError()
         isResending = true
         didResend = false

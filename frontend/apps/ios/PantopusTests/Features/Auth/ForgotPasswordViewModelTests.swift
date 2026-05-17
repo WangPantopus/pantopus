@@ -52,7 +52,7 @@ final class ForgotPasswordViewModelTests: XCTestCase {
         let vm = ForgotPasswordViewModel()
         vm.email = "  Alice@Example.com  "
 
-        await vm.requestReset(using: auth, now: Date(timeIntervalSince1970: 1_000))
+        await vm.requestReset(using: auth, now: Date(timeIntervalSince1970: 1000))
 
         if case let .sent(email) = vm.phase {
             XCTAssertEqual(email, "alice@example.com", "email should be trimmed + lowercased")
@@ -61,9 +61,9 @@ final class ForgotPasswordViewModelTests: XCTestCase {
         }
         XCTAssertNil(vm.errorMessage)
         XCTAssertFalse(vm.isLoading)
-        XCTAssertEqual(vm.resendCooldownUntil?.timeIntervalSince1970, 1_030)
+        XCTAssertEqual(vm.resendCooldownUntil?.timeIntervalSince1970, 1030)
 
-        let body = SequencedURLProtocol.capturedRequests.last?.httpBody
+        let body = SequencedURLProtocol.capturedRequests.last?.httpBodyData()
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         XCTAssertEqual(body?["email"] as? String, "alice@example.com")
     }
@@ -101,7 +101,7 @@ final class ForgotPasswordViewModelTests: XCTestCase {
         let auth = makeAuth()
         let vm = ForgotPasswordViewModel()
         vm.email = "alice@example.com"
-        let t0 = Date(timeIntervalSince1970: 1_000)
+        let t0 = Date(timeIntervalSince1970: 1000)
 
         await vm.requestReset(using: auth, now: t0)
         XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 1)
@@ -113,5 +113,26 @@ final class ForgotPasswordViewModelTests: XCTestCase {
         // After cooldown — the call goes through.
         await vm.resend(email: "alice@example.com", using: auth, now: t0.addingTimeInterval(31))
         XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 2)
+    }
+}
+
+private extension URLRequest {
+    func httpBodyData() -> Data? {
+        if let direct = httpBody { return direct }
+        guard let stream = httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        let bufferSize = 4096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
     }
 }

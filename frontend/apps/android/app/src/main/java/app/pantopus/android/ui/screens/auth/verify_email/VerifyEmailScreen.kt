@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MatchingDeclarationName", "MagicNumber", "LongMethod", "TooManyFunctions")
+@file:Suppress("PackageNaming", "MatchingDeclarationName", "MagicNumber", "LongMethod", "ReturnCount", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.auth.verify_email
 
@@ -78,17 +78,19 @@ fun VerifyEmailScreen(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PantopusColors.appSurface)
-            .testTag(VerifyEmailScreenTags.ROOT),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(PantopusColors.appSurface)
+                .testTag(VerifyEmailScreenTags.ROOT),
     ) {
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.s5),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = Spacing.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.s5),
         ) {
@@ -112,11 +114,12 @@ fun VerifyEmailScreen(
 @Composable
 private fun Illustration() {
     Box(
-        modifier = Modifier
-            .size(140.dp)
-            .clip(CircleShape)
-            .background(PantopusColors.primary50)
-            .testTag(VerifyEmailScreenTags.ILLUSTRATION),
+        modifier =
+            Modifier
+                .size(140.dp)
+                .clip(CircleShape)
+                .background(PantopusColors.primary50)
+                .testTag(VerifyEmailScreenTags.ILLUSTRATION),
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(
@@ -160,12 +163,13 @@ private data class BannerCopy(
 private fun BannerLine(state: VerifyEmailViewModel.UiState) {
     val copy = bannerCopyFor(state) ?: return
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radii.md))
-            .background(copy.background)
-            .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
-            .testTag(VerifyEmailScreenTags.BANNER),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(copy.background)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                .testTag(VerifyEmailScreenTags.BANNER),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -220,10 +224,11 @@ private fun ActionStack(
     onChangeEmail: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(PantopusColors.appSurface)
-            .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -244,22 +249,24 @@ private fun ActionStack(
                 text = "I'll do this later",
                 style = PantopusTextStyle.small.copy(fontWeight = FontWeight.SemiBold),
                 color = PantopusColors.primary600,
-                modifier = Modifier
-                    .clickable(onClick = onDoLater)
-                    .padding(vertical = Spacing.s1)
-                    .testTag(VerifyEmailScreenTags.DO_LATER)
-                    .semantics { contentDescription = "I'll do this later" },
+                modifier =
+                    Modifier
+                        .clickable(onClick = onDoLater)
+                        .padding(vertical = Spacing.s1)
+                        .testTag(VerifyEmailScreenTags.DO_LATER)
+                        .semantics { contentDescription = "I'll do this later" },
             )
         }
         Text(
             text = "Wrong email? Change it",
             style = PantopusTextStyle.caption,
             color = PantopusColors.appTextSecondary,
-            modifier = Modifier
-                .clickable(onClick = onChangeEmail)
-                .padding(vertical = Spacing.s1)
-                .testTag(VerifyEmailScreenTags.CHANGE_EMAIL)
-                .semantics { contentDescription = "Change email" },
+            modifier =
+                Modifier
+                    .clickable(onClick = onChangeEmail)
+                    .padding(vertical = Spacing.s1)
+                    .testTag(VerifyEmailScreenTags.CHANGE_EMAIL)
+                    .semantics { contentDescription = "Change email" },
         )
     }
 }
@@ -271,14 +278,15 @@ private fun PrimaryButton(
     tag: String,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(PantopusColors.primary600)
-            .clickable(onClick = onClick)
-            .testTag(tag)
-            .semantics { contentDescription = label },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.primary600)
+                .clickable(onClick = onClick)
+                .testTag(tag)
+                .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -298,15 +306,16 @@ private fun GhostButton(
     tag: String,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(44.dp)
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(PantopusColors.appSurface)
-            .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.lg))
-            .clickable(enabled = isEnabled, onClick = onClick)
-            .testTag(tag)
-            .semantics { contentDescription = label },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.lg))
+                .clickable(enabled = isEnabled, onClick = onClick)
+                .testTag(tag)
+                .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
         if (isLoading) {

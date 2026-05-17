@@ -47,7 +47,7 @@ struct ResetPasswordView: View {
             case .reset:
                 StatusWaitingView(
                     content: .passwordReset(),
-                    onPrimary: { _ in onDone() }
+                    onPrimary: finishReset
                 )
                 .accessibilityIdentifier("resetPasswordSuccessStatus")
                 .task {
@@ -61,6 +61,10 @@ struct ResetPasswordView: View {
         .background(Theme.Color.appSurface)
         .navigationBarHidden(true)
         .accessibilityIdentifier("resetPasswordScreen")
+    }
+
+    private func finishReset(_: StatusCTA) {
+        onDone()
     }
 
     private var formBody: some View {
@@ -192,7 +196,7 @@ private struct PasswordStrengthRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            ForEach(0 ..< 3, id: \.self) { index in
+            ForEach(0..<3, id: \.self) { index in
                 Capsule()
                     .fill(index < score ? color : Theme.Color.appSurfaceSunken)
                     .frame(height: 5)

@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber")
+@file:Suppress("PackageNaming", "MagicNumber", "SwallowedException", "TooGenericExceptionCaught")
 
 package app.pantopus.android.ui.screens.auth.verify_email
 

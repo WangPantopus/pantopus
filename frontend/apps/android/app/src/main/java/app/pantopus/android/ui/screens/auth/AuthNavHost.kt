@@ -1,3 +1,5 @@
+@file:Suppress("LongMethod")
+
 package app.pantopus.android.ui.screens.auth
 
 import androidx.compose.runtime.Composable
@@ -103,18 +105,19 @@ fun AuthNavHost() {
         }
         composable(
             route = AuthRoutes.VERIFY_EMAIL_PATTERN,
-            arguments = listOf(
-                navArgument(VerifyEmailViewModel.EMAIL_KEY) {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
-                navArgument(VerifyEmailViewModel.TOKEN_KEY) {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
-            ),
+            arguments =
+                listOf(
+                    navArgument(VerifyEmailViewModel.EMAIL_KEY) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument(VerifyEmailViewModel.TOKEN_KEY) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
         ) {
             VerifyEmailScreen(
                 onDone = {

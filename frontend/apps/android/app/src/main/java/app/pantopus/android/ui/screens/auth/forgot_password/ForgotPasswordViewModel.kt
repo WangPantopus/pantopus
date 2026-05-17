@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber")
+@file:Suppress("PackageNaming", "MagicNumber", "SwallowedException", "TooGenericExceptionCaught")
 
 package app.pantopus.android.ui.screens.auth.forgot_password
 
@@ -55,8 +55,7 @@ class ForgotPasswordViewModel
         private val _uiState = MutableStateFlow(UiState())
         val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-        fun onEmailChange(value: String) =
-            _uiState.update { it.copy(email = value, errorMessage = null) }
+        fun onEmailChange(value: String) = _uiState.update { it.copy(email = value, errorMessage = null) }
 
         fun clearError() = _uiState.update { it.copy(errorMessage = null) }
 

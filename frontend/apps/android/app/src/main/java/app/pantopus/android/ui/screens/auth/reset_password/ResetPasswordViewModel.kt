@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber")
+@file:Suppress("PackageNaming", "MagicNumber", "SwallowedException", "TooGenericExceptionCaught")
 
 package app.pantopus.android.ui.screens.auth.reset_password
 
@@ -68,11 +68,9 @@ class ResetPasswordViewModel
             MutableStateFlow(UiState(token = savedStateHandle.get<String>(TOKEN_KEY).orEmpty()))
         val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-        fun onPasswordChange(value: String) =
-            _uiState.update { it.copy(password = value, errorMessage = null) }
+        fun onPasswordChange(value: String) = _uiState.update { it.copy(password = value, errorMessage = null) }
 
-        fun onConfirmPasswordChange(value: String) =
-            _uiState.update { it.copy(confirmPassword = value, errorMessage = null) }
+        fun onConfirmPasswordChange(value: String) = _uiState.update { it.copy(confirmPassword = value, errorMessage = null) }
 
         fun clearError() = _uiState.update { it.copy(errorMessage = null) }
 

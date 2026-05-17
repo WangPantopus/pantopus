@@ -143,7 +143,9 @@ struct LoginView: View {
                         }
                     )
                 case .forgotPassword:
-                    ForgotPasswordView(onBack: { if !path.isEmpty { path.removeLast() } })
+                    ForgotPasswordView {
+                        if !path.isEmpty { path.removeLast() }
+                    }
                 case let .resetPassword(token):
                     ResetPasswordView(
                         token: token,

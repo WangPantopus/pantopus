@@ -35,8 +35,7 @@ class ResetPasswordViewModelTest {
     private fun buildVm(
         token: String,
         repo: AuthRepository = mockk(relaxed = true),
-    ): ResetPasswordViewModel =
-        ResetPasswordViewModel(repo, SavedStateHandle(mapOf(ResetPasswordViewModel.TOKEN_KEY to token)))
+    ): ResetPasswordViewModel = ResetPasswordViewModel(repo, SavedStateHandle(mapOf(ResetPasswordViewModel.TOKEN_KEY to token)))
 
     @Test
     fun `token is captured from SavedStateHandle`() {

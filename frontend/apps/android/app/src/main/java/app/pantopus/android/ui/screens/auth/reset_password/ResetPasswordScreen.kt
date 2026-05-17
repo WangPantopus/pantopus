@@ -80,22 +80,25 @@ fun ResetPasswordScreen(
     onDone: () -> Unit = {},
     redirectDelayMs: Long = 3_000,
 ) {
-    @Suppress("UNUSED_PARAMETER") val tokenForRouter = token
+    @Suppress("UNUSED_PARAMETER")
+    val tokenForRouter = token
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PantopusColors.appSurface)
-            .testTag(ResetPasswordScreenTags.ROOT),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(PantopusColors.appSurface)
+                .testTag(ResetPasswordScreenTags.ROOT),
     ) {
         TopBar(onClose = onClose)
         when (state.phase) {
             is ResetPasswordViewModel.Phase.Form -> FormBody(state = state, viewModel = viewModel)
-            is ResetPasswordViewModel.Phase.Reset -> SuccessBody(
-                onDone = onDone,
-                redirectDelayMs = redirectDelayMs,
-            )
+            is ResetPasswordViewModel.Phase.Reset ->
+                SuccessBody(
+                    onDone = onDone,
+                    redirectDelayMs = redirectDelayMs,
+                )
         }
     }
 }
@@ -103,10 +106,11 @@ fun ResetPasswordScreen(
 @Composable
 private fun TopBar(onClose: () -> Unit) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(44.dp)
-            .background(PantopusColors.appSurface),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .background(PantopusColors.appSurface),
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -114,11 +118,12 @@ private fun TopBar(onClose: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clickable(onClick = onClose)
-                    .testTag(ResetPasswordScreenTags.CLOSE)
-                    .semantics { contentDescription = "Close" },
+                modifier =
+                    Modifier
+                        .size(44.dp)
+                        .clickable(onClick = onClose)
+                        .testTag(ResetPasswordScreenTags.CLOSE)
+                        .semantics { contentDescription = "Close" },
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
@@ -144,11 +149,12 @@ private fun FormBody(
     viewModel: ResetPasswordViewModel,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.s5)
-            .padding(top = Spacing.s5, bottom = Spacing.s5),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.s5)
+                .padding(top = Spacing.s5, bottom = Spacing.s5),
         verticalArrangement = Arrangement.spacedBy(Spacing.s5),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
@@ -169,9 +175,10 @@ private fun FormBody(
             ErrorBanner(
                 error = error,
                 onDismiss = viewModel::clearError,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(ResetPasswordScreenTags.ERROR_BANNER),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .testTag(ResetPasswordScreenTags.ERROR_BANNER),
             )
         }
 
@@ -218,13 +225,14 @@ private fun PasswordField(
             color = PantopusColors.appTextSecondary,
         )
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .clip(RoundedCornerShape(Radii.md))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                .padding(horizontal = Spacing.s3),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                    .padding(horizontal = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
@@ -242,10 +250,11 @@ private fun PasswordField(
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag(tag)
-                    .semantics { contentDescription = label },
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .testTag(tag)
+                        .semantics { contentDescription = label },
                 decorationBox = { inner ->
                     if (value.isEmpty()) {
                         Text(
@@ -266,12 +275,13 @@ private fun PasswordStrengthRow(
     score: Int,
     label: String,
 ) {
-    val color: Color = when (score) {
-        1 -> PantopusColors.error
-        2 -> PantopusColors.warning
-        3 -> PantopusColors.success
-        else -> PantopusColors.appBorder
-    }
+    val color: Color =
+        when (score) {
+            1 -> PantopusColors.error
+            2 -> PantopusColors.warning
+            3 -> PantopusColors.success
+            else -> PantopusColors.appBorder
+        }
     Row(
         modifier = Modifier.fillMaxWidth().testTag(ResetPasswordScreenTags.STRENGTH),
         verticalAlignment = Alignment.CenterVertically,
@@ -279,11 +289,12 @@ private fun PasswordStrengthRow(
     ) {
         repeat(3) { index ->
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(5.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(if (index < score) color else PantopusColors.appSurfaceSunken),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(if (index < score) color else PantopusColors.appSurfaceSunken),
             )
         }
         Text(
@@ -305,14 +316,15 @@ private fun SubmitButton(
     val background =
         if (isEnabled) PantopusColors.primary600 else PantopusColors.appBorderStrong
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(background)
-            .clickable(enabled = isEnabled, onClick = onClick)
-            .testTag(ResetPasswordScreenTags.SUBMIT)
-            .semantics { contentDescription = if (isLoading) "Resetting" else label },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(background)
+                .clickable(enabled = isEnabled, onClick = onClick)
+                .testTag(ResetPasswordScreenTags.SUBMIT)
+                .semantics { contentDescription = if (isLoading) "Resetting" else label },
         contentAlignment = Alignment.Center,
     ) {
         if (isLoading) {

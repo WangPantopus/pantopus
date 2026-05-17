@@ -72,19 +72,21 @@ fun ForgotPasswordScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PantopusColors.appSurface)
-            .testTag(ForgotPasswordScreenTags.ROOT),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(PantopusColors.appSurface)
+                .testTag(ForgotPasswordScreenTags.ROOT),
     ) {
         TopBar(onBack = onBack)
         when (val phase = state.phase) {
             is ForgotPasswordViewModel.Phase.Form -> FormBody(state = state, viewModel = viewModel)
-            is ForgotPasswordViewModel.Phase.Sent -> SentBody(
-                email = phase.email,
-                onResend = viewModel::resend,
-                onBack = onBack,
-            )
+            is ForgotPasswordViewModel.Phase.Sent ->
+                SentBody(
+                    email = phase.email,
+                    onResend = viewModel::resend,
+                    onBack = onBack,
+                )
         }
     }
 }
@@ -92,11 +94,12 @@ fun ForgotPasswordScreen(
 @Composable
 private fun TopBar(onBack: () -> Unit) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(44.dp)
-            .background(PantopusColors.appSurface)
-            .border(0.dp, PantopusColors.appBorderSubtle),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .background(PantopusColors.appSurface)
+                .border(0.dp, PantopusColors.appBorderSubtle),
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -104,11 +107,12 @@ private fun TopBar(onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clickable(onClick = onBack)
-                    .testTag(ForgotPasswordScreenTags.BACK)
-                    .semantics { contentDescription = "Back" },
+                modifier =
+                    Modifier
+                        .size(44.dp)
+                        .clickable(onClick = onBack)
+                        .testTag(ForgotPasswordScreenTags.BACK)
+                        .semantics { contentDescription = "Back" },
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
@@ -134,11 +138,12 @@ private fun FormBody(
     viewModel: ForgotPasswordViewModel,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.s5)
-            .padding(top = Spacing.s5, bottom = Spacing.s5),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.s5)
+                .padding(top = Spacing.s5, bottom = Spacing.s5),
         verticalArrangement = Arrangement.spacedBy(Spacing.s5),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
@@ -159,9 +164,10 @@ private fun FormBody(
             ErrorBanner(
                 error = error,
                 onDismiss = viewModel::clearError,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(ForgotPasswordScreenTags.ERROR_BANNER),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .testTag(ForgotPasswordScreenTags.ERROR_BANNER),
             )
         }
 
@@ -192,13 +198,14 @@ private fun EmailField(
             color = PantopusColors.appTextSecondary,
         )
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .clip(RoundedCornerShape(Radii.md))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                .padding(horizontal = Spacing.s3),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                    .padding(horizontal = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
@@ -215,10 +222,11 @@ private fun EmailField(
                 cursorBrush = SolidColor(PantopusColors.primary600),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag(ForgotPasswordScreenTags.EMAIL_FIELD)
-                    .semantics { contentDescription = "Email address" },
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .testTag(ForgotPasswordScreenTags.EMAIL_FIELD)
+                        .semantics { contentDescription = "Email address" },
                 decorationBox = { inner ->
                     if (value.isEmpty()) {
                         Text(
@@ -245,14 +253,15 @@ private fun SubmitButton(
     val background =
         if (isEnabled) PantopusColors.primary600 else PantopusColors.appBorderStrong
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .clip(RoundedCornerShape(Radii.lg))
-            .background(background)
-            .clickable(enabled = isEnabled, onClick = onClick)
-            .testTag(tag)
-            .semantics { contentDescription = if (isLoading) "Sending" else label },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(background)
+                .clickable(enabled = isEnabled, onClick = onClick)
+                .testTag(tag)
+                .semantics { contentDescription = if (isLoading) "Sending" else label },
         contentAlignment = Alignment.Center,
     ) {
         if (isLoading) {
