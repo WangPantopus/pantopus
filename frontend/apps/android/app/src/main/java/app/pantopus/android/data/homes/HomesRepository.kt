@@ -2,10 +2,16 @@ package app.pantopus.android.data.homes
 
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
+import app.pantopus.android.data.api.models.homes.CreateDocumentRequest
+import app.pantopus.android.data.api.models.homes.CreateDocumentResponse
+import app.pantopus.android.data.api.models.homes.CreateEmergencyRequest
+import app.pantopus.android.data.api.models.homes.CreateEmergencyResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.FileUploadResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.GetHomeDocumentsResponse
+import app.pantopus.android.data.api.models.homes.GetHomeEmergenciesResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
@@ -102,6 +108,32 @@ open class HomesRepository
             homeId: String,
             billId: String,
         ): NetworkResult<GetBillSplitsResponse> = safeApiCall { api.getHomeBillSplits(homeId, billId) }
+
+        // ─── Emergency info (T6.4b / P17) ─────────────────────────
+
+        /** `GET /api/homes/:id/emergencies`. */
+        open suspend fun getHomeEmergencies(
+            homeId: String,
+        ): NetworkResult<GetHomeEmergenciesResponse> = safeApiCall { api.getHomeEmergencies(homeId) }
+
+        /** `POST /api/homes/:id/emergencies`. */
+        open suspend fun createHomeEmergency(
+            homeId: String,
+            request: CreateEmergencyRequest,
+        ): NetworkResult<CreateEmergencyResponse> = safeApiCall { api.createHomeEmergency(homeId, request) }
+
+        // ─── Documents (T6.4b / P17) ──────────────────────────────
+
+        /** `GET /api/homes/:id/documents`. */
+        open suspend fun getHomeDocuments(
+            homeId: String,
+        ): NetworkResult<GetHomeDocumentsResponse> = safeApiCall { api.getHomeDocuments(homeId) }
+
+        /** `POST /api/homes/:id/documents`. */
+        open suspend fun createHomeDocument(
+            homeId: String,
+            request: CreateDocumentRequest,
+        ): NetworkResult<CreateDocumentResponse> = safeApiCall { api.createHomeDocument(homeId, request) }
 
         /**
          * Upload one binary file to `POST /api/files/upload` and return

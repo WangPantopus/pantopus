@@ -43,6 +43,12 @@ public enum YouRoute: Hashable {
     case homeBills(homeId: String)
     /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
     case homePets(homeId: String)
+    /// T6.4b — Emergency info. The home-context "me.emergency" Activity
+    /// row pushes here with the primary home id resolved by the VM.
+    case homeEmergency(homeId: String)
+    /// T6.4b — Documents. The home-context "me.docs" action tile pushes
+    /// here with the primary home id resolved by the VM.
+    case homeDocs(homeId: String)
     /// T5.3.4 — per-listing offers panel. Pushed from a listing detail
     /// "View offers" affordance (visible when the current user owns the
     /// listing). The optional `title` is a hint rendered as the
@@ -276,6 +282,18 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.docs":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeDocs(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
+        case "me.emergency":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeEmergency(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         default:
             path.append(.placeholder(label: tile.label))
         }
@@ -307,6 +325,16 @@ public struct YouTabRoot: View {
         case "me.bills":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
+                return
+            }
+        case "me.docs":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeDocs(homeId: homeId))
+                return
+            }
+        case "me.emergency":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeEmergency(homeId: homeId))
                 return
             }
         case "me.editProfile":
@@ -599,6 +627,63 @@ public struct YouTabRoot: View {
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homeEmergency(homeId):
+            EmergencyInfoView(
+                viewModel: EmergencyInfoViewModel(
+                    homeId: homeId,
+                    onAction: { _ in
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Emergency item"))
+                        }
+                    },
+                    onAdd: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Add emergency info"))
+                        }
+                    },
+                    onShare: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Share emergency info"))
+                        }
+                    },
+                    onPrintCard: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Print emergency card"))
+                        }
+                    }
+                )
+            )
+        case let .homeDocs(homeId):
+            DocumentsView(
+                viewModel: DocumentsViewModel(
+                    homeId: homeId,
+                    onOpenDocument: { _ in
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Document detail"))
+                        }
+                    },
+                    onUpload: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Upload document"))
+                        }
+                    },
+                    onSearch: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Search documents"))
+                        }
+                    },
+                    onExport: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Export documents"))
+                        }
+                    },
+                    onDocumentAction: { _, _ in
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Document action"))
+                        }
+                    }
+                )
+            )
         #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(

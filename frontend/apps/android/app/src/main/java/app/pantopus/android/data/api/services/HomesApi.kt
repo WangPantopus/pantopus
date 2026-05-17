@@ -4,10 +4,16 @@ import app.pantopus.android.data.api.models.common.JsonValue
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CheckAddressResponse
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
+import app.pantopus.android.data.api.models.homes.CreateDocumentRequest
+import app.pantopus.android.data.api.models.homes.CreateDocumentResponse
+import app.pantopus.android.data.api.models.homes.CreateEmergencyRequest
+import app.pantopus.android.data.api.models.homes.CreateEmergencyResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.GetHomeDocumentsResponse
+import app.pantopus.android.data.api.models.homes.GetHomeEmergenciesResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.HomeDetailResponse
 import app.pantopus.android.data.api.models.homes.HomePublicProfileResponse
@@ -138,4 +144,34 @@ interface HomesApi {
         @Path("id") homeId: String,
         @Path("billId") billId: String,
     ): GetBillSplitsResponse
+
+    // ─── Emergency info (T6.4b / P17) ─────────────────────────
+
+    /** `GET /api/homes/:id/emergencies` — route `backend/routes/home.js:5406`. */
+    @GET("api/homes/{id}/emergencies")
+    suspend fun getHomeEmergencies(
+        @Path("id") homeId: String,
+    ): GetHomeEmergenciesResponse
+
+    /** `POST /api/homes/:id/emergencies` — route `backend/routes/home.js:5442`. */
+    @POST("api/homes/{id}/emergencies")
+    suspend fun createHomeEmergency(
+        @Path("id") homeId: String,
+        @Body body: CreateEmergencyRequest,
+    ): CreateEmergencyResponse
+
+    // ─── Documents (T6.4b / P17) ──────────────────────────────
+
+    /** `GET /api/homes/:id/documents` — route `backend/routes/home.js:4944`. */
+    @GET("api/homes/{id}/documents")
+    suspend fun getHomeDocuments(
+        @Path("id") homeId: String,
+    ): GetHomeDocumentsResponse
+
+    /** `POST /api/homes/:id/documents` — route `backend/routes/home.js:4985`. */
+    @POST("api/homes/{id}/documents")
+    suspend fun createHomeDocument(
+        @Path("id") homeId: String,
+        @Body body: CreateDocumentRequest,
+    ): CreateDocumentResponse
 }
