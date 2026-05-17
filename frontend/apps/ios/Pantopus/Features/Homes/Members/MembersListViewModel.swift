@@ -38,7 +38,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable type_body_length
 
 /// Stable tab identifiers — exposed for tests + the view layer.
 public enum MembersTab {
@@ -116,7 +116,7 @@ public final class MembersListViewModel: ListOfRowsDataSource {
     private var pendingInvites: [PendingInviteDTO] = []
     private var loadedOnce = false
 
-    public init(
+    init(
         homeId: String,
         api: APIClient = .shared,
         now: @escaping @Sendable () -> Date = { Date() },
@@ -235,7 +235,7 @@ public final class MembersListViewModel: ListOfRowsDataSource {
             let response: OccupantsResponse = try await api.request(
                 HomesEndpoints.listOccupants(homeId: homeId)
             )
-            occupants = response.occupants.filter { $0.isActive }
+            occupants = response.occupants.filter(\.isActive)
             pendingInvites = response.pendingInvites
             loadedOnce = true
             applyState()
@@ -358,7 +358,13 @@ public final class MembersListViewModel: ListOfRowsDataSource {
         let palette = role.palette
         let name = invite.name
         let inviteId = invite.id
-        let invitedText = "Invited \(Self.formatRelativeTime(invite.createdAt, now: now(), calendar: calendar, timeZone: timeZone) ?? "recently")"
+        let relative = Self.formatRelativeTime(
+            invite.createdAt,
+            now: now(),
+            calendar: calendar,
+            timeZone: timeZone
+        ) ?? "recently"
+        let invitedText = "Invited \(relative)"
         return RowModel(
             id: invite.id,
             title: name,
@@ -464,5 +470,7 @@ public final class MembersListViewModel: ListOfRowsDataSource {
 }
 
 private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }

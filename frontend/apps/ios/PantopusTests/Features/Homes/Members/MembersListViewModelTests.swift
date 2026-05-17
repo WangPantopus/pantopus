@@ -19,7 +19,7 @@
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable type_body_length
 
 @MainActor
 final class MembersListViewModelTests: XCTestCase {
@@ -49,6 +49,7 @@ final class MembersListViewModelTests: XCTestCase {
         return Calendar(identifier: .gregorian).date(from: components)
             ?? Date(timeIntervalSince1970: 1_778_846_400)
     }()
+
     private static let utcCalendar: Calendar = {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = utc
@@ -65,7 +66,7 @@ final class MembersListViewModelTests: XCTestCase {
         )
     }
 
-    // 3 active occupants (owner + admin + guest) + 1 pending invite.
+    // Fixture: 3 active occupants (owner + admin + guest) + 1 pending invite.
     private static let populatedJSON = """
     {
       "occupants":[
@@ -202,7 +203,10 @@ final class MembersListViewModelTests: XCTestCase {
     }
 
     func testEmptyGuestsTabShowsGuestEmptyState() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.populatedJSON)]
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.populatedJSON),
+            .status(200, body: "{}")
+        ]
         let vm = makeVM()
         await vm.load()
         // Remove the guest occupant via the same code path the UI uses.

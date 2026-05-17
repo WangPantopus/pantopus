@@ -206,13 +206,15 @@ class InviteMemberWizardViewModel(
     }
 
     companion object {
+        private const val EMAIL_MAX_LENGTH = 254
+
         /**
          * Loose email validation — backend re-validates. Just enough to
          * gate the Next CTA on the Identify step.
          */
         fun isValidEmail(raw: String): Boolean {
             val trimmed = raw.trim()
-            if (trimmed.isEmpty() || trimmed.length > 254) return false
+            if (trimmed.isEmpty() || trimmed.length > EMAIL_MAX_LENGTH) return false
             val parts = trimmed.split("@")
             if (parts.size != 2) return false
             val local = parts[0]

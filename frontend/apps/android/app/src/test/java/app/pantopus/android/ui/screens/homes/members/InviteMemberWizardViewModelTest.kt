@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -168,6 +169,7 @@ class InviteMemberWizardViewModelTest {
             vm.onPrimary() // → identify
             vm.onPrimary() // → review
             vm.onPrimary() // submit
+            advanceUntilIdle()
             assertNull(vm.pendingEvent.value)
             assertNotNull(vm.state.value.errorMessage)
             assertEquals(InviteMemberStep.Review, vm.state.value.currentStep)
@@ -197,6 +199,7 @@ class InviteMemberWizardViewModelTest {
             vm.onPrimary()
             vm.onPrimary()
             vm.onPrimary()
+            advanceUntilIdle()
             assertEquals("guest", captured.captured.relationship)
             coVerify { repo.invite("home_1", any()) }
         }

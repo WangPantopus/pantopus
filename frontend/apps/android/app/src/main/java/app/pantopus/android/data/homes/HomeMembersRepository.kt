@@ -22,8 +22,7 @@ open class HomeMembersRepository
         private val api: HomeMembersApi,
     ) {
         /** `GET /api/homes/:id/occupants`. */
-        open suspend fun listOccupants(homeId: String): NetworkResult<OccupantsResponse> =
-            safeApiCall { api.listOccupants(homeId) }
+        open suspend fun listOccupants(homeId: String): NetworkResult<OccupantsResponse> = safeApiCall { api.listOccupants(homeId) }
 
         /** `POST /api/homes/:id/invite`. */
         open suspend fun invite(

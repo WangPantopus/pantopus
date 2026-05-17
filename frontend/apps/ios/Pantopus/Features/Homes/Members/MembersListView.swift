@@ -74,7 +74,9 @@ public struct MembersListView: View {
     private struct RemoveTarget: Identifiable, Equatable {
         let userId: String
         let name: String
-        var id: String { userId }
+        var id: String {
+            userId
+        }
     }
 }
 

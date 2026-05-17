@@ -86,15 +86,15 @@ class MembersListViewModel
         private val _selectedTab = MutableStateFlow(MembersTab.MEMBERS)
         val selectedTab: StateFlow<String> = _selectedTab.asStateFlow()
 
+        private var occupants: List<OccupantDto> = emptyList()
+        private var pendingInvites: List<PendingInviteDto> = emptyList()
+        private var loadedOnce = false
+
         private val _tabs = MutableStateFlow(makeTabs())
         val tabs: StateFlow<List<ListOfRowsTab>> = _tabs.asStateFlow()
 
         private val _pendingEvent = MutableStateFlow<MembersListEvent?>(null)
         val pendingEvent: StateFlow<MembersListEvent?> = _pendingEvent.asStateFlow()
-
-        private var occupants: List<OccupantDto> = emptyList()
-        private var pendingInvites: List<PendingInviteDto> = emptyList()
-        private var loadedOnce = false
 
         /** 52dp home-green secondary-create FAB — design contract calls
          *  for `secondaryCreate` because this is a sub-screen of the
@@ -239,11 +239,9 @@ class MembersListViewModel
 
         // ─── Buckets ──────────────────────────────────────────────
 
-        private fun membersBucket(): List<OccupantDto> =
-            occupants.filter { MemberRole.parse(it.role) !in MemberRole.guestRoles }
+        private fun membersBucket(): List<OccupantDto> = occupants.filter { MemberRole.parse(it.role) !in MemberRole.guestRoles }
 
-        private fun guestsBucket(): List<OccupantDto> =
-            occupants.filter { MemberRole.parse(it.role) in MemberRole.guestRoles }
+        private fun guestsBucket(): List<OccupantDto> = occupants.filter { MemberRole.parse(it.role) in MemberRole.guestRoles }
 
         private fun makeTabs(): List<ListOfRowsTab> =
             listOf(
@@ -408,6 +406,13 @@ class MembersListViewModel
         // ─── Helpers ───────────────────────────────────────────────
 
         companion object {
+            private const val SECONDS_PER_MINUTE = 60L
+            private const val SECONDS_PER_HOUR = 3_600L
+            private const val SECONDS_PER_DAY = 86_400L
+            private const val ONE_DAY = 1L
+            private const val DAYS_IN_WEEK = 7L
+            private const val DAYS_IN_MONTH = 30L
+
             fun displayName(occ: OccupantDto): String {
                 if (!occ.displayName.isNullOrEmpty()) return occ.displayName
                 if (!occ.username.isNullOrEmpty()) return "@${occ.username}"
@@ -416,35 +421,40 @@ class MembersListViewModel
 
             private val iso8601: DateTimeFormatter = DateTimeFormatter.ISO_DATE_TIME
 
+            private fun parseInstant(raw: String?): Instant? {
+                if (raw.isNullOrEmpty()) return null
+                return runCatching {
+                    Instant.parse(raw)
+                }.getOrElse {
+                    runCatching {
+                        iso8601.parse(raw, Instant::from)
+                    }.getOrNull()
+                }
+            }
+
             internal fun relativeText(
                 raw: String?,
                 now: Instant,
                 zone: ZoneId,
             ): String? {
-                if (raw.isNullOrEmpty()) return null
-                val instant =
-                    runCatching {
-                        Instant.parse(raw)
-                    }.getOrElse {
-                        runCatching {
-                            iso8601.parse(raw, Instant::from)
-                        }.getOrNull()
-                    } ?: return null
+                val instant = parseInstant(raw) ?: return null
                 val interval = now.epochSecond - instant.epochSecond
-                if (interval < 60) return "just now"
-                if (interval < 3_600) return "${interval / 60}m ago"
-                if (interval < 86_400) return "${interval / 3_600}h ago"
                 val startOfNow = now.atZone(zone).toLocalDate()
                 val startOfDate = instant.atZone(zone).toLocalDate()
                 val dayDelta = ChronoUnit.DAYS.between(startOfDate, startOfNow)
-                if (dayDelta == 1L) return "yesterday"
-                if (dayDelta < 7L) return "${dayDelta}d ago"
-                if (dayDelta < 30L) return "${dayDelta / 7L}w ago"
                 val formatter =
                     DateTimeFormatter
                         .ofPattern("MMM d", Locale.US)
                         .withZone(zone)
-                return formatter.format(instant)
+                return when {
+                    interval < SECONDS_PER_MINUTE -> "just now"
+                    interval < SECONDS_PER_HOUR -> "${interval / SECONDS_PER_MINUTE}m ago"
+                    interval < SECONDS_PER_DAY -> "${interval / SECONDS_PER_HOUR}h ago"
+                    dayDelta == ONE_DAY -> "yesterday"
+                    dayDelta < DAYS_IN_WEEK -> "${dayDelta}d ago"
+                    dayDelta < DAYS_IN_MONTH -> "${dayDelta / DAYS_IN_WEEK}w ago"
+                    else -> formatter.format(instant)
+                }
             }
         }
     }

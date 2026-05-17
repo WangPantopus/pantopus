@@ -43,7 +43,9 @@ public enum InviteMemberStep: Int, CaseIterable, Sendable, Equatable {
     }
 
     /// 1-of-3 readout in the top bar.
-    public var stepNumber: Int { rawValue + 1 }
+    public var stepNumber: Int {
+        rawValue + 1
+    }
 }
 
 /// Form snapshot. Lives on the VM and is sent over the wire on submit.
@@ -82,7 +84,7 @@ public final class InviteMemberWizardViewModel: WizardModel {
     private let api: APIClient
     private var isSubmitting = false
 
-    public init(homeId: String, api: APIClient = .shared) {
+    init(homeId: String, api: APIClient = .shared) {
         self.homeId = homeId
         self.api = api
         form = InviteMemberForm()
@@ -189,7 +191,7 @@ public final class InviteMemberWizardViewModel: WizardModel {
         // The backend's `relationship` field maps to the wire role.
         // Guests are routed via the literal "guest"; everything else
         // sends the role's raw value (owner / admin / member / …).
-        let relationship: String = switch form.role {
+        let relationship = switch form.role {
         case .guest: "guest"
         case .owner: "owner"
         case .admin: "admin"
