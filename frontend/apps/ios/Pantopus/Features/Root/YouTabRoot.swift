@@ -56,6 +56,10 @@ public enum YouRoute: Hashable {
     case homeBills(homeId: String)
     /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
     case homePets(homeId: String)
+    /// P15 / T6.3g — Owners (legal-title roster). The "me.owners"
+    /// Household-section row pushes here with the primary home id
+    /// resolved by `MeViewModel.homeSections(...)`.
+    case homeOwners(homeId: String)
     /// T6.3a / P9 — Members. The home-context "me.members" action tile +
     /// "Household" section row both push here with the resolved home id.
     case homeMembers(homeId: String)
@@ -344,6 +348,11 @@ public struct YouTabRoot: View {
         case "me.bills":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
+                return
+            }
+        case "me.owners":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeOwners(homeId: homeId))
                 return
             }
         case "me.members":
@@ -696,6 +705,15 @@ public struct YouTabRoot: View {
                 onOpenMembers: { membersHomeId in
                     Task { @MainActor in path.append(.homeMembers(homeId: membersHomeId)) }
                 }
+            )
+        case let .homeOwners(homeId):
+            let currentUserId: String? = {
+                if case let .signedIn(user) = auth.state { return user.id }
+                return nil
+            }()
+            OwnersListView(
+                homeId: homeId,
+                currentUserId: currentUserId
             )
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId)
