@@ -73,6 +73,11 @@ import app.pantopus.android.ui.screens.homes.owners.OWNERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.owners.OwnersListScreen
 import app.pantopus.android.ui.screens.homes.pets.PETS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.pets.PetsListScreen
+import app.pantopus.android.ui.screens.homes.polls.POLLS_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.polls.POLL_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.polls.POLL_DETAIL_POLL_ID_KEY
+import app.pantopus.android.ui.screens.homes.polls.PollDetailScreen
+import app.pantopus.android.ui.screens.homes.polls.PollsListScreen
 import app.pantopus.android.ui.screens.homes.tasks.HOUSEHOLD_TASKS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.HouseholdTasksListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
@@ -155,6 +160,21 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home pets list. */
     fun homePets(homeId: String): String = "homes/$homeId/pets"
+
+    /** Polls list per home (T6.3e / P13). */
+    const val HOME_POLLS = "homes/{$POLLS_HOME_ID_KEY}/polls"
+
+    /** Poll detail (T6.3e / P13). */
+    const val POLL_DETAIL = "homes/{$POLL_DETAIL_HOME_ID_KEY}/polls/{$POLL_DETAIL_POLL_ID_KEY}"
+
+    /** Build the concrete path for a home polls list. */
+    fun homePolls(homeId: String): String = "homes/$homeId/polls"
+
+    /** Build the concrete path for a poll detail. */
+    fun pollDetail(
+        homeId: String,
+        pollId: String,
+    ): String = "homes/$homeId/polls/$pollId"
 
     /** Access codes per home (T6.4a). `homeName` rides as a query so the
      *  designed 2-line top bar can render without a second fetch. */
@@ -696,6 +716,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
+                    onOpenHomePolls = { homeId -> navController.navigate(ChildRoutes.homePolls(homeId)) },
                     onOpenAccessCodes = { homeId, homeName ->
                         navController.navigate(ChildRoutes.accessCodes(homeId, homeName))
                     },
@@ -747,6 +768,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenClaimsList = { navController.navigate(ChildRoutes.MY_CLAIMS) },
                     onOpenBills = { homeId ->
                         navController.navigate(ChildRoutes.homeBills(homeId))
+                    },
+                    onOpenPolls = { homeId ->
+                        navController.navigate(ChildRoutes.homePolls(homeId))
                     },
                     onOpenPlaceholder = { label ->
                         navController.navigate(ChildRoutes.placeholder(label))
@@ -813,6 +837,33 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
                 PetsListScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.HOME_POLLS,
+                arguments = listOf(navArgument(POLLS_HOME_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(POLLS_HOME_ID_KEY).orEmpty()
+                PollsListScreen(
+                    onOpenPoll = { pollId ->
+                        navController.navigate(ChildRoutes.pollDetail(homeId, pollId))
+                    },
+                    onStartPoll = {
+                        navController.navigate(ChildRoutes.placeholder("Start a poll"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.POLL_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(POLL_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(POLL_DETAIL_POLL_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                PollDetailScreen(
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(
                 route = ChildRoutes.ACCESS_CODES,
