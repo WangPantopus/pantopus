@@ -112,19 +112,22 @@ final class DisambiguateMailFormViewModel {
 
     private let mailId: String
     private let api: APIClient
+    private let isOnlineProvider: @MainActor () -> Bool
 
     init(
         mailId: String,
         ocrRecipient: String = "",
         confidence: Double = 0.0,
         envelopeImageURL: URL? = nil,
-        api: APIClient = .shared
+        api: APIClient = .shared,
+        isOnlineProvider: @escaping @MainActor () -> Bool = { NetworkMonitor.shared.isOnline }
     ) {
         self.mailId = mailId
         self.ocrRecipient = ocrRecipient
         self.confidence = confidence
         self.envelopeImageURL = envelopeImageURL
         self.api = api
+        self.isOnlineProvider = isOnlineProvider
     }
 
     func select(_ choice: MailRecipientChoice) {
@@ -141,7 +144,7 @@ final class DisambiguateMailFormViewModel {
             toast = ToastMessage(text: aliasError, kind: .error)
             return false
         }
-        if !NetworkMonitor.shared.isOnline {
+        if !isOnlineProvider() {
             toast = ToastMessage(
                 text: "You're offline. Try again when you're back online.",
                 kind: .error

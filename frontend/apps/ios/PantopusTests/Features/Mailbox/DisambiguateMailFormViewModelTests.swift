@@ -31,7 +31,7 @@ final class DisambiguateMailFormViewModelTests: XCTestCase {
             confidence: 0.85,
             envelopeImageURL: nil,
             api: makeAPI()
-        )
+        ) { true }
     }
 
     func testInitialStateBlocksSubmit() {

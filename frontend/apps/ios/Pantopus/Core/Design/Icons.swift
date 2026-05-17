@@ -143,6 +143,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case wandSparkles = "wand-sparkles"
     case arrowUpRight = "arrow-up-right"
 
+    // T6.3c Household tasks — chore-category iconography + banner glyph.
+    case leaf
+    case listChecks = "list-checks"
+    case utensils
+    case baby
+
     // T6.3b Maintenance — per-home maintenance task category iconography.
     // Same rationale as the Bills T6.0a additions: the design's
     // category-tinted leading tiles need glyphs that aren't on the
@@ -268,6 +274,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .shuffle: "shuffle"
         case .wandSparkles: "wand.and.stars"
         case .arrowUpRight: "arrow.up.right"
+        case .leaf: "leaf"
+        case .listChecks: "checklist"
+        case .utensils: "fork.knife"
+        case .baby: "figure.child"
         // T6.3b Maintenance. SF Symbols ships direct equivalents for most
         // — only `paint-roller` and `bell-ring` lack 1:1 glyphs, fall back
         // to `paintbrush.pointed` and `bell.badge` respectively.

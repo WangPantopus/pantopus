@@ -27,6 +27,10 @@ public enum HubRoute: Hashable {
     case packageDetail(homeId: String, packageId: String)
     /// Log-a-package sheet target.
     case logPackage(homeId: String)
+    /// Household tasks (per-home chore list) for a specific home
+    /// (T6.3c / P11). Distinct from `.myBids` / `.myTasks` (the gig
+    /// surfaces in the You tab).
+    case homeTasks(homeId: String)
     /// Maintenance sub-screen for a specific home (T6.3b / P10).
     case homeMaintenance(homeId: String)
     /// Members sub-screen for a specific home (T6.3a / P9).
@@ -317,6 +321,9 @@ public struct HubTabRoot: View {
                 onOpenPackages: { id in
                     Task { @MainActor in push(.homePackages(homeId: id)) }
                 },
+                onOpenTasks: { id in
+                    Task { @MainActor in push(.homeTasks(homeId: id)) }
+                },
                 onOpenMaintenance: { id in
                     Task { @MainActor in push(.homeMaintenance(homeId: id)) }
                 },
@@ -390,6 +397,21 @@ public struct HubTabRoot: View {
                         path.append(.packageDetail(homeId: homeId, packageId: packageId))
                     }
                 }
+            )
+        case let .homeTasks(homeId):
+            HouseholdTasksListView(
+                viewModel: HouseholdTasksListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Task detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in push(.placeholder(label: "Add a task")) }
+                    },
+                    onEditRecurring: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Edit recurring task")) }
+                    }
+                )
             )
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId)
