@@ -27,7 +27,11 @@ import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.BorderColor
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -50,6 +54,7 @@ import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.HourglassEmpty
@@ -58,11 +63,13 @@ import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MarkunreadMailbox
+import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreTime
@@ -78,6 +85,7 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Share
@@ -249,6 +257,16 @@ enum class PantopusIcon(
     Shuffle("shuffle"),
     WandSparkles("wand-sparkles"),
     ArrowUpRight("arrow-up-right"),
+
+    // T6.4c — Home calendar event-type palette + banner illustration.
+    Wrench("wrench"),
+    UsersRound("users-round"),
+    Gift("gift"),
+    PartyPopper("party-popper"),
+    GraduationCap("graduation-cap"),
+    Stethoscope("stethoscope"),
+    CalendarDays("calendar-days"),
+    Link("link"),
     ;
 
     companion object {
@@ -398,6 +416,18 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Shuffle -> IconSource.Material(Icons.Filled.Shuffle)
         PantopusIcon.WandSparkles -> IconSource.Material(Icons.Filled.AutoFixHigh)
         PantopusIcon.ArrowUpRight -> IconSource.Material(Icons.Filled.NorthEast)
+        // T6.4c — Home calendar event-type palette. Material lacks
+        // direct equivalents for Lucide `wrench`, `gift`, `party-popper`,
+        // `graduation-cap`, `stethoscope`, `calendar-days`; fall back to
+        // the closest visually-similar Material vector.
+        PantopusIcon.Wrench -> IconSource.Material(Icons.Filled.Build)
+        PantopusIcon.UsersRound -> IconSource.Material(Icons.Filled.Groups)
+        PantopusIcon.Gift -> IconSource.Material(Icons.Filled.CardGiftcard)
+        PantopusIcon.PartyPopper -> IconSource.Material(Icons.Filled.Celebration)
+        PantopusIcon.GraduationCap -> IconSource.Material(Icons.Filled.School)
+        PantopusIcon.Stethoscope -> IconSource.Material(Icons.Filled.MedicalServices)
+        PantopusIcon.CalendarDays -> IconSource.Material(Icons.Filled.CalendarMonth)
+        PantopusIcon.Link -> IconSource.Material(Icons.Filled.Link)
     }
 
 /**

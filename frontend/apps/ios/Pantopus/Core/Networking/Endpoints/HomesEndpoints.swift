@@ -121,6 +121,50 @@ public enum HomesEndpoints {
         )
     }
 
+    // MARK: - Calendar events (T6.4c / P18)
+
+    /// `GET /api/homes/:id/events` — route `backend/routes/home.js:4793`.
+    /// Optional `start_after` / `start_before` ISO-8601 filters narrow
+    /// the agenda window; both nil returns every event for the home.
+    public static func homeEvents(
+        homeId: String,
+        startAfter: String? = nil,
+        startBefore: String? = nil
+    ) -> Endpoint {
+        var query: [String: String] = [:]
+        if let startAfter { query["start_after"] = startAfter }
+        if let startBefore { query["start_before"] = startBefore }
+        return Endpoint(
+            method: .get,
+            path: "/api/homes/\(homeId)/events",
+            query: query
+        )
+    }
+
+    /// `POST /api/homes/:id/events` — route `backend/routes/home.js:4827`.
+    public static func createHomeEvent(
+        homeId: String,
+        request: CreateHomeEventRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/events",
+            body: request
+        )
+    }
+
+    /// `DELETE /api/homes/:id/events/:eventId` — route
+    /// `backend/routes/home.js:4912`.
+    public static func deleteHomeEvent(
+        homeId: String,
+        eventId: String
+    ) -> Endpoint {
+        Endpoint(
+            method: .delete,
+            path: "/api/homes/\(homeId)/events/\(eventId)"
+        )
+    }
+
     // MARK: - Pets (T5.2.1)
 
     /// `GET /api/homes/:id/pets` — route `backend/routes/home.js:6789`.

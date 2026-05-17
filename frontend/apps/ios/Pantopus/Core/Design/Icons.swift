@@ -143,6 +143,16 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case wandSparkles = "wand-sparkles"
     case arrowUpRight = "arrow-up-right"
 
+    // T6.4c Home calendar — event-type palette + banner illustration.
+    case wrench
+    case usersRound = "users-round"
+    case gift
+    case partyPopper = "party-popper"
+    case graduationCap = "graduation-cap"
+    case stethoscope
+    case calendarDays = "calendar-days"
+    case link
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -254,6 +264,14 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .shuffle: "shuffle"
         case .wandSparkles: "wand.and.stars"
         case .arrowUpRight: "arrow.up.right"
+        case .wrench: "wrench.adjustable"
+        case .usersRound: "person.3"
+        case .gift: "gift"
+        case .partyPopper: "party.popper"
+        case .graduationCap: "graduationcap"
+        case .stethoscope: "stethoscope"
+        case .calendarDays: "calendar"
+        case .link: "link"
         }
     }
 }

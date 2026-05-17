@@ -57,6 +57,8 @@ import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_BILL_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.BillDetailScreen
 import app.pantopus.android.ui.screens.homes.bills.BillsListScreen
+import app.pantopus.android.ui.screens.homes.calendar.HOME_CALENDAR_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.calendar.HomeCalendarScreen
 import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
@@ -144,6 +146,12 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home pets list. */
     fun homePets(homeId: String): String = "homes/$homeId/pets"
+
+    /** Home calendar per home (T6.4c / P18). */
+    const val HOME_CALENDAR = "homes/{$HOME_CALENDAR_HOME_ID_KEY}/calendar"
+
+    /** Build the concrete path for a home calendar. */
+    fun homeCalendar(homeId: String): String = "homes/$homeId/calendar"
 
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
@@ -637,6 +645,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
+                    onOpenHomeCalendar = { homeId ->
+                        navController.navigate(ChildRoutes.homeCalendar(homeId))
+                    },
                 )
             }
 
@@ -668,6 +679,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenPets = { homeId ->
                         navController.navigate(ChildRoutes.homePets(homeId))
+                    },
+                    onOpenCalendar = { homeId ->
+                        navController.navigate(ChildRoutes.homeCalendar(homeId))
                     },
                 )
             }
@@ -716,6 +730,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
                 PetsListScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.HOME_CALENDAR,
+                arguments =
+                    listOf(navArgument(HOME_CALENDAR_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                HomeCalendarScreen(
+                    onAddEvent = { navController.navigate(ChildRoutes.placeholder("Add event")) },
+                    onOpenEvent = {
+                        navController.navigate(ChildRoutes.placeholder("Event detail"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(ChildRoutes.MAILBOX_LIST) {
                 MailboxListScreen(

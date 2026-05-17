@@ -18,11 +18,27 @@ import SwiftUI
 // MARK: - Shell
 
 /// List-of-rows shell.
-public struct ListOfRowsView<DataSource: ListOfRowsDataSource>: View {
+///
+/// T6.4c — extended additively with a `customHeader` view-builder slot.
+/// The shell renders the slot between the chrome (search / chip / tab
+/// strip) and the state body. The slot is generic over a `Header: View`
+/// so concrete screens can hand the shell arbitrary feature-local chrome
+/// without leaking that view's type into the shell. The Home calendar's
+/// `MonthStripHeader` is the only consumer today; every existing call
+/// site keeps compiling because the convenience init below defaults
+/// `Header` to `EmptyView`.
+public struct ListOfRowsView<DataSource: ListOfRowsDataSource, Header: View>: View {
     @Bindable private var dataSource: DataSource
+    private let customHeader: Header
 
-    public init(dataSource: DataSource) {
+    /// Full init — provide a custom header view that renders between the
+    /// chrome strip (search / chip / tab) and the state body.
+    public init(
+        dataSource: DataSource,
+        @ViewBuilder customHeader: () -> Header
+    ) {
         self.dataSource = dataSource
+        self.customHeader = customHeader()
     }
 
     public var body: some View {
@@ -43,6 +59,7 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource>: View {
                     .background(Theme.Color.appSurface)
                     Divider().background(Theme.Color.appBorderSubtle)
                 }
+                customHeader
                 stateBody
             }
             if let fab = dataSource.fab {
@@ -110,6 +127,16 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource>: View {
         case let .error(message):
             ListOfRowsErrorBanner(message: message) { Task { await dataSource.load() } }
         }
+    }
+}
+
+/// Convenience init for the common case where no custom header is
+/// needed. Preserves the pre-T6.4c call-site shape — every existing
+/// `ListOfRowsView(dataSource: …)` site compiles unchanged because
+/// Swift infers `Header == EmptyView` from this overload.
+public extension ListOfRowsView where Header == EmptyView {
+    init(dataSource: DataSource) {
+        self.init(dataSource: dataSource, customHeader: { EmptyView() })
     }
 }
 

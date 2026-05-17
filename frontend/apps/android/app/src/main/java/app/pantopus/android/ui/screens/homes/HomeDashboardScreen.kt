@@ -61,6 +61,7 @@ fun HomeDashboardScreen(
     onOpenBills: ((String) -> Unit)? = null,
     onOpenPlaceholder: ((String) -> Unit)? = null,
     onOpenPets: ((String) -> Unit)? = null,
+    onOpenCalendar: ((String) -> Unit)? = null,
     viewModel: HomeDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -81,6 +82,7 @@ fun HomeDashboardScreen(
             "verify" -> "Verify home"
             "view_bills" -> "Bills"
             "pets" -> "Pets"
+            "calendar" -> "Calendar"
             else -> actionId.replace('_', ' ').replaceFirstChar(Char::uppercase)
         }
 
@@ -116,6 +118,10 @@ fun HomeDashboardScreen(
             "pets" ->
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenPets?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "calendar" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenCalendar?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
             else -> openPlaceholder(actionId)
         }

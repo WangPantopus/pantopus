@@ -4,6 +4,9 @@ import app.pantopus.android.data.api.models.common.JsonValue
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CheckAddressResponse
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
+import app.pantopus.android.data.api.models.homes.CreateHomeEventRequest
+import app.pantopus.android.data.api.models.homes.GetHomeEventsResponse
+import app.pantopus.android.data.api.models.homes.HomeEventResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
@@ -22,6 +25,7 @@ import app.pantopus.android.data.api.models.homes.UpdateBillRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -138,4 +142,27 @@ interface HomesApi {
         @Path("id") homeId: String,
         @Path("billId") billId: String,
     ): GetBillSplitsResponse
+
+    /** `GET /api/homes/:id/events` — route `backend/routes/home.js:4793`. */
+    @GET("api/homes/{id}/events")
+    suspend fun getHomeEvents(
+        @Path("id") homeId: String,
+        @Query("start_after") startAfter: String? = null,
+        @Query("start_before") startBefore: String? = null,
+    ): GetHomeEventsResponse
+
+    /** `POST /api/homes/:id/events` — route `backend/routes/home.js:4827`. */
+    @POST("api/homes/{id}/events")
+    suspend fun createHomeEvent(
+        @Path("id") homeId: String,
+        @Body body: CreateHomeEventRequest,
+    ): HomeEventResponse
+
+    /** `DELETE /api/homes/:id/events/:eventId` — route
+     *  `backend/routes/home.js:4912`. */
+    @DELETE("api/homes/{id}/events/{eventId}")
+    suspend fun deleteHomeEvent(
+        @Path("id") homeId: String,
+        @Path("eventId") eventId: String,
+    )
 }

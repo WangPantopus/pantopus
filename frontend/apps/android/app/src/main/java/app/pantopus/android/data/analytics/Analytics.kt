@@ -47,6 +47,8 @@ sealed class AnalyticsEvent(
 
     data object ScreenNotificationsViewed : AnalyticsEvent("screen.notifications.viewed")
 
+    data object ScreenHomeCalendarViewed : AnalyticsEvent("screen.home_calendar.viewed")
+
     data object ScreenPetsListViewed : AnalyticsEvent("screen.pets_list.viewed")
 
     data class ScreenPetsWizardStepViewed(

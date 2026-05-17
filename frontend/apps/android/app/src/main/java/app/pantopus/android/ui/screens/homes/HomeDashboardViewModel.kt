@@ -189,6 +189,7 @@ class HomeDashboardViewModel
                 quickActions =
                     listOf(
                         QuickActionTile("view_bills", "Bills", PantopusIcon.Receipt, IdentityPillar.Home),
+                        QuickActionTile("calendar", "Calendar", PantopusIcon.Calendar, IdentityPillar.Home),
                         QuickActionTile("add_mail", "Add mail", PantopusIcon.Mailbox, IdentityPillar.Home),
                         QuickActionTile("add_member", "Add member", PantopusIcon.UserPlus, IdentityPillar.Personal),
                         QuickActionTile("pets", "Pets", PantopusIcon.PawPrint, IdentityPillar.Home),

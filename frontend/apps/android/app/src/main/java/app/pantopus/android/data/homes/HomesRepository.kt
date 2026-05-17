@@ -2,7 +2,10 @@ package app.pantopus.android.data.homes
 
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
+import app.pantopus.android.data.api.models.homes.CreateHomeEventRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
+import app.pantopus.android.data.api.models.homes.GetHomeEventsResponse
+import app.pantopus.android.data.api.models.homes.HomeEventResponse
 import app.pantopus.android.data.api.models.homes.FileUploadResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
@@ -102,6 +105,26 @@ open class HomesRepository
             homeId: String,
             billId: String,
         ): NetworkResult<GetBillSplitsResponse> = safeApiCall { api.getHomeBillSplits(homeId, billId) }
+
+        /** `GET /api/homes/:id/events`. */
+        open suspend fun getHomeEvents(
+            homeId: String,
+            startAfter: String? = null,
+            startBefore: String? = null,
+        ): NetworkResult<GetHomeEventsResponse> =
+            safeApiCall { api.getHomeEvents(homeId, startAfter, startBefore) }
+
+        /** `POST /api/homes/:id/events`. */
+        open suspend fun createHomeEvent(
+            homeId: String,
+            request: CreateHomeEventRequest,
+        ): NetworkResult<HomeEventResponse> = safeApiCall { api.createHomeEvent(homeId, request) }
+
+        /** `DELETE /api/homes/:id/events/:eventId`. */
+        open suspend fun deleteHomeEvent(
+            homeId: String,
+            eventId: String,
+        ): NetworkResult<Unit> = safeApiCall { api.deleteHomeEvent(homeId, eventId) }
 
         /**
          * Upload one binary file to `POST /api/files/upload` and return

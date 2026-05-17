@@ -43,6 +43,10 @@ public enum YouRoute: Hashable {
     case homeBills(homeId: String)
     /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
     case homePets(homeId: String)
+    /// T6.4c (P18) — Home calendar. The home-context "me.calendar"
+    /// action tile + Home Dashboard "calendar" quick-action push here
+    /// with the primary home id resolved by the VM.
+    case homeCalendar(homeId: String)
     /// T5.3.4 — per-listing offers panel. Pushed from a listing detail
     /// "View offers" affordance (visible when the current user owns the
     /// listing). The optional `title` is a hint rendered as the
@@ -273,6 +277,12 @@ public struct YouTabRoot: View {
         case "me.pets":
             if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homePets(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
+        case "me.calendar":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeCalendar(homeId: homeId))
             } else {
                 path.append(.placeholder(label: tile.label))
             }
@@ -599,6 +609,22 @@ public struct YouTabRoot: View {
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homeCalendar(homeId):
+            HomeCalendarView(
+                viewModel: HomeCalendarViewModel(
+                    homeId: homeId,
+                    onAddEvent: {
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Add event"))
+                        }
+                    },
+                    onOpenEvent: { _ in
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Event detail"))
+                        }
+                    }
+                )
+            )
         #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(
