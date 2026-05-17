@@ -31,6 +31,16 @@ public struct ListingDTO: Decodable, Sendable, Hashable, Identifiable {
     public let createdAt: String?
     public let userHasSaved: Bool?
     public let approxLocation: ListingApproxLocation?
+    /// Lifetime impressions (from `Listing.view_count`).
+    public let viewCount: Int?
+    /// Live offer/message count from the buyer side (from
+    /// `Listing.active_offer_count`). Drives the chip-meta line on My
+    /// listings rows.
+    public let activeOfferCount: Int?
+    /// When the seller marked the listing sold.
+    public let soldAt: String?
+    /// When the seller archived the listing.
+    public let archivedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -49,7 +59,19 @@ public struct ListingDTO: Decodable, Sendable, Hashable, Identifiable {
         case createdAt = "created_at"
         case userHasSaved
         case approxLocation = "approx_location"
+        case viewCount = "view_count"
+        case activeOfferCount = "active_offer_count"
+        case soldAt = "sold_at"
+        case archivedAt = "archived_at"
     }
+}
+
+/// Envelope from `GET /api/listings/me` — the current user's own
+/// listings, optionally filtered by `status`. Route:
+/// `backend/routes/listings.js:1058`.
+public struct MyListingsResponse: Decodable, Sendable {
+    public let listings: [ListingDTO]
+    public let pagination: ListingsPagination?
 }
 
 /// Privacy-safe coarse location surfaced on map / in-bounds responses.
