@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Archive
@@ -34,8 +35,10 @@ import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -45,14 +48,17 @@ import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EnergySavingsLeaf
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FilterAlt
+import androidx.compose.material.icons.filled.FormatPaint
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.GppGood
+import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
@@ -61,6 +67,7 @@ import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Link
@@ -75,14 +82,18 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PestControl
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
@@ -102,6 +113,8 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
@@ -267,6 +280,29 @@ enum class PantopusIcon(
     Stethoscope("stethoscope"),
     CalendarDays("calendar-days"),
     Link("link"),
+    // T6.4a — Access codes: tap-to-reveal hide icon + empty-state key disc.
+    EyeOff("eye-off"),
+    KeyRound("key-round"),
+
+    // T6.3c — Household tasks chore-category iconography + banner glyph.
+    Leaf("leaf"),
+    ListChecks("list-checks"),
+    Utensils("utensils"),
+    Baby("baby"),
+
+    // T6.3b — Maintenance per-task-category iconography. Material's
+    // icon pack doesn't ship 1:1 Lucide-equivalents for every
+    // maintenance glyph, so each falls back to the closest Material
+    // vector (documented inline below). Visual signal is reinforced by
+    // the per-category background tint in
+    // [app.pantopus.android.ui.screens.homes.maintenance.MaintenanceCategoryPalette].
+    Fan("fan"),
+    CloudRain("cloud-rain"),
+    Refrigerator("refrigerator"),
+    Bug("bug"),
+    Trees("trees"),
+    PaintRoller("paint-roller"),
+    BellRing("bell-ring"),
     ;
 
     companion object {
@@ -428,6 +464,33 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Stethoscope -> IconSource.Material(Icons.Filled.MedicalServices)
         PantopusIcon.CalendarDays -> IconSource.Material(Icons.Filled.CalendarMonth)
         PantopusIcon.Link -> IconSource.Material(Icons.Filled.Link)
+        // T6.4a — Access codes glyphs.
+        PantopusIcon.EyeOff -> IconSource.Material(Icons.Filled.VisibilityOff)
+        PantopusIcon.KeyRound -> IconSource.Material(Icons.Filled.VpnKey)
+
+        // T6.3c — Household tasks chore-category iconography. Material
+        // lacks direct equivalents for Lucide's `utensils`, `baby`, and
+        // `list-checks`; fall back to the closest visually-similar
+        // Material vector. Visual signal is reinforced by the
+        // per-category background tint in `HouseholdTaskCategoryPalette`.
+        PantopusIcon.Leaf -> IconSource.Material(Icons.Filled.EnergySavingsLeaf)
+        PantopusIcon.ListChecks -> IconSource.Material(Icons.Filled.Checklist)
+        PantopusIcon.Utensils -> IconSource.Material(Icons.Filled.Restaurant)
+        PantopusIcon.Baby -> IconSource.Material(Icons.Filled.ChildCare)
+
+        // T6.3b — Maintenance per-task-category iconography. Material
+        // lacks 1:1 Lucide equivalents for `wrench`, `fan`, `paint-
+        // roller`, `bell-ring`, `cloud-rain`, `refrigerator`, `trees`;
+        // each falls back to the closest visually-similar Material
+        // vector. `bug` maps to PestControl; `wrench` to Build (which
+        // ships a wrench glyph).
+        PantopusIcon.Fan -> IconSource.Material(Icons.Filled.Air)
+        PantopusIcon.CloudRain -> IconSource.Material(Icons.Filled.Grain)
+        PantopusIcon.Refrigerator -> IconSource.Material(Icons.Filled.Kitchen)
+        PantopusIcon.Bug -> IconSource.Material(Icons.Filled.PestControl)
+        PantopusIcon.Trees -> IconSource.Material(Icons.Filled.Park)
+        PantopusIcon.PaintRoller -> IconSource.Material(Icons.Filled.FormatPaint)
+        PantopusIcon.BellRing -> IconSource.Material(Icons.Filled.NotificationsActive)
     }
 
 /**

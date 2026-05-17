@@ -21,6 +21,18 @@ public enum HubRoute: Hashable {
     case homeDashboard(homeId: String)
     /// Pets sub-screen for a specific home (T5.2.1).
     case homePets(homeId: String)
+    /// Packages list for a home (T6.3d / P14).
+    case homePackages(homeId: String)
+    /// Package detail (read-mostly summary with mark-picked-up).
+    case packageDetail(homeId: String, packageId: String)
+    /// Log-a-package sheet target.
+    case logPackage(homeId: String)
+    /// Household tasks (per-home chore list) for a specific home
+    /// (T6.3c / P11). Distinct from `.myBids` / `.myTasks` (the gig
+    /// surfaces in the You tab).
+    case homeTasks(homeId: String)
+    /// Maintenance sub-screen for a specific home (T6.3b / P10).
+    case homeMaintenance(homeId: String)
     /// Members sub-screen for a specific home (T6.3a / P9).
     case homeMembers(homeId: String)
     case publicProfile(userId: String)
@@ -33,6 +45,10 @@ public enum HubRoute: Hashable {
     case billDetail(homeId: String, billId: String)
     /// Add Bill wizard.
     case addBill(homeId: String)
+    /// Polls list for a home (T6.3e / P13).
+    case homePolls(homeId: String)
+    /// Poll detail — read + cast vote (T6.3e / P13).
+    case pollDetail(homeId: String, pollId: String)
     /// Pulse tab (T1.2). Reached from Hub → pillar(.pulse).
     case pulseFeed
     /// Compose post target — placeholder until the compose flow ships.
@@ -302,6 +318,7 @@ public struct HubTabRoot: View {
                 onClaimOwnership: { Task { @MainActor in push(.claimOwnership(homeId: homeId)) } },
                 onOpenClaimsList: { Task { @MainActor in push(.myClaims) } },
                 onOpenBills: { Task { @MainActor in push(.homeBills(homeId: homeId)) } },
+                onOpenPolls: { Task { @MainActor in push(.homePolls(homeId: homeId)) } },
                 onOpenPlaceholder: { label in
                     Task { @MainActor in push(.placeholder(label: label)) }
                 },
@@ -311,9 +328,30 @@ public struct HubTabRoot: View {
                 onOpenCalendar: { id in
                     Task { @MainActor in push(.homeCalendar(homeId: id)) }
                 },
+                onOpenPackages: { id in
+                    Task { @MainActor in push(.homePackages(homeId: id)) }
+                },
+                onOpenTasks: { id in
+                    Task { @MainActor in push(.homeTasks(homeId: id)) }
+                },
+                onOpenMaintenance: { id in
+                    Task { @MainActor in push(.homeMaintenance(homeId: id)) }
+                },
                 onOpenMembers: { id in
                     Task { @MainActor in push(.homeMembers(homeId: id)) }
                 }
+            )
+        case let .homeMaintenance(homeId):
+            MaintenanceListView(
+                viewModel: MaintenanceListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Maintenance detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in push(.placeholder(label: "Log maintenance")) }
+                    }
+                )
             )
         case let .homeBills(homeId):
             BillsListView(
@@ -341,6 +379,17 @@ public struct HubTabRoot: View {
                     path.append(.billDetail(homeId: homeId, billId: billId))
                 }
             )
+        case let .homePolls(homeId):
+            PollsListView(
+                viewModel: Self.pollsListViewModel(homeId: homeId, push: push)
+            )
+        case let .pollDetail(homeId, pollId):
+            PollDetailView(
+                homeId: homeId,
+                pollId: pollId
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
         case let .homeCalendar(homeId):
@@ -352,6 +401,48 @@ public struct HubTabRoot: View {
                     },
                     onOpenEvent: { _ in
                         Task { @MainActor in push(.placeholder(label: "Event detail")) }
+                    }
+                )
+            )
+        case let .homePackages(homeId):
+            PackagesListView(
+                viewModel: Self.packagesListViewModel(
+                    homeId: homeId,
+                    currentUserId: currentUserId.isEmpty ? nil : currentUserId,
+                    push: push
+                )
+            )
+        case let .packageDetail(homeId, packageId):
+            PackageDetailView(
+                homeId: homeId,
+                packageId: packageId
+            ) { if !path.isEmpty { path.removeLast() } }
+        case let .logPackage(homeId):
+            LogPackageSheetView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCreated: { packageId in
+                    Task { @MainActor in
+                        path.removeAll { route in
+                            if case .logPackage = route { return true }
+                            return false
+                        }
+                        path.append(.packageDetail(homeId: homeId, packageId: packageId))
+                    }
+                }
+            )
+        case let .homeTasks(homeId):
+            HouseholdTasksListView(
+                viewModel: HouseholdTasksListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Task detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in push(.placeholder(label: "Add a task")) }
+                    },
+                    onEditRecurring: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Edit recurring task")) }
                     }
                 )
             )
@@ -677,6 +768,46 @@ public struct HubTabRoot: View {
             homeId: homeId,
             onOpenBill: openBill,
             onAddBill: addBill
+        )
+    }
+
+    private static func packagesListViewModel(
+        homeId: String,
+        currentUserId: String?,
+        push: @escaping (HubRoute) -> Void
+    ) -> PackagesListViewModel {
+        let openPackage: @Sendable (String) -> Void = { packageId in
+            Task { @MainActor in push(.packageDetail(homeId: homeId, packageId: packageId)) }
+        }
+        let logPackage: @Sendable () -> Void = {
+            Task { @MainActor in push(.logPackage(homeId: homeId)) }
+        }
+        return PackagesListViewModel(
+            homeId: homeId,
+            currentUserId: currentUserId,
+            onOpenPackage: openPackage,
+            onLogPackage: logPackage
+        )
+    }
+
+    /// Construct the Polls list VM with navigation callbacks wired to
+    /// `push(.pollDetail(…))` for row taps. The FAB currently routes to
+    /// the not-yet-built composer placeholder — that screen lands in a
+    /// follow-up PR.
+    private static func pollsListViewModel(
+        homeId: String,
+        push: @escaping (HubRoute) -> Void
+    ) -> PollsListViewModel {
+        let openPoll: @Sendable (String) -> Void = { pollId in
+            Task { @MainActor in push(.pollDetail(homeId: homeId, pollId: pollId)) }
+        }
+        let startPoll: @Sendable () -> Void = {
+            Task { @MainActor in push(.placeholder(label: "Start a poll")) }
+        }
+        return PollsListViewModel(
+            homeId: homeId,
+            onOpenPoll: openPoll,
+            onStartPoll: startPoll
         )
     }
 }

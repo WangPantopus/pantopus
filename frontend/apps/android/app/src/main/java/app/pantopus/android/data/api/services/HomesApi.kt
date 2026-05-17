@@ -1,27 +1,47 @@
 package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.common.JsonValue
+import app.pantopus.android.data.api.models.homes.CastVoteRequest
+import app.pantopus.android.data.api.models.homes.CastVoteResponse
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CheckAddressResponse
+import app.pantopus.android.data.api.models.homes.CreateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeEventRequest
 import app.pantopus.android.data.api.models.homes.GetHomeEventsResponse
 import app.pantopus.android.data.api.models.homes.HomeEventResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
+import app.pantopus.android.data.api.models.homes.CreateMaintenanceRequest
+import app.pantopus.android.data.api.models.homes.CreatePackageRequest
+import app.pantopus.android.data.api.models.homes.CreatePollRequest
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.GetHomeMaintenanceResponse
+import app.pantopus.android.data.api.models.homes.GetHomePackagesResponse
+import app.pantopus.android.data.api.models.homes.GetHomePollsResponse
+import app.pantopus.android.data.api.models.homes.HomeAccessSecretResponse
+import app.pantopus.android.data.api.models.homes.HomeAccessSecretsResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.HomeDetailResponse
+import app.pantopus.android.data.api.models.homes.HomeMaintenanceResponse
+import app.pantopus.android.data.api.models.homes.HomePackageResponse
+import app.pantopus.android.data.api.models.homes.HomePollResponse
 import app.pantopus.android.data.api.models.homes.HomePublicProfileResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
 import app.pantopus.android.data.api.models.homes.InviteOwnerResponse
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
+import app.pantopus.android.data.api.models.homes.OwnersResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
+import app.pantopus.android.data.api.models.homes.RemoveOwnerResponse
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
+import app.pantopus.android.data.api.models.homes.UpdateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
+import app.pantopus.android.data.api.models.homes.UpdateMaintenanceRequest
+import app.pantopus.android.data.api.models.homes.UpdatePackageRequest
+import app.pantopus.android.data.api.models.homes.UpdatePollRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import retrofit2.http.Body
@@ -81,6 +101,29 @@ interface HomesApi {
         @Path("id") homeId: String,
         @Body body: InviteOwnerRequest,
     ): InviteOwnerResponse
+
+    /**
+     * `GET /api/homes/:id/owners` — route
+     * `backend/routes/homeOwnership.js:1381`. Per-home owner roster
+     * with each `user`-subject owner enriched with username + display
+     * name + avatar URL.
+     */
+    @GET("api/homes/{id}/owners")
+    suspend fun listOwners(
+        @Path("id") homeId: String,
+    ): OwnersResponse
+
+    /**
+     * `DELETE /api/homes/:id/owners/:ownerId` — route
+     * `backend/routes/homeOwnership.js:1614`. May return a quorum
+     * action id when removal requires co-owner approval; the screen
+     * keeps the row optimistically dropped in either case.
+     */
+    @DELETE("api/homes/{id}/owners/{ownerId}")
+    suspend fun removeOwner(
+        @Path("id") homeId: String,
+        @Path("ownerId") ownerId: String,
+    ): RemoveOwnerResponse
 
     /**
      * `POST /api/homes/:id/ownership-claims` — route
@@ -165,4 +208,130 @@ interface HomesApi {
         @Path("id") homeId: String,
         @Path("eventId") eventId: String,
     )
+    /** `GET /api/homes/:id/packages` — route `backend/routes/home.js:4673`. */
+    @GET("api/homes/{id}/packages")
+    suspend fun getHomePackages(
+        @Path("id") homeId: String,
+        @Query("status") status: String? = null,
+    ): GetHomePackagesResponse
+
+    /** `POST /api/homes/:id/packages` — route `backend/routes/home.js:4706`. */
+    @POST("api/homes/{id}/packages")
+    suspend fun createHomePackage(
+        @Path("id") homeId: String,
+        @Body body: CreatePackageRequest,
+    ): HomePackageResponse
+
+    /** `PUT /api/homes/:id/packages/:packageId` — route
+     *  `backend/routes/home.js:4746`. */
+    @PUT("api/homes/{id}/packages/{packageId}")
+    suspend fun updateHomePackage(
+        @Path("id") homeId: String,
+        @Path("packageId") packageId: String,
+        @Body body: UpdatePackageRequest,
+    ): HomePackageResponse
+
+    // ─── Polls (T6.3e / P13) ─────────────────────────────────────
+
+    /**
+     * `GET /api/homes/:id/polls` — route `backend/routes/home.js:6984`.
+     * The response is enriched server-side with `vote_count`,
+     * `option_counts` (per-option breakdown), and `my_vote`.
+     */
+    @GET("api/homes/{id}/polls")
+    suspend fun getHomePolls(
+        @Path("id") homeId: String,
+    ): GetHomePollsResponse
+
+    /** `POST /api/homes/:id/polls` — route `backend/routes/home.js:7058`. */
+    @POST("api/homes/{id}/polls")
+    suspend fun createHomePoll(
+        @Path("id") homeId: String,
+        @Body body: CreatePollRequest,
+    ): HomePollResponse
+
+    /**
+     * `POST /api/homes/:id/polls/:pollId/vote` — route
+     * `backend/routes/home.js:7100`. Upserts the viewer's vote
+     * (changing a vote is a re-call with new `selected_options`).
+     */
+    @POST("api/homes/{id}/polls/{pollId}/vote")
+    suspend fun castHomePollVote(
+        @Path("id") homeId: String,
+        @Path("pollId") pollId: String,
+        @Body body: CastVoteRequest,
+    ): CastVoteResponse
+
+    /**
+     * `PUT /api/homes/:id/polls/:pollId` — route `backend/routes/home.js:7159`.
+     * Used to close a poll (`status: "closed"`) or edit metadata.
+     */
+    @PUT("api/homes/{id}/polls/{pollId}")
+    suspend fun updateHomePoll(
+        @Path("id") homeId: String,
+        @Path("pollId") pollId: String,
+        @Body body: UpdatePollRequest,
+    ): HomePollResponse
+
+    // ─── Access codes (T6.4a) ──────────────────────────────────────
+
+    /** `GET /api/homes/:id/access` — route `backend/routes/home.js:5487`. */
+    @GET("api/homes/{id}/access")
+    suspend fun getHomeAccessSecrets(
+        @Path("id") homeId: String,
+    ): HomeAccessSecretsResponse
+
+    /** `POST /api/homes/:id/access` — route `backend/routes/home.js:5527`. */
+    @POST("api/homes/{id}/access")
+    suspend fun createHomeAccessSecret(
+        @Path("id") homeId: String,
+        @Body body: CreateAccessSecretRequest,
+    ): HomeAccessSecretResponse
+
+    /** `PUT /api/homes/:id/access/:secretId` — route `backend/routes/home.js:5586`. */
+    @PUT("api/homes/{id}/access/{secretId}")
+    suspend fun updateHomeAccessSecret(
+        @Path("id") homeId: String,
+        @Path("secretId") secretId: String,
+        @Body body: UpdateAccessSecretRequest,
+    ): HomeAccessSecretResponse
+
+    /** `DELETE /api/homes/:id/access/:secretId` — route `backend/routes/home.js:5624`. */
+    @DELETE("api/homes/{id}/access/{secretId}")
+    suspend fun deleteHomeAccessSecret(
+        @Path("id") homeId: String,
+        @Path("secretId") secretId: String,
+    )
+
+    // ─── Maintenance (T6.3b / P10) ─────────────────────────────
+
+    /** `GET /api/homes/:id/maintenance` — route `backend/routes/home.js`
+     *  (added in T6.3b / P10). */
+    @GET("api/homes/{id}/maintenance")
+    suspend fun getHomeMaintenance(
+        @Path("id") homeId: String,
+        @Query("status") status: String? = null,
+    ): GetHomeMaintenanceResponse
+
+    /** `POST /api/homes/:id/maintenance` — route `backend/routes/home.js`. */
+    @POST("api/homes/{id}/maintenance")
+    suspend fun createHomeMaintenance(
+        @Path("id") homeId: String,
+        @Body body: CreateMaintenanceRequest,
+    ): HomeMaintenanceResponse
+
+    /** `PUT /api/homes/:id/maintenance/:taskId` — route `backend/routes/home.js`. */
+    @PUT("api/homes/{id}/maintenance/{taskId}")
+    suspend fun updateHomeMaintenance(
+        @Path("id") homeId: String,
+        @Path("taskId") taskId: String,
+        @Body body: UpdateMaintenanceRequest,
+    ): HomeMaintenanceResponse
+
+    /** `DELETE /api/homes/:id/maintenance/:taskId` — route `backend/routes/home.js`. */
+    @DELETE("api/homes/{id}/maintenance/{taskId}")
+    suspend fun deleteHomeMaintenance(
+        @Path("id") homeId: String,
+        @Path("taskId") taskId: String,
+    ): retrofit2.Response<Unit>
 }

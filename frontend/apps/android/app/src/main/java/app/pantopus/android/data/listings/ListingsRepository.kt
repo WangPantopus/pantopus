@@ -8,6 +8,7 @@ import app.pantopus.android.data.api.models.listings.ListingsInBoundsResponse
 import app.pantopus.android.data.api.models.listings.ListingsNearbyResponse
 import app.pantopus.android.data.api.models.listings.MessageListingBody
 import app.pantopus.android.data.api.models.listings.MessageListingResponse
+import app.pantopus.android.data.api.models.listings.MyListingsResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.ListingsApi
@@ -93,4 +94,15 @@ class ListingsRepository
             id: String,
             body: MessageListingBody,
         ): NetworkResult<MessageListingResponse> = safeApiCall { api.messageListing(id, body) }
+
+        /**
+         * T6.3f / P14 — backs the My listings screen. Optional `status`
+         * filters server-side; the screen typically loads all and buckets
+         * client-side so tab counts stay honest.
+         */
+        suspend fun myListings(
+            status: String? = null,
+            limit: Int = 100,
+            offset: Int = 0,
+        ): NetworkResult<MyListingsResponse> = safeApiCall { api.myListings(status, limit, offset) }
     }

@@ -59,9 +59,14 @@ fun HomeDashboardScreen(
     onClaimOwnership: ((String) -> Unit)? = null,
     onOpenClaimsList: (() -> Unit)? = null,
     onOpenBills: ((String) -> Unit)? = null,
+    onOpenPolls: ((String) -> Unit)? = null,
     onOpenPlaceholder: ((String) -> Unit)? = null,
     onOpenPets: ((String) -> Unit)? = null,
     onOpenCalendar: ((String) -> Unit)? = null,
+    onOpenPackages: ((String) -> Unit)? = null,
+    onOpenAccessCodes: ((homeId: String, homeName: String?) -> Unit)? = null,
+    onOpenTasks: ((String) -> Unit)? = null,
+    onOpenMaintenance: ((String) -> Unit)? = null,
     /** T6.3a / P9 — push to the per-home Members list. When wired, the
      *  "Members" / "Add member" quick-actions navigate to the list
      *  (which owns its own invite FAB) instead of opening the legacy
@@ -82,12 +87,17 @@ fun HomeDashboardScreen(
     fun actionLabel(actionId: String): String =
         when (actionId) {
             "log_package" -> "Log a package"
+            "view_packages" -> "Packages"
             "add_mail" -> "Add mail"
             "add_member" -> "Add member"
             "verify" -> "Verify home"
             "view_bills" -> "Bills"
+            "view_polls" -> "Polls"
+            "view_tasks" -> "Tasks"
+            "view_maintenance" -> "Maintenance"
             "pets" -> "Pets"
             "calendar" -> "Calendar"
+            "access_codes" -> "Access codes"
             else -> actionId.replace('_', ' ').replaceFirstChar(Char::uppercase)
         }
 
@@ -127,6 +137,14 @@ fun HomeDashboardScreen(
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenBills?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
+            "view_polls" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenPolls?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "view_maintenance" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenMaintenance?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
             "pets" ->
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenPets?.invoke(homeId) ?: openPlaceholder(actionId)
@@ -134,6 +152,19 @@ fun HomeDashboardScreen(
             "calendar" ->
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenCalendar?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "view_packages" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenPackages?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "access_codes" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenAccessCodes?.invoke(homeId, viewModel.currentHomeName())
+                        ?: openPlaceholder(actionId)
+                }
+            "view_tasks" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenTasks?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
             else -> openPlaceholder(actionId)
         }

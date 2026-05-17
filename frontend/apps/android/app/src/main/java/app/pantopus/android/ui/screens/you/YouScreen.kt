@@ -92,7 +92,16 @@ fun YouScreen(
     onOpenHomeBills: (String) -> Unit = {},
     onOpenHomePets: (String) -> Unit = {},
     onOpenHomeCalendar: (String) -> Unit = {},
+    onOpenHomePackages: (String) -> Unit = {},
+    onOpenHomePolls: (String) -> Unit = {},
+    onOpenAccessCodes: (homeId: String, homeName: String?) -> Unit = { _, _ -> },
+    onOpenHomeTasks: (String) -> Unit = {},
+    onOpenHomeMaintenance: (String) -> Unit = {},
+    onOpenHomeOwners: (String) -> Unit = {},
     onOpenHomeMembers: (String) -> Unit = {},
+    onOpenMyHomes: () -> Unit = {},
+    onOpenMyListings: () -> Unit = {},
+    onOpenMyBusinesses: () -> Unit = {},
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
     val signedIn = state as? AuthRepository.State.SignedIn
@@ -121,6 +130,9 @@ fun YouScreen(
                 "me.posts" -> onOpenMyPosts()
                 "me.offers" -> onOpenOffers()
                 "me.connections" -> onOpenConnections()
+                "me.listings" -> onOpenMyListings()
+                "me.businesses" -> onOpenMyBusinesses()
+                "me.homes" -> onOpenMyHomes()
                 "me.bills" -> {
                     val homeId = tile.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomeBills(homeId) else onOpenPlaceholder(tile.label)
@@ -137,6 +149,22 @@ fun YouScreen(
                         onOpenPlaceholder(tile.label)
                     }
                 }
+                "me.packages" -> {
+                    val homeId = tile.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomePackages(homeId) else onOpenPlaceholder(tile.label)
+                }
+                "me.polls" -> {
+                    val homeId = tile.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomePolls(homeId) else onOpenPlaceholder(tile.label)
+                }
+                "me.tasks" -> {
+                    val homeId = tile.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeTasks(homeId) else onOpenPlaceholder(tile.label)
+                }
+                "me.maintenance" -> {
+                    val homeId = tile.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeMaintenance(homeId) else onOpenPlaceholder(tile.label)
+                }
                 "me.members" -> {
                     val homeId = tile.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomeMembers(homeId) else onOpenPlaceholder(tile.label)
@@ -151,11 +179,43 @@ fun YouScreen(
                 "me.gigs" -> onOpenMyTasks()
                 "me.offers" -> onOpenOffers()
                 "me.connections" -> onOpenConnections()
+                "me.homes" -> onOpenMyHomes()
+                "me.listings" -> onOpenMyListings()
+                "me.businesses" -> onOpenMyBusinesses()
                 "me.identityCenter" -> onOpenIdentityCenter()
                 "me.audience" -> onOpenAudienceProfile()
                 "me.bills" -> {
                     val homeId = row.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomeBills(homeId) else onOpenPlaceholder(row.label)
+                }
+                "me.packages" -> {
+                    val homeId = row.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomePackages(homeId) else onOpenPlaceholder(row.label)
+                }
+                "me.polls" -> {
+                    val homeId = row.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomePolls(homeId) else onOpenPlaceholder(row.label)
+                }
+                "me.access" -> {
+                    val homeId = row.routeArgs["homeId"].orEmpty()
+                    val homeName = row.routeArgs["homeName"]
+                    if (homeId.isNotEmpty()) {
+                        onOpenAccessCodes(homeId, homeName)
+                    } else {
+                        onOpenPlaceholder(row.label)
+                    }
+                }
+                "me.tasks" -> {
+                    val homeId = row.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeTasks(homeId) else onOpenPlaceholder(row.label)
+                }
+                "me.maintenance" -> {
+                    val homeId = row.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeMaintenance(homeId) else onOpenPlaceholder(row.label)
+                }
+                "me.owners" -> {
+                    val homeId = row.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeOwners(homeId) else onOpenPlaceholder(row.label)
                 }
                 "me.members" -> {
                     val homeId = row.routeArgs["homeId"].orEmpty()

@@ -68,9 +68,26 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource, Header: View>: Vi
             }
         }
         .accessibilityIdentifier("listOfRowsContainer")
-        .navigationTitle(dataSource.title)
+        .navigationTitle(dataSource.topBarSubtitle == nil ? dataSource.title : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if let subtitle = dataSource.topBarSubtitle {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text(dataSource.title)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appText)
+                            .lineLimit(1)
+                            .accessibilityAddTraits(.isHeader)
+                        Text(subtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .lineLimit(1)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("listOfRowsTopBarTitle")
+                }
+            }
             if let action = dataSource.topBarAction {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: action.handler) {
@@ -1160,7 +1177,29 @@ private struct TrailingView: View {
                         .foregroundStyle(Theme.Color.appTextMuted)
                 }
             }
+        case let .iconActions(primary, secondary):
+            HStack(spacing: Spacing.s1) {
+                IconActionButton(action: primary)
+                IconActionButton(action: secondary)
+            }
         }
+    }
+}
+
+private struct IconActionButton: View {
+    let action: RowIconAction
+
+    var body: some View {
+        Button(action: action.handler) {
+            ZStack {
+                RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
+                    .fill(action.background)
+                Icon(action.icon, size: 15, color: action.foreground)
+            }
+            .frame(width: 32, height: 32)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(action.accessibilityLabel)
     }
 }
 

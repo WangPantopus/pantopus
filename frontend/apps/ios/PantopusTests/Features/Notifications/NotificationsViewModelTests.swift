@@ -152,9 +152,12 @@ final class NotificationsViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         vm.selectedTab = NotificationsTab.unread
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        let tabState = await Self.waitForState(vm) { state in
+            guard case let .loaded(sections, _) = state else { return false }
+            return sections.flatMap(\.rows).count == 1
+        }
         XCTAssertEqual(vm.selectedTab, NotificationsTab.unread)
-        guard case let .loaded(sections, _) = vm.state else {
+        guard case let .loaded(sections, _) = tabState else {
             XCTFail("Expected .loaded after tab switch")
             return
         }
@@ -170,14 +173,21 @@ final class NotificationsViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         vm.selectedTab = NotificationsTab.unread
-        try? await Task.sleep(nanoseconds: 50_000_000)
-        guard case let .empty(content) = vm.state else {
+        let unreadState = await Self.waitForState(vm) { state in
+            if case .empty = state { return true }
+            return false
+        }
+        guard case let .empty(content) = unreadState else {
             XCTFail("Expected .empty unread state")
             return
         }
         XCTAssertEqual(content.ctaTitle, "View all notifications")
         content.onCTA?()
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        _ = await Self.waitForState(vm) { state in
+            guard vm.selectedTab == NotificationsTab.all else { return false }
+            if case .loaded = state { return true }
+            return false
+        }
         XCTAssertEqual(vm.selectedTab, NotificationsTab.all)
     }
 
@@ -501,5 +511,22 @@ final class NotificationsViewModelTests: XCTestCase {
             createdAt: createdAt,
             context: nil
         )
+    }
+
+    private static func waitForState(
+        _ vm: NotificationsViewModel,
+        timeoutNanoseconds: UInt64 = 1_000_000_000,
+        predicate: (ListOfRowsState) -> Bool
+    ) async -> ListOfRowsState? {
+        let pollNanoseconds: UInt64 = 20_000_000
+        var elapsed: UInt64 = 0
+        while elapsed <= timeoutNanoseconds {
+            if predicate(vm.state) {
+                return vm.state
+            }
+            try? await Task.sleep(nanoseconds: pollNanoseconds)
+            elapsed += pollNanoseconds
+        }
+        return nil
     }
 }

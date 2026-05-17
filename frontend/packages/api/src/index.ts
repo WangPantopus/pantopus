@@ -45,6 +45,7 @@ export * as payments from './endpoints/payments';
 export * as geo from './endpoints/geo';
 export * as bids from './endpoints/bids';
 export * as homeProfile from './endpoints/homeProfile';
+export type { PollOption, PollSummary } from './endpoints/homeProfile';
 export * as notifications from './endpoints/notifications';
 export * as homeIam from './endpoints/homeIam';
 export * as upload from './endpoints/upload';       // NEW

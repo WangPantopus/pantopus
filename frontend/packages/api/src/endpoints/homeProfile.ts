@@ -161,6 +161,67 @@ export async function getHomeBillSplits(homeId: string, billId: string) {
   return get<{ splits: HomeBillSplit[] }>(`/api/homes/${homeId}/bills/${billId}/splits`);
 }
 
+// ---- HomeMaintenance (T6.3b / P10) ----
+
+/** Maintenance task payload returned by `GET /api/homes/:id/maintenance`.
+ *  Backend table extended in migration `151_home_maintenance_tasks.sql`. */
+export interface HomeMaintenanceTask {
+  id: string;
+  home_id: string;
+  task: string;
+  vendor: string | null;
+  cost: number | string | null;
+  recurrence: 'one_time' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | string;
+  due_date: string | null;
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | string;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string | null;
+}
+
+export async function getHomeMaintenance(
+  homeId: string,
+  params?: { status?: string },
+) {
+  return get<{ tasks: HomeMaintenanceTask[] }>(`/api/homes/${homeId}/maintenance`, params);
+}
+
+export async function createHomeMaintenance(
+  homeId: string,
+  data: {
+    task: string;
+    vendor?: string | null;
+    cost?: number | null;
+    recurrence?: HomeMaintenanceTask['recurrence'];
+    due_date?: string | null;
+    status?: HomeMaintenanceTask['status'];
+  },
+) {
+  return post<{ task: HomeMaintenanceTask }>(`/api/homes/${homeId}/maintenance`, data);
+}
+
+export async function updateHomeMaintenance(
+  homeId: string,
+  taskId: string,
+  data: Partial<{
+    task: string;
+    vendor: string | null;
+    cost: number | null;
+    recurrence: HomeMaintenanceTask['recurrence'];
+    due_date: string | null;
+    status: HomeMaintenanceTask['status'];
+  }>,
+) {
+  return put<{ task: HomeMaintenanceTask }>(
+    `/api/homes/${homeId}/maintenance/${taskId}`,
+    data,
+  );
+}
+
+export async function deleteHomeMaintenance(homeId: string, taskId: string) {
+  return del<void>(`/api/homes/${homeId}/maintenance/${taskId}`);
+}
+
 // ---- HomePackage ----
 
 export async function getHomePackages(homeId: string, params?: {
@@ -390,33 +451,78 @@ export async function deleteHomePet(homeId: string, petId: string) {
   return del<{ message: string }>(`/api/homes/${homeId}/pets/${petId}`);
 }
 
-// ---- Polls ----
+// ---- Polls (T6.3e / P13) ----
+
+// `options` is stored as JSONB on the backend; the wire form is either a
+// bare-string array (`["Sat", "Sun"]`) or an object array
+// (`[{ id, label }, …]`). The client accepts both at decode time and
+// always emits `{ label }` objects on create.
+export type PollOption =
+  | string
+  | { id?: string; label?: string; text?: string; key?: string };
+
+export interface PollSummary {
+  id: string;
+  home_id: string;
+  title: string;
+  description?: string | null;
+  poll_type: 'single_choice' | 'multiple_choice' | 'yes_no' | 'ranking' | string;
+  options: PollOption[];
+  status: 'open' | 'closed' | 'canceled' | string;
+  closes_at?: string | null;
+  visibility?: string | null;
+  created_at?: string;
+  created_by?: string;
+  vote_count: number;
+  /** Per-option breakdown keyed by option id / label. Empty when nobody
+   *  has voted yet. */
+  option_counts?: Record<string, number>;
+  /** The current viewer's selected option keys, or null when they
+   *  haven't voted. */
+  my_vote?: string[] | null;
+}
 
 export async function getHomePolls(homeId: string) {
-  return get<{ polls: any[] }>(`/api/homes/${homeId}/polls`);
+  return get<{ polls: PollSummary[] }>(`/api/homes/${homeId}/polls`);
 }
 
-export async function createHomePoll(homeId: string, data: {
-  question: string;
-  poll_type?: string;
-  options?: string[];
-  closes_at?: string;
-}) {
-  return post<{ poll: any }>(`/api/homes/${homeId}/polls`, data);
+export async function createHomePoll(
+  homeId: string,
+  data: {
+    title: string;
+    description?: string;
+    poll_type?: 'single_choice' | 'multiple_choice' | 'yes_no' | 'ranking';
+    options: { label: string }[];
+    closes_at?: string;
+    visibility?: 'public' | 'members' | 'managers' | 'sensitive';
+  },
+) {
+  return post<{ poll: PollSummary }>(`/api/homes/${homeId}/polls`, data);
 }
 
-export async function voteOnPoll(homeId: string, pollId: string, data: {
-  option_index: number;
-}) {
-  return post<{ vote: any }>(`/api/homes/${homeId}/polls/${pollId}/vote`, data);
+export async function voteOnPoll(
+  homeId: string,
+  pollId: string,
+  data: {
+    /** Array of option keys (matching `PollSummary.options[].id` / label). */
+    selected_options: string[];
+  },
+) {
+  return post<{ vote: unknown }>(`/api/homes/${homeId}/polls/${pollId}/vote`, data);
 }
 
-export async function updateHomePoll(homeId: string, pollId: string, data: Partial<{
-  question: string;
-  closes_at: string;
-  status: string;
-}>) {
-  return put<{ poll: any }>(`/api/homes/${homeId}/polls/${pollId}`, data);
+export async function updateHomePoll(
+  homeId: string,
+  pollId: string,
+  data: Partial<{
+    title: string;
+    description: string;
+    closes_at: string | null;
+    status: 'open' | 'closed' | 'canceled';
+    visibility: 'public' | 'members' | 'managers' | 'sensitive';
+  }>,
+) {
+  return put<{ poll: PollSummary }>(`/api/homes/${homeId}/polls/${pollId}`, data);
 }
 
 // ---- Activity Log ----

@@ -19,6 +19,8 @@ struct HomeDashboardView: View {
     private let onOpenClaimsList: (() -> Void)?
     /// Route to the Bills list for this home (T5.2.2).
     private let onOpenBills: (() -> Void)?
+    /// Route to the Polls list for this home (T6.3e).
+    private let onOpenPolls: (() -> Void)?
     /// Host-supplied navigation for actions whose dedicated screen
     /// isn't built yet (Log package, Add mail, etc). Receives the
     /// human-readable action label.
@@ -29,6 +31,16 @@ struct HomeDashboardView: View {
     /// Push onto the host stack when the user taps the Calendar
     /// quick-action tile (T6.4c / P18).
     private let onOpenCalendar: ((String) -> Void)?
+    /// Push onto the host stack when the user taps the Packages
+    /// quick-action tile. Receives this home's id (T6.3d / P14).
+    private let onOpenPackages: ((String) -> Void)?
+    /// Push onto the host stack when the user taps the Tasks (T6.3c)
+    /// quick-action tile. Receives this home's id so the destination
+    /// can pre-fetch.
+    private let onOpenTasks: ((String) -> Void)?
+    /// T6.3b / P10 — Push onto the host stack when the user taps the
+    /// Maintenance quick-action tile. Receives this home's id.
+    private let onOpenMaintenance: ((String) -> Void)?
     /// Push onto the host stack when the user taps the Members
     /// quick-action tile or "Add member" CTA (T6.3a / P9). Receives
     /// this home's id so the destination can pre-fetch the roster.
@@ -40,9 +52,13 @@ struct HomeDashboardView: View {
         onClaimOwnership: (() -> Void)? = nil,
         onOpenClaimsList: (() -> Void)? = nil,
         onOpenBills: (() -> Void)? = nil,
+        onOpenPolls: (() -> Void)? = nil,
         onOpenPlaceholder: ((String) -> Void)? = nil,
         onOpenPets: ((String) -> Void)? = nil,
         onOpenCalendar: ((String) -> Void)? = nil,
+        onOpenPackages: ((String) -> Void)? = nil,
+        onOpenTasks: ((String) -> Void)? = nil,
+        onOpenMaintenance: ((String) -> Void)? = nil,
         onOpenMembers: ((String) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
@@ -51,9 +67,13 @@ struct HomeDashboardView: View {
         self.onClaimOwnership = onClaimOwnership
         self.onOpenClaimsList = onOpenClaimsList
         self.onOpenBills = onOpenBills
+        self.onOpenPolls = onOpenPolls
         self.onOpenPlaceholder = onOpenPlaceholder
         self.onOpenPets = onOpenPets
         self.onOpenCalendar = onOpenCalendar
+        self.onOpenPackages = onOpenPackages
+        self.onOpenTasks = onOpenTasks
+        self.onOpenMaintenance = onOpenMaintenance
         self.onOpenMembers = onOpenMembers
     }
 
@@ -161,10 +181,18 @@ struct HomeDashboardView: View {
             }
         case "view_bills":
             onOpenBills?()
+        case "view_polls":
+            onOpenPolls?()
+        case "view_maintenance":
+            onOpenMaintenance?(homeId)
         case "pets":
             onOpenPets?(homeId)
         case "calendar":
             onOpenCalendar?(homeId)
+        case "view_packages":
+            onOpenPackages?(homeId)
+        case "view_tasks":
+            onOpenTasks?(homeId)
         default:
             onOpenPlaceholder?(actionLabel(action))
         }
@@ -173,12 +201,16 @@ struct HomeDashboardView: View {
     private func actionLabel(_ id: String) -> String {
         switch id {
         case "log_package": "Log a package"
+        case "view_packages": "Packages"
         case "add_member": "Add member"
         case "add_mail": "Add mail"
         case "verify": "Verify home"
         case "view_bills": "Bills"
+        case "view_polls": "Polls"
+        case "view_maintenance": "Maintenance"
         case "pets": "Pets"
         case "calendar": "Calendar"
+        case "view_tasks": "Tasks"
         default: id.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }

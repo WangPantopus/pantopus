@@ -212,7 +212,7 @@ public final class MeViewModel {
                     MeStat(id: "members", value: "—", label: "Members")
                 ],
                 actionTiles: homeActionTiles(homeId: nil),
-                sections: withDebug(homeSections(homeId: nil, privacyValue: nil)),
+                sections: withDebug(homeSections(homeId: nil, homeName: nil, privacyValue: nil)),
                 isUnbound: true
             )
         }
@@ -239,7 +239,11 @@ public final class MeViewModel {
                 MeStat(id: "members", value: "\(memberCount)", label: "Members")
             ],
             actionTiles: homeActionTiles(homeId: home.id),
-            sections: withDebug(homeSections(homeId: home.id, privacyValue: "Neighbors"))
+            sections: withDebug(homeSections(
+                homeId: home.id,
+                homeName: displayName,
+                privacyValue: "Neighbors"
+            ))
         )
     }
 
@@ -287,6 +291,7 @@ public final class MeViewModel {
         let args = homeId.map { ["homeId": $0] } ?? [:]
         return [
             MeActionTile(id: "bills", icon: .file, label: "Bills", routeKey: "me.bills", routeArgs: args),
+            MeActionTile(id: "maintenance", icon: .hammer, label: "Maintenance", routeKey: "me.maintenance", routeArgs: args),
             MeActionTile(id: "pets", icon: .heart, label: "Pets", routeKey: "me.pets", routeArgs: args),
             MeActionTile(id: "members", icon: .userPlus, label: "Members", routeKey: "me.members", routeArgs: args),
             MeActionTile(id: "polls", icon: .checkCircle, label: "Polls", routeKey: "me.polls", routeArgs: args),
@@ -295,16 +300,23 @@ public final class MeViewModel {
         ]
     }
 
-    private static func homeSections(homeId: String?, privacyValue: String?) -> [MeSection] {
-        let args = homeId.map { ["homeId": $0] } ?? [:]
+    private static func homeSections(homeId: String?, homeName: String?, privacyValue: String?) -> [MeSection] {
+        var args: [String: String] = [:]
+        if let homeId, !homeId.isEmpty { args["homeId"] = homeId }
+        // homeName carries the access-codes top-bar subtitle so the
+        // designed "412 Birch Ln · Maria's household" line renders
+        // without a second fetch.
+        var accessArgs = args
+        if let homeName, !homeName.isEmpty { accessArgs["homeName"] = homeName }
         return [
             MeSection(id: "household", header: "Household", rows: [
                 MeSectionRow(id: "members", icon: .userPlus, label: "Members", routeKey: "me.members", routeArgs: args),
                 MeSectionRow(id: "owners", icon: .shield, label: "Owners", routeKey: "me.owners", routeArgs: args),
-                MeSectionRow(id: "access", icon: .lock, label: "Access codes", routeKey: "me.access", routeArgs: args)
+                MeSectionRow(id: "access", icon: .lock, label: "Access codes", routeKey: "me.access", routeArgs: accessArgs)
             ]),
             MeSection(id: "activity", header: "Activity", rows: [
                 MeSectionRow(id: "bills", icon: .file, label: "Bills", routeKey: "me.bills", routeArgs: args),
+                MeSectionRow(id: "maintenance", icon: .hammer, label: "Maintenance", routeKey: "me.maintenance", routeArgs: args),
                 MeSectionRow(id: "tasks", icon: .hammer, label: "Household tasks", routeKey: "me.tasks", routeArgs: args),
                 MeSectionRow(id: "packages", icon: .mailbox, label: "Packages", routeKey: "me.packages", routeArgs: args),
                 MeSectionRow(id: "emergency", icon: .shield, label: "Emergency info", routeKey: "me.emergency", routeArgs: args)

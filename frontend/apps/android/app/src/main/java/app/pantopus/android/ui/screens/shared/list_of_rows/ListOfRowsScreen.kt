@@ -1489,6 +1489,32 @@ private fun TrailingView(
                     )
                 }
             }
+        is RowTrailing.IconActions ->
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                IconActionButton(action = trailing.primary)
+                IconActionButton(action = trailing.secondary)
+            }
+    }
+}
+
+@Composable
+private fun IconActionButton(action: RowIconAction) {
+    Box(
+        modifier =
+            Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(Radii.sm))
+                .background(action.background)
+                .clickable(onClick = action.onClick)
+                .semantics { contentDescription = action.accessibilityLabel },
+        contentAlignment = Alignment.Center,
+    ) {
+        PantopusIconImage(
+            icon = action.icon,
+            contentDescription = null,
+            size = 15.dp,
+            tint = action.foreground,
+        )
     }
 }
 

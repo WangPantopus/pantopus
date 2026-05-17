@@ -17,6 +17,9 @@ xcuserdata/
 # Swift Package Manager
 .build/
 Packages/
+# Carve out the feature folder — `Packages/` above matches SwiftPM source
+# trees; the per-feature `Features/Homes/Packages/` directory is real code.
+!Pantopus/Features/Homes/Packages/
 Package.pins
 Package.resolved
 
