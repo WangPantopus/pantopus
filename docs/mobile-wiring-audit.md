@@ -297,7 +297,7 @@ the tiles deep-link with the resolved home id.
 | Tile | routeKey | Current dispatch | Primary entry today | Future home-tab dispatch |
 |---|---|---|---|---|
 | Bills | `me.home.bills` | placeholder | Home dashboard "Bills" quick-action tile → `BillsListView(homeId)` | `YouRoute.billsList(homeId)` / `ChildRoutes.billsList(homeId)` |
-| Access | `me.home.access` | placeholder | n/a (no screen built yet) | follow-up |
+| Access | `me.home.access` | `AccessCodesView(homeId:, homeName:)` via `YouRoute.accessCodes` ✅ T6.4a | Me-tab Household-section row ✅; Android Home Dashboard `access_codes` quick-action ✅ | shipped |
 | Packages | `me.home.packages` | placeholder | Mailbox → drawers | follow-up |
 | Members | `me.home.members` | placeholder | Home dashboard "Members" quick-action | follow-up |
 | Docs / Calendar | `me.home.docs`, `me.home.calendar` | placeholder | n/a (no screen built yet) | follow-up |
