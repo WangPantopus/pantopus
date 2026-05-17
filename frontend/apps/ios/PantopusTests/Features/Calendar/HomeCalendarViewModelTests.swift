@@ -41,10 +41,12 @@ final class HomeCalendarViewModelTests: XCTestCase {
 
     private func makeVM(api: APIClient? = nil) -> HomeCalendarViewModel {
         let frozen = Self.fixedNow
+        let now: @Sendable () -> Date = { frozen }
         return HomeCalendarViewModel(
             homeId: "home-1",
-            api: api ?? makeAPI()
-        ) { frozen }
+            api: api ?? makeAPI(),
+            now: now
+        )
     }
 
     /// Build one DTO for the given iso instant + type.
