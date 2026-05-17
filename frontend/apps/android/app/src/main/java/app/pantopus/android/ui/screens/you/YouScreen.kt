@@ -91,6 +91,7 @@ fun YouScreen(
     onOpenAudienceProfile: () -> Unit = {},
     onOpenHomeBills: (String) -> Unit = {},
     onOpenHomePets: (String) -> Unit = {},
+    onOpenHomeMaintenance: (String) -> Unit = {},
     onOpenHomeOwners: (String) -> Unit = {},
     onOpenHomeMembers: (String) -> Unit = {},
 ) {
@@ -129,6 +130,10 @@ fun YouScreen(
                     val homeId = tile.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomePets(homeId) else onOpenPlaceholder(tile.label)
                 }
+                "me.maintenance" -> {
+                    val homeId = tile.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeMaintenance(homeId) else onOpenPlaceholder(tile.label)
+                }
                 "me.members" -> {
                     val homeId = tile.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomeMembers(homeId) else onOpenPlaceholder(tile.label)
@@ -148,6 +153,10 @@ fun YouScreen(
                 "me.bills" -> {
                     val homeId = row.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomeBills(homeId) else onOpenPlaceholder(row.label)
+                }
+                "me.maintenance" -> {
+                    val homeId = row.routeArgs["homeId"].orEmpty()
+                    if (homeId.isNotEmpty()) onOpenHomeMaintenance(homeId) else onOpenPlaceholder(row.label)
                 }
                 "me.owners" -> {
                     val homeId = row.routeArgs["homeId"].orEmpty()

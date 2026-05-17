@@ -302,6 +302,13 @@ class MeViewModel
             val args = if (homeId != null) mapOf("homeId" to homeId) else emptyMap()
             return listOf(
                 MeActionTile("bills", PantopusIcon.File, "Bills", routeKey = "me.bills", routeArgs = args),
+                MeActionTile(
+                    "maintenance",
+                    PantopusIcon.Hammer,
+                    "Maintenance",
+                    routeKey = "me.maintenance",
+                    routeArgs = args,
+                ),
                 MeActionTile("pets", PantopusIcon.Heart, "Pets", routeKey = "me.pets", routeArgs = args),
                 MeActionTile("members", PantopusIcon.UserPlus, "Members", routeKey = "me.members", routeArgs = args),
                 MeActionTile("polls", PantopusIcon.CheckCircle, "Polls", routeKey = "me.polls", routeArgs = args),
@@ -332,6 +339,13 @@ class MeViewModel
                     rows =
                         listOf(
                             MeSectionRow("bills", PantopusIcon.File, "Bills", routeKey = "me.bills", routeArgs = args),
+                            MeSectionRow(
+                                "maintenance",
+                                PantopusIcon.Hammer,
+                                "Maintenance",
+                                routeKey = "me.maintenance",
+                                routeArgs = args,
+                            ),
                             MeSectionRow("tasks", PantopusIcon.Hammer, "Household tasks", routeKey = "me.tasks", routeArgs = args),
                             MeSectionRow("packages", PantopusIcon.Mailbox, "Packages", routeKey = "me.packages", routeArgs = args),
                             MeSectionRow(

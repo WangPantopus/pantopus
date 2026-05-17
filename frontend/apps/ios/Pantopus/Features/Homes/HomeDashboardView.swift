@@ -26,6 +26,9 @@ struct HomeDashboardView: View {
     /// Push onto the host stack when the user taps the Pets quick-action
     /// tile. Receives this home's id so the destination can pre-fetch.
     private let onOpenPets: ((String) -> Void)?
+    /// T6.3b / P10 — Push onto the host stack when the user taps the
+    /// Maintenance quick-action tile. Receives this home's id.
+    private let onOpenMaintenance: ((String) -> Void)?
     /// Push onto the host stack when the user taps the Members
     /// quick-action tile or "Add member" CTA (T6.3a / P9). Receives
     /// this home's id so the destination can pre-fetch the roster.
@@ -39,6 +42,7 @@ struct HomeDashboardView: View {
         onOpenBills: (() -> Void)? = nil,
         onOpenPlaceholder: ((String) -> Void)? = nil,
         onOpenPets: ((String) -> Void)? = nil,
+        onOpenMaintenance: ((String) -> Void)? = nil,
         onOpenMembers: ((String) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
@@ -49,6 +53,7 @@ struct HomeDashboardView: View {
         self.onOpenBills = onOpenBills
         self.onOpenPlaceholder = onOpenPlaceholder
         self.onOpenPets = onOpenPets
+        self.onOpenMaintenance = onOpenMaintenance
         self.onOpenMembers = onOpenMembers
     }
 
@@ -156,6 +161,8 @@ struct HomeDashboardView: View {
             }
         case "view_bills":
             onOpenBills?()
+        case "view_maintenance":
+            onOpenMaintenance?(homeId)
         case "pets":
             onOpenPets?(homeId)
         default:
@@ -170,6 +177,7 @@ struct HomeDashboardView: View {
         case "add_mail": "Add mail"
         case "verify": "Verify home"
         case "view_bills": "Bills"
+        case "view_maintenance": "Maintenance"
         case "pets": "Pets"
         default: id.replacingOccurrences(of: "_", with: " ").capitalized
         }

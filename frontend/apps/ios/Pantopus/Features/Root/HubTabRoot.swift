@@ -21,6 +21,8 @@ public enum HubRoute: Hashable {
     case homeDashboard(homeId: String)
     /// Pets sub-screen for a specific home (T5.2.1).
     case homePets(homeId: String)
+    /// Maintenance sub-screen for a specific home (T6.3b / P10).
+    case homeMaintenance(homeId: String)
     /// Members sub-screen for a specific home (T6.3a / P9).
     case homeMembers(homeId: String)
     case publicProfile(userId: String)
@@ -306,9 +308,24 @@ public struct HubTabRoot: View {
                 onOpenPets: { id in
                     Task { @MainActor in push(.homePets(homeId: id)) }
                 },
+                onOpenMaintenance: { id in
+                    Task { @MainActor in push(.homeMaintenance(homeId: id)) }
+                },
                 onOpenMembers: { id in
                     Task { @MainActor in push(.homeMembers(homeId: id)) }
                 }
+            )
+        case let .homeMaintenance(homeId):
+            MaintenanceListView(
+                viewModel: MaintenanceListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Maintenance detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in push(.placeholder(label: "Log maintenance")) }
+                    }
+                )
             )
         case let .homeBills(homeId):
             BillsListView(

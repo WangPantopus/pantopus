@@ -31,6 +31,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenBillDetailViewed
     case screenAddBillWizardStepViewed(stepNumber: Int, stepName: String)
     case ctaAddBillSubmit(result: AnalyticsResult)
+    case screenHomeMaintenanceViewed
     case screenPetsListViewed
     case screenPetsWizardStepViewed(stepNumber: Int, stepName: String)
     case screenOwnersListViewed
@@ -63,6 +64,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenBillDetailViewed: "screen.bill_detail.viewed"
         case .screenAddBillWizardStepViewed: "screen.add_bill_wizard.step_viewed"
         case .ctaAddBillSubmit: "cta.add_bill.submit"
+        case .screenHomeMaintenanceViewed: "screen.home_maintenance.viewed"
         case .screenPetsListViewed: "screen.pets_list.viewed"
         case .screenPetsWizardStepViewed: "screen.pets_wizard.step_viewed"
         case .screenOwnersListViewed: "screen.owners_list.viewed"
@@ -117,6 +119,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenMyClaimsViewed,
              .screenBillsViewed,
              .screenBillDetailViewed,
+             .screenHomeMaintenanceViewed,
              .screenPetsListViewed,
              .screenOwnersListViewed,
              .screenMembersListViewed,
