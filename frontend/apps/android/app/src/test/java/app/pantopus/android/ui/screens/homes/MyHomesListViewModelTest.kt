@@ -7,7 +7,11 @@ import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.ui.components.IdentityPillar
+import app.pantopus.android.ui.screens.shared.list_of_rows.BannerCtaTint
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +22,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -41,6 +47,8 @@ class MyHomesListViewModelTest {
         name: String? = "Main",
         city: String? = "X",
         ownership: String? = "verified",
+        roleBase: String? = null,
+        isPrimary: Boolean? = true,
     ) = MyHome(
         id = id,
         name = name,
@@ -53,45 +61,75 @@ class MyHomesListViewModelTest {
         description = null,
         createdAt = null,
         updatedAt = null,
-        occupancy = null as HomeOccupancy?,
+        occupancy =
+            roleBase?.let {
+                HomeOccupancy(
+                    id = "o-$id",
+                    role = it,
+                    roleBase = it,
+                    isActive = true,
+                    startAt = null,
+                    endAt = null,
+                    verificationStatus = "verified",
+                )
+            },
         ownershipStatus = ownership,
         verificationTier = "attom",
-        isPrimaryOwner = true,
+        isPrimaryOwner = isPrimary,
         pendingClaimId = null,
     )
 
     @Test
-    fun happy_path_emits_loaded_rows() =
+    fun happy_path_emits_loaded_rows_with_role_chip_and_banner() =
         runTest {
             coEvery { repo.myHomes() } returns
                 NetworkResult.Success(
-                    MyHomesResponse(homes = listOf(makeHome("h1")), message = null),
+                    MyHomesResponse(
+                        homes =
+                            listOf(
+                                makeHome("h1", name = "Birch Lane", city = "Elm Park", ownership = "verified", isPrimary = true),
+                                makeHome(
+                                    "h2",
+                                    name = null,
+                                    city = "Sellwood",
+                                    ownership = null,
+                                    roleBase = "lease_resident",
+                                    isPrimary = false,
+                                ),
+                            ),
+                        message = null,
+                    ),
                 )
             val vm = MyHomesListViewModel(repo)
-            vm.state.test {
-                assertEquals(ListOfRowsUiState.Loading, awaitItem())
-                vm.load()
-                val loaded = awaitItem() as ListOfRowsUiState.Loaded
-                assertEquals(
-                    1,
-                    loaded.sections
-                        .first()
-                        .rows.size,
-                )
-                assertEquals(
-                    "Main",
-                    loaded.sections
-                        .first()
-                        .rows
-                        .first()
-                        .title,
-                )
-                cancelAndConsumeRemainingEvents()
-            }
+            vm.load()
+            val loaded = vm.state.value as ListOfRowsUiState.Loaded
+            val rows = loaded.sections.first().rows
+            assertEquals(2, rows.size)
+            // Primary-owner row has the Active-home chip and verified ring.
+            assertEquals("Birch Lane", rows[0].title)
+            assertEquals("Owner · Elm Park, CA", rows[0].subtitle)
+            val chips = rows[0].chips
+            assertNotNull(chips)
+            assertEquals("Active home", chips!!.first().text)
+            assertTrue(chips.first().tint is RowChip.Tint.Custom)
+            val leading = rows[0].leading as RowLeading.Avatar
+            assertEquals(IdentityPillar.Home, leading.identity)
+            assertEquals(1.0f, leading.ringProgress, 0.001f)
+            // Tenant row has no chip, address-only title, and the lower
+            // 0.3 ring progress.
+            assertEquals("1 Main", rows[1].title)
+            assertEquals("Tenant · Sellwood, CA", rows[1].subtitle)
+            assertNull(rows[1].chips)
+            assertEquals(0.3f, (rows[1].leading as RowLeading.Avatar).ringProgress, 0.001f)
+            // Banner shows count + home tint when populated.
+            val banner = vm.banner.value
+            assertNotNull(banner)
+            assertEquals("2 homes you belong to", banner!!.title)
+            assertEquals(BannerCtaTint.Home, banner.tint)
         }
 
     @Test
-    fun empty_response_surfaces_empty_state() =
+    fun empty_response_surfaces_empty_state_and_clears_banner() =
         runTest {
             coEvery { repo.myHomes() } returns NetworkResult.Success(MyHomesResponse(homes = emptyList(), message = null))
             val vm = MyHomesListViewModel(repo)
@@ -99,10 +137,11 @@ class MyHomesListViewModelTest {
                 awaitItem() // Loading
                 vm.load()
                 val empty = awaitItem() as ListOfRowsUiState.Empty
-                assertEquals("No homes claimed yet", empty.headline)
+                assertEquals("You don’t belong to any homes yet", empty.headline)
                 assertEquals("Claim a home", empty.ctaTitle)
                 cancelAndConsumeRemainingEvents()
             }
+            assertNull(vm.banner.value)
         }
 
     @Test

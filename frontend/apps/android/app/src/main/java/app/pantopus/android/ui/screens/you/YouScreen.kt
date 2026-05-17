@@ -95,6 +95,9 @@ fun YouScreen(
     onOpenHomeMaintenance: (String) -> Unit = {},
     onOpenHomeOwners: (String) -> Unit = {},
     onOpenHomeMembers: (String) -> Unit = {},
+    onOpenMyHomes: () -> Unit = {},
+    onOpenMyListings: () -> Unit = {},
+    onOpenMyBusinesses: () -> Unit = {},
 ) {
     val state by viewModel.authState.collectAsStateWithLifecycle()
     val signedIn = state as? AuthRepository.State.SignedIn
@@ -123,6 +126,9 @@ fun YouScreen(
                 "me.posts" -> onOpenMyPosts()
                 "me.offers" -> onOpenOffers()
                 "me.connections" -> onOpenConnections()
+                "me.listings" -> onOpenMyListings()
+                "me.businesses" -> onOpenMyBusinesses()
+                "me.homes" -> onOpenMyHomes()
                 "me.bills" -> {
                     val homeId = tile.routeArgs["homeId"].orEmpty()
                     if (homeId.isNotEmpty()) onOpenHomeBills(homeId) else onOpenPlaceholder(tile.label)
@@ -153,6 +159,9 @@ fun YouScreen(
                 "me.gigs" -> onOpenMyTasks()
                 "me.offers" -> onOpenOffers()
                 "me.connections" -> onOpenConnections()
+                "me.homes" -> onOpenMyHomes()
+                "me.listings" -> onOpenMyListings()
+                "me.businesses" -> onOpenMyBusinesses()
                 "me.identityCenter" -> onOpenIdentityCenter()
                 "me.audience" -> onOpenAudienceProfile()
                 "me.bills" -> {

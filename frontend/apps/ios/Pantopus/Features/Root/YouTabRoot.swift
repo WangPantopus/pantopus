@@ -34,6 +34,19 @@ public enum YouRoute: Hashable {
     case myPosts
     /// T5.2.3 — Connections. The "me.connections" Personal action tile pushes here.
     case connections
+    /// T6.3f / P14 — My homes (avatar-first roster). The "me.homes"
+    /// Activity-section row pushes here; tapping a row drills into the
+    /// home dashboard via `homeDashboard(homeId:)`.
+    case myHomes
+    /// T6.3f / P14 — My listings (Active / Sold / Drafts tabs). The
+    /// "me.listings" Personal action tile pushes here.
+    case myListings
+    /// T6.3f / P14 — My businesses (avatar-first roster). The
+    /// "me.businesses" Activity-section row pushes here.
+    case myBusinesses
+    /// T6.3f / P14 — Home dashboard for a specific home, reached from
+    /// the My homes row tap inside the You stack.
+    case homeDashboard(homeId: String)
     /// T3.2 — Identity Center. The "me.identityCenter" Personal section row pushes here.
     case identityCenter
     /// T3.3 — Audience profile. The "me.audience" Personal section row pushes here.
@@ -279,6 +292,12 @@ public struct YouTabRoot: View {
             path.append(.offers)
         case "me.connections":
             path.append(.connections)
+        case "me.listings":
+            path.append(.myListings)
+        case "me.businesses":
+            path.append(.myBusinesses)
+        case "me.homes":
+            path.append(.myHomes)
         case "me.bills":
             if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
@@ -330,6 +349,15 @@ public struct YouTabRoot: View {
             return
         case "me.connections":
             path.append(.connections)
+            return
+        case "me.homes":
+            path.append(.myHomes)
+            return
+        case "me.listings":
+            path.append(.myListings)
+            return
+        case "me.businesses":
+            path.append(.myBusinesses)
             return
         case "me.identityCenter":
             path.append(.identityCenter)
@@ -652,6 +680,62 @@ public struct YouTabRoot: View {
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case .myHomes:
+            MyHomesListView(
+                viewModel: MyHomesListViewModel(
+                    onOpenHome: { homeId in
+                        Task { @MainActor in path.append(.homeDashboard(homeId: homeId)) }
+                    },
+                    onAddHome: {
+                        Task { @MainActor in path.append(.placeholder(label: "Claim a home")) }
+                    }
+                )
+            )
+        case .myListings:
+            MyListingsView(
+                viewModel: MyListingsViewModel(
+                    onOpenListing: { listingId in
+                        Task { @MainActor in path.append(.listingDetail(listingId: listingId)) }
+                    },
+                    onCompose: {
+                        Task { @MainActor in path.append(.placeholder(label: "List something")) }
+                    }
+                )
+            )
+        case .myBusinesses:
+            MyBusinessesView(
+                viewModel: MyBusinessesViewModel(
+                    onOpenBusiness: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Business dashboard")) }
+                    },
+                    onRegister: {
+                        Task { @MainActor in path.append(.placeholder(label: "Register a business")) }
+                    }
+                )
+            )
+        case let .homeDashboard(homeId):
+            HomeDashboardView(
+                homeId: homeId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onClaimOwnership: {
+                    Task { @MainActor in path.append(.placeholder(label: "Claim ownership")) }
+                },
+                onOpenClaimsList: {
+                    Task { @MainActor in path.append(.placeholder(label: "My claims")) }
+                },
+                onOpenBills: {
+                    Task { @MainActor in path.append(.homeBills(homeId: homeId)) }
+                },
+                onOpenPlaceholder: { label in
+                    Task { @MainActor in path.append(.placeholder(label: label)) }
+                },
+                onOpenPets: { petHomeId in
+                    Task { @MainActor in path.append(.homePets(homeId: petHomeId)) }
+                },
+                onOpenMembers: { membersHomeId in
+                    Task { @MainActor in path.append(.homeMembers(homeId: membersHomeId)) }
+                }
+            )
         case let .homeTasks(homeId):
             HouseholdTasksListView(
                 viewModel: HouseholdTasksListViewModel(
