@@ -51,14 +51,10 @@ import app.pantopus.android.ui.theme.Spacing
 
 /**
  * Designed Me tab — one chrome, three identity bindings. Hosts the
- * pill row, gradient header, stats, action grid, section groups, and
- * the destructive card at the bottom.
- *
- * @param onAction Invoked for any action-grid tap. Host maps the
- *     `routeKey` to a real route or pushes a placeholder.
- * @param onSection Invoked for any section-row tap.
- * @param onLogOut Invoked when the destructive card is tapped while
- *     the active identity is `Personal`.
+ * pill row (top of the gradient header), the 72pt verification-ring
+ * avatar + name + tagline, the 3-tile stats card, the 2×3 action
+ * grid, the section groups, and the destructive card at the bottom.
+ * T6.2b re-skin.
  */
 @Composable
 fun MeView(
@@ -184,7 +180,7 @@ private fun MeHeader(
 ) {
     val brush =
         Brush.verticalGradient(
-            colors = listOf(content.identity.accentBg, PantopusColors.appSurface),
+            colors = content.identity.headerGradient,
         )
     Column(
         modifier =
@@ -195,42 +191,6 @@ private fun MeHeader(
                 .testTag("meHeader_${content.identity.key}"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Avatar(content)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = content.displayName,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PantopusColors.appText,
-                    maxLines = 1,
-                )
-                Text(
-                    text = content.handle,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = PantopusColors.appTextSecondary,
-                    maxLines = 1,
-                )
-                if (!content.locality.isNullOrEmpty()) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        PantopusIconImage(
-                            icon = PantopusIcon.MapPin,
-                            contentDescription = null,
-                            size = 11.dp,
-                            tint = PantopusColors.appTextSecondary,
-                        )
-                        Text(
-                            text = content.locality,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = PantopusColors.appTextSecondary,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
-        }
         IdentitySwitcherPillRow(
             options =
                 MeIdentity.entries.map { identity ->
@@ -245,11 +205,47 @@ private fun MeHeader(
             identifierPrefix = "meIdentityPill",
             onSelect = { key -> onSwitch(MeIdentity.fromKey(key)) },
         )
-        if (!content.bio.isNullOrEmpty()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Avatar(content)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = content.displayName,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appTextInverse,
+                    maxLines = 1,
+                )
+                Text(
+                    text = content.handle,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = PantopusColors.appTextInverse.copy(alpha = 0.85f),
+                    maxLines = 1,
+                )
+                if (!content.locality.isNullOrEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.MapPin,
+                            contentDescription = null,
+                            size = 11.dp,
+                            tint = PantopusColors.appTextInverse.copy(alpha = 0.85f),
+                        )
+                        Text(
+                            text = content.locality,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = PantopusColors.appTextInverse.copy(alpha = 0.85f),
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+        if (!content.tagline.isNullOrEmpty()) {
             Text(
-                text = content.bio,
+                text = content.tagline,
                 fontSize = 13.5.sp,
-                color = PantopusColors.appTextStrong,
+                color = PantopusColors.appTextInverse.copy(alpha = 0.9f),
                 maxLines = 2,
             )
         }
@@ -263,7 +259,7 @@ private fun Avatar(content: MeIdentityContent) {
             modifier =
                 Modifier
                     .size(72.dp)
-                    .shadow(elevation = 4.dp, shape = CircleShape)
+                    .shadow(elevation = 6.dp, shape = CircleShape)
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
@@ -291,8 +287,9 @@ private fun Avatar(content: MeIdentityContent) {
                         .align(Alignment.TopEnd)
                         .size(22.dp)
                         .clip(CircleShape)
-                        .background(PantopusColors.primary600)
-                        .border(2.dp, PantopusColors.appSurface, CircleShape)
+                        .background(PantopusColors.appSurface)
+                        .border(2.dp, content.identity.accent, CircleShape)
+                        .testTag("meVerificationBadge")
                         .semantics { contentDescription = "Verified" },
                 contentAlignment = Alignment.Center,
             ) {
@@ -300,7 +297,7 @@ private fun Avatar(content: MeIdentityContent) {
                     icon = PantopusIcon.Check,
                     contentDescription = null,
                     size = 11.dp,
-                    tint = PantopusColors.appTextInverse,
+                    tint = PantopusColors.primary600,
                 )
             }
         }

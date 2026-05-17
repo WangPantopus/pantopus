@@ -40,7 +40,7 @@ public enum MeIdentity: String, CaseIterable, Sendable, Hashable {
         }
     }
 
-    /// Soft tint used for the header gradient top + pill background.
+    /// Soft tint used for the pill background + scaffolding.
     public var accentBg: Color {
         switch self {
         case .personal: Theme.Color.primary50
@@ -48,9 +48,24 @@ public enum MeIdentity: String, CaseIterable, Sendable, Hashable {
         case .business: Theme.Color.businessBg
         }
     }
+
+    /// 3-stop gradient for the header card (per T6.2b design — sky
+    /// gets `primary600 → primary500 → primary700`; home and business
+    /// mirror with opacity-shifted accents since the theme doesn't
+    /// expose 500 / 700 ramps for those identities).
+    public var headerGradient: [Color] {
+        switch self {
+        case .personal:
+            [Theme.Color.primary600, Theme.Color.primary500, Theme.Color.primary700]
+        case .home:
+            [Theme.Color.home, Theme.Color.home.opacity(0.86), Theme.Color.home]
+        case .business:
+            [Theme.Color.business, Theme.Color.business.opacity(0.86), Theme.Color.business]
+        }
+    }
 }
 
-/// One cell in the 4-cell stats row.
+/// One cell in the stats row.
 public struct MeStat: Identifiable, Sendable, Hashable {
     public let id: String
     public let value: String
@@ -73,13 +88,26 @@ public struct MeActionTile: Identifiable, Sendable, Hashable {
     /// pushes a labeled placeholder when the destination doesn't exist
     /// yet (see `docs/mobile-wiring-audit.md`).
     public let routeKey: String
+    /// Optional per-route arguments (e.g. `["homeId": "abc-123"]`).
+    /// Carries the primary home id on home-context tiles so the host
+    /// can construct `BillsListView` etc. without re-introspecting the
+    /// VM.
+    public let routeArgs: [String: String]
 
-    public init(id: String, icon: PantopusIcon, label: String, badge: Int? = nil, routeKey: String) {
+    public init(
+        id: String,
+        icon: PantopusIcon,
+        label: String,
+        badge: Int? = nil,
+        routeKey: String,
+        routeArgs: [String: String] = [:]
+    ) {
         self.id = id
         self.icon = icon
         self.label = label
         self.badge = badge
         self.routeKey = routeKey
+        self.routeArgs = routeArgs
     }
 }
 
@@ -90,17 +118,27 @@ public struct MeSectionRow: Identifiable, Sendable, Hashable {
     public let label: String
     public let value: String?
     public let routeKey: String
+    public let routeArgs: [String: String]
 
-    public init(id: String, icon: PantopusIcon, label: String, value: String? = nil, routeKey: String) {
+    public init(
+        id: String,
+        icon: PantopusIcon,
+        label: String,
+        value: String? = nil,
+        routeKey: String,
+        routeArgs: [String: String] = [:]
+    ) {
         self.id = id
         self.icon = icon
         self.label = label
         self.value = value
         self.routeKey = routeKey
+        self.routeArgs = routeArgs
     }
 }
 
-/// A grouped section in the lower stack (Account · Activity · Support).
+/// A grouped section in the lower stack (Profile & Privacy · Activity ·
+/// Help & Legal).
 public struct MeSection: Identifiable, Sendable, Hashable {
     public let id: String
     public let header: String
@@ -120,7 +158,10 @@ public struct MeIdentityContent: Sendable, Hashable {
     public let initials: String
     public let handle: String
     public let locality: String?
-    public let bio: String?
+    /// Short bio / one-liner under the name. Mapped from
+    /// `UserProfile.tagline` (falls back to `bio`) for Personal; home
+    /// uses a household summary; business is its tagline copy.
+    public let tagline: String?
     public let verified: Bool
     public let stats: [MeStat]
     public let actionTiles: [MeActionTile]
@@ -136,7 +177,7 @@ public struct MeIdentityContent: Sendable, Hashable {
         initials: String,
         handle: String,
         locality: String?,
-        bio: String?,
+        tagline: String?,
         verified: Bool,
         stats: [MeStat],
         actionTiles: [MeActionTile],
@@ -148,7 +189,7 @@ public struct MeIdentityContent: Sendable, Hashable {
         self.initials = initials
         self.handle = handle
         self.locality = locality
-        self.bio = bio
+        self.tagline = tagline
         self.verified = verified
         self.stats = stats
         self.actionTiles = actionTiles

@@ -32,6 +32,17 @@ public enum YouRoute: Hashable {
     case composeTask
     /// T5.3.3 — My posts. The "me.posts" Activity-section row pushes here.
     case myPosts
+    /// T5.2.3 — Connections. The "me.connections" Personal action tile pushes here.
+    case connections
+    /// T3.2 — Identity Center. The "me.identityCenter" Personal section row pushes here.
+    case identityCenter
+    /// T3.3 — Audience profile. The "me.audience" Personal section row pushes here.
+    case audienceProfile
+    /// T5.2.2 — Bills. The home-context "me.bills" action tile + Activity
+    /// row push here with the primary home id resolved by the VM.
+    case homeBills(homeId: String)
+    /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
+    case homePets(homeId: String)
     /// T5.3.4 — per-listing offers panel. Pushed from a listing detail
     /// "View offers" affordance (visible when the current user owns the
     /// listing). The optional `title` is a hint rendered as the
@@ -236,37 +247,79 @@ public struct YouTabRoot: View {
 
     /// Dispatch a tap on an action-grid tile to the matching route.
     /// Tiles whose dedicated screen doesn't exist yet land on the
-    /// generic placeholder.
+    /// generic placeholder, labelled per the destination they will
+    /// resolve to once their T6 sub-PR lands (see PR description for
+    /// the full table — `me.members` → P9, `me.tasks` → P11, etc.).
     private func handleAction(_ tile: MeActionTile) {
         switch tile.routeKey {
         case "me.mail":
             path.append(.mailbox)
         case "me.bids":
-            // T5.3.1 — dedicated My bids screen.
             path.append(.myBids)
         case "me.gigs":
-            // T5.3.2 — dedicated My tasks V2 screen (poster side).
             path.append(.myTasks)
+        case "me.posts":
+            path.append(.myPosts)
+        case "me.offers":
+            path.append(.offers)
+        case "me.connections":
+            path.append(.connections)
+        case "me.bills":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeBills(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
+        case "me.pets":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homePets(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         default:
             path.append(.placeholder(label: tile.label))
         }
     }
 
     private func handleSection(_ row: MeSectionRow) {
-        // T5.3.3 — My posts is reachable from the Activity section row.
-        // Wired in both DEBUG and release configurations.
-        if row.routeKey == "me.posts" {
+        switch row.routeKey {
+        case "me.posts":
             path.append(.myPosts)
             return
-        }
-        #if DEBUG
-        switch row.routeKey {
+        case "me.bids":
+            path.append(.myBids)
+            return
+        case "me.gigs":
+            path.append(.myTasks)
+            return
+        case "me.offers":
+            path.append(.offers)
+            return
+        case "me.connections":
+            path.append(.connections)
+            return
+        case "me.identityCenter":
+            path.append(.identityCenter)
+            return
+        case "me.audience":
+            path.append(.audienceProfile)
+            return
+        case "me.bills":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeBills(homeId: homeId))
+                return
+            }
         case "me.editProfile":
             showsEditProfile = true
             return
         case "me.settings":
             path.append(.settings)
             return
+        default:
+            break
+        }
+        #if DEBUG
+        switch row.routeKey {
         case "me.debug.openProfile":
             debugProfileSheet = true
             return
@@ -296,15 +349,6 @@ public struct YouTabRoot: View {
             return
         default:
             break
-        }
-        #else
-        if row.routeKey == "me.editProfile" {
-            showsEditProfile = true
-            return
-        }
-        if row.routeKey == "me.settings" {
-            path.append(.settings)
-            return
         }
         #endif
         path.append(.placeholder(label: row.label))
@@ -510,6 +554,51 @@ public struct YouTabRoot: View {
             )
         case .composeTask:
             NotYetAvailableView(tabName: "Post a task", icon: .pencil)
+        case .connections:
+            ConnectionsView(
+                viewModel: ConnectionsViewModel(
+                    onMessage: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Messages")) }
+                    },
+                    onFindPeople: {
+                        Task { @MainActor in path.append(.placeholder(label: "Find people")) }
+                    }
+                )
+            )
+        case .identityCenter:
+            IdentityCenterView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOpenIdentity: { _ in
+                    Task { @MainActor in path.append(.placeholder(label: "Identity")) }
+                }
+            )
+        case .audienceProfile:
+            AudienceProfileView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOpenFollower: { _ in
+                    Task { @MainActor in path.append(.placeholder(label: "Follower")) }
+                },
+                onOpenThread: { _ in
+                    Task { @MainActor in path.append(.placeholder(label: "Thread")) }
+                },
+                onOpenSetup: {
+                    Task { @MainActor in path.append(.placeholder(label: "Audience setup")) }
+                }
+            )
+        case let .homeBills(homeId):
+            BillsListView(
+                viewModel: BillsListViewModel(
+                    homeId: homeId,
+                    onOpenBill: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Bill detail")) }
+                    },
+                    onAddBill: {
+                        Task { @MainActor in path.append(.placeholder(label: "Add a bill")) }
+                    }
+                )
+            )
+        case let .homePets(homeId):
+            PetsListView(homeId: homeId)
         #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(

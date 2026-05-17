@@ -23,7 +23,7 @@ enum class MeIdentity(val key: String, val label: String, val icon: PantopusIcon
                 Business -> PantopusColors.business
             }
 
-    /** Soft tint for the header gradient top + pill background. */
+    /** Soft tint for the pill background + scaffolding. */
     val accentBg: Color
         get() =
             when (this) {
@@ -32,12 +32,26 @@ enum class MeIdentity(val key: String, val label: String, val icon: PantopusIcon
                 Business -> PantopusColors.businessBg
             }
 
+    /**
+     * 3-stop gradient for the header card (per T6.2b design — sky gets
+     * `primary600 → primary500 → primary700`; home and business mirror
+     * with opacity-shifted accents since the theme doesn't expose
+     * 500 / 700 ramps for those identities).
+     */
+    val headerGradient: List<Color>
+        get() =
+            when (this) {
+                Personal -> listOf(PantopusColors.primary600, PantopusColors.primary500, PantopusColors.primary700)
+                Home -> listOf(PantopusColors.home, PantopusColors.home.copy(alpha = 0.86f), PantopusColors.home)
+                Business -> listOf(PantopusColors.business, PantopusColors.business.copy(alpha = 0.86f), PantopusColors.business)
+            }
+
     companion object {
         fun fromKey(key: String): MeIdentity = entries.firstOrNull { it.key == key } ?: Personal
     }
 }
 
-/** One cell in the 4-cell stats row. */
+/** One cell in the stats row. */
 @Immutable
 data class MeStat(
     val id: String,
@@ -53,6 +67,12 @@ data class MeActionTile(
     val label: String,
     val badge: Int? = null,
     val routeKey: String,
+    /**
+     * Optional per-route arguments (e.g. `mapOf("homeId" to "abc-123")`).
+     * Carries the primary home id on home-context tiles so the host can
+     * construct BillsListScreen etc. without re-introspecting the VM.
+     */
+    val routeArgs: Map<String, String> = emptyMap(),
 )
 
 /** One row in a section group. */
@@ -63,9 +83,10 @@ data class MeSectionRow(
     val label: String,
     val value: String? = null,
     val routeKey: String,
+    val routeArgs: Map<String, String> = emptyMap(),
 )
 
-/** A grouped section in the lower stack (Account · Activity · Support). */
+/** A grouped section in the lower stack (Profile & Privacy · Activity · Help & Legal). */
 @Immutable
 data class MeSection(
     val id: String,
@@ -81,7 +102,8 @@ data class MeIdentityContent(
     val initials: String,
     val handle: String,
     val locality: String?,
-    val bio: String?,
+    /** Short bio / one-liner under the name. */
+    val tagline: String?,
     val verified: Boolean,
     val stats: List<MeStat>,
     val actionTiles: List<MeActionTile>,
