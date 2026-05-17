@@ -33,6 +33,8 @@ import javax.inject.Inject
 /** Nav arg key for the home id consumed via [SavedStateHandle]. */
 const val OWNERS_LIST_HOME_ID_KEY = "homeId"
 
+private const val SUBJECT_ID_DISPLAY_SUFFIX_LENGTH = 4
+
 /**
  * Surfaced to the screen so it can present sheets / confirms in response
  * to row interactions without the VM holding view state.
@@ -273,7 +275,7 @@ class OwnersListViewModel
             if (name != null) return name
             val username = owner.user?.username?.takeIf { it.isNotEmpty() }
             if (username != null) return "@$username"
-            val suffix = owner.subjectId.takeLast(4)
+            val suffix = owner.subjectId.takeLast(SUBJECT_ID_DISPLAY_SUFFIX_LENGTH)
             return when (owner.subjectType.lowercase()) {
                 "business" -> "Business · $suffix"
                 "trust" -> "Trust · $suffix"

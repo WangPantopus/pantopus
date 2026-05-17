@@ -39,8 +39,8 @@ final class OwnersListViewModelTests: XCTestCase {
         )
     }
 
-    // Three-owner roster: a verified primary (legal tier), a verified
-    // co-owner (standard tier), and a pending invitee.
+    /// Three-owner roster: a verified primary (legal tier), a verified
+    /// co-owner (standard tier), and a pending invitee.
     private static let threeOwnersJSON = """
     {"owners":[
       {"id":"o1","subject_type":"user","subject_id":"user_1",
