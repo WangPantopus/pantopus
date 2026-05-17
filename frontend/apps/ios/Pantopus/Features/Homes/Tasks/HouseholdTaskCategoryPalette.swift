@@ -172,38 +172,109 @@ public enum HouseholdTaskCategory: String, CaseIterable, Sendable {
         ),
         Pattern(
             category: .pet,
-            matchers: ["walk the dog", "walk dog", "dog walk", "feed the dog", "feed the cat",
-                       "litter box", "dog", " cat ", "puppy", " pet ", "pet ", "vet "]
+            matchers: [
+                "walk the dog",
+                "walk dog",
+                "dog walk",
+                "feed the dog",
+                "feed the cat",
+                "litter box",
+                "dog",
+                " cat ",
+                "puppy",
+                " pet ",
+                "pet ",
+                "vet "
+            ]
         ),
         Pattern(
             category: .kitchen,
-            matchers: ["dishwasher", "dishes", "dish", "kitchen", "cook", "meal", "fridge",
-                       "groceries away", "wipe counters", "stove", "oven"]
+            matchers: [
+                "dishwasher",
+                "dishes",
+                "dish",
+                "cook",
+                "meal",
+                "fridge",
+                "groceries away",
+                "stove",
+                "oven"
+            ]
         ),
         Pattern(
             category: .laundry,
-            matchers: ["laundry", "wash clothes", "fold clothes", "fold the laundry",
-                       "dryer", "ironing", "iron the"]
+            matchers: [
+                "laundry",
+                "wash clothes",
+                "fold clothes",
+                "fold the laundry",
+                "dryer",
+                "ironing",
+                "iron the"
+            ]
         ),
         Pattern(
             category: .yard,
-            matchers: ["water plants", "water the plants", "plants", "garden", "mow", "lawn",
-                       "rake", "leaves", "yard", "porch", "weed"]
+            matchers: [
+                "water plants",
+                "water the plants",
+                "plants",
+                "garden",
+                "mow",
+                "lawn",
+                "rake",
+                "leaves",
+                "yard",
+                "porch",
+                "weed"
+            ]
         ),
         Pattern(
             category: .cleaning,
-            matchers: ["vacuum", "clean", "dust", "mop", "wipe", "scrub", "sweep",
-                       "tidy", "bathroom", "bedroom"]
+            matchers: [
+                "vacuum",
+                "clean",
+                "dust",
+                "mop",
+                "wipe",
+                "scrub",
+                "sweep",
+                "tidy",
+                "bathroom",
+                "bedroom"
+            ]
         ),
         Pattern(
             category: .errand,
-            matchers: ["costco", "grocery", "groceries", "shopping", "shop ", "pick up",
-                       "pickup", "buy ", "errand", "store run", "post office", "pharmacy"]
+            matchers: [
+                "costco",
+                "grocery",
+                "groceries",
+                "shopping",
+                "shop ",
+                "pick up",
+                "pickup",
+                "buy ",
+                "errand",
+                "store run",
+                "post office",
+                "pharmacy"
+            ]
         ),
         Pattern(
             category: .kids,
-            matchers: ["kid", "kids", "school", "homework", "lunchbox", "lunchboxes",
-                       "daycare", "playdate", "baby ", "diaper"]
+            matchers: [
+                "kid",
+                "kids",
+                "school",
+                "homework",
+                "lunchbox",
+                "lunchboxes",
+                "daycare",
+                "playdate",
+                "baby ",
+                "diaper"
+            ]
         )
     ]
 }

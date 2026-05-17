@@ -112,9 +112,7 @@ open class HomesRepository
         // MARK: - Household tasks (T6.3c / P11)
 
         /** `GET /api/homes/:id/tasks`. */
-        open suspend fun getHomeTasks(
-            homeId: String,
-        ): NetworkResult<GetHomeTasksResponse> = safeApiCall { tasksApi.getHomeTasks(homeId) }
+        open suspend fun getHomeTasks(homeId: String): NetworkResult<GetHomeTasksResponse> = safeApiCall { tasksApi.getHomeTasks(homeId) }
 
         /** `POST /api/homes/:id/tasks`. */
         open suspend fun createHomeTask(
