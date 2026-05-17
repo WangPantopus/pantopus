@@ -26,6 +26,10 @@ struct HomeDashboardView: View {
     /// Push onto the host stack when the user taps the Pets quick-action
     /// tile. Receives this home's id so the destination can pre-fetch.
     private let onOpenPets: ((String) -> Void)?
+    /// Push onto the host stack when the user taps the Tasks (T6.3c)
+    /// quick-action tile. Receives this home's id so the destination
+    /// can pre-fetch.
+    private let onOpenTasks: ((String) -> Void)?
     /// T6.3b / P10 — Push onto the host stack when the user taps the
     /// Maintenance quick-action tile. Receives this home's id.
     private let onOpenMaintenance: ((String) -> Void)?
@@ -42,6 +46,7 @@ struct HomeDashboardView: View {
         onOpenBills: (() -> Void)? = nil,
         onOpenPlaceholder: ((String) -> Void)? = nil,
         onOpenPets: ((String) -> Void)? = nil,
+        onOpenTasks: ((String) -> Void)? = nil,
         onOpenMaintenance: ((String) -> Void)? = nil,
         onOpenMembers: ((String) -> Void)? = nil
     ) {
@@ -53,6 +58,7 @@ struct HomeDashboardView: View {
         self.onOpenBills = onOpenBills
         self.onOpenPlaceholder = onOpenPlaceholder
         self.onOpenPets = onOpenPets
+        self.onOpenTasks = onOpenTasks
         self.onOpenMaintenance = onOpenMaintenance
         self.onOpenMembers = onOpenMembers
     }
@@ -165,6 +171,8 @@ struct HomeDashboardView: View {
             onOpenMaintenance?(homeId)
         case "pets":
             onOpenPets?(homeId)
+        case "view_tasks":
+            onOpenTasks?(homeId)
         default:
             onOpenPlaceholder?(actionLabel(action))
         }
@@ -179,6 +187,7 @@ struct HomeDashboardView: View {
         case "view_bills": "Bills"
         case "view_maintenance": "Maintenance"
         case "pets": "Pets"
+        case "view_tasks": "Tasks"
         default: id.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }

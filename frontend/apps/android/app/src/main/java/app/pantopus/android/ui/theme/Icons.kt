@@ -32,8 +32,10 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -43,6 +45,7 @@ import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EnergySavingsLeaf
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -84,6 +87,7 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
@@ -258,6 +262,12 @@ enum class PantopusIcon(
     WandSparkles("wand-sparkles"),
     ArrowUpRight("arrow-up-right"),
 
+    // T6.3c — Household tasks chore-category iconography + banner glyph.
+    Leaf("leaf"),
+    ListChecks("list-checks"),
+    Utensils("utensils"),
+    Baby("baby"),
+
     // T6.3b — Maintenance per-task-category iconography. Material's
     // icon pack doesn't ship 1:1 Lucide-equivalents for every
     // maintenance glyph, so each falls back to the closest Material
@@ -421,6 +431,16 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Shuffle -> IconSource.Material(Icons.Filled.Shuffle)
         PantopusIcon.WandSparkles -> IconSource.Material(Icons.Filled.AutoFixHigh)
         PantopusIcon.ArrowUpRight -> IconSource.Material(Icons.Filled.NorthEast)
+        // T6.3c — Household tasks chore-category iconography. Material
+        // lacks direct equivalents for Lucide's `utensils`, `baby`, and
+        // `list-checks`; fall back to the closest visually-similar
+        // Material vector. Visual signal is reinforced by the
+        // per-category background tint in `HouseholdTaskCategoryPalette`.
+        PantopusIcon.Leaf -> IconSource.Material(Icons.Filled.EnergySavingsLeaf)
+        PantopusIcon.ListChecks -> IconSource.Material(Icons.Filled.Checklist)
+        PantopusIcon.Utensils -> IconSource.Material(Icons.Filled.Restaurant)
+        PantopusIcon.Baby -> IconSource.Material(Icons.Filled.ChildCare)
+
         // T6.3b — Maintenance per-task-category iconography. Material
         // lacks 1:1 Lucide equivalents for `wrench`, `fan`, `paint-
         // roller`, `bell-ring`, `cloud-rain`, `refrigerator`, `trees`;
