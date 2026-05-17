@@ -56,6 +56,61 @@ public struct MailDetailContent: Sendable {
     public let ackRequired: Bool
     public let isAcknowledged: Bool
 
+    // MARK: - T6.5c variant payloads
+
+    /// Decoded booklet payload — set when `category == .booklet` and the
+    /// detail response's `object` JSON carries at least one page URL.
+    /// The Booklet variant view consumes this through `BookletPager`.
+    public let bookletDetail: BookletDetailDTO?
+
+    /// Decoded certified payload — set when `category == .certified` and
+    /// the detail response's `object` JSON carries a reference number.
+    /// The Certified variant view consumes this through the chain-of-
+    /// custody timeline + combined sender/carrier card.
+    public let certifiedDetail: CertifiedDetailDTO?
+
+    public init(
+        mailId: String,
+        category: MailItemCategory,
+        trust: MailTrust,
+        detailTrust: MailDetailTrust,
+        senderDisplayName: String,
+        senderMeta: String?,
+        senderInitials: String,
+        senderUserId: String?,
+        title: String,
+        excerpt: String?,
+        createdAtLabel: String?,
+        expiresAtLabel: String?,
+        bodyParagraphs: [String],
+        attachments: [String],
+        aiSummary: String?,
+        ackRequired: Bool,
+        isAcknowledged: Bool,
+        bookletDetail: BookletDetailDTO? = nil,
+        certifiedDetail: CertifiedDetailDTO? = nil
+    ) {
+        self.mailId = mailId
+        self.category = category
+        self.trust = trust
+        self.detailTrust = detailTrust
+        self.senderDisplayName = senderDisplayName
+        self.senderMeta = senderMeta
+        self.senderInitials = senderInitials
+        self.senderUserId = senderUserId
+        self.title = title
+        self.excerpt = excerpt
+        self.createdAtLabel = createdAtLabel
+        self.expiresAtLabel = expiresAtLabel
+        self.bodyParagraphs = bodyParagraphs
+        self.attachments = attachments
+        self.aiSummary = aiSummary
+        self.ackRequired = ackRequired
+        self.isAcknowledged = isAcknowledged
+        self.bookletDetail = bookletDetail
+        self.certifiedDetail = certifiedDetail
+    }
+
     /// Build a `KeyFactRow` list from the projected fields. Variants
     /// extend this in P21-P23; the generic surface keeps it minimal.
     public func keyFacts() -> [MailDetailKeyFact] {
@@ -194,6 +249,20 @@ public final class MailDetailViewModel {
         let ackRequired = item.ackRequired ?? false
         let isAcknowledged = (item.ackStatus ?? "").lowercased() == "acknowledged"
         let initials = makeInitials(from: senderDisplayName)
+        // T6.5c — decode the per-variant payloads from `mail.object`.
+        // Both decoders return nil unless the payload carries the
+        // required shape, so the generic projection still works when the
+        // backend hasn't populated `object_payload` for this mail.
+        let bookletDetail = category == .booklet
+            ? BookletDetailDTO.decode(from: detail.object)
+            : nil
+        let certifiedDetail = category == .certified
+            ? CertifiedDetailDTO.decode(from: detail.object)
+            : nil
+        // Certified mail flips the acknowledgement state from its decoded
+        // payload too — backend can ship the chain with `is_acknowledged`
+        // set even before `ack_status` on the item row updates.
+        let resolvedAck = isAcknowledged || (certifiedDetail?.isAcknowledged ?? false)
         return MailDetailContent(
             mailId: item.id,
             category: category,
@@ -211,7 +280,9 @@ public final class MailDetailViewModel {
             attachments: attachments,
             aiSummary: aiSummary,
             ackRequired: ackRequired,
-            isAcknowledged: isAcknowledged
+            isAcknowledged: resolvedAck,
+            bookletDetail: bookletDetail,
+            certifiedDetail: certifiedDetail
         )
     }
 
@@ -258,7 +329,9 @@ private extension MailDetailContent {
             attachments: content.attachments,
             aiSummary: content.aiSummary,
             ackRequired: content.ackRequired,
-            isAcknowledged: value
+            isAcknowledged: value,
+            bookletDetail: content.bookletDetail,
+            certifiedDetail: content.certifiedDetail
         )
     }
 }

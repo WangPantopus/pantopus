@@ -1,0 +1,738 @@
+@file:Suppress(
+    "PackageNaming",
+    "MagicNumber",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "ComplexMethod",
+)
+
+package app.pantopus.android.ui.screens.mailbox.mail_detail.variants
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
+import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
+import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailContent
+import app.pantopus.android.ui.screens.mailbox.mail_detail.components.CertifiedStampBadge
+import app.pantopus.android.ui.screens.mailbox.mail_detail.components.CombinedSenderCarrierCard
+import app.pantopus.android.ui.screens.mailbox.mail_detail.components.MailCarrierInfo
+import app.pantopus.android.ui.screens.shared.mail_item_detail.AIElfStripContent
+import app.pantopus.android.ui.screens.shared.mail_item_detail.AttachmentItem
+import app.pantopus.android.ui.screens.shared.mail_item_detail.AttachmentKind
+import app.pantopus.android.ui.screens.shared.mail_item_detail.AttachmentsRowContent
+import app.pantopus.android.ui.screens.shared.mail_item_detail.ChainOfCustodyEvent
+import app.pantopus.android.ui.screens.shared.mail_item_detail.ChainOfCustodyStatus
+import app.pantopus.android.ui.screens.shared.mail_item_detail.ChainOfCustodyTimeline
+import app.pantopus.android.ui.screens.shared.mail_item_detail.MailDetailTrust
+import app.pantopus.android.ui.screens.shared.mail_item_detail.MailItemDetailShell
+import app.pantopus.android.ui.screens.shared.mail_item_detail.MailOverflowItem
+import app.pantopus.android.ui.screens.shared.mail_item_detail.MailTopBarConfig
+import app.pantopus.android.ui.screens.shared.mail_item_detail.MailTopBarTrailingAction
+import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.util.Locale
+
+/**
+ * T6.5c (P21) — Certified (A17.3) variant layout. Adds the stamp +
+ * chain-of-custody timeline + combined sender/carrier card on top of
+ * the shared shell. Mirrors iOS `CertifiedDetailLayout`.
+ */
+@Composable
+fun CertifiedDetailLayout(
+    content: MailDetailContent,
+    certified: CertifiedDetailDto,
+    ackInFlight: Boolean,
+    onBack: () -> Unit,
+    onAcknowledge: () -> Unit,
+    onOpenSenderProfile: (String) -> Unit = {},
+) {
+    Box(modifier = Modifier.testTag("mailDetail_certified")) {
+        MailItemDetailShell(
+            topBar = makeTopBar(onBack = onBack),
+            aiElf = makeAIElf(content = content),
+            attachments = makeAttachments(content = content),
+            hero = { HeroCard(content = content, certified = certified) },
+            keyFacts = { CertifiedKeyFactsCard(rows = makeKeyFacts(content, certified)) },
+            body = {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+                    ChainOfCustodyTimeline(
+                        events = makeChainEvents(certified),
+                        subtitle = "Postal scans · cryptographic receipts",
+                        status = chainStatus(certified),
+                    )
+                    if (content.bodyParagraphs.isNotEmpty()) {
+                        BodyCard(paragraphs = content.bodyParagraphs)
+                    }
+                }
+            },
+            sender = {
+                CombinedSenderCarrierCard(
+                    senderName = content.senderDisplayName,
+                    senderMeta = content.senderMeta,
+                    senderInitials = content.senderInitials,
+                    senderAvatarTint = content.category.accent,
+                    senderUserId = content.senderUserId,
+                    trust = content.trust,
+                    carrier = defaultCarrier(certified),
+                    onOpenSenderProfile = onOpenSenderProfile,
+                )
+            },
+            actions = {
+                ActionsRow(
+                    isAcknowledged = content.isAcknowledged,
+                    ackInFlight = ackInFlight,
+                    onAcknowledge = onAcknowledge,
+                )
+            },
+        )
+    }
+}
+
+// ─── Top bar / AI elf / attachments ──────────────────────────
+
+private fun makeTopBar(onBack: () -> Unit): MailTopBarConfig =
+    MailTopBarConfig(
+        eyebrow = "Certified mail",
+        trust = MailDetailTrust.Verified,
+        onBack = onBack,
+        trailingAction =
+            MailTopBarTrailingAction(
+                icon = PantopusIcon.Bookmark,
+                contentDescription = "Save to vault",
+            ) {},
+        overflowItems =
+            listOf(
+                MailOverflowItem("forward", PantopusIcon.Send, "Forward") {},
+                MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {},
+                MailOverflowItem("report", PantopusIcon.Info, "Report") {},
+                MailOverflowItem(
+                    id = "delete",
+                    icon = PantopusIcon.Trash2,
+                    label = "Delete",
+                    isDestructive = true,
+                ) {},
+            ),
+    )
+
+private fun makeAIElf(content: MailDetailContent): AIElfStripContent? {
+    val summary = content.aiSummary?.takeIf { it.isNotEmpty() } ?: return null
+    return AIElfStripContent(
+        headline = if (content.isAcknowledged) "What happens next" else "Pantopus read this for you",
+        summary = summary,
+    )
+}
+
+private fun makeAttachments(content: MailDetailContent): AttachmentsRowContent? {
+    if (content.attachments.isEmpty()) return null
+    val items =
+        content.attachments.mapIndexed { index, name ->
+            AttachmentItem(id = "att-$index", kind = AttachmentKind.Pdf, name = name)
+        }
+    return AttachmentsRowContent(items = items)
+}
+
+// ─── Key facts (emphasised Deadline + Amount) ───────────────
+
+@Immutable
+private data class CertifiedKeyFact(
+    val id: String,
+    val icon: PantopusIcon,
+    val label: String,
+    val value: String,
+    val note: String?,
+    val tag: KeyFactTag?,
+    val isEmphasis: Boolean,
+)
+
+@Immutable
+private data class KeyFactTag(val text: String, val background: Color, val foreground: Color)
+
+private fun makeKeyFacts(
+    content: MailDetailContent,
+    certified: CertifiedDetailDto,
+): List<CertifiedKeyFact> =
+    buildList {
+        certified.acknowledgeBy?.let { iso ->
+            val pretty = formatLongDate(iso)
+            if (pretty != null) {
+                add(
+                    CertifiedKeyFact(
+                        id = "ackBy",
+                        icon = PantopusIcon.CalendarClock,
+                        label = "Acknowledge by",
+                        value = pretty,
+                        note = "Required to keep the chain unbroken",
+                        tag = countdownTag(iso),
+                        isEmphasis = true,
+                    ),
+                )
+            }
+        }
+        extractAmount(content.bodyParagraphs.joinToString("\n\n"))?.let { amount ->
+            add(
+                CertifiedKeyFact(
+                    id = "amount",
+                    icon = PantopusIcon.DollarSign,
+                    label = "Amount due",
+                    value = amount,
+                    note = null,
+                    tag =
+                        KeyFactTag(
+                            text = "New charge",
+                            background = PantopusColors.errorBg,
+                            foreground = PantopusColors.error,
+                        ),
+                    isEmphasis = true,
+                ),
+            )
+        }
+        certified.referenceNumber
+            .trim()
+            .takeIf { it.isNotEmpty() }
+            ?.let { ref ->
+                add(
+                    CertifiedKeyFact(
+                        id = "ref",
+                        icon = PantopusIcon.Hash,
+                        label = "Reference",
+                        value = ref,
+                        note = null,
+                        tag = null,
+                        isEmphasis = false,
+                    ),
+                )
+            }
+        certified.documentType?.let { doc ->
+            add(
+                CertifiedKeyFact(
+                    id = "doc",
+                    icon = PantopusIcon.FileText,
+                    label = "Document type",
+                    value = doc,
+                    note = null,
+                    tag = null,
+                    isEmphasis = false,
+                ),
+            )
+        }
+        content.createdAtLabel?.let { received ->
+            add(
+                CertifiedKeyFact(
+                    id = "received",
+                    icon = PantopusIcon.Calendar,
+                    label = "Received",
+                    value = received,
+                    note = null,
+                    tag = null,
+                    isEmphasis = false,
+                ),
+            )
+        }
+    }
+
+@Composable
+private fun CertifiedKeyFactsCard(rows: List<CertifiedKeyFact>) {
+    if (rows.isEmpty()) return
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+    ) {
+        Text(
+            text = "KEY FACTS",
+            modifier =
+                Modifier
+                    .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                    .semantics { heading() },
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+        HorizontalDivider(color = PantopusColors.appBorderSubtle)
+        rows.forEachIndexed { index, row ->
+            CertifiedKeyFactRow(row = row)
+            if (index < rows.size - 1) {
+                HorizontalDivider(color = PantopusColors.appBorderSubtle)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CertifiedKeyFactRow(row: CertifiedKeyFact) {
+    val tintBackground =
+        if (row.isEmphasis) PantopusColors.warningLight else PantopusColors.appSurfaceSunken
+    val tintForeground =
+        if (row.isEmphasis) PantopusColors.warning else PantopusColors.appTextStrong
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(if (row.isEmphasis) PantopusColors.warningBg else Color.Transparent)
+                .padding(if (row.isEmphasis) Spacing.s3 else Spacing.s2),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(if (row.isEmphasis) 28.dp else 24.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(tintBackground),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = row.icon,
+                contentDescription = null,
+                size = if (row.isEmphasis) 15.dp else 13.dp,
+                tint = tintForeground,
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(if (row.isEmphasis) 2.dp else 1.dp),
+        ) {
+            Text(
+                text = row.label.uppercase(),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.4.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = row.value,
+                fontSize = if (row.isEmphasis) 16.sp else 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            row.note?.let {
+                Text(text = it, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
+            }
+        }
+        row.tag?.let { tag ->
+            Text(
+                text = tag.text,
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(tag.background)
+                        .padding(horizontal = Spacing.s1 + 2.dp, vertical = 3.dp),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = tag.foreground,
+            )
+        }
+    }
+}
+
+// ─── Hero + chain helpers ─────────────────────────────────────
+
+@Composable
+private fun HeroCard(content: MailDetailContent, certified: CertifiedDetailDto) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .width(4.dp)
+                    .size(width = 4.dp, height = 200.dp)
+                    .background(content.category.accent),
+        )
+        Column(
+            modifier = Modifier.weight(1f).padding(Spacing.s3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CategoryBadge(category = content.category)
+                Spacer(Modifier.weight(1f))
+                content.createdAtLabel?.let { received ->
+                    Text(text = received, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = content.senderDisplayName.uppercase(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.6.sp,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                    Text(
+                        text = content.title,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appText,
+                        lineHeight = 23.sp,
+                    )
+                    Text(
+                        text = certified.referenceNumber,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+                CertifiedStampBadge(trackingId = certified.referenceNumber)
+            }
+            if (content.isAcknowledged) {
+                AcknowledgedBanner()
+            }
+        }
+    }
+}
+
+@Composable
+private fun AcknowledgedBanner() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(PantopusColors.successBg)
+                .border(1.dp, PantopusColors.successLight, RoundedCornerShape(10.dp))
+                .padding(horizontal = 9.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.success),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Check,
+                contentDescription = null,
+                size = 13.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+        }
+        Text(
+            text = "Acknowledged · receipt on file",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.success,
+        )
+    }
+}
+
+@Composable
+private fun CategoryBadge(category: MailItemCategory) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(category.rowBackground)
+                .padding(horizontal = Spacing.s2, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        PantopusIconImage(
+            icon = category.icon,
+            contentDescription = null,
+            size = 11.dp,
+            tint = category.accent,
+        )
+        Text(
+            text = category.label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.4.sp,
+            color = category.accent,
+        )
+    }
+}
+
+@Composable
+private fun BodyCard(paragraphs: List<String>) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Text(
+            text = "NOTICE TEXT",
+            modifier = Modifier.semantics { heading() },
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+        paragraphs.forEach { paragraph ->
+            Text(
+                text = paragraph,
+                fontSize = 13.sp,
+                color = PantopusColors.appTextStrong,
+                lineHeight = 20.sp,
+            )
+        }
+    }
+}
+
+private fun makeChainEvents(certified: CertifiedDetailDto): List<ChainOfCustodyEvent> =
+    certified.chain.map { step ->
+        ChainOfCustodyEvent(
+            id = step.id,
+            icon = iconForChainStep(step.id),
+            label = step.label,
+            meta = null,
+            timestamp = step.occurredAt?.let(::formatChainTimestamp),
+            isPantopusEvent = step.id.lowercase()
+                .let { it.contains("ack") || it.contains("pantopus") },
+            isComplete = step.isComplete,
+        )
+    }
+
+private fun chainStatus(certified: CertifiedDetailDto): ChainOfCustodyStatus =
+    if (certified.chain.any { it.isComplete }) {
+        ChainOfCustodyStatus.Unbroken
+    } else {
+        ChainOfCustodyStatus.Custom(
+            label = "Pending",
+            background = PantopusColors.appSurfaceSunken,
+            foreground = PantopusColors.appTextSecondary,
+        )
+    }
+
+private fun defaultCarrier(certified: CertifiedDetailDto): MailCarrierInfo =
+    MailCarrierInfo(
+        service = "USPS Certified Mail",
+        trackingId = certified.referenceNumber.trim().takeIf { it.isNotEmpty() },
+        signatureRequired = true,
+        postmarkVerified = true,
+    )
+
+private fun iconForChainStep(id: String): PantopusIcon {
+    val lower = id.lowercase()
+    return when {
+        "ack" in lower -> PantopusIcon.BadgeCheck
+        "deliver" in lower -> PantopusIcon.Mailbox
+        "transit" in lower || "plane" in lower -> PantopusIcon.Package
+        "scan" in lower -> PantopusIcon.ScanLine
+        "postmark" in lower || "postal" in lower -> PantopusIcon.Stamp
+        else -> PantopusIcon.Check
+    }
+}
+
+private fun formatLongDate(iso: String): String? {
+    val instant = runCatching { Instant.parse(iso) }.getOrNull() ?: return null
+    val zoned = instant.atZone(ZoneId.systemDefault())
+    return DateTimeFormatter.ofPattern("EEE MMM d, yyyy", Locale.US).format(zoned)
+}
+
+private fun formatChainTimestamp(iso: String): String {
+    val instant = runCatching { Instant.parse(iso) }.getOrNull() ?: return iso
+    return DateTimeFormatter
+        .ofPattern("EEE · h:mm a", Locale.US)
+        .withZone(ZoneId.systemDefault())
+        .format(instant)
+}
+
+private fun countdownTag(iso: String): KeyFactTag? {
+    val instant = runCatching { Instant.parse(iso) }.getOrNull() ?: return null
+    val daysOut = ChronoUnit.DAYS.between(Instant.now(), instant).toInt()
+    return when {
+        daysOut < 0 ->
+            KeyFactTag(
+                text = "Overdue",
+                background = PantopusColors.errorBg,
+                foreground = PantopusColors.error,
+            )
+        daysOut == 0 ->
+            KeyFactTag(
+                text = "Today",
+                background = PantopusColors.warningBg,
+                foreground = PantopusColors.warning,
+            )
+        else ->
+            KeyFactTag(
+                text = "$daysOut days left",
+                background = PantopusColors.warningBg,
+                foreground = PantopusColors.warning,
+            )
+    }
+}
+
+private fun extractAmount(body: String): String? {
+    val regex = Regex("\\$\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})")
+    return regex.find(body)?.value
+}
+
+// ─── Actions ──────────────────────────────────────────────────
+
+@Composable
+private fun ActionsRow(
+    isAcknowledged: Boolean,
+    ackInFlight: Boolean,
+    onAcknowledge: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        AcknowledgeButton(
+            isAcknowledged = isAcknowledged,
+            ackInFlight = ackInFlight,
+            onAcknowledge = onAcknowledge,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            SecondaryTile(
+                icon = PantopusIcon.DollarSign,
+                label = "Pay",
+                modifier = Modifier.weight(1f),
+            )
+            SecondaryTile(
+                icon = PantopusIcon.Calendar,
+                label = "Calendar",
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            SecondaryTile(icon = PantopusIcon.Flag, label = "Dispute", modifier = Modifier.weight(1f))
+            SecondaryTile(
+                icon = PantopusIcon.Archive,
+                label = "Archive",
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Text(
+            text = "Acknowledging confirms receipt only · it does not waive your right to appeal or dispute the charge.",
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp),
+            fontSize = 10.5.sp,
+            color = PantopusColors.appTextMuted,
+        )
+    }
+}
+
+@Composable
+private fun AcknowledgeButton(
+    isAcknowledged: Boolean,
+    ackInFlight: Boolean,
+    onAcknowledge: () -> Unit,
+) {
+    val bg = if (isAcknowledged) PantopusColors.appSurface else PantopusColors.primary600
+    val fg = if (isAcknowledged) PantopusColors.success else PantopusColors.appTextInverse
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(bg)
+                .then(
+                    if (isAcknowledged) {
+                        Modifier.border(1.5.dp, PantopusColors.successLight, RoundedCornerShape(14.dp))
+                    } else {
+                        Modifier
+                    },
+                )
+                .clickable(enabled = !ackInFlight, onClick = onAcknowledge)
+                .padding(vertical = 14.dp)
+                .testTag("mailDetail_certified_acknowledge")
+                .semantics { contentDescription = "Acknowledge receipt" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        PantopusIconImage(
+            icon = if (isAcknowledged) PantopusIcon.CheckCircle else PantopusIcon.Check,
+            contentDescription = null,
+            size = 16.dp,
+            tint = fg,
+        )
+        Spacer(Modifier.width(Spacing.s2))
+        Text(
+            text = if (isAcknowledged) "Acknowledged · receipt on file" else "Acknowledge receipt",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = fg,
+        )
+    }
+}
+
+@Composable
+private fun SecondaryTile(
+    icon: PantopusIcon,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .clickable {}
+                .padding(horizontal = Spacing.s2, vertical = 11.dp)
+                .semantics { contentDescription = label },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = icon,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.primary600,
+        )
+        Text(
+            text = label,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+        )
+    }
+}

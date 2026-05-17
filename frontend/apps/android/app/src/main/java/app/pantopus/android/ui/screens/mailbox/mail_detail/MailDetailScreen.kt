@@ -42,6 +42,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
+import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.BookletDetailLayout
+import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.CertifiedDetailLayout
 import app.pantopus.android.ui.screens.shared.mail_item_detail.AttachmentItem
 import app.pantopus.android.ui.screens.shared.mail_item_detail.AttachmentKind
 import app.pantopus.android.ui.screens.shared.mail_item_detail.AttachmentsRowContent
@@ -123,6 +125,35 @@ private fun LoadedLayout(
     onAcknowledge: () -> Unit,
     onOpenSenderProfile: (String) -> Unit,
 ) {
+    // T6.5c (P21) — dispatch to variant layouts when the projected
+    // content carries decoded payloads. Variants sit on the same
+    // `MailItemDetailShell` and override only the slots their design
+    // diverges on; generic A17.1 is the fall-through.
+    val booklet = content.bookletDetail
+    val certified = content.certifiedDetail
+    when {
+        content.category == MailItemCategory.Booklet && booklet != null -> {
+            BookletDetailLayout(
+                content = content,
+                booklet = booklet,
+                onBack = onBack,
+                onOpenSenderProfile = onOpenSenderProfile,
+            )
+            return
+        }
+        content.category == MailItemCategory.Certified && certified != null -> {
+            CertifiedDetailLayout(
+                content = content,
+                certified = certified,
+                ackInFlight = ackInFlight,
+                onBack = onBack,
+                onAcknowledge = onAcknowledge,
+                onOpenSenderProfile = onOpenSenderProfile,
+            )
+            return
+        }
+        else -> {}
+    }
     MailItemDetailShell(
         topBar =
             MailTopBarConfig(

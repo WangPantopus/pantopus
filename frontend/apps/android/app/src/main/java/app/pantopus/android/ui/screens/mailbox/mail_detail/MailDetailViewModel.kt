@@ -6,6 +6,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.mailbox.MailDetail
+import app.pantopus.android.data.api.models.mailbox.v2.BookletDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
@@ -38,6 +40,10 @@ sealed interface MailDetailUiState {
 /**
  * Pure projection of the backend mail item into the A17 shell slots.
  * Mirrors iOS `MailDetailContent`.
+ *
+ * T6.5c — adds optional `bookletDetail` / `certifiedDetail` fields so
+ * the variant layouts can render their slot-specific designs without a
+ * second fetch.
  */
 data class MailDetailContent(
     val mailId: String,
@@ -57,6 +63,8 @@ data class MailDetailContent(
     val aiSummary: String?,
     val ackRequired: Boolean,
     val isAcknowledged: Boolean,
+    val bookletDetail: BookletDetailDto? = null,
+    val certifiedDetail: CertifiedDetailDto? = null,
 ) {
     /** Build a typed key-facts row list for the shell's KeyFacts slot. */
     fun keyFacts(): List<MailDetailKeyFact> =
@@ -186,7 +194,23 @@ class MailDetailViewModel
                         ?.filter { it.isNotEmpty() }
                         ?: emptyList()
                 val ackRequired = detail.ackRequired == true
-                val isAcknowledged = detail.ackStatus?.lowercase() == "acknowledged"
+                val ackStatus = detail.ackStatus?.lowercase() == "acknowledged"
+                // T6.5c — decode the per-variant payloads from
+                // `mail.object`. Each decoder returns null unless the
+                // payload carries its required shape.
+                val bookletDetail =
+                    if (category == MailItemCategory.Booklet) {
+                        BookletDetailDto.decodeFromObjectPayload(detail.`object`)
+                    } else {
+                        null
+                    }
+                val certifiedDetail =
+                    if (category == MailItemCategory.Certified) {
+                        CertifiedDetailDto.decodeFromObjectPayload(detail.`object`)
+                    } else {
+                        null
+                    }
+                val resolvedAck = ackStatus || (certifiedDetail?.isAcknowledged == true)
                 return MailDetailContent(
                     mailId = detail.id,
                     category = category,
@@ -204,7 +228,9 @@ class MailDetailViewModel
                     attachments = detail.attachments ?: emptyList(),
                     aiSummary = null,
                     ackRequired = ackRequired,
-                    isAcknowledged = isAcknowledged,
+                    isAcknowledged = resolvedAck,
+                    bookletDetail = bookletDetail,
+                    certifiedDetail = certifiedDetail,
                 )
             }
 

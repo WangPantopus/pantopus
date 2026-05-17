@@ -57,23 +57,48 @@ public struct MailDetailView: View {
         .animation(.easeInOut(duration: 0.2), value: viewModel.toast)
     }
 
+    @ViewBuilder
     private func loaded(_ content: MailDetailContent) -> some View {
-        MailItemDetailShell(
-            topBar: makeTopBar(for: content),
-            aiElf: makeAIElf(for: content),
-            attachments: makeAttachments(for: content),
-            hero: { HeroCard(content: content) },
-            keyFacts: { KeyFactsCard(rows: content.keyFacts()) },
-            body: { BodyCard(paragraphs: content.bodyParagraphs) },
-            sender: { SenderCard(content: content, onOpenProfile: onOpenSenderProfile) },
-            actions: {
-                ActionsRow(
-                    content: content,
-                    ackInFlight: viewModel.ackInFlight,
-                    onAck: { Task { await viewModel.acknowledge() } }
-                )
-            }
-        )
+        // T6.5c (P21) — dispatch to variant layouts when the projected
+        // content carries decoded variant payloads. Variants sit on the
+        // same `MailItemDetailShell` and override only the slots their
+        // design diverges on; generic A17.1 falls through.
+        if content.category == .booklet, let booklet = content.bookletDetail {
+            BookletDetailLayout(
+                content: content,
+                booklet: booklet,
+                ackInFlight: viewModel.ackInFlight,
+                onBack: { onBack() },
+                onAcknowledge: { Task { await viewModel.acknowledge() } },
+                onOpenSenderProfile: onOpenSenderProfile
+            )
+        } else if content.category == .certified, let certified = content.certifiedDetail {
+            CertifiedDetailLayout(
+                content: content,
+                certified: certified,
+                ackInFlight: viewModel.ackInFlight,
+                onBack: { onBack() },
+                onAcknowledge: { Task { await viewModel.acknowledge() } },
+                onOpenSenderProfile: onOpenSenderProfile
+            )
+        } else {
+            MailItemDetailShell(
+                topBar: makeTopBar(for: content),
+                aiElf: makeAIElf(for: content),
+                attachments: makeAttachments(for: content),
+                hero: { HeroCard(content: content) },
+                keyFacts: { KeyFactsCard(rows: content.keyFacts()) },
+                body: { BodyCard(paragraphs: content.bodyParagraphs) },
+                sender: { SenderCard(content: content, onOpenProfile: onOpenSenderProfile) },
+                actions: {
+                    ActionsRow(
+                        content: content,
+                        ackInFlight: viewModel.ackInFlight,
+                        onAck: { Task { await viewModel.acknowledge() } }
+                    )
+                }
+            )
+        }
     }
 
     private func makeTopBar(for content: MailDetailContent) -> MailTopBarConfig {
