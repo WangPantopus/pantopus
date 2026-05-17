@@ -57,6 +57,8 @@ import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_BILL_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.BillDetailScreen
 import app.pantopus.android.ui.screens.homes.bills.BillsListScreen
+import app.pantopus.android.ui.screens.homes.maintenance.MAINTENANCE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.maintenance.MaintenanceListScreen
 import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
@@ -144,6 +146,12 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home pets list. */
     fun homePets(homeId: String): String = "homes/$homeId/pets"
+
+    /** Maintenance list per home (T6.3b / P10). */
+    const val HOME_MAINTENANCE = "homes/{$MAINTENANCE_HOME_ID_KEY}/maintenance"
+
+    /** Build the concrete path for a home maintenance list. */
+    fun homeMaintenance(homeId: String): String = "homes/$homeId/maintenance"
 
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
@@ -637,6 +645,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
+                    onOpenHomeMaintenance = { homeId ->
+                        navController.navigate(ChildRoutes.homeMaintenance(homeId))
+                    },
                 )
             }
 
@@ -668,6 +679,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenPets = { homeId ->
                         navController.navigate(ChildRoutes.homePets(homeId))
+                    },
+                    onOpenMaintenance = { homeId ->
+                        navController.navigate(ChildRoutes.homeMaintenance(homeId))
                     },
                 )
             }
@@ -716,6 +730,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
                 PetsListScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = ChildRoutes.HOME_MAINTENANCE,
+                arguments = listOf(navArgument(MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                MaintenanceListScreen(
+                    onOpenTask = { _ ->
+                        navController.navigate(ChildRoutes.placeholder("Maintenance detail"))
+                    },
+                    onAddTask = {
+                        navController.navigate(ChildRoutes.placeholder("Log maintenance"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(ChildRoutes.MAILBOX_LIST) {
                 MailboxListScreen(

@@ -43,6 +43,9 @@ public enum YouRoute: Hashable {
     case homeBills(homeId: String)
     /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
     case homePets(homeId: String)
+    /// T6.3b / P10 — Maintenance. The home-context "me.maintenance"
+    /// action tile pushes here.
+    case homeMaintenance(homeId: String)
     /// T5.3.4 — per-listing offers panel. Pushed from a listing detail
     /// "View offers" affordance (visible when the current user owns the
     /// listing). The optional `title` is a hint rendered as the
@@ -276,6 +279,12 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.maintenance":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeMaintenance(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         default:
             path.append(.placeholder(label: tile.label))
         }
@@ -307,6 +316,11 @@ public struct YouTabRoot: View {
         case "me.bills":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
+                return
+            }
+        case "me.maintenance":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeMaintenance(homeId: homeId))
                 return
             }
         case "me.editProfile":
@@ -599,6 +613,18 @@ public struct YouTabRoot: View {
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homeMaintenance(homeId):
+            MaintenanceListView(
+                viewModel: MaintenanceListViewModel(
+                    homeId: homeId,
+                    onOpenTask: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Maintenance detail")) }
+                    },
+                    onAddTask: {
+                        Task { @MainActor in path.append(.placeholder(label: "Log maintenance")) }
+                    }
+                )
+            )
         #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(

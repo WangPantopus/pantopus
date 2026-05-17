@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Archive
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.BorderColor
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -47,7 +49,9 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FilterAlt
+import androidx.compose.material.icons.filled.FormatPaint
 import androidx.compose.material.icons.filled.Gavel
+import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.History
@@ -56,6 +60,7 @@ import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -68,9 +73,12 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PestControl
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
@@ -249,6 +257,21 @@ enum class PantopusIcon(
     Shuffle("shuffle"),
     WandSparkles("wand-sparkles"),
     ArrowUpRight("arrow-up-right"),
+
+    // T6.3b — Maintenance per-task-category iconography. Material's
+    // icon pack doesn't ship 1:1 Lucide-equivalents for every
+    // maintenance glyph, so each falls back to the closest Material
+    // vector (documented inline below). Visual signal is reinforced by
+    // the per-category background tint in
+    // [app.pantopus.android.ui.screens.homes.maintenance.MaintenanceCategoryPalette].
+    Wrench("wrench"),
+    Fan("fan"),
+    CloudRain("cloud-rain"),
+    Refrigerator("refrigerator"),
+    Bug("bug"),
+    Trees("trees"),
+    PaintRoller("paint-roller"),
+    BellRing("bell-ring"),
     ;
 
     companion object {
@@ -398,6 +421,20 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Shuffle -> IconSource.Material(Icons.Filled.Shuffle)
         PantopusIcon.WandSparkles -> IconSource.Material(Icons.Filled.AutoFixHigh)
         PantopusIcon.ArrowUpRight -> IconSource.Material(Icons.Filled.NorthEast)
+        // T6.3b — Maintenance per-task-category iconography. Material
+        // lacks 1:1 Lucide equivalents for `wrench`, `fan`, `paint-
+        // roller`, `bell-ring`, `cloud-rain`, `refrigerator`, `trees`;
+        // each falls back to the closest visually-similar Material
+        // vector. `bug` maps to PestControl; `wrench` to Build (which
+        // ships a wrench glyph).
+        PantopusIcon.Wrench -> IconSource.Material(Icons.Filled.Build)
+        PantopusIcon.Fan -> IconSource.Material(Icons.Filled.Air)
+        PantopusIcon.CloudRain -> IconSource.Material(Icons.Filled.Grain)
+        PantopusIcon.Refrigerator -> IconSource.Material(Icons.Filled.Kitchen)
+        PantopusIcon.Bug -> IconSource.Material(Icons.Filled.PestControl)
+        PantopusIcon.Trees -> IconSource.Material(Icons.Filled.Park)
+        PantopusIcon.PaintRoller -> IconSource.Material(Icons.Filled.FormatPaint)
+        PantopusIcon.BellRing -> IconSource.Material(Icons.Filled.NotificationsActive)
     }
 
 /**
