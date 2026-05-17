@@ -79,7 +79,7 @@ private data class PackagesTabCounts(
  * `GET /api/homes/:id/packages` and projects each [PackageDto] into a
  * [RowModel] using:
  *  - [RowLeading.TypeIcon] tinted via [CourierKind]
- *  - [RowTrailing.StatusChip] driven by [PackageChipStatus]
+ *  - [RowTrailing.Status] driven by [PackageChipStatus]
  *  - title = description (or tracking number / `Package` fallback)
  *  - subtitle = `[courier] · [drop location]`
  *  - body = recipient label when `picked_up_by` is set and ≠ the
@@ -266,7 +266,7 @@ class PackagesListViewModel
                         foreground = projection.courier.foreground,
                     ),
                 trailing =
-                    RowTrailing.StatusChip(
+                    RowTrailing.Status(
                         text = projection.chipText,
                         variant = projection.chipVariant,
                     ),
