@@ -238,8 +238,7 @@ class MaintenanceListViewModel
             )
         }
 
-        private fun bannerTitle(summary: MaintenanceBannerSummary): String =
-            summary.scheduledSubtitle ?: "Maintenance"
+        private fun bannerTitle(summary: MaintenanceBannerSummary): String = summary.scheduledSubtitle ?: "Maintenance"
 
         private fun bannerSubtitle(summary: MaintenanceBannerSummary): String? {
             if (summary.overdueCount > 0) {
@@ -458,11 +457,13 @@ class MaintenanceListViewModel
                 tasks: List<MaintenanceTaskDto>,
                 now: Instant,
             ): MaintenanceBannerSummary {
+                val utc = ZoneId.of("UTC")
                 val yearStart =
-                    LocalDate
-                        .ofInstant(now, ZoneId.of("UTC"))
+                    now
+                        .atZone(utc)
+                        .toLocalDate()
                         .withDayOfYear(1)
-                        .atStartOfDay(ZoneId.of("UTC"))
+                        .atStartOfDay(utc)
                         .toInstant()
                 var overdueCount = 0
                 var scheduledCount = 0
@@ -474,52 +475,23 @@ class MaintenanceListViewModel
                         MaintenanceChipStatus.Overdue -> {
                             overdueCount += 1
                             scheduledCount += 1
-                            task.dueDate?.let(::parseInstant)?.let { due ->
-                                nextDue = nextDueCandidate(nextDue, due, task)
-                            }
+                            nextDue = nextDueCandidate(nextDue, task, now, allowPast = true)
                         }
                         MaintenanceChipStatus.Scheduled,
                         MaintenanceChipStatus.DueSoon,
                         MaintenanceChipStatus.InProgress,
                         -> {
                             scheduledCount += 1
-                            val due = task.dueDate?.let(::parseInstant)
-                            if (due != null && !due.isBefore(now)) {
-                                nextDue = nextDueCandidate(nextDue, due, task)
-                            }
+                            nextDue = nextDueCandidate(nextDue, task, now)
                         }
                         MaintenanceChipStatus.Completed -> {
-                            val performedAt =
-                                task.updatedAt?.let(::parseInstant)
-                                    ?: task.createdAt?.let(::parseInstant)
-                            val cost = task.cost
-                            if (cost != null && performedAt != null && !performedAt.isBefore(yearStart)) {
-                                ytdSpend = ytdSpend.add(cost)
-                            }
+                            ytdCost(task, yearStart)?.let { ytdSpend = ytdSpend.add(it) }
                         }
                         MaintenanceChipStatus.Cancelled -> Unit
                     }
                 }
                 val ytdLabel = if (ytdSpend > BigDecimal.ZERO) formatCurrency(ytdSpend) else null
-                val scheduledSubtitle: String? =
-                    if (scheduledCount == 0) {
-                        null
-                    } else {
-                        nextDue?.let { (date, t) ->
-                            val title = if (t.task.isEmpty()) "next task" else t.task
-                            val days = Duration.between(now, date).toDays().toInt()
-                            val when_ =
-                                when {
-                                    days < 0 -> "overdue"
-                                    days == 0 -> "today"
-                                    days == 1 -> "tomorrow"
-                                    else -> "in $days days"
-                                }
-                            val prefix =
-                                if (scheduledCount == 1) "1 scheduled" else "$scheduledCount scheduled"
-                            "$prefix · $title $when_"
-                        } ?: if (scheduledCount == 1) "1 scheduled" else "$scheduledCount scheduled"
-                    }
+                val scheduledSubtitle = scheduledSubtitle(scheduledCount, nextDue, now)
                 return MaintenanceBannerSummary(
                     overdueCount = overdueCount,
                     ytdSpendLabel = ytdLabel,
@@ -529,6 +501,17 @@ class MaintenanceListViewModel
 
             private fun nextDueCandidate(
                 current: Pair<Instant, MaintenanceTaskDto>?,
+                task: MaintenanceTaskDto,
+                now: Instant,
+                allowPast: Boolean = false,
+            ): Pair<Instant, MaintenanceTaskDto>? {
+                val due = task.dueDate?.let(::parseInstant) ?: return current
+                if (!allowPast && due.isBefore(now)) return current
+                return earlierDueCandidate(current, due, task)
+            }
+
+            private fun earlierDueCandidate(
+                current: Pair<Instant, MaintenanceTaskDto>?,
                 due: Instant,
                 task: MaintenanceTaskDto,
             ): Pair<Instant, MaintenanceTaskDto> =
@@ -537,6 +520,40 @@ class MaintenanceListViewModel
                     due.isBefore(current.first) -> due to task
                     else -> current
                 }
+
+            private fun ytdCost(
+                task: MaintenanceTaskDto,
+                yearStart: Instant,
+            ): BigDecimal? {
+                val cost = task.cost ?: return null
+                val performedAt =
+                    task.updatedAt?.let(::parseInstant)
+                        ?: task.createdAt?.let(::parseInstant)
+                        ?: return null
+                return if (!performedAt.isBefore(yearStart)) cost else null
+            }
+
+            private fun scheduledSubtitle(
+                scheduledCount: Int,
+                nextDue: Pair<Instant, MaintenanceTaskDto>?,
+                now: Instant,
+            ): String? {
+                if (scheduledCount == 0) return null
+                val prefix = scheduledCountLabel(scheduledCount)
+                val due = nextDue ?: return prefix
+                val title = if (due.second.task.isEmpty()) "next task" else due.second.task
+                val days = Duration.between(now, due.first).toDays().toInt()
+                val whenLabel =
+                    when {
+                        days < 0 -> "overdue"
+                        days == 0 -> "today"
+                        days == 1 -> "tomorrow"
+                        else -> "in $days days"
+                    }
+                return "$prefix · $title $whenLabel"
+            }
+
+            private fun scheduledCountLabel(count: Int): String = if (count == 1) "1 scheduled" else "$count scheduled"
 
             @JvmStatic
             fun formatCurrency(amount: BigDecimal): String =

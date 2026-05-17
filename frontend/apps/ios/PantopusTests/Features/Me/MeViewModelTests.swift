@@ -135,11 +135,11 @@ final class MeViewModelTests: XCTestCase {
         XCTAssertEqual(home.identity, .home)
         XCTAssertEqual(home.displayName, "412 Birch Ln")
         XCTAssertFalse(home.isUnbound)
-        // T6.2b home action grid is { bills, pets, members, polls, calendar, docs }.
-        XCTAssertEqual(home.actionTiles.count, 6)
+        // T6.2b/T6.3b home action grid adds maintenance after bills.
+        XCTAssertEqual(home.actionTiles.count, 7)
         XCTAssertEqual(
             home.actionTiles.map(\.routeKey),
-            ["me.bills", "me.pets", "me.members", "me.polls", "me.calendar", "me.docs"]
+            ["me.bills", "me.maintenance", "me.pets", "me.members", "me.polls", "me.calendar", "me.docs"]
         )
         // Home tiles carry the primary home id so the host can build
         // BillsListView / PetsListView without re-introspecting the VM.

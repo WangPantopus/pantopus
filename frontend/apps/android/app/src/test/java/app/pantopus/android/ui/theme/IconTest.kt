@@ -121,6 +121,15 @@ class IconTest {
             "shuffle",
             "wand-sparkles",
             "arrow-up-right",
+            // T6.3b — Maintenance category glyphs.
+            "wrench",
+            "fan",
+            "cloud-rain",
+            "refrigerator",
+            "bug",
+            "trees",
+            "paint-roller",
+            "bell-ring",
         )
 
     @Test

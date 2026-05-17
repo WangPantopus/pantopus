@@ -17,7 +17,7 @@
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable type_body_length file_length
+// swiftlint:disable type_body_length
 
 @MainActor
 final class MaintenanceListViewModelTests: XCTestCase {
@@ -44,10 +44,13 @@ final class MaintenanceListViewModelTests: XCTestCase {
 
     private func makeVM(api: APIClient? = nil) -> MaintenanceListViewModel {
         let frozen = Self.fixedNow
+        // swiftlint:disable trailing_closure
         return MaintenanceListViewModel(
             homeId: "home-1",
-            api: api ?? makeAPI()
-        ) { frozen }
+            api: api ?? makeAPI(),
+            now: { frozen }
+        )
+        // swiftlint:enable trailing_closure
     }
 
     private func makeTask(
@@ -99,7 +102,16 @@ final class MaintenanceListViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: """
             {"tasks":[
-              {"id":"m1","home_id":"home-1","task":"Fall HVAC tune-up","vendor":"Riverside HVAC","cost":"185","recurrence":"yearly","due_date":"2026-05-25T08:00:00Z","status":"scheduled"}
+              {
+                "id":"m1",
+                "home_id":"home-1",
+                "task":"Fall HVAC tune-up",
+                "vendor":"Riverside HVAC",
+                "cost":"185",
+                "recurrence":"yearly",
+                "due_date":"2026-05-25T08:00:00Z",
+                "status":"scheduled"
+              }
             ]}
             """)
         ]
@@ -128,12 +140,12 @@ final class MaintenanceListViewModelTests: XCTestCase {
     // MARK: - Chip derivation
 
     func testChipCancelledWins() {
-        let task = makeTask(status: "cancelled", dueDate: "2026-05-01T00:00:00Z")
+        let task = makeTask(dueDate: "2026-05-01T00:00:00Z", status: "cancelled")
         XCTAssertEqual(MaintenanceListViewModel.chipStatus(for: task, now: Self.fixedNow), .cancelled)
     }
 
     func testChipCompletedWins() {
-        let task = makeTask(status: "completed", dueDate: "2030-01-01T00:00:00Z")
+        let task = makeTask(dueDate: "2030-01-01T00:00:00Z", status: "completed")
         XCTAssertEqual(MaintenanceListViewModel.chipStatus(for: task, now: Self.fixedNow), .completed)
     }
 
@@ -143,23 +155,23 @@ final class MaintenanceListViewModelTests: XCTestCase {
     }
 
     func testChipOverdueWhenScheduledAndDuePast() {
-        let task = makeTask(status: "scheduled", dueDate: "2026-05-01T00:00:00Z")
+        let task = makeTask(dueDate: "2026-05-01T00:00:00Z", status: "scheduled")
         XCTAssertEqual(MaintenanceListViewModel.chipStatus(for: task, now: Self.fixedNow), .overdue)
     }
 
     func testChipDueSoonWhenScheduledAndWithinSevenDays() {
         // fixedNow = 2026-05-15; 6 days out = 2026-05-21 → dueSoon
-        let task = makeTask(status: "scheduled", dueDate: "2026-05-21T00:00:00Z")
+        let task = makeTask(dueDate: "2026-05-21T00:00:00Z", status: "scheduled")
         XCTAssertEqual(MaintenanceListViewModel.chipStatus(for: task, now: Self.fixedNow), .dueSoon)
     }
 
     func testChipScheduledWhenBeyondSevenDays() {
-        let task = makeTask(status: "scheduled", dueDate: "2026-05-30T00:00:00Z")
+        let task = makeTask(dueDate: "2026-05-30T00:00:00Z", status: "scheduled")
         XCTAssertEqual(MaintenanceListViewModel.chipStatus(for: task, now: Self.fixedNow), .scheduled)
     }
 
     func testChipScheduledWhenNoDueDate() {
-        let task = makeTask(status: "scheduled", dueDate: nil)
+        let task = makeTask(dueDate: nil, status: "scheduled")
         XCTAssertEqual(MaintenanceListViewModel.chipStatus(for: task, now: Self.fixedNow), .scheduled)
     }
 
@@ -203,7 +215,7 @@ final class MaintenanceListViewModelTests: XCTestCase {
 
     func testProjectionOverdueChipAndHighlight() {
         let projection = MaintenanceListViewModel.project(
-            task: makeTask(status: "scheduled", dueDate: "2026-05-01T00:00:00Z"),
+            task: makeTask(dueDate: "2026-05-01T00:00:00Z", status: "scheduled"),
             now: Self.fixedNow
         )
         XCTAssertEqual(projection.chipText, "Overdue")
@@ -214,7 +226,7 @@ final class MaintenanceListViewModelTests: XCTestCase {
 
     func testProjectionCompletedRendersSuccessChip() {
         let projection = MaintenanceListViewModel.project(
-            task: makeTask(status: "completed", cost: 240),
+            task: makeTask(cost: 240, status: "completed"),
             now: Self.fixedNow
         )
         XCTAssertEqual(projection.chipText, "Completed")
@@ -320,8 +332,22 @@ final class MaintenanceListViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: """
             {"tasks":[
-              {"id":"a","home_id":"home-1","task":"Scheduled future","status":"scheduled","due_date":"2026-06-01T00:00:00Z","recurrence":"yearly"},
-              {"id":"b","home_id":"home-1","task":"Scheduled overdue","status":"scheduled","due_date":"2026-05-01T00:00:00Z","recurrence":"yearly"},
+              {
+                "id":"a",
+                "home_id":"home-1",
+                "task":"Scheduled future",
+                "status":"scheduled",
+                "due_date":"2026-06-01T00:00:00Z",
+                "recurrence":"yearly"
+              },
+              {
+                "id":"b",
+                "home_id":"home-1",
+                "task":"Scheduled overdue",
+                "status":"scheduled",
+                "due_date":"2026-05-01T00:00:00Z",
+                "recurrence":"yearly"
+              },
               {"id":"c","home_id":"home-1","task":"In progress now","status":"in_progress","recurrence":"yearly"},
               {"id":"d","home_id":"home-1","task":"Completed","status":"completed","recurrence":"yearly"},
               {"id":"e","home_id":"home-1","task":"Cancelled","status":"cancelled","recurrence":"yearly"}

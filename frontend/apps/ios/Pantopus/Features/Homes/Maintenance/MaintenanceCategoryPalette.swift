@@ -206,21 +206,22 @@ public enum MaintenanceCategory: String, CaseIterable, Sendable {
             category: .chimney,
             matchers: ["chimney", "fireplace", "flue", "soot"]
         ),
-        // HVAC — heating + cooling + air filtration.
-        Pattern(
-            category: .hvac,
-            matchers: [
-                "hvac", "furnace", "air condition", "ac unit", "heater",
-                "boiler", "thermostat", "duct", "vent",
-                "filter swap", "filter change", "air filter"
-            ]
-        ),
         // Plumbing — water lines, drains, water heater.
         Pattern(
             category: .plumbing,
             matchers: [
                 "plumbing", "plumber", "leak", "drain", "faucet",
                 "water heater", "toilet", "pipe", "sump pump"
+            ]
+        ),
+        // HVAC — heating + cooling + air filtration. Kept after
+        // plumbing so "water heater" wins before generic "heater".
+        Pattern(
+            category: .hvac,
+            matchers: [
+                "hvac", "furnace", "air condition", "ac unit", "heater",
+                "boiler", "thermostat", "duct", "vent",
+                "filter swap", "filter change", "air filter"
             ]
         ),
         // Electrical — circuits + outlets.
