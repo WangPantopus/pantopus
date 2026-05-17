@@ -145,6 +145,7 @@ final class HomeDashboardViewModel {
             stats: stats,
             quickActions: [
                 QuickActionTile(id: "view_bills", label: "Bills", icon: .receipt, tint: .home),
+                QuickActionTile(id: "view_polls", label: "Polls", icon: .checkCircle, tint: .home),
                 QuickActionTile(id: "add_mail", label: "Add mail", icon: .mailbox, tint: .home),
                 QuickActionTile(id: "add_member", label: "Add member", icon: .userPlus, tint: .personal),
                 QuickActionTile(id: "pets", label: "Pets", icon: .pawPrint, tint: .home)

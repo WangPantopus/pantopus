@@ -69,6 +69,7 @@ object NetworkModule {
             // null instead of writing JSON `null`.
             .add(UploadEvidenceRequestJsonAdapter())
             .add(app.pantopus.android.data.api.models.homes.BillDecimalAdapter())
+            .add(app.pantopus.android.data.api.models.homes.PollOptionAdapter())
             .add(Instant::class.java, Rfc3339DateJsonAdapter().nullSafe())
             .addLast(KotlinJsonAdapterFactory())
             .build()

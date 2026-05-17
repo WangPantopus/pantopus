@@ -7009,12 +7009,16 @@ router.get('/:id/polls', verifyToken, async (req, res) => {
     const pollIds = (polls || []).map(p => p.id);
     let voteCounts = {};
     let myVotes = {};
+    // Per-option breakdown: poll_id -> { option_key: count }. Mobile uses
+    // this to render the "Leading: <option> · N votes" chip on the list
+    // row without an N+1 fetch.
+    let optionBreakdown = {};
 
     if (pollIds.length > 0) {
       const [countsRes, myVotesRes] = await Promise.allSettled([
         supabaseAdmin
           .from('HomePollVote')
-          .select('poll_id')
+          .select('poll_id, selected_options')
           .in('poll_id', pollIds),
         supabaseAdmin
           .from('HomePollVote')
@@ -7026,6 +7030,15 @@ router.get('/:id/polls', verifyToken, async (req, res) => {
       if (countsRes.status === 'fulfilled' && countsRes.value.data) {
         for (const v of countsRes.value.data) {
           voteCounts[v.poll_id] = (voteCounts[v.poll_id] || 0) + 1;
+          const opts = Array.isArray(v.selected_options) ? v.selected_options : [v.selected_options];
+          if (!optionBreakdown[v.poll_id]) optionBreakdown[v.poll_id] = {};
+          for (const opt of opts) {
+            if (opt == null) continue;
+            const key = typeof opt === 'string' || typeof opt === 'number'
+              ? String(opt)
+              : (opt.id || opt.label || opt.key || JSON.stringify(opt));
+            optionBreakdown[v.poll_id][key] = (optionBreakdown[v.poll_id][key] || 0) + 1;
+          }
         }
       }
 
@@ -7039,6 +7052,7 @@ router.get('/:id/polls', verifyToken, async (req, res) => {
     const enriched = (polls || []).map(p => ({
       ...p,
       vote_count: voteCounts[p.id] || 0,
+      option_counts: optionBreakdown[p.id] || {},
       my_vote: myVotes[p.id] || null,
     }));
 

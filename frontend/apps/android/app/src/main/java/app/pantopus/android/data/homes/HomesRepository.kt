@@ -1,12 +1,17 @@
 package app.pantopus.android.data.homes
 
+import app.pantopus.android.data.api.models.homes.CastVoteRequest
+import app.pantopus.android.data.api.models.homes.CastVoteResponse
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
+import app.pantopus.android.data.api.models.homes.CreatePollRequest
 import app.pantopus.android.data.api.models.homes.FileUploadResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.GetHomePollsResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
+import app.pantopus.android.data.api.models.homes.HomePollResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
@@ -14,6 +19,7 @@ import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
+import app.pantopus.android.data.api.models.homes.UpdatePollRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import app.pantopus.android.data.api.net.NetworkResult
@@ -102,6 +108,31 @@ open class HomesRepository
             homeId: String,
             billId: String,
         ): NetworkResult<GetBillSplitsResponse> = safeApiCall { api.getHomeBillSplits(homeId, billId) }
+
+        /** `GET /api/homes/:id/polls` (T6.3e / P13). */
+        open suspend fun getHomePolls(
+            homeId: String,
+        ): NetworkResult<GetHomePollsResponse> = safeApiCall { api.getHomePolls(homeId) }
+
+        /** `POST /api/homes/:id/polls` (T6.3e / P13). */
+        open suspend fun createHomePoll(
+            homeId: String,
+            request: CreatePollRequest,
+        ): NetworkResult<HomePollResponse> = safeApiCall { api.createHomePoll(homeId, request) }
+
+        /** `POST /api/homes/:id/polls/:pollId/vote` (T6.3e / P13). */
+        open suspend fun castHomePollVote(
+            homeId: String,
+            pollId: String,
+            request: CastVoteRequest,
+        ): NetworkResult<CastVoteResponse> = safeApiCall { api.castHomePollVote(homeId, pollId, request) }
+
+        /** `PUT /api/homes/:id/polls/:pollId` (T6.3e / P13). */
+        open suspend fun updateHomePoll(
+            homeId: String,
+            pollId: String,
+            request: UpdatePollRequest,
+        ): NetworkResult<HomePollResponse> = safeApiCall { api.updateHomePoll(homeId, pollId, request) }
 
         /**
          * Upload one binary file to `POST /api/files/upload` and return

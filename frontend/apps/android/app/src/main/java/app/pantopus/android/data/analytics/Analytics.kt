@@ -49,6 +49,16 @@ sealed class AnalyticsEvent(
 
     data object ScreenPetsListViewed : AnalyticsEvent("screen.pets_list.viewed")
 
+    data object ScreenPollsViewed : AnalyticsEvent("screen.polls.viewed")
+
+    data object ScreenPollDetailViewed : AnalyticsEvent("screen.poll_detail.viewed")
+
+    data class CtaPollVoteSubmit(
+        val result: AnalyticsResult,
+    ) : AnalyticsEvent("cta.poll_vote.submit") {
+        override val properties = mapOf("result" to result.value)
+    }
+
     data class ScreenPetsWizardStepViewed(
         val stepNumber: Int,
         val stepName: String,

@@ -43,6 +43,10 @@ public enum YouRoute: Hashable {
     case homeBills(homeId: String)
     /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
     case homePets(homeId: String)
+    /// T6.3e — Polls. The home-context "me.polls" action tile pushes here.
+    case homePolls(homeId: String)
+    /// T6.3e — Poll detail. Pushed from a Polls list row.
+    case pollDetail(homeId: String, pollId: String)
     /// T5.3.4 — per-listing offers panel. Pushed from a listing detail
     /// "View offers" affordance (visible when the current user owns the
     /// listing). The optional `title` is a hint rendered as the
@@ -276,6 +280,12 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.polls":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homePolls(homeId: homeId))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         default:
             path.append(.placeholder(label: tile.label))
         }
@@ -307,6 +317,11 @@ public struct YouTabRoot: View {
         case "me.bills":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
+                return
+            }
+        case "me.polls":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homePolls(homeId: homeId))
                 return
             }
         case "me.editProfile":
@@ -599,6 +614,25 @@ public struct YouTabRoot: View {
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homePolls(homeId):
+            PollsListView(
+                viewModel: PollsListViewModel(
+                    homeId: homeId,
+                    onOpenPoll: { pollId in
+                        Task { @MainActor in path.append(.pollDetail(homeId: homeId, pollId: pollId)) }
+                    },
+                    onStartPoll: {
+                        Task { @MainActor in path.append(.placeholder(label: "Start a poll")) }
+                    }
+                )
+            )
+        case let .pollDetail(homeId, pollId):
+            PollDetailView(
+                homeId: homeId,
+                pollId: pollId
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(

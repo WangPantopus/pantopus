@@ -18,7 +18,13 @@ import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
+import app.pantopus.android.data.api.models.homes.CastVoteRequest
+import app.pantopus.android.data.api.models.homes.CastVoteResponse
+import app.pantopus.android.data.api.models.homes.CreatePollRequest
+import app.pantopus.android.data.api.models.homes.GetHomePollsResponse
+import app.pantopus.android.data.api.models.homes.HomePollResponse
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
+import app.pantopus.android.data.api.models.homes.UpdatePollRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import retrofit2.http.Body
@@ -138,4 +144,46 @@ interface HomesApi {
         @Path("id") homeId: String,
         @Path("billId") billId: String,
     ): GetBillSplitsResponse
+
+    // ─── Polls (T6.3e / P13) ─────────────────────────────────────
+
+    /**
+     * `GET /api/homes/:id/polls` — route `backend/routes/home.js:6984`.
+     * The response is enriched server-side with `vote_count`,
+     * `option_counts` (per-option breakdown), and `my_vote`.
+     */
+    @GET("api/homes/{id}/polls")
+    suspend fun getHomePolls(
+        @Path("id") homeId: String,
+    ): GetHomePollsResponse
+
+    /** `POST /api/homes/:id/polls` — route `backend/routes/home.js:7058`. */
+    @POST("api/homes/{id}/polls")
+    suspend fun createHomePoll(
+        @Path("id") homeId: String,
+        @Body body: CreatePollRequest,
+    ): HomePollResponse
+
+    /**
+     * `POST /api/homes/:id/polls/:pollId/vote` — route
+     * `backend/routes/home.js:7100`. Upserts the viewer's vote
+     * (changing a vote is a re-call with new `selected_options`).
+     */
+    @POST("api/homes/{id}/polls/{pollId}/vote")
+    suspend fun castHomePollVote(
+        @Path("id") homeId: String,
+        @Path("pollId") pollId: String,
+        @Body body: CastVoteRequest,
+    ): CastVoteResponse
+
+    /**
+     * `PUT /api/homes/:id/polls/:pollId` — route `backend/routes/home.js:7159`.
+     * Used to close a poll (`status: "closed"`) or edit metadata.
+     */
+    @PUT("api/homes/{id}/polls/{pollId}")
+    suspend fun updateHomePoll(
+        @Path("id") homeId: String,
+        @Path("pollId") pollId: String,
+        @Body body: UpdatePollRequest,
+    ): HomePollResponse
 }

@@ -146,4 +146,51 @@ public enum HomesEndpoints {
     public static func deletePet(homeId: String, petId: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/homes/\(homeId)/pets/\(petId)")
     }
+
+    // MARK: - Polls (T6.3e / P13)
+
+    /// `GET /api/homes/:id/polls` — route `backend/routes/home.js:6984`.
+    /// Response is enriched server-side with `vote_count`, `option_counts`
+    /// (per-option breakdown keyed by `PollOptionDTO.id`), and `my_vote`.
+    public static func listPolls(homeId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/homes/\(homeId)/polls")
+    }
+
+    /// `POST /api/homes/:id/polls` — route `backend/routes/home.js:7058`.
+    public static func createPoll(homeId: String, request: CreatePollRequest) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/polls",
+            body: request
+        )
+    }
+
+    /// `POST /api/homes/:id/polls/:pollId/vote` — route
+    /// `backend/routes/home.js:7100`. Upserts the viewer's vote (changing
+    /// a vote is a re-call with new `selectedOptions`).
+    public static func castPollVote(
+        homeId: String,
+        pollId: String,
+        request: CastVoteRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/polls/\(pollId)/vote",
+            body: request
+        )
+    }
+
+    /// `PUT /api/homes/:id/polls/:pollId` — route `backend/routes/home.js:7159`.
+    /// Used to close a poll (`status: "closed"`) or edit metadata.
+    public static func updatePoll(
+        homeId: String,
+        pollId: String,
+        request: UpdatePollRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .put,
+            path: "/api/homes/\(homeId)/polls/\(pollId)",
+            body: request
+        )
+    }
 }
