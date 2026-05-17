@@ -85,15 +85,16 @@ object SignUpScreenTags {
 @Composable
 fun SignUpScreen(
     onClose: () -> Unit = {},
-    onSuccess: () -> Unit = {},
+    onSuccess: (String) -> Unit = {},
     viewModel: SignUpViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(state.didSucceed) {
         if (state.didSucceed) {
+            val email = state.email.trim().lowercase()
             viewModel.acknowledgeSuccess()
-            onSuccess()
+            onSuccess(email)
         }
     }
 

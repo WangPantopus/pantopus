@@ -35,6 +35,20 @@ final class AuthScreensSnapshotTests: XCTestCase {
         try assertBaseline("error")
     }
 
+    // T6.1c P5 — Forgot / Reset / Verify baselines.
+
+    func test_forgot_ios_baseline_is_present() throws {
+        try assertBaseline("forgot")
+    }
+
+    func test_reset_ios_baseline_is_present() throws {
+        try assertBaseline("reset")
+    }
+
+    func test_verify_ios_baseline_is_present() throws {
+        try assertBaseline("verify")
+    }
+
     private func assertBaseline(_ screen: String) throws {
         let url = baselineURL.appendingPathComponent("\(screen)-ios.png")
         XCTAssertTrue(

@@ -138,6 +138,73 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .notifications)
     }
 
+    // MARK: - T6.1c P5 — auth deep links
+
+    func testResetPasswordCustomScheme() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://auth/reset-password?token=hashed-recovery"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .resetPassword(token: "hashed-recovery"))
+    }
+
+    func testResetPasswordHTTPSHost() throws {
+        let url = try XCTUnwrap(URL(string: "https://pantopus.app/auth/reset-password?token=abc-123"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .resetPassword(token: "abc-123"))
+    }
+
+    func testResetPasswordWithoutTokenFallsBack() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://auth/reset-password"))
+        DeepLinkRouter.shared.handle(url: url)
+        if case .unknown = DeepLinkRouter.shared.pending {
+            // ok
+        } else {
+            XCTFail("Expected .unknown when /auth/reset-password is missing the token")
+        }
+    }
+
+    func testResetPasswordAcceptsBareShape() throws {
+        // The backend's older recovery template emits `/reset-password?token=…`
+        // without the `/auth/` prefix — must still route.
+        let url = try XCTUnwrap(URL(string: "pantopus://reset-password?token=bare-shape-tok"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .resetPassword(token: "bare-shape-tok"))
+    }
+
+    func testResetPasswordAcceptsTokenHashParam() throws {
+        // Supabase's older email template uses `token_hash` as the param
+        // name; we accept both shapes.
+        let url = try XCTUnwrap(URL(string: "pantopus://auth/reset-password?token_hash=hash-shape"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .resetPassword(token: "hash-shape"))
+    }
+
+    func testVerifyEmailCustomScheme() throws {
+        let url = try XCTUnwrap(
+            URL(string: "pantopus://auth/verify-email?token=hashed-otp&email=alice%40example.com")
+        )
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(
+            DeepLinkRouter.shared.pending,
+            .verifyEmail(token: "hashed-otp", email: "alice%40example.com")
+        )
+    }
+
+    func testVerifyEmailHTTPSHost() throws {
+        let url = try XCTUnwrap(URL(string: "https://pantopus.app/auth/verify-email?token=tok"))
+        DeepLinkRouter.shared.handle(url: url)
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .verifyEmail(token: "tok", email: nil))
+    }
+
+    func testVerifyEmailWithoutTokenFallsBack() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://auth/verify-email"))
+        DeepLinkRouter.shared.handle(url: url)
+        if case .unknown = DeepLinkRouter.shared.pending {
+            // ok
+        } else {
+            XCTFail("Expected .unknown when /auth/verify-email is missing the token")
+        }
+    }
+
     // MARK: - Path entry point (notification payload `link` field)
 
     func testHandlePathBoxesAbsolutePathIntoRouter() {

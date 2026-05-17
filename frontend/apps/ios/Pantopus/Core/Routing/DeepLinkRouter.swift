@@ -34,6 +34,15 @@ final class DeepLinkRouter {
         case connections
         case discoverHub
         case invite(token: String)
+        /// `pantopus://auth/reset-password?token=…` — surfaces the hashed
+        /// recovery token from the password-reset email. Carries the raw
+        /// token; the caller invokes `AuthManager.resetPassword` on submit.
+        case resetPassword(token: String)
+        /// `pantopus://auth/verify-email?token=…` — surfaces the hashed
+        /// Supabase OTP from the verification email. `email` is optional
+        /// (the link from the resend / signup flow carries `&email=` so
+        /// the screen can render the recipient).
+        case verifyEmail(token: String, email: String?)
         case unknown(URL)
     }
 
@@ -97,6 +106,15 @@ final class DeepLinkRouter {
         // home-member-requests entry routes correctly.
         let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let tabQuery = comps?.queryItems?.first { $0.name == "tab" }?.value
+        // Auth deep links carry `token` / `token_hash` (Supabase's two
+        // recovery-link param names) and an optional `email`. Auth-callback
+        // emails sometimes encode params in the fragment instead of the
+        // query string, so parse both.
+        let tokenQuery = comps?.queryItems?.first { $0.name == "token" || $0.name == "token_hash" }?.value
+            ?? fragmentParam(url.fragment, name: "token")
+            ?? fragmentParam(url.fragment, name: "token_hash")
+        let emailQuery = comps?.queryItems?.first { $0.name == "email" }?.value
+            ?? fragmentParam(url.fragment, name: "email")
 
         switch firstSegment {
         case "feed":
@@ -142,8 +160,44 @@ final class DeepLinkRouter {
                 return .invite(token: token)
             }
             return .unknown(url)
+        case "auth":
+            // `pantopus://auth/reset-password?token=…` and
+            // `pantopus://auth/verify-email?token=…&email=…`.
+            let sub = segments.dropFirst().first ?? ""
+            switch sub {
+            case "reset-password", "reset_password":
+                guard let token = tokenQuery, !token.isEmpty else { return .unknown(url) }
+                return .resetPassword(token: token)
+            case "verify-email", "verify_email":
+                guard let token = tokenQuery, !token.isEmpty else { return .unknown(url) }
+                return .verifyEmail(token: token, email: emailQuery)
+            default:
+                return .unknown(url)
+            }
+        case "reset-password", "reset_password":
+            // Tolerate the bare `/reset-password?token=…` shape that the
+            // backend's older recovery template emits (no `/auth/` prefix).
+            guard let token = tokenQuery, !token.isEmpty else { return .unknown(url) }
+            return .resetPassword(token: token)
+        case "verify-email", "verify_email":
+            guard let token = tokenQuery, !token.isEmpty else { return .unknown(url) }
+            return .verifyEmail(token: token, email: emailQuery)
         default:
             return .unknown(url)
         }
+    }
+
+    /// Pulls a single key out of a `#` fragment of the form `key=v&k2=v2`.
+    /// Supabase auth-callback links sometimes ship the access_token /
+    /// token_hash / email in the fragment instead of the query string.
+    private func fragmentParam(_ fragment: String?, name: String) -> String? {
+        guard let fragment, !fragment.isEmpty else { return nil }
+        for pair in fragment.split(separator: "&") {
+            let parts = pair.split(separator: "=", maxSplits: 1)
+            if parts.count == 2, parts[0] == Substring(name) {
+                return String(parts[1])
+            }
+        }
+        return nil
     }
 }

@@ -378,3 +378,24 @@ the 403 + `needsVerification` reply as `.serverError("Please verify your
 email…")` and routes to `AuthRoute.verifyEmail`, which is functionally a
 hard gate (P3 stub behaviour). P4 picks up the soft-gate UX once the
 backend ships option 2.
+
+### T6.1c status (P5)
+
+The Verify-email surface now first-class implements the soft-gate **UI**
+contract: the tertiary "I'll do this later" link renders by default on
+both iOS (`VerifyEmailView(softGate: true, …)`) and Android (the
+`SOFT_GATE_KEY` SavedStateHandle arg defaults to `true`), so on the day
+the backend ships option 2 above no UI change is needed — the screen
+simply stops being the only place a fresh user can land. Until then,
+"I'll do this later" still pops back to login (where the 403 will
+re-route), so the worst-case is one extra friction step rather than a
+dead end.
+
+The deep-link router on both platforms now accepts
+`pantopus://auth/verify-email?token=…&email=…` and
+`pantopus://auth/reset-password?token=…`. Both routes also tolerate the
+bare `/verify-email?token=…` / `/reset-password?token=…` shapes the
+older Supabase recovery template emits, and the `token_hash` Supabase
+param name as a synonym for `token`. See
+`DeepLinkRouterTests` (iOS) and `DeepLinkRouterTest` (Android) for
+the full smoke matrix.

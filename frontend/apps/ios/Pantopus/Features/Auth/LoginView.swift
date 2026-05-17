@@ -14,6 +14,7 @@ struct LoginView: View {
     @State private var viewModel = LoginViewModel()
     @State private var path: [AuthRoute] = []
     @State private var showPassword: Bool = false
+    @State private var deepLink = DeepLinkRouter.shared
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -131,20 +132,38 @@ struct LoginView: View {
                 case .signUp:
                     SignUpView(
                         onClose: { if !path.isEmpty { path.removeLast() } },
-                        onSuccess: {
+                        onSuccess: { email in
                             // Backend hard-gates login on email_confirmed_at
                             // today (see docs/mobile/auth-backend-contracts.md
                             // §"Backend gap discovered"). Route through the
-                            // verify-email surface until soft-gate lands.
-                            path = [.verifyEmail]
+                            // verify-email surface until soft-gate lands;
+                            // we hand it the email so the body copy + resend
+                            // CTA render correctly.
+                            path = [.verifyEmail(email: email, token: nil)]
                         }
                     )
                 case .forgotPassword:
-                    ForgotPasswordView()
+                    ForgotPasswordView(onBack: { if !path.isEmpty { path.removeLast() } })
                 case let .resetPassword(token):
-                    ResetPasswordView(token: token)
-                case .verifyEmail:
-                    VerifyEmailView()
+                    ResetPasswordView(
+                        token: token,
+                        onClose: { if !path.isEmpty { path.removeLast() } },
+                        onDone: { path = [] }
+                    )
+                case let .verifyEmail(email, token):
+                    VerifyEmailView(
+                        email: email,
+                        token: token,
+                        softGate: true,
+                        onDone: { path = [] },
+                        onChangeEmail: { _ in
+                            // Route back to signup so the user can re-enter
+                            // an email. The backend's email-change flow is
+                            // documented in `docs/mobile/auth-backend-contracts.md`
+                            // §2; today we restart signup with the new value.
+                            path = [.signUp]
+                        }
+                    )
                 case let .error(authError):
                     AuthErrorView(
                         error: authError,
@@ -152,6 +171,26 @@ struct LoginView: View {
                     ) { if !path.isEmpty { path.removeLast() } }
                 }
             }
+            .onAppear { consumeAuthDeepLinkIfNeeded() }
+            .onChange(of: deepLink.pending) { _, _ in consumeAuthDeepLinkIfNeeded() }
+        }
+    }
+
+    /// Pulls the `auth/reset-password` / `auth/verify-email` destinations
+    /// off `DeepLinkRouter` and pushes the matching `AuthRoute` onto the
+    /// stack. Anything else stays pending for the signed-in router to
+    /// consume after sign-in. Idempotent on re-entry.
+    private func consumeAuthDeepLinkIfNeeded() {
+        guard let pending = deepLink.pending else { return }
+        switch pending {
+        case let .resetPassword(token):
+            _ = deepLink.consume()
+            path = [.resetPassword(token: token)]
+        case let .verifyEmail(token, email):
+            _ = deepLink.consume()
+            path = [.verifyEmail(email: email, token: token)]
+        default:
+            break
         }
     }
 

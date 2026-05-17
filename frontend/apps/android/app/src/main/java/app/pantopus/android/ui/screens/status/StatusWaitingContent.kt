@@ -137,6 +137,37 @@ data class StatusWaitingContent(
             )
         }
 
+        /**
+         * Frame 4 — Reset link sent. Status frame for the Forgot-password
+         * success state — used by `ForgotPasswordScreen`. Primary CTA is
+         * "Resend"; ghost CTA is "Back to login". Body interpolates the
+         * caller's email so the user can visually confirm where the link
+         * went.
+         */
+        fun resetLinkSent(email: String): StatusWaitingContent {
+            val recipient = email.ifBlank { "your email" }
+            return StatusWaitingContent(
+                illustration = StatusIllustration.Email,
+                headline = "Check your email",
+                subcopy = "We sent a reset link to $recipient. Click it to set a new password.",
+                primaryCta = StatusCta(label = "Resend", actionKey = "resend_reset"),
+                secondaryCta = StatusCta(label = "Back to login", actionKey = "back_to_login"),
+            )
+        }
+
+        /**
+         * Frame 5 — Password reset success. Reached after `ResetPasswordScreen`
+         * submits a valid token + new password. Auto-redirects to login
+         * after 3 seconds (caller wires the timer).
+         */
+        fun passwordReset(): StatusWaitingContent =
+            StatusWaitingContent(
+                illustration = StatusIllustration.Success,
+                headline = "Password reset",
+                subcopy = "You can now log in with your new password.",
+                primaryCta = StatusCta(label = "Back to login", actionKey = "back_to_login"),
+            )
+
         /** Frame 3 — Check your email (info). */
         fun checkYourEmail(email: String? = null): StatusWaitingContent {
             val recipient =

@@ -19,10 +19,13 @@ public enum AuthRoute: Hashable, Sendable {
     /// Forgot password — request a reset email (P4).
     case forgotPassword
     /// Reset password — landed on via the email deep link with the hashed
-    /// recovery `token` (P4).
+    /// recovery `token` (P5).
     case resetPassword(token: String)
-    /// Check-your-email confirmation (P5).
-    case verifyEmail
+    /// Check-your-email surface (P5). `email` is rendered in the body
+    /// copy + used by the resend CTA. `token` is set when the route was
+    /// reached via the verification email's deep link, in which case the
+    /// screen auto-verifies on appear.
+    case verifyEmail(email: String? = nil, token: String? = nil)
     /// Generic auth error / banner detail screen (P4).
     case error(AuthError)
 }
