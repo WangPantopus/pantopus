@@ -60,6 +60,14 @@ public enum YouRoute: Hashable {
     case homePolls(homeId: String)
     /// T6.3e — Poll detail. Pushed from a Polls list row.
     case pollDetail(homeId: String, pollId: String)
+    /// T6.4a — Access codes. Per-home roster of Wi-Fi / Alarm / Gate /
+    /// Lockbox / Garage / Smart lock codes. The "me.access" Household-
+    /// section row pushes here with the primary home id resolved by
+    /// the VM; the Home Dashboard quick-action shares the same screen.
+    /// `homeName` is an optional pre-resolved subtitle ("412 Birch Ln")
+    /// rendered under the title while the underlying home payload is
+    /// in flight or unavailable.
+    case accessCodes(homeId: String, homeName: String?)
     /// T6.3c / P11 — Household tasks (per-home chore list). The
     /// "me.tasks" Activity-section row pushes here with the primary
     /// home id resolved by the Me VM. Distinct from `.myTasks` which is
@@ -383,6 +391,12 @@ public struct YouTabRoot: View {
         case "me.polls":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homePolls(homeId: homeId))
+                return
+            }
+        case "me.access":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                let homeName = row.routeArgs["homeName"]
+                path.append(.accessCodes(homeId: homeId, homeName: homeName))
                 return
             }
         case "me.tasks":
@@ -714,6 +728,25 @@ public struct YouTabRoot: View {
             ) {
                 if !path.isEmpty { path.removeLast() }
             }
+        case let .accessCodes(homeId, homeName):
+            AccessCodesView(
+                viewModel: AccessCodesViewModel(
+                    homeId: homeId,
+                    homeName: homeName
+                ) { target in
+                    Task { @MainActor in
+                        switch target {
+                        case let .addCode(homeId: _, category: category):
+                            let label = category.map { "Add \($0.label) code" } ?? "Add access code"
+                            path.append(.placeholder(label: label))
+                        case .editCode:
+                            path.append(.placeholder(label: "Edit access code"))
+                        case .search:
+                            path.append(.placeholder(label: "Search access codes"))
+                        }
+                    }
+                }
+            )
         case .myHomes:
             MyHomesListView(
                 viewModel: MyHomesListViewModel(

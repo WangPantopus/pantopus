@@ -3,6 +3,7 @@ package app.pantopus.android.data.homes
 import app.pantopus.android.data.api.models.homes.CastVoteRequest
 import app.pantopus.android.data.api.models.homes.CastVoteResponse
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
+import app.pantopus.android.data.api.models.homes.CreateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeTaskRequest
@@ -14,6 +15,8 @@ import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.GetHomePollsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeTasksResponse
+import app.pantopus.android.data.api.models.homes.HomeAccessSecretResponse
+import app.pantopus.android.data.api.models.homes.HomeAccessSecretsResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.HomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.HomePollResponse
@@ -24,6 +27,7 @@ import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
+import app.pantopus.android.data.api.models.homes.UpdateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
 import app.pantopus.android.data.api.models.homes.UpdateHomeTaskRequest
 import app.pantopus.android.data.api.models.homes.UpdateMaintenanceRequest
@@ -166,6 +170,31 @@ open class HomesRepository
             homeId: String,
             taskId: String,
         ): NetworkResult<Unit> = safeApiCall { tasksApi.deleteHomeTask(homeId, taskId) }
+
+        // ─── Access codes (T6.4a) ──────────────────────────────────
+
+        /** `GET /api/homes/:id/access`. */
+        open suspend fun getHomeAccessSecrets(homeId: String): NetworkResult<HomeAccessSecretsResponse> =
+            safeApiCall { api.getHomeAccessSecrets(homeId) }
+
+        /** `POST /api/homes/:id/access`. */
+        open suspend fun createHomeAccessSecret(
+            homeId: String,
+            request: CreateAccessSecretRequest,
+        ): NetworkResult<HomeAccessSecretResponse> = safeApiCall { api.createHomeAccessSecret(homeId, request) }
+
+        /** `PUT /api/homes/:id/access/:secretId`. */
+        open suspend fun updateHomeAccessSecret(
+            homeId: String,
+            secretId: String,
+            request: UpdateAccessSecretRequest,
+        ): NetworkResult<HomeAccessSecretResponse> = safeApiCall { api.updateHomeAccessSecret(homeId, secretId, request) }
+
+        /** `DELETE /api/homes/:id/access/:secretId`. */
+        open suspend fun deleteHomeAccessSecret(
+            homeId: String,
+            secretId: String,
+        ): NetworkResult<Unit> = safeApiCall { api.deleteHomeAccessSecret(homeId, secretId) }
 
         // ─── Maintenance (T6.3b / P10) ─────────────────────────
 

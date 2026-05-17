@@ -121,6 +121,9 @@ class IconTest {
             "shuffle",
             "wand-sparkles",
             "arrow-up-right",
+            // T6.4a — Access codes
+            "eye-off",
+            "key-round",
             // T6.3c — Household tasks chore categories.
             "leaf",
             "list-checks",

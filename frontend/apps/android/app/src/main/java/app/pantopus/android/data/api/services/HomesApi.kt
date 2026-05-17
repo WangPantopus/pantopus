@@ -5,6 +5,7 @@ import app.pantopus.android.data.api.models.homes.CastVoteRequest
 import app.pantopus.android.data.api.models.homes.CastVoteResponse
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CheckAddressResponse
+import app.pantopus.android.data.api.models.homes.CreateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
@@ -14,6 +15,8 @@ import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.GetHomePollsResponse
+import app.pantopus.android.data.api.models.homes.HomeAccessSecretResponse
+import app.pantopus.android.data.api.models.homes.HomeAccessSecretsResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.HomeDetailResponse
 import app.pantopus.android.data.api.models.homes.HomeMaintenanceResponse
@@ -28,6 +31,7 @@ import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.models.homes.RemoveOwnerResponse
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
+import app.pantopus.android.data.api.models.homes.UpdateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
 import app.pantopus.android.data.api.models.homes.UpdateMaintenanceRequest
 import app.pantopus.android.data.api.models.homes.UpdatePollRequest
@@ -216,6 +220,36 @@ interface HomesApi {
         @Path("pollId") pollId: String,
         @Body body: UpdatePollRequest,
     ): HomePollResponse
+
+    // ─── Access codes (T6.4a) ──────────────────────────────────────
+
+    /** `GET /api/homes/:id/access` — route `backend/routes/home.js:5487`. */
+    @GET("api/homes/{id}/access")
+    suspend fun getHomeAccessSecrets(
+        @Path("id") homeId: String,
+    ): HomeAccessSecretsResponse
+
+    /** `POST /api/homes/:id/access` — route `backend/routes/home.js:5527`. */
+    @POST("api/homes/{id}/access")
+    suspend fun createHomeAccessSecret(
+        @Path("id") homeId: String,
+        @Body body: CreateAccessSecretRequest,
+    ): HomeAccessSecretResponse
+
+    /** `PUT /api/homes/:id/access/:secretId` — route `backend/routes/home.js:5586`. */
+    @PUT("api/homes/{id}/access/{secretId}")
+    suspend fun updateHomeAccessSecret(
+        @Path("id") homeId: String,
+        @Path("secretId") secretId: String,
+        @Body body: UpdateAccessSecretRequest,
+    ): HomeAccessSecretResponse
+
+    /** `DELETE /api/homes/:id/access/:secretId` — route `backend/routes/home.js:5624`. */
+    @DELETE("api/homes/{id}/access/{secretId}")
+    suspend fun deleteHomeAccessSecret(
+        @Path("id") homeId: String,
+        @Path("secretId") secretId: String,
+    )
 
     // ─── Maintenance (T6.3b / P10) ─────────────────────────────
 

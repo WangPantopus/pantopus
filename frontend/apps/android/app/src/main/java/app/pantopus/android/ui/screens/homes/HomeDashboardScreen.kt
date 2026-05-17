@@ -62,6 +62,7 @@ fun HomeDashboardScreen(
     onOpenPolls: ((String) -> Unit)? = null,
     onOpenPlaceholder: ((String) -> Unit)? = null,
     onOpenPets: ((String) -> Unit)? = null,
+    onOpenAccessCodes: ((homeId: String, homeName: String?) -> Unit)? = null,
     onOpenTasks: ((String) -> Unit)? = null,
     onOpenMaintenance: ((String) -> Unit)? = null,
     /** T6.3a / P9 — push to the per-home Members list. When wired, the
@@ -92,6 +93,7 @@ fun HomeDashboardScreen(
             "view_tasks" -> "Tasks"
             "view_maintenance" -> "Maintenance"
             "pets" -> "Pets"
+            "access_codes" -> "Access codes"
             else -> actionId.replace('_', ' ').replaceFirstChar(Char::uppercase)
         }
 
@@ -142,6 +144,11 @@ fun HomeDashboardScreen(
             "pets" ->
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenPets?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "access_codes" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenAccessCodes?.invoke(homeId, viewModel.currentHomeName())
+                        ?: openPlaceholder(actionId)
                 }
             "view_tasks" ->
                 viewModel.currentHomeId()?.let { homeId ->
