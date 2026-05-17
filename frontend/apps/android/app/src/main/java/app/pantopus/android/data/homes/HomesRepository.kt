@@ -44,6 +44,7 @@ import javax.inject.Singleton
  * taxonomy. ViewModels depend on this rather than Retrofit directly so
  * they can expose a single error surface to the UI.
  */
+@Suppress("TooManyFunctions")
 @Singleton
 open class HomesRepository
     @Inject
