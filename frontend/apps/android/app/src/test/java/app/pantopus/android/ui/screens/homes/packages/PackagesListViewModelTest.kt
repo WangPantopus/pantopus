@@ -142,8 +142,8 @@ class PackagesListViewModelTest {
             assertEquals("Birthday cards", row.title)
             assertEquals("USPS · Mailbox", row.subtitle)
             val trailing = row.trailing
-            assertTrue(trailing is RowTrailing.StatusChip)
-            val chip = trailing as RowTrailing.StatusChip
+            assertTrue(trailing is RowTrailing.Status)
+            val chip = trailing as RowTrailing.Status
             assertEquals("Out for delivery", chip.text)
             assertEquals(StatusChipVariant.Info, chip.variant)
             val leading = row.leading
