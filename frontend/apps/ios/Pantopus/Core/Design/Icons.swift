@@ -143,13 +143,46 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case wandSparkles = "wand-sparkles"
     case arrowUpRight = "arrow-up-right"
 
+    // T6.4b Emergency info — per-category tile glyphs (shutoff / contact /
+    // evac / medical) + row action icons (phoneCall / image / mapPin) +
+    // banner CTA + pinned marker + empty-state quick-prompt.
+    case pin
+    case power
+    case phoneCall = "phone-call"
+    case phone
+    case navigation
+    case heartPulse = "heart-pulse"
+    case siren
+    case stethoscope
+    case cross
+    case flag
+    case userRound = "user-round"
+    case flaskConical = "flask-conical"
+    case flameKindling = "flame-kindling"
+    case printer
+    case listChecks = "list-checks"
+    case alertTriangle = "alert-triangle"
+
+    // T6.4b Documents — file-type tile glyphs (pdf / image / doc / sheet /
+    // archive / scan) + category section icons (lease / insurance /
+    // warranty / tax / permit / hoa / id) + banner / row chip glyphs.
+    case image
+    case fileType = "file-type"
+    case fileSpreadsheet = "file-spreadsheet"
+    case fileSignature = "file-signature"
+    case landmark
+    case stamp
+    case idCard = "id-card"
+    case folderLock = "folder-lock"
+    case uploadCloud = "upload-cloud"
+    case calendarClock = "calendar-clock"
+    case download
     // T6.4a Access codes — tap-to-reveal hide icon + empty-state key disc.
     case eyeOff = "eye-off"
     case keyRound = "key-round"
 
     // T6.3c Household tasks — chore-category iconography + banner glyph.
     case leaf
-    case listChecks = "list-checks"
     case utensils
     case baby
 
@@ -278,10 +311,38 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .shuffle: "shuffle"
         case .wandSparkles: "wand.and.stars"
         case .arrowUpRight: "arrow.up.right"
+        // T6.4b Emergency info
+        case .pin: "pin"
+        case .power: "power"
+        case .phoneCall: "phone.fill"
+        case .phone: "phone"
+        case .navigation: "location.north.fill"
+        case .heartPulse: "waveform.path.ecg"
+        case .siren: "exclamationmark.octagon.fill"
+        case .stethoscope: "stethoscope"
+        case .cross: "cross.fill"
+        case .flag: "flag.fill"
+        case .userRound: "person.crop.circle.fill"
+        case .flaskConical: "testtube.2"
+        case .flameKindling: "flame.fill"
+        case .printer: "printer"
+        case .listChecks: "checklist"
+        case .alertTriangle: "exclamationmark.triangle"
+        // T6.4b Documents
+        case .image: "photo"
+        case .fileType: "doc.fill"
+        case .fileSpreadsheet: "tablecells"
+        case .fileSignature: "doc.text.fill"
+        case .landmark: "building.columns"
+        case .stamp: "checkmark.seal.fill"
+        case .idCard: "person.text.rectangle"
+        case .folderLock: "lock.doc"
+        case .uploadCloud: "icloud.and.arrow.up"
+        case .calendarClock: "calendar.badge.clock"
+        case .download: "arrow.down.circle"
         case .eyeOff: "eye.slash"
         case .keyRound: "key"
         case .leaf: "leaf"
-        case .listChecks: "checklist"
         case .utensils: "fork.knife"
         case .baby: "figure.child"
         // T6.3b Maintenance. SF Symbols ships direct equivalents for most

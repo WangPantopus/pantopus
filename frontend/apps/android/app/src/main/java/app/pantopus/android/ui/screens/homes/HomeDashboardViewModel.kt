@@ -196,6 +196,9 @@ class HomeDashboardViewModel
                 quickActions =
                     listOf(
                         QuickActionTile("view_bills", "Bills", PantopusIcon.Receipt, IdentityPillar.Home),
+                        QuickActionTile("view_docs", "Documents", PantopusIcon.FolderLock, IdentityPillar.Home),
+                        QuickActionTile("view_emergency", "Emergency", PantopusIcon.ShieldCheck, IdentityPillar.Home),
+                        QuickActionTile("pets", "Pets", PantopusIcon.PawPrint, IdentityPillar.Home),
                         QuickActionTile("view_packages", "Packages", PantopusIcon.Package, IdentityPillar.Home),
                         QuickActionTile("view_polls", "Polls", PantopusIcon.CheckCircle, IdentityPillar.Home),
                         QuickActionTile("access_codes", "Access codes", PantopusIcon.Lock, IdentityPillar.Home),
@@ -203,7 +206,6 @@ class HomeDashboardViewModel
                         QuickActionTile("view_maintenance", "Maintenance", PantopusIcon.Hammer, IdentityPillar.Home),
                         QuickActionTile("add_mail", "Add mail", PantopusIcon.Mailbox, IdentityPillar.Home),
                         QuickActionTile("add_member", "Add member", PantopusIcon.UserPlus, IdentityPillar.Personal),
-                        QuickActionTile("pets", "Pets", PantopusIcon.PawPrint, IdentityPillar.Home),
                     ),
                 tabs =
                     listOf(

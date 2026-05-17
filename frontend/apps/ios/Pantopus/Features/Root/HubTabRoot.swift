@@ -21,6 +21,10 @@ public enum HubRoute: Hashable {
     case homeDashboard(homeId: String)
     /// Pets sub-screen for a specific home (T5.2.1).
     case homePets(homeId: String)
+    /// Emergency info sub-screen for a specific home (T6.4b / P17).
+    case homeEmergency(homeId: String)
+    /// Documents sub-screen for a specific home (T6.4b / P17).
+    case homeDocs(homeId: String)
     /// Packages list for a home (T6.3d / P14).
     case homePackages(homeId: String)
     /// Package detail (read-mostly summary with mark-picked-up).
@@ -323,6 +327,12 @@ public struct HubTabRoot: View {
                 onOpenPets: { id in
                     Task { @MainActor in push(.homePets(homeId: id)) }
                 },
+                onOpenDocs: { id in
+                    Task { @MainActor in push(.homeDocs(homeId: id)) }
+                },
+                onOpenEmergency: { id in
+                    Task { @MainActor in push(.homeEmergency(homeId: id)) }
+                },
                 onOpenPackages: { id in
                     Task { @MainActor in push(.homePackages(homeId: id)) }
                 },
@@ -387,6 +397,63 @@ public struct HubTabRoot: View {
             }
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
+        case let .homeEmergency(homeId):
+            EmergencyInfoView(
+                viewModel: EmergencyInfoViewModel(
+                    homeId: homeId,
+                    onAction: { _ in
+                        Task { @MainActor in
+                            push(.placeholder(label: "Emergency item"))
+                        }
+                    },
+                    onAdd: {
+                        Task { @MainActor in
+                            push(.placeholder(label: "Add emergency info"))
+                        }
+                    },
+                    onShare: {
+                        Task { @MainActor in
+                            push(.placeholder(label: "Share emergency info"))
+                        }
+                    },
+                    onPrintCard: {
+                        Task { @MainActor in
+                            push(.placeholder(label: "Print emergency card"))
+                        }
+                    }
+                )
+            )
+        case let .homeDocs(homeId):
+            DocumentsView(
+                viewModel: DocumentsViewModel(
+                    homeId: homeId,
+                    onOpenDocument: { _ in
+                        Task { @MainActor in
+                            push(.placeholder(label: "Document detail"))
+                        }
+                    },
+                    onUpload: {
+                        Task { @MainActor in
+                            push(.placeholder(label: "Upload document"))
+                        }
+                    },
+                    onSearch: {
+                        Task { @MainActor in
+                            push(.placeholder(label: "Search documents"))
+                        }
+                    },
+                    onExport: {
+                        Task { @MainActor in
+                            push(.placeholder(label: "Export documents"))
+                        }
+                    },
+                    onDocumentAction: { _, _ in
+                        Task { @MainActor in
+                            push(.placeholder(label: "Document action"))
+                        }
+                    }
+                )
+            )
         case let .homePackages(homeId):
             PackagesListView(
                 viewModel: Self.packagesListViewModel(

@@ -311,7 +311,9 @@ the tiles deep-link with the resolved home id.
 | Household tasks | `me.tasks` | **wired (T6.3c / P11)** — `YouRoute.homeTasks(homeId)` (iOS) / `ChildRoutes.homeTasks(homeId)` (Android) → `HouseholdTasksListView` / `HouseholdTasksListScreen`; also reached from the Home Dashboard "Tasks" quick-action tile (`view_tasks`). | Me-tab `me.tasks` Activity row + Home Dashboard "Tasks" quick action | n/a — wired |
 | Packages | `me.home.packages` | placeholder | Mailbox → drawers | follow-up |
 | Members | `me.home.members` | placeholder | Home dashboard "Members" quick-action | follow-up |
-| Docs / Calendar | `me.home.docs`, `me.home.calendar` | placeholder | n/a (no screen built yet) | follow-up |
+| Calendar | `me.home.calendar` | placeholder | n/a (no screen built yet) | follow-up |
+
+**T6.4b / P17 (this PR):** the `me.docs` and `me.emergency` route keys flip from `placeholder` to real `homeDocs(homeId:)` / `homeEmergency(homeId:)` destinations on both iOS (`YouRoute` + `HubRoute`) and Android (`ChildRoutes.HOME_DOCS` / `ChildRoutes.HOME_EMERGENCY`). The Home dashboard's quick-action grid also picks up two new tiles (`view_docs`, `view_emergency`) that hit the same destinations — both Me-tab and Home-dashboard entry points route to the same view-model.
 
 ## T5 — screen-by-screen wiring (P5–P16)
 
