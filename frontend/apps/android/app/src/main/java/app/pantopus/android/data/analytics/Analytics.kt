@@ -59,6 +59,8 @@ sealed class AnalyticsEvent(
         override val properties = mapOf("result" to result.value)
     }
 
+    data object ScreenOwnersListViewed : AnalyticsEvent("screen.owners_list.viewed")
+
     data class ScreenPetsWizardStepViewed(
         val stepNumber: Int,
         val stepName: String,
