@@ -415,7 +415,7 @@ class PackagesListViewModel
             fun shortTracking(raw: String): String {
                 val stripped = raw.replace(" ", "")
                 if (stripped.length <= 8) return raw
-                return "…" + stripped.substring(stripped.length - 6)
+                return "…" + stripped.substring(stripped.length - 7)
             }
 
             internal fun parseInstant(iso: String): Instant? =

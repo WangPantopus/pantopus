@@ -641,9 +641,8 @@ public struct YouTabRoot: View {
         case let .packageDetail(homeId, packageId):
             PackageDetailView(
                 homeId: homeId,
-                packageId: packageId,
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+                packageId: packageId
+            ) { if !path.isEmpty { path.removeLast() } }
         case let .logPackage(homeId):
             LogPackageSheetView(
                 homeId: homeId,

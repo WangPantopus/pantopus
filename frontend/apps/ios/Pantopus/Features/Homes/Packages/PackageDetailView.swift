@@ -223,9 +223,8 @@ private struct LoadedShell: View {
     var body: some View {
         let projection = PackagesListViewModel.project(
             package: pkg,
-            currentUserId: nil,
-            memberLookup: { _ in nil }
-        )
+            currentUserId: nil
+        ) { _ in nil }
         let status = projection.status
         return ContentDetailShell(
             title: "Package",

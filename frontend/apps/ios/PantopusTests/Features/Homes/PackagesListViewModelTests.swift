@@ -15,7 +15,7 @@
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable type_body_length file_length
+// swiftlint:disable type_body_length
 
 @MainActor
 final class PackagesListViewModelTests: XCTestCase {
@@ -173,18 +173,16 @@ final class PackagesListViewModelTests: XCTestCase {
                 trackingNumber: "1Z9X4 W84 2218",
                 description: nil
             ),
-            currentUserId: nil,
-            memberLookup: { _ in nil }
-        )
+            currentUserId: nil
+        ) { _ in nil }
         XCTAssertEqual(projection.title, "Tracking #…W842218")
     }
 
     func testTitleFallbacksToPackageWhenBothMissing() {
         let projection = PackagesListViewModel.project(
             package: makePackage(carrier: "Amazon"),
-            currentUserId: nil,
-            memberLookup: { _ in nil }
-        )
+            currentUserId: nil
+        ) { _ in nil }
         XCTAssertEqual(projection.title, "Package")
     }
 
@@ -195,18 +193,16 @@ final class PackagesListViewModelTests: XCTestCase {
                 description: "Side table",
                 deliveryInstructions: "Front porch"
             ),
-            currentUserId: nil,
-            memberLookup: { _ in nil }
-        )
+            currentUserId: nil
+        ) { _ in nil }
         XCTAssertEqual(projection.subtitle, "FedEx · Front porch")
     }
 
     func testSubtitleOmitsDropWhenMissing() {
         let projection = PackagesListViewModel.project(
             package: makePackage(carrier: "Amazon", description: "Cat food"),
-            currentUserId: nil,
-            memberLookup: { _ in nil }
-        )
+            currentUserId: nil
+        ) { _ in nil }
         XCTAssertEqual(projection.subtitle, "Amazon")
     }
 
@@ -217,9 +213,8 @@ final class PackagesListViewModelTests: XCTestCase {
                 description: "Jacket",
                 pickedUpBy: "user-ava"
             ),
-            currentUserId: "viewer",
-            memberLookup: { id in id == "user-ava" ? "Ava" : nil }
-        )
+            currentUserId: "viewer"
+        ) { id in id == "user-ava" ? "Ava" : nil }
         XCTAssertEqual(projection.body, "Picked up by Ava")
     }
 
@@ -230,18 +225,16 @@ final class PackagesListViewModelTests: XCTestCase {
                 description: "Jacket",
                 pickedUpBy: "viewer"
             ),
-            currentUserId: "viewer",
-            memberLookup: { _ in "Maria" }
-        )
+            currentUserId: "viewer"
+        ) { _ in "Maria" }
         XCTAssertNil(projection.body)
     }
 
     func testReturnedStatusGetsMutedHighlight() {
         let projection = PackagesListViewModel.project(
             package: makePackage(status: "returned"),
-            currentUserId: nil,
-            memberLookup: { _ in nil }
-        )
+            currentUserId: nil
+        ) { _ in nil }
         XCTAssertEqual(projection.highlight, .muted)
         XCTAssertEqual(projection.chipVariant, .neutral)
     }
@@ -357,7 +350,7 @@ final class PackagesListViewModelTests: XCTestCase {
 
     // MARK: - FAB + topBarAction contract
 
-    func testFabIsCanonicalCreateWithHomeTint() async {
+    func testFabIsCanonicalCreateWithHomeTint() {
         let vm = makeVM()
         guard let fab = vm.fab else {
             XCTFail("Expected FAB")

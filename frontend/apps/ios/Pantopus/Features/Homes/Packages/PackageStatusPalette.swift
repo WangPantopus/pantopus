@@ -37,13 +37,13 @@ public enum PackageChipStatus: String, Sendable, Hashable, CaseIterable {
     /// `.expected` (the schema default).
     public static func from(raw: String?) -> PackageChipStatus {
         switch raw {
-        case "expected": return .expected
-        case "out_for_delivery": return .outForDelivery
-        case "delivered": return .delivered
-        case "picked_up": return .pickedUp
-        case "lost": return .lost
-        case "returned": return .returned
-        default: return .expected
+        case "expected": .expected
+        case "out_for_delivery": .outForDelivery
+        case "delivered": .delivered
+        case "picked_up": .pickedUp
+        case "lost": .lost
+        case "returned": .returned
+        default: .expected
         }
     }
 
