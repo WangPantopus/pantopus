@@ -2,6 +2,8 @@
 //  EmergencyInfoViewModel.swift
 //  Pantopus
 //
+// swiftlint:disable type_body_length
+
 //  T6.4b / P17 — Backs `EmergencyInfoView`. Fetches
 //  `GET /api/homes/:id/emergencies` (route `backend/routes/home.js:5406`)
 //  and projects each row into a category-grouped section with a
@@ -68,7 +70,9 @@ public struct EmergencyBannerSummary: Sendable, Equatable {
     public let lastReviewedLabel: String?
     public let needsReviewCount: Int
 
-    public var hasContent: Bool { totalItems > 0 }
+    public var hasContent: Bool {
+        totalItems > 0
+    }
 }
 
 @Observable
@@ -97,15 +101,13 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
         let counts = rowsByCategory().mapValues(\.count)
         let totalCount = counts.values.reduce(0, +)
         let chips: [ChipStripConfig.Chip] = EmergencyFilter.allCases.map { filter in
-            let label: String = {
-                switch filter {
-                case .all: "All \(totalCount)"
-                case .shutoff: "\(EmergencyCategory.shutoff.chipLabel) \(counts[.shutoff] ?? 0)"
-                case .contact: "\(EmergencyCategory.contact.chipLabel) \(counts[.contact] ?? 0)"
-                case .evac: "\(EmergencyCategory.evac.chipLabel) \(counts[.evac] ?? 0)"
-                case .medical: "\(EmergencyCategory.medical.chipLabel) \(counts[.medical] ?? 0)"
-                }
-            }()
+            let label = switch filter {
+            case .all: "All \(totalCount)"
+            case .shutoff: "\(EmergencyCategory.shutoff.chipLabel) \(counts[.shutoff] ?? 0)"
+            case .contact: "\(EmergencyCategory.contact.chipLabel) \(counts[.contact] ?? 0)"
+            case .evac: "\(EmergencyCategory.evac.chipLabel) \(counts[.evac] ?? 0)"
+            case .medical: "\(EmergencyCategory.medical.chipLabel) \(counts[.medical] ?? 0)"
+            }
             return ChipStripConfig.Chip(
                 id: filter.rawValue,
                 label: label,
@@ -116,11 +118,15 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
             chips: chips,
             selectedId: selectedTab
         ) { [weak self] id in
-            self?.selectedTab = id
+            Task { @MainActor [weak self] in
+                self?.selectedTab = id
+            }
         }
     }
 
-    var tabs: [ListOfRowsTab] { [] }
+    var tabs: [ListOfRowsTab] {
+        []
+    }
 
     var selectedTab: String = EmergencyFilter.all.rawValue {
         didSet { rebuildState() }
@@ -165,7 +171,7 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
     private let onAdd: @Sendable () -> Void
     private let onShare: @Sendable () -> Void
     private let onPrintCard: @Sendable () -> Void
-    /// Inject a stable "now" for tests; production uses `Date.init`.
+    /// Inject a stable "now" for tests; production uses `Date()`.
     private let now: @Sendable () -> Date
 
     init(
@@ -175,7 +181,7 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
         onAdd: @escaping @Sendable () -> Void = {},
         onShare: @escaping @Sendable () -> Void = {},
         onPrintCard: @escaping @Sendable () -> Void = {},
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.homeId = homeId
         self.api = api
@@ -221,7 +227,8 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
                 ListOfRowsState.EmptyContent(
                     icon: .shieldCheck,
                     headline: "No emergency info set up",
-                    subcopy: "Set up shutoffs, key contacts, evac spots, and medical info for this home. Easier to do now than during a 2 AM water leak.",
+                    subcopy: "Set up shutoffs, key contacts, evac spots, and medical info for this home. " +
+                        "Easier to do now than during a 2 AM water leak.",
                     ctaTitle: "Add info"
                 ) { [onAdd] in onAdd() }
             )
@@ -301,8 +308,8 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
             onTap: { [onAction] in onAction(dtoCopy) },
             body: projection.body,
             bodyIcon: projection.bodyIcon,
-            chips: chips(for: projection),
             inlineChip: nil,
+            chips: chips(for: projection),
             metaTail: projection.needsReview ? nil : projection.lastReviewed
         )
     }
@@ -330,7 +337,7 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
 
     /// Pure mapping from a DTO to display strings. Public-static so
     /// tests can exercise it without standing the VM up.
-    public static func project(dto: HomeEmergencyDTO, pinned: Bool) -> EmergencyRowProjection {
+    static func project(dto: HomeEmergencyDTO, pinned: Bool) -> EmergencyRowProjection {
         let category = EmergencyCategory.from(type: dto.type)
         let glyph = EmergencyCategory.glyph(for: dto.type)
         let body = detailString(dto: dto)
@@ -373,11 +380,11 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
     ) -> PantopusIcon? {
         switch category {
         case .contact:
-            return dto.details["phone"] != nil ? .phone : .info
+            dto.details["phone"] != nil ? .phone : .info
         case .shutoff, .evac:
-            return .mapPin
+            .mapPin
         case .medical:
-            return dto.details["phone"] != nil ? .phone : .mapPin
+            dto.details["phone"] != nil ? .phone : .mapPin
         }
     }
 
@@ -387,9 +394,9 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
     ) -> String? {
         switch category {
         case .contact, .medical:
-            return dto.details["phone"]
+            dto.details["phone"]
         case .evac, .shutoff:
-            return dto.details["map_url"] ?? dto.details["photo_url"]
+            dto.details["map_url"] ?? dto.details["photo_url"]
         }
     }
 
@@ -406,15 +413,14 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
         return Self.summarize(emergencies: emergencies)
     }
 
-    public static func summarize(emergencies: [HomeEmergencyDTO]) -> EmergencyBannerSummary {
+    static func summarize(emergencies: [HomeEmergencyDTO]) -> EmergencyBannerSummary {
         let total = emergencies.count
         let needsReview = emergencies.filter { $0.details["needs_review"] == "1" }.count
         // Pick the most recent `reviewed` value across rows. Designs use
         // a single household-wide review date so the most recent wins.
         let mostRecent = emergencies
             .compactMap { $0.details["reviewed"] }
-            .sorted(by: >)
-            .first
+            .max()
         let label = mostRecent.map { "reviewed \($0)" }
         return EmergencyBannerSummary(
             totalItems: total,

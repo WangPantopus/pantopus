@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber")
+@file:Suppress("PackageNaming", "MagicNumber", "MatchingDeclarationName")
 
 package app.pantopus.android.ui.screens.homes.documents
 
@@ -76,39 +76,23 @@ enum class DocumentFileType(
         fun fromMime(
             mimeType: String?,
             filename: String? = null,
-        ): DocumentFileType {
-            val mime = mimeType?.lowercase() ?: ""
-            if (mime.isNotEmpty() && mime != "application/octet-stream") {
-                if (mime == "application/pdf") return Pdf
-                if (mime.startsWith("image/")) return Image
-                if (mime == "application/msword" ||
-                    mime.startsWith("application/vnd.openxmlformats-officedocument.wordprocessingml") ||
-                    mime == "application/vnd.oasis.opendocument.text"
-                ) {
-                    return Doc
-                }
-                if (mime == "application/vnd.ms-excel" ||
-                    mime.startsWith("application/vnd.openxmlformats-officedocument.spreadsheetml") ||
-                    mime == "text/csv" ||
-                    mime == "application/vnd.oasis.opendocument.spreadsheet"
-                ) {
-                    return Sheet
-                }
-                if (mime == "application/zip" ||
-                    mime == "application/x-zip-compressed" ||
-                    mime == "application/x-tar" ||
-                    mime == "application/x-gzip"
-                ) {
-                    return Archive
-                }
+        ): DocumentFileType =
+            bucketForMime(mimeType?.lowercase().orEmpty())
+                ?: bucketForExtension(filename)
+
+        private fun bucketForMime(mime: String): DocumentFileType? =
+            when {
+                mime.isEmpty() || mime == "application/octet-stream" -> null
+                mime == "application/pdf" -> Pdf
+                mime.startsWith("image/") -> Image
+                isDocumentMime(mime) -> Doc
+                isSheetMime(mime) -> Sheet
+                isArchiveMime(mime) -> Archive
+                else -> null
             }
-            // Fallback: inspect the filename extension if MIME was empty
-            // or generic.
-            val ext =
-                (filename ?: "")
-                    .lowercase()
-                    .substringAfterLast('.', "")
-            return when (ext) {
+
+        private fun bucketForExtension(filename: String?): DocumentFileType =
+            when ((filename ?: "").lowercase().substringAfterLast('.', "")) {
                 "pdf" -> Pdf
                 "jpg", "jpeg", "png", "gif", "heic", "webp", "tiff" -> Image
                 "doc", "docx", "odt", "rtf", "txt" -> Doc
@@ -116,6 +100,36 @@ enum class DocumentFileType(
                 "zip", "tar", "gz", "rar", "7z" -> Archive
                 else -> Pdf
             }
-        }
+
+        private fun isDocumentMime(mime: String): Boolean =
+            mime in documentMimes ||
+                mime.startsWith("application/vnd.openxmlformats-officedocument.wordprocessingml")
+
+        private fun isSheetMime(mime: String): Boolean =
+            mime in sheetMimes ||
+                mime.startsWith("application/vnd.openxmlformats-officedocument.spreadsheetml")
+
+        private fun isArchiveMime(mime: String): Boolean = mime in archiveMimes
+
+        private val documentMimes =
+            setOf(
+                "application/msword",
+                "application/vnd.oasis.opendocument.text",
+            )
+
+        private val sheetMimes =
+            setOf(
+                "application/vnd.ms-excel",
+                "text/csv",
+                "application/vnd.oasis.opendocument.spreadsheet",
+            )
+
+        private val archiveMimes =
+            setOf(
+                "application/zip",
+                "application/x-zip-compressed",
+                "application/x-tar",
+                "application/x-gzip",
+            )
     }
 }

@@ -59,13 +59,13 @@ import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_BILL_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.BillDetailScreen
 import app.pantopus.android.ui.screens.homes.bills.BillsListScreen
+import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
+import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENTS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.documents.DocumentsScreen
 import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoScreen
-import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
-import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
-import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
@@ -183,6 +183,7 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home documents screen. */
     fun homeDocs(homeId: String): String = "homes/$homeId/docs"
+
     /** Packages list per home (T6.3d / P14). */
     const val HOME_PACKAGES = "homes/{$PACKAGES_HOME_ID_KEY}/packages"
 

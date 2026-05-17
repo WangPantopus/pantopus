@@ -2,6 +2,8 @@
 //  DocumentsViewModel.swift
 //  Pantopus
 //
+// swiftlint:disable file_length type_body_length
+
 //  T6.4b / P17 — Backs `DocumentsView`. Fetches
 //  `GET /api/homes/:id/documents` (route `backend/routes/home.js:4944`)
 //  and projects each row into a category-grouped section with a
@@ -54,7 +56,9 @@ public struct DocumentsBannerSummary: Sendable, Equatable {
     public let storageUsedLabel: String?
     public let expiringCount: Int
 
-    public var hasContent: Bool { totalCount > 0 }
+    public var hasContent: Bool {
+        totalCount > 0
+    }
 }
 
 @Observable
@@ -77,12 +81,11 @@ final class DocumentsViewModel: ListOfRowsDataSource {
         let counts = chipCounts()
         let chips: [ChipStripConfig.Chip] = DocumentsFilter.allCases.map { filter in
             let count = counts[filter] ?? 0
-            let label: String
-            switch filter {
-            case .all: label = "All \(count)"
-            case .recent: label = "Recent \(count)"
-            case .expiring: label = "Expiring \(count)"
-            case .shared: label = "Shared \(count)"
+            let label = switch filter {
+            case .all: "All \(count)"
+            case .recent: "Recent \(count)"
+            case .expiring: "Expiring \(count)"
+            case .shared: "Shared \(count)"
             }
             return ChipStripConfig.Chip(id: filter.rawValue, label: label)
         }
@@ -90,11 +93,15 @@ final class DocumentsViewModel: ListOfRowsDataSource {
             chips: chips,
             selectedId: selectedTab
         ) { [weak self] id in
-            self?.selectedTab = id
+            Task { @MainActor [weak self] in
+                self?.selectedTab = id
+            }
         }
     }
 
-    var tabs: [ListOfRowsTab] { [] }
+    var tabs: [ListOfRowsTab] {
+        []
+    }
 
     var selectedTab: String = DocumentsFilter.all.rawValue {
         didSet { rebuildState() }
@@ -140,7 +147,7 @@ final class DocumentsViewModel: ListOfRowsDataSource {
     private let onSearch: @Sendable () -> Void
     private let onExport: @Sendable () -> Void
     private let onDocumentAction: @Sendable (HomeDocumentDTO, DocumentAction) -> Void
-    /// Inject a stable "now" for tests; production uses `Date.init`.
+    /// Inject a stable "now" for tests; production uses `Date()`.
     private let now: @Sendable () -> Date
 
     init(
@@ -151,7 +158,7 @@ final class DocumentsViewModel: ListOfRowsDataSource {
         onSearch: @escaping @Sendable () -> Void = {},
         onExport: @escaping @Sendable () -> Void = {},
         onDocumentAction: @escaping @Sendable (HomeDocumentDTO, DocumentAction) -> Void = { _, _ in },
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.homeId = homeId
         self.api = api
@@ -255,9 +262,8 @@ final class DocumentsViewModel: ListOfRowsDataSource {
         case .expiring:
             return expiresWithin(dto: dto, days: 90, now: now)
         case .shared:
-            let isShared = dto.visibility != "private"
+            return dto.visibility != "private"
                 && Self.sharedCount(for: dto) > 0
-            return isShared
         }
     }
 
@@ -283,7 +289,6 @@ final class DocumentsViewModel: ListOfRowsDataSource {
 
     func row(for dto: HomeDocumentDTO, now: Date) -> RowModel {
         let projection = Self.project(dto: dto, now: now)
-        let category = projection.category
         let fileType = projection.fileType
         let dtoCopy = dto
         return RowModel(
@@ -351,7 +356,7 @@ final class DocumentsViewModel: ListOfRowsDataSource {
 
     /// Pure mapping from a DTO to display strings. Public-static so
     /// tests can exercise it without standing the VM up.
-    public static func project(dto: HomeDocumentDTO, now: Date) -> DocumentRowProjection {
+    static func project(dto: HomeDocumentDTO, now: Date) -> DocumentRowProjection {
         let category = DocumentCategory.from(docType: dto.docType)
         let fileType = DocumentFileType.from(mimeType: dto.mimeType, filename: dto.title)
         let sizeLabel = formatSize(bytes: dto.sizeBytes)
@@ -459,7 +464,7 @@ final class DocumentsViewModel: ListOfRowsDataSource {
         return Self.summarize(documents: documents, now: now())
     }
 
-    public static func summarize(documents: [HomeDocumentDTO], now: Date) -> DocumentsBannerSummary {
+    static func summarize(documents: [HomeDocumentDTO], now: Date) -> DocumentsBannerSummary {
         var totalBytes: Int64 = 0
         var expiring = 0
         let cutoff = now.addingTimeInterval(90 * 24 * 60 * 60)

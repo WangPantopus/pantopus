@@ -2,6 +2,7 @@
 //  HomesEndpoints.swift
 //  Pantopus
 //
+// swiftlint:disable file_length
 
 import Foundation
 

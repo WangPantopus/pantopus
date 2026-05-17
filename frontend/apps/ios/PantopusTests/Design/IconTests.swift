@@ -42,6 +42,13 @@ final class IconTests: XCTestCase {
         "tv", "laptop", "monitor", "shuffle", "wand-sparkles", "arrow-up-right",
         // T6.4a Access codes — reveal toggle + empty state.
         "eye-off", "key-round",
+        // T6.4b Emergency info — per-category tiles, quick actions, and markers.
+        "pin", "power", "phone-call", "phone", "navigation", "heart-pulse",
+        "siren", "stethoscope", "cross", "flag", "user-round", "flask-conical",
+        "flame-kindling", "printer", "alert-triangle",
+        // T6.4b Documents — file-type tiles, category rows, and document actions.
+        "image", "file-type", "file-spreadsheet", "file-signature", "landmark",
+        "stamp", "id-card", "folder-lock", "upload-cloud", "calendar-clock", "download",
         // T6.3c Household tasks — chore-category iconography + banner glyph.
         "leaf", "list-checks", "utensils", "baby",
         // T6.3b Maintenance — task category iconography.

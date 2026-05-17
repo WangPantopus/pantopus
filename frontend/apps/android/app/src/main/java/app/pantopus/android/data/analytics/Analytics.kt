@@ -55,6 +55,7 @@ sealed class AnalyticsEvent(
     data object ScreenEmergencyInfoViewed : AnalyticsEvent("screen.emergency_info.viewed")
 
     data object ScreenDocumentsViewed : AnalyticsEvent("screen.documents.viewed")
+
     data object ScreenPollsViewed : AnalyticsEvent("screen.polls.viewed")
 
     data object ScreenPollDetailViewed : AnalyticsEvent("screen.poll_detail.viewed")

@@ -218,6 +218,7 @@ interface HomesApi {
         @Path("id") homeId: String,
         @Body body: CreateDocumentRequest,
     ): CreateDocumentResponse
+
     /** `GET /api/homes/:id/packages` — route `backend/routes/home.js:4673`. */
     @GET("api/homes/{id}/packages")
     suspend fun getHomePackages(

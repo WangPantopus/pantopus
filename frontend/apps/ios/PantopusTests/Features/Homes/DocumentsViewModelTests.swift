@@ -38,7 +38,7 @@ final class DocumentsViewModelTests: XCTestCase {
 
     private func makeVM() -> DocumentsViewModel {
         let frozen = Self.fixedNow
-        return DocumentsViewModel(homeId: "home-1", api: makeAPI(), now: { frozen })
+        return DocumentsViewModel(homeId: "home-1", api: makeAPI()) { frozen }
     }
 
     private func dto(
@@ -229,8 +229,11 @@ final class DocumentsViewModelTests: XCTestCase {
             title: "Lease — 412 Birch Ln (2024–2026).pdf",
             mimeType: "application/pdf",
             sizeBytes: 2_400_000,
-            details: ["uploaded_by": "John", "version": "v3 signed",
-                      "expires_at": "2026-06-15T00:00:00Z"]
+            details: [
+                "uploaded_by": "John",
+                "version": "v3 signed",
+                "expires_at": "2026-06-15T00:00:00Z"
+            ]
         )
         let projection = DocumentsViewModel.project(dto: doc, now: Self.fixedNow)
         XCTAssertEqual(projection.filename, "Lease — 412 Birch Ln (2024–2026).pdf")

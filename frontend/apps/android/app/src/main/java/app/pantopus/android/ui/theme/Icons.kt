@@ -31,8 +31,8 @@ import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.BorderColor
-import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -322,6 +322,7 @@ enum class PantopusIcon(
     UploadCloud("upload-cloud"),
     CalendarClock("calendar-clock"),
     Download("download"),
+
     // T6.4a — Access codes: tap-to-reveal hide icon + empty-state key disc.
     EyeOff("eye-off"),
     KeyRound("key-round"),

@@ -204,19 +204,21 @@ class EmergencyInfoViewModel
             }
             val categoriesToShow: List<EmergencyCategory> =
                 if (filter.category != null) listOf(filter.category) else allCategoriesInOrder
-            for (category in categoriesToShow) {
-                val dtos = bucketed[category] ?: continue
-                if (dtos.isEmpty()) continue
-                val rows = dtos.map { rowFor(it, pinned = false) }
-                sections.add(
-                    RowSection(
-                        id = "emergency.${category.id}",
-                        header = category.label,
-                        rows = rows,
-                        count = rows.size,
-                    ),
-                )
-            }
+            categoriesToShow
+                .mapNotNull { category ->
+                    val dtos = bucketed[category].orEmpty()
+                    val rows = dtos.map { rowFor(it, pinned = false) }
+                    if (rows.isEmpty()) {
+                        null
+                    } else {
+                        RowSection(
+                            id = "emergency.${category.id}",
+                            header = category.label,
+                            rows = rows,
+                            count = rows.size,
+                        )
+                    }
+                }.forEach(sections::add)
 
             if (sections.isEmpty()) {
                 _banner.value = null
@@ -438,15 +440,16 @@ class EmergencyInfoViewModel
 
             private fun detailString(dto: HomeEmergencyDto): String {
                 val details = dto.details
-                details?.get("detail")?.let { if (it.isNotEmpty()) return it }
-                val phone = details?.get("phone")
-                if (!phone.isNullOrEmpty()) {
-                    val note = details["note"]
-                    if (!note.isNullOrEmpty()) return "$phone · $note"
-                    return phone
+                val detail = details?.get("detail").orEmpty()
+                val phone = details?.get("phone").orEmpty()
+                val note = details?.get("note").orEmpty()
+                return when {
+                    detail.isNotEmpty() -> detail
+                    phone.isNotEmpty() && note.isNotEmpty() -> "$phone · $note"
+                    phone.isNotEmpty() -> phone
+                    !dto.location.isNullOrEmpty() -> dto.location
+                    else -> ""
                 }
-                if (!dto.location.isNullOrEmpty()) return dto.location
-                return ""
             }
 
             private fun bodyIconFor(

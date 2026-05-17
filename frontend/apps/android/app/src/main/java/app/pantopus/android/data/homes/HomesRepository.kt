@@ -137,9 +137,8 @@ open class HomesRepository
         // ─── Emergency info (T6.4b / P17) ─────────────────────────
 
         /** `GET /api/homes/:id/emergencies`. */
-        open suspend fun getHomeEmergencies(
-            homeId: String,
-        ): NetworkResult<GetHomeEmergenciesResponse> = safeApiCall { api.getHomeEmergencies(homeId) }
+        open suspend fun getHomeEmergencies(homeId: String): NetworkResult<GetHomeEmergenciesResponse> =
+            safeApiCall { api.getHomeEmergencies(homeId) }
 
         /** `POST /api/homes/:id/emergencies`. */
         open suspend fun createHomeEmergency(
@@ -150,15 +149,15 @@ open class HomesRepository
         // ─── Documents (T6.4b / P17) ──────────────────────────────
 
         /** `GET /api/homes/:id/documents`. */
-        open suspend fun getHomeDocuments(
-            homeId: String,
-        ): NetworkResult<GetHomeDocumentsResponse> = safeApiCall { api.getHomeDocuments(homeId) }
+        open suspend fun getHomeDocuments(homeId: String): NetworkResult<GetHomeDocumentsResponse> =
+            safeApiCall { api.getHomeDocuments(homeId) }
 
         /** `POST /api/homes/:id/documents`. */
         open suspend fun createHomeDocument(
             homeId: String,
             request: CreateDocumentRequest,
         ): NetworkResult<CreateDocumentResponse> = safeApiCall { api.createHomeDocument(homeId, request) }
+
         /** `GET /api/homes/:id/packages`. */
         open suspend fun getHomePackages(
             homeId: String,

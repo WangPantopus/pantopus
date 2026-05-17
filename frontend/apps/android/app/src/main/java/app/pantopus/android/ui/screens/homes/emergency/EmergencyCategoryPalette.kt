@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber")
+@file:Suppress("PackageNaming", "MagicNumber", "MatchingDeclarationName")
 
 package app.pantopus.android.ui.screens.homes.emergency
 
@@ -9,7 +9,7 @@ import app.pantopus.android.ui.theme.PantopusIcon
  * T6.4b — Per-emergency-category visual tokens for the
  * EmergencyInfoScreen row. Lifted from `emergency-frames.jsx:54-59`.
  * Feature code references typed swatches; no hex literal lives in
- * `ui/screens/**` outside this palette file (documented exception per
+ * the feature screen tree outside this palette file (documented exception per
  * the Android `CLAUDE.md` token rules).
  *
  * The four design categories collapse the nine backend
