@@ -47,6 +47,25 @@ public enum HomesEndpoints {
         )
     }
 
+    /// `GET /api/homes/:id/owners` — route
+    /// `backend/routes/homeOwnership.js:1381`. Returns the per-home
+    /// owner roster with each user-type owner enriched with username +
+    /// display name + avatar URL.
+    public static func listOwners(homeId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/homes/\(homeId)/owners")
+    }
+
+    /// `DELETE /api/homes/:id/owners/:ownerId` — route
+    /// `backend/routes/homeOwnership.js:1614`. May return a quorum
+    /// action id when removal requires co-owner approval; in that case
+    /// the row stays in the list until the quorum resolves.
+    public static func removeOwner(homeId: String, ownerId: String) -> Endpoint {
+        Endpoint(
+            method: .delete,
+            path: "/api/homes/\(homeId)/owners/\(ownerId)"
+        )
+    }
+
     /// `POST /api/homes/:id/ownership-claims` — route
     /// `backend/routes/homeOwnership.js:251`.
     public static func submitClaim(homeId: String, request: SubmitClaimRequest) -> Endpoint {
