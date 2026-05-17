@@ -196,6 +196,44 @@ public extension StatusWaitingContent {
         )
     }
 
+    /// Frame 4 — Reset link sent. Status frame for the Forgot-password
+    /// success state — used by `ForgotPasswordView`. The primary action is
+    /// "Resend"; the ghost CTA is "Back to login". Body interpolates the
+    /// caller's email so the user can visually confirm where the link went.
+    static func resetLinkSent(email: String) -> StatusWaitingContent {
+        let recipient = email.isEmpty ? "your email" : email
+        return StatusWaitingContent(
+            illustration: .email,
+            headline: "Check your email",
+            subcopy: "We sent a reset link to \(recipient). Click it to set a new password.",
+            timeline: [],
+            currentStageId: nil,
+            etaChip: nil,
+            actionCards: [],
+            explainerBullets: [],
+            primaryCta: StatusCTA(label: "Resend", actionKey: "resend_reset"),
+            secondaryCta: StatusCTA(label: "Back to login", actionKey: "back_to_login")
+        )
+    }
+
+    /// Frame 5 — Password reset success. Reached after `ResetPasswordView`
+    /// submits a valid token + new password. Auto-redirects to login after
+    /// 3 seconds (the caller wires the timer).
+    static func passwordReset() -> StatusWaitingContent {
+        StatusWaitingContent(
+            illustration: .success,
+            headline: "Password reset",
+            subcopy: "You can now log in with your new password.",
+            timeline: [],
+            currentStageId: nil,
+            etaChip: nil,
+            actionCards: [],
+            explainerBullets: [],
+            primaryCta: StatusCTA(label: "Back to login", actionKey: "back_to_login"),
+            secondaryCta: nil
+        )
+    }
+
     /// Frame 3 — Check your email. Email-verification frame fed from
     /// `/api/users/me` (or the response from a /resend call).
     static func checkYourEmail(

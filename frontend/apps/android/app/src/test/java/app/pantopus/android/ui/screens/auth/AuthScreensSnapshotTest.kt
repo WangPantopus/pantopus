@@ -30,6 +30,17 @@ class AuthScreensSnapshotTest {
     @Test
     fun error_android_baseline_is_present() = assertBaseline("error")
 
+    // T6.1c P5 — Forgot / Reset / Verify baselines.
+
+    @Test
+    fun forgot_android_baseline_is_present() = assertBaseline("forgot")
+
+    @Test
+    fun reset_android_baseline_is_present() = assertBaseline("reset")
+
+    @Test
+    fun verify_android_baseline_is_present() = assertBaseline("verify")
+
     private fun assertBaseline(screen: String) {
         val file = File(baselineDir, "$screen-android.png")
         assertTrue("Missing baseline: ${file.path}", file.exists())

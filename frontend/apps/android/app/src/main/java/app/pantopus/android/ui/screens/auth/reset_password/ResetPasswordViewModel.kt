@@ -1,21 +1,100 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "MagicNumber", "SwallowedException", "TooGenericExceptionCaught")
 
 package app.pantopus.android.ui.screens.auth.reset_password
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.auth.AuthError
 import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.ui.screens.auth.AuthValidation
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** P3 stub. P4 wires real state + reset-password submission. */
+/**
+ * T6.1c P5 — Reset password view-model. Mirrors iOS
+ * `ResetPasswordViewModel` (`Features/Auth/Screens/ResetPasswordView.swift`).
+ * Reads the hashed recovery token from [SavedStateHandle] (populated by
+ * the NavHost's `{token}` path argument). Submit is gated on the two
+ * passwords matching AND the new password passing the same client-side
+ * strength rules as signup.
+ */
 @HiltViewModel
 class ResetPasswordViewModel
     @Inject
     constructor(
-        @Suppress("UnusedPrivateProperty") private val authRepository: AuthRepository,
-        @Suppress("UnusedPrivateProperty") private val savedStateHandle: SavedStateHandle,
+        private val authRepository: AuthRepository,
+        private val savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
+        sealed interface Phase {
+            data object Form : Phase
+
+            data object Reset : Phase
+        }
+
+        data class UiState(
+            val token: String = "",
+            val password: String = "",
+            val confirmPassword: String = "",
+            val phase: Phase = Phase.Form,
+            val isLoading: Boolean = false,
+            val errorMessage: AuthError? = null,
+        ) {
+            val passwordsMeetStrength: Boolean get() = AuthValidation.password(password) == null
+            val passwordsMatch: Boolean
+                get() = confirmPassword.isNotEmpty() && password == confirmPassword
+
+            val canSubmit: Boolean
+                get() = !isLoading && passwordsMeetStrength && passwordsMatch && token.isNotEmpty()
+
+            val passwordStrength: Int get() = AuthValidation.passwordStrength(password)
+
+            val passwordStrengthLabel: String
+                get() =
+                    when (passwordStrength) {
+                        1 -> "Weak"
+                        2 -> "Fair"
+                        3 -> "Strong"
+                        else -> "—"
+                    }
+        }
+
+        private val _uiState =
+            MutableStateFlow(UiState(token = savedStateHandle.get<String>(TOKEN_KEY).orEmpty()))
+        val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+        fun onPasswordChange(value: String) = _uiState.update { it.copy(password = value, errorMessage = null) }
+
+        fun onConfirmPasswordChange(value: String) = _uiState.update { it.copy(confirmPassword = value, errorMessage = null) }
+
+        fun clearError() = _uiState.update { it.copy(errorMessage = null) }
+
+        /**
+         * Submits the reset request to `POST /api/users/reset-password`. On
+         * success flips [Phase.Reset] so the screen can render the
+         * "Password reset" status frame + start its auto-redirect timer.
+         */
+        fun submit() {
+            val snapshot = _uiState.value
+            if (!snapshot.canSubmit) return
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            viewModelScope.launch {
+                try {
+                    authRepository.resetPassword(snapshot.token, snapshot.password)
+                    _uiState.update { it.copy(isLoading = false, phase = Phase.Reset) }
+                } catch (e: AuthError) {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = e) }
+                } catch (e: Throwable) {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = AuthError.Unknown) }
+                }
+            }
+        }
+
         companion object {
             const val TOKEN_KEY = "token"
         }

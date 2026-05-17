@@ -51,11 +51,14 @@ export default function ForgotPasswordPage() {
         <div className="flex justify-center">
           <PantopusBadge />
         </div>
-        <h2 className="mt-6 text-center text-3xl font-bold text-app-text dark:text-white">
-          Forgot your password?
+        <div className="mt-6 text-center text-xs font-bold tracking-wider uppercase text-primary-600">
+          Forgot password
+        </div>
+        <h2 className="mt-1 text-center text-3xl font-bold text-app-text dark:text-white">
+          Reset your password
         </h2>
         <p className="mt-2 text-center text-sm text-app-text-secondary">
-          Enter your email and we&apos;ll send a reset link.
+          Enter your email and we&apos;ll send you a link to reset it.
         </p>
       </div>
 
@@ -92,6 +95,7 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading || cooldown > 0}
+              data-testid="forgotPasswordSubmitButton"
               className="w-full flex justify-center py-2.5 px-4 rounded-lg shadow-sm text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400/40 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {loading ? 'Sending...' : cooldown > 0 ? `Resend in ${cooldown}s` : 'Send reset link'}

@@ -15,9 +15,10 @@ struct SignUpView: View {
 
     /// Caller-supplied dismiss hook — invoked by the top-bar X.
     let onClose: () -> Void
-    /// Invoked when signUp returns 201, so the host can push
-    /// `AuthRoute.verifyEmail` onto the auth stack.
-    let onSuccess: () -> Void
+    /// Invoked when signUp returns 201, with the email that was registered
+    /// so the host can push `AuthRoute.verifyEmail(email:)` onto the auth
+    /// stack and the verify-email surface can render + resend correctly.
+    let onSuccess: (String) -> Void
 
     var body: some View {
         FormShell(
@@ -73,8 +74,9 @@ struct SignUpView: View {
         }
         .onChange(of: viewModel.didSucceed) { _, succeeded in
             guard succeeded else { return }
+            let email = viewModel.email.trimmingCharacters(in: .whitespaces).lowercased()
             viewModel.acknowledgeSuccess()
-            onSuccess()
+            onSuccess(email)
         }
     }
 
@@ -443,6 +445,6 @@ struct ErrorBanner: View {
 }
 
 #Preview {
-    SignUpView(onClose: {}, onSuccess: {})
+    SignUpView(onClose: {}, onSuccess: { _ in })
         .environment(AuthManager.previewSignedOut)
 }

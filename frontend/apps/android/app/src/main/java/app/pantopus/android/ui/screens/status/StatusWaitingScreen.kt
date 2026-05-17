@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "TooManyFunctions")
+@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "MagicNumber", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.status
 
@@ -49,13 +49,17 @@ fun StatusWaitingScreen(
     onAction: (StatusActionCard) -> Unit = {},
     onPrimary: (StatusCta) -> Unit = {},
     onSecondary: (StatusCta) -> Unit = {},
+    modifier: Modifier = Modifier,
+    primaryTestTag: String = "statusPrimaryCta",
+    secondaryTestTag: String = "statusSecondaryCta",
+    rootTestTag: String = "statusWaiting",
 ) {
     Column(
         modifier =
-            Modifier
+            modifier
                 .fillMaxSize()
                 .background(PantopusColors.appBg)
-                .testTag("statusWaiting"),
+                .testTag(rootTestTag),
     ) {
         Column(
             modifier =
@@ -93,6 +97,8 @@ fun StatusWaitingScreen(
                 secondary = content.secondaryCta,
                 onPrimary = onPrimary,
                 onSecondary = onSecondary,
+                primaryTestTag = primaryTestTag,
+                secondaryTestTag = secondaryTestTag,
             )
         }
     }
@@ -269,6 +275,8 @@ private fun StickyCtas(
     secondary: StatusCta?,
     onPrimary: (StatusCta) -> Unit,
     onSecondary: (StatusCta) -> Unit,
+    primaryTestTag: String = "statusPrimaryCta",
+    secondaryTestTag: String = "statusSecondaryCta",
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
@@ -289,7 +297,7 @@ private fun StickyCtas(
                             .clip(RoundedCornerShape(10.dp))
                             .background(PantopusColors.appSurfaceSunken)
                             .clickable { onSecondary(cta) }
-                            .testTag("statusSecondaryCta"),
+                            .testTag(secondaryTestTag),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -309,7 +317,7 @@ private fun StickyCtas(
                             .clip(RoundedCornerShape(10.dp))
                             .background(PantopusColors.primary600)
                             .clickable { onPrimary(cta) }
-                            .testTag("statusPrimaryCta"),
+                            .testTag(primaryTestTag),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
