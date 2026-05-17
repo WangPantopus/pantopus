@@ -27,6 +27,8 @@ public enum HubRoute: Hashable {
     case packageDetail(homeId: String, packageId: String)
     /// Log-a-package sheet target.
     case logPackage(homeId: String)
+    /// Members sub-screen for a specific home (T6.3a / P9).
+    case homeMembers(homeId: String)
     case publicProfile(userId: String)
     case pulsePost(postId: String)
     /// Bills list for a home (T5.2.2 / P13).
@@ -312,6 +314,9 @@ public struct HubTabRoot: View {
                 },
                 onOpenPackages: { id in
                     Task { @MainActor in push(.homePackages(homeId: id)) }
+                },
+                onOpenMembers: { id in
+                    Task { @MainActor in push(.homeMembers(homeId: id)) }
                 }
             )
         case let .homeBills(homeId):
@@ -369,6 +374,8 @@ public struct HubTabRoot: View {
                     }
                 }
             )
+        case let .homeMembers(homeId):
+            MembersListView(homeId: homeId)
         case let .claimOwnership(homeId):
             ClaimOwnershipWizardView(
                 homeId: homeId,

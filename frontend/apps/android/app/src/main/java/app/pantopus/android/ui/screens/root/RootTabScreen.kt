@@ -63,6 +63,8 @@ import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.homes.members.MEMBERS_LIST_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.members.MembersListScreen
 import app.pantopus.android.ui.screens.homes.packages.LOG_PACKAGE_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.packages.LogPackageScreen
 import app.pantopus.android.ui.screens.homes.packages.PACKAGES_HOME_ID_KEY
@@ -173,6 +175,12 @@ private object ChildRoutes {
 
     /** Build the concrete path for the Log Package form. */
     fun logPackage(homeId: String): String = "homes/$homeId/packages/new"
+
+    /** Members list per home (T6.3a / P9). */
+    const val HOME_MEMBERS = "homes/{$MEMBERS_LIST_HOME_ID_KEY}/members"
+
+    /** Build the concrete path for a home members list. */
+    fun homeMembers(homeId: String): String = "homes/$homeId/members"
 
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
@@ -669,6 +677,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenHomePackages = { homeId ->
                         navController.navigate(ChildRoutes.homePackages(homeId))
                     },
+                    onOpenHomeMembers = { homeId -> navController.navigate(ChildRoutes.homeMembers(homeId)) },
                 )
             }
 
@@ -703,6 +712,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenPackages = { homeId ->
                         navController.navigate(ChildRoutes.homePackages(homeId))
+                    },
+                    onOpenMembers = { homeId ->
+                        navController.navigate(ChildRoutes.homeMembers(homeId))
                     },
                 )
             }
@@ -792,6 +804,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.packageDetail(homeId, packageId))
                     },
                 )
+            }
+            composable(
+                route = ChildRoutes.HOME_MEMBERS,
+                arguments = listOf(navArgument(MEMBERS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                MembersListScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.MAILBOX_LIST) {
                 MailboxListScreen(

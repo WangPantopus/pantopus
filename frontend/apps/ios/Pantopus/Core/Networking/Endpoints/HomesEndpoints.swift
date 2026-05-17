@@ -188,4 +188,29 @@ public enum HomesEndpoints {
             body: request
         )
     }
+
+    // MARK: - Members (T6.3a / P9)
+
+    /// `GET /api/homes/:id/occupants` — route `backend/routes/home.js:3705`.
+    /// Returns `{ occupants, pendingInvites }`; the Members screen
+    /// buckets client-side into the Members / Guests / Pending tabs.
+    public static func listOccupants(homeId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/homes/\(homeId)/occupants")
+    }
+
+    /// `POST /api/homes/:id/invite` — route `backend/routes/home.js:5662`.
+    /// Body shape: `InviteMemberRequest`.
+    public static func inviteMember(
+        homeId: String,
+        request: InviteMemberRequest
+    ) -> Endpoint {
+        Endpoint(method: .post, path: "/api/homes/\(homeId)/invite", body: request)
+    }
+
+    /// `DELETE /api/homes/:id/members/:userId` — route
+    /// `backend/routes/homeIam.js:512`. Removes the membership; if the
+    /// caller is the target it acts as a self-leave.
+    public static func removeMember(homeId: String, userId: String) -> Endpoint {
+        Endpoint(method: .delete, path: "/api/homes/\(homeId)/members/\(userId)")
+    }
 }
