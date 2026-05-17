@@ -18,7 +18,9 @@ import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
 import app.pantopus.android.data.api.models.homes.InviteOwnerResponse
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
+import app.pantopus.android.data.api.models.homes.OwnersResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
+import app.pantopus.android.data.api.models.homes.RemoveOwnerResponse
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
@@ -82,6 +84,29 @@ interface HomesApi {
         @Path("id") homeId: String,
         @Body body: InviteOwnerRequest,
     ): InviteOwnerResponse
+
+    /**
+     * `GET /api/homes/:id/owners` — route
+     * `backend/routes/homeOwnership.js:1381`. Per-home owner roster
+     * with each `user`-subject owner enriched with username + display
+     * name + avatar URL.
+     */
+    @GET("api/homes/{id}/owners")
+    suspend fun listOwners(
+        @Path("id") homeId: String,
+    ): OwnersResponse
+
+    /**
+     * `DELETE /api/homes/:id/owners/:ownerId` — route
+     * `backend/routes/homeOwnership.js:1614`. May return a quorum
+     * action id when removal requires co-owner approval; the screen
+     * keeps the row optimistically dropped in either case.
+     */
+    @DELETE("api/homes/{id}/owners/{ownerId}")
+    suspend fun removeOwner(
+        @Path("id") homeId: String,
+        @Path("ownerId") ownerId: String,
+    ): RemoveOwnerResponse
 
     /**
      * `POST /api/homes/:id/ownership-claims` — route

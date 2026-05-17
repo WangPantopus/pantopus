@@ -67,6 +67,8 @@ import app.pantopus.android.ui.screens.homes.maintenance.MAINTENANCE_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.maintenance.MaintenanceListScreen
 import app.pantopus.android.ui.screens.homes.members.MEMBERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.members.MembersListScreen
+import app.pantopus.android.ui.screens.homes.owners.OWNERS_LIST_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.owners.OwnersListScreen
 import app.pantopus.android.ui.screens.homes.pets.PETS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.pets.PetsListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
@@ -154,6 +156,15 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home maintenance list. */
     fun homeMaintenance(homeId: String): String = "homes/$homeId/maintenance"
+
+    /**
+     * Owners list per home (P15 / T6.3g). The Owners VM pulls the viewer's id
+     * from [AuthRepository] internally, so no extra arg needs to ride on the route.
+     */
+    const val HOME_OWNERS = "homes/{$OWNERS_LIST_HOME_ID_KEY}/owners"
+
+    /** Build the concrete path for a home owners list. */
+    fun homeOwners(homeId: String): String = "homes/$homeId/owners"
 
     /** Members list per home (T6.3a / P9). */
     const val HOME_MEMBERS = "homes/{$MEMBERS_LIST_HOME_ID_KEY}/members"
@@ -656,6 +667,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenHomeMaintenance = { homeId ->
                         navController.navigate(ChildRoutes.homeMaintenance(homeId))
                     },
+                    onOpenHomeOwners = { homeId -> navController.navigate(ChildRoutes.homeOwners(homeId)) },
                     onOpenHomeMembers = { homeId -> navController.navigate(ChildRoutes.homeMembers(homeId)) },
                 )
             }
@@ -753,6 +765,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onAddTask = {
                         navController.navigate(ChildRoutes.placeholder("Log maintenance"))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.HOME_OWNERS,
+                arguments = listOf(navArgument(OWNERS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                OwnersListScreen(
+                    onOpenInvite = { homeId ->
+                        navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
                     },
                     onBack = { navController.popBackStack() },
                 )
