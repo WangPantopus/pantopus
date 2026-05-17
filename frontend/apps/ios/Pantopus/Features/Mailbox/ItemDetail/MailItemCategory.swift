@@ -15,6 +15,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
     case coupon
     case booklet
     case certified
+    case community
     case notice
     case bill
     case statement
@@ -35,6 +36,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .coupon: Theme.Color.childCare
         case .booklet: Theme.Color.moving // violet token per P18 FrameBooklet
         case .certified: Theme.Color.primary600 // primary token per P18 FrameCertified
+        case .community: Theme.Color.cleaning // green token per A17.4 community accent
         case .notice: Theme.Color.warning
         case .bill: Theme.Color.error
         case .statement: Theme.Color.tutoring
@@ -59,6 +61,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .coupon: .tag
         case .booklet: .fileText
         case .certified: .badgeCheck
+        case .community: .users
         case .notice: .alertCircle
         case .bill: .receipt
         case .statement: .fileText
@@ -81,6 +84,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .coupon: Theme.Color.businessBg
         case .booklet: Theme.Color.personalBg
         case .certified: Theme.Color.primary50
+        case .community: Theme.Color.successBg
         case .notice: Theme.Color.warningBg
         case .bill: Theme.Color.errorBg
         case .statement: Theme.Color.personalBg
@@ -104,6 +108,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .coupon: "Coupon"
         case .booklet: "Booklet"
         case .certified: "Certified"
+        case .community: "Community"
         case .notice: "Notice"
         case .bill: "Bill"
         case .statement: "Statement"
@@ -123,7 +128,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
     /// kind used by the A17 shell's top-bar eyebrow.
     public var detailTrust: MailDetailTrust {
         switch self {
-        case .certified, .legal, .tax: .verified
+        case .certified, .community, .legal, .tax: .verified
         case .notice, .bill: .warning
         default: .neutral
         }

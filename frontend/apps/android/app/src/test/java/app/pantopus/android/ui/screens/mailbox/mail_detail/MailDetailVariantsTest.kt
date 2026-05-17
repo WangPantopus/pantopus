@@ -5,6 +5,9 @@ package app.pantopus.android.ui.screens.mailbox.mail_detail
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.mailbox.MailDetail
 import app.pantopus.android.data.api.models.mailbox.MailDetailResponse
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpResponse
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
+import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
@@ -269,6 +272,174 @@ class MailDetailVariantsTest {
             assertEquals(1, content.bodyParagraphs.size)
             assertTrue(content.bodyParagraphs[0].contains("$1,247.82"))
         }
+
+    // ─── Community ─────────────────────────────────────────
+
+    private val communityObject: Map<String, Any?> =
+        mapOf(
+            "community_item_id" to "ci-elm-cleanup",
+            "group" to
+                mapOf(
+                    "name" to "Elm Park HOA",
+                    "tagline" to "40 households",
+                    "role" to "Resident",
+                    "membership_since" to "Mar 2024",
+                    "member_count" to 87,
+                    "verified" to true,
+                ),
+            "event" to
+                mapOf(
+                    "when" to mapOf("day" to "Sat", "date" to "May 24", "range" to "9:00 – 11:00 AM"),
+                    "where" to "Elm Park playground",
+                    "where_note" to "Gather at the gazebo",
+                    "bring" to listOf("Work gloves", "A reusable mug"),
+                    "weather" to mapOf("summary" to "Partly sunny", "temperature_f" to 64),
+                ),
+            "attendee_count" to 12,
+            "attendees_from_block" to 3,
+            "attendees" to
+                listOf(
+                    mapOf("id" to "u1", "display_name" to "Jamal T.", "verified" to true),
+                ),
+            "pulse_thread" to
+                mapOf(
+                    "thread_id" to "pt-elm",
+                    "title" to "Talk about Saturday cleanup",
+                    "reply_count" to 12,
+                    "last_reply" to mapOf("author" to "Jamal T.", "when" to "12m", "preview" to "I'll bring the blower"),
+                ),
+            "rsvp_status" to "undecided",
+        )
+
+    @Test
+    fun community_projection_decodes_group_event_attendees() =
+        runTest {
+            coEvery { repo.detail("m1") } returns
+                NetworkResult.Success(
+                    MailDetailResponse(
+                        mail = makeDetail(category = MailItemCategory.Community, objectPayload = communityObject),
+                    ),
+                )
+            val vm = makeVm()
+            vm.load()
+            val content = (vm.state.value as MailDetailUiState.Loaded).content
+            assertEquals(MailItemCategory.Community, content.category)
+            assertNotNull(content.communityDetail)
+            assertEquals("ci-elm-cleanup", content.communityDetail?.communityItemId)
+            assertEquals("Elm Park HOA", content.communityDetail?.group?.name)
+            assertEquals(12, content.communityDetail?.attendeeCount)
+            assertEquals(3, content.communityDetail?.attendeesFromBlock)
+            assertEquals(2, content.communityDetail?.event?.bringItems?.size)
+            assertEquals(64, content.communityDetail?.event?.weatherTemperatureF)
+            assertEquals("Talk about Saturday cleanup", content.communityDetail?.pulseThread?.title)
+            assertEquals(CommunityRsvpStatus.Undecided, content.communityDetail?.rsvp)
+        }
+
+    @Test
+    fun community_payload_absent_leaves_null() =
+        runTest {
+            coEvery { repo.detail("m1") } returns
+                NetworkResult.Success(
+                    MailDetailResponse(mail = makeDetail(category = MailItemCategory.Community)),
+                )
+            val vm = makeVm()
+            vm.load()
+            val content = (vm.state.value as MailDetailUiState.Loaded).content
+            assertEquals(MailItemCategory.Community, content.category)
+            assertNull(content.communityDetail)
+        }
+
+    @Test
+    fun non_community_category_never_decodes_community() =
+        runTest {
+            coEvery { repo.detail("m1") } returns
+                NetworkResult.Success(
+                    MailDetailResponse(
+                        mail = makeDetail(category = MailItemCategory.Notice, objectPayload = communityObject),
+                    ),
+                )
+            val vm = makeVm()
+            vm.load()
+            val content = (vm.state.value as MailDetailUiState.Loaded).content
+            assertNull(content.communityDetail)
+        }
+
+    @Test
+    fun rsvp_going_posts_and_updates_attendee_count() =
+        runTest {
+            coEvery { repo.detail("m1") } returns
+                NetworkResult.Success(
+                    MailDetailResponse(
+                        mail = makeDetail(category = MailItemCategory.Community, objectPayload = communityObject),
+                    ),
+                )
+            coEvery { repo.communityRsvp("ci-elm-cleanup") } returns
+                NetworkResult.Success(CommunityRsvpResponse(message = "RSVP confirmed", rsvpCount = 13))
+            val vm = makeVm()
+            vm.load()
+            vm.setRsvp(CommunityRsvpStatus.Going)
+            val content = (vm.state.value as MailDetailUiState.Loaded).content
+            assertEquals(CommunityRsvpStatus.Going, content.communityDetail?.rsvp)
+            assertEquals(13, content.communityDetail?.attendeeCount)
+            assertEquals("You're going", vm.toast.value)
+            assertFalse(vm.rsvpInFlight.value)
+        }
+
+    @Test
+    fun rsvp_going_rolls_back_on_transport_failure() =
+        runTest {
+            coEvery { repo.detail("m1") } returns
+                NetworkResult.Success(
+                    MailDetailResponse(
+                        mail = makeDetail(category = MailItemCategory.Community, objectPayload = communityObject),
+                    ),
+                )
+            coEvery { repo.communityRsvp("ci-elm-cleanup") } returns
+                NetworkResult.Failure(NetworkError.Server(500, "oops"))
+            val vm = makeVm()
+            vm.load()
+            vm.setRsvp(CommunityRsvpStatus.Going)
+            val content = (vm.state.value as MailDetailUiState.Loaded).content
+            assertEquals(CommunityRsvpStatus.Undecided, content.communityDetail?.rsvp)
+            assertEquals(12, content.communityDetail?.attendeeCount)
+            assertNotNull(vm.toast.value)
+        }
+
+    @Test
+    fun rsvp_maybe_is_local_only_and_still_toasts() =
+        runTest {
+            coEvery { repo.detail("m1") } returns
+                NetworkResult.Success(
+                    MailDetailResponse(
+                        mail = makeDetail(category = MailItemCategory.Community, objectPayload = communityObject),
+                    ),
+                )
+            val vm = makeVm()
+            vm.load()
+            vm.setRsvp(CommunityRsvpStatus.Maybe)
+            val content = (vm.state.value as MailDetailUiState.Loaded).content
+            assertEquals(CommunityRsvpStatus.Maybe, content.communityDetail?.rsvp)
+            assertEquals(12, content.communityDetail?.attendeeCount)
+            assertEquals("Saved as maybe", vm.toast.value)
+        }
+
+    @Test
+    fun rsvp_status_from_wire_maps_correctly() {
+        assertEquals(CommunityRsvpStatus.Going, CommunityRsvpStatus.fromWire("going"))
+        assertEquals(CommunityRsvpStatus.Going, CommunityRsvpStatus.fromWire("will_attend"))
+        assertEquals(CommunityRsvpStatus.Maybe, CommunityRsvpStatus.fromWire("maybe"))
+        assertEquals(CommunityRsvpStatus.NotGoing, CommunityRsvpStatus.fromWire("not_going"))
+        assertEquals(CommunityRsvpStatus.NotGoing, CommunityRsvpStatus.fromWire("declined"))
+        assertEquals(CommunityRsvpStatus.Undecided, CommunityRsvpStatus.fromWire(null))
+        assertEquals(CommunityRsvpStatus.Undecided, CommunityRsvpStatus.fromWire("anything"))
+    }
+
+    @Test
+    fun community_category_token_tour() {
+        assertEquals("Community", MailItemCategory.Community.label)
+        assertEquals("community", MailItemCategory.Community.raw)
+        assertEquals(MailDetailTrust.Verified, MailItemCategory.Community.detailTrust)
+    }
 
     // ─── Generic fallthrough ───────────────────────────────
 

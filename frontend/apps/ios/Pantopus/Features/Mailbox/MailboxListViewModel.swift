@@ -167,7 +167,7 @@ final class MailboxListViewModel: ListOfRowsDataSource {
         let mailId = mail.id
         return RowModel(
             id: mail.id,
-            title: mail.displayTitle ?? mail.subject ?? mail.senderBusinessName ?? "Mail",
+            title: mail.displayTitle ?? mail.subject ?? "Mail",
             subtitle: mail.senderBusinessName ?? mail.senderAddress,
             template: .statusChip,
             leading: .typeIcon(

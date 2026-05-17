@@ -1,5 +1,7 @@
 package app.pantopus.android.data.api.services
 
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpRequest
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerItemsResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerListResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionRequest
@@ -64,4 +66,15 @@ interface MailboxV2Api {
     suspend fun resolve(
         @Body body: ResolveRoutingRequest,
     ): ResolveRoutingResponse
+
+    /**
+     * `POST /api/mailbox/v2/community/rsvp` — route
+     * `backend/routes/mailboxV2Phase3.js:746`. Adds a `will_attend`
+     * reaction to the `CommunityMailItem` and returns the updated
+     * RSVP count. The backend treats RSVP as idempotent.
+     */
+    @POST("api/mailbox/v2/community/rsvp")
+    suspend fun communityRsvp(
+        @Body body: CommunityRsvpRequest,
+    ): CommunityRsvpResponse
 }

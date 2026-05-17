@@ -3,6 +3,8 @@ package app.pantopus.android.data.mailbox
 import app.pantopus.android.data.api.models.mailbox.AckResponse
 import app.pantopus.android.data.api.models.mailbox.MailDetailResponse
 import app.pantopus.android.data.api.models.mailbox.MailboxListResponse
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpRequest
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerListResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionRequest
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxItemActionResponse
@@ -81,4 +83,8 @@ class MailboxRepository
 
         /** `POST /api/mailbox/v2/resolve`. */
         suspend fun resolve(request: ResolveRoutingRequest): NetworkResult<ResolveRoutingResponse> = safeApiCall { v2Api.resolve(request) }
+
+        /** `POST /api/mailbox/v2/community/rsvp` — T6.5d community RSVP. */
+        suspend fun communityRsvp(communityItemId: String): NetworkResult<CommunityRsvpResponse> =
+            safeApiCall { v2Api.communityRsvp(CommunityRsvpRequest(communityItemId = communityItemId)) }
     }

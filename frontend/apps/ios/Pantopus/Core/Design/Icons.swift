@@ -118,6 +118,8 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case clockPlus = "clock-plus"
     case circleSlash = "circle-slash"
     case play
+    /// T6.5d voice-postscript player toggle (play / pause).
+    case pause
 
     // T5.3.3 My posts — archive chip + empty-state compose icon.
     case archive
@@ -303,6 +305,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .clockPlus: "clock.arrow.circlepath"
         case .circleSlash: "circle.slash"
         case .play: "play.fill"
+        case .pause: "pause.fill"
         case .archive: "archivebox"
         case .messageSquarePlus: "bubble.left.and.text.bubble.right"
         case .bookmark: "bookmark"
