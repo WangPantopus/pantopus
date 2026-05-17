@@ -28,7 +28,9 @@ public enum OwnersListEvent: Sendable, Equatable {
 final class OwnersListViewModel: ListOfRowsDataSource {
     let title = "Owners"
 
-    var topBarAction: TopBarAction? { nil }
+    var topBarAction: TopBarAction? {
+        nil
+    }
 
     let tabs: [ListOfRowsTab] = []
     var selectedTab: String = ""

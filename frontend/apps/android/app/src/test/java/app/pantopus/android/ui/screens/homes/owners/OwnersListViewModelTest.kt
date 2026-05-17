@@ -5,10 +5,10 @@ package app.pantopus.android.ui.screens.homes.owners
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import app.pantopus.android.data.api.models.homes.OwnerDto
-import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.models.homes.OwnerUser
 import app.pantopus.android.data.api.models.homes.OwnersResponse
 import app.pantopus.android.data.api.models.homes.RemoveOwnerResponse
+import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository

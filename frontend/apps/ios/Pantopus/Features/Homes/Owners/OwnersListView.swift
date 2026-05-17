@@ -83,7 +83,9 @@ public struct OwnersListView: View {
     private struct RemoveTarget: Identifiable, Equatable {
         let ownerId: String
         let displayName: String
-        var id: String { ownerId }
+        var id: String {
+            ownerId
+        }
     }
 
     private var currentUserEmail: String {

@@ -16,8 +16,8 @@ import app.pantopus.android.data.api.models.homes.InviteOwnerResponse
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.OwnersResponse
-import app.pantopus.android.data.api.models.homes.RemoveOwnerResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
+import app.pantopus.android.data.api.models.homes.RemoveOwnerResponse
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
