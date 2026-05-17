@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BorderColor
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -224,6 +225,7 @@ enum class PantopusIcon(
     Tag("tag"),
     ShieldAlert("shield-alert"),
     CheckCheck("check-check"),
+    Bookmark("bookmark"),
     History("history"),
     Receipt("receipt"),
     Clock("clock"),
@@ -457,6 +459,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Tag -> IconSource.Material(Icons.Filled.Sell)
         PantopusIcon.ShieldAlert -> IconSource.Material(Icons.Filled.Warning)
         PantopusIcon.CheckCheck -> IconSource.Material(Icons.Filled.DoneAll)
+        PantopusIcon.Bookmark -> IconSource.Material(Icons.Filled.Bookmark)
         PantopusIcon.History -> IconSource.Material(Icons.Filled.History)
         PantopusIcon.Receipt -> IconSource.Material(Icons.Filled.Receipt)
         PantopusIcon.Clock -> IconSource.Material(Icons.Filled.Schedule)

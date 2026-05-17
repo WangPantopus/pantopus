@@ -96,7 +96,7 @@ fun CertifiedStampBadge(
             horizontalArrangement = Arrangement.spacedBy(1.dp),
         ) {
             // Same bar widths as iOS / web for a consistent stamp profile.
-            listOf(1.5, 2.5, 1, 3, 1.5, 2, 1, 2.5, 1.5, 3, 1, 2, 1.5).forEach { w ->
+            listOf(1.5f, 2.5f, 1f, 3f, 1.5f, 2f, 1f, 2.5f, 1.5f, 3f, 1f, 2f, 1.5f).forEach { w ->
                 Box(
                     modifier =
                         Modifier
