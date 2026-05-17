@@ -188,15 +188,6 @@ enum class MaintenanceCategory(val rawValue: String) {
                     Chimney,
                     listOf("chimney", "fireplace", "flue", "soot"),
                 ),
-                // HVAC — heating + cooling + air filtration.
-                Pattern(
-                    Hvac,
-                    listOf(
-                        "hvac", "furnace", "air condition", "ac unit", "heater",
-                        "boiler", "thermostat", "duct", "vent",
-                        "filter swap", "filter change", "air filter",
-                    ),
-                ),
                 // Plumbing — water lines, drains, water heater.
                 Pattern(
                     Plumbing,
@@ -205,13 +196,20 @@ enum class MaintenanceCategory(val rawValue: String) {
                         "water heater", "toilet", "pipe", "sump pump",
                     ),
                 ),
+                // HVAC — heating + cooling + air filtration. Kept after
+                // plumbing so "water heater" wins before generic "heater".
+                Pattern(
+                    Hvac,
+                    listOf(
+                        "hvac", "furnace", "air condition", "ac unit", "heater",
+                        "boiler", "thermostat", "duct", "vent",
+                        "filter swap", "filter change", "air filter",
+                    ),
+                ),
                 // Electrical.
                 Pattern(
                     Electrical,
-                    listOf(
-                        "electrical", "electrician", "wiring", "outlet",
-                        "breaker", "panel", "circuit",
-                    ),
+                    listOf("electrical", "electrician", "wiring", "outlet", "breaker", "panel", "circuit"),
                 ),
                 // Roof.
                 Pattern(
@@ -234,10 +232,7 @@ enum class MaintenanceCategory(val rawValue: String) {
                 // Pest control.
                 Pattern(
                     Pest,
-                    listOf(
-                        "pest", "exterminate", "termite", "rodent", "ant",
-                        "roach", "mouse", "rats",
-                    ),
+                    listOf("pest", "exterminate", "termite", "rodent", "ant", "roach", "mouse", "rats"),
                 ),
                 // Landscaping + yard.
                 Pattern(
@@ -260,10 +255,7 @@ enum class MaintenanceCategory(val rawValue: String) {
                 // Safety — smoke + CO alarms, fire extinguishers.
                 Pattern(
                     Safety,
-                    listOf(
-                        "alarm", "smoke detector", "co detector", "carbon monoxide",
-                        "fire extinguisher", "safety check",
-                    ),
+                    listOf("alarm", "smoke detector", "co detector", "carbon monoxide", "fire extinguisher", "safety check"),
                 ),
             )
     }

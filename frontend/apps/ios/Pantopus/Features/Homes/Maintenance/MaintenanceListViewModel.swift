@@ -100,7 +100,9 @@ final class MaintenanceListViewModel: ListOfRowsDataSource {
     /// T6.3b: top-bar action is `null` by design — mirrors Bills T6.0a.
     /// The FAB owns the canonical "Log maintenance" action and the
     /// design's filter glyph isn't wired to a real filter sheet yet.
-    var topBarAction: TopBarAction? { nil }
+    var topBarAction: TopBarAction? {
+        nil
+    }
 
     var tabs: [ListOfRowsTab] {
         let summary = tasks.map(counts) ?? MaintenanceTabCounts(
@@ -414,21 +416,12 @@ final class MaintenanceListViewModel: ListOfRowsDataSource {
             case .overdue:
                 overdueCount += 1
                 scheduledCount += 1
-                if let iso = task.dueDate, let due = parseDate(iso) {
-                    if nextDue.map({ due < $0.0 }) ?? true {
-                        nextDue = (due, task)
-                    }
-                }
+                nextDue = earlierDueTask(nextDue, task: task, now: now, allowPast: true)
             case .scheduled, .dueSoon, .inProgress:
                 scheduledCount += 1
-                if let iso = task.dueDate, let due = parseDate(iso), due >= now,
-                   nextDue.map({ due < $0.0 }) ?? true {
-                    nextDue = (due, task)
-                }
+                nextDue = earlierDueTask(nextDue, task: task, now: now)
             case .completed:
-                if let cost = task.cost,
-                   let performedAt = parseDate(task.updatedAt ?? task.createdAt ?? ""),
-                   performedAt >= yearStart {
+                if let cost = ytdCost(for: task, yearStart: yearStart) {
                     ytdSpend += cost
                 }
             case .cancelled:
@@ -436,34 +429,63 @@ final class MaintenanceListViewModel: ListOfRowsDataSource {
             }
         }
         let ytdLabel = ytdSpend > 0 ? formatCurrency(ytdSpend) : nil
-        let scheduledSubtitle: String?
-        if scheduledCount == 0 {
-            scheduledSubtitle = nil
-        } else if let nextDue {
-            let title = nextDue.1.task.isEmpty ? "next task" : nextDue.1.task
-            let days = Int(nextDue.0.timeIntervalSince(now) / (24 * 60 * 60))
-            let when: String
-            if days < 0 {
-                when = "overdue"
-            } else if days == 0 {
-                when = "today"
-            } else if days == 1 {
-                when = "tomorrow"
-            } else {
-                when = "in \(days) days"
-            }
-            let prefix = scheduledCount == 1 ? "1 scheduled" : "\(scheduledCount) scheduled"
-            scheduledSubtitle = "\(prefix) · \(title) \(when)"
-        } else {
-            scheduledSubtitle = scheduledCount == 1
-                ? "1 scheduled"
-                : "\(scheduledCount) scheduled"
-        }
+        let scheduledSubtitle = scheduledSubtitle(
+            scheduledCount: scheduledCount,
+            nextDue: nextDue,
+            now: now
+        )
         return MaintenanceBannerSummary(
             overdueCount: overdueCount,
             ytdSpendLabel: ytdLabel,
             scheduledSubtitle: scheduledSubtitle
         )
+    }
+
+    private static func earlierDueTask(
+        _ current: (Date, MaintenanceTaskDTO)?,
+        task: MaintenanceTaskDTO,
+        now: Date,
+        allowPast: Bool = false
+    ) -> (Date, MaintenanceTaskDTO)? {
+        guard let iso = task.dueDate, let due = parseDate(iso) else { return current }
+        guard allowPast || due >= now else { return current }
+        guard let current else { return (due, task) }
+        return due < current.0 ? (due, task) : current
+    }
+
+    private static func ytdCost(for task: MaintenanceTaskDTO, yearStart: Date) -> Decimal? {
+        guard let cost = task.cost,
+              let performedAt = parseDate(task.updatedAt ?? task.createdAt ?? ""),
+              performedAt >= yearStart else {
+            return nil
+        }
+        return cost
+    }
+
+    private static func scheduledSubtitle(
+        scheduledCount: Int,
+        nextDue: (Date, MaintenanceTaskDTO)?,
+        now: Date
+    ) -> String? {
+        if scheduledCount == 0 {
+            return nil
+        }
+        if let nextDue {
+            let title = nextDue.1.task.isEmpty ? "next task" : nextDue.1.task
+            let days = Int(nextDue.0.timeIntervalSince(now) / (24 * 60 * 60))
+            let when = if days < 0 {
+                "overdue"
+            } else if days == 0 {
+                "today"
+            } else if days == 1 {
+                "tomorrow"
+            } else {
+                "in \(days) days"
+            }
+            let prefix = scheduledCount == 1 ? "1 scheduled" : "\(scheduledCount) scheduled"
+            return "\(prefix) · \(title) \(when)"
+        }
+        return scheduledCount == 1 ? "1 scheduled" : "\(scheduledCount) scheduled"
     }
 
     private func bannerTitle(for summary: MaintenanceBannerSummary) -> String {
@@ -537,11 +559,10 @@ final class MaintenanceListViewModel: ListOfRowsDataSource {
     }
 
     private static func vendorSubtitle(vendor: String?, recurrence: String?) -> String {
-        let vendorPart: String
-        if let vendor, !vendor.isEmpty {
-            vendorPart = vendor
+        let vendorPart: String = if let vendor, !vendor.isEmpty {
+            vendor
         } else {
-            vendorPart = "Self-managed"
+            "Self-managed"
         }
         if let recurrence {
             return "\(vendorPart) · \(recurrence)"

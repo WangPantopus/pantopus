@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "LongParameterList")
 
 package app.pantopus.android.ui.screens.homes.maintenance
 
@@ -288,7 +288,13 @@ class MaintenanceListViewModelTest {
                 // Scheduled future → scheduled
                 makeTask(id = "soon", task = "HVAC", cost = BigDecimal("185"), dueDate = "2026-05-20T08:00:00Z"),
                 // Completed this year → YTD spend
-                makeTask(id = "done", task = "Gutter clean", cost = BigDecimal("240"), status = "completed", updatedAt = "2026-02-10T00:00:00Z"),
+                makeTask(
+                    id = "done",
+                    task = "Gutter clean",
+                    cost = BigDecimal("240"),
+                    status = "completed",
+                    updatedAt = "2026-02-10T00:00:00Z",
+                ),
                 // Cancelled → excluded
                 makeTask(id = "cancelled", cost = BigDecimal("99"), status = "cancelled"),
             )
