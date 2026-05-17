@@ -25,6 +25,13 @@ public enum PrivacyEndpoints {
     /// `GET /api/privacy/blocks` — list of blocked users for the
     /// "Blocked users" row. Route `backend/routes/privacy.js:154`.
     public static let blocks = Endpoint(method: .get, path: "/api/privacy/blocks")
+
+    /// `DELETE /api/privacy/blocks/:blockId` — remove a single block by
+    /// its row id (not the blocked user's id). Route
+    /// `backend/routes/privacy.js:251`. Returns `{ message }`.
+    public static func deleteBlock(blockId: String) -> Endpoint {
+        Endpoint(method: .delete, path: "/api/privacy/blocks/\(blockId)")
+    }
 }
 
 /// Endpoints under `/api/notifications/*`.
@@ -47,9 +54,17 @@ public enum AuthMethodsEndpoints {
     public static let methods = Endpoint(method: .get, path: "/api/users/auth-methods")
 
     /// `POST /api/users/password` — change the password (rate-limited
-    /// by `reauthLimiter`). Route `backend/routes/users.js:1771`.
+    /// by `reauthLimiter`). Route `backend/routes/users.js:1771`. The
+    /// Joi schema accepts camelCase keys, so the body uses them too.
     public static func updatePassword(_ body: PasswordUpdateBody) -> Endpoint {
         Endpoint(method: .post, path: "/api/users/password", body: body)
+    }
+
+    /// `POST /api/users/resend-verification` — re-send the email
+    /// verification link. Route `backend/routes/users.js:3049`.
+    /// Schema: `{ email: string }`.
+    public static func resendVerification(_ body: ResendVerificationBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/users/resend-verification", body: body, authenticated: false)
     }
 
     /// `DELETE /api/users/account` — schedule account deletion. Route
@@ -124,18 +139,24 @@ public struct PushTokenBody: Encodable, Sendable {
 }
 
 /// Body for `POST /api/users/password` — the backend's
-/// `updatePasswordSchema` accepts current + new password.
+/// `updatePasswordSchema` (users.js:736) accepts camelCase
+/// `currentPassword` + `newPassword`. `currentPassword` is optional
+/// (omit for OAuth-only accounts setting an initial password).
 public struct PasswordUpdateBody: Encodable, Sendable {
-    public let currentPassword: String
+    public let currentPassword: String?
     public let newPassword: String
 
-    public init(currentPassword: String, newPassword: String) {
+    public init(currentPassword: String?, newPassword: String) {
         self.currentPassword = currentPassword
         self.newPassword = newPassword
     }
+}
 
-    enum CodingKeys: String, CodingKey {
-        case currentPassword = "current_password"
-        case newPassword = "new_password"
+/// Body for `POST /api/users/resend-verification`.
+public struct ResendVerificationBody: Encodable, Sendable {
+    public let email: String
+
+    public init(email: String) {
+        self.email = email
     }
 }

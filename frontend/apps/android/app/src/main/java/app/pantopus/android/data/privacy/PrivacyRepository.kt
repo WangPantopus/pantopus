@@ -26,4 +26,9 @@ class PrivacyRepository
             }
 
         suspend fun blocks(): NetworkResult<PrivacyBlocksResponse> = safeApiCall { api.blocks() }
+
+        /** `DELETE /api/privacy/blocks/:blockId` — remove a single block
+         *  row. Returns `Unit` on success; callers should rollback their
+         *  optimistic state on `NetworkResult.Failure`. */
+        suspend fun deleteBlock(blockId: String): NetworkResult<Unit> = safeApiCall { api.deleteBlock(blockId) }
     }
