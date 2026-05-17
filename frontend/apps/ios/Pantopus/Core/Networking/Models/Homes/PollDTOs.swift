@@ -114,7 +114,7 @@ public struct PollDTO: Decodable, Sendable, Hashable, Identifiable {
         key: K
     ) -> [String]? {
         if let array = try? container.decodeIfPresent([PollVoteValue].self, forKey: key) {
-            return array.map { $0.key }
+            return array.map(\.key)
         }
         if let single = try? container.decodeIfPresent(PollVoteValue.self, forKey: key) {
             return [single.key]
@@ -164,7 +164,7 @@ public struct PollOptionDTO: Decodable, Sendable, Hashable, Identifiable {
 /// Wire form for a single value inside `my_vote` — either a string
 /// (`"Sage"`) or an object with `id` / `label`. Decoded to a single
 /// `key` we can compare against `PollOptionDTO.id`.
-struct PollVoteValue: Decodable, Sendable {
+struct PollVoteValue: Decodable {
     let key: String
 
     init(from decoder: Decoder) throws {
@@ -216,7 +216,9 @@ public struct CreatePollRequest: Encodable, Sendable {
 
     public struct Option: Encodable, Sendable, Hashable {
         public let label: String
-        public init(label: String) { self.label = label }
+        public init(label: String) {
+            self.label = label
+        }
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -336,7 +338,7 @@ public struct PollVoteDTO: Decodable, Sendable, Hashable, Identifiable {
         pollId = try c.decodeIfPresent(String.self, forKey: .pollId)
         userId = try c.decodeIfPresent(String.self, forKey: .userId)
         if let array = try? c.decodeIfPresent([PollVoteValue].self, forKey: .selectedOptions) {
-            selectedOptions = array.map { $0.key }
+            selectedOptions = array.map(\.key)
         } else if let single = try? c.decodeIfPresent(PollVoteValue.self, forKey: .selectedOptions) {
             selectedOptions = [single.key]
         } else {

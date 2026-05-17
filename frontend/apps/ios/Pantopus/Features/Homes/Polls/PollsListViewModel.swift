@@ -20,7 +20,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length function_body_length
+// swiftlint:disable file_length type_body_length
 
 /// Canonical poll-row status chip.
 public enum PollChipStatus: String, Sendable, Hashable {
@@ -253,7 +253,7 @@ final class PollsListViewModel: ListOfRowsDataSource {
     /// Pure mapping from a poll + clock to display strings. Exposed
     /// `static` so unit tests can exercise the chip / subtitle / leading
     /// derivation without standing the VM up.
-    public static func project(poll: PollDTO, now: Date) -> PollRowProjection {
+    static func project(poll: PollDTO, now: Date) -> PollRowProjection {
         let kind = PollKind.from(pollType: poll.pollType, title: poll.title)
         let chipStatus = chipStatus(for: poll, now: now)
         let voteWord = poll.voteCount == 1 ? "vote" : "votes"
@@ -301,7 +301,7 @@ final class PollsListViewModel: ListOfRowsDataSource {
     ///   - `closed`   when status is "closed" / "canceled" OR closes_at is past
     ///   - `closing`  when active AND closes_at is within next 24 h
     ///   - `active`   otherwise
-    public static func chipStatus(for poll: PollDTO, now: Date) -> PollChipStatus {
+    static func chipStatus(for poll: PollDTO, now: Date) -> PollChipStatus {
         let normalised = poll.status.lowercased()
         if normalised == "closed" || normalised == "canceled" || normalised == "cancelled" {
             return .closed
@@ -429,7 +429,7 @@ final class PollsListViewModel: ListOfRowsDataSource {
     /// works whether or not the caller passes one. The parameter stays in
     /// the signature so future expansion (different backlog rules per
     /// viewer role) can land without changing the call sites.
-    public static func summarize(
+    static func summarize(
         polls: [PollDTO],
         viewerId: String?,
         now: Date
@@ -479,7 +479,8 @@ final class PollsListViewModel: ListOfRowsDataSource {
     private func emptySubcopy(for tab: PollsTab) -> String {
         switch tab {
         case .active:
-            "Ask the household. Paint colours, weekend plans, whether to replace the dishwasher — get a quick read instead of a long thread."
+            "Ask the household. Paint colours, weekend plans, whether to replace " +
+                "the dishwasher — get a quick read instead of a long thread."
         case .closed:
             "Closed polls show up here once a vote wraps up or a member closes it manually."
         }

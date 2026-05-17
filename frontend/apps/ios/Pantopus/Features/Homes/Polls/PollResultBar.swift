@@ -133,27 +133,24 @@ struct PollResultBar: View {
             totalVotes: 3,
             isMyVote: true,
             isWinner: false,
-            isLoading: false,
-            onTap: {}
-        )
+            isLoading: false
+        ) {}
         PollResultBar(
             label: "White",
             votes: 1,
             totalVotes: 3,
             isMyVote: false,
             isWinner: false,
-            isLoading: false,
-            onTap: {}
-        )
+            isLoading: false
+        ) {}
         PollResultBar(
             label: "Navy",
             votes: 0,
             totalVotes: 3,
             isMyVote: false,
             isWinner: false,
-            isLoading: false,
-            onTap: {}
-        )
+            isLoading: false
+        ) {}
     }
     .padding()
     .background(Theme.Color.appBg)

@@ -8,7 +8,7 @@ import app.pantopus.android.ui.theme.PantopusIcon
 /**
  * T6.3e — Per-poll-kind visual tokens for the Polls row. Lifted from
  * the design at `polls-frames.jsx:50-55`. Feature code references these
- * typed swatches; no hex literal appears in `ui/screens/**` outside
+ * typed swatches; no hex literal appears in feature code outside
  * this file.
  *
  * Kind classification is client-derived: the backend's `poll_type` enum
@@ -70,7 +70,10 @@ enum class PollKind(
          *  - `multiple_choice` → [Open].
          *  - `ranking` / `single_choice` (default) → [Decision].
          */
-        fun from(pollType: String, title: String): PollKind {
+        fun from(
+            pollType: String,
+            title: String,
+        ): PollKind {
             val normalised = pollType.lowercase().replace("-", "_")
             if (normalised == "yes_no" || normalised == "yesno") return YesNo
             if (isScheduleTitle(title)) return Schedule
@@ -81,11 +84,12 @@ enum class PollKind(
             }
         }
 
-        private val scheduleKeywords = listOf(
-            "when ", "what day", "what date", "which day", "which date",
-            "weekend", "schedule", "saturday", "sunday", "monday", "tuesday",
-            "wednesday", "thursday", "friday", " date ", " date?", "date?",
-        )
+        private val scheduleKeywords =
+            listOf(
+                "when ", "what day", "what date", "which day", "which date",
+                "weekend", "schedule", "saturday", "sunday", "monday", "tuesday",
+                "wednesday", "thursday", "friday", " date ", " date?", "date?",
+            )
 
         private fun isScheduleTitle(title: String): Boolean {
             val lower = " " + title.lowercase() + " "

@@ -15,7 +15,7 @@
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable type_body_length file_length
+// swiftlint:disable type_body_length
 
 @MainActor
 final class PollsListViewModelTests: XCTestCase {
@@ -125,10 +125,12 @@ final class PollsListViewModelTests: XCTestCase {
         XCTAssertEqual(row.title, "Paint color?")
         XCTAssertEqual(row.subtitle, "2 votes · 2 options")
         guard case .chevron = row.trailing else {
-            XCTFail("Expected chevron trailing"); return
+            XCTFail("Expected chevron trailing")
+            return
         }
         guard case let .typeIcon(icon, background: _, foreground: _) = row.leading else {
-            XCTFail("Expected typeIcon leading"); return
+            XCTFail("Expected typeIcon leading")
+            return
         }
         XCTAssertEqual(icon, .clipboardList)
         // chip strip: status chip + leading chip + voted chip
@@ -270,7 +272,8 @@ final class PollsListViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         guard case let .loaded(sections, _) = vm.state else {
-            XCTFail("Expected loaded"); return
+            XCTFail("Expected loaded")
+            return
         }
         XCTAssertEqual(sections[0].rows.count, 1)
         XCTAssertEqual(sections[0].rows[0].id, "a")
@@ -293,7 +296,8 @@ final class PollsListViewModelTests: XCTestCase {
         await vm.load()
         vm.selectedTab = PollsTab.closed.rawValue
         guard case let .loaded(sections, _) = vm.state else {
-            XCTFail("Expected loaded after tab switch"); return
+            XCTFail("Expected loaded after tab switch")
+            return
         }
         XCTAssertEqual(sections[0].rows.count, 1)
         XCTAssertEqual(sections[0].rows[0].id, "c")
@@ -374,7 +378,8 @@ final class PollsListViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         guard let fab = vm.fab else {
-            XCTFail("Expected FAB"); return
+            XCTFail("Expected FAB")
+            return
         }
         XCTAssertEqual(fab.accessibilityLabel, "Start a poll")
         XCTAssertEqual(fab.tint, .home)
@@ -385,7 +390,7 @@ final class PollsListViewModelTests: XCTestCase {
 
     // MARK: - Top bar
 
-    func testTopBarActionIsNilByDesign() async {
+    func testTopBarActionIsNilByDesign() {
         let vm = makeVM()
         XCTAssertNil(vm.topBarAction)
     }

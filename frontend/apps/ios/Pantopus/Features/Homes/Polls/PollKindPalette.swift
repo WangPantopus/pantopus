@@ -133,9 +133,9 @@ public enum PollKind: String, CaseIterable, Sendable, Hashable {
 /// hex-literal-free per universal convention.
 public enum PollLeadingChipTint {
     /// CSS f1f5f9 — slate-100. Pill background.
-    public static let background: Color =
+    public static let background =
         Color(red: 0xF1 / 255.0, green: 0xF5 / 255.0, blue: 0xF9 / 255.0)
     /// CSS 334155 — slate-700. Pill foreground (icon + text).
-    public static let foreground: Color =
+    public static let foreground =
         Color(red: 0x33 / 255.0, green: 0x41 / 255.0, blue: 0x55 / 255.0)
 }
