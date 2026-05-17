@@ -109,8 +109,7 @@ final class AddHomeWizardViewModelTests: XCTestCase {
     func testPrimaryAdvancesAndFiresCheckAddress() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.checkAddressJSON)]
         let vm = makeVM(initialState: filled())
-        vm.primaryTapped()
-        await waitFor("addressCheck populated") { vm.addressCheck != nil }
+        await vm.advanceForTesting()
         XCTAssertEqual(vm.currentStep, .confirm)
         XCTAssertNotNil(vm.addressCheck)
         XCTAssertEqual(vm.chrome.leading, .back, "Back chevron replaces X on step 2.")
@@ -119,8 +118,7 @@ final class AddHomeWizardViewModelTests: XCTestCase {
     func testCheckAddressErrorSurfacesMessage() async {
         SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"down\"}")]
         let vm = makeVM(initialState: filled())
-        vm.primaryTapped()
-        await waitFor("errorMessage set") { vm.errorMessage != nil }
+        await vm.advanceForTesting()
         XCTAssertEqual(vm.currentStep, .confirm)
         XCTAssertNil(vm.addressCheck)
         XCTAssertNotNil(vm.errorMessage)
@@ -131,8 +129,7 @@ final class AddHomeWizardViewModelTests: XCTestCase {
     func testBackOnConfirmGoesToAddress() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.checkAddressJSON)]
         let vm = makeVM(initialState: filled())
-        vm.primaryTapped()
-        await waitFor("step is confirm") { vm.currentStep == .confirm && !vm.isCheckingAddress }
+        await vm.advanceForTesting()
         vm.leadingTapped()
         XCTAssertEqual(vm.currentStep, .address)
     }
@@ -156,8 +153,7 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         seed.step = AddHomeStep.review.rawValue
         seed.role = .owner
         let vm = makeVM(initialState: seed)
-        vm.primaryTapped()
-        await waitFor("currentStep == .success") { vm.currentStep == .success }
+        await vm.advanceForTesting()
         XCTAssertEqual(vm.currentStep, .success)
         XCTAssertEqual(vm.createdHomeId, "home_42")
         XCTAssertEqual(vm.chrome.primaryCTALabel, "View home")
@@ -171,8 +167,7 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         seed.step = AddHomeStep.review.rawValue
         seed.role = .owner
         let vm = makeVM(initialState: seed)
-        vm.primaryTapped()
-        await waitFor("errorMessage set") { vm.errorMessage != nil }
+        await vm.advanceForTesting()
         XCTAssertEqual(vm.currentStep, .review)
         XCTAssertNotNil(vm.errorMessage)
     }
@@ -185,17 +180,8 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         seed.step = AddHomeStep.review.rawValue
         seed.role = .owner
         let vm = makeVM(initialState: seed)
-        vm.primaryTapped()
-        // Wait for the .success step itself, not just createdHomeId — the
-        // VM sets createdHomeId BEFORE transition(to: .success), so a wait
-        // on createdHomeId alone returns while we're still on .review.
-        // primaryTapped() then re-enters submit() and consumes a second
-        // (non-existent) URL stub instead of firing openHomeDashboard.
-        await waitFor("currentStep == .success") { vm.currentStep == .success }
-        vm.primaryTapped()
-        await waitFor("openHomeDashboard event") {
-            vm.pendingEvent == .openHomeDashboard(homeId: "home_42")
-        }
+        await vm.advanceForTesting()
+        await vm.advanceForTesting()
         XCTAssertEqual(vm.pendingEvent, .openHomeDashboard(homeId: "home_42"))
     }
 
@@ -205,10 +191,7 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         seed.step = AddHomeStep.review.rawValue
         seed.role = .owner
         let vm = makeVM(initialState: seed)
-        vm.primaryTapped()
-        // Same gating as testSuccessPrimary above — wait for the actual
-        // step transition, not just createdHomeId.
-        await waitFor("currentStep == .success") { vm.currentStep == .success }
+        await vm.advanceForTesting()
         vm.secondaryTapped()
         XCTAssertEqual(vm.pendingEvent, .dismiss)
     }
@@ -231,8 +214,7 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         seed.step = AddHomeStep.review.rawValue
         seed.role = .owner
         let vm = makeVM(initialState: seed)
-        vm.primaryTapped()
-        await waitFor("currentStep == .success") { vm.currentStep == .success }
+        await vm.advanceForTesting()
         XCTAssertFalse(vm.chrome.dirty)
     }
 
