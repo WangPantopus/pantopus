@@ -7,7 +7,6 @@ import app.pantopus.android.data.auth.AccountType
 import app.pantopus.android.data.auth.AuthError
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.auth.SignUpResult
-import io.mockk.captureNullable
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -22,7 +21,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -187,7 +185,7 @@ class SignUpViewModelTest {
             val firstNameSlot = slot<String>()
             val lastNameSlot = slot<String>()
             val accountTypeSlot = slot<AccountType>()
-            val dobSlot = slot<String?>()
+            val expectedDateOfBirth = LocalDate.of(1999, 1, 15)
             coEvery {
                 repo.signUp(
                     email = capture(emailSlot),
@@ -197,7 +195,7 @@ class SignUpViewModelTest {
                     firstName = capture(firstNameSlot),
                     middleName = any(),
                     lastName = capture(lastNameSlot),
-                    dateOfBirth = captureNullable(dobSlot),
+                    dateOfBirth = expectedDateOfBirth.toString(),
                     address = any(),
                     city = any(),
                     state = any(),
@@ -209,6 +207,7 @@ class SignUpViewModelTest {
 
             val vm = buildVm(repo)
             fillValid(vm)
+            vm.onDateOfBirthChange(expectedDateOfBirth)
             vm.submit()
             advanceUntilIdle()
 
@@ -221,7 +220,24 @@ class SignUpViewModelTest {
             assertEquals("Maria", firstNameSlot.captured)
             assertEquals("Kowalski", lastNameSlot.captured)
             assertEquals(AccountType.Personal, accountTypeSlot.captured)
-            assertNotNull(dobSlot.captured)
+            coVerify(exactly = 1) {
+                repo.signUp(
+                    email = any(),
+                    password = any(),
+                    phoneNumber = any(),
+                    username = any(),
+                    firstName = any(),
+                    middleName = any(),
+                    lastName = any(),
+                    dateOfBirth = expectedDateOfBirth.toString(),
+                    address = any(),
+                    city = any(),
+                    state = any(),
+                    zipcode = any(),
+                    accountType = any(),
+                    inviteCode = any(),
+                )
+            }
         }
 
     @Test

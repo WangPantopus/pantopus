@@ -159,6 +159,7 @@ dependencies {
 
     // Networking
     implementation(libs.bundles.networking)
+    ksp(libs.moshi.kotlin.codegen)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)

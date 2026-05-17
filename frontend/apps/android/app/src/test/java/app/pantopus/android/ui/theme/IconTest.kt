@@ -37,6 +37,7 @@ class IconTest {
             "check",
             "more-horizontal",
             "arrow-left",
+            "arrow-right",
             "send",
             "chevron-down",
             "chevron-up",
