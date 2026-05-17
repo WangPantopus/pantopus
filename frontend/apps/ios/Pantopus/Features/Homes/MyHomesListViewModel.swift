@@ -92,7 +92,7 @@ final class MyHomesListViewModel: ListOfRowsDataSource {
                 state = .empty(
                     ListOfRowsState.EmptyContent(
                         icon: .home,
-                        headline: "You don't belong to any homes yet",
+                        headline: "You don’t belong to any homes yet",
                         subcopy: "Claim or join a verified home to unlock packages, bills, tasks, and member chat.",
                         ctaTitle: "Claim a home",
                         onCTA: onAddHome
