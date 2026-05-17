@@ -20,7 +20,10 @@ import Observation
 @Observable
 @MainActor
 public final class VerificationCenterViewModel: GroupedListDataSource {
-    public var title: String { "Verification" }
+    public var title: String {
+        "Verification"
+    }
+
     public var footerCaption: String? {
         "Verified neighbors can find you in search and reach you with confidence."
     }
@@ -41,7 +44,7 @@ public final class VerificationCenterViewModel: GroupedListDataSource {
         case failed(message: String)
     }
 
-    public init(api: APIClient = .shared, auth: AuthManager = .shared) {
+    init(api: APIClient = .shared, auth: AuthManager = .shared) {
         self.api = api
         self.auth = auth
     }
@@ -109,12 +112,11 @@ public final class VerificationCenterViewModel: GroupedListDataSource {
             subtext: emailSubtext,
             control: emailControl
         )
-        let resendLabel: String
-        switch lastResendStatus {
-        case .idle: resendLabel = "Resend verification email"
-        case .sending: resendLabel = "Sending…"
-        case .sent: resendLabel = "Sent — check your inbox"
-        case .failed: resendLabel = "Try again"
+        let resendLabel = switch lastResendStatus {
+        case .idle: "Resend verification email"
+        case .sending: "Sending…"
+        case .sent: "Sent — check your inbox"
+        case .failed: "Try again"
         }
         let emailGroup: GroupedListGroup
         if emailVerified {

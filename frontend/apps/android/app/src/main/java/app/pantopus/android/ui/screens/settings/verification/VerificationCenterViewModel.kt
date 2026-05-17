@@ -142,9 +142,12 @@ class VerificationCenterViewModel
                                 id = "phone.status",
                                 label = "Phone number",
                                 subtext = "Coming soon",
-                                control = RowControl.ChipStatus(
-                                    "Not started", RowControl.ChipTone.Neutral, includesChevron = false,
-                                ),
+                                control =
+                                    RowControl.ChipStatus(
+                                        "Not started",
+                                        RowControl.ChipTone.Neutral,
+                                        includesChevron = false,
+                                    ),
                             ),
                         ),
                 )
@@ -159,9 +162,12 @@ class VerificationCenterViewModel
                                 id = "home.status",
                                 label = "Address verification",
                                 subtext = "Coming soon",
-                                control = RowControl.ChipStatus(
-                                    "Not started", RowControl.ChipTone.Neutral, includesChevron = false,
-                                ),
+                                control =
+                                    RowControl.ChipStatus(
+                                        "Not started",
+                                        RowControl.ChipTone.Neutral,
+                                        includesChevron = false,
+                                    ),
                             ),
                         ),
                 )
@@ -175,9 +181,12 @@ class VerificationCenterViewModel
                                 id = "photoid.status",
                                 label = "Government-issued ID",
                                 subtext = "Used by business listings only",
-                                control = RowControl.ChipStatus(
-                                    "Optional", RowControl.ChipTone.Neutral, includesChevron = false,
-                                ),
+                                control =
+                                    RowControl.ChipStatus(
+                                        "Optional",
+                                        RowControl.ChipTone.Neutral,
+                                        includesChevron = false,
+                                    ),
                             ),
                         ),
                 )

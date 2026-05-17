@@ -13,7 +13,7 @@ public struct PasswordChangeView: View {
     @State private var viewModel: PasswordChangeViewModel
     private let onBack: @MainActor () -> Void
 
-    public init(
+    init(
         viewModel: PasswordChangeViewModel = PasswordChangeViewModel(),
         onBack: @escaping @MainActor () -> Void
     ) {
@@ -40,10 +40,15 @@ public struct PasswordChangeView: View {
         .task { await viewModel.load() }
         .overlay(alignment: .bottom) {
             if let toast = viewModel.toast {
-                ToastView(message: toast)
-                    .padding(.bottom, Spacing.s10)
-                    .accessibilityIdentifier("passwordChangeToast")
-                    .transition(.opacity)
+                ToastView(
+                    message: ToastMessage(
+                        text: toast,
+                        kind: toast == "Password updated" ? .success : .error
+                    )
+                )
+                .padding(.bottom, Spacing.s10)
+                .accessibilityIdentifier("passwordChangeToast")
+                .transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.toast)
@@ -104,6 +109,6 @@ public struct PasswordChangeView: View {
 
 #Preview {
     NavigationStack {
-        PasswordChangeView(onBack: {})
+        PasswordChangeView {}
     }
 }

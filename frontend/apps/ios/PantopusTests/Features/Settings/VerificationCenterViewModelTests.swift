@@ -82,7 +82,7 @@ final class VerificationCenterViewModelTests: XCTestCase {
             XCTFail("Expected .loaded after resend")
             return
         }
-        let resend = groups.first(where: { $0.id == "email" })?.rows.first(where: { $0.id == "email.resend" })
+        let resend = groups.first { $0.id == "email" }?.rows.first { $0.id == "email.resend" }
         XCTAssertEqual(resend?.label, "Sent — check your inbox")
     }
 }

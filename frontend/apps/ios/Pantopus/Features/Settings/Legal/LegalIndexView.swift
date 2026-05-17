@@ -13,7 +13,9 @@ import SwiftUI
 public enum LegalDocument: String, CaseIterable, Sendable, Hashable, Identifiable {
     case terms, privacy, acceptableUse, cookies, openSource
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -39,10 +41,14 @@ public enum LegalDocument: String, CaseIterable, Sendable, Hashable, Identifiabl
 @Observable
 @MainActor
 public final class LegalIndexViewModel: GroupedListDataSource {
-    public var title: String { "Legal" }
+    public var title: String {
+        "Legal"
+    }
+
     public var footerCaption: String? {
         "All documents are kept in plain language. Reach out via Help if anything's unclear."
     }
+
     public private(set) var state: GroupedListState = .loading
 
     private let onSelect: @MainActor (LegalDocument) -> Void

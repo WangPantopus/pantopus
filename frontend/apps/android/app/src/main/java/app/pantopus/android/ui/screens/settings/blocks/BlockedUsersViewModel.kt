@@ -92,9 +92,10 @@ class BlockedUsersViewModel
             }
             val rows =
                 blocks.map { block ->
-                    val name = block.blocked?.name
-                        ?: block.blocked?.username?.let { "@$it" }
-                        ?: "Blocked user"
+                    val name =
+                        block.blocked?.name
+                            ?: block.blocked?.username?.let { "@$it" }
+                            ?: "Blocked user"
                     val subtitle =
                         block.reason?.trim()?.ifEmpty { null }
                             ?: scopeLabel(block.blockScope)

@@ -54,7 +54,8 @@ public struct AboutView: View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             infoCard(
                 heading: "Mission",
-                body: "A trusted neighborhood platform. We help neighbors swap goods, find help, and stay in touch — without the noise of a public feed."
+                body: "A trusted neighborhood platform. We help neighbors swap goods, find help, " +
+                    "and stay in touch — without the noise of a public feed."
             )
             infoCard(
                 heading: "Built by",
@@ -114,6 +115,6 @@ public struct AboutView: View {
 
 #Preview {
     NavigationStack {
-        AboutView(onBack: {})
+        AboutView {}
     }
 }

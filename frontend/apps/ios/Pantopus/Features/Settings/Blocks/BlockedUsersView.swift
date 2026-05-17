@@ -15,7 +15,7 @@ public struct BlockedUsersView: View {
     @State private var viewModel: BlockedUsersViewModel
     private let onBack: @MainActor () -> Void
 
-    public init(
+    init(
         viewModel: BlockedUsersViewModel = BlockedUsersViewModel(),
         onBack: @escaping @MainActor () -> Void
     ) {
@@ -37,6 +37,6 @@ public struct BlockedUsersView: View {
 
 #Preview {
     NavigationStack {
-        BlockedUsersView(onBack: {})
+        BlockedUsersView {}
     }
 }

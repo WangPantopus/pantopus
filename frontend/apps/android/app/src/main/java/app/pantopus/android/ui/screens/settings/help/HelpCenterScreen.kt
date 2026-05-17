@@ -45,8 +45,9 @@ fun HelpCenterScreen(
                     color = PantopusColors.appText,
                 )
                 Text(
-                    text = "Most questions about messages, mail, and gigs have answers below. " +
-                        "If you don't see yours, reach out — we read every message.",
+                    text =
+                        "Most questions about messages, mail, and gigs have answers below. " +
+                            "If you don't see yours, reach out — we read every message.",
                     style = PantopusTextStyle.small,
                     color = PantopusColors.appTextSecondary,
                 )
@@ -132,13 +133,15 @@ private val Sections =
                 listOf(
                     Item(
                         question = "Why do I need to verify my email?",
-                        answer = "Verifying your email unlocks posting, messaging, and trust signals other neighbors look for. " +
-                            "It also lets us send you a Magic Link if you forget your password.",
+                        answer =
+                            "Verifying your email unlocks posting, messaging, and trust signals other neighbors look for. " +
+                                "It also lets us send you a Magic Link if you forget your password.",
                     ),
                     Item(
                         question = "Who can see my address?",
-                        answer = "Only verified connections — and only at the precision you set under " +
-                            "Settings → Privacy → Address sharing. The default is street-level.",
+                        answer =
+                            "Only verified connections — and only at the precision you set under " +
+                                "Settings → Privacy → Address sharing. The default is street-level.",
                     ),
                 ),
         ),
@@ -148,14 +151,16 @@ private val Sections =
                 listOf(
                     Item(
                         question = "What's the difference between mail and a chat?",
-                        answer = "Mail is asynchronous and ceremonial — it lands in your mailbox, can carry " +
-                            "attachments and trust signals, and you reply when you're ready. " +
-                            "Chats are real-time and live in the inbox tab.",
+                        answer =
+                            "Mail is asynchronous and ceremonial — it lands in your mailbox, can carry " +
+                                "attachments and trust signals, and you reply when you're ready. " +
+                                "Chats are real-time and live in the inbox tab.",
                     ),
                     Item(
                         question = "Why didn't my message send?",
-                        answer = "If the other person has blocked you, or if their privacy settings prevent " +
-                            "unsolicited messages, the send fails. We surface this with a clear error in the chat thread.",
+                        answer =
+                            "If the other person has blocked you, or if their privacy settings prevent " +
+                                "unsolicited messages, the send fails. We surface this with a clear error in the chat thread.",
                     ),
                 ),
         ),
@@ -165,13 +170,15 @@ private val Sections =
                 listOf(
                     Item(
                         question = "How do I block someone?",
-                        answer = "Open their profile, tap the kebab menu (•••), and choose Block. " +
-                            "You can unblock them later from Settings → Blocked users.",
+                        answer =
+                            "Open their profile, tap the kebab menu (•••), and choose Block. " +
+                                "You can unblock them later from Settings → Blocked users.",
                     ),
                     Item(
                         question = "How do I delete my account?",
-                        answer = "Email support@pantopus.app with the subject \"Delete my account\". " +
-                            "We'll confirm and schedule the deletion within 30 days, per our Privacy policy.",
+                        answer =
+                            "Email support@pantopus.app with the subject \"Delete my account\". " +
+                                "We'll confirm and schedule the deletion within 30 days, per our Privacy policy.",
                     ),
                 ),
         ),

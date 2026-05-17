@@ -12,7 +12,7 @@ public struct VerificationCenterView: View {
     @State private var viewModel: VerificationCenterViewModel
     private let onBack: @MainActor () -> Void
 
-    public init(
+    init(
         viewModel: VerificationCenterViewModel = VerificationCenterViewModel(),
         onBack: @escaping @MainActor () -> Void
     ) {
@@ -28,6 +28,6 @@ public struct VerificationCenterView: View {
 
 #Preview {
     NavigationStack {
-        VerificationCenterView(onBack: {})
+        VerificationCenterView {}
     }
 }

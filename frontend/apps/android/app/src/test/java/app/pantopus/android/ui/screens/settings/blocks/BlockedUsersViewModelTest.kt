@@ -61,56 +61,61 @@ class BlockedUsersViewModelTest {
                 ),
         )
 
-    @Test fun loadEmptyProducesEmptyState() = runTest {
-        coEvery { privacy.blocks() } returns NetworkResult.Success(PrivacyBlocksResponse(blocks = emptyList()))
-        val vm = viewModel()
-        vm.load()
-        val state = vm.state.value
-        assertTrue("Expected Empty, got $state", state is ListOfRowsUiState.Empty)
-    }
+    @Test fun loadEmptyProducesEmptyState() =
+        runTest {
+            coEvery { privacy.blocks() } returns NetworkResult.Success(PrivacyBlocksResponse(blocks = emptyList()))
+            val vm = viewModel()
+            vm.load()
+            val state = vm.state.value
+            assertTrue("Expected Empty, got $state", state is ListOfRowsUiState.Empty)
+        }
 
-    @Test fun loadPopulatedProducesLoadedRows() = runTest {
-        coEvery { privacy.blocks() } returns NetworkResult.Success(twoBlocks)
-        val vm = viewModel()
-        vm.load()
-        val loaded = vm.state.value as ListOfRowsUiState.Loaded
-        assertEquals(1, loaded.sections.size)
-        val rows = loaded.sections[0].rows
-        assertEquals(listOf("b1", "b2"), rows.map { it.id })
-        assertEquals("Alice", rows[0].title)
-        // Block reason wins the subtitle when present.
-        assertEquals("Spam", rows[0].subtitle)
-        // Without a reason, the scope label is the subtitle.
-        assertEquals("Hidden from search", rows[1].subtitle)
-        // Trailing is always Kebab so the row's unblock action fires.
-        assertEquals(RowTrailing.Kebab, rows[0].trailing)
-    }
+    @Test fun loadPopulatedProducesLoadedRows() =
+        runTest {
+            coEvery { privacy.blocks() } returns NetworkResult.Success(twoBlocks)
+            val vm = viewModel()
+            vm.load()
+            val loaded = vm.state.value as ListOfRowsUiState.Loaded
+            assertEquals(1, loaded.sections.size)
+            val rows = loaded.sections[0].rows
+            assertEquals(listOf("b1", "b2"), rows.map { it.id })
+            assertEquals("Alice", rows[0].title)
+            // Block reason wins the subtitle when present.
+            assertEquals("Spam", rows[0].subtitle)
+            // Without a reason, the scope label is the subtitle.
+            assertEquals("Hidden from search", rows[1].subtitle)
+            // Trailing is always Kebab so the row's unblock action fires.
+            assertEquals(RowTrailing.Kebab, rows[0].trailing)
+        }
 
-    @Test fun loadFailureProducesErrorState() = runTest {
-        coEvery { privacy.blocks() } returns NetworkResult.Failure(NetworkError.Server(500, null))
-        val vm = viewModel()
-        vm.load()
-        val state = vm.state.value
-        assertTrue("Expected Error, got $state", state is ListOfRowsUiState.Error)
-    }
+    @Test fun loadFailureProducesErrorState() =
+        runTest {
+            coEvery { privacy.blocks() } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = viewModel()
+            vm.load()
+            val state = vm.state.value
+            assertTrue("Expected Error, got $state", state is ListOfRowsUiState.Error)
+        }
 
-    @Test fun unblockSuccessRemovesRow() = runTest {
-        coEvery { privacy.blocks() } returns NetworkResult.Success(twoBlocks)
-        coEvery { privacy.deleteBlock("b1") } returns NetworkResult.Success(Unit)
-        val vm = viewModel()
-        vm.load()
-        vm.unblock("b1")
-        val loaded = vm.state.value as ListOfRowsUiState.Loaded
-        assertEquals(listOf("b2"), loaded.sections[0].rows.map { it.id })
-    }
+    @Test fun unblockSuccessRemovesRow() =
+        runTest {
+            coEvery { privacy.blocks() } returns NetworkResult.Success(twoBlocks)
+            coEvery { privacy.deleteBlock("b1") } returns NetworkResult.Success(Unit)
+            val vm = viewModel()
+            vm.load()
+            vm.unblock("b1")
+            val loaded = vm.state.value as ListOfRowsUiState.Loaded
+            assertEquals(listOf("b2"), loaded.sections[0].rows.map { it.id })
+        }
 
-    @Test fun unblockFailureRestoresRow() = runTest {
-        coEvery { privacy.blocks() } returns NetworkResult.Success(twoBlocks)
-        coEvery { privacy.deleteBlock("b1") } returns NetworkResult.Failure(NetworkError.Server(500, null))
-        val vm = viewModel()
-        vm.load()
-        vm.unblock("b1")
-        val loaded = vm.state.value as ListOfRowsUiState.Loaded
-        assertEquals(setOf("b1", "b2"), loaded.sections[0].rows.map { it.id }.toSet())
-    }
+    @Test fun unblockFailureRestoresRow() =
+        runTest {
+            coEvery { privacy.blocks() } returns NetworkResult.Success(twoBlocks)
+            coEvery { privacy.deleteBlock("b1") } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = viewModel()
+            vm.load()
+            vm.unblock("b1")
+            val loaded = vm.state.value as ListOfRowsUiState.Loaded
+            assertEquals(setOf("b1", "b2"), loaded.sections[0].rows.map { it.id }.toSet())
+        }
 }

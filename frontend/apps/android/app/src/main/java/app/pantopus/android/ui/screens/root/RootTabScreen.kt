@@ -210,8 +210,7 @@ private object ChildRoutes {
     const val SETTINGS_LEGAL_DOC_KEY = "doc"
     const val SETTINGS_LEGAL_CONTENT = "settings/legal/{$SETTINGS_LEGAL_DOC_KEY}"
 
-    fun settingsLegalContent(doc: String): String =
-        "settings/legal/${java.net.URLEncoder.encode(doc, "UTF-8")}"
+    fun settingsLegalContent(doc: String): String = "settings/legal/${java.net.URLEncoder.encode(doc, "UTF-8")}"
 
     /** P8 / T6.2c — Settings → About. */
     const val SETTINGS_ABOUT = "settings/about"

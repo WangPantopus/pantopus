@@ -67,14 +67,8 @@ public struct SettingsView: View {
 
     @ViewBuilder private func destination(for route: SettingsStackRoute) -> some View {
         switch route {
-        case .notifications:
-            GroupedListView(
-                dataSource: NotificationSettingsViewModel()
-            ) { popLast() }
-        case .privacy:
-            GroupedListView(
-                dataSource: PrivacySettingsViewModel()
-            ) { popLast() }
+        case .notifications, .privacy:
+            groupedDestination(for: route)
         case .identityCenter:
             IdentityCenterView(
                 onBack: { popLast() },
@@ -87,24 +81,39 @@ public struct SettingsView: View {
         case .audienceProfile:
             AudienceProfileView { popLast() }
         case .blockedUsers:
-            BlockedUsersView(onBack: { popLast() })
+            BlockedUsersView { popLast() }
         case .password:
-            PasswordChangeView(onBack: { popLast() })
+            PasswordChangeView { popLast() }
         case .verification:
-            VerificationCenterView(onBack: { popLast() })
+            VerificationCenterView { popLast() }
         case .help:
-            HelpCenterView(onBack: { popLast() })
+            HelpCenterView { popLast() }
         case .legal:
             LegalIndexView(
                 onBack: { popLast() },
                 onSelect: { doc in path.append(.legalContent(doc)) }
             )
         case let .legalContent(doc):
-            LegalContentView(document: doc, onBack: { popLast() })
+            LegalContentView(document: doc) { popLast() }
         case .about:
-            AboutView(onBack: { popLast() })
+            AboutView { popLast() }
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
+        }
+    }
+
+    @ViewBuilder private func groupedDestination(for route: SettingsStackRoute) -> some View {
+        switch route {
+        case .notifications:
+            GroupedListView(
+                dataSource: NotificationSettingsViewModel()
+            ) { popLast() }
+        case .privacy:
+            GroupedListView(
+                dataSource: PrivacySettingsViewModel()
+            ) { popLast() }
+        default:
+            EmptyView()
         }
     }
 

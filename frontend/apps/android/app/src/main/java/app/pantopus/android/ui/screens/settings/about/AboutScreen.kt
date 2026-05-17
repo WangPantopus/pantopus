@@ -33,9 +33,7 @@ import java.util.Calendar
  * mission, and a link to Settings → Legal for attributions.
  */
 @Composable
-fun AboutScreen(
-    onBack: () -> Unit = {},
-) {
+fun AboutScreen(onBack: () -> Unit = {}) {
     ContentDetailShell(
         title = "About",
         onBack = onBack,
@@ -87,13 +85,15 @@ fun AboutScreen(
             ) {
                 InfoCard(
                     heading = "Mission",
-                    body = "A trusted neighborhood platform. We help neighbors swap goods, find help, " +
-                        "and stay in touch — without the noise of a public feed.",
+                    body =
+                        "A trusted neighborhood platform. We help neighbors swap goods, find help, " +
+                            "and stay in touch — without the noise of a public feed.",
                 )
                 InfoCard(
                     heading = "Built by",
-                    body = "A small team of people who wanted somewhere better to ask their block for a ladder. " +
-                        "Reach us at support@pantopus.app.",
+                    body =
+                        "A small team of people who wanted somewhere better to ask their block for a ladder. " +
+                            "Reach us at support@pantopus.app.",
                 )
                 Column(
                     modifier =

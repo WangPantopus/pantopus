@@ -23,7 +23,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -48,46 +47,48 @@ class VerificationCenterViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel(): VerificationCenterViewModel =
-        VerificationCenterViewModel(identity, account, auth)
+    private fun viewModel(): VerificationCenterViewModel = VerificationCenterViewModel(identity, account, auth)
 
     private fun overview(verified: Boolean): IdentityCenterResponse =
         IdentityCenterResponse(
             privateAccount = PrivateAccountDto(id = "u_test", email = "a@b.co", name = "A", verified = verified),
         )
 
-    @Test fun loadVerifiedShowsSingleEmailRow() = runTest {
-        coEvery { identity.overview() } returns NetworkResult.Success(overview(verified = true))
-        val vm = viewModel()
-        vm.load()
-        val loaded = vm.state.value as GroupedListUiState.Loaded
-        val emailGroup = loaded.groups.first { it.id == "email" }
-        assertEquals(1, emailGroup.rows.size)
-        val chip = emailGroup.rows.first().control as RowControl.ChipStatus
-        assertEquals("Verified", chip.label)
-        assertEquals(RowControl.ChipTone.Success, chip.tone)
-        assertEquals(listOf("email", "phone", "home", "photoid"), loaded.groups.map { it.id })
-    }
+    @Test fun loadVerifiedShowsSingleEmailRow() =
+        runTest {
+            coEvery { identity.overview() } returns NetworkResult.Success(overview(verified = true))
+            val vm = viewModel()
+            vm.load()
+            val loaded = vm.state.value as GroupedListUiState.Loaded
+            val emailGroup = loaded.groups.first { it.id == "email" }
+            assertEquals(1, emailGroup.rows.size)
+            val chip = emailGroup.rows.first().control as RowControl.ChipStatus
+            assertEquals("Verified", chip.label)
+            assertEquals(RowControl.ChipTone.Success, chip.tone)
+            assertEquals(listOf("email", "phone", "home", "photoid"), loaded.groups.map { it.id })
+        }
 
-    @Test fun loadUnverifiedShowsResendRow() = runTest {
-        coEvery { identity.overview() } returns NetworkResult.Success(overview(verified = false))
-        val vm = viewModel()
-        vm.load()
-        val loaded = vm.state.value as GroupedListUiState.Loaded
-        val emailGroup = loaded.groups.first { it.id == "email" }
-        assertEquals(2, emailGroup.rows.size)
-        assertEquals("email.resend", emailGroup.rows.last().id)
-    }
+    @Test fun loadUnverifiedShowsResendRow() =
+        runTest {
+            coEvery { identity.overview() } returns NetworkResult.Success(overview(verified = false))
+            val vm = viewModel()
+            vm.load()
+            val loaded = vm.state.value as GroupedListUiState.Loaded
+            val emailGroup = loaded.groups.first { it.id == "email" }
+            assertEquals(2, emailGroup.rows.size)
+            assertEquals("email.resend", emailGroup.rows.last().id)
+        }
 
-    @Test fun resendOnSuccessUpdatesLabel() = runTest {
-        coEvery { identity.overview() } returns NetworkResult.Success(overview(verified = false))
-        coEvery { account.resendVerification("a@b.co") } returns NetworkResult.Success(Unit)
-        val vm = viewModel()
-        vm.load()
-        vm.onRow("email.resend")
-        val loaded = vm.state.value as GroupedListUiState.Loaded
-        val emailGroup = loaded.groups.first { it.id == "email" }
-        val resend = emailGroup.rows.first { it.id == "email.resend" }
-        assertEquals("Sent — check your inbox", resend.label)
-    }
+    @Test fun resendOnSuccessUpdatesLabel() =
+        runTest {
+            coEvery { identity.overview() } returns NetworkResult.Success(overview(verified = false))
+            coEvery { account.resendVerification("a@b.co") } returns NetworkResult.Success(Unit)
+            val vm = viewModel()
+            vm.load()
+            vm.onRow("email.resend")
+            val loaded = vm.state.value as GroupedListUiState.Loaded
+            val emailGroup = loaded.groups.first { it.id == "email" }
+            val resend = emailGroup.rows.first { it.id == "email.resend" }
+            assertEquals("Sent — check your inbox", resend.label)
+        }
 }

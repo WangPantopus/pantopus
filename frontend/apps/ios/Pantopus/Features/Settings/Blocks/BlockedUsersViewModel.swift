@@ -16,17 +16,29 @@ import Observation
 @Observable
 @MainActor
 public final class BlockedUsersViewModel: ListOfRowsDataSource {
-    public var title: String { "Blocked users" }
-    public var topBarAction: TopBarAction? { nil }
-    public var tabs: [ListOfRowsTab] { [] }
+    public var title: String {
+        "Blocked users"
+    }
+
+    public var topBarAction: TopBarAction? {
+        nil
+    }
+
+    public var tabs: [ListOfRowsTab] {
+        []
+    }
+
     public var selectedTab: String = ""
-    public var fab: FABAction? { nil }
+    public var fab: FABAction? {
+        nil
+    }
+
     public private(set) var state: ListOfRowsState = .loading
 
     private let api: APIClient
     private var blocks: [PrivacyBlock] = []
 
-    public init(api: APIClient = .shared) {
+    init(api: APIClient = .shared) {
         self.api = api
     }
 
@@ -115,5 +127,7 @@ public final class BlockedUsersViewModel: ListOfRowsDataSource {
 }
 
 private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }

@@ -12,7 +12,7 @@ import XCTest
 @MainActor
 final class LegalIndexViewModelTests: XCTestCase {
     func testLoadProducesPoliciesAndCreditsGroups() async {
-        let vm = LegalIndexViewModel(onSelect: { _ in })
+        let vm = LegalIndexViewModel { _ in }
         await vm.load()
         guard case let .loaded(groups) = vm.state else {
             XCTFail("Expected .loaded")

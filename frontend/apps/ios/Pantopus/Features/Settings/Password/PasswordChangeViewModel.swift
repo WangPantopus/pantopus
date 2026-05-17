@@ -35,22 +35,24 @@ public final class PasswordChangeViewModel {
     public private(set) var hasPassword: Bool = true
     public private(set) var isSaving: Bool = false
     public var fields: [FieldKey: FormFieldState] = [
-        .current: FormFieldState(id: "current", value: "", originalValue: ""),
-        .new: FormFieldState(id: "new", value: "", originalValue: ""),
-        .confirm: FormFieldState(id: "confirm", value: "", originalValue: "")
+        .current: FormFieldState(id: "current", originalValue: ""),
+        .new: FormFieldState(id: "new", originalValue: ""),
+        .confirm: FormFieldState(id: "confirm", originalValue: "")
     ]
     public private(set) var toast: String?
     public var shouldDismiss: Bool = false
 
     private let api: APIClient
 
-    public init(api: APIClient = .shared) {
+    init(api: APIClient = .shared) {
         self.api = api
     }
 
     public static let minPasswordLength = 8
 
-    public var requiresCurrent: Bool { hasPassword }
+    public var requiresCurrent: Bool {
+        hasPassword
+    }
 
     public var isDirty: Bool {
         let newValue = fields[.new]?.value ?? ""
