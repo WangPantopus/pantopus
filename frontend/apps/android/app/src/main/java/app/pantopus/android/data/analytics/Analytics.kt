@@ -45,6 +45,9 @@ sealed class AnalyticsEvent(
         override val properties = mapOf("result" to result.value)
     }
 
+    /** T6.3b / P10 — Maintenance list view. */
+    data object ScreenHomeMaintenanceViewed : AnalyticsEvent("screen.home_maintenance.viewed")
+
     data object ScreenNotificationsViewed : AnalyticsEvent("screen.notifications.viewed")
 
     data object ScreenPetsListViewed : AnalyticsEvent("screen.pets_list.viewed")

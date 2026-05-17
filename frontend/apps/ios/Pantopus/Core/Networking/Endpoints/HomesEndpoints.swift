@@ -140,6 +140,61 @@ public enum HomesEndpoints {
         )
     }
 
+    // MARK: - Maintenance (T6.3b / P10)
+
+    /// `GET /api/homes/:id/maintenance` — route `backend/routes/home.js`
+    /// (added in T6.3b / P10).
+    public static func maintenance(
+        homeId: String,
+        status: String? = nil
+    ) -> Endpoint {
+        var query: [String: String] = [:]
+        if let status { query["status"] = status }
+        return Endpoint(
+            method: .get,
+            path: "/api/homes/\(homeId)/maintenance",
+            query: query
+        )
+    }
+
+    /// `POST /api/homes/:id/maintenance` — route `backend/routes/home.js`.
+    public static func createMaintenance(
+        homeId: String,
+        request: CreateMaintenanceRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/homes/\(homeId)/maintenance",
+            body: request
+        )
+    }
+
+    /// `PUT /api/homes/:id/maintenance/:taskId` — route
+    /// `backend/routes/home.js`.
+    public static func updateMaintenance(
+        homeId: String,
+        taskId: String,
+        request: UpdateMaintenanceRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .put,
+            path: "/api/homes/\(homeId)/maintenance/\(taskId)",
+            body: request
+        )
+    }
+
+    /// `DELETE /api/homes/:id/maintenance/:taskId` — route
+    /// `backend/routes/home.js`.
+    public static func deleteMaintenance(
+        homeId: String,
+        taskId: String
+    ) -> Endpoint {
+        Endpoint(
+            method: .delete,
+            path: "/api/homes/\(homeId)/maintenance/\(taskId)"
+        )
+    }
+
     // MARK: - Pets (T5.2.1)
 
     /// `GET /api/homes/:id/pets` — route `backend/routes/home.js:6789`.

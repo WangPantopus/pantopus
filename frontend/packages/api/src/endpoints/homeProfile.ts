@@ -161,6 +161,67 @@ export async function getHomeBillSplits(homeId: string, billId: string) {
   return get<{ splits: HomeBillSplit[] }>(`/api/homes/${homeId}/bills/${billId}/splits`);
 }
 
+// ---- HomeMaintenance (T6.3b / P10) ----
+
+/** Maintenance task payload returned by `GET /api/homes/:id/maintenance`.
+ *  Backend table extended in migration `151_home_maintenance_tasks.sql`. */
+export interface HomeMaintenanceTask {
+  id: string;
+  home_id: string;
+  task: string;
+  vendor: string | null;
+  cost: number | string | null;
+  recurrence: 'one_time' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | string;
+  due_date: string | null;
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | string;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string | null;
+}
+
+export async function getHomeMaintenance(
+  homeId: string,
+  params?: { status?: string },
+) {
+  return get<{ tasks: HomeMaintenanceTask[] }>(`/api/homes/${homeId}/maintenance`, params);
+}
+
+export async function createHomeMaintenance(
+  homeId: string,
+  data: {
+    task: string;
+    vendor?: string | null;
+    cost?: number | null;
+    recurrence?: HomeMaintenanceTask['recurrence'];
+    due_date?: string | null;
+    status?: HomeMaintenanceTask['status'];
+  },
+) {
+  return post<{ task: HomeMaintenanceTask }>(`/api/homes/${homeId}/maintenance`, data);
+}
+
+export async function updateHomeMaintenance(
+  homeId: string,
+  taskId: string,
+  data: Partial<{
+    task: string;
+    vendor: string | null;
+    cost: number | null;
+    recurrence: HomeMaintenanceTask['recurrence'];
+    due_date: string | null;
+    status: HomeMaintenanceTask['status'];
+  }>,
+) {
+  return put<{ task: HomeMaintenanceTask }>(
+    `/api/homes/${homeId}/maintenance/${taskId}`,
+    data,
+  );
+}
+
+export async function deleteHomeMaintenance(homeId: string, taskId: string) {
+  return del<void>(`/api/homes/${homeId}/maintenance/${taskId}`);
+}
+
 // ---- HomePackage ----
 
 export async function getHomePackages(homeId: string, params?: {
