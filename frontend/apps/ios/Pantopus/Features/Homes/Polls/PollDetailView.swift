@@ -84,7 +84,9 @@ final class PollDetailViewModel {
         voteError = nil
         votingOptionId = optionId
         preVoteSnapshot = current
-        state = .loaded(applyOptimisticVote(poll: current, optionId: optionId))
+        state = .loaded(
+            PollDetailViewModel.applyOptimisticVote(poll: current, optionId: optionId)
+        )
         defer { votingOptionId = nil }
         do {
             _ = try await api.request(
@@ -253,9 +255,11 @@ private struct LoadedShell: View {
             sum + (poll.optionCounts[option.id] ?? poll.optionCounts[option.label] ?? 0)
         }
         let isActive = projection.chipStatus != .closed
-        let topVotes = poll.options.map {
-            poll.optionCounts[$0.id] ?? poll.optionCounts[$0.label] ?? 0
-        }.max() ?? 0
+        let topVotes = poll.options
+            .map {
+                poll.optionCounts[$0.id] ?? poll.optionCounts[$0.label] ?? 0
+            }
+            .max() ?? 0
         return ContentDetailShell(
             title: "Poll",
             onBack: onBack,

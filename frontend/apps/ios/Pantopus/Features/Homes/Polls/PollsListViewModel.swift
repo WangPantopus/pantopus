@@ -20,7 +20,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length function_body_length
+// swiftlint:disable file_length type_body_length
 
 /// Canonical poll-row status chip.
 public enum PollChipStatus: String, Sendable, Hashable {
@@ -479,7 +479,8 @@ final class PollsListViewModel: ListOfRowsDataSource {
     private func emptySubcopy(for tab: PollsTab) -> String {
         switch tab {
         case .active:
-            "Ask the household. Paint colours, weekend plans, whether to replace the dishwasher — get a quick read instead of a long thread."
+            "Ask the household. Paint colours, weekend plans, whether to replace " +
+                "the dishwasher — get a quick read instead of a long thread."
         case .closed:
             "Closed polls show up here once a vote wraps up or a member closes it manually."
         }

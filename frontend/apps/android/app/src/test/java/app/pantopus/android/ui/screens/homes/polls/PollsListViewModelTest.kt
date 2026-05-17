@@ -63,6 +63,7 @@ class PollsListViewModelTest {
         Dispatchers.resetMain()
     }
 
+    @Suppress("LongParameterList")
     private fun makePoll(
         id: String = "p",
         title: String = "Paint color?",

@@ -162,7 +162,10 @@ class PollOptionAdapter {
         }
 
     @ToJson
-    fun toJson(writer: JsonWriter, value: PollOptionDto) {
+    fun toJson(
+        writer: JsonWriter,
+        value: PollOptionDto,
+    ) {
         writer.beginObject()
         writer.name("id").value(value.id)
         writer.name("label").value(value.label)
@@ -194,6 +197,7 @@ class PollOptionAdapter {
  * `selected_options`.
  */
 class MyVoteListAdapter : JsonAdapter<List<String>>() {
+    @Suppress("CyclomaticComplexMethod", "NestedBlockDepth")
     override fun fromJson(reader: JsonReader): List<String>? =
         when (reader.peek()) {
             JsonReader.Token.NULL -> {
@@ -215,18 +219,22 @@ class MyVoteListAdapter : JsonAdapter<List<String>>() {
                             reader.beginObject()
                             while (reader.hasNext()) {
                                 when (reader.nextName()) {
-                                    "id" -> idValue =
-                                        if (reader.peek() == JsonReader.Token.NULL) {
-                                            reader.nextNull<Any>(); null
-                                        } else {
-                                            reader.nextString()
-                                        }
-                                    "label" -> labelValue =
-                                        if (reader.peek() == JsonReader.Token.NULL) {
-                                            reader.nextNull<Any>(); null
-                                        } else {
-                                            reader.nextString()
-                                        }
+                                    "id" ->
+                                        idValue =
+                                            if (reader.peek() == JsonReader.Token.NULL) {
+                                                reader.nextNull<Any>()
+                                                null
+                                            } else {
+                                                reader.nextString()
+                                            }
+                                    "label" ->
+                                        labelValue =
+                                            if (reader.peek() == JsonReader.Token.NULL) {
+                                                reader.nextNull<Any>()
+                                                null
+                                            } else {
+                                                reader.nextString()
+                                            }
                                     else -> reader.skipValue()
                                 }
                             }
@@ -245,7 +253,10 @@ class MyVoteListAdapter : JsonAdapter<List<String>>() {
             }
         }
 
-    override fun toJson(writer: JsonWriter, value: List<String>?) {
+    override fun toJson(
+        writer: JsonWriter,
+        value: List<String>?,
+    ) {
         if (value == null) {
             writer.nullValue()
             return

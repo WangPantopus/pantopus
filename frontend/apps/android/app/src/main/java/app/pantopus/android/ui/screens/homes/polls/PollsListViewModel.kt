@@ -249,13 +249,14 @@ class PollsListViewModel
             now: Instant,
         ): RowModel {
             val projection = project(poll, now)
-            val chips = mutableListOf<RowChip>(
-                RowChip(
-                    text = projection.chipText,
-                    icon = projection.chipIcon,
-                    tint = RowChip.Tint.Status(projection.chipVariant),
-                ),
-            )
+            val chips =
+                mutableListOf<RowChip>(
+                    RowChip(
+                        text = projection.chipText,
+                        icon = projection.chipIcon,
+                        tint = RowChip.Tint.Status(projection.chipVariant),
+                    ),
+                )
             projection.leadingChip?.let { chips += it }
             projection.votedChip?.let { chips += it }
             return RowModel(
@@ -405,7 +406,8 @@ class PollsListViewModel
                 viewerId: String?,
                 now: Instant,
             ): PollsBannerSummary {
-                @Suppress("UNUSED_PARAMETER") val viewerHint = viewerId
+                @Suppress("UNUSED_PARAMETER")
+                val viewerHint = viewerId
                 var awaiting = 0
                 var totalActive = 0
                 for (poll in polls) {
@@ -443,14 +445,15 @@ class PollsListViewModel
                 return RowChip(
                     text = "$prefix: ${leading.first} · ${leading.second} $voteWord",
                     icon = if (status == PollChipStatus.Closed) PantopusIcon.BadgeCheck else null,
-                    tint = if (status == PollChipStatus.Closed) {
-                        RowChip.Tint.Status(StatusChipVariant.Success)
-                    } else {
-                        RowChip.Tint.Custom(
-                            background = PollLeadingChipTint.background,
-                            foreground = PollLeadingChipTint.foreground,
-                        )
-                    },
+                    tint =
+                        if (status == PollChipStatus.Closed) {
+                            RowChip.Tint.Status(StatusChipVariant.Success)
+                        } else {
+                            RowChip.Tint.Custom(
+                                background = PollLeadingChipTint.background,
+                                foreground = PollLeadingChipTint.foreground,
+                            )
+                        },
                 )
             }
 
@@ -459,9 +462,10 @@ class PollsListViewModel
                 var topLabel: String? = null
                 var topVotes = 0
                 for (option in poll.options) {
-                    val votes = poll.optionCounts[option.id]
-                        ?: poll.optionCounts[option.label]
-                        ?: 0
+                    val votes =
+                        poll.optionCounts[option.id]
+                            ?: poll.optionCounts[option.label]
+                            ?: 0
                     if (votes > topVotes) {
                         topVotes = votes
                         topLabel = option.label

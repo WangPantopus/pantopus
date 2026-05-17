@@ -110,9 +110,7 @@ open class HomesRepository
         ): NetworkResult<GetBillSplitsResponse> = safeApiCall { api.getHomeBillSplits(homeId, billId) }
 
         /** `GET /api/homes/:id/polls` (T6.3e / P13). */
-        open suspend fun getHomePolls(
-            homeId: String,
-        ): NetworkResult<GetHomePollsResponse> = safeApiCall { api.getHomePolls(homeId) }
+        open suspend fun getHomePolls(homeId: String): NetworkResult<GetHomePollsResponse> = safeApiCall { api.getHomePolls(homeId) }
 
         /** `POST /api/homes/:id/polls` (T6.3e / P13). */
         open suspend fun createHomePoll(
