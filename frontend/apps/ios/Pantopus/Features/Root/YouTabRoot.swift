@@ -48,6 +48,10 @@ public enum YouRoute: Hashable {
     /// home id resolved by the Me VM. Distinct from `.myTasks` which is
     /// the posted-to-neighbours gig list.
     case homeTasks(homeId: String)
+    /// P15 / T6.3g — Owners (legal-title roster). The "me.owners"
+    /// Household-section row pushes here with the primary home id
+    /// resolved by `MeViewModel.homeSections(...)`.
+    case homeOwners(homeId: String)
     /// T6.3a / P9 — Members. The home-context "me.members" action tile +
     /// "Household" section row both push here with the resolved home id.
     case homeMembers(homeId: String)
@@ -332,6 +336,11 @@ public struct YouTabRoot: View {
         case "me.tasks":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeTasks(homeId: homeId))
+                return
+            }
+        case "me.owners":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.homeOwners(homeId: homeId))
                 return
             }
         case "me.members":
@@ -643,6 +652,15 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.placeholder(label: "Edit recurring task")) }
                     }
                 )
+            )
+        case let .homeOwners(homeId):
+            let currentUserId: String? = {
+                if case let .signedIn(user) = auth.state { return user.id }
+                return nil
+            }()
+            OwnersListView(
+                homeId: homeId,
+                currentUserId: currentUserId
             )
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId)
