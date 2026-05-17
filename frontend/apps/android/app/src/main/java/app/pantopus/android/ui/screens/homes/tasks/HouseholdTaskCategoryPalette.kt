@@ -132,7 +132,10 @@ enum class HouseholdTaskCategory(val rawValue: String) {
          * pattern is a one-line edit to [patterns] plus a test fixture.
          */
         @JvmStatic
-        fun from(title: String?, taskType: String? = null): HouseholdTaskCategory {
+        fun from(
+            title: String?,
+            taskType: String? = null,
+        ): HouseholdTaskCategory {
             if (title.isNullOrEmpty()) {
                 if (taskType?.lowercase() == "shopping") return Errand
                 return Other
@@ -157,55 +160,121 @@ enum class HouseholdTaskCategory(val rawValue: String) {
             listOf(
                 Pattern(
                     Trash,
-                    listOf("trash", "garbage", "recycle", "recycling", "rubbish", "bin out", "bins out", "compost"),
+                    listOf(
+                        "trash",
+                        "garbage",
+                        "recycle",
+                        "recycling",
+                        "rubbish",
+                        "bin out",
+                        "bins out",
+                        "compost",
+                    ),
                 ),
                 Pattern(
                     Pet,
                     listOf(
-                        "walk the dog", "walk dog", "dog walk", "feed the dog", "feed the cat",
-                        "litter box", "dog", " cat ", "puppy", " pet ", "pet ", "vet ",
+                        "walk the dog",
+                        "walk dog",
+                        "dog walk",
+                        "feed the dog",
+                        "feed the cat",
+                        "litter box",
+                        "dog",
+                        " cat ",
+                        "puppy",
+                        " pet ",
+                        "pet ",
+                        "vet ",
                     ),
                 ),
                 Pattern(
                     Kitchen,
                     listOf(
-                        "dishwasher", "dishes", "dish", "kitchen", "cook", "meal", "fridge",
-                        "groceries away", "wipe counters", "stove", "oven",
+                        "dishwasher",
+                        "dishes",
+                        "dish",
+                        "cook",
+                        "meal",
+                        "fridge",
+                        "groceries away",
+                        "stove",
+                        "oven",
                     ),
                 ),
                 Pattern(
                     Laundry,
                     listOf(
-                        "laundry", "wash clothes", "fold clothes", "fold the laundry",
-                        "dryer", "ironing", "iron the",
+                        "laundry",
+                        "wash clothes",
+                        "fold clothes",
+                        "fold the laundry",
+                        "dryer",
+                        "ironing",
+                        "iron the",
                     ),
                 ),
                 Pattern(
                     Yard,
                     listOf(
-                        "water plants", "water the plants", "plants", "garden", "mow", "lawn",
-                        "rake", "leaves", "yard", "porch", "weed",
+                        "water plants",
+                        "water the plants",
+                        "plants",
+                        "garden",
+                        "mow",
+                        "lawn",
+                        "rake",
+                        "leaves",
+                        "yard",
+                        "porch",
+                        "weed",
                     ),
                 ),
                 Pattern(
                     Cleaning,
                     listOf(
-                        "vacuum", "clean", "dust", "mop", "wipe", "scrub", "sweep",
-                        "tidy", "bathroom", "bedroom",
+                        "vacuum",
+                        "clean",
+                        "dust",
+                        "mop",
+                        "wipe",
+                        "scrub",
+                        "sweep",
+                        "tidy",
+                        "bathroom",
+                        "bedroom",
                     ),
                 ),
                 Pattern(
                     Errand,
                     listOf(
-                        "costco", "grocery", "groceries", "shopping", "shop ", "pick up",
-                        "pickup", "buy ", "errand", "store run", "post office", "pharmacy",
+                        "costco",
+                        "grocery",
+                        "groceries",
+                        "shopping",
+                        "shop ",
+                        "pick up",
+                        "pickup",
+                        "buy ",
+                        "errand",
+                        "store run",
+                        "post office",
+                        "pharmacy",
                     ),
                 ),
                 Pattern(
                     Kids,
                     listOf(
-                        "kid", "kids", "school", "homework", "lunchbox", "lunchboxes",
-                        "daycare", "playdate", "baby ", "diaper",
+                        "kid",
+                        "kids",
+                        "school",
+                        "homework",
+                        "lunchbox",
+                        "lunchboxes",
+                        "daycare",
+                        "playdate",
+                        "baby ",
+                        "diaper",
                     ),
                 ),
             )

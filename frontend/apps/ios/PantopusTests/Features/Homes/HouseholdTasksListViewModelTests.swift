@@ -18,8 +18,6 @@
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable type_body_length file_length
-
 @MainActor
 final class HouseholdTasksListViewModelTests: XCTestCase {
     override func setUp() {

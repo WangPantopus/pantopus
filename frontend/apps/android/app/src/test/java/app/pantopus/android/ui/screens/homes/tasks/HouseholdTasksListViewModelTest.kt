@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "LongParameterList")
 
 package app.pantopus.android.ui.screens.homes.tasks
 
@@ -222,7 +222,7 @@ class HouseholdTasksListViewModelTest {
     }
 
     @Test fun due_later_this_week_row_surfaces_neutral_chip() {
-        val task = makeTask(dueAt = "2026-05-19T22:00:00Z") // 4 days out
+        val task = makeTask(dueAt = "2026-05-19T22:00:00Z")
         val projection = HouseholdTasksListViewModel.project(task, fixedNow)
         assertEquals(StatusChipVariant.Neutral, projection.chipVariant)
         assertFalse(projection.chipText.isNullOrEmpty())
@@ -233,7 +233,7 @@ class HouseholdTasksListViewModelTest {
             makeTask(
                 status = "done",
                 assignedTo = "user-aaaa1111",
-                completedAt = "2026-05-15T10:00:00Z", // 2 hours before fixedNow
+                completedAt = "2026-05-15T10:00:00Z",
             )
         val projection = HouseholdTasksListViewModel.project(task, fixedNow)
         assertTrue(projection.subtitle.startsWith("Done by "))
@@ -254,11 +254,11 @@ class HouseholdTasksListViewModelTest {
     @Test fun banner_summary_counts_overdue_and_due_today() {
         val tasks =
             listOf(
-                makeTask(id = "t1", status = "open", dueAt = "2026-05-13T00:00:00Z"), // overdue
-                makeTask(id = "t2", status = "open", dueAt = "2026-05-12T00:00:00Z"), // overdue
-                makeTask(id = "t3", status = "open", dueAt = "2026-05-15T18:00:00Z"), // today
-                makeTask(id = "t4", status = "open", dueAt = "2026-05-20T00:00:00Z"), // later
-                makeTask(id = "t5", status = "done", dueAt = "2026-05-15T00:00:00Z"), // ignored
+                makeTask(id = "t1", status = "open", dueAt = "2026-05-13T00:00:00Z"),
+                makeTask(id = "t2", status = "open", dueAt = "2026-05-12T00:00:00Z"),
+                makeTask(id = "t3", status = "open", dueAt = "2026-05-15T18:00:00Z"),
+                makeTask(id = "t4", status = "open", dueAt = "2026-05-20T00:00:00Z"),
+                makeTask(id = "t5", status = "done", dueAt = "2026-05-15T00:00:00Z"),
             )
         val summary = HouseholdTasksListViewModel.summarize(tasks, fixedNow)
         assertEquals(2, summary.overdueCount)

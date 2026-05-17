@@ -9,6 +9,7 @@ import app.pantopus.android.data.api.models.homes.HomeTaskDto
 import app.pantopus.android.data.api.models.homes.UpdateHomeTaskRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerCtaTint
@@ -25,7 +26,6 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
-import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -381,7 +381,7 @@ class HouseholdTasksListViewModel
                 subtitle = projection.subtitle,
                 template = RowTemplate.StatusChip,
                 leading = leadingFor(projection),
-                trailing = trailingFor(task, tab, projection, taskId),
+                trailing = trailingFor(task, tab, taskId),
                 onTap = { onOpenTask(taskId) },
                 inlineChip =
                     if (tab == HouseholdTasksTab.Recurring && projection.recurrenceChip != null) {
@@ -422,7 +422,6 @@ class HouseholdTasksListViewModel
         private fun trailingFor(
             task: HomeTaskDto,
             tab: HouseholdTasksTab,
-            projection: HouseholdTaskRowProjection,
             taskId: String,
         ): RowTrailing =
             when (tab) {
@@ -617,15 +616,15 @@ class HouseholdTasksListViewModel
                 val nowDay = now.atZone(zone).toLocalDate()
                 var dueToday = 0
                 var overdue = 0
-                for (task in tasks) {
-                    if (task.status != "open" && task.status != "in_progress") continue
-                    val iso = task.dueAt ?: continue
-                    val due = parseInstant(iso) ?: continue
-                    val dueDay = due.atZone(zone).toLocalDate()
-                    val days = ChronoUnit.DAYS.between(nowDay, dueDay)
-                    when {
-                        days < 0 -> overdue += 1
-                        days == 0L -> dueToday += 1
+                tasks.forEach { task ->
+                    val due = task.dueAt?.let(::parseInstant)
+                    if ((task.status == "open" || task.status == "in_progress") && due != null) {
+                        val dueDay = due.atZone(zone).toLocalDate()
+                        val days = ChronoUnit.DAYS.between(nowDay, dueDay)
+                        when {
+                            days < 0 -> overdue += 1
+                            days == 0L -> dueToday += 1
+                        }
                     }
                 }
                 return HouseholdTasksBannerSummary(dueTodayCount = dueToday, overdueCount = overdue)
@@ -675,8 +674,13 @@ class HouseholdTasksListViewModel
                 val token = tail.substringBefore(';')
                 val map =
                     mapOf(
-                        "mo" to "Mon", "tu" to "Tue", "we" to "Wed", "th" to "Thu",
-                        "fr" to "Fri", "sa" to "Sat", "su" to "Sun",
+                        "mo" to "Mon",
+                        "tu" to "Tue",
+                        "we" to "Wed",
+                        "th" to "Thu",
+                        "fr" to "Fri",
+                        "sa" to "Sat",
+                        "su" to "Sun",
                     )
                 val pieces = token.split(",").mapNotNull { map[it.trim().lowercase()] }
                 return if (pieces.isEmpty()) null else pieces.joinToString(", ")

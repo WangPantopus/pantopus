@@ -143,8 +143,8 @@ const PATTERNS: Pattern[] = [
   {
     category: 'kitchen',
     matchers: [
-      'dishwasher', 'dishes', 'dish', 'kitchen', 'cook', 'meal', 'fridge',
-      'groceries away', 'wipe counters', 'stove', 'oven',
+      'dishwasher', 'dishes', 'dish', 'cook', 'meal', 'fridge',
+      'groceries away', 'stove', 'oven',
     ],
   },
   {

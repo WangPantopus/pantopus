@@ -43,7 +43,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length function_body_length
+// swiftlint:disable file_length type_body_length
 
 /// Canonical chip status for one household task. Reduces the backend's
 /// 4-state `status` column to the 3 buckets the design surfaces.
@@ -105,6 +105,20 @@ public struct HouseholdTaskRowProjection: Sendable, Equatable {
     public let highlight: RowHighlight?
 }
 
+private struct HouseholdTaskDueProjection {
+    let chipText: String?
+    let chipVariant: StatusChipVariant?
+    let chipIcon: PantopusIcon?
+    let dueLine: String?
+
+    static let empty = HouseholdTaskDueProjection(
+        chipText: nil,
+        chipVariant: nil,
+        chipIcon: nil,
+        dueLine: nil
+    )
+}
+
 /// ViewModel for the Household tasks list. Builds `RowModel`s from
 /// `HomeTaskDTO`s and re-renders the tab filter client-side — backend
 /// supports `?status=` queries (line 4178 of `home.js` doesn't actually
@@ -120,7 +134,9 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
     /// filter intent. The FAB owns the canonical "Add a task" action so
     /// we don't need a duplicate entry point in the top bar. Tracked
     /// for a follow-up if a filter sheet ships.
-    var topBarAction: TopBarAction? { nil }
+    var topBarAction: TopBarAction? {
+        nil
+    }
 
     /// Tabs with live counts. Rebuilt whenever `tasks` changes.
     var tabs: [ListOfRowsTab] {
@@ -294,21 +310,22 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
     private func emptyContent(for tab: HouseholdTasksTab) -> ListOfRowsState.EmptyContent {
         switch tab {
         case .active:
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .listChecks,
                 headline: "No tasks yet",
-                subcopy: "Track who's doing what. Add a one-off chore, or set up the recurring stuff (trash, dog walks, plants) once and let it spawn itself.",
+                subcopy: "Track who's doing what. Add a one-off chore, or set up the recurring stuff " +
+                    "(trash, dog walks, plants) once and let it spawn itself.",
                 ctaTitle: "Add a task"
             ) { [onAddTask] in onAddTask() }
         case .done:
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .checkCircle,
                 headline: "Nothing done yet",
                 subcopy: "Finished chores from the last 30 days will show up here.",
                 ctaTitle: "Add a task"
             ) { [onAddTask] in onAddTask() }
         case .recurring:
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .arrowsRepeat,
                 headline: "No recurring chores",
                 subcopy: "Set up the weekly trash run, daily dog walks, or plant watering once and they'll spawn themselves.",
@@ -346,7 +363,7 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
     }
 
     private func leading(
-        for task: HomeTaskDTO,
+        for _: HomeTaskDTO,
         projection: HouseholdTaskRowProjection
     ) -> RowLeading {
         if projection.isAssigned, let label = projection.assigneeLabel {
@@ -370,7 +387,7 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
     private func trailing(
         for task: HomeTaskDTO,
         tab: HouseholdTasksTab,
-        projection: HouseholdTaskRowProjection,
+        projection _: HouseholdTaskRowProjection,
         taskId: String
     ) -> RowTrailing {
         switch tab {
@@ -380,13 +397,12 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
                 icon: isDone ? .check : .circle,
                 accessibilityLabel: isDone ? "Mark not done" : "Mark done",
                 background: isDone ? Theme.Color.homeBg : Theme.Color.appSurface,
-                foreground: isDone ? Theme.Color.home : Theme.Color.appTextMuted,
-                handler: { [weak self] in
-                    Task { @MainActor [weak self] in
-                        await self?.toggleDone(taskId: taskId)
-                    }
+                foreground: isDone ? Theme.Color.home : Theme.Color.appTextMuted
+            ) { [weak self] in
+                Task { @MainActor [weak self] in
+                    await self?.toggleDone(taskId: taskId)
                 }
-            )
+            }
         case .done:
             return .statusChip(text: "Done", variant: .success)
         case .recurring:
@@ -446,15 +462,15 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
             )
         default:
             // open / in_progress
-            let (chipText, chipVariant, chipIcon, dueLine) = dueChip(for: task.dueAt, now: now)
+            let due = dueChip(for: task.dueAt, now: now)
             let assigneeLine = assigneeLabel.map { "Assigned to \($0)" } ?? "Unassigned"
-            let subtitle = dueLine.map { "\(assigneeLine) · \($0)" } ?? assigneeLine
+            let subtitle = due.dueLine.map { "\(assigneeLine) · \($0)" } ?? assigneeLine
             return HouseholdTaskRowProjection(
                 title: task.title,
                 subtitle: subtitle,
-                chipText: chipText,
-                chipVariant: chipVariant,
-                chipIcon: chipIcon,
+                chipText: due.chipText,
+                chipVariant: due.chipVariant,
+                chipIcon: due.chipIcon,
                 recurrenceChip: recurrenceChip,
                 category: category,
                 isAssigned: isAssigned,
@@ -467,12 +483,12 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
     /// Pure helper — maps `due_at` + clock to (chip text, chip variant,
     /// chip icon, subtitle-due-line). Returns `nil`s when the task has
     /// no due date.
-    static func dueChip(
+    private static func dueChip(
         for iso: String?,
         now: Date
-    ) -> (String?, StatusChipVariant?, PantopusIcon?, String?) {
+    ) -> HouseholdTaskDueProjection {
         guard let iso, let due = parseDate(iso) else {
-            return (nil, nil, nil, nil)
+            return .empty
         }
         let calendar = Calendar.current
         let dueDay = calendar.startOfDay(for: due)
@@ -481,20 +497,45 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
         if days < 0 {
             let lateBy = -days
             let label = lateBy == 1 ? "1 day late" : "\(lateBy) days late"
-            return (label, .error, .alertCircle, label)
+            return HouseholdTaskDueProjection(
+                chipText: label,
+                chipVariant: .error,
+                chipIcon: .alertCircle,
+                dueLine: label
+            )
         }
         if days == 0 {
-            return ("Today", .warning, .clock, "Due today")
+            return HouseholdTaskDueProjection(
+                chipText: "Today",
+                chipVariant: .warning,
+                chipIcon: .clock,
+                dueLine: "Due today"
+            )
         }
         if days == 1 {
-            return ("Tomorrow", .warning, .clock, "Due tomorrow")
+            return HouseholdTaskDueProjection(
+                chipText: "Tomorrow",
+                chipVariant: .warning,
+                chipIcon: .clock,
+                dueLine: "Due tomorrow"
+            )
         }
         if days <= 7 {
             let label = formatWeekday(due) ?? "This week"
-            return (label, .neutral, nil, "Due \(label)")
+            return HouseholdTaskDueProjection(
+                chipText: label,
+                chipVariant: .neutral,
+                chipIcon: nil,
+                dueLine: "Due \(label)"
+            )
         }
         let label = formatDateShort(date: due) ?? "Later"
-        return (label, .neutral, nil, "Due \(label)")
+        return HouseholdTaskDueProjection(
+            chipText: label,
+            chipVariant: .neutral,
+            chipIcon: nil,
+            dueLine: "Due \(label)"
+        )
     }
 
     /// Pass the row through tab membership. Per the brief:
@@ -554,7 +595,7 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
     }
 
     /// Pure summary projection. Public-static for tests.
-    public static func summarize(
+    static func summarize(
         tasks: [HomeTaskDTO],
         now: Date
     ) -> HouseholdTasksBannerSummary {

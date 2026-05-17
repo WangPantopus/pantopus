@@ -64,9 +64,9 @@ import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_E
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
 import app.pantopus.android.ui.screens.homes.pets.PETS_LIST_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.pets.PetsListScreen
 import app.pantopus.android.ui.screens.homes.tasks.HOUSEHOLD_TASKS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.HouseholdTasksListScreen
-import app.pantopus.android.ui.screens.homes.pets.PetsListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
