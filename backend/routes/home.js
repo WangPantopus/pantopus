@@ -4665,6 +4665,214 @@ router.get('/:id/bills/:billId/splits', verifyToken, async (req, res) => {
 });
 
 
+// ============ HOME MAINTENANCE ============
+//
+// T6.3b / P10 — Per-home maintenance log. The `HomeMaintenanceLog`
+// table was extended in migration `151_home_maintenance_tasks.sql`
+// with `task / vendor / recurrence / due_date / status / updated_at /
+// created_by` so the new design's forward-looking task list works
+// alongside the historical "I performed this" log.
+//
+// Authz: list/get requires home membership (no special permission);
+// create/update/delete require `home.edit` (mirrors the bills/packages
+// pattern — managers + admins + owners can write).
+
+const MAINTENANCE_STATUS_VALUES = new Set([
+  'scheduled', 'in_progress', 'completed', 'cancelled'
+]);
+const MAINTENANCE_RECURRENCE_VALUES = new Set([
+  'one_time', 'weekly', 'monthly', 'quarterly', 'yearly'
+]);
+
+/**
+ * GET /api/homes/:id/maintenance
+ *
+ * Returns every maintenance task for a home, newest-due first when a
+ * `due_date` exists and falling back to `performed_at` for historical
+ * rows. The Scheduled / Completed / All client-side tabs filter by
+ * `status` (Scheduled = `scheduled|in_progress`).
+ */
+router.get('/:id/maintenance', verifyToken, async (req, res) => {
+  try {
+    const { id: homeId } = req.params;
+    const userId = req.user.id;
+    const { status } = req.query;
+
+    const access = await checkHomePermission(homeId, userId);
+    if (!access.hasAccess) return res.status(403).json({ error: 'No access to this home' });
+
+    let query = supabaseAdmin
+      .from('HomeMaintenanceLog')
+      .select('*')
+      .eq('home_id', homeId)
+      .order('due_date', { ascending: true });
+
+    if (status) {
+      if (!MAINTENANCE_STATUS_VALUES.has(status)) {
+        return res.status(400).json({ error: 'Invalid status filter' });
+      }
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      logger.error('Error fetching home maintenance', { error: error.message, homeId });
+      return res.status(500).json({ error: 'Failed to fetch maintenance' });
+    }
+
+    res.json({ tasks: data || [] });
+  } catch (err) {
+    logger.error('Maintenance fetch error', { error: err.message });
+    res.status(500).json({ error: 'Failed to fetch maintenance' });
+  }
+});
+
+/**
+ * POST /api/homes/:id/maintenance
+ *
+ * Body: { task, vendor?, cost?, recurrence?, due_date?, status? }.
+ *  - `task` is required (non-empty); everything else is optional.
+ *  - `status` defaults to `scheduled`; `recurrence` defaults to `one_time`.
+ */
+router.post('/:id/maintenance', verifyToken, async (req, res) => {
+  try {
+    const { id: homeId } = req.params;
+    const userId = req.user.id;
+
+    const access = await checkHomePermission(homeId, userId, 'home.edit');
+    if (!access.hasAccess) return res.status(403).json({ error: 'No permission to manage maintenance' });
+
+    const { task, vendor, cost, recurrence, due_date, status } = req.body || {};
+
+    if (!task || typeof task !== 'string' || !task.trim()) {
+      return res.status(400).json({ error: 'task is required' });
+    }
+    if (status && !MAINTENANCE_STATUS_VALUES.has(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    if (recurrence && !MAINTENANCE_RECURRENCE_VALUES.has(recurrence)) {
+      return res.status(400).json({ error: 'Invalid recurrence' });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('HomeMaintenanceLog')
+      .insert({
+        home_id: homeId,
+        task: task.trim(),
+        vendor: vendor || null,
+        cost: cost == null ? null : cost,
+        recurrence: recurrence || 'one_time',
+        due_date: due_date || null,
+        status: status || 'scheduled',
+        created_by: userId,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Error creating maintenance task', { error: error.message, homeId });
+      return res.status(500).json({ error: 'Failed to create maintenance task' });
+    }
+
+    res.status(201).json({ task: data });
+  } catch (err) {
+    logger.error('Maintenance create error', { error: err.message });
+    res.status(500).json({ error: 'Failed to create maintenance task' });
+  }
+});
+
+/**
+ * PUT /api/homes/:id/maintenance/:taskId
+ *
+ * Whitelisted patch — only the design-spec fields are accepted, plus
+ * `updated_at` always refreshed. Auto-stamps `performed_at` +
+ * `performed_by` when the row flips to `completed` (so the historical
+ * `HomeMaintenanceLog` interpretation stays consistent).
+ */
+router.put('/:id/maintenance/:taskId', verifyToken, async (req, res) => {
+  try {
+    const { id: homeId, taskId } = req.params;
+    const userId = req.user.id;
+
+    const access = await checkHomePermission(homeId, userId, 'home.edit');
+    if (!access.hasAccess) return res.status(403).json({ error: 'No permission to manage maintenance' });
+
+    const allowed = ['task', 'vendor', 'cost', 'recurrence', 'due_date', 'status'];
+    const updates = {};
+    for (const key of allowed) {
+      if (req.body && req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+
+    if (updates.status && !MAINTENANCE_STATUS_VALUES.has(updates.status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    if (updates.recurrence && !MAINTENANCE_RECURRENCE_VALUES.has(updates.recurrence)) {
+      return res.status(400).json({ error: 'Invalid recurrence' });
+    }
+
+    if (updates.status === 'completed') {
+      updates.performed_at = new Date().toISOString();
+      updates.performed_by = userId;
+    }
+
+    updates.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabaseAdmin
+      .from('HomeMaintenanceLog')
+      .update(updates)
+      .eq('id', taskId)
+      .eq('home_id', homeId)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Error updating maintenance task', { error: error.message, taskId });
+      return res.status(500).json({ error: 'Failed to update maintenance task' });
+    }
+    if (!data) return res.status(404).json({ error: 'Maintenance task not found' });
+
+    res.json({ task: data });
+  } catch (err) {
+    logger.error('Maintenance update error', { error: err.message });
+    res.status(500).json({ error: 'Failed to update maintenance task' });
+  }
+});
+
+/**
+ * DELETE /api/homes/:id/maintenance/:taskId
+ *
+ * Hard-delete. Bills used soft-delete (`status='cancelled'`) because
+ * splits + audit reasons; maintenance has no downstream constraints,
+ * so hard-delete is fine. Web/mobile clients can still opt to mark
+ * `status='cancelled'` via PUT for soft-cancel UX.
+ */
+router.delete('/:id/maintenance/:taskId', verifyToken, async (req, res) => {
+  try {
+    const { id: homeId, taskId } = req.params;
+    const userId = req.user.id;
+
+    const access = await checkHomePermission(homeId, userId, 'home.edit');
+    if (!access.hasAccess) return res.status(403).json({ error: 'No permission to manage maintenance' });
+
+    const { error } = await supabaseAdmin
+      .from('HomeMaintenanceLog')
+      .delete()
+      .eq('id', taskId)
+      .eq('home_id', homeId);
+
+    if (error) {
+      logger.error('Error deleting maintenance task', { error: error.message, taskId });
+      return res.status(500).json({ error: 'Failed to delete maintenance task' });
+    }
+
+    res.status(204).end();
+  } catch (err) {
+    logger.error('Maintenance delete error', { error: err.message });
+    res.status(500).json({ error: 'Failed to delete maintenance task' });
+  }
+});
+
+
 // ============ HOME PACKAGES ============
 
 /**

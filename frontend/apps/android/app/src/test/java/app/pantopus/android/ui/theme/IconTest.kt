@@ -124,6 +124,15 @@ class IconTest {
             // T6.4a — Access codes
             "eye-off",
             "key-round",
+            // T6.3b — Maintenance category glyphs.
+            "wrench",
+            "fan",
+            "cloud-rain",
+            "refrigerator",
+            "bug",
+            "trees",
+            "paint-roller",
+            "bell-ring",
         )
 
     @Test

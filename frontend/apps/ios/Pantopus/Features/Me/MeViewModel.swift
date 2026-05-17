@@ -291,6 +291,7 @@ public final class MeViewModel {
         let args = homeId.map { ["homeId": $0] } ?? [:]
         return [
             MeActionTile(id: "bills", icon: .file, label: "Bills", routeKey: "me.bills", routeArgs: args),
+            MeActionTile(id: "maintenance", icon: .hammer, label: "Maintenance", routeKey: "me.maintenance", routeArgs: args),
             MeActionTile(id: "pets", icon: .heart, label: "Pets", routeKey: "me.pets", routeArgs: args),
             MeActionTile(id: "members", icon: .userPlus, label: "Members", routeKey: "me.members", routeArgs: args),
             MeActionTile(id: "polls", icon: .checkCircle, label: "Polls", routeKey: "me.polls", routeArgs: args),
@@ -315,6 +316,7 @@ public final class MeViewModel {
             ]),
             MeSection(id: "activity", header: "Activity", rows: [
                 MeSectionRow(id: "bills", icon: .file, label: "Bills", routeKey: "me.bills", routeArgs: args),
+                MeSectionRow(id: "maintenance", icon: .hammer, label: "Maintenance", routeKey: "me.maintenance", routeArgs: args),
                 MeSectionRow(id: "tasks", icon: .hammer, label: "Household tasks", routeKey: "me.tasks", routeArgs: args),
                 MeSectionRow(id: "packages", icon: .mailbox, label: "Packages", routeKey: "me.packages", routeArgs: args),
                 MeSectionRow(id: "emergency", icon: .shield, label: "Emergency info", routeKey: "me.emergency", routeArgs: args)

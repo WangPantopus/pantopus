@@ -62,6 +62,7 @@ fun HomeDashboardScreen(
     onOpenPlaceholder: ((String) -> Unit)? = null,
     onOpenPets: ((String) -> Unit)? = null,
     onOpenAccessCodes: ((homeId: String, homeName: String?) -> Unit)? = null,
+    onOpenMaintenance: ((String) -> Unit)? = null,
     /** T6.3a / P9 — push to the per-home Members list. When wired, the
      *  "Members" / "Add member" quick-actions navigate to the list
      *  (which owns its own invite FAB) instead of opening the legacy
@@ -86,6 +87,7 @@ fun HomeDashboardScreen(
             "add_member" -> "Add member"
             "verify" -> "Verify home"
             "view_bills" -> "Bills"
+            "view_maintenance" -> "Maintenance"
             "pets" -> "Pets"
             "access_codes" -> "Access codes"
             else -> actionId.replace('_', ' ').replaceFirstChar(Char::uppercase)
@@ -126,6 +128,10 @@ fun HomeDashboardScreen(
             "view_bills" ->
                 viewModel.currentHomeId()?.let { homeId ->
                     onOpenBills?.invoke(homeId) ?: openPlaceholder(actionId)
+                }
+            "view_maintenance" ->
+                viewModel.currentHomeId()?.let { homeId ->
+                    onOpenMaintenance?.invoke(homeId) ?: openPlaceholder(actionId)
                 }
             "pets" ->
                 viewModel.currentHomeId()?.let { homeId ->

@@ -4,12 +4,15 @@ import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CreateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
+import app.pantopus.android.data.api.models.homes.CreateMaintenanceRequest
 import app.pantopus.android.data.api.models.homes.FileUploadResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
+import app.pantopus.android.data.api.models.homes.GetHomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.HomeAccessSecretResponse
 import app.pantopus.android.data.api.models.homes.HomeAccessSecretsResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
+import app.pantopus.android.data.api.models.homes.HomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
@@ -18,6 +21,7 @@ import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
 import app.pantopus.android.data.api.models.homes.UpdateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
+import app.pantopus.android.data.api.models.homes.UpdateMaintenanceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import app.pantopus.android.data.api.net.NetworkResult
@@ -131,6 +135,40 @@ open class HomesRepository
             homeId: String,
             secretId: String,
         ): NetworkResult<Unit> = safeApiCall { api.deleteHomeAccessSecret(homeId, secretId) }
+
+        // ─── Maintenance (T6.3b / P10) ─────────────────────────
+
+        /** `GET /api/homes/:id/maintenance`. */
+        open suspend fun getHomeMaintenance(
+            homeId: String,
+            status: String? = null,
+        ): NetworkResult<GetHomeMaintenanceResponse> = safeApiCall { api.getHomeMaintenance(homeId, status) }
+
+        /** `POST /api/homes/:id/maintenance`. */
+        open suspend fun createHomeMaintenance(
+            homeId: String,
+            request: CreateMaintenanceRequest,
+        ): NetworkResult<HomeMaintenanceResponse> = safeApiCall { api.createHomeMaintenance(homeId, request) }
+
+        /** `PUT /api/homes/:id/maintenance/:taskId`. */
+        open suspend fun updateHomeMaintenance(
+            homeId: String,
+            taskId: String,
+            request: UpdateMaintenanceRequest,
+        ): NetworkResult<HomeMaintenanceResponse> = safeApiCall { api.updateHomeMaintenance(homeId, taskId, request) }
+
+        /** `DELETE /api/homes/:id/maintenance/:taskId`. */
+        open suspend fun deleteHomeMaintenance(
+            homeId: String,
+            taskId: String,
+        ): NetworkResult<Unit> =
+            safeApiCall {
+                val response = api.deleteHomeMaintenance(homeId, taskId)
+                if (!response.isSuccessful) {
+                    throw retrofit2.HttpException(response)
+                }
+                Unit
+            }
 
         /**
          * Upload one binary file to `POST /api/files/upload` and return
