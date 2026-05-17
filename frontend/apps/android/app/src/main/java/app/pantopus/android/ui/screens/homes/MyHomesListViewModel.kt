@@ -128,10 +128,11 @@ class MyHomesListViewModel
                         RowChip(
                             text = "Active home",
                             icon = PantopusIcon.Home,
-                            tint = RowChip.Tint.Custom(
-                                background = PantopusColors.homeBg,
-                                foreground = PantopusColors.home,
-                            ),
+                            tint =
+                                RowChip.Tint.Custom(
+                                    background = PantopusColors.homeBg,
+                                    foreground = PantopusColors.home,
+                                ),
                         ),
                     )
                 } else {

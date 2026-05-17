@@ -216,10 +216,11 @@ class MyListingsViewModel
                 RowChip(
                     text = "$views ${if (views == 1) "view" else "views"}",
                     icon = PantopusIcon.Eye,
-                    tint = RowChip.Tint.Custom(
-                        background = PantopusColors.appSurfaceSunken,
-                        foreground = PantopusColors.appTextSecondary,
-                    ),
+                    tint =
+                        RowChip.Tint.Custom(
+                            background = PantopusColors.appSurfaceSunken,
+                            foreground = PantopusColors.appTextSecondary,
+                        ),
                 )
             val offers = listing.activeOfferCount ?: 0
             chips +=
@@ -227,19 +228,21 @@ class MyListingsViewModel
                     RowChip(
                         text = "$offers ${if (offers == 1) "offer" else "offers"}",
                         icon = PantopusIcon.HandCoins,
-                        tint = RowChip.Tint.Custom(
-                            background = PantopusColors.primary50,
-                            foreground = PantopusColors.primary700,
-                        ),
+                        tint =
+                            RowChip.Tint.Custom(
+                                background = PantopusColors.primary50,
+                                foreground = PantopusColors.primary700,
+                            ),
                     )
                 } else {
                     RowChip(
                         text = "0 offers",
                         icon = PantopusIcon.HandCoins,
-                        tint = RowChip.Tint.Custom(
-                            background = PantopusColors.appSurfaceSunken,
-                            foreground = PantopusColors.appTextSecondary,
-                        ),
+                        tint =
+                            RowChip.Tint.Custom(
+                                background = PantopusColors.appSurfaceSunken,
+                                foreground = PantopusColors.appTextSecondary,
+                            ),
                     )
                 }
             chips += statusChip(listing.status ?: "active")

@@ -119,16 +119,20 @@ final class MyHomesListViewModel: ListOfRowsDataSource {
         let subtitleParts = [role, locality].compactMap { $0 }
         let subtitle = subtitleParts.isEmpty ? nil : subtitleParts.joined(separator: " · ")
 
-        let chips: [RowChip]? = entry.isPrimaryOwner == true
-            ? [RowChip(
-                text: "Active home",
-                icon: .home,
-                tint: .custom(
-                    background: Theme.Color.homeBg,
-                    foreground: Theme.Color.home
+        let chips: [RowChip]? = if entry.isPrimaryOwner == true {
+            [
+                RowChip(
+                    text: "Active home",
+                    icon: .home,
+                    tint: .custom(
+                        background: Theme.Color.homeBg,
+                        foreground: Theme.Color.home
+                    )
                 )
-            )]
-            : nil
+            ]
+        } else {
+            nil
+        }
 
         return RowModel(
             id: entry.id,
@@ -177,8 +181,8 @@ final class MyHomesListViewModel: ListOfRowsDataSource {
             return "Manager"
         case nil:
             return nil
-        default:
-            return entry.occupancy?.roleBase?.capitalized
+        case let roleBase?:
+            return roleBase.capitalized
         }
     }
 }

@@ -25,7 +25,9 @@ import SwiftUI
 @MainActor
 final class MyBusinessesViewModel: ListOfRowsDataSource {
     let title = "My businesses"
-    var topBarAction: TopBarAction? { nil }
+    var topBarAction: TopBarAction? {
+        nil
+    }
 
     let tabs: [ListOfRowsTab] = []
     var selectedTab: String = ""
@@ -172,5 +174,7 @@ final class MyBusinessesViewModel: ListOfRowsDataSource {
 }
 
 private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }

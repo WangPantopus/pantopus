@@ -7,11 +7,11 @@ import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerCtaTint
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
-import app.pantopus.android.ui.components.IdentityPillar
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -88,7 +88,14 @@ class MyHomesListViewModelTest {
                         homes =
                             listOf(
                                 makeHome("h1", name = "Birch Lane", city = "Elm Park", ownership = "verified", isPrimary = true),
-                                makeHome("h2", name = null, city = "Sellwood", ownership = null, roleBase = "lease_resident", isPrimary = false),
+                                makeHome(
+                                    "h2",
+                                    name = null,
+                                    city = "Sellwood",
+                                    ownership = null,
+                                    roleBase = "lease_resident",
+                                    isPrimary = false,
+                                ),
                             ),
                         message = null,
                     ),

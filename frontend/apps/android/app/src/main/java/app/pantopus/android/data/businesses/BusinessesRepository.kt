@@ -16,6 +16,5 @@ open class BusinessesRepository
         private val api: BusinessesApi,
     ) {
         /** T6.3f / P14 — backs My businesses. Owner + staff seats. */
-        open suspend fun myBusinesses(): NetworkResult<MyBusinessesResponse> =
-            safeApiCall { api.myBusinesses() }
+        open suspend fun myBusinesses(): NetworkResult<MyBusinessesResponse> = safeApiCall { api.myBusinesses() }
     }
