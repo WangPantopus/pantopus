@@ -26,6 +26,10 @@ struct HomeDashboardView: View {
     /// Push onto the host stack when the user taps the Pets quick-action
     /// tile. Receives this home's id so the destination can pre-fetch.
     private let onOpenPets: ((String) -> Void)?
+    /// Push onto the host stack when the user taps the Members
+    /// quick-action tile or "Add member" CTA (T6.3a / P9). Receives
+    /// this home's id so the destination can pre-fetch the roster.
+    private let onOpenMembers: ((String) -> Void)?
 
     init(
         homeId: String,
@@ -34,7 +38,8 @@ struct HomeDashboardView: View {
         onOpenClaimsList: (() -> Void)? = nil,
         onOpenBills: (() -> Void)? = nil,
         onOpenPlaceholder: ((String) -> Void)? = nil,
-        onOpenPets: ((String) -> Void)? = nil
+        onOpenPets: ((String) -> Void)? = nil,
+        onOpenMembers: ((String) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
         self.homeId = homeId
@@ -44,6 +49,7 @@ struct HomeDashboardView: View {
         self.onOpenBills = onOpenBills
         self.onOpenPlaceholder = onOpenPlaceholder
         self.onOpenPets = onOpenPets
+        self.onOpenMembers = onOpenMembers
     }
 
     /// Current signed-in user's email — used by the Invite Owner form
@@ -125,7 +131,14 @@ struct HomeDashboardView: View {
     private func handleFabAction(_ action: String) {
         switch action {
         case "add_member":
-            showsInviteOwner = true
+            // Prefer the dedicated Members screen when its host wired
+            // the callback (T6.3a). Falls back to the legacy
+            // InviteOwnerForm sheet for older hosts.
+            if let onOpenMembers {
+                onOpenMembers(homeId)
+            } else {
+                showsInviteOwner = true
+            }
         default:
             onOpenPlaceholder?(actionLabel(action))
         }
@@ -136,7 +149,11 @@ struct HomeDashboardView: View {
         case "verify":
             onClaimOwnership?()
         case "add_member":
-            showsInviteOwner = true
+            if let onOpenMembers {
+                onOpenMembers(homeId)
+            } else {
+                showsInviteOwner = true
+            }
         case "view_bills":
             onOpenBills?()
         case "pets":

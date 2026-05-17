@@ -59,6 +59,16 @@ sealed class AnalyticsEvent(
             mapOf("step_number" to stepNumber.toString(), "step_name" to stepName)
     }
 
+    data object ScreenMembersListViewed : AnalyticsEvent("screen.members_list.viewed")
+
+    data class ScreenMembersWizardStepViewed(
+        val stepNumber: Int,
+        val stepName: String,
+    ) : AnalyticsEvent("screen.members_wizard.step_viewed") {
+        override val properties =
+            mapOf("step_number" to stepNumber.toString(), "step_name" to stepName)
+    }
+
     data class ScreenPulseFeedViewed(
         val intent: String,
     ) : AnalyticsEvent("screen.pulse_feed.viewed") {
