@@ -41,6 +41,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +62,7 @@ fun AudienceProfileScreen(
     onOpenFollower: (FollowerRowContent) -> Unit = {},
     onOpenThread: (ThreadRowContent) -> Unit = {},
     onOpenSetup: () -> Unit = {},
+    onOpenCreatorInbox: () -> Unit = {},
     viewModel: AudienceProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -99,6 +102,7 @@ fun AudienceProfileScreen(
                     onSubmitUpdate = viewModel::submitUpdate,
                     onOpenFollower = onOpenFollower,
                     onOpenThread = onOpenThread,
+                    onOpenCreatorInbox = onOpenCreatorInbox,
                 )
         }
     }
@@ -271,6 +275,7 @@ internal fun LoadedFrame(
     onSubmitUpdate: () -> Unit,
     onOpenFollower: (FollowerRowContent) -> Unit,
     onOpenThread: (ThreadRowContent) -> Unit,
+    onOpenCreatorInbox: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier.fillMaxSize().testTag("audienceProfileContent"),
@@ -299,7 +304,11 @@ internal fun LoadedFrame(
                     onOpenFollower = onOpenFollower,
                 )
             AudienceProfileTab.Threads ->
-                ThreadsTab(threads = loaded.threads, onOpenThread = onOpenThread)
+                ThreadsTab(
+                    threads = loaded.threads,
+                    onOpenThread = onOpenThread,
+                    onOpenCreatorInbox = onOpenCreatorInbox,
+                )
         }
     }
 }
@@ -918,6 +927,7 @@ private fun EmptyFollowersCard() {
 private fun ThreadsTab(
     threads: List<ThreadRowContent>,
     onOpenThread: (ThreadRowContent) -> Unit,
+    onOpenCreatorInbox: () -> Unit = {},
 ) {
     Column(
         modifier =
@@ -931,9 +941,51 @@ private fun ThreadsTab(
         if (threads.isEmpty()) {
             EmptyThreadsCard()
         } else {
+            ViewAllMessagesCTA(onClick = onOpenCreatorInbox)
             threads.forEach { ThreadRow(it, onOpen = { onOpenThread(it) }) }
         }
         Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun ViewAllMessagesCTA(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(PantopusColors.primary50)
+                .border(1.dp, PantopusColors.primary100, RoundedCornerShape(8.dp))
+                .clickable(onClick = onClick)
+                .heightIn(min = 44.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .testTag("audienceProfileViewAllMessages")
+                .semantics { contentDescription = "View all messages in Creator Inbox" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Inbox,
+            contentDescription = null,
+            size = 14.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.primary600,
+        )
+        Text(
+            text = "View all messages",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.primary700,
+            modifier = Modifier.weight(1f),
+        )
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 12.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.primary600,
+        )
     }
 }
 

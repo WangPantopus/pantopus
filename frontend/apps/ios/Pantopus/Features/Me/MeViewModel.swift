@@ -171,7 +171,8 @@ public final class MeViewModel {
                 MeSection(id: "profile_privacy", header: "Profile & Privacy", rows: [
                     MeSectionRow(id: "edit", icon: .edit2, label: "Edit profile", routeKey: "me.editProfile"),
                     MeSectionRow(id: "identityCenter", icon: .shield, label: "Identity Center", routeKey: "me.identityCenter"),
-                    MeSectionRow(id: "audience", icon: .megaphone, label: "Audience profile", routeKey: "me.audience")
+                    MeSectionRow(id: "audience", icon: .megaphone, label: "Audience profile", routeKey: "me.audience"),
+                    MeSectionRow(id: "creatorInbox", icon: .inbox, label: "Creator inbox", routeKey: "me.creatorInbox")
                 ]),
                 MeSection(id: "activity", header: "Activity", rows: [
                     MeSectionRow(id: "posts", icon: .file, label: "My posts", routeKey: "me.posts"),
