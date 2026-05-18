@@ -31,6 +31,7 @@ import app.pantopus.android.data.api.services.PostsApi
 import app.pantopus.android.data.api.services.PrivacyApi
 import app.pantopus.android.data.api.services.PrivacyHandshakeApi
 import app.pantopus.android.data.api.services.RelationshipsApi
+import app.pantopus.android.data.api.services.SupportTrainsApi
 import app.pantopus.android.data.api.services.TokenAcceptApi
 import app.pantopus.android.data.api.services.UsersApi
 import app.pantopus.android.data.auth.AuthInterceptor
@@ -231,6 +232,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOffersApi(retrofit: Retrofit): OffersApi = retrofit.create(OffersApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideSupportTrainsApi(retrofit: Retrofit): SupportTrainsApi = retrofit.create(SupportTrainsApi::class.java)
 
     // Legacy aggregate — retained for existing AuthRepository / FeedScreen.
     @Provides @Singleton

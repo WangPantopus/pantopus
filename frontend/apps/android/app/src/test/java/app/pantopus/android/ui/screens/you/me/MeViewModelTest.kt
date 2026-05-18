@@ -117,10 +117,18 @@ class MeViewModelTest {
             assertEquals(3, loaded.personal.stats.size)
             assertEquals("Verified", loaded.personal.stats.first { it.id == "trust" }.value)
             assertEquals("4.9", loaded.personal.stats.first { it.id == "reputation" }.value)
-            assertEquals(6, loaded.personal.actionTiles.size)
-            // T6.2b action grid is { posts, bids, gigs, offers, listings, connections }.
+            assertEquals(7, loaded.personal.actionTiles.size)
+            // T6.6c personal action grid adds Support trains after connections.
             assertEquals(
-                listOf("me.posts", "me.bids", "me.gigs", "me.offers", "me.listings", "me.connections"),
+                listOf(
+                    "me.posts",
+                    "me.bids",
+                    "me.gigs",
+                    "me.offers",
+                    "me.listings",
+                    "me.connections",
+                    "me.supportTrains",
+                ),
                 loaded.personal.actionTiles.map { it.routeKey },
             )
             // T6.2b sections — Profile & Privacy / Activity / Help & Legal

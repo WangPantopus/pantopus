@@ -132,6 +132,7 @@ import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
 import app.pantopus.android.ui.screens.profile.PublicProfileScreen
+import app.pantopus.android.ui.screens.review_signups.ReviewSignupsScreen
 import app.pantopus.android.ui.screens.settings.NotificationSettingsScreen
 import app.pantopus.android.ui.screens.settings.PrivacySettingsScreen
 import app.pantopus.android.ui.screens.settings.SettingsIndexScreen
@@ -144,6 +145,7 @@ import app.pantopus.android.ui.screens.settings.legal.LegalDocument
 import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
+import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.you.YouScreen
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -374,6 +376,17 @@ private object ChildRoutes {
     const val TOKEN_ACCEPT = "invite/{$TOKEN_ACCEPT_TOKEN_KEY}"
 
     fun tokenAccept(token: String): String = "invite/${java.net.URLEncoder.encode(token, "UTF-8")}"
+
+    /** T6.6c (P26.5) Support Trains list. */
+    const val SUPPORT_TRAINS = "support-trains"
+
+    /** T6.6c (P26.5) Review signups (organizer-only). `:id` is the
+     *  Support Train UUID. Keep in sync with
+     *  `ReviewSignupsViewModel.SUPPORT_TRAIN_ID_KEY`. */
+    const val REVIEW_SIGNUPS_ID_KEY = "supportTrainId"
+    const val REVIEW_SIGNUPS = "support-trains/{$REVIEW_SIGNUPS_ID_KEY}/review"
+
+    fun reviewSignups(trainId: String): String = "support-trains/${java.net.URLEncoder.encode(trainId, "UTF-8")}/review"
 
     /**
      * Generic placeholder for intents whose destination hasn't been
@@ -635,7 +648,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.SupportTrain -> {
-                navController.navigate(ChildRoutes.placeholder("Support train · ${pending.id}"))
+                // Deep links to a specific Support Train open the review queue
+                // (organizer-only) when the caller owns the train. The
+                // detail / non-organizer view is the next surface to land —
+                // until then the route lists the user's support trains so
+                // the deep link still resolves to something useful.
+                navController.navigate(ChildRoutes.SUPPORT_TRAINS)
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.Gig -> {
@@ -795,6 +813,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenMyTasks = { navController.navigate(ChildRoutes.MY_TASKS) },
                     onOpenMyPosts = { navController.navigate(ChildRoutes.MY_POSTS) },
                     onOpenConnections = { navController.navigate(ChildRoutes.CONNECTIONS) },
+                    onOpenSupportTrains = { navController.navigate(ChildRoutes.SUPPORT_TRAINS) },
                     onOpenIdentityCenter = { navController.navigate(ChildRoutes.IDENTITY_CENTER) },
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
@@ -1758,6 +1777,42 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(ChildRoutes.MAILBOX_SEARCH) {
                 NotYetAvailableView(tabName = "Mail search", icon = PantopusIcon.Search)
+            }
+            composable(ChildRoutes.SUPPORT_TRAINS) {
+                SupportTrainsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenTrain = { trainId ->
+                        navController.navigate(ChildRoutes.reviewSignups(trainId))
+                    },
+                    onStartTrain = {
+                        navController.navigate(ChildRoutes.placeholder("Start a support train"))
+                    },
+                    onSearch = {
+                        navController.navigate(ChildRoutes.placeholder("Search support trains"))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.REVIEW_SIGNUPS,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.REVIEW_SIGNUPS_ID_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                ReviewSignupsScreen(
+                    onBack = { navController.popBackStack() },
+                    onShareTrain = {
+                        navController.navigate(ChildRoutes.placeholder("Share train"))
+                    },
+                    onEditSignup = { reservationId ->
+                        navController.navigate(ChildRoutes.placeholder("Edit signup · $reservationId"))
+                    },
+                    onMessageHelper = { reservationId ->
+                        navController.navigate(ChildRoutes.placeholder("Message helper · $reservationId"))
+                    },
+                )
             }
             composable(
                 route = ChildRoutes.PLACEHOLDER,

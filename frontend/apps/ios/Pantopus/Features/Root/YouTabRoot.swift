@@ -34,6 +34,12 @@ public enum YouRoute: Hashable {
     case myPosts
     /// T5.2.3 — Connections. The "me.connections" Personal action tile pushes here.
     case connections
+    /// T6.6c (P26.5) — Support Trains. The "me.supportTrains" Personal
+    /// action tile pushes here. Personal pillar (mutual-aid surface).
+    case supportTrains
+    /// T6.6c (P26.5) — Review signups (organizer-only) for one Support
+    /// Train. Pushed from a Support Trains row tap.
+    case reviewSignups(supportTrainId: String)
     /// T6.3f / P14 — My homes (avatar-first roster). The "me.homes"
     /// Activity-section row pushes here; tapping a row drills into the
     /// home dashboard via `homeDashboard(homeId:)`.
@@ -327,6 +333,8 @@ public struct YouTabRoot: View {
             path.append(.offers)
         case "me.connections":
             path.append(.connections)
+        case "me.supportTrains":
+            path.append(.supportTrains)
         case "me.listings":
             path.append(.myListings)
         case "me.businesses":
@@ -414,6 +422,8 @@ public struct YouTabRoot: View {
             return
         case "me.connections":
             path.append(.connections)
+        case "me.supportTrains":
+            path.append(.supportTrains)
             return
         case "me.homes":
             path.append(.myHomes)
@@ -737,6 +747,42 @@ public struct YouTabRoot: View {
                     },
                     onFindPeople: {
                         Task { @MainActor in path.append(.placeholder(label: "Find people")) }
+                    }
+                )
+            )
+        case .supportTrains:
+            SupportTrainsView(
+                viewModel: SupportTrainsViewModel(
+                    onStartTrain: {
+                        Task { @MainActor in path.append(.placeholder(label: "Start a support train")) }
+                    },
+                    onOpenTrain: { trainId in
+                        Task { @MainActor in path.append(.reviewSignups(supportTrainId: trainId)) }
+                    },
+                    onSearch: {
+                        Task { @MainActor in path.append(.placeholder(label: "Search support trains")) }
+                    }
+                )
+            )
+        case let .reviewSignups(supportTrainId):
+            ReviewSignupsView(
+                viewModel: ReviewSignupsViewModel(
+                    supportTrainId: supportTrainId,
+                    onShareTrain: {
+                        Task { @MainActor in path.append(.placeholder(label: "Share train")) }
+                    },
+                    onConfirm: { _ in
+                        // POST `/api/support-trains/:id/reservations/:id/confirm`
+                        // wiring lands with the editor surface — the VM's
+                        // optimistic patch is the visible feedback today.
+                    },
+                    onMessage: { _ in
+                        Task { @MainActor in path.append(.placeholder(label: "Message helper")) }
+                    },
+                    onEdit: { reservationId in
+                        Task { @MainActor in
+                            path.append(.placeholder(label: "Edit signup · \(reservationId)"))
+                        }
                     }
                 )
             )
