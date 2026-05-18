@@ -7,12 +7,14 @@ import app.pantopus.android.data.api.models.settings.ResendVerificationBody
 import app.pantopus.android.data.api.models.users.ProfileResponse
 import app.pantopus.android.data.api.models.users.ProfileUpdateRequest
 import app.pantopus.android.data.api.models.users.ProfileUpdateResponse
+import app.pantopus.android.data.api.models.users.UserSearchResponse
 import app.pantopus.android.data.api.models.users.UserStatsDto
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /** User profile routes from `backend/routes/users.js`. */
 interface UsersApi {
@@ -56,4 +58,15 @@ interface UsersApi {
     suspend fun resendVerification(
         @Body body: ResendVerificationBody,
     )
+
+    /** `GET /api/users/search?q=…&type=…&limit=…` — verified-user
+     *  directory search. Route `backend/routes/users.js:2367`. Backend
+     *  rejects `q` under 2 characters with a 400, so callers must gate
+     *  on `query.length >= 2`. */
+    @GET("api/users/search")
+    suspend fun search(
+        @Query("q") query: String,
+        @Query("limit") limit: Int = 20,
+        @Query("type") type: String = "all",
+    ): UserSearchResponse
 }

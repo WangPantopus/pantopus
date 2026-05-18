@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -202,12 +203,18 @@ internal fun ChatHeader(
         when (counterparty) {
             is ChatCounterparty.Person -> {
                 Row {
-                    HeaderIcon(PantopusIcon.Send)
-                    HeaderIcon(PantopusIcon.Camera)
-                    HeaderIcon(PantopusIcon.MoreHorizontal)
+                    HeaderIcon(PantopusIcon.Phone)
+                    HeaderIcon(PantopusIcon.Video)
+                    HeaderIcon(PantopusIcon.MoreVertical)
                 }
             }
-            else -> HeaderIcon(PantopusIcon.MoreHorizontal)
+            is ChatCounterparty.Ai -> {
+                Row {
+                    HeaderIcon(PantopusIcon.History)
+                    HeaderIcon(PantopusIcon.MoreVertical)
+                }
+            }
+            is ChatCounterparty.Group -> HeaderIcon(PantopusIcon.MoreVertical)
         }
     }
     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
@@ -338,7 +345,7 @@ private fun AiAvatar(size: androidx.compose.ui.unit.Dp) {
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(
-            icon = PantopusIcon.Info,
+            icon = PantopusIcon.Sparkles,
             contentDescription = "AI",
             size = size * 0.5f,
             tint = PantopusColors.appTextInverse,
@@ -519,7 +526,7 @@ private fun AiWelcomeFrame(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     PantopusIconImage(
-                        icon = PantopusIcon.Info,
+                        icon = PantopusIcon.Sparkles,
                         contentDescription = null,
                         size = 10.dp,
                         tint = PantopusColors.primary700,
@@ -793,20 +800,13 @@ private fun StampRow(
         if (content.side == ChatMessageSide.Outgoing) {
             when (content.deliveryState) {
                 ChatDeliveryState.Read ->
-                    Row(modifier = Modifier.padding(start = 4.dp)) {
-                        PantopusIconImage(
-                            icon = PantopusIcon.Check,
-                            contentDescription = null,
-                            size = 9.dp,
-                            tint = PantopusColors.primary600,
-                        )
-                        PantopusIconImage(
-                            icon = PantopusIcon.Check,
-                            contentDescription = null,
-                            size = 9.dp,
-                            tint = PantopusColors.primary600,
-                        )
-                    }
+                    PantopusIconImage(
+                        icon = PantopusIcon.CheckCheck,
+                        contentDescription = null,
+                        size = 11.dp,
+                        tint = PantopusColors.primary600,
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
                 ChatDeliveryState.Delivered ->
                     PantopusIconImage(
                         icon = PantopusIcon.Check,
@@ -910,9 +910,10 @@ internal fun Composer(
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
-                    icon = PantopusIcon.PlusCircle,
+                    icon = PantopusIcon.Plus,
                     contentDescription = "Attach",
                     size = 18.dp,
+                    strokeWidth = 2.4f,
                     tint = PantopusColors.appTextStrong,
                 )
             }
@@ -948,8 +949,20 @@ internal fun Composer(
             }
             Box(
                 modifier =
-                    Modifier
-                        .size(38.dp)
+                    (
+                        if (canSend) {
+                            Modifier
+                                .size(38.dp)
+                                .shadow(
+                                    elevation = 10.dp,
+                                    shape = CircleShape,
+                                    ambientColor = PantopusColors.primary600,
+                                    spotColor = PantopusColors.primary600,
+                                )
+                        } else {
+                            Modifier.size(38.dp)
+                        }
+                    )
                         .clip(CircleShape)
                         .background(if (canSend) PantopusColors.primary600 else PantopusColors.appSurfaceSunken)
                         .clickable(enabled = canSend, onClick = onSend)

@@ -100,10 +100,12 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreTime
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Payments
@@ -144,6 +146,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.VpnKey
@@ -387,6 +390,13 @@ enum class PantopusIcon(
     ReceiptText("receipt-text"),
     Paperclip("paperclip"),
     ArrowDownUp("arrow-down-up"),
+
+    // T6.6b — Chat conversation refresh: header trailing (phone / video /
+    // more-vertical for person, history / more-vertical for AI) +
+    // empty-state "Introduce yourself" quick-chip.
+    Video("video"),
+    MoreVertical("more-vertical"),
+    Hand("hand"),
     ;
 
     companion object {
@@ -627,6 +637,16 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.ReceiptText -> IconSource.Material(Icons.Filled.Description)
         PantopusIcon.Paperclip -> IconSource.Material(Icons.Filled.AttachFile)
         PantopusIcon.ArrowDownUp -> IconSource.Material(Icons.Filled.Sort)
+
+        // T6.6b — Chat conversation refresh. Material's `MoreVert` is a
+        // direct match for `more-vertical`; `Videocam` matches Lucide's
+        // `video`. Lucide's `hand` (waving open hand for the "Introduce
+        // yourself" quick-chip) has no direct Material equivalent; fall
+        // back to `PanTool` (the "stop / open hand" gesture) — closest
+        // available shape until a Lucide vector export lands.
+        PantopusIcon.Video -> IconSource.Material(Icons.Filled.Videocam)
+        PantopusIcon.MoreVertical -> IconSource.Material(Icons.Filled.MoreVert)
+        PantopusIcon.Hand -> IconSource.Material(Icons.Filled.PanTool)
     }
 
 /**

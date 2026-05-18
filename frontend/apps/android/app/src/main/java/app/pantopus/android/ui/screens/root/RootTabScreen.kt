@@ -109,6 +109,7 @@ import app.pantopus.android.ui.screens.inbox.chat.ConversationRowVariant
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationHost
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
 import app.pantopus.android.ui.screens.inbox.conversation.ChatThreadMode
+import app.pantopus.android.ui.screens.inbox.newmessage.NewMessageScreen
 import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
 import app.pantopus.android.ui.screens.listings.MyListingsScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
@@ -455,6 +456,10 @@ private object ChildRoutes {
             "&$CHAT_LOCALITY_KEY={$CHAT_LOCALITY_KEY}" +
             "&$CHAT_ONLINE_KEY={$CHAT_ONLINE_KEY}"
 
+    /** New message contact picker (T6.6b P25). Reached from Chat list
+     *  compose button + empty-state CTA. */
+    const val NEW_MESSAGE = "chat/new"
+
     /** Compose post target — placeholder until the compose flow ships. */
     const val COMPOSE_INTENT_KEY = "intent"
     const val COMPOSE_POST = "feed/compose?$COMPOSE_INTENT_KEY={$COMPOSE_INTENT_KEY}"
@@ -545,6 +550,27 @@ private object ChildRoutes {
             "&$CHAT_VERIFIED_KEY=${row.verified}" +
             "&$CHAT_IDENTITY_KEY=${enc(identity)}" +
             "&$CHAT_LOCALITY_KEY=" +
+            "&$CHAT_ONLINE_KEY=false"
+    }
+
+    /** Build the chat-conversation path for a New Message picker
+     *  selection. The picker emits `userId / displayName / initials /
+     *  verified / locality`; we route to person mode and surface the
+     *  empty "Say hi" state on first paint. */
+    fun chatConversationFromPicker(
+        userId: String,
+        displayName: String,
+        initials: String,
+        verified: Boolean,
+        locality: String?,
+    ): String {
+        fun enc(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
+        return "chat/person/${enc(userId)}?" +
+            "$CHAT_NAME_KEY=${enc(displayName)}" +
+            "&$CHAT_INITIALS_KEY=${enc(initials)}" +
+            "&$CHAT_VERIFIED_KEY=$verified" +
+            "&$CHAT_IDENTITY_KEY=" +
+            "&$CHAT_LOCALITY_KEY=${enc(locality ?: "")}" +
             "&$CHAT_ONLINE_KEY=false"
     }
 }
@@ -726,7 +752,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenConversation = { row ->
                         navController.navigate(ChildRoutes.chatConversation(row))
                     },
-                    onCompose = { navController.navigate(ChildRoutes.placeholder("New message")) },
+                    onCompose = { navController.navigate(ChildRoutes.NEW_MESSAGE) },
                     onOpenSearch = { navController.navigate(ChildRoutes.placeholder("Chat search")) },
                 )
             }
@@ -1260,6 +1286,27 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     mode = mode,
                     counterparty = counterparty,
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.NEW_MESSAGE) {
+                NewMessageScreen(
+                    onCancel = { navController.popBackStack() },
+                    onSelect = { destination ->
+                        // Pop the picker first so back from the
+                        // conversation returns to the chat list, not
+                        // the picker (mirrors iOS InboxTabRoot).
+                        navController.popBackStack()
+                        navController.navigate(
+                            ChildRoutes.chatConversationFromPicker(
+                                userId = destination.userId,
+                                displayName = destination.displayName,
+                                initials = destination.initials,
+                                verified = destination.verified,
+                                locality = destination.locality,
+                            ),
+                        )
+                    },
+                    onInvite = { navController.navigate(ChildRoutes.placeholder("Invite to Pantopus")) },
                 )
             }
             composable(ChildRoutes.PULSE_FEED) {

@@ -97,7 +97,25 @@ public struct InboxTabRoot: View {
                 )
             ) { if !path.isEmpty { path.removeLast() } }
         case .compose:
-            NotYetAvailableView(tabName: "New message", icon: .edit2)
+            NewMessageView(
+                viewModel: NewMessageViewModel(
+                    onSelect: { destination in
+                        // Swap the picker for the chat conversation —
+                        // pop the picker first so back-button on the
+                        // conversation returns to the chat list, not
+                        // the picker.
+                        if !path.isEmpty { path.removeLast() }
+                        path.append(.conversation(InboxConversationDestination(
+                            mode: .person(otherUserId: destination.userId),
+                            displayName: destination.displayName,
+                            initials: destination.initials,
+                            identityKind: nil,
+                            verified: destination.verified
+                        )))
+                    },
+                    onCancel: { if !path.isEmpty { path.removeLast() } }
+                )
+            )
         case .search:
             NotYetAvailableView(tabName: "Chat search", icon: .search)
         }
