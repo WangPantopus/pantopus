@@ -800,7 +800,7 @@ private fun FooterPrimaryButton(
                 .heightIn(min = 48.dp)
                 .clip(RoundedCornerShape(Radii.xl))
                 .background(background)
-                .androidx_clickable(enabled = enabled, onClick = onClick)
+                .conditionalClickable(enabled = enabled, onClick = onClick)
                 .padding(horizontal = Spacing.s3)
                 .semantics { contentDescription = accessibilityLabel },
         verticalAlignment = Alignment.CenterVertically,
@@ -849,7 +849,7 @@ private fun FooterSecondaryButton(
                 .clip(RoundedCornerShape(Radii.xl))
                 .background(tintBg)
                 .border(1.dp, tintFg.copy(alpha = 0.5f), RoundedCornerShape(Radii.xl))
-                .androidx_clickable(enabled = enabled, onClick = onClick)
+                .conditionalClickable(enabled = enabled, onClick = onClick)
                 .padding(horizontal = Spacing.s3)
                 .semantics { contentDescription = accessibilityLabel },
         verticalAlignment = Alignment.CenterVertically,
@@ -912,7 +912,7 @@ private fun NoteCaptureSheet(
                     modifier =
                         Modifier
                             .size(44.dp)
-                            .androidx_clickable(enabled = true, onClick = onDismiss)
+                            .conditionalClickable(enabled = true, onClick = onDismiss)
                             .semantics { contentDescription = "Close" },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -979,7 +979,7 @@ private fun NoteCaptureSheet(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = 44.dp)
-                        .androidx_clickable(enabled = !isSubmitting, onClick = onDismiss)
+                        .conditionalClickable(enabled = !isSubmitting, onClick = onDismiss)
                         .semantics { contentDescription = "Cancel" },
                 contentAlignment = Alignment.Center,
             ) {
@@ -999,7 +999,7 @@ private fun NoteCaptureSheet(
 // Small wrapper that no-ops the click when `enabled = false`, keeping the
 // per-button geometry call sites tidy and matching the disabled affordance
 // the design wants while a review action is in-flight.
-private fun Modifier.androidx_clickable(
+private fun Modifier.conditionalClickable(
     enabled: Boolean,
     onClick: () -> Unit,
 ): Modifier = if (enabled) this.clickable(onClick = onClick) else this
