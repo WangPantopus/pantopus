@@ -104,8 +104,7 @@ final class InviteMemberWizardViewModelTests: XCTestCase {
         vm.primaryTapped() // role → identify
         vm.primaryTapped() // identify → review
         vm.primaryTapped() // submit
-        // Allow the Task in primaryTapped to run.
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        await waitForSubmitResult(vm)
         guard case let .submitted(invitation) = vm.pendingEvent else {
             XCTFail("Expected .submitted, got \(String(describing: vm.pendingEvent))")
             return
@@ -124,7 +123,7 @@ final class InviteMemberWizardViewModelTests: XCTestCase {
         vm.primaryTapped() // role → identify
         vm.primaryTapped() // identify → review
         vm.primaryTapped() // submit
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        await waitForSubmitResult(vm)
         XCTAssertNil(vm.pendingEvent)
         XCTAssertNotNil(vm.errorMessage)
         XCTAssertEqual(vm.currentStep, .review)
@@ -148,7 +147,7 @@ final class InviteMemberWizardViewModelTests: XCTestCase {
         vm.primaryTapped()
         vm.primaryTapped()
         vm.primaryTapped()
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        await waitForSubmitResult(vm)
         if case let .submitted(invitation) = vm.pendingEvent {
             XCTAssertEqual(invitation.proposedRole, "guest")
         } else {
@@ -173,5 +172,12 @@ final class InviteMemberWizardViewModelTests: XCTestCase {
         XCTAssertFalse(vm.chrome.dirty)
         vm.setEmail("anything")
         XCTAssertTrue(vm.chrome.dirty)
+    }
+
+    private func waitForSubmitResult(_ vm: InviteMemberWizardViewModel) async {
+        let deadline = Date().addingTimeInterval(2)
+        while vm.pendingEvent == nil, vm.errorMessage == nil, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
     }
 }
