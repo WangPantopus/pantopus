@@ -188,6 +188,9 @@ class IconTest {
             "video",
             "more-vertical",
             "hand",
+            // P1.3 — Broadcast detail sub-route
+            "reply",
+            "radio-tower",
         )
 
     @Test

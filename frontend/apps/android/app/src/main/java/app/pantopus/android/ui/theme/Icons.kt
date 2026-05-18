@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.AccountBalance
@@ -118,6 +119,7 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Public
@@ -397,6 +399,13 @@ enum class PantopusIcon(
     Video("video"),
     MoreVertical("more-vertical"),
     Hand("hand"),
+
+    // P1.3 — Broadcast detail sub-route: sticky-footer Reply CTA + the
+    // analytics "Reach" cell glyph borrowed from the audience-frames
+    // design. Material's Reply is automirrored; RadioTower falls back to
+    // Material's Podcasts glyph (broadcast-from-tower mast lines).
+    Reply("reply"),
+    RadioTower("radio-tower"),
     ;
 
     companion object {
@@ -647,6 +656,11 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Video -> IconSource.Material(Icons.Filled.Videocam)
         PantopusIcon.MoreVertical -> IconSource.Material(Icons.Filled.MoreVert)
         PantopusIcon.Hand -> IconSource.Material(Icons.Filled.PanTool)
+        // P1.3 — Broadcast detail. Material ships an automirrored Reply
+        // (correct RTL flip) and Podcasts is the closest visual analog
+        // for Lucide's radio-tower (mast-with-waves).
+        PantopusIcon.Reply -> IconSource.Material(Icons.AutoMirrored.Filled.Reply)
+        PantopusIcon.RadioTower -> IconSource.Material(Icons.Filled.Podcasts)
     }
 
 /**

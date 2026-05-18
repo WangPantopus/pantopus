@@ -15,6 +15,7 @@ import app.pantopus.android.data.api.models.audience.PersonaTierDto
 import app.pantopus.android.data.api.models.audience.PublishUpdateBody
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.audience.AudienceProfileRepository
+import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BroadcastDetailSeedCache
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +37,7 @@ class AudienceProfileViewModel
     @Inject
     constructor(
         private val repository: AudienceProfileRepository,
+        private val broadcastSeedCache: BroadcastDetailSeedCache,
     ) : ViewModel() {
         private val _state = MutableStateFlow<AudienceProfileUiState>(AudienceProfileUiState.Loading)
         val state: StateFlow<AudienceProfileUiState> = _state.asStateFlow()
@@ -117,6 +119,22 @@ class AudienceProfileViewModel
 
         fun selectTab(tab: AudienceProfileTab) {
             _activeTab.value = tab
+        }
+
+        /** Cache the tapped update + tier ladder so
+         *  [app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BroadcastDetailViewModel]
+         *  can pick them up after the navigation hop. */
+        fun cacheBroadcastSeed(
+            card: UpdateCardContent,
+            tiers: List<TierBreakdownContent.TierSegment>,
+        ) {
+            broadcastSeedCache.cache(
+                BroadcastDetailSeedCache.Seed(
+                    broadcastId = card.id,
+                    card = card,
+                    tiers = tiers,
+                ),
+            )
         }
 
         fun selectTierFilter(rank: Int?) {

@@ -61,6 +61,7 @@ fun AudienceProfileScreen(
     onBack: () -> Unit = {},
     onOpenFollower: (FollowerRowContent) -> Unit = {},
     onOpenThread: (ThreadRowContent) -> Unit = {},
+    onOpenBroadcast: (UpdateCardContent, List<TierBreakdownContent.TierSegment>) -> Unit = { _, _ -> },
     onOpenSetup: () -> Unit = {},
     onOpenCreatorInbox: () -> Unit = {},
     viewModel: AudienceProfileViewModel = hiltViewModel(),
@@ -112,6 +113,7 @@ fun AudienceProfileScreen(
                                 AudienceProfileNavigationActions(
                                     onOpenFollower = onOpenFollower,
                                     onOpenThread = onOpenThread,
+                                    onOpenBroadcast = onOpenBroadcast,
                                     onOpenCreatorInbox = onOpenCreatorInbox,
                                 ),
                         ),
@@ -288,10 +290,10 @@ internal fun LoadedFrame(
                     updates = state.loaded.updates,
                     composer = state.composer,
                     channelId = state.loaded.channelId,
-                    onComposerText = actions.composer.onText,
-                    onComposerVisibility = actions.composer.onVisibility,
-                    onComposerTier = actions.composer.onTier,
-                    onSubmit = actions.composer.onSubmit,
+                    composerActions = actions.composer,
+                    onOpenBroadcast = { card ->
+                        actions.navigation.onOpenBroadcast(card, state.loaded.tierBreakdown.segments)
+                    },
                 )
             AudienceProfileTab.Followers ->
                 FollowersTab(
@@ -338,6 +340,7 @@ internal data class AudienceProfileComposerActions(
 internal data class AudienceProfileNavigationActions(
     val onOpenFollower: (FollowerRowContent) -> Unit,
     val onOpenThread: (ThreadRowContent) -> Unit,
+    val onOpenBroadcast: (UpdateCardContent, List<TierBreakdownContent.TierSegment>) -> Unit = { _, _ -> },
     val onOpenCreatorInbox: () -> Unit = {},
 )
 
@@ -441,10 +444,8 @@ private fun UpdatesTab(
     updates: List<UpdateCardContent>,
     composer: UpdateComposerState,
     channelId: String?,
-    onComposerText: (String) -> Unit,
-    onComposerVisibility: (UpdateVisibility) -> Unit,
-    onComposerTier: (Int?) -> Unit,
-    onSubmit: () -> Unit,
+    composerActions: AudienceProfileComposerActions,
+    onOpenBroadcast: (UpdateCardContent) -> Unit,
 ) {
     Column(
         modifier =
@@ -458,15 +459,17 @@ private fun UpdatesTab(
         ComposerCard(
             composer = composer,
             channelId = channelId,
-            onText = onComposerText,
-            onVisibility = onComposerVisibility,
-            onTier = onComposerTier,
-            onSubmit = onSubmit,
+            onText = composerActions.onText,
+            onVisibility = composerActions.onVisibility,
+            onTier = composerActions.onTier,
+            onSubmit = composerActions.onSubmit,
         )
         if (updates.isEmpty()) {
             EmptyUpdatesCard()
         } else {
-            updates.forEach { UpdateCard(it) }
+            updates.forEach { card ->
+                UpdateCard(card = card, onOpen = { onOpenBroadcast(card) })
+            }
         }
         Spacer(modifier = Modifier.height(24.dp))
     }
@@ -638,7 +641,10 @@ private fun EmptyUpdatesCard() {
 }
 
 @Composable
-private fun UpdateCard(card: UpdateCardContent) {
+private fun UpdateCard(
+    card: UpdateCardContent,
+    onOpen: () -> Unit,
+) {
     Column(
         modifier =
             Modifier
@@ -646,6 +652,7 @@ private fun UpdateCard(card: UpdateCardContent) {
                 .clip(RoundedCornerShape(12.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .clickable(onClick = onOpen)
                 .padding(14.dp)
                 .testTag("updateCard_${card.id}"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -669,7 +676,10 @@ private fun UpdateCard(card: UpdateCardContent) {
             Text(text = card.timeAgo, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
         }
         Text(text = card.body, fontSize = 14.sp, color = PantopusColors.appText)
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             Text(
                 text = "Delivered ${card.deliveredCount}",
                 fontSize = 11.sp,
@@ -681,6 +691,14 @@ private fun UpdateCard(card: UpdateCardContent) {
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = PantopusColors.appTextSecondary,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronRight,
+                contentDescription = null,
+                size = 13.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.appTextMuted,
             )
         }
     }

@@ -17,6 +17,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -30,6 +31,9 @@ import app.pantopus.android.BuildConfig
 import app.pantopus.android.core.routing.DeepLinkRouter
 import app.pantopus.android.ui.screens._internal.TokenGalleryScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
+import app.pantopus.android.ui.screens.audience_profile.AudienceProfileViewModel
+import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BROADCAST_DETAIL_ID_KEY
+import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BroadcastDetailScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
@@ -356,6 +360,14 @@ private object ChildRoutes {
 
     /** Public Profile management / Creator audience dashboard (T3.3). */
     const val AUDIENCE_PROFILE = "audience-profile"
+
+    /** P1.3 — Broadcast detail full-screen takeover pushed from a tap
+     *  on an update card on the Audience Profile. The tapped row's
+     *  snapshot + the persona's tier ladder ride across the hop via
+     *  [BroadcastDetailSeedCache] (routes can only carry strings). */
+    const val BROADCAST_DETAIL = "broadcasts/{$BROADCAST_DETAIL_ID_KEY}"
+
+    fun broadcastDetail(broadcastId: String): String = "broadcasts/${java.net.URLEncoder.encode(broadcastId, "UTF-8")}"
 
     /** P1.2 — Creator Inbox (standalone DM thread list for creators).
      *  Reached from the You tab Personal section row + Audience Profile
@@ -1766,6 +1778,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.AUDIENCE_PROFILE) {
+                val audienceViewModel: AudienceProfileViewModel = hiltViewModel()
                 AudienceProfileScreen(
                     onBack = { navController.popBackStack() },
                     onOpenFollower = { row ->
@@ -1774,11 +1787,36 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenThread = {
                         navController.navigate(ChildRoutes.CREATOR_INBOX)
                     },
+                    onOpenBroadcast = { card, tiers ->
+                        audienceViewModel.cacheBroadcastSeed(card, tiers)
+                        navController.navigate(ChildRoutes.broadcastDetail(card.id))
+                    },
                     onOpenSetup = {
                         navController.navigate(ChildRoutes.placeholder("Set up Public Profile"))
                     },
                     onOpenCreatorInbox = {
                         navController.navigate(ChildRoutes.CREATOR_INBOX)
+                    },
+                    viewModel = audienceViewModel,
+                )
+            }
+            composable(
+                ChildRoutes.BROADCAST_DETAIL,
+                arguments = listOf(navArgument(BROADCAST_DETAIL_ID_KEY) { type = NavType.StringType }),
+            ) {
+                BroadcastDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOverflow = {
+                        navController.navigate(ChildRoutes.placeholder("Broadcast actions"))
+                    },
+                    onReply = {
+                        navController.navigate(ChildRoutes.placeholder("Reply to broadcast"))
+                    },
+                    onBoost = {
+                        navController.navigate(ChildRoutes.placeholder("Boost broadcast"))
+                    },
+                    onPin = {
+                        navController.navigate(ChildRoutes.placeholder("Pin broadcast"))
                     },
                 )
             }

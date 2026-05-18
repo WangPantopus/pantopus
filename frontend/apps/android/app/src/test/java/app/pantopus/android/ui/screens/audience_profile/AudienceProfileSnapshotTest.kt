@@ -98,6 +98,7 @@ class AudienceProfileSnapshotTest {
                 AudienceProfileNavigationActions(
                     onOpenFollower = {},
                     onOpenThread = {},
+                    onOpenBroadcast = { _, _ -> },
                 ),
         )
 

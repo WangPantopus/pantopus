@@ -57,6 +57,13 @@ public enum YouRoute: Hashable {
     case identityCenter
     /// T3.3 — Audience profile. The "me.audience" Personal section row pushes here.
     case audienceProfile
+    /// P1.3 — Broadcast detail full-screen takeover, pushed when the
+    /// creator taps an update card on the Audience Profile. The
+    /// `card` payload seeds the hero + delivered/read counters so the
+    /// detail can render without a second fetch, and `tierSegments`
+    /// carries the persona's tier ladder so the read-share bar paints
+    /// per-tier widths immediately.
+    case broadcastDetail(broadcastId: String, card: UpdateCardContent, tierSegments: [TierBreakdownContent.TierSegment])
     /// P1.2 — Creator Inbox (standalone DM thread list for creators).
     /// The "me.creatorInbox" Personal section row pushes here, and the
     /// Audience Profile Threads tab "View all messages" CTA also lands
@@ -813,11 +820,41 @@ public struct YouTabRoot: View {
                 onOpenThread: { _ in
                     Task { @MainActor in path.append(.creatorInbox) }
                 },
+                onOpenBroadcast: { card, tierSegments in
+                    Task { @MainActor in
+                        path.append(.broadcastDetail(
+                            broadcastId: card.id,
+                            card: card,
+                            tierSegments: tierSegments
+                        ))
+                    }
+                },
                 onOpenSetup: {
                     Task { @MainActor in path.append(.placeholder(label: "Audience setup")) }
                 },
                 onOpenCreatorInbox: {
                     Task { @MainActor in path.append(.creatorInbox) }
+                }
+            )
+        case let .broadcastDetail(broadcastId, card, tierSegments):
+            BroadcastDetailView(
+                viewModel: BroadcastDetailViewModel(
+                    broadcastId: broadcastId,
+                    seed: card,
+                    tierSegments: tierSegments
+                ),
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOverflow: {
+                    Task { @MainActor in path.append(.placeholder(label: "Broadcast actions")) }
+                },
+                onReply: {
+                    Task { @MainActor in path.append(.placeholder(label: "Reply to broadcast")) }
+                },
+                onBoost: {
+                    Task { @MainActor in path.append(.placeholder(label: "Boost broadcast")) }
+                },
+                onPin: {
+                    Task { @MainActor in path.append(.placeholder(label: "Pin broadcast")) }
                 }
             )
         case .creatorInbox:

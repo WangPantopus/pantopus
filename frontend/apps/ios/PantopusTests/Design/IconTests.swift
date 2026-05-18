@@ -58,7 +58,9 @@ final class IconTests: XCTestCase {
         // T6.5e Mailbox Vault — envelope state + folder palette + chrome.
         "mail", "mail-open", "folder-plus", "piggy-bank", "plane", "receipt-text", "paperclip", "arrow-down-up",
         // T6.6b Chat conversation refresh — header + composer.
-        "video", "more-vertical", "hand"
+        "video", "more-vertical", "hand",
+        // P1.3 Broadcast detail — sticky footer + analytics.
+        "reply", "radio-tower"
     ]
 
     func testInventoryMatches() {
