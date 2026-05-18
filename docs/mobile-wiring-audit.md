@@ -536,3 +536,141 @@ hub", "My posts", "Pets" route now points at the real screen.
   Token Accept, Status/Wait, Legal) hold no drift against the new
   designs; documented per-screen in `mobile-parity-audit.md §1 Tier 6
   T6.6c`.**
+
+---
+
+## T6 closeout (P27) — wiring sweep refresh
+
+This section is added by P27 (T6.6c closeout) to document the final
+state of the wiring sweep across iOS + Android after every T6 PR has
+landed.
+
+### Reproducible audit
+
+```bash
+grep -rn 'NotYetAvailable' frontend/apps/ios/Pantopus
+grep -rn 'placeholder(label:' frontend/apps/ios/Pantopus
+grep -rn 'NotYetAvailableView' frontend/apps/android/app/src/main/java
+grep -rn 'ChildRoutes\.placeholder(' frontend/apps/android/app/src/main/java
+```
+
+Counts at HEAD (`e37b5c8c`):
+
+- iOS `NotYetAvailable` references: **29** (component definition +
+  preview + comments + ContentDetail body / header stubs + Mailbox
+  CategoryBodies fallback + 1 Settings P8.5 deferral + 5 HubTabRoot
+  drawer/compose/snap-and-sell/mail-search stubs + 2 InboxTabRoot
+  invite/chat-search stubs + 2 NearbyTabRoot map-filter/info stubs +
+  2 YouTabRoot compose-task/info stubs).
+- Android `NotYetAvailable` references: **17** (component definition +
+  preview + Bodies / CategoryBodies / NearbyScreen comments + 8
+  RootTabScreen stubs mirroring the iOS set — Snap & sell, Post a
+  task, Legal-deferred, Mail search, generic Info).
+- iOS `placeholder(label:)` references: 70-ish (every per-screen
+  affordance that hasn't been wired yet — e.g. "Filter bids", "Edit
+  signup", "Share train", "Discovery filters", "Sort offers", etc.).
+- Android `ChildRoutes.placeholder(...)` references: ~80 (matching
+  set).
+
+### T6-shipped surfaces vs `NotYetAvailableView`
+
+**Zero** T6-shipped surfaces use `NotYetAvailableView`. Every T6
+screen has a real view at its destination. Verified by grep:
+
+```bash
+# Each of these should match the real view at the destination, not a placeholder
+grep -rn 'Features/SupportTrains\|ui/screens/support_trains' frontend/apps/{ios,android}/...
+grep -rn 'Features/ReviewSignups\|ui/screens/review_signups' frontend/apps/{ios,android}/...
+grep -rn 'Features/Chat/NewMessage\|ui/screens/inbox/newmessage' frontend/apps/{ios,android}/...
+grep -rn 'Features/Mailbox/Vault\|ui/screens/mailbox/vault' frontend/apps/{ios,android}/...
+grep -rn 'Features/Mailbox/MailDetail\|ui/screens/mailbox/mail_detail' frontend/apps/{ios,android}/...
+grep -rn 'Features/Homes/Calendar\|ui/screens/homes/calendar' frontend/apps/{ios,android}/...
+grep -rn 'Features/Homes/Documents\|ui/screens/homes/documents' frontend/apps/{ios,android}/...
+grep -rn 'Features/Homes/Emergency\|ui/screens/homes/emergency' frontend/apps/{ios,android}/...
+grep -rn 'Features/Homes/Members\|ui/screens/homes/members' frontend/apps/{ios,android}/...
+grep -rn 'Features/Homes/Maintenance\|ui/screens/homes/maintenance' frontend/apps/{ios,android}/...
+grep -rn 'Features/Homes/HouseholdTasks\|ui/screens/homes/household_tasks' frontend/apps/{ios,android}/...
+grep -rn 'Features/Homes/Owners\|ui/screens/homes/owners' frontend/apps/{ios,android}/...
+grep -rn 'Features/Homes/Packages\|ui/screens/homes/packages' frontend/apps/{ios,android}/...
+grep -rn 'Features/Homes/Polls\|ui/screens/homes/polls' frontend/apps/{ios,android}/...
+grep -rn 'Features/Homes/Access\|ui/screens/homes/access' frontend/apps/{ios,android}/...
+```
+
+Each finds the real composable / view, the routing wired through the
+parent root, and a `*ViewModel.swift` / `*ViewModel.kt` driving the
+data flow. None lands on `NotYetAvailableView` / `ChildRoutes.placeholder`.
+
+### Classification of remaining `NotYetAvailableView` (post-T6)
+
+Every remaining match still falls in one of these buckets — the table
+from the T5 closeout pass still holds, with T6 deltas annotated:
+
+| Bucket | iOS examples | Android examples | Justification | T6 delta |
+|---|---|---|---|---|
+| Component definition | `Features/Root/NotYetAvailableView.swift` | `ui/screens/root/NotYetAvailableView.kt` | The placeholder component itself. | unchanged |
+| Content-detail body slots | `Features/Shared/ContentDetail/Bodies.swift:117/131/140/149` + `Headers.swift:100/110` | `ui/screens/shared/content_detail/Bodies.kt` | Generic body / header stubs for non-Home detail types. Future tiers swap them. | unchanged |
+| Mailbox category bodies (legacy) | `Features/Mailbox/ItemDetail/Bodies/CategoryBodies.swift:56` | `ui/screens/mailbox/item_detail/bodies/CategoryBodies.kt:88` | 13 of 14 mailbox categories don't yet have a designed body; fallback is correct. **Note:** T6.5b (P20) added the new A17 `MailDetailView` / `MailDetailScreen` on top of the shared `MailItemDetailShell`; the legacy `MailboxItemDetailView` is preserved for P21–P23 piecewise migration. | unchanged (legacy preserved per T6 plan) |
+| Hub-tab pillar / action chip | `HubTabRoot.swift` drawer detail, compose gig, compose listing, mail search | `RootTabScreen.kt` same set | Each names the tier (T2.3 composer, T2.5 Snap & sell, etc.) in inline doc-comments. | unchanged — these are future-tier (T2.x / T7) |
+| You-tab generic | `YouTabRoot.swift` generic + `composeTask` | `RootTabScreen.kt` same | `composeTask` is the only Me-tab route that still placeholders; T2.3 will land the composer screen. | unchanged — T2.3 is post-T6 |
+| Inbox / Nearby tab | `InboxTabRoot.swift` invite + chat-search + `NearbyTabRoot.swift` map filters / info | `RootTabScreen.kt` same | All out-of-scope for T6 (covered by post-T6 tiers). **Note:** T6.6b (P25) landed the New Message picker so the prior `InboxRoute.compose` placeholder is **resolved**; T6.6a (P24) landed MapListHybrid so the prior "no sheet detents" gap on Nearby map is **resolved**. The remaining `Map filters` placeholder is a follow-up filter-sheet design. | partially resolved (compose + map base) |
+| Settings sub-screens | `Features/Settings/SettingsView.swift:80` (the 2 Q7-parked sub-routes) | (Android parity row in T3.1) | Data export + Payments & payouts remain parked per Q7 / P8.5. The other 6 Settings sub-routes (Blocked / Password / Verification / Help / Legal / About) are **wired in T6.2c**. | 6 resolved (T6.2c), 2 still parked |
+| Discover hub filter / Discover businesses filter | `HubTabRoot.swift` discoverHub case onOpenFilters | `RootTabScreen.kt` same | Filter sheet redesign is post-T6. The chip strip already covers the canonical filter cases; the icon entry-point lands on a placeholder. | unchanged |
+| `me.home.*` Active Home tiles | YouTabRoot default case | RootTabScreen default case | Bills / Members / Packages etc. are reachable from the Home Dashboard quick-action tiles; the Me-tab parallel-entry tiles fall through to a labelled placeholder. **Note:** T6.4a (Access), T6.4b (Documents + Emergency), T6.4c (Calendar), T6.3c (Household tasks), T6.3a (Members), T6.3d (Packages), T6.3e (Polls), T6.3g (Owners) all **flipped** their primary entry points to real screens from the home dashboard. The remaining placeholders represent Me-tab parallel-entry deferrals tracked for a follow-up that plumbs `homeId` into `MeIdentityContent`. | parallel-entry only; primary entries shipped |
+
+### Wiring deltas applied across the T6 batch
+
+This list documents every wiring flip a T6 PR landed (from
+`placeholder(label:)` / `NotYetAvailableView` → real destination):
+
+| T6 PR | Wiring flip | New destination |
+|---|---|---|
+| T6.1b (P4) | `pantopus://auth/signup` | `AuthRoute.signUp` → `SignUpView` / `SignUpScreen` |
+| T6.1b (P4) | `AuthRoute.error(AuthError)` from any auth failure | `AuthErrorView` / `AuthErrorScreen` |
+| T6.1c (P5) | `pantopus://auth/forgot-password` | `AuthRoute.forgotPassword` → `ForgotPasswordView` / `ForgotPasswordScreen` |
+| T6.1c (P5) | `pantopus://auth/reset-password?token=…` | `AuthRoute.resetPassword(token)` → `ResetPasswordView` / `ResetPasswordScreen` |
+| T6.1c (P5) | `pantopus://auth/verify-email?token=…&email=…` | `AuthRoute.verifyEmail` → `VerifyEmailView` / `VerifyEmailScreen` |
+| T6.2c (P8) | `SettingsRoute.BlockedUsers` (was `NotYetAvailableView`) | `BlockedUsersView` / `BlockedUsersScreen` |
+| T6.2c (P8) | `SettingsRoute.PasswordChange` (was placeholder) | `PasswordChangeView` / `PasswordChangeScreen` |
+| T6.2c (P8) | `SettingsRoute.Verification` (was placeholder) | `VerificationCenterView` / `VerificationCenterScreen` |
+| T6.2c (P8) | `SettingsRoute.Help` (was placeholder) | `HelpCenterView` / `HelpCenterScreen` |
+| T6.2c (P8) | `SettingsRoute.Legal` (was placeholder) | `LegalIndexView` + `LegalContentView` / equivalents |
+| T6.2c (P8) | `SettingsRoute.About` (was placeholder) | `AboutView` / `AboutScreen` |
+| T6.3a (P9) | `me.home.members` (parallel-entry placeholder) + Home Dashboard "Members" quick-action | `MembersListView` / `MembersListScreen` |
+| T6.3b (P10) | `me.maintenance` action tile (was `placeholder`) | `MaintenanceListView` / `MaintenanceListScreen` |
+| T6.3c (P11) | `me.tasks` Activity-section row + Home Dashboard "Tasks" quick-action (was `placeholder`) | `HouseholdTasksListView` / `HouseholdTasksListScreen` |
+| T6.3d (P14) | `me.home.packages` (parallel-entry) + Home Dashboard `view_packages` quick-action (replaces prior `add_mail` placeholder) | `PackagesListView` / `PackagesListScreen` (+ `PackageDetailView` + `LogPackageView`) |
+| T6.3e (P13) | `me.polls` Personal action tile + Home Dashboard `view_polls` quick-action | `PollsListView` / `PollsListScreen` (+ `PollDetailView`) |
+| T6.3f (P14) | `me.homes` Me-tab Activity row (was `placeholder`) | `MyHomesListView` / `MyHomesListScreen` (refresh) |
+| T6.3f (P14) | `me.listings` Me-tab action tile (was `placeholder`) | `MyListingsView` / `MyListingsScreen` |
+| T6.3f (P14) | `me.businesses` Me-tab Activity row (was `placeholder`) | `MyBusinessesView` / `MyBusinessesScreen` |
+| T6.3g (P15) | `me.owners` Household-section row | `OwnersListView` / `OwnersListScreen` |
+| T6.4a (P16) | `me.access` Household-section row (was `placeholder`) + Home Dashboard `access_codes` quick-action | `AccessCodesView` / `AccessCodesScreen` |
+| T6.4b (P17) | `me.docs` action tile + Home Dashboard `view_docs` quick-action (both were `placeholder`) | `DocumentsView` / `DocumentsScreen` |
+| T6.4b (P17) | `me.emergency` Activity row + Home Dashboard `view_emergency` quick-action (both were `placeholder`) | `EmergencyInfoView` / `EmergencyInfoScreen` |
+| T6.4c (P18) | `me.calendar` action tile + Home Dashboard `calendar` quick-action (both were `placeholder`) | `HomeCalendarView` / `HomeCalendarScreen` |
+| T6.5a (P19) | (new shell — no wiring flip yet) | `MailItemDetailShell` shared shell |
+| T6.5b (P20) | `HubRoute.mailItemDetail(mailId:)` / `ChildRoutes.MAILBOX_ITEM_DETAIL` (was T1.3 generic) | New A17 `MailDetailView` / `MailDetailScreen` on the shared shell |
+| T6.5d (P22) | RSVP "going" on Community mail | `POST /api/mailbox/v2/community/rsvp` (real, optimistic) |
+| T6.5e (P19.5) | Mailbox drawer list "Vault" row (added) | `HubRoute.mailboxVault` / `ChildRoutes.MAILBOX_VAULT` → `VaultListView` / `VaultListScreen` |
+| T6.5e (P19.5) | Mail detail overflow "Save to vault" | folder-picker sheet → `POST /api/mailbox/v2/p2/vault/file` |
+| T6.6a (P24) | (new shell — Nearby map migration P26) | `MapListHybridShell` shared shell |
+| T6.6b (P25) | `InboxRoute.compose` (was `NotYetAvailableView`) + Chat list "New message" entry points | `NewMessageView` / `NewMessageScreen` (real picker) |
+| T6.6c (P26.5) | Hub tab → `.supportTrains` + You tab `me.supportTrains` row + deep link `pantopus://support-trains[/:id]` | `SupportTrainsView` / `SupportTrainsScreen` |
+| T6.6c (P26.5) | Support Train row tap → organizer review queue | `ReviewSignupsView` / `ReviewSignupsScreen` |
+
+### Acceptance
+
+- **Zero** T6-shipped screen lands on `NotYetAvailableView` or
+  `ChildRoutes.placeholder(...)`.
+- All 29 iOS + 17 Android `NotYetAvailableView` references are either
+  the component definition itself, a documented future-tier deferral,
+  a parallel-entry gap with a real primary path, or a slot-stub inside
+  a shared shell awaiting a designed body.
+- All ~70 iOS + ~80 Android `placeholder(label:)` references represent
+  inner-screen affordances (filter sheets, sort sheets, edit-signup,
+  start-a-poll composer, etc.) that are tracked for follow-up tiers.
+  Each carries a labelled placeholder so the user sees what they're
+  blocked on, never a silent no-op.
+
+This is the final wiring-sweep state at T6 close. Future tiers re-run
+the grep + add a corresponding closeout section.

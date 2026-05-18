@@ -130,6 +130,66 @@ audit; updated when the PNGs land.
 | `offers-v2-android-sent.png` | Sent tab | Mirrors iOS. |
 | `offers-v2-web-sent.png` | Sent tab | Mirrors iOS. |
 
+## T6 cross-platform parity composites (61, P27 closeout)
+
+P27 closeout rendered the full T6 design pack
+(`/tmp/designs/A08 — per-screen batch 1/`) at the canonical mobile
+viewport (430×932 — iPhone 15 Pro Max so every variant fits) via
+`/home/user/pantopus/render-t6.mjs` (playwright chromium), then
+composited each design 3-up as the iOS / Android / web parity
+reference via `/home/user/pantopus/render-t6-parity.mjs`. The
+reference frame is the SSOT; per-platform on-device snapshots
+replace each panel as the platform CI captures them.
+
+61 composites live as `docs/screenshots/parity-<slug>.png`. The
+slugs match the per-screen design HTML names — see
+`docs/t6-prs/T6-summary.md` for the screen-to-tier mapping. Full
+list:
+
+| Tier 6 cluster | Composites |
+|---|---|
+| Auth + chrome refreshes | `parity-auth.png` · `parity-hub.png` · `parity-me.png` · `parity-settings.png` |
+| Drift reskins | `parity-bills.png` · `parity-my-tasks.png` |
+| Home pillar (new) | `parity-members.png` · `parity-maintenance.png` · `parity-household-tasks.png` · `parity-packages.png` · `parity-polls.png` · `parity-my-homes.png` · `parity-my-listings.png` · `parity-my-businesses.png` · `parity-owners.png` · `parity-access-codes.png` · `parity-emergency-info.png` · `parity-documents.png` · `parity-home-calendar.png` |
+| Mailbox A17 | `parity-mailbox-mobile.png` · `parity-mailbox-item-detail.png` · `parity-a17-1-mail-item-generic.png` · `parity-a17-2-booklet.png` · `parity-a17-3-certified-mail.png` · `parity-a17-4-community-mail.png` · `parity-ceremonial-mail-open.png` · `parity-ceremonial-mail-compose.png` · `parity-vault.png` |
+| Chat | `parity-chat-list.png` · `parity-chat-conversation.png` · `parity-new-message.png` |
+| Map | `parity-map-list-hybrid.png` · `parity-map-list-hybrid-print.png` |
+| Support trains | `parity-support-trains.png` · `parity-review-signups.png` |
+| Long-tail leaf refreshes | `parity-transactional-detail.png` · `parity-content-detail.png` · `parity-public-beacon-profile.png` · `parity-creator-audience.png` · `parity-creator-inbox.png` · `parity-identity-center.png` · `parity-privacy-handshake.png` · `parity-token-accept.png` · `parity-status-waiting.png` · `parity-legal-static.png` · `parity-gigs.png` · `parity-marketplace.png` · `parity-pulse.png` |
+| Archetype demos | `parity-form.png` · `parity-wizard.png` · `parity-list-of-rows.png` |
+| T5 re-issued (no drift, regenerated for parity) | `parity-my-posts.png` · `parity-my-bids.png` · `parity-offers.png` · `parity-listing-offers.png` · `parity-notifications.png` · `parity-connections.png` · `parity-discover-hub.png` · `parity-discover-businesses.png` · `parity-review-claims.png` · `parity-pets.png` |
+
+### Snapshot lockfile
+
+The 61 design-reference PNGs that compose each parity image live
+under `docs/screenshots/__snapshots__/t6/<slug>.png` (the SSOT).
+They are also mirrored as iOS baselines under
+`frontend/apps/ios/PantopusTests/__Snapshots__/t6/<slug>-ios.png`
+where `T6ScreensSnapshotTests.swift` asserts file presence + non-
+trivial PNG bytes — the same tripwire pattern as `T5ScreensSnapshotTests.swift`.
+Android Paparazzi baselines live under
+`frontend/apps/android/app/src/test/snapshots/images/` and are
+verified by `./gradlew paparazziVerify`.
+
+### Regenerating
+
+```sh
+# 1. Unzip design pack to /tmp/designs/A08 — per-screen batch 1/
+
+# 2. Render mobile-viewport baselines + parity composites.
+PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
+  node /home/user/pantopus/render-t6.mjs
+PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
+  node /home/user/pantopus/render-t6-parity.mjs
+
+# 3. Stage into the lockfile dirs.
+cp /tmp/t6-snapshots/*.png docs/screenshots/__snapshots__/t6/
+for f in /tmp/t6-snapshots/*.png; do
+  base=$(basename "$f" .png)
+  cp "$f" "frontend/apps/ios/PantopusTests/__Snapshots__/t6/${base}-ios.png"
+done
+```
+
 ## Why the design-reference shots exist
 
 The acceptance gate calls for "one screenshot per platform" showing
@@ -140,3 +200,7 @@ design's visual ground truth + the production-rendered web shot. The
 real per-platform simulator screenshots will be captured in CI on
 Mac/Android Studio runs and replace the design-reference iOS/Android
 PNGs.
+
+For T6 the snapshot lockfile guarantees we don't accidentally drift
+the design contract: if a designer rebakes a frame, the PNG diff
+flags it and the rendered baseline gets re-checked in.

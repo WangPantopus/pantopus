@@ -1,6 +1,17 @@
-# Mobile Parity / A11y / Perf Audit (T4.2)
+# Mobile Parity / A11y / Perf Audit (live — T6 closeout)
 
-Acceptance gate for the gap-closure effort (Tiers 1–4.1). Audits every
+> **P27 (T6 closeout) status:** every screen built in T1–T6 has a row
+> below. Wiring sweep verified zero `NotYetAvailableView` references
+> for T6-shipped surfaces (see
+> [`docs/mobile-wiring-audit.md`](mobile-wiring-audit.md) "T6
+> closeout (P27)" §). Accessibility audit now lives at
+> [`docs/a11y-audit-current.md`](a11y-audit-current.md) — renamed
+> from `a11y-audit-t5.md` to reflect coverage spanning T5 + T6.
+> Snapshot lockfile lives at `__snapshots__/t6/` (61 design-
+> reference PNGs); iOS tripwire is
+> `PantopusTests/Features/Shared/T6ScreensSnapshotTests.swift`.
+
+Acceptance gate for the gap-closure effort (Tiers 1–6). Audits every
 screen built in those tiers against three lenses: **iOS ↔ Android parity**,
 **WCAG 2.2 AA + platform a11y guidelines**, and the **perf budgets** in
 `frontend/apps/{ios,android}/docs/perf_budgets.md`.

@@ -164,6 +164,13 @@ targets:
     platform: iOS
     sources:
       - path: PantopusTests
+        excludes:
+          # Baseline PNGs are resolved at runtime via `#filePath` from the
+          # source tree, so they must not be copied into the test bundle.
+          # t5/ and t6/ share several basenames (e.g. bills-ios.png), and
+          # the flattened CopyPNGFile destination collides on those names —
+          # exclude the whole tree.
+          - "__Snapshots__/**"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.pantopus.ios.tests

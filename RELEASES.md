@@ -1,8 +1,124 @@
 # Pantopus — Release notes
 
-Newest first. Each tier (T1–T5+) batches a coherent slice of feature work
+Newest first. Each tier (T1–T6+) batches a coherent slice of feature work
 across iOS, Android, and web. Per-PR detail lives under
-`docs/t5-prs/T5-summary.md` (and its T1–T4 predecessors).
+`docs/t6-prs/T6-summary.md`, `docs/t5-prs/T5-summary.md`, and their
+T1–T4 predecessors.
+
+---
+
+## Tier 6 — 46 net-new screens + 2 new shared shells · 2026-05-18
+
+**Theme: design-pack closeout.** Forty-six newly designed screens
+shipped on iOS + Android (web parity where a web route already
+existed). The Tier-6 design pack also forced two **net-new shared
+shells** — `MailItemDetailShell` (8-slot A17 mailbox detail) and
+`MapListHybridShell` (full-bleed map + 3-detent draggable bottom
+sheet) — plus 8 strictly-additive extensions on `ListOfRows`. Two
+T5 screens (Bills, My tasks V2) drifted hard enough to justify
+dedicated re-skin PRs (T6.0a, T6.0b) before the rest of the tier
+landed.
+
+### Screens (46 net-new + 2 re-skins)
+
+The full per-screen table lives in
+[`docs/t6-prs/T6-summary.md`](docs/t6-prs/T6-summary.md). High-
+level groupings:
+
+| Cluster | Count | Notes |
+|---|---|---|
+| Drift catch-up reskins | 2 | Bills (T6.0a) + My tasks V2 (T6.0b) |
+| Auth (Login refresh + Create acct + Forgot + Reset + Verify + Error) | 6 | T6.1a–c, behind no flag, replaces 1-frame login |
+| Tier-1 refreshes | 2 | Hub (T6.2a), Me (T6.2b) — direct cutover per Q12 |
+| Settings sub-routes | 6 | Blocked / Password / Verification / Help / Legal index + content / About (T6.2c); Data export + Payments parked at P8.5 |
+| Home pillar | 11 | Members / Maintenance / Household tasks / Packages (+ detail + log) / Polls (+ detail) / MyHomes refresh / MyListings / MyBusinesses / Owners / Access codes / Emergency info / Documents / Home calendar (T6.3a–T6.4c) |
+| Mailbox A17 | 8 | Shell + root reskin + generic / Booklet / Certified / Community variants + Vault + Ceremonial open + Ceremonial compose refresh (T6.5a–e) |
+| Chat + New message | 2 | Chat conversation refresh + New message picker (T6.6b) |
+| MapListHybrid | 1 | Shell shipped; Nearby map migrated (T6.6a) |
+| Support trains | 2 | Support trains list + Review signups (T6.6c / P26.5) |
+| Long-tail leaf refreshes | 9 | Transactional Detail · Content Detail · Beacon (iOS deferred) · Audience hub · Creator Inbox · Identity Center · Privacy Handshake · Token Accept · Status / Wait · Legal · Form / Wizard / ListOfRows / Mailbox archetype demos (T6.6c / P26.9) |
+
+### New shared shells
+
+- **`MailItemDetailShell`** — 8-slot composition powering the four
+  A17 mailbox detail variants. Documented per-platform in
+  `frontend/apps/{ios,android}/Pantopus/Features/Shared/MailItemDetail/README.md`
+  + `frontend/apps/web/src/components/mail-item-detail/README.md`.
+- **`MapListHybridShell`** — full-bleed map + draggable bottom
+  sheet with 3 absolute-height detents (160 / 296 / 518 pt). Shared
+  detent-resolver algorithm + per-platform velocity thresholds.
+  Documented per-platform in
+  `frontend/apps/{ios,android}/Pantopus/Features/Shared/MapListHybrid/README.md`
+  + `frontend/apps/web/src/components/map-list-hybrid/README.md`.
+
+### Additive shell extensions (T6 deltas to `ListOfRows`)
+
+All strictly additive — every T5 / v1 call site compiles unchanged:
+
+- `RowLeading.magicArchetypeTile` (44pt gradient + 18pt sparkles disc)
+- `RowModel.archetypeOverline: String?` (10pt magic-violet uppercase)
+- `FabVariant.magicCreate` (60pt gradient FAB)
+- `FabTint` enum + `FABAction.tint` (per-identity colour-ramp)
+- `RowModel.splitWith: SplitStackData?` (Bills split-bill avatar stack)
+- `BannerConfig.cta: BannerCTA?` + `BannerConfig.tint: BannerCTATint`
+- `RowTrailing.iconActions(primary:secondary:)` (Access codes copy + kebab pair)
+- `ListOfRowsDataSource.topBarSubtitle: String?` (2-line top bar)
+- `customHeader` view-builder slot on `ListOfRows*` (Home calendar
+  month strip) — between chrome and state body.
+
+### Wiring sweep
+
+**Zero** T6-shipped surfaces use `NotYetAvailableView`. Every T6
+screen has a real view at its destination. 24 wiring flips landed
+across the T6 batch (from `placeholder(label:)` / `NotYetAvailableView`
+to real screens). See
+[`docs/mobile-wiring-audit.md`](docs/mobile-wiring-audit.md) — "T6
+closeout (P27)" § for the full classification + the per-PR delta
+table.
+
+### Quality gates
+
+- **iOS:** `make lint && make test` — CI green on `ios-ci.yml`.
+- **Android:** `./gradlew ktlintCheck detekt test paparazziVerify :app:assembleDebug`
+  — CI green on `android-ci.yml`.
+- **Web:** `pnpm -F @pantopus/web lint` clean (0 errors, ~510
+  warnings carried over from T5 — same pattern, no new T6
+  regressions).
+- **Hex-literal grep:** zero matches across all iOS + Android T6
+  feature dirs.
+- **Snapshot lockfile:** 61 design-reference PNGs under
+  `frontend/apps/ios/PantopusTests/__Snapshots__/t6/<slug>-ios.png`
+  with `T6ScreensSnapshotTests.swift` asserting file presence +
+  non-trivial PNG bytes. Mirrored under
+  `docs/screenshots/__snapshots__/t6/`.
+
+### Open follow-ups
+
+- iOS Beacon profile against `/api/personas/:handle`
+  (`T6.6c-followup-beacon-ios`)
+- Long-tail leaf screen visual-diff baselines
+  (`T6.6c-followup-baselines`) — 9 refresh-only screens
+- Settings sub-routes Data export + Payments & payouts (P8.5)
+- Web parity for home-pillar deep screens (P-after-T7 sweep)
+- Hub today reshape backend (`/api/hub` discrete fields)
+- Posts archive backend (carried over from T5)
+- Bills splits write endpoints (carried over from T5)
+- Maintenance + Documents + Emergency PATCH/DELETE
+- HomeOwner.share_percentage backend
+- Polls composer
+- Documents kebab action sheet
+- Android `StoreScreenshotsTest` scaffolding (carried over from T5)
+
+### Reference docs
+
+- [PR summary](docs/t6-prs/T6-summary.md)
+- [Buildout plan of record](docs/t6-buildout-plan.md)
+- [Open-question decision log](docs/t6-open-questions-decisions.md)
+- [Parity audit (live)](docs/mobile-parity-audit.md)
+- [Wiring audit (live)](docs/mobile-wiring-audit.md)
+- [Accessibility audit (current)](docs/a11y-audit-current.md)
+- [Cross-platform screenshots](docs/screenshots/README.md)
+- [Lighthouse audits (web)](docs/lighthouse-t6/README.md)
 
 ---
 

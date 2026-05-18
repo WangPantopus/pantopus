@@ -57,6 +57,51 @@ that breaks v1 callers.
 └───────────────────────────────────────┘
 ```
 
+## T6 additions (strictly additive — no v1 / T5 call site changes)
+
+T6 layered eight new surfaces onto the same shell. Every addition is
+optional / defaulted / a new sealed-subtype, so screens that don't opt
+in behave exactly as they did at the end of T5.
+
+| Addition | Cluster | Use |
+|---|---|---|
+| `RowLeading.MagicArchetypeTile(...)` | `RowLeading` sealed type | 44dp rounded gradient tile + 18dp sparkles disc overlay (T6.0b My tasks V2 magic chrome). |
+| `RowModel.archetypeOverline: String?` | `RowModel` field | 10sp lavender uppercase overline above the title (T6.0b). |
+| `FabVariant.MagicCreate` | FAB enum | 60dp gradient FAB with sparkles disc (T6.0b). |
+| `FabTint` + `FABAction.tint` | `FABAction` field | per-identity colour-ramp (`Personal` / `Home` / `Business`). Defaults to `None`. |
+| `RowModel.splitWith: SplitStackData?` | `RowModel` field | 18dp overlapping avatars at the right edge (Bills T6.0a). |
+| `BannerConfig.cta: BannerCTA?` + `BannerConfig.tint: BannerCTATint` | banner slot | adds a primary CTA + tint enum (Bills T6.0a "Pay all"). |
+| `RowTrailing.IconActions(primary, secondary)` | `RowTrailing` sealed type | 32dp icon pair when a row needs two trailing actions (Access codes T6.4a). |
+| `ListOfRowsDataSource.topBarSubtitle: String?` | data-source field | optional 2-line top bar (Access codes T6.4a). |
+| `customHeader: @Composable () -> Unit` slot | shell chrome | optional composable slot between chrome and state body (Home calendar T6.4c). |
+
+### Per-feature palette files (documented hex-exception locations)
+
+T6 added more category palettes — each feature owns a `*Palette.kt`
+file. Direct hex usage anywhere **else** in `ui/screens/**` trips the
+CI hex-grep guard via `./gradlew detekt`.
+
+- `UtilityCategoryPalette` (Bills) · `CourierPalette` (Packages) ·
+  `MaintenanceCategoryPalette` · `HouseholdTaskCategoryPalette` ·
+  `PollKindPalette` · `AccessCategoryPalette` ·
+  `EmergencyCategoryPalette` · `DocumentCategoryPalette` +
+  `DocumentFileTypePalette` · `OwnerProofPalette` ·
+  `MemberRolePalette` · `CalendarEventCategory` ·
+  `MailboxVaultFolderIcon` + `MailboxVaultMailType` ·
+  `SpeciesPalette` (T5).
+
+### Cross-reference — sibling shells added in T6
+
+- `ui/screens/shared/mail_item_detail/` — A17 mailbox detail shell.
+  See `mail_item_detail/README.md` for the slot contract.
+- `ui/screens/shared/map_list_hybrid/` — full-bleed-map + 3-detent
+  sheet shell. See `map_list_hybrid/README.md` for the detent
+  contract.
+
+— Pantopus T6
+
+---
+
 ## RowModel contract
 
 ```kotlin
