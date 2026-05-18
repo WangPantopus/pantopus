@@ -51,8 +51,8 @@ final class ReviewClaimsViewModelTests: XCTestCase {
     /// triage chips read as "New" + "Aging" in the populated test.
     private static let pendingJSON: String = {
         let now = Date()
-        let recent = ISO8601DateFormatter().string(from: now.addingTimeInterval(-2 * 86_400)) // 2 days
-        let old = ISO8601DateFormatter().string(from: now.addingTimeInterval(-10 * 86_400)) // 10 days
+        let recent = ISO8601DateFormatter().string(from: now.addingTimeInterval(-2 * 86400)) // 2 days
+        let old = ISO8601DateFormatter().string(from: now.addingTimeInterval(-10 * 86400)) // 10 days
         return """
         {
           "claims": [
@@ -61,20 +61,36 @@ final class ReviewClaimsViewModelTests: XCTestCase {
               "claim_type": "owner", "state": "submitted", "method": "doc_upload",
               "risk_score": 12, "created_at": "\(recent)", "updated_at": "\(recent)",
               "evidence_count": 3,
-              "home": {"id":"h1","address":"12 Elm St","city":"Pittsburgh","state":"PA","zipcode":"15213","name":"12 Elm Street","home_type":"single_family"},
-              "claimant": {"id":"u_new","username":"riya","name":"Riya Patel","email":"riya@example.com","created_at":"2025-09-01T00:00:00Z","profile_picture_url":null}
+              "home": {
+                "id":"h1","address":"12 Elm St","city":"Pittsburgh",
+                "state":"PA","zipcode":"15213","name":"12 Elm Street",
+                "home_type":"single_family"
+              },
+              "claimant": {
+                "id":"u_new","username":"riya","name":"Riya Patel",
+                "email":"riya@example.com",
+                "created_at":"2025-09-01T00:00:00Z","profile_picture_url":null
+              }
             },
             {
               "id": "c_old", "home_id": "h2", "claimant_user_id": "u_old",
               "claim_type": "owner", "state": "submitted", "method": "escrow_agent",
               "risk_score": 62, "created_at": "\(old)", "updated_at": "\(old)",
               "evidence_count": 5,
-              "home": {"id":"h2","address":"88 Pinecrest Ln","city":"Pittsburgh","state":"PA","zipcode":"15213","name":null,"home_type":"single_family"},
-              "claimant": {"id":"u_old","username":"sam","name":"Sam Reyes","email":"sam@example.com","created_at":"2025-04-01T00:00:00Z","profile_picture_url":null}
+              "home": {
+                "id":"h2","address":"88 Pinecrest Ln","city":"Pittsburgh",
+                "state":"PA","zipcode":"15213","name":null,
+                "home_type":"single_family"
+              },
+              "claimant": {
+                "id":"u_old","username":"sam","name":"Sam Reyes",
+                "email":"sam@example.com",
+                "created_at":"2025-04-01T00:00:00Z","profile_picture_url":null
+              }
             }
           ],
           "total": 2,
-          "oldest_age_seconds": \(Int(10 * 86_400))
+          "oldest_age_seconds": \(Int(10 * 86400))
         }
         """
     }()
@@ -89,10 +105,19 @@ final class ReviewClaimsViewModelTests: XCTestCase {
         {
           "id": "c_app1", "home_id": "h3", "claimant_user_id": "u3",
           "claim_type": "owner", "state": "approved", "method": "doc_upload",
-          "risk_score": 8, "created_at": "2026-04-01T10:00:00Z", "updated_at": "2026-04-02T11:00:00Z",
+          "risk_score": 8,
+          "created_at": "2026-04-01T10:00:00Z",
+          "updated_at": "2026-04-02T11:00:00Z",
           "evidence_count": 4,
-          "home": {"id":"h3","address":"212 Oak Rd","city":"Pittsburgh","state":"PA","zipcode":null,"name":null,"home_type":null},
-          "claimant": {"id":"u3","username":"jordan","name":"Jordan Lee","email":"jordan@example.com","created_at":"2025-01-01T00:00:00Z","profile_picture_url":null}
+          "home": {
+            "id":"h3","address":"212 Oak Rd","city":"Pittsburgh",
+            "state":"PA","zipcode":null,"name":null,"home_type":null
+          },
+          "claimant": {
+            "id":"u3","username":"jordan","name":"Jordan Lee",
+            "email":"jordan@example.com",
+            "created_at":"2025-01-01T00:00:00Z","profile_picture_url":null
+          }
         }
       ],
       "total": 1,
@@ -106,10 +131,19 @@ final class ReviewClaimsViewModelTests: XCTestCase {
         {
           "id": "c_rej1", "home_id": "h4", "claimant_user_id": "u4",
           "claim_type": "resident", "state": "rejected", "method": "doc_upload",
-          "risk_score": 91, "created_at": "2026-03-01T10:00:00Z", "updated_at": "2026-03-02T11:00:00Z",
+          "risk_score": 91,
+          "created_at": "2026-03-01T10:00:00Z",
+          "updated_at": "2026-03-02T11:00:00Z",
           "evidence_count": 0,
-          "home": {"id":"h4","address":"56 Maple Ave","city":"Pittsburgh","state":"PA","zipcode":null,"name":null,"home_type":null},
-          "claimant": {"id":"u4","username":"alex","name":"Alex Chen","email":"alex@example.com","created_at":"2024-12-01T00:00:00Z","profile_picture_url":null}
+          "home": {
+            "id":"h4","address":"56 Maple Ave","city":"Pittsburgh",
+            "state":"PA","zipcode":null,"name":null,"home_type":null
+          },
+          "claimant": {
+            "id":"u4","username":"alex","name":"Alex Chen",
+            "email":"alex@example.com",
+            "created_at":"2024-12-01T00:00:00Z","profile_picture_url":null
+          }
         }
       ],
       "total": 1,
@@ -177,7 +211,7 @@ final class ReviewClaimsViewModelTests: XCTestCase {
         await vm.load()
         guard case let .loaded(sections, _) = vm.state,
               let rows = sections.first?.rows
-        else { return XCTFail() }
+        else { return XCTFail("Expected loaded state with at least one row section") }
         XCTAssertEqual(rows[0].chips?[1].text, "3 docs")
         XCTAssertEqual(rows[1].chips?[1].text, "5 docs")
     }
@@ -240,7 +274,7 @@ final class ReviewClaimsViewModelTests: XCTestCase {
 
         guard case let .loaded(sections, _) = vm.state,
               let row = sections.first?.rows.first
-        else { return XCTFail() }
+        else { return XCTFail("Expected loaded rejected bucket with at least one row") }
         XCTAssertEqual(row.chips?[0].text, "Rejected")
         XCTAssertEqual(row.chips?[0].icon, .circleSlash)
         XCTAssertEqual(row.highlight, .muted)
@@ -255,7 +289,7 @@ final class ReviewClaimsViewModelTests: XCTestCase {
         await vm.load()
         guard case let .loaded(sections, _) = vm.state,
               let row = sections.first?.rows.first
-        else { return XCTFail() }
+        else { return XCTFail("Expected loaded pending bucket with at least one row") }
         row.onTap()
         XCTAssertEqual(lastOpened, "c_new")
     }
@@ -268,7 +302,7 @@ final class ReviewClaimsViewModelTests: XCTestCase {
         guard case let .loaded(sections, _) = vm.state,
               let row = sections.first?.rows.first,
               let footer = row.footer
-        else { return XCTFail() }
+        else { return XCTFail("Expected loaded row with a footer for tap dispatch") }
         XCTAssertEqual(footer.actions.first?.title, "Review claim")
         footer.actions.first?.handler()
         XCTAssertEqual(lastOpened, "c_new")

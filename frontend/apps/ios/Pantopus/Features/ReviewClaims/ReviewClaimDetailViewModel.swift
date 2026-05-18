@@ -13,7 +13,7 @@ import Observation
 import SwiftUI
 
 @MainActor
-public enum ReviewClaimDetailState: Sendable {
+public enum ReviewClaimDetailState {
     case loading
     case loaded(AdminClaimDetailResponse)
     case error(message: String)
@@ -30,7 +30,7 @@ public final class ReviewClaimDetailViewModel {
     private let claimId: String
     private var loadedOnce = false
 
-    public init(
+    init(
         claimId: String,
         api: APIClient = .shared
     ) {

@@ -70,99 +70,120 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
     }
 
     private func rebuild() {
+        var groups: [GroupedListGroup] = [
+            accountGroup(),
+            privacyGroup(),
+            notificationsGroup(),
+            paymentsGroup(),
+            supportGroup()
+        ]
+        if isAdmin { groups.append(adminGroup()) }
+        groups.append(signOutGroup())
+        state = .loaded(groups)
+    }
+
+    private func accountGroup() -> GroupedListGroup {
         let verificationChip: RowControl =
             verified
                 ? .chipStatus(label: "Verified", tone: .success, includesChevron: true)
                 : .chevron
+        return GroupedListGroup(
+            id: "account",
+            overline: "Account",
+            rows: [
+                GroupedListRow(id: "editProfile", label: "Edit profile", control: .chevron),
+                GroupedListRow(id: "password", label: "Password", control: .chevron),
+                GroupedListRow(id: "verification", label: "Verification", control: verificationChip)
+            ]
+        )
+    }
+
+    private func privacyGroup() -> GroupedListGroup {
+        GroupedListGroup(
+            id: "privacy",
+            overline: "Privacy",
+            rows: [
+                GroupedListRow(
+                    id: "blocks",
+                    label: "Blocked users",
+                    subtext: blockCount > 0 ? "\(blockCount) \(blockCount == 1 ? "person" : "people")" : nil,
+                    control: .chevron
+                ),
+                GroupedListRow(id: "visibility", label: "Profiles & Privacy", control: .chevron),
+                GroupedListRow(id: "export", label: "Data export", control: .chevron)
+            ]
+        )
+    }
+
+    private func notificationsGroup() -> GroupedListGroup {
+        GroupedListGroup(
+            id: "notifications",
+            overline: "Notifications",
+            rows: [
+                GroupedListRow(
+                    id: "notificationPreferences",
+                    label: "Notification preferences",
+                    subtext: "Push, email, SMS",
+                    control: .chevron
+                )
+            ]
+        )
+    }
+
+    private func paymentsGroup() -> GroupedListGroup {
         let stripeChip: RowControl =
             stripeConnected == true
                 ? .chipStatus(label: "Stripe connected", tone: .success, includesChevron: true)
                 : .chevron
-
-        var groups: [GroupedListGroup] = [
-            GroupedListGroup(
-                id: "account",
-                overline: "Account",
-                rows: [
-                    GroupedListRow(id: "editProfile", label: "Edit profile", control: .chevron),
-                    GroupedListRow(id: "password", label: "Password", control: .chevron),
-                    GroupedListRow(id: "verification", label: "Verification", control: verificationChip)
-                ]
-            ),
-            GroupedListGroup(
-                id: "privacy",
-                overline: "Privacy",
-                rows: [
-                    GroupedListRow(
-                        id: "blocks",
-                        label: "Blocked users",
-                        subtext: blockCount > 0 ? "\(blockCount) \(blockCount == 1 ? "person" : "people")" : nil,
-                        control: .chevron
-                    ),
-                    GroupedListRow(id: "visibility", label: "Profiles & Privacy", control: .chevron),
-                    GroupedListRow(id: "export", label: "Data export", control: .chevron)
-                ]
-            ),
-            GroupedListGroup(
-                id: "notifications",
-                overline: "Notifications",
-                rows: [
-                    GroupedListRow(
-                        id: "notificationPreferences",
-                        label: "Notification preferences",
-                        subtext: "Push, email, SMS",
-                        control: .chevron
-                    )
-                ]
-            ),
-            GroupedListGroup(
-                id: "payments",
-                overline: "Payments",
-                rows: [
-                    GroupedListRow(id: "paymentsPayouts", label: "Payments & payouts", control: stripeChip)
-                ]
-            ),
-            GroupedListGroup(
-                id: "support",
-                overline: "Support",
-                rows: [
-                    GroupedListRow(id: "help", label: "Help", control: .chevron),
-                    GroupedListRow(id: "legal", label: "Legal", control: .chevron),
-                    GroupedListRow(
-                        id: "about",
-                        label: "About",
-                        subtext: Self.versionString(),
-                        control: .chevron
-                    )
-                ]
-            )
-        ]
-        if isAdmin {
-            groups.append(
-                GroupedListGroup(
-                    id: "admin",
-                    overline: "Admin",
-                    rows: [
-                        GroupedListRow(
-                            id: "reviewClaims",
-                            label: "Review claims",
-                            subtext: "Home-ownership claim queue",
-                            control: .chevron
-                        )
-                    ]
-                )
-            )
-        }
-        groups.append(
-            GroupedListGroup(
-                id: "session",
-                overline: nil,
-                rows: [
-                    GroupedListRow(id: "signOut", label: "Log out", control: .chevron, destructive: true)
-                ]
-            )
+        return GroupedListGroup(
+            id: "payments",
+            overline: "Payments",
+            rows: [
+                GroupedListRow(id: "paymentsPayouts", label: "Payments & payouts", control: stripeChip)
+            ]
         )
-        state = .loaded(groups)
+    }
+
+    private func supportGroup() -> GroupedListGroup {
+        GroupedListGroup(
+            id: "support",
+            overline: "Support",
+            rows: [
+                GroupedListRow(id: "help", label: "Help", control: .chevron),
+                GroupedListRow(id: "legal", label: "Legal", control: .chevron),
+                GroupedListRow(
+                    id: "about",
+                    label: "About",
+                    subtext: Self.versionString(),
+                    control: .chevron
+                )
+            ]
+        )
+    }
+
+    private func adminGroup() -> GroupedListGroup {
+        GroupedListGroup(
+            id: "admin",
+            overline: "Admin",
+            rows: [
+                GroupedListRow(
+                    id: "reviewClaims",
+                    label: "Review claims",
+                    subtext: "Home-ownership claim queue",
+                    control: .chevron
+                )
+            ]
+        )
+    }
+
+    private func signOutGroup() -> GroupedListGroup {
+        GroupedListGroup(
+            id: "session",
+            overline: nil,
+            rows: [
+                GroupedListRow(id: "signOut", label: "Log out", control: .chevron, destructive: true)
+            ]
+        )
     }
 
     public func tapRow(_ rowId: String) async {

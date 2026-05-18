@@ -27,7 +27,7 @@ public struct ReviewClaimsView: View {
 #Preview {
     NavigationStack {
         ReviewClaimsView(
-            viewModel: ReviewClaimsViewModel(onOpenClaim: { _ in })
+            viewModel: ReviewClaimsViewModel { _ in }
         )
     }
 }

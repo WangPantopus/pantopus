@@ -28,7 +28,7 @@ public enum AdminClaimBucket: String, Sendable, Hashable {
 
 /// Action posted to `/api/admin/claims/:claimId/review`. The handler
 /// rejects anything outside this set with a 400.
-public enum AdminClaimReviewAction: String, Sendable, Hashable {
+public enum AdminClaimReviewAction: String, Codable, Sendable, Hashable {
     case approve
     case reject
     case requestMoreInfo = "request_more_info"
@@ -200,9 +200,6 @@ public struct AdminClaimReviewResponse: Decodable, Sendable, Hashable {
     public let homeId: String?
 
     private enum CodingKeys: String, CodingKey {
-        case action
-        case newState = "newState"
-        case claimId = "claimId"
-        case homeId = "homeId"
+        case action, newState, claimId, homeId
     }
 }

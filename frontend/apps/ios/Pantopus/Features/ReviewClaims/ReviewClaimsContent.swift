@@ -109,7 +109,7 @@ public enum AdminClaimChip {
         let date = parser.date(from: claim.createdAt)
             ?? ISO8601DateFormatter().date(from: claim.createdAt)
         let ageSeconds = date.map { referenceDate.timeIntervalSince($0) } ?? 0
-        let ageDays = Int(ageSeconds / 86_400)
+        let ageDays = Int(ageSeconds / 86400)
         if ageDays >= 7 {
             return AdminClaimChipDescriptor(
                 text: "Aging · \(ageDays)d",
@@ -135,9 +135,9 @@ public enum AdminClaimTimeFormat {
         let seconds = max(0, Int(referenceDate.timeIntervalSince(date)))
         switch seconds {
         case ..<60: return "filed just now"
-        case ..<3_600: return "filed \(seconds / 60)m ago"
-        case ..<86_400: return "filed \(seconds / 3_600)h ago"
-        default: return "filed \(seconds / 86_400)d ago"
+        case ..<3600: return "filed \(seconds / 60)m ago"
+        case ..<86400: return "filed \(seconds / 3600)h ago"
+        default: return "filed \(seconds / 86400)d ago"
         }
     }
 
@@ -146,9 +146,9 @@ public enum AdminClaimTimeFormat {
     public static func oldestAge(_ seconds: Int?) -> String {
         guard let s = seconds else { return "no claims" }
         if s < 60 { return "\(s)s" }
-        if s < 3_600 { return "\(s / 60) min" }
-        if s < 86_400 { return "\(s / 3_600)h" }
-        return "\(s / 86_400)d"
+        if s < 3600 { return "\(s / 60) min" }
+        if s < 86400 { return "\(s / 3600)h" }
+        return "\(s / 86400)d"
     }
 
     /// Format a posix date as "Mar 4, 2026" — used in the detail summary.

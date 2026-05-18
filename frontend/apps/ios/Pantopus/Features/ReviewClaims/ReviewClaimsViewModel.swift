@@ -18,8 +18,6 @@ import Foundation
 import Observation
 import SwiftUI
 
-// swiftlint:disable type_body_length
-
 /// Stable tab ids for the queue. Match the backend's `bucket` enum.
 public enum ReviewClaimsTab {
     public static let pending = AdminClaimBucket.pending.rawValue
@@ -92,7 +90,7 @@ public final class ReviewClaimsViewModel: ListOfRowsDataSource {
     private var counts: AdminClaimCountsResponse?
     private var oldestAgeSeconds: Int?
 
-    public init(
+    init(
         api: APIClient = .shared,
         onOpenClaim: @escaping @MainActor (String) -> Void = { _ in }
     ) {
@@ -179,11 +177,10 @@ public final class ReviewClaimsViewModel: ListOfRowsDataSource {
                 icon: .checkCheck,
                 headline: "No claims to review",
                 subcopy: "You're all caught up. New ownership claims will appear here when neighbors submit address verification.",
-                ctaTitle: "View approved",
-                onCTA: { [weak self] in
-                    MainActor.assumeIsolated { self?.selectedTab = ReviewClaimsTab.approved }
-                }
-            )
+                ctaTitle: "View approved"
+            ) { [weak self] in
+                MainActor.assumeIsolated { self?.selectedTab = ReviewClaimsTab.approved }
+            }
         case .approved:
             ListOfRowsState.EmptyContent(
                 icon: .checkCircle,
@@ -247,5 +244,3 @@ public final class ReviewClaimsViewModel: ListOfRowsDataSource {
         )
     }
 }
-
-// swiftlint:enable type_body_length

@@ -907,17 +907,14 @@ public struct HubTabRoot: View {
             )
         case .reviewClaims:
             ReviewClaimsView(
-                viewModel: ReviewClaimsViewModel(
-                    onOpenClaim: { claimId in
-                        Task { @MainActor in push(.reviewClaimDetail(claimId: claimId)) }
-                    }
-                )
+                viewModel: ReviewClaimsViewModel { claimId in
+                    Task { @MainActor in push(.reviewClaimDetail(claimId: claimId)) }
+                }
             )
         case let .reviewClaimDetail(claimId):
             ReviewClaimDetailView(
-                viewModel: ReviewClaimDetailViewModel(claimId: claimId),
-                onClose: { if !path.isEmpty { path.removeLast() } }
-            )
+                viewModel: ReviewClaimDetailViewModel(claimId: claimId)
+            ) { if !path.isEmpty { path.removeLast() } }
         case .mailboxSearch:
             NotYetAvailableView(tabName: "Mail search", icon: .search)
         case let .placeholder(label):

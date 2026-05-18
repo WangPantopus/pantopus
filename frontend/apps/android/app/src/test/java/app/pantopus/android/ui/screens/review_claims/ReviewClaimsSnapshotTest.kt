@@ -174,8 +174,7 @@ class ReviewClaimsSnapshotTest {
             ListOfRowsTab(id = ReviewClaimsTab.REJECTED, label = "Rejected", count = 3),
         )
 
-    private fun populatedRows(): List<RowModel> =
-        listOf(newClaimRow(), agingClaimRow())
+    private fun populatedRows(): List<RowModel> = listOf(newClaimRow(), agingClaimRow())
 
     private fun newClaimRow(): RowModel =
         RowModel(
