@@ -23,6 +23,7 @@ import app.pantopus.android.data.api.models.audience.PublishUpdateResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.audience.AudienceProfileRepository
+import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BroadcastDetailSeedCache
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.slot
@@ -50,6 +51,9 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class AudienceProfileViewModelTest {
     private val repository: AudienceProfileRepository = mockk()
+    private val seedCache: BroadcastDetailSeedCache = BroadcastDetailSeedCache()
+
+    private fun makeVm(): AudienceProfileViewModel = AudienceProfileViewModel(repository, seedCache)
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -174,7 +178,7 @@ class AudienceProfileViewModelTest {
     @Test fun load_projects_header_updates_followers_threads() =
         runTest {
             stubLoaded()
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             vm.load()
             val loaded = vm.state.value as AudienceProfileUiState.Loaded
             assertEquals("Maya Builds", loaded.content.header.displayName)
@@ -194,7 +198,7 @@ class AudienceProfileViewModelTest {
     @Test fun load_projects_analytics_cells_and_stacked_bar() =
         runTest {
             stubLoaded()
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             vm.load()
             val loaded = vm.state.value as AudienceProfileUiState.Loaded
             assertEquals(4, loaded.content.analyticsCells.size)
@@ -212,7 +216,7 @@ class AudienceProfileViewModelTest {
         runTest {
             coEvery { repository.me() } returns
                 NetworkResult.Success(PersonaMeResponse(persona = null, channel = null))
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             vm.load()
             assertTrue(vm.state.value is AudienceProfileUiState.Empty)
         }
@@ -220,7 +224,7 @@ class AudienceProfileViewModelTest {
     @Test fun load_failure_transitions_error() =
         runTest {
             coEvery { repository.me() } returns NetworkResult.Failure(NetworkError.Server(500, null))
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             vm.load()
             assertTrue(vm.state.value is AudienceProfileUiState.Error)
         }
@@ -228,7 +232,7 @@ class AudienceProfileViewModelTest {
     @Test fun submitUpdate_requires_non_empty_body() =
         runTest {
             stubLoaded()
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             vm.load()
             vm.onComposerText("   ")
             assertTrue(!vm.composer.value.canSubmit)
@@ -239,7 +243,7 @@ class AudienceProfileViewModelTest {
     @Test fun submitUpdate_tier_or_above_requires_rank() =
         runTest {
             stubLoaded()
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             vm.load()
             vm.onComposerText("Hello tier 2")
             vm.onComposerVisibility(UpdateVisibility.TierOrAbove)
@@ -258,7 +262,7 @@ class AudienceProfileViewModelTest {
                         message = BroadcastMessageDto(id = "new1", body = "Hello", visibility = "followers"),
                     ),
                 )
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             vm.load()
             vm.onComposerText("Hello")
             vm.onComposerVisibility(UpdateVisibility.Followers)
@@ -277,7 +281,7 @@ class AudienceProfileViewModelTest {
             stubLoaded()
             coEvery { repository.publishUpdate(any(), any()) } returns
                 NetworkResult.Failure(NetworkError.Server(500, null))
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             vm.load()
             vm.onComposerText("Hello")
             vm.submitUpdate()
@@ -292,7 +296,7 @@ class AudienceProfileViewModelTest {
             val captured = slot<PublishUpdateBody>()
             coEvery { repository.publishUpdate(any(), capture(captured)) } returns
                 NetworkResult.Success(PublishUpdateResponse(message = null))
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             vm.load()
             vm.onComposerText("Members only")
             vm.onComposerVisibility(UpdateVisibility.TierOrAbove)
@@ -305,7 +309,7 @@ class AudienceProfileViewModelTest {
     @Test fun tier_filter_reduces_visible_followers() =
         runTest {
             stubLoaded()
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             vm.load()
             assertEquals(2, vm.visibleFollowers().size)
             vm.selectTierFilter(2)
@@ -317,7 +321,7 @@ class AudienceProfileViewModelTest {
 
     @Test fun active_tab_defaults_to_updates() =
         runTest {
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             assertEquals(AudienceProfileTab.Updates, vm.activeTab.value)
             vm.selectTab(AudienceProfileTab.Followers)
             assertEquals(AudienceProfileTab.Followers, vm.activeTab.value)
@@ -326,7 +330,7 @@ class AudienceProfileViewModelTest {
     @Test fun update_card_visibility_label_for_tier_includes_rank() =
         runTest {
             stubLoaded()
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             vm.load()
             val loaded = vm.state.value as AudienceProfileUiState.Loaded
             assertEquals("Followers", loaded.content.updates.first { it.id == "u1" }.visibilityLabel)
@@ -336,7 +340,7 @@ class AudienceProfileViewModelTest {
     @Test fun tier_chip_for_rank_1_surfaces_correct_count() =
         runTest {
             stubLoaded()
-            val vm = AudienceProfileViewModel(repository)
+            val vm = makeVm()
             vm.load()
             val loaded = vm.state.value as AudienceProfileUiState.Loaded
             assertEquals(8, loaded.content.tierChips.first { it.id == "tier_1" }.count)

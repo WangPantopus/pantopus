@@ -59,6 +59,7 @@ fun AudienceProfileScreen(
     onBack: () -> Unit = {},
     onOpenFollower: (FollowerRowContent) -> Unit = {},
     onOpenThread: (ThreadRowContent) -> Unit = {},
+    onOpenBroadcast: (UpdateCardContent, List<TierBreakdownContent.TierSegment>) -> Unit = { _, _ -> },
     onOpenSetup: () -> Unit = {},
     viewModel: AudienceProfileViewModel = hiltViewModel(),
 ) {
@@ -99,6 +100,7 @@ fun AudienceProfileScreen(
                     onSubmitUpdate = viewModel::submitUpdate,
                     onOpenFollower = onOpenFollower,
                     onOpenThread = onOpenThread,
+                    onOpenBroadcast = onOpenBroadcast,
                 )
         }
     }
@@ -271,6 +273,7 @@ internal fun LoadedFrame(
     onSubmitUpdate: () -> Unit,
     onOpenFollower: (FollowerRowContent) -> Unit,
     onOpenThread: (ThreadRowContent) -> Unit,
+    onOpenBroadcast: (UpdateCardContent, List<TierBreakdownContent.TierSegment>) -> Unit = { _, _ -> },
 ) {
     Column(
         modifier = Modifier.fillMaxSize().testTag("audienceProfileContent"),
@@ -283,10 +286,12 @@ internal fun LoadedFrame(
                     updates = loaded.updates,
                     composer = composer,
                     channelId = loaded.channelId,
+                    tierSegments = loaded.tierBreakdown.segments,
                     onComposerText = onComposerText,
                     onComposerVisibility = onComposerVisibility,
                     onComposerTier = onComposerTier,
                     onSubmit = onSubmitUpdate,
+                    onOpenBroadcast = onOpenBroadcast,
                 )
             AudienceProfileTab.Followers ->
                 FollowersTab(
@@ -404,10 +409,12 @@ private fun UpdatesTab(
     updates: List<UpdateCardContent>,
     composer: UpdateComposerState,
     channelId: String?,
+    tierSegments: List<TierBreakdownContent.TierSegment>,
     onComposerText: (String) -> Unit,
     onComposerVisibility: (UpdateVisibility) -> Unit,
     onComposerTier: (Int?) -> Unit,
     onSubmit: () -> Unit,
+    onOpenBroadcast: (UpdateCardContent, List<TierBreakdownContent.TierSegment>) -> Unit,
 ) {
     Column(
         modifier =
@@ -429,7 +436,9 @@ private fun UpdatesTab(
         if (updates.isEmpty()) {
             EmptyUpdatesCard()
         } else {
-            updates.forEach { UpdateCard(it) }
+            updates.forEach { card ->
+                UpdateCard(card = card, onOpen = { onOpenBroadcast(card, tierSegments) })
+            }
         }
         Spacer(modifier = Modifier.height(24.dp))
     }
@@ -601,7 +610,10 @@ private fun EmptyUpdatesCard() {
 }
 
 @Composable
-private fun UpdateCard(card: UpdateCardContent) {
+private fun UpdateCard(
+    card: UpdateCardContent,
+    onOpen: () -> Unit,
+) {
     Column(
         modifier =
             Modifier
@@ -609,6 +621,7 @@ private fun UpdateCard(card: UpdateCardContent) {
                 .clip(RoundedCornerShape(12.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .clickable(onClick = onOpen)
                 .padding(14.dp)
                 .testTag("updateCard_${card.id}"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -632,7 +645,10 @@ private fun UpdateCard(card: UpdateCardContent) {
             Text(text = card.timeAgo, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
         }
         Text(text = card.body, fontSize = 14.sp, color = PantopusColors.appText)
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             Text(
                 text = "Delivered ${card.deliveredCount}",
                 fontSize = 11.sp,
@@ -644,6 +660,14 @@ private fun UpdateCard(card: UpdateCardContent) {
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = PantopusColors.appTextSecondary,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronRight,
+                contentDescription = null,
+                size = 13.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.appTextMuted,
             )
         }
     }

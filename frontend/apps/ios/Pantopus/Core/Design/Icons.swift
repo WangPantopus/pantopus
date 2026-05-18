@@ -231,6 +231,11 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case moreVertical = "more-vertical"
     case hand
 
+    // P1.3 Broadcast detail — sticky-footer Reply CTA + radio-tower
+    // "reach" cell glyph borrowed from the audience-frames design.
+    case reply
+    case radioTower = "radio-tower"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -414,6 +419,9 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .video: "video"
         case .moreVertical: "ellipsis"
         case .hand: "hand.wave"
+        // P1.3 Broadcast detail.
+        case .reply: "arrowshape.turn.up.left"
+        case .radioTower: "antenna.radiowaves.left.and.right"
         }
     }
 }

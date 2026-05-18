@@ -57,6 +57,13 @@ public enum YouRoute: Hashable {
     case identityCenter
     /// T3.3 — Audience profile. The "me.audience" Personal section row pushes here.
     case audienceProfile
+    /// P1.3 — Broadcast detail full-screen takeover, pushed when the
+    /// creator taps an update card on the Audience Profile. The
+    /// `card` payload seeds the hero + delivered/read counters so the
+    /// detail can render without a second fetch, and `tierSegments`
+    /// carries the persona's tier ladder so the read-share bar paints
+    /// per-tier widths immediately.
+    case broadcastDetail(broadcastId: String, card: UpdateCardContent, tierSegments: [TierBreakdownContent.TierSegment])
     /// T5.2.2 — Bills. The home-context "me.bills" action tile + Activity
     /// row push here with the primary home id resolved by the VM.
     case homeBills(homeId: String)
@@ -802,8 +809,38 @@ public struct YouTabRoot: View {
                 onOpenThread: { _ in
                     Task { @MainActor in path.append(.placeholder(label: "Thread")) }
                 },
+                onOpenBroadcast: { card, tierSegments in
+                    Task { @MainActor in
+                        path.append(.broadcastDetail(
+                            broadcastId: card.id,
+                            card: card,
+                            tierSegments: tierSegments
+                        ))
+                    }
+                },
                 onOpenSetup: {
                     Task { @MainActor in path.append(.placeholder(label: "Audience setup")) }
+                }
+            )
+        case let .broadcastDetail(broadcastId, card, tierSegments):
+            BroadcastDetailView(
+                viewModel: BroadcastDetailViewModel(
+                    broadcastId: broadcastId,
+                    seed: card,
+                    tierSegments: tierSegments
+                ),
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOverflow: {
+                    Task { @MainActor in path.append(.placeholder(label: "Broadcast actions")) }
+                },
+                onReply: {
+                    Task { @MainActor in path.append(.placeholder(label: "Reply to broadcast")) }
+                },
+                onBoost: {
+                    Task { @MainActor in path.append(.placeholder(label: "Boost broadcast")) }
+                },
+                onPin: {
+                    Task { @MainActor in path.append(.placeholder(label: "Pin broadcast")) }
                 }
             )
         case let .homeBills(homeId):

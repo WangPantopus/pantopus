@@ -49,6 +49,7 @@ class AudienceProfileSnapshotTest {
                     onSubmitUpdate = {},
                     onOpenFollower = {},
                     onOpenThread = {},
+                    onOpenBroadcast = { _, _ -> },
                 )
             }
         }
@@ -72,6 +73,7 @@ class AudienceProfileSnapshotTest {
                     onSubmitUpdate = {},
                     onOpenFollower = {},
                     onOpenThread = {},
+                    onOpenBroadcast = { _, _ -> },
                 )
             }
         }
@@ -95,6 +97,7 @@ class AudienceProfileSnapshotTest {
                     onSubmitUpdate = {},
                     onOpenFollower = {},
                     onOpenThread = {},
+                    onOpenBroadcast = { _, _ -> },
                 )
             }
         }
