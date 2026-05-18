@@ -36,9 +36,9 @@ import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenSc
 import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
 import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
-import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
+import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesTarget
 import app.pantopus.android.ui.screens.discoverhub.DiscoverHubScreen

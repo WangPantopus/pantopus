@@ -14,6 +14,14 @@
 
 import SwiftUI
 
+private struct CreatorInboxPromptContent {
+    let id: String
+    let icon: PantopusIcon
+    let title: String
+    let subtitle: String
+    let cta: String
+}
+
 public struct CreatorInboxView: View {
     @State private var viewModel: CreatorInboxViewModel
     private let onBack: @MainActor () -> Void
@@ -91,9 +99,9 @@ public struct CreatorInboxView: View {
 
     private var headerHandle: String? {
         switch viewModel.state {
-        case let .loaded(loaded): return loaded.header.handle
-        case let .empty(header): return header.handle
-        case .loading, .error: return nil
+        case let .loaded(loaded): loaded.header.handle
+        case let .empty(header): header.handle
+        case .loading, .error: nil
         }
     }
 
@@ -347,7 +355,7 @@ public struct CreatorInboxView: View {
                     .accessibilityAddTraits(.isHeader)
                 Text(
                     "Your fans haven't reached out. DMs usually start after a broadcast, " +
-                    "a paywall reply, or a tip — try one of these to get the inbox moving."
+                        "a paywall reply, or a tip — try one of these to get the inbox moving."
                 )
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.Color.appTextSecondary)
@@ -361,27 +369,33 @@ public struct CreatorInboxView: View {
     private var emptyPromptList: some View {
         VStack(spacing: 8) {
             emptyPromptRow(
-                id: "broadcast",
-                icon: .megaphone,
-                title: "Send a broadcast",
-                sub: "Fans can reply privately to anything you post",
-                cta: "Compose",
+                CreatorInboxPromptContent(
+                    id: "broadcast",
+                    icon: .megaphone,
+                    title: "Send a broadcast",
+                    subtitle: "Fans can reply privately to anything you post",
+                    cta: "Compose"
+                ),
                 action: onOpenBroadcast
             )
             emptyPromptRow(
-                id: "unlock",
-                icon: .shield,
-                title: "Unlock fan DMs",
-                sub: "Bronze+ fans can message you directly",
-                cta: "Settings",
+                CreatorInboxPromptContent(
+                    id: "unlock",
+                    icon: .shield,
+                    title: "Unlock fan DMs",
+                    subtitle: "Bronze+ fans can message you directly",
+                    cta: "Settings"
+                ),
                 action: onOpenSettings
             )
             emptyPromptRow(
-                id: "tip",
-                icon: .handCoins,
-                title: "Enable tip-with-message",
-                sub: "Tips arrive as paid DMs at the top of inbox",
-                cta: "Turn on",
+                CreatorInboxPromptContent(
+                    id: "tip",
+                    icon: .handCoins,
+                    title: "Enable tip-with-message",
+                    subtitle: "Tips arrive as paid DMs at the top of inbox",
+                    cta: "Turn on"
+                ),
                 action: onOpenSettings
             )
         }
@@ -389,11 +403,7 @@ public struct CreatorInboxView: View {
     }
 
     private func emptyPromptRow(
-        id: String,
-        icon: PantopusIcon,
-        title: String,
-        sub: String,
-        cta: String,
+        _ prompt: CreatorInboxPromptContent,
         action: @escaping @MainActor () -> Void
     ) -> some View {
         Button(action: action) {
@@ -401,21 +411,21 @@ public struct CreatorInboxView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
                         .fill(Theme.Color.primary50)
-                    Icon(icon, size: 16, color: Theme.Color.primary600)
+                    Icon(prompt.icon, size: 16, color: Theme.Color.primary600)
                 }
                 .frame(width: 32, height: 32)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
+                    Text(prompt.title)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
-                    Text(sub)
+                    Text(prompt.subtitle)
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
                 HStack(spacing: 2) {
-                    Text(cta)
+                    Text(prompt.cta)
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(Theme.Color.primary600)
                     Icon(.arrowRight, size: 11, color: Theme.Color.primary600)
@@ -433,7 +443,7 @@ public struct CreatorInboxView: View {
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("creatorInboxPrompt_\(id)")
+        .accessibilityIdentifier("creatorInboxPrompt_\(prompt.id)")
     }
 
     private var emptyFootnote: some View {
@@ -586,6 +596,7 @@ public struct CreatorInboxView: View {
     }
 
     // MARK: - Tier color helpers (rank → semantic token)
+
     //
     // Mirrors the rank → semantic-token mapping already used in
     // `AudienceProfileView.tierColor(rank:)` so the tier chip on

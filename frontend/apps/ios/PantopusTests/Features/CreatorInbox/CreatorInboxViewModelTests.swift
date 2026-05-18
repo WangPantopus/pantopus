@@ -112,7 +112,7 @@ final class CreatorInboxViewModelTests: XCTestCase {
             return
         }
         XCTAssertEqual(loaded.rows.count, 3)
-        XCTAssertTrue(loaded.rows.allSatisfy { $0.unread })
+        XCTAssertTrue(loaded.rows.allSatisfy(\.unread))
     }
 
     func testFilterBronzePlusExcludesFreeTier() async {
@@ -194,7 +194,10 @@ final class CreatorInboxViewModelTests: XCTestCase {
             XCTFail("Expected .loaded")
             return
         }
-        let row = loaded.rows.first { $0.id == "th_gold" }!
+        guard let row = loaded.rows.first(where: { $0.id == "th_gold" }) else {
+            XCTFail("Expected gold thread")
+            return
+        }
         let dest = vm.conversationDestination(for: row)
         XCTAssertEqual(dest.userId, "u_derek")
         XCTAssertEqual(dest.displayName, "Derek Tan")

@@ -21,13 +21,17 @@ public final class CreatorInboxViewModel {
 
     private let api: APIClient
     private var threads: [PersonaThreadDTO] = []
-    private var header: CreatorInboxHeader = CreatorInboxHeader(
+    private var header = CreatorInboxHeader(
         title: "Creator Inbox",
         handle: nil,
         isCrossPersona: false
     )
 
-    init(api: APIClient = .shared) {
+    public init() {
+        api = .shared
+    }
+
+    init(api: APIClient) {
         self.api = api
     }
 
@@ -73,14 +77,9 @@ public final class CreatorInboxViewModel {
     /// Resolve a thread row's counterparty for the `ChatConversationView`
     /// push — prefer the explicit `counterpartyUserId`, fall back to the
     /// row id (server defaults that to the membership id today).
-    public func conversationDestination(for row: CreatorInboxRowContent) -> (
-        userId: String,
-        displayName: String,
-        initials: String,
-        verified: Bool
-    ) {
+    public func conversationDestination(for row: CreatorInboxRowContent) -> CreatorInboxConversationDestination {
         let userId = row.counterpartyUserId ?? row.id
-        return (
+        return CreatorInboxConversationDestination(
             userId: userId,
             displayName: row.displayName.isEmpty ? row.handle : row.displayName,
             initials: row.initials,
@@ -98,8 +97,8 @@ public final class CreatorInboxViewModel {
         let rows = threads.compactMap(Self.row)
         let counts = CreatorInboxCounts(
             total: rows.count,
-            unread: rows.filter { $0.unread }.count,
-            flagged: rows.filter { $0.flagged }.count
+            unread: rows.filter(\.unread).count,
+            flagged: rows.filter(\.flagged).count
         )
         let chips = Self.chips(rows: rows, counts: counts)
         let filtered = rows.filter { Self.matches($0, filter: activeFilter) }
@@ -124,10 +123,10 @@ public final class CreatorInboxViewModel {
 
     static func matches(_ row: CreatorInboxRowContent, filter: CreatorInboxFilter) -> Bool {
         switch filter {
-        case .all: return true
-        case .unread: return row.unread
-        case .bronzePlus: return row.tierRank >= 2
-        case .flagged: return row.flagged
+        case .all: true
+        case .unread: row.unread
+        case .bronzePlus: row.tierRank >= 2
+        case .flagged: row.flagged
         }
     }
 

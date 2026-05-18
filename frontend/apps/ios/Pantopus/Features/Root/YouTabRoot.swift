@@ -136,23 +136,6 @@ public enum YouRoute: Hashable {
     #endif
 }
 
-/// Routing payload for the Creator Inbox → conversation push. Carries
-/// the counterparty data needed to construct `ChatConversationViewModel`
-/// without re-fetching the row from the inbox VM.
-public struct CreatorInboxConversationDestination: Hashable, Sendable {
-    public let userId: String
-    public let displayName: String
-    public let initials: String
-    public let verified: Bool
-
-    public init(userId: String, displayName: String, initials: String, verified: Bool) {
-        self.userId = userId
-        self.displayName = displayName
-        self.initials = initials
-        self.verified = verified
-    }
-}
-
 #if DEBUG
 private struct DebugInviteHomeItem: Identifiable, Hashable {
     let id: String
