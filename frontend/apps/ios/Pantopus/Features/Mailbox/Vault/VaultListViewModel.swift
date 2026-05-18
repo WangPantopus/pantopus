@@ -31,9 +31,11 @@ public final class VaultListViewModel: ListOfRowsDataSource {
             ? "Saved from Mailbox"
             : "Saved from Mailbox · \(total) item\(total == 1 ? "" : "s")"
     }
+
     public var topBarAction: TopBarAction? {
         nil
     }
+
     public let tabs: [ListOfRowsTab] = []
     public var selectedTab: String = ""
 
@@ -88,7 +90,7 @@ public final class VaultListViewModel: ListOfRowsDataSource {
 
     /// Local phase — finer-grained than `ListOfRowsState` because the
     /// shell's `state` is recomputed from this on every observation.
-    private enum Phase: Sendable {
+    private enum Phase {
         case loading
         case loaded(rows: [VaultListRow], total: Int)
         case error(message: String)

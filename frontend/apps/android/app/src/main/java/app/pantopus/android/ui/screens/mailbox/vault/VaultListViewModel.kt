@@ -361,19 +361,21 @@ enum class MailboxVaultFolderIcon {
             }
 
     companion object {
+        private val matchers: List<Pair<MailboxVaultFolderIcon, List<String>>> =
+            listOf(
+                Civic to listOf("📋", "📜", "🏛", "civic", "permit"),
+                Receipts to listOf("🧾", "receipt", "invoice"),
+                Health to listOf("🏥", "health", "medical"),
+                Finance to listOf("🏦", "💳", "bank", "finance", "tax"),
+                Travel to listOf("✈", "plane", "travel"),
+                Keepsakes to listOf("📩", "keepsake", "letter"),
+            )
+
         fun fromRaw(raw: String?): MailboxVaultFolderIcon {
             val key = raw?.lowercase(Locale.ROOT) ?: return Generic
-            return when {
-                key.contains("📋") || key.contains("📜") || key.contains("🏛") ||
-                    key.contains("civic") || key.contains("permit") -> Civic
-                key.contains("🧾") || key.contains("receipt") || key.contains("invoice") -> Receipts
-                key.contains("🏥") || key.contains("health") || key.contains("medical") -> Health
-                key.contains("🏦") || key.contains("💳") || key.contains("bank") ||
-                    key.contains("finance") || key.contains("tax") -> Finance
-                key.contains("✈") || key.contains("plane") || key.contains("travel") -> Travel
-                key.contains("📩") || key.contains("keepsake") || key.contains("letter") -> Keepsakes
-                else -> Generic
-            }
+            return matchers.firstOrNull { (_, keywords) ->
+                keywords.any { key.contains(it) }
+            }?.first ?: Generic
         }
     }
 }

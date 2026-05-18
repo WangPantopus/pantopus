@@ -104,7 +104,7 @@ final class VaultListViewModelTests: XCTestCase {
         }
         XCTAssertEqual(sections.first?.rows.count, 3)
         // Newest first — m3 (May 15) before m1 (May 14) before m2 (May 13).
-        XCTAssertEqual(sections.first?.rows.map { $0.id }, ["m3", "m1", "m2"])
+        XCTAssertEqual(sections.first?.rows.map(\.id), ["m3", "m1", "m2"])
     }
 
     // MARK: - Projection helpers
@@ -156,7 +156,7 @@ final class VaultListViewModelTests: XCTestCase {
             folders: [folder],
             itemsByFolder: ["f1": [older, newer]]
         )
-        XCTAssertEqual(rows.map { $0.id }, ["m2", "m1"])
+        XCTAssertEqual(rows.map(\.id), ["m2", "m1"])
     }
 
     func testFilterMatchesTitleSubtitleOrFolderLabel() {
@@ -223,10 +223,10 @@ final class VaultListViewModelTests: XCTestCase {
             folder: receiptsFolder
         )
         let rows = [permit, receipt]
-        XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "permit").map { $0.id }, ["m1"])
-        XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "costco").map { $0.id }, ["m2"])
-        XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "Civic").map { $0.id }, ["m1"])
-        XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "Receipts").map { $0.id }, ["m2"])
+        XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "permit").map(\.id), ["m1"])
+        XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "costco").map(\.id), ["m2"])
+        XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "Civic").map(\.id), ["m1"])
+        XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "Receipts").map(\.id), ["m2"])
         XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "").count, 2)
     }
 
