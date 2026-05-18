@@ -94,7 +94,8 @@ enum Fixtures {
             id: "u_123",
             email: "alice@example.com",
             displayName: "Alice",
-            avatarURL: nil
+            avatarURL: nil,
+            isAdmin: false
         )
     }
 }

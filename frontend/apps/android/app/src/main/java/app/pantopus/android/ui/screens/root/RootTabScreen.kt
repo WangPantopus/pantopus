@@ -42,6 +42,7 @@ import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
+import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesTarget
 import app.pantopus.android.ui.screens.discoverhub.DiscoverHubScreen
@@ -136,6 +137,8 @@ import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
 import app.pantopus.android.ui.screens.profile.PublicProfileScreen
+import app.pantopus.android.ui.screens.review_claims.ReviewClaimDetailScreen
+import app.pantopus.android.ui.screens.review_claims.ReviewClaimsScreen
 import app.pantopus.android.ui.screens.review_signups.ReviewSignupsScreen
 import app.pantopus.android.ui.screens.settings.NotificationSettingsScreen
 import app.pantopus.android.ui.screens.settings.PrivacySettingsScreen
@@ -367,6 +370,11 @@ private object ChildRoutes {
     fun broadcastDetail(broadcastId: String): String =
         "broadcasts/${java.net.URLEncoder.encode(broadcastId, "UTF-8")}"
 
+    /** P1.2 — Creator Inbox (standalone DM thread list for creators).
+     *  Reached from the You tab Personal section row + Audience Profile
+     *  Threads tab "View all messages" CTA + thread row tap. */
+    const val CREATOR_INBOX = "creator-inbox"
+
     /** Ceremonial Mail Compose wizard (T3.7). */
     const val CEREMONIAL_MAIL = "mailbox/compose-letter"
 
@@ -400,6 +408,16 @@ private object ChildRoutes {
     const val REVIEW_SIGNUPS = "support-trains/{$REVIEW_SIGNUPS_ID_KEY}/review"
 
     fun reviewSignups(trainId: String): String = "support-trains/${java.net.URLEncoder.encode(trainId, "UTF-8")}/review"
+
+    /** P1.1 — Admin Review-claims queue. Gated by [SettingsRoute.ReviewClaims]. */
+    const val REVIEW_CLAIMS = "admin/review-claims"
+
+    /** P1.1 — Admin Review-claim detail (single claim). Keep in sync with
+     *  `ReviewClaimDetailViewModel.CLAIM_ID_KEY`. */
+    const val REVIEW_CLAIM_DETAIL_ID_KEY = "claimId"
+    const val REVIEW_CLAIM_DETAIL = "admin/review-claims/{$REVIEW_CLAIM_DETAIL_ID_KEY}"
+
+    fun reviewClaimDetail(claimId: String): String = "admin/review-claims/${java.net.URLEncoder.encode(claimId, "UTF-8")}"
 
     /**
      * Generic placeholder for intents whose destination hasn't been
@@ -829,6 +847,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenSupportTrains = { navController.navigate(ChildRoutes.SUPPORT_TRAINS) },
                     onOpenIdentityCenter = { navController.navigate(ChildRoutes.IDENTITY_CENTER) },
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
+                    onOpenCreatorInbox = { navController.navigate(ChildRoutes.CREATOR_INBOX) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
                     onOpenHomeCalendar = { homeId ->
@@ -1641,6 +1660,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             SettingsRoute.Help -> navController.navigate(ChildRoutes.SETTINGS_HELP)
                             SettingsRoute.Legal -> navController.navigate(ChildRoutes.SETTINGS_LEGAL)
                             SettingsRoute.About -> navController.navigate(ChildRoutes.SETTINGS_ABOUT)
+                            SettingsRoute.ReviewClaims -> {
+                                // Close settings, push the admin queue.
+                                navController.popBackStack()
+                                navController.navigate(ChildRoutes.REVIEW_CLAIMS)
+                            }
                             SettingsRoute.DidSignOut -> navController.popBackStack()
                         }
                     },
@@ -1761,8 +1785,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenFollower = { row ->
                         navController.navigate(ChildRoutes.placeholder("Follower · ${row.displayName}"))
                     },
-                    onOpenThread = { row ->
-                        navController.navigate(ChildRoutes.placeholder("Thread · ${row.displayName}"))
+                    onOpenThread = {
+                        navController.navigate(ChildRoutes.CREATOR_INBOX)
                     },
                     onOpenBroadcast = { card, tiers ->
                         audienceViewModel.cacheBroadcastSeed(card, tiers)
@@ -1770,6 +1794,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenSetup = {
                         navController.navigate(ChildRoutes.placeholder("Set up Public Profile"))
+                    },
+                    onOpenCreatorInbox = {
+                        navController.navigate(ChildRoutes.CREATOR_INBOX)
                     },
                     viewModel = audienceViewModel,
                 )
@@ -1792,6 +1819,25 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onPin = {
                         navController.navigate(ChildRoutes.placeholder("Pin broadcast"))
                     },
+                )
+            }
+            composable(ChildRoutes.CREATOR_INBOX) {
+                CreatorInboxScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenThread = { row ->
+                        val userId = row.counterpartyUserId ?: row.id
+                        navController.navigate(
+                            ChildRoutes.chatConversationFromPicker(
+                                userId = userId,
+                                displayName = row.displayName.ifEmpty { row.handle },
+                                initials = row.initials,
+                                verified = row.verifiedLocal,
+                                locality = null,
+                            ),
+                        )
+                    },
+                    onOpenBroadcast = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
+                    onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Inbox settings")) },
                 )
             }
             composable(ChildRoutes.IDENTITY_CENTER) {
@@ -1851,6 +1897,30 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onMessageHelper = { reservationId ->
                         navController.navigate(ChildRoutes.placeholder("Message helper · $reservationId"))
                     },
+                )
+            }
+            composable(ChildRoutes.REVIEW_CLAIMS) {
+                ReviewClaimsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenClaim = { claimId ->
+                        navController.navigate(ChildRoutes.reviewClaimDetail(claimId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.REVIEW_CLAIM_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.REVIEW_CLAIM_DETAIL_ID_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                // VM reads `claimId` from SavedStateHandle via the
+                // `CLAIM_ID_KEY` constant, which mirrors
+                // `REVIEW_CLAIM_DETAIL_ID_KEY` above.
+                ReviewClaimDetailScreen(
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(

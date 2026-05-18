@@ -185,6 +185,19 @@ public struct PersonaThreadDTO: Decodable, Sendable, Hashable, Identifiable {
     public let lastMessageAt: String?
     public let unreadCount: Int?
     public let status: String?
+    /// Marked by the creator (or the moderation pipeline) as flagged
+    /// for review — drives the amber flag glyph on the Creator Inbox
+    /// row and the "Flagged" filter chip count. Missing field decodes
+    /// as `nil`, treated as `false` at the projection boundary.
+    public let flagged: Bool?
+    /// Verified-local follower flag, mirrored from `FanDTO`. Drives the
+    /// small sky-blue check overlay on the avatar.
+    public let verifiedLocal: Bool?
+    /// Counterparty user id needed to push the existing
+    /// `ChatConversationView` in `.person` mode from a Creator Inbox
+    /// row tap. Older serializers may not surface this — when nil the
+    /// row's tap target uses `membershipId` as the conversation peer.
+    public let counterpartyUserId: String?
 }
 
 // MARK: - POST /api/broadcast/channels/:id/messages

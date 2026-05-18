@@ -20,6 +20,7 @@ public struct AudienceProfileView: View {
     private let onOpenThread: @MainActor (ThreadRowContent) -> Void
     private let onOpenBroadcast: @MainActor (UpdateCardContent, [TierBreakdownContent.TierSegment]) -> Void
     private let onOpenSetup: @MainActor () -> Void
+    private let onOpenCreatorInbox: @MainActor () -> Void
 
     init(
         viewModel: AudienceProfileViewModel = AudienceProfileViewModel(),
@@ -27,7 +28,8 @@ public struct AudienceProfileView: View {
         onOpenFollower: @escaping @MainActor (FollowerRowContent) -> Void = { _ in },
         onOpenThread: @escaping @MainActor (ThreadRowContent) -> Void = { _ in },
         onOpenBroadcast: @escaping @MainActor (UpdateCardContent, [TierBreakdownContent.TierSegment]) -> Void = { _, _ in },
-        onOpenSetup: @escaping @MainActor () -> Void = {}
+        onOpenSetup: @escaping @MainActor () -> Void = {},
+        onOpenCreatorInbox: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
@@ -35,6 +37,7 @@ public struct AudienceProfileView: View {
         self.onOpenThread = onOpenThread
         self.onOpenBroadcast = onOpenBroadcast
         self.onOpenSetup = onOpenSetup
+        self.onOpenCreatorInbox = onOpenCreatorInbox
     }
 
     public var body: some View {
@@ -651,6 +654,7 @@ public struct AudienceProfileView: View {
                 if loaded.threads.isEmpty {
                     emptyThreadsState
                 } else {
+                    viewAllMessagesCTA
                     ForEach(loaded.threads) { thread in
                         threadRow(thread)
                     }
@@ -660,6 +664,32 @@ public struct AudienceProfileView: View {
             .padding(16)
         }
         .accessibilityIdentifier("audienceProfileThreadsList")
+    }
+
+    private var viewAllMessagesCTA: some View {
+        Button(action: onOpenCreatorInbox) {
+            HStack(spacing: 8) {
+                Icon(.inbox, size: 14, color: Theme.Color.primary600)
+                Text("View all messages")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.primary700)
+                Spacer(minLength: 0)
+                Icon(.chevronRight, size: 12, color: Theme.Color.primary600)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 44)
+            .background(Theme.Color.primary50)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.primary100, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("audienceProfileViewAllMessages")
+        .accessibilityLabel("View all messages in Creator Inbox")
     }
 
     private func threadRow(_ row: ThreadRowContent) -> some View {

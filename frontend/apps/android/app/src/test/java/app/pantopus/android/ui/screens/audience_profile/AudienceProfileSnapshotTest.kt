@@ -36,20 +36,8 @@ class AudienceProfileSnapshotTest {
         paparazzi.snapshot {
             Frame {
                 LoadedFrame(
-                    loaded = sampleLoaded(),
-                    activeTab = AudienceProfileTab.Updates,
-                    composer = UpdateComposerState(),
-                    selectedTier = null,
-                    visibleFollowers = sampleLoaded().followers,
-                    onSelectTab = {},
-                    onSelectTier = {},
-                    onComposerText = {},
-                    onComposerVisibility = {},
-                    onComposerTier = {},
-                    onSubmitUpdate = {},
-                    onOpenFollower = {},
-                    onOpenThread = {},
-                    onOpenBroadcast = { _, _ -> },
+                    state = sampleFrameState(activeTab = AudienceProfileTab.Updates),
+                    actions = sampleFrameActions(),
                 )
             }
         }
@@ -60,20 +48,8 @@ class AudienceProfileSnapshotTest {
         paparazzi.snapshot {
             Frame {
                 LoadedFrame(
-                    loaded = sampleLoaded(),
-                    activeTab = AudienceProfileTab.Followers,
-                    composer = UpdateComposerState(),
-                    selectedTier = null,
-                    visibleFollowers = sampleLoaded().followers,
-                    onSelectTab = {},
-                    onSelectTier = {},
-                    onComposerText = {},
-                    onComposerVisibility = {},
-                    onComposerTier = {},
-                    onSubmitUpdate = {},
-                    onOpenFollower = {},
-                    onOpenThread = {},
-                    onOpenBroadcast = { _, _ -> },
+                    state = sampleFrameState(activeTab = AudienceProfileTab.Followers),
+                    actions = sampleFrameActions(),
                 )
             }
         }
@@ -84,24 +60,47 @@ class AudienceProfileSnapshotTest {
         paparazzi.snapshot {
             Frame {
                 LoadedFrame(
-                    loaded = sampleLoaded(),
-                    activeTab = AudienceProfileTab.Threads,
-                    composer = UpdateComposerState(),
-                    selectedTier = null,
-                    visibleFollowers = emptyList(),
-                    onSelectTab = {},
-                    onSelectTier = {},
-                    onComposerText = {},
-                    onComposerVisibility = {},
-                    onComposerTier = {},
-                    onSubmitUpdate = {},
-                    onOpenFollower = {},
-                    onOpenThread = {},
-                    onOpenBroadcast = { _, _ -> },
+                    state =
+                        sampleFrameState(
+                            activeTab = AudienceProfileTab.Threads,
+                            visibleFollowers = emptyList(),
+                        ),
+                    actions = sampleFrameActions(),
                 )
             }
         }
     }
+
+    private fun sampleFrameState(
+        activeTab: AudienceProfileTab,
+        visibleFollowers: List<FollowerRowContent> = sampleLoaded().followers,
+    ): AudienceProfileLoadedFrameState =
+        AudienceProfileLoadedFrameState(
+            loaded = sampleLoaded(),
+            activeTab = activeTab,
+            composer = UpdateComposerState(),
+            selectedTier = null,
+            visibleFollowers = visibleFollowers,
+        )
+
+    private fun sampleFrameActions(): AudienceProfileLoadedFrameActions =
+        AudienceProfileLoadedFrameActions(
+            onSelectTab = {},
+            onSelectTier = {},
+            composer =
+                AudienceProfileComposerActions(
+                    onText = {},
+                    onVisibility = {},
+                    onTier = {},
+                    onSubmit = {},
+                ),
+            navigation =
+                AudienceProfileNavigationActions(
+                    onOpenFollower = {},
+                    onOpenThread = {},
+                    onOpenBroadcast = { _, _ -> },
+                ),
+        )
 
     private fun sampleLoaded(): AudienceProfileLoaded =
         AudienceProfileLoaded(
