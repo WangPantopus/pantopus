@@ -130,6 +130,7 @@ final class SupportTrainsViewModelTests: XCTestCase {
         SequencedURLProtocol.routeResponses = [
             "/api/support-trains/me/support-trains": [.status(500, body: "{}")]
         ]
+        // swiftlint:disable:next trailing_closure
         let vm = makeVM(locationProvider: { (latitude: 40.0, longitude: -73.0) })
         SequencedURLProtocol.routeResponses["/api/support-trains/nearby"] = [.status(500, body: "{}")]
         await vm.load()
@@ -165,6 +166,7 @@ final class SupportTrainsViewModelTests: XCTestCase {
 
     func testNearbyTabUsesLocationProviderWhenSupplied() async {
         stub(mine: Self.emptyJSON, nearby: Self.nearbyEnrichedJSON)
+        // swiftlint:disable:next trailing_closure
         let vm = makeVM(locationProvider: { (latitude: 40.0, longitude: -73.0) })
         await vm.load()
         vm.selectedTab = SupportTrainsTab.nearby
@@ -217,6 +219,7 @@ final class SupportTrainsViewModelTests: XCTestCase {
 
     func testNearbyRowUsesMealArchetypeWhenTypeProjected() async {
         stub(mine: Self.emptyJSON, nearby: Self.nearbyEnrichedJSON)
+        // swiftlint:disable:next trailing_closure
         let vm = makeVM(locationProvider: { (latitude: 40.0, longitude: -73.0) })
         await vm.load()
         vm.selectedTab = SupportTrainsTab.nearby
@@ -231,6 +234,7 @@ final class SupportTrainsViewModelTests: XCTestCase {
 
     func testNearbyRowRendersSlotProgressAndDistance() async {
         stub(mine: Self.emptyJSON, nearby: Self.nearbyEnrichedJSON)
+        // swiftlint:disable:next trailing_closure
         let vm = makeVM(locationProvider: { (latitude: 40.0, longitude: -73.0) })
         await vm.load()
         vm.selectedTab = SupportTrainsTab.nearby
@@ -247,7 +251,10 @@ final class SupportTrainsViewModelTests: XCTestCase {
         stub(mine: Self.mineRealJSON)
         let vm = makeVM()
         await vm.load()
-        guard case let .loaded(sections, _) = vm.state else { XCTFail(); return }
+        guard case let .loaded(sections, _) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
         // st1.status == "filling" → ("Filling up", .info)
         // st2.status == "active"  → ("Active",   .success)
         let trailings = sections.first?.rows.compactMap { row -> String? in
@@ -260,6 +267,7 @@ final class SupportTrainsViewModelTests: XCTestCase {
     func testRowTapRoutesToOpenTrain() async {
         stub(mine: Self.mineRealJSON)
         var captured: String?
+        // swiftlint:disable:next trailing_closure
         let vm = makeVM(onOpenTrain: { id in captured = id })
         await vm.load()
         guard case let .loaded(sections, _) = vm.state,

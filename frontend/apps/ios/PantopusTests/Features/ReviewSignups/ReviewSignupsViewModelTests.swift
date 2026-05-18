@@ -166,7 +166,7 @@ final class ReviewSignupsViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         vm.updateFilter(ReviewSignupsFilter.pending)
-        guard case let .loaded(sections, _) = vm.state else { XCTFail(); return }
+        guard case let .loaded(sections, _) = vm.state else { XCTFail("Unexpected state: \(vm.state)"); return }
         XCTAssertEqual(sections.first?.rows.map(\.id), ["r1"])
     }
 
@@ -175,7 +175,7 @@ final class ReviewSignupsViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         vm.updateFilter(ReviewSignupsFilter.confirmed)
-        guard case let .loaded(sections, _) = vm.state else { XCTFail(); return }
+        guard case let .loaded(sections, _) = vm.state else { XCTFail("Unexpected state: \(vm.state)"); return }
         XCTAssertEqual(sections.first?.rows.map(\.id), ["r2"])
     }
 
@@ -184,7 +184,7 @@ final class ReviewSignupsViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         vm.updateFilter(ReviewSignupsFilter.canceled)
-        guard case let .loaded(sections, _) = vm.state else { XCTFail(); return }
+        guard case let .loaded(sections, _) = vm.state else { XCTFail("Unexpected state: \(vm.state)"); return }
         XCTAssertEqual(sections.first?.rows.map(\.id), ["r3"])
     }
 
@@ -193,7 +193,7 @@ final class ReviewSignupsViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         vm.updateFilter(ReviewSignupsFilter.edited)
-        guard case let .loaded(sections, _) = vm.state else { XCTFail(); return }
+        guard case let .loaded(sections, _) = vm.state else { XCTFail("Unexpected state: \(vm.state)"); return }
         // r1: updated == created → not edited
         // r2: updated > created → edited (but status confirmed)
         // r3: updated > created → edited but canceled (excluded)
@@ -207,7 +207,7 @@ final class ReviewSignupsViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         guard case let .loaded(sections, _) = vm.state,
-              let row = sections.first?.rows.first else { XCTFail(); return }
+              let row = sections.first?.rows.first else { XCTFail("Unexpected state: \(vm.state)"); return }
         XCTAssertEqual(row.title, "Block Neighbor")
     }
 
@@ -216,7 +216,7 @@ final class ReviewSignupsViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         guard case let .loaded(sections, _) = vm.state,
-              let first = sections.first?.rows.first else { XCTFail(); return }
+              let first = sections.first?.rows.first else { XCTFail("Unexpected state: \(vm.state)"); return }
         XCTAssertEqual(first.subtitle, "Veggie chili + cornbread")
     }
 
@@ -225,7 +225,7 @@ final class ReviewSignupsViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         guard case let .loaded(sections, _) = vm.state,
-              let row = sections.first?.rows.first else { XCTFail(); return }
+              let row = sections.first?.rows.first else { XCTFail("Unexpected state: \(vm.state)"); return }
         XCTAssertEqual(row.subtitle, "Sage & Stone")
     }
 
@@ -234,7 +234,7 @@ final class ReviewSignupsViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.load()
         guard case let .loaded(sections, _) = vm.state,
-              let row = sections.first?.rows.first else { XCTFail(); return }
+              let row = sections.first?.rows.first else { XCTFail("Unexpected state: \(vm.state)"); return }
         XCTAssertEqual(row.body, "\u{201C}I'll knock when I'm there\u{201D}")
     }
 
@@ -242,10 +242,10 @@ final class ReviewSignupsViewModelTests: XCTestCase {
         stub(Self.populatedJSON)
         let vm = makeVM()
         await vm.load()
-        guard case let .loaded(sections, _) = vm.state else { XCTFail(); return }
+        guard case let .loaded(sections, _) = vm.state else { XCTFail("Unexpected state: \(vm.state)"); return }
         // r2 is confirmed with updated_at != created_at → "Edited" chip
         let r2 = sections.first?.rows.first { $0.id == "r2" }
-        guard case let .statusChip(text, _) = r2?.trailing else { XCTFail(); return }
+        guard case let .statusChip(text, _) = r2?.trailing else { XCTFail("Unexpected state: \(vm.state)"); return }
         XCTAssertEqual(text, "Edited")
     }
 
@@ -254,12 +254,13 @@ final class ReviewSignupsViewModelTests: XCTestCase {
     func testConfirmOptimisticallyBumpsStatusAndFiresCallback() async {
         stub(Self.populatedJSON)
         var capturedConfirmId: String?
+        // swiftlint:disable:next trailing_closure
         let vm = makeVM(onConfirm: { id in capturedConfirmId = id })
         await vm.load()
         vm.confirm("r1")
         XCTAssertEqual(capturedConfirmId, "r1")
         vm.updateFilter(ReviewSignupsFilter.confirmed)
-        guard case let .loaded(sections, _) = vm.state else { XCTFail(); return }
-        XCTAssertTrue(sections.first?.rows.contains(where: { $0.id == "r1" }) ?? false)
+        guard case let .loaded(sections, _) = vm.state else { XCTFail("Unexpected state: \(vm.state)"); return }
+        XCTAssertTrue(sections.first?.rows.contains { $0.id == "r1" } ?? false)
     }
 }

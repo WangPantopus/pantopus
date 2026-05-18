@@ -77,7 +77,7 @@ class ReviewSignupsViewModel
         private val _selectedFilter = MutableStateFlow(ReviewSignupsFilter.ALL)
         val selectedFilter: StateFlow<String> = _selectedFilter.asStateFlow()
 
-        private val _topBarAction = MutableStateFlow<TopBarAction?>(makeTopBarAction(::noop))
+        private val _topBarAction = MutableStateFlow<TopBarAction?>(makeTopBarAction({ }))
         val topBarAction: StateFlow<TopBarAction?> = _topBarAction.asStateFlow()
 
         private val _chipStrip = MutableStateFlow(makeChipStrip(ReviewSignupsFilter.ALL))
@@ -124,9 +124,10 @@ class ReviewSignupsViewModel
         fun confirm(reservationId: String) {
             val idx = reservations.indexOfFirst { it.id == reservationId }
             if (idx >= 0) {
-                reservations = reservations.toMutableList().apply {
-                    this[idx] = this[idx].copy(status = "confirmed")
-                }
+                reservations =
+                    reservations.toMutableList().apply {
+                        this[idx] = this[idx].copy(status = "confirmed")
+                    }
                 applyState()
             }
             onConfirmReservation(reservationId)
@@ -384,8 +385,6 @@ class ReviewSignupsViewModel
                         onCta = { onShareTrain() },
                     )
             }
-
-        private fun noop() {}
 
         companion object {
             /**

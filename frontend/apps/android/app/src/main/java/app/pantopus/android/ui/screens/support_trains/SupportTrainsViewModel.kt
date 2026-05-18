@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.support_trains.SupportTrainListItemDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.support_trains.SupportTrainsRepository
+import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.GradientPair
@@ -24,7 +25,6 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
-import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -116,10 +116,10 @@ class SupportTrainsViewModel
         private val _tabs = MutableStateFlow(makeTabs())
         val tabs: StateFlow<List<ListOfRowsTab>> = _tabs.asStateFlow()
 
-        private val _topBarAction = MutableStateFlow<TopBarAction?>(makeTopBarAction(::noop))
+        private val _topBarAction = MutableStateFlow<TopBarAction?>(makeTopBarAction({ }))
         val topBarAction: StateFlow<TopBarAction?> = _topBarAction.asStateFlow()
 
-        private val _fab = MutableStateFlow<FabAction?>(makeFab(::noop))
+        private val _fab = MutableStateFlow<FabAction?>(makeFab({ }))
         val fab: StateFlow<FabAction?> = _fab.asStateFlow()
 
         /**
@@ -191,10 +191,11 @@ class SupportTrainsViewModel
             }
 
         private suspend fun fetchNearby(): Boolean {
-            val loc = locationProvider() ?: run {
-                nearbyRows = emptyList()
-                return true
-            }
+            val loc =
+                locationProvider() ?: run {
+                    nearbyRows = emptyList()
+                    return true
+                }
             return when (val result = repo.nearby(latitude = loc.first, longitude = loc.second)) {
                 is NetworkResult.Success -> {
                     nearbyRows = result.data.supportTrains
@@ -372,6 +373,4 @@ class SupportTrainsViewModel
                         onCta = { onStartTrain() },
                     )
             }
-
-        private fun noop() {}
     }

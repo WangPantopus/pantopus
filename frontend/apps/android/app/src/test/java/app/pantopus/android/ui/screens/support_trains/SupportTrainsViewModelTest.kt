@@ -1,4 +1,4 @@
-@file:Suppress("LongMethod")
+@file:Suppress("LongMethod", "PackageNaming")
 
 package app.pantopus.android.ui.screens.support_trains
 
@@ -215,12 +215,14 @@ class SupportTrainsViewModelTest {
                     SupportTrainsNearbyResponse(
                         supportTrains =
                             listOf(
+                                // 4830 metres ≈ 3 mi — exercises the distance-only meta tail
+                                // fallback path when slot counts are missing.
                                 SupportTrainListItemDto(
                                     id = "n2",
                                     title = "Errand train",
                                     status = "active",
                                     supportTrainType = "errand_support",
-                                    distanceMeters = 4830.0, // ~3 mi
+                                    distanceMeters = 4830.0,
                                 ),
                             ),
                     ),

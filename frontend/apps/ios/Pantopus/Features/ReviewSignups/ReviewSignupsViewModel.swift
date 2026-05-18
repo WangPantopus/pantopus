@@ -65,11 +65,10 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
                 ChipStripConfig.Chip(id: ReviewSignupsFilter.edited, label: "Edited", icon: .pencil),
                 ChipStripConfig.Chip(id: ReviewSignupsFilter.canceled, label: "Canceled", icon: .x)
             ],
-            selectedId: selectedFilter,
-            onSelect: { [weak self] id in
-                MainActor.assumeIsolated { self?.updateFilter(id) }
-            }
-        )
+            selectedId: selectedFilter
+        ) { [weak self] id in
+            MainActor.assumeIsolated { self?.updateFilter(id) }
+        }
     }
 
     // MARK: - Filter state
@@ -95,7 +94,7 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
     private var reservations: [SupportTrainReservationDTO] = []
     private var loadedOnce = false
 
-    public init(
+    init(
         supportTrainId: String,
         api: APIClient = .shared,
         onShareTrain: @escaping @MainActor () -> Void = {},
@@ -151,14 +150,22 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
     private func rebuild() {
         let filtered = filteredReservations
         if filtered.isEmpty {
+            let isAll = selectedFilter == ReviewSignupsFilter.all
+            let ctaTitle: String? = isAll ? "Share train" : nil
+            let onCTA: (@Sendable () -> Void)?
+            if isAll {
+                onCTA = { [weak self] in
+                    MainActor.assumeIsolated { self?.onShareTrain() }
+                }
+            } else {
+                onCTA = nil
+            }
             state = .empty(ListOfRowsState.EmptyContent(
                 icon: .clipboardList,
                 headline: emptyHeadline,
                 subcopy: emptySubcopy,
-                ctaTitle: selectedFilter == ReviewSignupsFilter.all ? "Share train" : nil,
-                onCTA: selectedFilter == ReviewSignupsFilter.all ? { [weak self] in
-                    MainActor.assumeIsolated { self?.onShareTrain() }
-                } : nil
+                ctaTitle: ctaTitle,
+                onCTA: onCTA
             ))
             return
         }
@@ -393,46 +400,4 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
         f.dateFormat = "EEE MMM d"
         return f
     }()
-}
-
-// MARK: - Memberwise init for optimistic patches
-
-/// `SupportTrainReservationDTO` is `Decodable`-only by default; the
-/// optimistic confirm path needs to construct an updated copy. This
-/// memberwise initialiser sits alongside the auto-synthesised
-/// `Decodable` init and preserves `Sendable` / `Hashable` conformance.
-public extension SupportTrainReservationDTO {
-    init(
-        id: String,
-        slotId: String?,
-        userId: String?,
-        guestName: String?,
-        status: String?,
-        contributionMode: String?,
-        dishTitle: String?,
-        restaurantName: String?,
-        estimatedArrivalAt: String?,
-        noteToRecipient: String?,
-        privateNoteToOrganizer: String?,
-        createdAt: String?,
-        updatedAt: String?,
-        canceledAt: String?,
-        helper: SupportTrainHelperDTO?
-    ) {
-        self.id = id
-        self.slotId = slotId
-        self.userId = userId
-        self.guestName = guestName
-        self.status = status
-        self.contributionMode = contributionMode
-        self.dishTitle = dishTitle
-        self.restaurantName = restaurantName
-        self.estimatedArrivalAt = estimatedArrivalAt
-        self.noteToRecipient = noteToRecipient
-        self.privateNoteToOrganizer = privateNoteToOrganizer
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
-        self.canceledAt = canceledAt
-        self.helper = helper
-    }
 }

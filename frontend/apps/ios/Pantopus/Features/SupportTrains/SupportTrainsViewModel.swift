@@ -92,7 +92,7 @@ public final class SupportTrainsViewModel: ListOfRowsDataSource {
     private var nearby: [SupportTrainListItemDTO] = []
     private var loadedOnce = false
 
-    public init(
+    init(
         api: APIClient = .shared,
         onStartTrain: @escaping @MainActor () -> Void = {},
         onOpenTrain: @escaping @MainActor (String) -> Void = { _ in },
@@ -191,11 +191,10 @@ public final class SupportTrainsViewModel: ListOfRowsDataSource {
                 icon: .heart,
                 headline: "No trains nearby right now",
                 subcopy: "When a neighbor starts a meal, ride, or pet-care train within 25 mi, you'll see it here.",
-                ctaTitle: "Start a train",
-                onCTA: { [weak self] in
-                    MainActor.assumeIsolated { self?.onStartTrain() }
-                }
-            )
+                ctaTitle: "Start a train"
+            ) { [weak self] in
+                MainActor.assumeIsolated { self?.onStartTrain() }
+            }
         case SupportTrainsTab.invitations:
             activeRows = invitationRows
             emptyContent = ListOfRowsState.EmptyContent(
@@ -205,15 +204,16 @@ public final class SupportTrainsViewModel: ListOfRowsDataSource {
             )
         default:
             activeRows = mineRows
+            let subcopy = "A support train is a calendar of neighbors taking turns helping someone " +
+                "through a life event. Start one for someone, or join one nearby."
             emptyContent = ListOfRowsState.EmptyContent(
                 icon: .handCoins,
                 headline: "No support trains yet",
-                subcopy: "A support train is a calendar of neighbors taking turns helping someone through a life event. Start one for someone, or join one nearby.",
-                ctaTitle: "Start a train",
-                onCTA: { [weak self] in
-                    MainActor.assumeIsolated { self?.onStartTrain() }
-                }
-            )
+                subcopy: subcopy,
+                ctaTitle: "Start a train"
+            ) { [weak self] in
+                MainActor.assumeIsolated { self?.onStartTrain() }
+            }
         }
         if activeRows.isEmpty {
             state = .empty(emptyContent)

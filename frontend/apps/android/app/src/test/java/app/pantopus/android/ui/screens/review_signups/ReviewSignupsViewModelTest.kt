@@ -1,4 +1,4 @@
-@file:Suppress("LongMethod")
+@file:Suppress("LongMethod", "PackageNaming", "LongParameterList")
 
 package app.pantopus.android.ui.screens.review_signups
 
@@ -22,7 +22,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -71,14 +70,15 @@ class ReviewSignupsViewModelTest {
         createdAt = createdAt,
         updatedAt = updatedAt,
         canceledAt = if (status == "canceled") updatedAt else null,
-        helper = helperName?.let {
-            SupportTrainHelperDto(
-                id = "u_$id",
-                username = it.lowercase().replace(" ", ""),
-                name = it,
-                profilePictureUrl = null,
-            )
-        },
+        helper =
+            helperName?.let {
+                SupportTrainHelperDto(
+                    id = "u_$id",
+                    username = it.lowercase().replace(" ", ""),
+                    name = it,
+                    profilePictureUrl = null,
+                )
+            },
     )
 
     // MARK: - Lifecycle

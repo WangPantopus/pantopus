@@ -1,3 +1,5 @@
+@file:Suppress("PackageNaming")
+
 package app.pantopus.android.ui.screens.support_trains
 
 import androidx.compose.foundation.layout.Box

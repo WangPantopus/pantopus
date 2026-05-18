@@ -171,6 +171,43 @@ public struct SupportTrainReservationDTO: Decodable, Sendable, Identifiable, Has
     /// `helper` at the decoder boundary.
     public let helper: SupportTrainHelperDTO?
 
+    /// Memberwise init for optimistic patches. Declared in the struct
+    /// body (not an extension) so the auto-synthesised memberwise init
+    /// is suppressed — otherwise the two collide.
+    public init(
+        id: String,
+        slotId: String?,
+        userId: String?,
+        guestName: String?,
+        status: String?,
+        contributionMode: String?,
+        dishTitle: String?,
+        restaurantName: String?,
+        estimatedArrivalAt: String?,
+        noteToRecipient: String?,
+        privateNoteToOrganizer: String?,
+        createdAt: String?,
+        updatedAt: String?,
+        canceledAt: String?,
+        helper: SupportTrainHelperDTO?
+    ) {
+        self.id = id
+        self.slotId = slotId
+        self.userId = userId
+        self.guestName = guestName
+        self.status = status
+        self.contributionMode = contributionMode
+        self.dishTitle = dishTitle
+        self.restaurantName = restaurantName
+        self.estimatedArrivalAt = estimatedArrivalAt
+        self.noteToRecipient = noteToRecipient
+        self.privateNoteToOrganizer = privateNoteToOrganizer
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.canceledAt = canceledAt
+        self.helper = helper
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, status
         case slotId = "slot_id"
@@ -207,6 +244,18 @@ public struct SupportTrainHelperDTO: Decodable, Sendable, Hashable {
     public let username: String?
     public let name: String?
     public let profilePictureUrl: String?
+
+    public init(
+        id: String,
+        username: String?,
+        name: String?,
+        profilePictureUrl: String?
+    ) {
+        self.id = id
+        self.username = username
+        self.name = name
+        self.profilePictureUrl = profilePictureUrl
+    }
 
     enum CodingKeys: String, CodingKey {
         case id, username, name

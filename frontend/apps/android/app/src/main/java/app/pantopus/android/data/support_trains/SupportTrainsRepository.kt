@@ -1,3 +1,5 @@
+@file:Suppress("PackageNaming")
+
 package app.pantopus.android.data.support_trains
 
 import app.pantopus.android.data.api.models.support_trains.SupportTrainReservationsResponse
