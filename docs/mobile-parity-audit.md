@@ -118,6 +118,88 @@ renders three example configurations (every slot supplied · required
 slots only · nil-skipping) so the designer can sanity-check spacing,
 trust dot, AI elf, and attachments tiles before any variant ships.
 
+## T6.6a — MapListHybrid archetype shell (P24)
+
+T6.6a stands up a NEW shared shell — `MapListHybridShell` — covering
+the full-bleed-map + draggable-bottom-sheet pattern used by every
+"X near me" map surface. Per `docs/t6-open-questions-decisions.md`
+Q9, the three detents are absolute heights:
+
+| Detent | iOS / Android / web | Behaviour |
+|---|---|---|
+| Collapsed | 160 pt / dp / px | header + drag-to-expand prompt |
+| Standard | 296 pt / dp / px | header + horizontal card carousel |
+| Expanded | 518 pt / dp / px | header + full vertical list |
+
+The shell sits at:
+
+- iOS: `Pantopus/Features/Shared/MapListHybrid/MapListHybridShell.swift`
+  (detent + pin model alongside in `MapListHybridContent.swift`,
+  designer canvas in `MapListHybridPreview.swift`).
+- Android:
+  `ui/screens/shared/map_list_hybrid/MapListHybridShell.kt` (model
+  + detent resolver in `MapListHybridContent.kt`, paparazzi-friendly
+  static canvas in `MapListHybridPreview.kt`).
+- Web: `frontend/apps/web/src/components/map-list-hybrid/`
+  (`MapListHybridShell.tsx`, `MapListHybridMapLayer.tsx`, `types.ts`).
+
+Slot contract (every slot is a renderless prop; consumers supply
+whatever chrome they need):
+
+1. **Map layer** — owned by the shell. iOS uses MapKit; Android uses
+   Google Maps via `google-maps-compose`; web uses Leaflet via
+   `react-leaflet`. The shell renders supplied `[MapPin]` with the
+   design's coloured-disc + white-ring (confirmed) or dashed-outline
+   (pending) treatment, plus an optional "you are here" anchor disc.
+2. **Top pill** — floating back / title / filter pill on the top edge
+   (blur background).
+3. **Category chips** — overlay horizontal strip sitting under the
+   top pill.
+4. **Map controls** — locate-fixed / layers buttons stacked on the
+   right edge, automatically anchored above the current sheet height.
+5. **Sheet header** — count label + sort selector inside the sheet.
+6. **Sheet body** — the variable part (carousel for `.standard`, list
+   for `.expanded`, drag-up prompt for `.collapsed`).
+
+Pin↔list selection sync is the consumer's job: the shell fires
+`onPinTap(id)` when a pin is tapped; the consumer typically (a)
+updates its own selection state and (b) snaps `detent` to
+`.standard` so the matching card surfaces. The active pin draws a
+1.6s dual-halo pulse on iOS / web (suppressed under reduce-motion;
+static ring instead) and a static double-halo on Android (Paparazzi
+diffs cleanly).
+
+**Detent resolver.** A pure function — `MapListHybridDetentResolver`
+on iOS / Android, `resolveMapListHybridDetent` on web — runs the
+snap-to-nearest + velocity-nudge math. All three platforms share the
+same algorithm so the same gesture lands at the same stop:
+
+- snap to the detent closest to the released height
+- flick up (negative velocity on iOS / web, negative on Android's
+  draggable too) advances one stop
+- flick down retreats one stop
+- magnitudes equal to the threshold do **not** nudge — strict greater
+  than only — so the threshold edge defers to snap-to-nearest
+
+**Test tag parity (root container).** Both platforms + web use the
+same identifier — `mapListHybridShell` — plus child tags
+`mapListHybridMap`, `mapListHybridPin_<id>`, `mapListHybridSheet`,
+`mapListHybridSheetHeader`, `mapListHybridSheetBody`,
+`mapListHybridMapControls`. The same string lives on iOS
+(`accessibilityIdentifier`), Android (`Modifier.testTag`), and web
+(`data-testid`).
+
+**P24 acceptance.** Shell-only — the existing `NearbyMapView` (T2.4)
+keeps its own chrome and migrates in P26 (wiring sweep). Future
+consumers: Marketplace map mode and Discover Businesses map view.
+
+**Designer preview.** Reachable on iOS via the debug Token gallery →
+"Map+List hybrid shell" (`MapListHybridPreviewHost`); on Android via
+the Paparazzi snapshot baselines
+(`MapListHybridShellSnapshotTest.kt` — one per detent); on web at
+`/map-list-hybrid-preview` (every detent rendered side-by-side with
+live Mapbox tiles + sample pins).
+
 ## How to read this
 
 Each row lists:

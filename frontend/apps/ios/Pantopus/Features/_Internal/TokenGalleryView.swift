@@ -50,6 +50,7 @@ public struct TokenGalleryView: View {
                 Section {
                     NavigationLink("Icon gallery") { IconGalleryView() }
                     NavigationLink("Component gallery") { ComponentGalleryView() }
+                    NavigationLink("Map+List hybrid shell") { MapListHybridPreviewHost() }
                 }
             }
             .listStyle(.insetGrouped)
