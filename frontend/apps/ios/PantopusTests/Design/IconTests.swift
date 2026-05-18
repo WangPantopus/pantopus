@@ -56,7 +56,9 @@ final class IconTests: XCTestCase {
         // T6.3b Maintenance — task category iconography.
         "wrench", "fan", "cloud-rain", "refrigerator", "bug", "trees", "paint-roller", "bell-ring",
         // T6.5e Mailbox Vault — envelope state + folder palette + chrome.
-        "mail", "mail-open", "folder-plus", "piggy-bank", "plane", "receipt-text", "paperclip", "arrow-down-up"
+        "mail", "mail-open", "folder-plus", "piggy-bank", "plane", "receipt-text", "paperclip", "arrow-down-up",
+        // T6.6b Chat conversation refresh — header + composer.
+        "video", "more-vertical", "hand"
     ]
 
     func testInventoryMatches() {
