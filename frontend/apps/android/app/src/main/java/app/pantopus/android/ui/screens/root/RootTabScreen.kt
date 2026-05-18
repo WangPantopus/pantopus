@@ -132,6 +132,8 @@ import app.pantopus.android.ui.screens.nearby.map.MapEntity
 import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
 import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
 import app.pantopus.android.ui.screens.notifications.NotificationsScreen
+import app.pantopus.android.ui.screens.recent_activity.RecentActivityDestination
+import app.pantopus.android.ui.screens.recent_activity.RecentActivityScreen
 import app.pantopus.android.ui.screens.offers.OffersScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
@@ -293,6 +295,10 @@ private object ChildRoutes {
 
     /** Notifications center (T4.1). Reached from the Hub bell icon. */
     const val NOTIFICATIONS = "notifications"
+
+    /** P1.5 — Recent activity log. Reached from the Hub
+     *  `HubRecentActivity` "See all" CTA. */
+    const val RECENT_ACTIVITY = "recent-activity"
 
     /** Connections center (T5.2.3). Reached from the You / Me action grid
      *  or via `pantopus://connections`. */
@@ -780,6 +786,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 routeForJumpBackIn(intent.item).also { navController.navigate(it) }
                             HubNavigationIntent.OpenToday ->
                                 navController.navigate(ChildRoutes.placeholder("Today"))
+                            HubNavigationIntent.OpenRecentActivity ->
+                                navController.navigate(ChildRoutes.RECENT_ACTIVITY)
                         }
                     })
                 }
@@ -1490,6 +1498,27 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(ChildRoutes.NOTIFICATIONS) {
                 NotificationsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.RECENT_ACTIVITY) {
+                RecentActivityScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpen = { destination ->
+                        when (destination) {
+                            is RecentActivityDestination.GigDetail ->
+                                navController.navigate(ChildRoutes.gigDetail(destination.id))
+                            is RecentActivityDestination.ListingDetail ->
+                                navController.navigate(ChildRoutes.listingDetail(destination.id))
+                            is RecentActivityDestination.MailItemDetail ->
+                                navController.navigate(ChildRoutes.mailboxItemDetail(destination.id))
+                            is RecentActivityDestination.PulsePost ->
+                                navController.navigate(ChildRoutes.pulsePost(destination.id))
+                            is RecentActivityDestination.HomeDashboard ->
+                                navController.navigate(ChildRoutes.homeDashboard(destination.id))
+                            is RecentActivityDestination.Placeholder ->
+                                navController.navigate(ChildRoutes.placeholder(destination.label))
+                        }
+                    },
+                )
             }
             composable(ChildRoutes.CONNECTIONS) {
                 ConnectionsScreen(

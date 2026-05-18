@@ -115,6 +115,9 @@ public enum HubRoute: Hashable {
     /// `InboxConversationDestination` so the same `ChatConversationView`
     /// can host the thread inside the Hub stack.
     case chatConversation(InboxConversationDestination)
+    /// P1.5 — Recent activity log. Pushed when the Hub's
+    /// `HubRecentActivity` "See all" CTA fires.
+    case recentActivity
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
     case menu
     /// Mailbox search target. Replaced when `/api/mailbox` accepts a query.
@@ -217,6 +220,7 @@ public struct HubTabRoot: View {
             // then this is a no-op so the chevron-right feels live but
             // doesn't push to a stub.
             case .openToday: break
+            case .openRecentActivity: path.append(.recentActivity)
             }
         }
         .overlay(alignment: .topLeading) { debugTapTarget }
@@ -729,6 +733,19 @@ public struct HubTabRoot: View {
             InvoiceDetailView(
                 viewModel: InvoiceDetailViewModel(invoiceId: invoiceId)
             ) { if !path.isEmpty { path.removeLast() } }
+        case .recentActivity:
+            RecentActivityView(
+                viewModel: RecentActivityViewModel(onOpen: { destination in
+                    switch destination {
+                    case let .gigDetail(id): push(.gigDetail(gigId: id))
+                    case let .listingDetail(id): push(.listingDetail(listingId: id))
+                    case let .mailItemDetail(id): push(.mailItemDetail(mailId: id))
+                    case let .pulsePost(id): push(.pulsePost(postId: id))
+                    case let .homeDashboard(id): push(.homeDashboard(homeId: id))
+                    case let .placeholder(label): push(.placeholder(label: label))
+                    }
+                })
+            )
         case .notifications:
             NotificationsView(
                 viewModel: NotificationsViewModel()
