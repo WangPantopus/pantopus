@@ -148,6 +148,17 @@ data class PersonaThreadDto(
     val lastMessageAt: String? = null,
     val unreadCount: Int? = null,
     val status: String? = null,
+    /** Creator-flagged thread — drives the amber flag glyph + Flagged
+     *  filter chip count on the Creator Inbox surface. */
+    val flagged: Boolean? = null,
+    /** Verified-local follower flag — mirrors `FanDto.verifiedLocal` so
+     *  the row avatar can render the small sky-blue check overlay. */
+    val verifiedLocal: Boolean? = null,
+    /** Counterparty user id needed to push the existing
+     *  `ChatConversationScreen` in `Person` mode. Older serializers may
+     *  not surface it — when null the row's tap target uses
+     *  `membershipId` as the conversation peer. */
+    val counterpartyUserId: String? = null,
 )
 
 // POST /api/broadcast/channels/:id/messages

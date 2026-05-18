@@ -38,6 +38,7 @@ import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
+import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesTarget
 import app.pantopus.android.ui.screens.discoverhub.DiscoverHubScreen
@@ -355,6 +356,11 @@ private object ChildRoutes {
 
     /** Public Profile management / Creator audience dashboard (T3.3). */
     const val AUDIENCE_PROFILE = "audience-profile"
+
+    /** P1.2 — Creator Inbox (standalone DM thread list for creators).
+     *  Reached from the You tab Personal section row + Audience Profile
+     *  Threads tab "View all messages" CTA + thread row tap. */
+    const val CREATOR_INBOX = "creator-inbox"
 
     /** Ceremonial Mail Compose wizard (T3.7). */
     const val CEREMONIAL_MAIL = "mailbox/compose-letter"
@@ -828,6 +834,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenSupportTrains = { navController.navigate(ChildRoutes.SUPPORT_TRAINS) },
                     onOpenIdentityCenter = { navController.navigate(ChildRoutes.IDENTITY_CENTER) },
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
+                    onOpenCreatorInbox = { navController.navigate(ChildRoutes.CREATOR_INBOX) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },
                     onOpenHomePets = { homeId -> navController.navigate(ChildRoutes.homePets(homeId)) },
                     onOpenHomeCalendar = { homeId ->
@@ -1764,12 +1771,34 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenFollower = { row ->
                         navController.navigate(ChildRoutes.placeholder("Follower · ${row.displayName}"))
                     },
-                    onOpenThread = { row ->
-                        navController.navigate(ChildRoutes.placeholder("Thread · ${row.displayName}"))
+                    onOpenThread = {
+                        navController.navigate(ChildRoutes.CREATOR_INBOX)
                     },
                     onOpenSetup = {
                         navController.navigate(ChildRoutes.placeholder("Set up Public Profile"))
                     },
+                    onOpenCreatorInbox = {
+                        navController.navigate(ChildRoutes.CREATOR_INBOX)
+                    },
+                )
+            }
+            composable(ChildRoutes.CREATOR_INBOX) {
+                CreatorInboxScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenThread = { row ->
+                        val userId = row.counterpartyUserId ?: row.id
+                        navController.navigate(
+                            ChildRoutes.chatConversationFromPicker(
+                                userId = userId,
+                                displayName = row.displayName.ifEmpty { row.handle },
+                                initials = row.initials,
+                                verified = row.verifiedLocal,
+                                locality = null,
+                            ),
+                        )
+                    },
+                    onOpenBroadcast = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
+                    onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Inbox settings")) },
                 )
             }
             composable(ChildRoutes.IDENTITY_CENTER) {

@@ -129,7 +129,7 @@ final class MeViewModelTests: XCTestCase {
         XCTAssertTrue(personal.sections.contains { $0.header == "Help & Legal" })
         XCTAssertEqual(
             personal.sections.first { $0.header == "Profile & Privacy" }?.rows.map(\.routeKey),
-            ["me.editProfile", "me.identityCenter", "me.audience"]
+            ["me.editProfile", "me.identityCenter", "me.audience", "me.creatorInbox"]
         )
 
         XCTAssertEqual(home.identity, .home)
