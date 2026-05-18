@@ -82,10 +82,13 @@ fun CommunityDetailLayout(
     onBack: () -> Unit,
     onRsvp: (CommunityRsvpStatus) -> Unit,
     onOpenSenderProfile: (String) -> Unit = {},
+    // T6.5e (P19.5) — Defaults to a no-op so existing call sites
+    // compile unchanged.
+    onSaveToVault: () -> Unit = {},
 ) {
     Box(modifier = Modifier.testTag("mailDetail_community")) {
         MailItemDetailShell(
-            topBar = makeTopBar(onBack = onBack),
+            topBar = makeTopBar(onBack = onBack, onSaveToVault = onSaveToVault),
             aiElf = makeAIElf(content = content, community = community),
             attachments = buildAttachments(content.attachments),
             hero = { CommunityHeroCard(content = content, community = community) },
@@ -126,7 +129,10 @@ fun CommunityDetailLayout(
     }
 }
 
-private fun makeTopBar(onBack: () -> Unit): MailTopBarConfig =
+private fun makeTopBar(
+    onBack: () -> Unit,
+    onSaveToVault: () -> Unit,
+): MailTopBarConfig =
     MailTopBarConfig(
         eyebrow = "Community mail",
         trust = MailDetailTrust.Verified,
@@ -135,11 +141,12 @@ private fun makeTopBar(onBack: () -> Unit): MailTopBarConfig =
             MailTopBarTrailingAction(
                 icon = PantopusIcon.Bookmark,
                 contentDescription = "Save to vault",
-                onClick = {},
+                onClick = { onSaveToVault() },
             ),
         overflowItems =
             listOf(
                 MailOverflowItem("share", PantopusIcon.Share, "Share") {},
+                MailOverflowItem("saveToVault", PantopusIcon.Bookmark, "Save to vault") { onSaveToVault() },
                 MailOverflowItem("addToCalendar", PantopusIcon.Calendar, "Add to calendar") {},
                 MailOverflowItem("mute", PantopusIcon.Bell, "Mute thread") {},
                 MailOverflowItem("report", PantopusIcon.Info, "Report") {},

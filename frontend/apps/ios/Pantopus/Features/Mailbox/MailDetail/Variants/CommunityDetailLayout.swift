@@ -36,6 +36,9 @@ struct CommunityDetailLayout: View {
     let onBack: @MainActor () -> Void
     let onRsvp: @MainActor (CommunityRsvpStatus) -> Void
     let onOpenSenderProfile: (@MainActor (String) -> Void)?
+    /// T6.5e (P19.5) — Opens the host's Save-to-vault picker. Defaults
+    /// to a no-op so existing call sites compile unchanged.
+    var onSaveToVault: @MainActor () -> Void = {}
 
     var body: some View {
         MailItemDetailShell(
@@ -89,9 +92,12 @@ struct CommunityDetailLayout: View {
                 icon: .bookmark,
                 accessibilityLabel: "Save to vault",
                 isActive: false
-            ) {},
+            ) { @Sendable in Task { @MainActor in onSaveToVault() } },
             overflowItems: [
                 MailOverflowItem(id: "share", icon: .share, label: "Share") {},
+                MailOverflowItem(id: "saveToVault", icon: .bookmark, label: "Save to vault") { @Sendable in
+                    Task { @MainActor in onSaveToVault() }
+                },
                 MailOverflowItem(id: "addToCalendar", icon: .calendar, label: "Add to calendar") {},
                 MailOverflowItem(id: "mute", icon: .bell, label: "Mute thread") {},
                 MailOverflowItem(id: "report", icon: .info, label: "Report") {},

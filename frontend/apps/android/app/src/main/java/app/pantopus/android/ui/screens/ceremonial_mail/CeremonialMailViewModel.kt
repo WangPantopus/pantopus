@@ -293,20 +293,25 @@ class CeremonialMailViewModel
         // MARK: - Helpers
 
         private fun titleFor(step: CeremonialMailStep): String =
+            // T6.5e — Step titles match the ceremonial-compose design
+            // (Porch Call · Address It · Write It · Seal & Send) while
+            // the internal enum stays decide / verify / compose / commit
+            // so existing tests and analytics events keep their stable
+            // names.
             when (step) {
-                CeremonialMailStep.Decide -> "Who and why"
-                CeremonialMailStep.Verify -> "Verify the address"
-                CeremonialMailStep.Compose -> "Compose the letter"
-                CeremonialMailStep.Commit -> "Commit and send"
+                CeremonialMailStep.Decide -> "Porch Call"
+                CeremonialMailStep.Verify -> "Address It"
+                CeremonialMailStep.Compose -> "Write It"
+                CeremonialMailStep.Commit -> "Seal & Send"
                 CeremonialMailStep.Success -> "Letter on its way"
             }
 
         private fun primaryCtaLabelFor(step: CeremonialMailStep): String =
             when (step) {
                 CeremonialMailStep.Decide -> "Continue"
-                CeremonialMailStep.Verify -> "Continue"
+                CeremonialMailStep.Verify -> "Continue to letter"
                 CeremonialMailStep.Compose -> "Continue"
-                CeremonialMailStep.Commit -> "Send letter"
+                CeremonialMailStep.Commit -> "Seal and send"
                 CeremonialMailStep.Success -> "Done"
             }
 

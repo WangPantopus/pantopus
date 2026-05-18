@@ -211,6 +211,19 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case paintRoller = "paint-roller"
     case bellRing = "bell-ring"
 
+    // T6.5e Mailbox Vault — folder palette + mail-type tile glyphs + FAB
+    // glyph. Distinct from existing `mailbox` (mail.stack) so the new
+    // Mailbox surfaces can render the closed-envelope and open-envelope
+    // states from the design palette.
+    case mail
+    case mailOpen = "mail-open"
+    case folderPlus = "folder-plus"
+    case piggyBank = "piggy-bank"
+    case plane
+    case receiptText = "receipt-text"
+    case paperclip
+    case arrowDownUp = "arrow-down-up"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -374,6 +387,17 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .trees: "tree"
         case .paintRoller: "paintbrush.pointed"
         case .bellRing: "bell.badge"
+        // T6.5e Mailbox Vault. SF Symbols has direct envelope glyphs;
+        // `piggy-bank` and `arrow-down-up` lack 1:1 equivalents so fall
+        // back to `dollarsign.circle` and `arrow.up.arrow.down` glyphs.
+        case .mail: "envelope"
+        case .mailOpen: "envelope.open"
+        case .folderPlus: "folder.badge.plus"
+        case .piggyBank: "dollarsign.circle"
+        case .plane: "airplane"
+        case .receiptText: "doc.plaintext"
+        case .paperclip: "paperclip"
+        case .arrowDownUp: "arrow.up.arrow.down"
         }
     }
 }

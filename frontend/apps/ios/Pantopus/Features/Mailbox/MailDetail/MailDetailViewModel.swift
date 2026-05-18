@@ -164,6 +164,15 @@ public final class MailDetailViewModel {
     public private(set) var ackInFlight: Bool = false
     /// Community RSVP mutation is in-flight; disables the chip row.
     public private(set) var rsvpInFlight: Bool = false
+    /// T6.5e — Save-to-vault picker visibility. The view binds a
+    /// confirmation dialog to this flag; tapping a folder calls
+    /// `saveToVault(folderId:)`.
+    public var showsSaveToVaultPicker: Bool = false
+    /// Vault folders fetched lazily the first time the overflow item
+    /// is tapped, then cached for the lifetime of the screen.
+    public private(set) var saveToVaultFolders: [VaultFolderDTO] = []
+    /// Save mutation in-flight.
+    public private(set) var saveToVaultInFlight: Bool = false
 
     private let mailId: String
     private let api: APIClient
@@ -263,6 +272,51 @@ public final class MailDetailViewModel {
         case .notGoing: "Marked as can't make it"
         case .undecided: "RSVP cleared"
         }
+    }
+
+    // MARK: - Save to vault (T6.5e / P19.5)
+
+    /// Open the save-to-vault picker. Fetches folders on the first
+    /// call; cached after.
+    public func openSaveToVaultPicker() async {
+        if saveToVaultFolders.isEmpty {
+            do {
+                let response: VaultFoldersResponse = try await api.request(
+                    MailboxVaultEndpoints.folders(drawer: "personal")
+                )
+                saveToVaultFolders = response.folders
+            } catch {
+                toast = (error as? APIError)?.errorDescription
+                    ?? "Couldn't load your vault folders."
+                return
+            }
+        }
+        guard !saveToVaultFolders.isEmpty else {
+            toast = "Add a folder in your Vault first."
+            return
+        }
+        showsSaveToVaultPicker = true
+    }
+
+    /// POST the current mail to the supplied vault folder. Optimistic
+    /// toast on success; surfaces a readable error on failure.
+    public func saveToVault(folderId: String) async {
+        guard !saveToVaultInFlight else { return }
+        saveToVaultInFlight = true
+        defer { saveToVaultInFlight = false }
+        do {
+            let _: FileToVaultResponse = try await api.request(
+                MailboxVaultEndpoints.file(
+                    body: FileToVaultBody(mailId: mailId, folderId: folderId)
+                )
+            )
+            let folderLabel = saveToVaultFolders.first(where: { $0.id == folderId })?.label
+            toast = folderLabel.map { "Saved to \($0)" } ?? "Saved to vault"
+        } catch {
+            toast = (error as? APIError)?.errorDescription
+                ?? "Couldn't save to vault. Try again."
+        }
+        showsSaveToVaultPicker = false
     }
 
     // MARK: - Pure projection (exposed for tests)

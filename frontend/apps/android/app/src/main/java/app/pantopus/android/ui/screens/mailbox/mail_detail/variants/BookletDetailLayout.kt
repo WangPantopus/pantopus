@@ -66,10 +66,13 @@ fun BookletDetailLayout(
     booklet: BookletDetailDto,
     onBack: () -> Unit,
     onOpenSenderProfile: (String) -> Unit = {},
+    // T6.5e (P19.5) — Defaults to a no-op so existing call sites
+    // compile unchanged.
+    onSaveToVault: () -> Unit = {},
 ) {
     Box(modifier = Modifier.testTag("mailDetail_booklet")) {
         MailItemDetailShell(
-            topBar = makeTopBar(content = content, onBack = onBack),
+            topBar = makeTopBar(content = content, onBack = onBack, onSaveToVault = onSaveToVault),
             aiElf = makeAIElf(content = content, booklet = booklet),
             attachments = makeAttachments(content = content),
             hero = { HeroCard(content = content) },
@@ -84,6 +87,7 @@ fun BookletDetailLayout(
 private fun makeTopBar(
     content: MailDetailContent,
     onBack: () -> Unit,
+    onSaveToVault: () -> Unit,
 ): MailTopBarConfig =
     MailTopBarConfig(
         eyebrow = content.category.label,
@@ -93,6 +97,7 @@ private fun makeTopBar(
         overflowItems =
             listOf(
                 MailOverflowItem("share", PantopusIcon.Share, "Share") {},
+                MailOverflowItem("saveToVault", PantopusIcon.Bookmark, "Save to vault") { onSaveToVault() },
                 MailOverflowItem("download", PantopusIcon.Download, "Save PDF") {},
                 MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {},
                 MailOverflowItem(

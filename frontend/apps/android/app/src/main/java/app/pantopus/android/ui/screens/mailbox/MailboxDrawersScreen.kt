@@ -15,12 +15,13 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 @Composable
 fun MailboxDrawersScreen(
     onOpenDrawer: (String) -> Unit,
+    onOpenVault: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     viewModel: MailboxDrawersViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
-        viewModel.configureNavigation(onOpenDrawer = onOpenDrawer)
+        viewModel.configureNavigation(onOpenDrawer = onOpenDrawer, onOpenVault = onOpenVault)
         viewModel.load()
         Analytics.track(AnalyticsEvent.ScreenMailboxDrawersViewed)
     }

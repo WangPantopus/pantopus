@@ -24,6 +24,7 @@ import app.pantopus.android.data.api.services.ListingsApi
 import app.pantopus.android.data.api.services.MailComposeApi
 import app.pantopus.android.data.api.services.MailboxApi
 import app.pantopus.android.data.api.services.MailboxV2Api
+import app.pantopus.android.data.api.services.MailboxVaultApi
 import app.pantopus.android.data.api.services.NotificationsApi
 import app.pantopus.android.data.api.services.OffersApi
 import app.pantopus.android.data.api.services.PostsApi
@@ -171,6 +172,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideMailboxV2Api(retrofit: Retrofit): MailboxV2Api = retrofit.create(MailboxV2Api::class.java)
+
+    @Provides @Singleton
+    fun provideMailboxVaultApi(retrofit: Retrofit): MailboxVaultApi = retrofit.create(MailboxVaultApi::class.java)
 
     @Provides @Singleton
     fun providePostsApi(retrofit: Retrofit): PostsApi = retrofit.create(PostsApi::class.java)

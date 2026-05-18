@@ -27,6 +27,11 @@ struct CertifiedDetailLayout: View {
     let onBack: @MainActor () -> Void
     let onAcknowledge: @MainActor () -> Void
     let onOpenSenderProfile: (@MainActor (String) -> Void)?
+    /// T6.5e (P19.5) — Opens the Save-to-vault picker. The host
+    /// (`MailDetailView`) owns the confirmation dialog; the variant
+    /// just signals the trigger. Defaults to a no-op so existing call
+    /// sites compile unchanged.
+    var onSaveToVault: @MainActor () -> Void = {}
 
     var body: some View {
         MailItemDetailShell(
@@ -64,9 +69,12 @@ struct CertifiedDetailLayout: View {
                 icon: .bookmark,
                 accessibilityLabel: "Save to vault",
                 isActive: false
-            ) {},
+            ) { @Sendable in Task { @MainActor in onSaveToVault() } },
             overflowItems: [
                 MailOverflowItem(id: "forward", icon: .send, label: "Forward") {},
+                MailOverflowItem(id: "saveToVault", icon: .bookmark, label: "Save to vault") { @Sendable in
+                    Task { @MainActor in onSaveToVault() }
+                },
                 MailOverflowItem(id: "archive", icon: .archive, label: "Archive") {},
                 MailOverflowItem(id: "report", icon: .info, label: "Report") {},
                 MailOverflowItem(id: "delete", icon: .trash2, label: "Delete", isDestructive: true) {}

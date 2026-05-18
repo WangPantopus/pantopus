@@ -81,10 +81,13 @@ fun CertifiedDetailLayout(
     onBack: () -> Unit,
     onAcknowledge: () -> Unit,
     onOpenSenderProfile: (String) -> Unit = {},
+    // T6.5e (P19.5) — Defaults to a no-op so existing call sites
+    // compile unchanged.
+    onSaveToVault: () -> Unit = {},
 ) {
     Box(modifier = Modifier.testTag("mailDetail_certified")) {
         MailItemDetailShell(
-            topBar = makeTopBar(onBack = onBack),
+            topBar = makeTopBar(onBack = onBack, onSaveToVault = onSaveToVault),
             aiElf = makeAIElf(content = content),
             attachments = makeAttachments(content = content),
             hero = { HeroCard(content = content, certified = certified) },
@@ -126,7 +129,10 @@ fun CertifiedDetailLayout(
 
 // ─── Top bar / AI elf / attachments ──────────────────────────
 
-private fun makeTopBar(onBack: () -> Unit): MailTopBarConfig =
+private fun makeTopBar(
+    onBack: () -> Unit,
+    onSaveToVault: () -> Unit,
+): MailTopBarConfig =
     MailTopBarConfig(
         eyebrow = "Certified mail",
         trust = MailDetailTrust.Verified,
@@ -135,10 +141,11 @@ private fun makeTopBar(onBack: () -> Unit): MailTopBarConfig =
             MailTopBarTrailingAction(
                 icon = PantopusIcon.Bookmark,
                 contentDescription = "Save to vault",
-            ) {},
+            ) { onSaveToVault() },
         overflowItems =
             listOf(
                 MailOverflowItem("forward", PantopusIcon.Send, "Forward") {},
+                MailOverflowItem("saveToVault", PantopusIcon.Bookmark, "Save to vault") { onSaveToVault() },
                 MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {},
                 MailOverflowItem("report", PantopusIcon.Info, "Report") {},
                 MailOverflowItem(

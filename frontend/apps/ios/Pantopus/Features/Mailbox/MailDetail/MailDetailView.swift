@@ -55,6 +55,26 @@ public struct MailDetailView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.toast)
+        .confirmationDialog(
+            "Save to vault",
+            isPresented: Binding(
+                get: { viewModel.showsSaveToVaultPicker },
+                set: { viewModel.showsSaveToVaultPicker = $0 }
+            ),
+            titleVisibility: .visible
+        ) {
+            ForEach(viewModel.saveToVaultFolders) { folder in
+                Button(folder.label) {
+                    Task { await viewModel.saveToVault(folderId: folder.id) }
+                }
+                .accessibilityIdentifier("mailDetail_saveToVault_\(folder.id)")
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.showsSaveToVaultPicker = false
+            }
+        } message: {
+            Text("Pick a folder to keep this mail in.")
+        }
     }
 
     @ViewBuilder
@@ -70,7 +90,8 @@ public struct MailDetailView: View {
                 ackInFlight: viewModel.ackInFlight,
                 onBack: { onBack() },
                 onAcknowledge: { Task { await viewModel.acknowledge() } },
-                onOpenSenderProfile: onOpenSenderProfile
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
             )
         } else if content.category == .certified, let certified = content.certifiedDetail {
             CertifiedDetailLayout(
@@ -79,7 +100,8 @@ public struct MailDetailView: View {
                 ackInFlight: viewModel.ackInFlight,
                 onBack: { onBack() },
                 onAcknowledge: { Task { await viewModel.acknowledge() } },
-                onOpenSenderProfile: onOpenSenderProfile
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
             )
         } else if content.category == .community, let community = content.communityDetail {
             CommunityDetailLayout(
@@ -88,7 +110,8 @@ public struct MailDetailView: View {
                 rsvpInFlight: viewModel.rsvpInFlight,
                 onBack: { onBack() },
                 onRsvp: { status in Task { await viewModel.setRsvp(status) } },
-                onOpenSenderProfile: onOpenSenderProfile
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
             )
         } else {
             MailItemDetailShell(
@@ -120,6 +143,9 @@ public struct MailDetailView: View {
             trailingAction: nil,
             overflowItems: [
                 MailOverflowItem(id: "forward", icon: .send, label: "Forward") {},
+                MailOverflowItem(id: "saveToVault", icon: .bookmark, label: "Save to vault") { @Sendable in
+                    Task { @MainActor in await viewModel.openSaveToVaultPicker() }
+                },
                 MailOverflowItem(id: "archive", icon: .archive, label: "Archive") {},
                 MailOverflowItem(id: "unread", icon: .bell, label: "Mark unread") {},
                 MailOverflowItem(

@@ -16,6 +16,8 @@ public enum HubRoute: Hashable {
     case mailbox
     case mailItemDetail(mailId: String)
     case drawerDetail(drawer: String)
+    /// T6.5e (P19.5) Mailbox Vault — saved mail list. Personal pillar.
+    case mailboxVault
     case addHome
     case claimOwnership(homeId: String)
     case homeDashboard(homeId: String)
@@ -570,12 +572,44 @@ public struct HubTabRoot: View {
             )
         case .mailboxDrawers:
             MailboxDrawersView(
-                viewModel: MailboxDrawersViewModel { drawer in
-                    Task { @MainActor in push(.drawerDetail(drawer: drawer)) }
-                }
+                viewModel: MailboxDrawersViewModel(
+                    onOpenDrawer: { drawer in
+                        Task { @MainActor in push(.drawerDetail(drawer: drawer)) }
+                    },
+                    onOpenVault: {
+                        Task { @MainActor in push(.mailboxVault) }
+                    }
+                )
             )
         case let .drawerDetail(drawer):
             NotYetAvailableView(tabName: "Drawer · \(drawer)", icon: .mailbox)
+        case .mailboxVault:
+            // T6.5e (P19.5) — Mailbox Vault list.
+            VaultListView(
+                viewModel: VaultListViewModel(
+                    onOpenItem: { mailId in
+                        Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
+                    },
+                    onAddTapped: {
+                        Task { @MainActor in
+                            if path.contains(.mailbox) {
+                                while let last = path.last, last != .mailbox {
+                                    path.removeLast()
+                                }
+                            } else {
+                                push(.mailbox)
+                            }
+                        }
+                    },
+                    onOpenMailbox: {
+                        Task { @MainActor in
+                            if !path.contains(.mailbox) {
+                                push(.mailbox)
+                            }
+                        }
+                    }
+                )
+            )
         case .pulseFeed:
             FeedView(
                 onOpenPost: { postId in

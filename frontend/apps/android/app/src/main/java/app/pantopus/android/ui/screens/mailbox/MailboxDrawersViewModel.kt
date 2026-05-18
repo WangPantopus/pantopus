@@ -36,10 +36,15 @@ class MailboxDrawersViewModel
         val state: StateFlow<ListOfRowsUiState> = _state.asStateFlow()
 
         private var onOpenDrawer: (String) -> Unit = {}
+        private var onOpenVault: () -> Unit = {}
 
         /** Wire nav callback before first load. */
-        fun configureNavigation(onOpenDrawer: (String) -> Unit) {
+        fun configureNavigation(
+            onOpenDrawer: (String) -> Unit,
+            onOpenVault: () -> Unit = {},
+        ) {
             this.onOpenDrawer = onOpenDrawer
+            this.onOpenVault = onOpenVault
         }
 
         /** Initial load. */
@@ -69,10 +74,23 @@ class MailboxDrawersViewModel
                     )
                 return
             }
-            val rows = drawers.map(::rowFor)
+            // T6.5e (P19.5) — Append a "Vault" row alongside the four
+            // drawers so the saved-mail list is reachable without
+            // leaving the inbox shell.
+            val drawerRows = drawers.map(::rowFor)
+            val vaultRow =
+                RowModel(
+                    id = "vault",
+                    title = "Vault",
+                    subtitle = "Saved mail",
+                    template = RowTemplate.FileChevron,
+                    leading = RowLeading.Icon(icon = PantopusIcon.Archive, tint = PantopusColors.primary600),
+                    trailing = RowTrailing.Chevron,
+                    onTap = { onOpenVault() },
+                )
             _state.value =
                 ListOfRowsUiState.Loaded(
-                    sections = listOf(RowSection(id = "drawers", rows = rows)),
+                    sections = listOf(RowSection(id = "drawers", rows = drawerRows + vaultRow)),
                     hasMore = false,
                 )
         }

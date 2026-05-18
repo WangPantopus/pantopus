@@ -9,6 +9,7 @@ import app.pantopus.android.data.api.models.mailbox.MailDetailResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
+import app.pantopus.android.data.mailbox.MailboxVaultRepository
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailDetailTrust
 import io.mockk.coEvery
@@ -35,6 +36,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class MailDetailViewModelTest {
     private val repo: MailboxRepository = mockk()
+    private val vaultRepo: MailboxVaultRepository = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -85,6 +87,7 @@ class MailDetailViewModelTest {
     private fun makeVm(): MailDetailViewModel =
         MailDetailViewModel(
             repo = repo,
+            vaultRepo = vaultRepo,
             savedStateHandle = SavedStateHandle(mapOf(MAIL_DETAIL_MAIL_ID_KEY to "m1")),
         )
 

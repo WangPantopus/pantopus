@@ -72,8 +72,8 @@ public struct CeremonialMailWizardView: View {
 
     private var decideStep: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            HeadlineBlock("Decide who and why")
-            SubcopyBlock("Mail keeps your name and address private — the recipient only sees what you choose to share.")
+            HeadlineBlock("Who are you writing to?")
+            SubcopyBlock("Choose a verified neighbor, a saved correspondent, or paste a handle. Mail keeps your name and address private — the recipient only sees what you choose to share.")
             recipientSearchField
             if !viewModel.recipientResults.isEmpty {
                 recipientResults
@@ -232,8 +232,8 @@ public struct CeremonialMailWizardView: View {
 
     private var verifyStep: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            HeadlineBlock("Verify the address")
-            SubcopyBlock("We'll ship to the address Pantopus has on file. The recipient never sees yours unless you opt in.")
+            HeadlineBlock("Address it")
+            SubcopyBlock("Pantopus verifies physical addresses. By sending, you're confirming this exact recipient. There's no undo.")
             if let ctx = viewModel.homeContext {
                 addressCard(ctx)
             } else if let address = viewModel.selectedRecipient?.homeAddress {
@@ -334,7 +334,7 @@ public struct CeremonialMailWizardView: View {
 
     private var composeStep: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            HeadlineBlock("Compose the letter")
+            HeadlineBlock("Write it")
             SubcopyBlock("Pick a stationery + ink, write your note, optionally add a voice postscript.")
             pickerRow(
                 title: "Stationery",
@@ -505,8 +505,8 @@ public struct CeremonialMailWizardView: View {
 
     private var commitStep: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            HeadlineBlock("Commit and send")
-            SubcopyBlock("Take one more look — you can't edit a letter after it's delivered.")
+            HeadlineBlock("Seal and send")
+            SubcopyBlock("Take one more look — you can't edit a letter after it's delivered. Pick a wax seal, then send.")
             reviewCard
             Text("WHEN TO DELIVER")
                 .font(.system(size: 10, weight: .bold))

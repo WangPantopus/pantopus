@@ -248,11 +248,15 @@ public final class CeremonialMailViewModel: WizardModel {
     // MARK: - Computed
 
     private var stepTitle: String {
+        // T6.5e — Step titles match the ceremonial-compose design
+        // (Porch Call · Address It · Write It · Seal & Send) while the
+        // internal enum stays decide / verify / compose / commit so
+        // existing tests and analytics events keep their stable names.
         switch step {
-        case .decide: "Who and why"
-        case .verify: "Verify the address"
-        case .compose: "Compose the letter"
-        case .commit: "Commit and send"
+        case .decide: "Porch Call"
+        case .verify: "Address It"
+        case .compose: "Write It"
+        case .commit: "Seal & Send"
         case .success: "Letter on its way"
         }
     }
@@ -260,9 +264,9 @@ public final class CeremonialMailViewModel: WizardModel {
     private var primaryCtaLabel: String {
         switch step {
         case .decide: "Continue"
-        case .verify: "Continue"
+        case .verify: "Continue to letter"
         case .compose: "Continue"
-        case .commit: "Send letter"
+        case .commit: "Seal and send"
         case .success: "Done"
         }
     }
