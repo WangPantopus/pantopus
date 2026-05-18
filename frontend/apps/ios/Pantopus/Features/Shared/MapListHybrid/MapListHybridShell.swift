@@ -76,7 +76,7 @@ public struct MapListHybridShell<
         self.pins = pins
         self.anchor = anchor
         self.selectedPinId = selectedPinId
-        self._detent = detent
+        _detent = detent
         self.onPinTap = onPinTap
         self.topPill = topPill
         self.categoryChips = categoryChips

@@ -53,6 +53,7 @@ final class MapListHybridShellTests: XCTestCase {
     }
 
     // MARK: - Velocity nudge
+
     //
     // Sign convention: positive velocity = downward flick (shrinks the
     // sheet); negative = upward (grows). Matches Compose's `draggable`

@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod")
+@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod", "LongParameterList")
 @file:OptIn(com.google.maps.android.compose.MapsComposeExperimentalApi::class)
 
 package app.pantopus.android.ui.screens.shared.map_list_hybrid

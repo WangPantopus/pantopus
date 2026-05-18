@@ -27,11 +27,23 @@ public struct MapListHybridPreviewHost: View {
     private static let samplePins: [MapPin] = [
         MapPin(id: "handyman-1", latitude: 40.7494, longitude: -73.9867, color: Color(red: 234 / 255, green: 88 / 255, blue: 12 / 255)),
         MapPin(id: "cleaning-1", latitude: 40.7502, longitude: -73.9840, color: Color(red: 14 / 255, green: 165 / 255, blue: 233 / 255)),
-        MapPin(id: "moving-1", latitude: 40.7470, longitude: -73.9810, color: Color(red: 124 / 255, green: 58 / 255, blue: 237 / 255), state: .pending),
+        MapPin(
+            id: "moving-1",
+            latitude: 40.7470,
+            longitude: -73.9810,
+            color: Color(red: 124 / 255, green: 58 / 255, blue: 237 / 255),
+            state: .pending
+        ),
         MapPin(id: "petcare-1", latitude: 40.7459, longitude: -73.9882, color: Color(red: 22 / 255, green: 163 / 255, blue: 74 / 255)),
         MapPin(id: "childcare-1", latitude: 40.7515, longitude: -73.9905, color: Color(red: 219 / 255, green: 39 / 255, blue: 119 / 255)),
-        MapPin(id: "tutoring-1", latitude: 40.7440, longitude: -73.9930, color: Color(red: 202 / 255, green: 138 / 255, blue: 4 / 255), state: .pending),
-        MapPin(id: "handyman-2", latitude: 40.7460, longitude: -73.9990, color: Color(red: 234 / 255, green: 88 / 255, blue: 12 / 255)),
+        MapPin(
+            id: "tutoring-1",
+            latitude: 40.7440,
+            longitude: -73.9930,
+            color: Color(red: 202 / 255, green: 138 / 255, blue: 4 / 255),
+            state: .pending
+        ),
+        MapPin(id: "handyman-2", latitude: 40.7460, longitude: -73.9990, color: Color(red: 234 / 255, green: 88 / 255, blue: 12 / 255))
     ]
 
     private static let anchor = MapAnchor(latitude: 40.7484, longitude: -73.9857)
@@ -153,14 +165,20 @@ private struct PreviewTopPill: View {
 }
 
 private struct PreviewCategoryChips: View {
-    private static let categories: [(key: String, label: String, color: Color)] = [
-        ("all", "All", Theme.Color.primary600),
-        ("handyman", "Handyman", Color(red: 234 / 255, green: 88 / 255, blue: 12 / 255)),
-        ("cleaning", "Cleaning", Color(red: 14 / 255, green: 165 / 255, blue: 233 / 255)),
-        ("moving", "Moving", Color(red: 124 / 255, green: 58 / 255, blue: 237 / 255)),
-        ("petcare", "Pet care", Color(red: 22 / 255, green: 163 / 255, blue: 74 / 255)),
-        ("childcare", "Child care", Color(red: 219 / 255, green: 39 / 255, blue: 119 / 255)),
-        ("tutoring", "Tutoring", Color(red: 202 / 255, green: 138 / 255, blue: 4 / 255)),
+    private struct CategoryEntry {
+        let key: String
+        let label: String
+        let color: Color
+    }
+
+    private static let categories: [CategoryEntry] = [
+        CategoryEntry(key: "all", label: "All", color: Theme.Color.primary600),
+        CategoryEntry(key: "handyman", label: "Handyman", color: Color(red: 234 / 255, green: 88 / 255, blue: 12 / 255)),
+        CategoryEntry(key: "cleaning", label: "Cleaning", color: Color(red: 14 / 255, green: 165 / 255, blue: 233 / 255)),
+        CategoryEntry(key: "moving", label: "Moving", color: Color(red: 124 / 255, green: 58 / 255, blue: 237 / 255)),
+        CategoryEntry(key: "petcare", label: "Pet care", color: Color(red: 22 / 255, green: 163 / 255, blue: 74 / 255)),
+        CategoryEntry(key: "childcare", label: "Child care", color: Color(red: 219 / 255, green: 39 / 255, blue: 119 / 255)),
+        CategoryEntry(key: "tutoring", label: "Tutoring", color: Color(red: 202 / 255, green: 138 / 255, blue: 4 / 255))
     ]
 
     var body: some View {
