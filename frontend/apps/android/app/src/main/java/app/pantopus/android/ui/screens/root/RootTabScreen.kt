@@ -398,8 +398,7 @@ private object ChildRoutes {
     const val REVIEW_CLAIM_DETAIL_ID_KEY = "claimId"
     const val REVIEW_CLAIM_DETAIL = "admin/review-claims/{$REVIEW_CLAIM_DETAIL_ID_KEY}"
 
-    fun reviewClaimDetail(claimId: String): String =
-        "admin/review-claims/${java.net.URLEncoder.encode(claimId, "UTF-8")}"
+    fun reviewClaimDetail(claimId: String): String = "admin/review-claims/${java.net.URLEncoder.encode(claimId, "UTF-8")}"
 
     /**
      * Generic placeholder for intents whose destination hasn't been

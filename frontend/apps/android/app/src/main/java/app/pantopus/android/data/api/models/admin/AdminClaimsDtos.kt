@@ -31,8 +31,7 @@ enum class AdminClaimBucket(val backendValue: String) {
     ;
 
     companion object {
-        fun fromBackend(value: String?): AdminClaimBucket =
-            entries.firstOrNull { it.backendValue == value } ?: Pending
+        fun fromBackend(value: String?): AdminClaimBucket = entries.firstOrNull { it.backendValue == value } ?: Pending
     }
 }
 

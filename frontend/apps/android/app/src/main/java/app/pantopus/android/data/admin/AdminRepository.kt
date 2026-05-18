@@ -36,12 +36,10 @@ class AdminRepository
             }
 
         /** `GET /api/admin/claims/counts` — three tab badges. */
-        suspend fun claimCounts(): NetworkResult<AdminClaimCountsResponse> =
-            safeApiCall { api.claimCounts() }
+        suspend fun claimCounts(): NetworkResult<AdminClaimCountsResponse> = safeApiCall { api.claimCounts() }
 
         /** `GET /api/admin/claims/:claimId` — full claim detail. */
-        suspend fun claimDetail(claimId: String): NetworkResult<AdminClaimDetailResponse> =
-            safeApiCall { api.claimDetail(claimId) }
+        suspend fun claimDetail(claimId: String): NetworkResult<AdminClaimDetailResponse> = safeApiCall { api.claimDetail(claimId) }
 
         /**
          * `POST /api/admin/claims/:claimId/review` — reviewer decision
@@ -50,6 +48,5 @@ class AdminRepository
         suspend fun reviewClaim(
             claimId: String,
             request: AdminClaimReviewRequest,
-        ): NetworkResult<AdminClaimReviewResponse> =
-            safeApiCall { api.reviewClaim(claimId, request) }
+        ): NetworkResult<AdminClaimReviewResponse> = safeApiCall { api.reviewClaim(claimId, request) }
     }

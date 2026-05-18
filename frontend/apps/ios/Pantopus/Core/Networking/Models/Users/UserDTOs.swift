@@ -44,6 +44,15 @@ public struct UserDTO: Decodable, Sendable, Hashable, Identifiable {
         self.isAdmin = isAdmin
     }
 
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        email = try container.decode(String.self, forKey: .email)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        avatarURL = try container.decodeIfPresent(URL.self, forKey: .avatarURL)
+        isAdmin = try container.decodeIfPresent(Bool.self, forKey: .isAdmin) ?? false
+    }
+
     /// Project a rich [`AuthenticatedUser`](x-source-tag://AuthenticatedUser) down to the session shape.
     public init(from authUser: AuthenticatedUser) {
         id = authUser.id
