@@ -106,12 +106,15 @@ fun EditProfileScreen(
                 EditProfileSkeleton()
             EditProfileUiState.Loaded ->
                 EditProfileLoaded(
-                    fields = fields,
-                    email = email,
-                    emailVerified = emailVerified,
-                    isValid = viewModel.isValid,
-                    isDirty = viewModel.isDirty,
-                    isSaving = isSaving,
+                    state =
+                        EditProfileLoadedState(
+                            fields = fields,
+                            email = email,
+                            emailVerified = emailVerified,
+                            isValid = viewModel.isValid,
+                            isDirty = viewModel.isDirty,
+                            isSaving = isSaving,
+                        ),
                     onClose = onBack,
                     onCommit = viewModel::save,
                     onUpdate = viewModel::update,
@@ -160,14 +163,18 @@ internal fun EditProfileToastView(
     }
 }
 
+internal data class EditProfileLoadedState(
+    val fields: Map<EditProfileField, FormFieldState>,
+    val email: String,
+    val emailVerified: Boolean,
+    val isValid: Boolean,
+    val isDirty: Boolean,
+    val isSaving: Boolean,
+)
+
 @Composable
 internal fun EditProfileLoaded(
-    fields: Map<EditProfileField, FormFieldState>,
-    email: String,
-    emailVerified: Boolean,
-    isValid: Boolean,
-    isDirty: Boolean,
-    isSaving: Boolean,
+    state: EditProfileLoadedState,
     onClose: () -> Unit,
     onCommit: () -> Unit,
     onUpdate: (EditProfileField, String) -> Unit,
@@ -175,9 +182,9 @@ internal fun EditProfileLoaded(
     FormShell(
         title = "Edit profile",
         rightActionLabel = "Save",
-        isValid = isValid,
-        isDirty = isDirty,
-        isSaving = isSaving,
+        isValid = state.isValid,
+        isDirty = state.isDirty,
+        isSaving = state.isSaving,
         onClose = onClose,
         onCommit = onCommit,
     ) {
@@ -189,57 +196,57 @@ internal fun EditProfileLoaded(
             TextRow(
                 field = EditProfileField.FirstName,
                 label = "First name",
-                fields = fields,
+                fields = state.fields,
                 onUpdate = onUpdate,
             )
             TextRow(
                 field = EditProfileField.MiddleName,
                 label = "Middle name (optional)",
-                fields = fields,
+                fields = state.fields,
                 onUpdate = onUpdate,
             )
             TextRow(
                 field = EditProfileField.LastName,
                 label = "Last name",
-                fields = fields,
+                fields = state.fields,
                 onUpdate = onUpdate,
             )
             TextRow(
                 field = EditProfileField.Tagline,
                 label = "Tagline (optional)",
                 placeholder = "A short headline",
-                fields = fields,
+                fields = state.fields,
                 onUpdate = onUpdate,
             )
-            BioField(fields = fields, onUpdate = onUpdate)
+            BioField(fields = state.fields, onUpdate = onUpdate)
         }
         FormFieldGroup("Contact") {
             // Note: the design allows editing email when `verified ==
             // false`. `updateProfileSchema` exposes no `email` key, so
             // the field is read-only until the backend adds it.
-            ReadOnlyEmailRow(email = email, verified = emailVerified)
+            ReadOnlyEmailRow(email = state.email, verified = state.emailVerified)
             TextRow(
                 field = EditProfileField.PhoneNumber,
                 label = "Phone (optional)",
                 placeholder = "+15555550123",
                 keyboardType = KeyboardType.Phone,
-                fields = fields,
+                fields = state.fields,
                 onUpdate = onUpdate,
             )
-            DateOfBirthField(fields = fields, onUpdate = onUpdate)
+            DateOfBirthField(fields = state.fields, onUpdate = onUpdate)
         }
         FormFieldGroup("Address") {
             TextRow(
                 field = EditProfileField.Address,
                 label = "Street",
                 placeholder = "123 Main St",
-                fields = fields,
+                fields = state.fields,
                 onUpdate = onUpdate,
             )
             TextRow(
                 field = EditProfileField.City,
                 label = "City",
-                fields = fields,
+                fields = state.fields,
                 onUpdate = onUpdate,
             )
             Row(
@@ -250,7 +257,7 @@ internal fun EditProfileLoaded(
                     TextRow(
                         field = EditProfileField.State,
                         label = "State",
-                        fields = fields,
+                        fields = state.fields,
                         onUpdate = onUpdate,
                     )
                 }
@@ -258,7 +265,7 @@ internal fun EditProfileLoaded(
                     TextRow(
                         field = EditProfileField.Zipcode,
                         label = "Zip",
-                        fields = fields,
+                        fields = state.fields,
                         onUpdate = onUpdate,
                     )
                 }
@@ -270,7 +277,7 @@ internal fun EditProfileLoaded(
                 label = "Website",
                 placeholder = "https://example.com",
                 keyboardType = KeyboardType.Uri,
-                fields = fields,
+                fields = state.fields,
                 onUpdate = onUpdate,
             )
             TextRow(
@@ -278,7 +285,7 @@ internal fun EditProfileLoaded(
                 label = "LinkedIn",
                 placeholder = "https://linkedin.com/in/…",
                 keyboardType = KeyboardType.Uri,
-                fields = fields,
+                fields = state.fields,
                 onUpdate = onUpdate,
             )
             TextRow(
@@ -286,7 +293,7 @@ internal fun EditProfileLoaded(
                 label = "Twitter / X",
                 placeholder = "https://x.com/…",
                 keyboardType = KeyboardType.Uri,
-                fields = fields,
+                fields = state.fields,
                 onUpdate = onUpdate,
             )
             TextRow(
@@ -294,7 +301,7 @@ internal fun EditProfileLoaded(
                 label = "Instagram",
                 placeholder = "https://instagram.com/…",
                 keyboardType = KeyboardType.Uri,
-                fields = fields,
+                fields = state.fields,
                 onUpdate = onUpdate,
             )
             TextRow(
@@ -302,7 +309,7 @@ internal fun EditProfileLoaded(
                 label = "Facebook",
                 placeholder = "https://facebook.com/…",
                 keyboardType = KeyboardType.Uri,
-                fields = fields,
+                fields = state.fields,
                 onUpdate = onUpdate,
             )
         }
@@ -313,7 +320,7 @@ internal fun EditProfileLoaded(
             // exposes the 3-way `profileVisibility` enum today, so we
             // render the segmented picker and omit the toggle until
             // the backend adds it.
-            VisibilityPicker(fields = fields, onUpdate = onUpdate)
+            VisibilityPicker(fields = state.fields, onUpdate = onUpdate)
         }
     }
 }

@@ -49,12 +49,7 @@ class EditProfileSnapshotTest {
         paparazzi.snapshot {
             Frame {
                 EditProfileLoaded(
-                    fields = seededFields(),
-                    email = "alice@example.com",
-                    emailVerified = true,
-                    isValid = true,
-                    isDirty = false,
-                    isSaving = false,
+                    state = loadedState(),
                     onClose = {},
                     onCommit = {},
                     onUpdate = { _, _ -> },
@@ -68,12 +63,12 @@ class EditProfileSnapshotTest {
         paparazzi.snapshot {
             Frame {
                 EditProfileLoaded(
-                    fields = seededFields(firstName = "Alex"),
-                    email = "alice@example.com",
-                    emailVerified = true,
-                    isValid = true,
-                    isDirty = true,
-                    isSaving = true,
+                    state =
+                        loadedState(
+                            fields = seededFields(firstName = "Alex"),
+                            isDirty = true,
+                            isSaving = true,
+                        ),
                     onClose = {},
                     onCommit = {},
                     onUpdate = { _, _ -> },
@@ -103,13 +98,12 @@ class EditProfileSnapshotTest {
             Frame {
                 Box(modifier = Modifier.fillMaxSize()) {
                     EditProfileLoaded(
-                        fields =
-                            seededFields(firstName = "", firstNameError = "First name is required."),
-                        email = "alice@example.com",
-                        emailVerified = true,
-                        isValid = false,
-                        isDirty = true,
-                        isSaving = false,
+                        state =
+                            loadedState(
+                                fields = seededFields(firstName = "", firstNameError = "First name is required."),
+                                isValid = false,
+                                isDirty = true,
+                            ),
                         onClose = {},
                         onCommit = {},
                         onUpdate = { _, _ -> },
@@ -134,6 +128,21 @@ class EditProfileSnapshotTest {
             ) { content() }
         }
     }
+
+    private fun loadedState(
+        fields: Map<EditProfileField, FormFieldState> = seededFields(),
+        isValid: Boolean = true,
+        isDirty: Boolean = false,
+        isSaving: Boolean = false,
+    ): EditProfileLoadedState =
+        EditProfileLoadedState(
+            fields = fields,
+            email = "alice@example.com",
+            emailVerified = true,
+            isValid = isValid,
+            isDirty = isDirty,
+            isSaving = isSaving,
+        )
 
     /** Build a populated field map mirroring the iOS hydration. Lets
      *  callers override individual fields to simulate dirty / error

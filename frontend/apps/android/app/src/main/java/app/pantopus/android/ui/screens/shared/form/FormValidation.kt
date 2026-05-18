@@ -130,6 +130,23 @@ private val E164_PATTERN = Regex("""^\+[1-9]\d{1,14}$""")
 private val EMAIL_PATTERN = Regex("""^[A-Z0-9a-z._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$""")
 private val URL_PATTERN = Regex("""^https?://[A-Za-z0-9.\-]+(?::\d+)?(?:/[^\s]*)?$""")
 private val ISO_DATE_PATTERN = Regex("""^\d{4}-\d{2}-\d{2}$""")
+private val LONG_MONTHS = setOf(1, 3, 5, 7, 8, 10, 12)
+private val SHORT_MONTHS = setOf(4, 6, 9, 11)
+
+private const val ISO_DATE_PART_COUNT = 3
+private const val YEAR_PART_INDEX = 0
+private const val MONTH_PART_INDEX = 1
+private const val DAY_PART_INDEX = 2
+private const val FEBRUARY = 2
+private const val FIRST_DAY_OF_MONTH = 1
+private const val NO_DAYS_IN_MONTH = 0
+private const val DAYS_IN_LONG_MONTH = 31
+private const val DAYS_IN_SHORT_MONTH = 30
+private const val DAYS_IN_LEAP_FEBRUARY = 29
+private const val DAYS_IN_COMMON_FEBRUARY = 28
+private const val LEAP_YEAR_FOUR = 4
+private const val LEAP_YEAR_HUNDRED = 100
+private const val LEAP_YEAR_FOUR_HUNDRED = 400
 
 /**
  * Confirm `value` is a real calendar date — the regex only checks
@@ -137,19 +154,27 @@ private val ISO_DATE_PATTERN = Regex("""^\d{4}-\d{2}-\d{2}$""")
  */
 private fun isCalendarDate(value: String): Boolean {
     val parts = value.split('-')
-    if (parts.size != 3) return false
-    val year = parts[0].toIntOrNull() ?: return false
-    val month = parts[1].toIntOrNull() ?: return false
-    val day = parts[2].toIntOrNull() ?: return false
-    if (month !in 1..12) return false
-    val daysInMonth =
-        when (month) {
-            1, 3, 5, 7, 8, 10, 12 -> 31
-            4, 6, 9, 11 -> 30
-            2 -> if (isLeapYear(year)) 29 else 28
-            else -> return false
-        }
-    return day in 1..daysInMonth
+    val year = parts.getOrNull(YEAR_PART_INDEX)?.toIntOrNull()
+    val month = parts.getOrNull(MONTH_PART_INDEX)?.toIntOrNull()
+    val day = parts.getOrNull(DAY_PART_INDEX)?.toIntOrNull()
+
+    return parts.size == ISO_DATE_PART_COUNT &&
+        year != null &&
+        month != null &&
+        day != null &&
+        day in FIRST_DAY_OF_MONTH..daysInMonth(year, month)
 }
 
-private fun isLeapYear(year: Int): Boolean = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+private fun daysInMonth(
+    year: Int,
+    month: Int,
+): Int =
+    when {
+        month in LONG_MONTHS -> DAYS_IN_LONG_MONTH
+        month in SHORT_MONTHS -> DAYS_IN_SHORT_MONTH
+        month == FEBRUARY -> if (isLeapYear(year)) DAYS_IN_LEAP_FEBRUARY else DAYS_IN_COMMON_FEBRUARY
+        else -> NO_DAYS_IN_MONTH
+    }
+
+private fun isLeapYear(year: Int): Boolean =
+    (year % LEAP_YEAR_FOUR == 0 && year % LEAP_YEAR_HUNDRED != 0) || year % LEAP_YEAR_FOUR_HUNDRED == 0
