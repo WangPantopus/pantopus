@@ -25,6 +25,8 @@ import Foundation
 import Observation
 import SwiftUI
 
+// swiftlint:disable type_body_length
+
 public enum ReviewSignupsFilter {
     public static let all = "all"
     public static let pending = "pending"
@@ -38,7 +40,9 @@ public enum ReviewSignupsFilter {
 public final class ReviewSignupsViewModel: ListOfRowsDataSource {
     // MARK: - ListOfRowsDataSource
 
-    public var title: String { "Review signups" }
+    public var title: String {
+        "Review signups"
+    }
 
     public var topBarAction: TopBarAction? {
         TopBarAction(
@@ -49,10 +53,15 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
         }
     }
 
-    public var tabs: [ListOfRowsTab] { [] }
+    public var tabs: [ListOfRowsTab] {
+        []
+    }
+
     public var selectedTab: String = ""
 
-    public var fab: FABAction? { nil }
+    public var fab: FABAction? {
+        nil
+    }
 
     public private(set) var state: ListOfRowsState = .loading
 
@@ -152,13 +161,12 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
         if filtered.isEmpty {
             let isAll = selectedFilter == ReviewSignupsFilter.all
             let ctaTitle: String? = isAll ? "Share train" : nil
-            let onCTA: (@Sendable () -> Void)?
-            if isAll {
-                onCTA = { [weak self] in
+            let onCTA: (@Sendable () -> Void)? = if isAll {
+                { [weak self] in
                     MainActor.assumeIsolated { self?.onShareTrain() }
                 }
             } else {
-                onCTA = nil
+                nil
             }
             state = .empty(ListOfRowsState.EmptyContent(
                 icon: .clipboardList,
@@ -179,15 +187,15 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
     private var filteredReservations: [SupportTrainReservationDTO] {
         switch selectedFilter {
         case ReviewSignupsFilter.pending:
-            return reservations.filter { ($0.status ?? "") == "pending" }
+            reservations.filter { ($0.status ?? "") == "pending" }
         case ReviewSignupsFilter.confirmed:
-            return reservations.filter { ($0.status ?? "") == "confirmed" }
+            reservations.filter { ($0.status ?? "") == "confirmed" }
         case ReviewSignupsFilter.edited:
-            return reservations.filter { $0.wasEdited && ($0.status ?? "") != "canceled" }
+            reservations.filter { $0.wasEdited && ($0.status ?? "") != "canceled" }
         case ReviewSignupsFilter.canceled:
-            return reservations.filter { ($0.status ?? "") == "canceled" }
+            reservations.filter { ($0.status ?? "") == "canceled" }
         default:
-            return reservations.filter { ($0.status ?? "") != "canceled" }
+            reservations.filter { ($0.status ?? "") != "canceled" }
         }
     }
 
@@ -204,15 +212,15 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
     private var emptySubcopy: String {
         switch selectedFilter {
         case ReviewSignupsFilter.pending:
-            return "When a neighbor signs up for a slot, they'll appear here for you to review."
+            "When a neighbor signs up for a slot, they'll appear here for you to review."
         case ReviewSignupsFilter.confirmed:
-            return "Confirmed slots will show up here once you approve their signup."
+            "Confirmed slots will show up here once you approve their signup."
         case ReviewSignupsFilter.edited:
-            return "When a helper updates their slot, the edit will appear here for confirmation."
+            "When a helper updates their slot, the edit will appear here for confirmation."
         case ReviewSignupsFilter.canceled:
-            return "When a helper cancels their slot, it moves here so you can backfill."
+            "When a helper cancels their slot, it moves here so you can backfill."
         default:
-            return "Share the train so neighbors can grab a slot. You'll see new signups here for review before they're confirmed."
+            "Share the train so neighbors can grab a slot. You'll see new signups here for review before they're confirmed."
         }
     }
 
@@ -299,7 +307,7 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
     private func footer(for r: SupportTrainReservationDTO) -> RowFooter? {
         switch r.status ?? "" {
         case "pending":
-            return RowFooter(actions: [
+            RowFooter(actions: [
                 RowFooterAction(
                     title: "Confirm",
                     icon: .check,
@@ -316,7 +324,7 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
                 }
             ])
         case "confirmed":
-            return RowFooter(actions: [
+            RowFooter(actions: [
                 RowFooterAction(
                     title: "Message",
                     icon: .messageCircle,
@@ -326,7 +334,7 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
                 }
             ])
         default:
-            return nil
+            nil
         }
     }
 
@@ -383,19 +391,19 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
 
     /// ISO-8601 with optional fractional seconds — matches Postgres'
     /// `timestamp with time zone` JSON encoding.
-    nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
+    private nonisolated(unsafe) static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f
     }()
 
-    nonisolated(unsafe) private static let timeFormatter: DateFormatter = {
+    private nonisolated(unsafe) static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "h:mm a"
         return f
     }()
 
-    nonisolated(unsafe) private static let dateFormatter: DateFormatter = {
+    private nonisolated(unsafe) static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "EEE MMM d"
         return f

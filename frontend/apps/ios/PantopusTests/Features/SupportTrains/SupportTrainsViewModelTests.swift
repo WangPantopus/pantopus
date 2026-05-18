@@ -146,10 +146,10 @@ final class SupportTrainsViewModelTests: XCTestCase {
         stub(mine: Self.mineWithInviteJSON)
         let vm = makeVM()
         await vm.load()
-        let labels = vm.tabs.map { $0.label }
+        let labels = vm.tabs.map(\.label)
         XCTAssertEqual(labels, ["My trains", "Nearby", "Invitations"])
         let counts = vm.tabs.map { $0.count ?? -1 }
-        XCTAssertEqual(counts, [1, 0, 1])  // 1 mine (filling), 0 nearby (no loc), 1 invited
+        XCTAssertEqual(counts, [1, 0, 1]) // 1 mine (filling), 0 nearby (no loc), 1 invited
     }
 
     func testInvitationsTabSegmentsInvitedRows() async {
@@ -179,7 +179,7 @@ final class SupportTrainsViewModelTests: XCTestCase {
 
     func testNearbyTabGracefullyDegradesWithoutLocation() async {
         stub(mine: Self.emptyJSON)
-        let vm = makeVM()  // locationProvider returns nil by default
+        let vm = makeVM() // locationProvider returns nil by default
         await vm.load()
         vm.selectedTab = SupportTrainsTab.nearby
         guard case let .empty(content) = vm.state else {

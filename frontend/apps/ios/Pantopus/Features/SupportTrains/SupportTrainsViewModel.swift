@@ -297,14 +297,14 @@ public final class SupportTrainsViewModel: ListOfRowsDataSource {
 
     private func statusChip(for status: String?) -> (text: String, variant: StatusChipVariant) {
         switch status ?? "" {
-        case "active":   return ("Active", .success)
-        case "filling":  return ("Filling up", .info)
-        case "full":     return ("Slots full", .neutral)
-        case "wrapping": return ("Wrapping up", .warning)
-        case "complete": return ("Complete", .neutral)
-        case "invited":  return ("Invited", .business)
-        case "proposed": return ("Proposed", .neutral)
-        default:         return ("Active", .info)
+        case "active": ("Active", .success)
+        case "filling": ("Filling up", .info)
+        case "full": ("Slots full", .neutral)
+        case "wrapping": ("Wrapping up", .warning)
+        case "complete": ("Complete", .neutral)
+        case "invited": ("Invited", .business)
+        case "proposed": ("Proposed", .neutral)
+        default: ("Active", .info)
         }
     }
 
@@ -337,13 +337,13 @@ public enum SupportTrainType: Sendable, Hashable, CaseIterable {
     /// Nearby RPC populates the field and the tile lights up.
     public static func from(_ raw: String?) -> SupportTrainType {
         switch raw ?? "" {
-        case "meal_support", "meals": return .meals
-        case "ride_support", "rides": return .rides
-        case "childcare": return .childcare
-        case "pet_care", "petcare", "pet": return .petcare
-        case "errands", "errand_support": return .errands
-        case "visits", "visit_support": return .visits
-        default: return .generic
+        case "meal_support", "meals": .meals
+        case "ride_support", "rides": .rides
+        case "childcare": .childcare
+        case "pet_care", "petcare", "pet": .petcare
+        case "errands", "errand_support": .errands
+        case "visits", "visit_support": .visits
+        default: .generic
         }
     }
 
