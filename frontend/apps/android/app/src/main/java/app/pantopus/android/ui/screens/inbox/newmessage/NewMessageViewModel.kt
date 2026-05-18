@@ -333,9 +333,11 @@ class NewMessageViewModel
             user.name?.takeIf { it.isNotEmpty() }?.let { return it }
             val first = user.firstName?.takeIf { it.isNotEmpty() }
             val last = user.lastName?.takeIf { it.isNotEmpty() }
-            if (first != null && last != null) return "$first $last"
-            if (first != null) return first
-            return user.username?.takeIf { it.isNotEmpty() }
+            return when {
+                first != null && last != null -> "$first $last"
+                first != null -> first
+                else -> user.username?.takeIf { it.isNotEmpty() }
+            }
         }
 
         private fun localityText(user: RelationshipUserDto?): String? {
