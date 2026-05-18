@@ -159,9 +159,9 @@ public final class BroadcastDetailViewModel {
     /// design uses the unabbreviated form for sub-1000 counts and the
     /// `1.2K` style above.
     private static func shortCount(_ count: Int) -> String {
-        if count < 1_000 { return "\(count)" }
-        let thousands = Double(count) / 1_000.0
-        if count < 10_000 {
+        if count < 1000 { return "\(count)" }
+        let thousands = Double(count) / 1000.0
+        if count < 10000 {
             return String(format: "%.1fK", thousands)
         }
         return "\(Int(thousands.rounded()))K"

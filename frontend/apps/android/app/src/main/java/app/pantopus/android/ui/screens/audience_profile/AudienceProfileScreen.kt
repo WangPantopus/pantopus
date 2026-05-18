@@ -290,12 +290,10 @@ internal fun LoadedFrame(
                     updates = state.loaded.updates,
                     composer = state.composer,
                     channelId = state.loaded.channelId,
-                    tierSegments = state.loaded.tierBreakdown.segments,
-                    onComposerText = actions.composer.onText,
-                    onComposerVisibility = actions.composer.onVisibility,
-                    onComposerTier = actions.composer.onTier,
-                    onSubmit = actions.composer.onSubmit,
-                    onOpenBroadcast = actions.navigation.onOpenBroadcast,
+                    composerActions = actions.composer,
+                    onOpenBroadcast = { card ->
+                        actions.navigation.onOpenBroadcast(card, state.loaded.tierBreakdown.segments)
+                    },
                 )
             AudienceProfileTab.Followers ->
                 FollowersTab(
@@ -446,12 +444,8 @@ private fun UpdatesTab(
     updates: List<UpdateCardContent>,
     composer: UpdateComposerState,
     channelId: String?,
-    tierSegments: List<TierBreakdownContent.TierSegment>,
-    onComposerText: (String) -> Unit,
-    onComposerVisibility: (UpdateVisibility) -> Unit,
-    onComposerTier: (Int?) -> Unit,
-    onSubmit: () -> Unit,
-    onOpenBroadcast: (UpdateCardContent, List<TierBreakdownContent.TierSegment>) -> Unit,
+    composerActions: AudienceProfileComposerActions,
+    onOpenBroadcast: (UpdateCardContent) -> Unit,
 ) {
     Column(
         modifier =
@@ -465,16 +459,16 @@ private fun UpdatesTab(
         ComposerCard(
             composer = composer,
             channelId = channelId,
-            onText = onComposerText,
-            onVisibility = onComposerVisibility,
-            onTier = onComposerTier,
-            onSubmit = onSubmit,
+            onText = composerActions.onText,
+            onVisibility = composerActions.onVisibility,
+            onTier = composerActions.onTier,
+            onSubmit = composerActions.onSubmit,
         )
         if (updates.isEmpty()) {
             EmptyUpdatesCard()
         } else {
             updates.forEach { card ->
-                UpdateCard(card = card, onOpen = { onOpenBroadcast(card, tierSegments) })
+                UpdateCard(card = card, onOpen = { onOpenBroadcast(card) })
             }
         }
         Spacer(modifier = Modifier.height(24.dp))

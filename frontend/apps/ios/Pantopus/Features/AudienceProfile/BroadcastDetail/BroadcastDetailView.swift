@@ -194,13 +194,11 @@ public struct BroadcastDetailView: View {
     }
 
     private func visibilityChip(_ hero: BroadcastDetailHero) -> some View {
-        let icon: PantopusIcon = {
-            switch hero.visibility {
-            case .publicVisible: return .radioTower
-            case .followers: return .users
-            case .tierOrAbove: return .lock
-            }
-        }()
+        let icon: PantopusIcon = switch hero.visibility {
+        case .publicVisible: .radioTower
+        case .followers: .users
+        case .tierOrAbove: .lock
+        }
         return HStack(spacing: 3) {
             Icon(icon, size: 11, strokeWidth: 2.4, color: Theme.Color.primary700)
             Text(hero.visibilityLabel.uppercased())
