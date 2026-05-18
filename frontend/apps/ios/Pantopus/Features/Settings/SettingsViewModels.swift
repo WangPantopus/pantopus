@@ -42,6 +42,7 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
     private var stripeConnected: Bool?
     private var verified: Bool = false
     private var blockCount: Int = 0
+    private var isAdmin: Bool = false
 
     init(
         api: APIClient = .shared,
@@ -59,6 +60,7 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
         if case let .signedIn(user) = auth.state {
             verified = user.email.contains("@") // best signal we have without /me re-fetch
             footer = "\(user.email) · ID \(String(user.id.prefix(8)))"
+            isAdmin = user.isAdmin
         }
         // Block count (best-effort).
         if let blocks: PrivacyBlocksResponse = try? await api.request(PrivacyEndpoints.blocks) {
@@ -77,7 +79,7 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
                 ? .chipStatus(label: "Stripe connected", tone: .success, includesChevron: true)
                 : .chevron
 
-        state = .loaded([
+        var groups: [GroupedListGroup] = [
             GroupedListGroup(
                 id: "account",
                 overline: "Account",
@@ -133,7 +135,25 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
                         control: .chevron
                     )
                 ]
-            ),
+            )
+        ]
+        if isAdmin {
+            groups.append(
+                GroupedListGroup(
+                    id: "admin",
+                    overline: "Admin",
+                    rows: [
+                        GroupedListRow(
+                            id: "reviewClaims",
+                            label: "Review claims",
+                            subtext: "Home-ownership claim queue",
+                            control: .chevron
+                        )
+                    ]
+                )
+            )
+        }
+        groups.append(
             GroupedListGroup(
                 id: "session",
                 overline: nil,
@@ -141,7 +161,8 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
                     GroupedListRow(id: "signOut", label: "Log out", control: .chevron, destructive: true)
                 ]
             )
-        ])
+        )
+        state = .loaded(groups)
     }
 
     public func tapRow(_ rowId: String) async {
@@ -157,6 +178,7 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
         case "help": onNavigate(.help)
         case "legal": onNavigate(.legal)
         case "about": onNavigate(.about)
+        case "reviewClaims": onNavigate(.reviewClaims)
         case "signOut":
             await auth.signOut()
             onNavigate(.didSignOut)
@@ -189,6 +211,9 @@ public enum SettingsRoute: Sendable, Hashable {
     case help
     case legal
     case about
+    /// Admin Review-claims queue. Only emitted when the signed-in user
+    /// has `isAdmin == true`; the host pushes `HubRoute.reviewClaims`.
+    case reviewClaims
     case didSignOut
 }
 

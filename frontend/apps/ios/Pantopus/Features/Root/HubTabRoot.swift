@@ -89,6 +89,12 @@ public enum HubRoute: Hashable {
     /// Review-signups (T6.6c / P26.5) — organizer-only review queue
     /// for one Support Train. Pushed from a Support Trains row tap.
     case reviewSignups(supportTrainId: String)
+    /// Admin home-ownership-claims review queue. Gated by
+    /// `auth.user.isAdmin` and reached from the Settings menu's Admin
+    /// group. Mirrors the web `/app/admin/review-claims` page.
+    case reviewClaims
+    /// Admin claim detail — pushed from a `reviewClaims` row tap.
+    case reviewClaimDetail(claimId: String)
     /// My bids — outgoing bids on neighbour gigs (T5.3.1). Reached from
     /// the You / Me action grid or from Hub's marketplace pillar shelf.
     case myBids
@@ -888,7 +894,29 @@ public struct HubTabRoot: View {
             SettingsView(
                 onClose: { if !path.isEmpty { path.removeLast() } },
                 onEditProfile: { Task { @MainActor in push(.placeholder(label: "Edit profile")) } },
+                onOpenReviewClaims: {
+                    // Close the settings sheet/screen then push the admin
+                    // queue at the Hub level so its top-bar back chevron
+                    // returns to the Hub root, not back into Settings.
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        push(.reviewClaims)
+                    }
+                },
                 onSignedOut: { if !path.isEmpty { path.removeLast() } }
+            )
+        case .reviewClaims:
+            ReviewClaimsView(
+                viewModel: ReviewClaimsViewModel(
+                    onOpenClaim: { claimId in
+                        Task { @MainActor in push(.reviewClaimDetail(claimId: claimId)) }
+                    }
+                )
+            )
+        case let .reviewClaimDetail(claimId):
+            ReviewClaimDetailView(
+                viewModel: ReviewClaimDetailViewModel(claimId: claimId),
+                onClose: { if !path.isEmpty { path.removeLast() } }
             )
         case .mailboxSearch:
             NotYetAvailableView(tabName: "Mail search", icon: .search)

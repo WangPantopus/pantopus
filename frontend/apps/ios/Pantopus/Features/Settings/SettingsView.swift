@@ -33,15 +33,18 @@ public struct SettingsView: View {
     @State private var path: [SettingsStackRoute] = []
     private let onClose: @MainActor () -> Void
     private let onEditProfile: @MainActor () -> Void
+    private let onOpenReviewClaims: @MainActor () -> Void
     private let onSignedOut: @MainActor () -> Void
 
     public init(
         onClose: @escaping @MainActor () -> Void = {},
         onEditProfile: @escaping @MainActor () -> Void = {},
+        onOpenReviewClaims: @escaping @MainActor () -> Void = {},
         onSignedOut: @escaping @MainActor () -> Void = {}
     ) {
         self.onClose = onClose
         self.onEditProfile = onEditProfile
+        self.onOpenReviewClaims = onOpenReviewClaims
         self.onSignedOut = onSignedOut
     }
 
@@ -136,6 +139,7 @@ public struct SettingsView: View {
         case .help: path.append(.help)
         case .legal: path.append(.legal)
         case .about: path.append(.about)
+        case .reviewClaims: onOpenReviewClaims()
         case .didSignOut: onSignedOut()
         }
     }

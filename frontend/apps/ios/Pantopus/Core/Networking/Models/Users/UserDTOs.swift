@@ -11,23 +11,37 @@ import Foundation
 /// Compact user identity used in app session state. Derived from the
 /// authenticated-user payload; kept small so AuthManager doesn't leak the
 /// full profile surface into every screen that only needs id/email.
+///
+/// `isAdmin` is true when the backend `User.role` is `"admin"` — the same
+/// role check `requireAdmin` enforces server-side at
+/// `backend/middleware/verifyToken.js:128`. Used to gate admin-only entry
+/// points (e.g. Review claims) in the Settings menu.
 public struct UserDTO: Decodable, Sendable, Hashable, Identifiable {
     public let id: String
     public let email: String
     public let displayName: String?
     public let avatarURL: URL?
+    public let isAdmin: Bool
 
     private enum CodingKeys: String, CodingKey {
         case id, email
         case displayName = "display_name"
         case avatarURL = "avatar_url"
+        case isAdmin = "is_admin"
     }
 
-    public init(id: String, email: String, displayName: String?, avatarURL: URL?) {
+    public init(
+        id: String,
+        email: String,
+        displayName: String?,
+        avatarURL: URL?,
+        isAdmin: Bool = false
+    ) {
         self.id = id
         self.email = email
         self.displayName = displayName
         self.avatarURL = avatarURL
+        self.isAdmin = isAdmin
     }
 
     /// Project a rich [`AuthenticatedUser`](x-source-tag://AuthenticatedUser) down to the session shape.
@@ -36,6 +50,7 @@ public struct UserDTO: Decodable, Sendable, Hashable, Identifiable {
         email = authUser.email
         displayName = authUser.name.isEmpty ? nil : authUser.name
         avatarURL = nil
+        isAdmin = authUser.role == "admin"
     }
 
     /// Project a full [`UserProfile`](x-source-tag://UserProfile) down to the session shape.
@@ -48,6 +63,7 @@ public struct UserDTO: Decodable, Sendable, Hashable, Identifiable {
         } else {
             avatarURL = nil
         }
+        isAdmin = profile.role == "admin"
     }
 }
 
