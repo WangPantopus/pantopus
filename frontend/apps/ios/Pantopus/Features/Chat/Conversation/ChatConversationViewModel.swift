@@ -84,13 +84,13 @@ public final class ChatConversationViewModel {
         self.socket = socket
         aiPrompts = [
             ChatPromptChip(id: "mail", label: "Summarize my inbox", icon: .mailbox),
-            ChatPromptChip(id: "task", label: "Post a task", icon: .edit2),
+            ChatPromptChip(id: "task", label: "Post a task", icon: .pencil),
             ChatPromptChip(id: "handy", label: "Find a handyman nearby", icon: .hammer)
         ]
         emptyChips = [
-            ChatPromptChip(id: "intro", label: "Introduce yourself", icon: .user),
-            ChatPromptChip(id: "gig", label: "Ask about the gig", icon: .hammer),
-            ChatPromptChip(id: "listing", label: "Share a listing", icon: .shoppingBag)
+            ChatPromptChip(id: "intro", label: "Introduce yourself", icon: .hand),
+            ChatPromptChip(id: "gig", label: "Ask about the gig", icon: .briefcase),
+            ChatPromptChip(id: "listing", label: "Share a listing", icon: .tag)
         ]
     }
 

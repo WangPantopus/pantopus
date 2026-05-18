@@ -67,9 +67,9 @@ class ChatConversationSnapshotTest {
                     aiPrompts = emptyList(),
                     emptyChips =
                         listOf(
-                            ChatPromptChip("intro", "Introduce yourself", PantopusIcon.User),
-                            ChatPromptChip("gig", "Ask about the gig", PantopusIcon.Hammer),
-                            ChatPromptChip("listing", "Share a listing", PantopusIcon.ShoppingBag),
+                            ChatPromptChip("intro", "Introduce yourself", PantopusIcon.Hand),
+                            ChatPromptChip("gig", "Ask about the gig", PantopusIcon.Briefcase),
+                            ChatPromptChip("listing", "Share a listing", PantopusIcon.Tag),
                         ),
                     onChipTap = {},
                 )
@@ -86,7 +86,7 @@ class ChatConversationSnapshotTest {
                     aiPrompts =
                         listOf(
                             ChatPromptChip("mail", "Summarize my inbox", PantopusIcon.Mailbox),
-                            ChatPromptChip("task", "Post a task", PantopusIcon.Edit2),
+                            ChatPromptChip("task", "Post a task", PantopusIcon.Pencil),
                             ChatPromptChip("handy", "Find a handyman nearby", PantopusIcon.Hammer),
                         ),
                     emptyChips = emptyList(),

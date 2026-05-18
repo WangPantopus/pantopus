@@ -184,6 +184,10 @@ class IconTest {
             "receipt-text",
             "paperclip",
             "arrow-down-up",
+            // T6.6b — Chat conversation refresh (header + composer)
+            "video",
+            "more-vertical",
+            "hand",
         )
 
     @Test

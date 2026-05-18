@@ -188,7 +188,7 @@ public struct ChatConversationView: View {
                     ChatAIAvatar(size: 32)
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 5) {
-                            Icon(.info, size: 10, strokeWidth: 2.4, color: Theme.Color.primary700)
+                            Icon(.sparkles, size: 10, strokeWidth: 2.4, color: Theme.Color.primary700)
                             Text("PANTOPUS AI")
                                 .font(.system(size: 10, weight: .bold))
                                 .tracking(0.4)
@@ -399,13 +399,19 @@ private struct ChatConversationHeader: View {
         switch counterparty {
         case .person:
             HStack(spacing: 0) {
-                Icon(.send, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
-                Icon(.camera, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
-                Icon(.moreHorizontal, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
+                Icon(.phone, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
+                Icon(.video, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
+                Icon(.moreVertical, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
             }
             .accessibilityHidden(true)
-        case .ai, .group:
-            Icon(.moreHorizontal, size: 18, color: Theme.Color.appText)
+        case .ai:
+            HStack(spacing: 0) {
+                Icon(.history, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
+                Icon(.moreVertical, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
+            }
+            .accessibilityHidden(true)
+        case .group:
+            Icon(.moreVertical, size: 18, color: Theme.Color.appText)
                 .frame(width: 34, height: 34)
                 .accessibilityHidden(true)
         }
@@ -498,7 +504,7 @@ private struct ChatAIAvatar: View {
                         endPoint: .bottomTrailing
                     )
                 )
-            Icon(.info, size: size * 0.5, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
+            Icon(.sparkles, size: size * 0.5, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
         }
         .frame(width: size, height: size)
         .accessibilityLabel("AI")
@@ -640,6 +646,14 @@ private struct ChatBubbleRow: View {
             if content.side == .outgoing {
                 switch content.deliveryState {
                 case .read:
+                    // Render as a tight pair of single-checks — SF
+                    // Symbols ships no native "double check" glyph
+                    // (`.checkCheck` maps to `checkmark.circle`,
+                    // which we reuse for "completed/paid" status
+                    // chips elsewhere). Two `.check`s with -2 spacing
+                    // matches the design's `check-check` intent
+                    // closely enough that the read indicator reads as
+                    // a WhatsApp-style double check.
                     HStack(spacing: -2) {
                         Icon(.check, size: 9, strokeWidth: 2.6, color: Theme.Color.primary600)
                         Icon(.check, size: 9, strokeWidth: 2.6, color: Theme.Color.primary600)
@@ -766,7 +780,7 @@ private struct ChatComposer: View {
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             Button(action: onAttach) {
-                Icon(.plusCircle, size: 18, color: Theme.Color.appTextStrong)
+                Icon(.plus, size: 18, strokeWidth: 2.4, color: Theme.Color.appTextStrong)
                     .frame(width: 38, height: 38)
                     .background(Theme.Color.appSurfaceSunken)
                     .clipShape(Circle())
@@ -791,7 +805,7 @@ private struct ChatComposer: View {
                     .frame(width: 38, height: 38)
                     .background(canSend ? Theme.Color.primary600 : Theme.Color.appSurfaceSunken)
                     .clipShape(Circle())
-                    .shadow(color: canSend ? Theme.Color.primary600.opacity(0.30) : .clear, radius: 6, x: 0, y: 4)
+                    .shadow(color: canSend ? Theme.Color.primary600.opacity(0.30) : .clear, radius: 10, x: 0, y: 4)
             }
             .buttonStyle(.plain)
             .disabled(!canSend)

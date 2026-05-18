@@ -224,6 +224,13 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case paperclip
     case arrowDownUp = "arrow-down-up"
 
+    // T6.6b Chat conversation refresh — header trailing (phone / video /
+    // more-vertical for person; history / more-vertical for AI) + empty-
+    // state "Introduce yourself" quick-chip.
+    case video
+    case moreVertical = "more-vertical"
+    case hand
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -398,6 +405,15 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .receiptText: "doc.plaintext"
         case .paperclip: "paperclip"
         case .arrowDownUp: "arrow.up.arrow.down"
+        // T6.6b Chat conversation refresh. SF Symbols ships direct
+        // `video` and a `hand.wave` glyph (iOS 17+); no native
+        // `ellipsis.vertical` exists, so `moreVertical` collapses to the
+        // standard `ellipsis` glyph — Swift sizes it the same and
+        // visually distinguishing horizontal vs vertical ellipsis isn't
+        // worth a custom drawable today.
+        case .video: "video"
+        case .moreVertical: "ellipsis"
+        case .hand: "hand.wave"
         }
     }
 }

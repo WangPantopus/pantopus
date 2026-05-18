@@ -2,6 +2,7 @@ package app.pantopus.android.data.profile
 
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.models.users.ProfileResponse
+import app.pantopus.android.data.api.models.users.UserSearchResponse
 import app.pantopus.android.data.api.models.users.UserStatsDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
@@ -24,4 +25,18 @@ class ProfileRepository
 
         /** `GET /api/users/:id/stats` — route `backend/routes/users.js:2787`. */
         suspend fun stats(userId: String): NetworkResult<UserStatsDto> = safeApiCall { api.stats(userId) }
+
+        /**
+         * `GET /api/users/search?q=…&type=…&limit=…` — verified-user
+         * directory search. Route `backend/routes/users.js:2367`. The
+         * backend rejects `q` under 2 characters; callers must gate.
+         */
+        suspend fun search(
+            query: String,
+            limit: Int = 20,
+            type: String = "all",
+        ): NetworkResult<UserSearchResponse> =
+            safeApiCall {
+                api.search(query = query, limit = limit, type = type)
+            }
     }
