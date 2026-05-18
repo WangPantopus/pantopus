@@ -504,13 +504,7 @@ private fun ThreadCard(
     isCrossPersona: Boolean,
     onTap: () -> Unit,
 ) {
-    val shape =
-        when {
-            isFirst && isLast -> RoundedCornerShape(14.dp)
-            isFirst -> RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
-            isLast -> RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 14.dp, bottomEnd = 14.dp)
-            else -> RoundedCornerShape(0.dp)
-        }
+    val shape = threadCardShape(isFirst = isFirst, isLast = isLast)
     Column(
         modifier =
             Modifier
@@ -531,65 +525,99 @@ private fun ThreadCard(
         ) {
             Avatar(row = row)
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = if (row.handle.isEmpty()) row.displayName else row.handle,
-                        fontSize = 13.sp,
-                        fontWeight = if (row.unread) FontWeight.Bold else FontWeight.SemiBold,
-                        color = PantopusColors.appText,
-                        maxLines = 1,
-                        modifier = Modifier.widthIn(max = 140.dp),
-                    )
-                    val tier = row.tierName
-                    if (tier != null) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        TierChip(tier = tier, rank = row.tierRank)
-                    }
-                    if (isCrossPersona && !row.personaChip.isNullOrEmpty()) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        PersonaChip(label = row.personaChip)
-                    }
-                    if (row.flagged) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        PantopusIconImage(
-                            icon = PantopusIcon.Flag,
-                            contentDescription = "Flagged",
-                            size = 11.dp,
-                            strokeWidth = 2.4f,
-                            tint = PantopusColors.warning,
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    Text(
-                        text = row.timeAgo,
-                        fontSize = 10.sp,
-                        fontWeight = if (row.unread) FontWeight.Bold else FontWeight.Medium,
-                        color = if (row.unread) PantopusColors.primary600 else PantopusColors.appTextMuted,
-                        maxLines = 1,
-                    )
-                }
+                ThreadHeader(row = row, isCrossPersona = isCrossPersona)
                 Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = row.preview,
-                    fontSize = 12.sp,
-                    fontWeight = if (row.unread) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (row.unread) PantopusColors.appText else PantopusColors.appTextSecondary,
-                    maxLines = 2,
-                )
+                ThreadPreview(row = row)
             }
-            if (row.unread) {
-                Box(
-                    modifier =
-                        Modifier
-                            .padding(top = 8.dp)
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(PantopusColors.primary600),
-                )
-            }
+            UnreadDot(row.unread)
         }
     }
-    if (!isLast) {
+    ThreadDivider(show = !isLast)
+}
+
+private fun threadCardShape(
+    isFirst: Boolean,
+    isLast: Boolean,
+): RoundedCornerShape =
+    when {
+        isFirst && isLast -> RoundedCornerShape(14.dp)
+        isFirst -> RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
+        isLast -> RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 14.dp, bottomEnd = 14.dp)
+        else -> RoundedCornerShape(0.dp)
+    }
+
+@Composable
+private fun ThreadHeader(
+    row: CreatorInboxRowContent,
+    isCrossPersona: Boolean,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = if (row.handle.isEmpty()) row.displayName else row.handle,
+            fontSize = 13.sp,
+            fontWeight = if (row.unread) FontWeight.Bold else FontWeight.SemiBold,
+            color = PantopusColors.appText,
+            maxLines = 1,
+            modifier = Modifier.widthIn(max = 140.dp),
+        )
+        val tier = row.tierName
+        if (tier != null) {
+            Spacer(modifier = Modifier.width(6.dp))
+            TierChip(tier = tier, rank = row.tierRank)
+        }
+        if (isCrossPersona && !row.personaChip.isNullOrEmpty()) {
+            Spacer(modifier = Modifier.width(6.dp))
+            PersonaChip(label = row.personaChip)
+        }
+        if (row.flagged) {
+            Spacer(modifier = Modifier.width(6.dp))
+            PantopusIconImage(
+                icon = PantopusIcon.Flag,
+                contentDescription = "Flagged",
+                size = 11.dp,
+                strokeWidth = 2.4f,
+                tint = PantopusColors.warning,
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = row.timeAgo,
+            fontSize = 10.sp,
+            fontWeight = if (row.unread) FontWeight.Bold else FontWeight.Medium,
+            color = if (row.unread) PantopusColors.primary600 else PantopusColors.appTextMuted,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun ThreadPreview(row: CreatorInboxRowContent) {
+    Text(
+        text = row.preview,
+        fontSize = 12.sp,
+        fontWeight = if (row.unread) FontWeight.SemiBold else FontWeight.Normal,
+        color = if (row.unread) PantopusColors.appText else PantopusColors.appTextSecondary,
+        maxLines = 2,
+    )
+}
+
+@Composable
+private fun UnreadDot(visible: Boolean) {
+    if (visible) {
+        Box(
+            modifier =
+                Modifier
+                    .padding(top = 8.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.primary600),
+        )
+    }
+}
+
+@Composable
+private fun ThreadDivider(show: Boolean) {
+    if (show) {
         Box(
             modifier =
                 Modifier

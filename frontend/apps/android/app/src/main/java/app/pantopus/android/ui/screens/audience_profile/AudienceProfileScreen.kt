@@ -89,20 +89,32 @@ fun AudienceProfileScreen(
                 ErrorFrame(message = current.message, onRetry = viewModel::load)
             is AudienceProfileUiState.Loaded ->
                 LoadedFrame(
-                    loaded = current.content,
-                    activeTab = activeTab,
-                    composer = composer,
-                    selectedTier = selectedTier,
-                    visibleFollowers = viewModel.visibleFollowers(),
-                    onSelectTab = viewModel::selectTab,
-                    onSelectTier = viewModel::selectTierFilter,
-                    onComposerText = viewModel::onComposerText,
-                    onComposerVisibility = viewModel::onComposerVisibility,
-                    onComposerTier = viewModel::onComposerTier,
-                    onSubmitUpdate = viewModel::submitUpdate,
-                    onOpenFollower = onOpenFollower,
-                    onOpenThread = onOpenThread,
-                    onOpenCreatorInbox = onOpenCreatorInbox,
+                    state =
+                        AudienceProfileLoadedFrameState(
+                            loaded = current.content,
+                            activeTab = activeTab,
+                            composer = composer,
+                            selectedTier = selectedTier,
+                            visibleFollowers = viewModel.visibleFollowers(),
+                        ),
+                    actions =
+                        AudienceProfileLoadedFrameActions(
+                            onSelectTab = viewModel::selectTab,
+                            onSelectTier = viewModel::selectTierFilter,
+                            composer =
+                                AudienceProfileComposerActions(
+                                    onText = viewModel::onComposerText,
+                                    onVisibility = viewModel::onComposerVisibility,
+                                    onTier = viewModel::onComposerTier,
+                                    onSubmit = viewModel::submitUpdate,
+                                ),
+                            navigation =
+                                AudienceProfileNavigationActions(
+                                    onOpenFollower = onOpenFollower,
+                                    onOpenThread = onOpenThread,
+                                    onOpenCreatorInbox = onOpenCreatorInbox,
+                                ),
+                        ),
                 )
         }
     }
@@ -262,56 +274,72 @@ private fun ErrorFrame(
 
 @Composable
 internal fun LoadedFrame(
-    loaded: AudienceProfileLoaded,
-    activeTab: AudienceProfileTab,
-    composer: UpdateComposerState,
-    selectedTier: Int?,
-    visibleFollowers: List<FollowerRowContent>,
-    onSelectTab: (AudienceProfileTab) -> Unit,
-    onSelectTier: (Int?) -> Unit,
-    onComposerText: (String) -> Unit,
-    onComposerVisibility: (UpdateVisibility) -> Unit,
-    onComposerTier: (Int?) -> Unit,
-    onSubmitUpdate: () -> Unit,
-    onOpenFollower: (FollowerRowContent) -> Unit,
-    onOpenThread: (ThreadRowContent) -> Unit,
-    onOpenCreatorInbox: () -> Unit = {},
+    state: AudienceProfileLoadedFrameState,
+    actions: AudienceProfileLoadedFrameActions,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().testTag("audienceProfileContent"),
     ) {
-        HeaderCard(loaded.header)
-        TabStrip(activeTab = activeTab, onSelect = onSelectTab)
-        when (activeTab) {
+        HeaderCard(state.loaded.header)
+        TabStrip(activeTab = state.activeTab, onSelect = actions.onSelectTab)
+        when (state.activeTab) {
             AudienceProfileTab.Updates ->
                 UpdatesTab(
-                    updates = loaded.updates,
-                    composer = composer,
-                    channelId = loaded.channelId,
-                    onComposerText = onComposerText,
-                    onComposerVisibility = onComposerVisibility,
-                    onComposerTier = onComposerTier,
-                    onSubmit = onSubmitUpdate,
+                    updates = state.loaded.updates,
+                    composer = state.composer,
+                    channelId = state.loaded.channelId,
+                    onComposerText = actions.composer.onText,
+                    onComposerVisibility = actions.composer.onVisibility,
+                    onComposerTier = actions.composer.onTier,
+                    onSubmit = actions.composer.onSubmit,
                 )
             AudienceProfileTab.Followers ->
                 FollowersTab(
-                    cells = loaded.analyticsCells,
-                    breakdown = loaded.tierBreakdown,
-                    chips = loaded.tierChips,
-                    selectedTier = selectedTier,
-                    followers = visibleFollowers,
-                    onSelectTier = onSelectTier,
-                    onOpenFollower = onOpenFollower,
+                    cells = state.loaded.analyticsCells,
+                    breakdown = state.loaded.tierBreakdown,
+                    chips = state.loaded.tierChips,
+                    selectedTier = state.selectedTier,
+                    followers = state.visibleFollowers,
+                    onSelectTier = actions.onSelectTier,
+                    onOpenFollower = actions.navigation.onOpenFollower,
                 )
             AudienceProfileTab.Threads ->
                 ThreadsTab(
-                    threads = loaded.threads,
-                    onOpenThread = onOpenThread,
-                    onOpenCreatorInbox = onOpenCreatorInbox,
+                    threads = state.loaded.threads,
+                    onOpenThread = actions.navigation.onOpenThread,
+                    onOpenCreatorInbox = actions.navigation.onOpenCreatorInbox,
                 )
         }
     }
 }
+
+internal data class AudienceProfileLoadedFrameState(
+    val loaded: AudienceProfileLoaded,
+    val activeTab: AudienceProfileTab,
+    val composer: UpdateComposerState,
+    val selectedTier: Int?,
+    val visibleFollowers: List<FollowerRowContent>,
+)
+
+internal data class AudienceProfileLoadedFrameActions(
+    val onSelectTab: (AudienceProfileTab) -> Unit,
+    val onSelectTier: (Int?) -> Unit,
+    val composer: AudienceProfileComposerActions,
+    val navigation: AudienceProfileNavigationActions,
+)
+
+internal data class AudienceProfileComposerActions(
+    val onText: (String) -> Unit,
+    val onVisibility: (UpdateVisibility) -> Unit,
+    val onTier: (Int?) -> Unit,
+    val onSubmit: () -> Unit,
+)
+
+internal data class AudienceProfileNavigationActions(
+    val onOpenFollower: (FollowerRowContent) -> Unit,
+    val onOpenThread: (ThreadRowContent) -> Unit,
+    val onOpenCreatorInbox: () -> Unit = {},
+)
 
 @Composable
 private fun HeaderCard(header: AudienceHeaderContent) {

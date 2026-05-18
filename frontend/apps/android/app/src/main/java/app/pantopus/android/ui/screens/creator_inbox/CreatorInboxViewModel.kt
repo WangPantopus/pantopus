@@ -208,17 +208,26 @@ class CreatorInboxViewModel
             }
 
             internal fun timeAgo(iso: String?): String {
-                if (iso.isNullOrBlank()) return ""
-                val instant = runCatching { Instant.parse(iso) }.getOrNull() ?: return ""
+                val instant =
+                    iso
+                        ?.takeUnless(String::isBlank)
+                        ?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                return instant?.let(::relativeTimeAgo).orEmpty()
+            }
+
+            private fun relativeTimeAgo(instant: Instant): String {
                 val secs = Duration.between(instant, Instant.now()).seconds.coerceAtLeast(0)
                 val mins = secs / 60
-                if (mins < 1) return "Just now"
-                if (mins < 60) return "${mins}m"
                 val hrs = mins / 60
-                if (hrs < 24) return "${hrs}h"
                 val days = hrs / 24
-                if (days < 7) return if (days == 1L) "Yesterday" else "${days}d"
-                return "${days / 7}w"
+                return when {
+                    mins < 1 -> "Just now"
+                    mins < 60 -> "${mins}m"
+                    hrs < 24 -> "${hrs}h"
+                    days == 1L -> "Yesterday"
+                    days < 7 -> "${days}d"
+                    else -> "${days / 7}w"
+                }
             }
         }
 
