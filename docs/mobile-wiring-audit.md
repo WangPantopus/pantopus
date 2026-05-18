@@ -520,3 +520,19 @@ hub", "My posts", "Pets" route now points at the real screen.
 - My bids / My tasks V2 / My posts → **T5.3.1 / T5.3.2 / T5.3.3**
 - Discover hub → **T5.4.1**
 - Listing offers / Offers V2 → **T5.3.4 / T5.2.4**
+- Support Trains → **T6.6c (P26.5) — replaces the
+  `ChildRoutes.placeholder("Support train · …")` fall-through in
+  `RootTabScreen.kt:611` and the iOS `Features/SupportTrains/…` path.
+  Backend wired to `/api/support-trains/me/support-trains` and
+  `/api/support-trains/nearby`. The deep-link `Destination.SupportTrain`
+  on Android now navigates to the real list screen rather than the
+  generic placeholder.**
+- Review signups → **T6.6c (P26.5) — organizer-only review queue,
+  reachable from a Support Train row tap. Wired to
+  `/api/support-trains/:id/reservations`.**
+- Long-tail leaf refresh sweep → **T6.6c (P26) — confirms the 9
+  existing leaf screens (Transactional Detail, Content Detail, Beacon,
+  Audience hub, Creator inbox, Identity Center, Privacy Handshake,
+  Token Accept, Status/Wait, Legal) hold no drift against the new
+  designs; documented per-screen in `mobile-parity-audit.md §1 Tier 6
+  T6.6c`.**
