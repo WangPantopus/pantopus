@@ -20,7 +20,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -224,8 +224,9 @@ class NewMessageViewModelTest {
             viewModel.load()
             runCurrent()
             viewModel.updateSearch("Reyes")
-            // Past the 280ms debounce.
-            advanceTimeBy(320)
+            // Past the 280ms debounce — let the test scheduler exhaust
+            // every queued delay, then any queued continuation.
+            advanceUntilIdle()
             runCurrent()
             val state = viewModel.state.value
             assertTrue("expected Loaded, got $state", state is NewMessageUiState.Loaded)

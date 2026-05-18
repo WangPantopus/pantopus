@@ -658,7 +658,7 @@ private fun ContactRow(
 private fun AvatarWithBadge(row: NewMessageContactRow) {
     val badgeColor: Color =
         when (row.identity) {
-            NewMessageIdentityBadge.Personal -> PantopusColors.primary700
+            NewMessageIdentityBadge.Personal -> PantopusColors.personal
             NewMessageIdentityBadge.Home -> PantopusColors.home
             NewMessageIdentityBadge.Business -> PantopusColors.business
         }

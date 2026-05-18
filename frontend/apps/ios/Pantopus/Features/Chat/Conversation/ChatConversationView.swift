@@ -646,7 +646,18 @@ private struct ChatBubbleRow: View {
             if content.side == .outgoing {
                 switch content.deliveryState {
                 case .read:
-                    Icon(.checkCheck, size: 11, strokeWidth: 2.4, color: Theme.Color.primary600)
+                    // Render as a tight pair of single-checks — SF
+                    // Symbols ships no native "double check" glyph
+                    // (`.checkCheck` maps to `checkmark.circle`,
+                    // which we reuse for "completed/paid" status
+                    // chips elsewhere). Two `.check`s with -2 spacing
+                    // matches the design's `check-check` intent
+                    // closely enough that the read indicator reads as
+                    // a WhatsApp-style double check.
+                    HStack(spacing: -2) {
+                        Icon(.check, size: 9, strokeWidth: 2.6, color: Theme.Color.primary600)
+                        Icon(.check, size: 9, strokeWidth: 2.6, color: Theme.Color.primary600)
+                    }
                 case .delivered:
                     Icon(.check, size: 11, strokeWidth: 2.4, color: Theme.Color.appTextSecondary)
                 case .sending:

@@ -410,7 +410,7 @@ private struct NewMessageContactRowView: View {
 
     private var badgeColor: Color {
         switch row.identity {
-        case .personal: Theme.Color.primary700
+        case .personal: Theme.Color.personal
         case .home: Theme.Color.home
         case .business: Theme.Color.business
         }

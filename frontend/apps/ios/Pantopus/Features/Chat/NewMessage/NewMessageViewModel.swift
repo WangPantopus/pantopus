@@ -178,7 +178,14 @@ public final class NewMessageViewModel {
         searchTask = Task { [weak self] in
             // 280ms debounce — matches the backend rate-limit budget
             // and keeps keystroke chatter manageable on the picker.
-            try? await Task.sleep(nanoseconds: 280_000_000)
+            // Cancellation throws out of Task.sleep; bail before the
+            // network call so a quick-clear doesn't fire a stale
+            // request.
+            do {
+                try await Task.sleep(nanoseconds: 280_000_000)
+            } catch {
+                return
+            }
             await self?.runSearch(trimmed, sequence: seq)
         }
     }

@@ -13,6 +13,7 @@ import SwiftUI
 public enum InboxRoute: Hashable {
     case conversation(InboxConversationDestination)
     case compose
+    case invite
     case search
 }
 
@@ -113,9 +114,12 @@ public struct InboxTabRoot: View {
                             verified: destination.verified
                         )))
                     },
-                    onCancel: { if !path.isEmpty { path.removeLast() } }
+                    onCancel: { if !path.isEmpty { path.removeLast() } },
+                    onInvite: { path.append(.invite) }
                 )
             )
+        case .invite:
+            NotYetAvailableView(tabName: "Invite to Pantopus", icon: .userPlus)
         case .search:
             NotYetAvailableView(tabName: "Chat search", icon: .search)
         }
