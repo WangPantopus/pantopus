@@ -14,6 +14,13 @@ data class UserDto(
     val email: String,
     @Json(name = "display_name") val displayName: String?,
     @Json(name = "avatar_url") val avatarUrl: String?,
+    /**
+     * P1.1 — true when the backend reports `role == "admin"`. Drives the
+     * Admin section on the Settings index + the admin-only Review-claims
+     * gate. Defaults to `false` so existing UserDto call sites compile
+     * unchanged.
+     */
+    @Json(name = "is_admin") val isAdmin: Boolean = false,
 )
 
 /**

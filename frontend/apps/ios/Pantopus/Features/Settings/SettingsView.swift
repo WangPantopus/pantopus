@@ -33,15 +33,18 @@ public struct SettingsView: View {
     @State private var path: [SettingsStackRoute] = []
     private let onClose: @MainActor () -> Void
     private let onEditProfile: @MainActor () -> Void
+    private let onOpenReviewClaims: @MainActor () -> Void
     private let onSignedOut: @MainActor () -> Void
 
     public init(
         onClose: @escaping @MainActor () -> Void = {},
         onEditProfile: @escaping @MainActor () -> Void = {},
+        onOpenReviewClaims: @escaping @MainActor () -> Void = {},
         onSignedOut: @escaping @MainActor () -> Void = {}
     ) {
         self.onClose = onClose
         self.onEditProfile = onEditProfile
+        self.onOpenReviewClaims = onOpenReviewClaims
         self.onSignedOut = onSignedOut
     }
 
@@ -122,21 +125,33 @@ public struct SettingsView: View {
     }
 
     private func handle(route: SettingsRoute) {
+        if let stack = Self.stackRoute(for: route) {
+            path.append(stack)
+            return
+        }
         switch route {
         case .editProfile: onEditProfile()
-        case .notifications: path.append(.notifications)
-        case .privacy: path.append(.identityCenter) // Profiles & Privacy is the unified destination.
-        case .blocks: path.append(.blockedUsers)
-        case .password: path.append(.password)
-        case .verification: path.append(.verification)
-        // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
-        case .dataExport: path.append(.placeholder(label: "Data export"))
-        // Parked until P8.5 — depends on Stripe Connect wallet UX.
-        case .paymentsPayouts: path.append(.placeholder(label: "Payments & payouts"))
-        case .help: path.append(.help)
-        case .legal: path.append(.legal)
-        case .about: path.append(.about)
+        case .reviewClaims: onOpenReviewClaims()
         case .didSignOut: onSignedOut()
+        default: break
+        }
+    }
+
+    private static func stackRoute(for route: SettingsRoute) -> SettingsStackRoute? {
+        switch route {
+        case .notifications: .notifications
+        case .privacy: .identityCenter // Profiles & Privacy is the unified destination.
+        case .blocks: .blockedUsers
+        case .password: .password
+        case .verification: .verification
+        // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
+        case .dataExport: .placeholder(label: "Data export")
+        // Parked until P8.5 — depends on Stripe Connect wallet UX.
+        case .paymentsPayouts: .placeholder(label: "Payments & payouts")
+        case .help: .help
+        case .legal: .legal
+        case .about: .about
+        default: nil
         }
     }
 }

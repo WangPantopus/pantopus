@@ -132,6 +132,8 @@ import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
 import app.pantopus.android.ui.screens.profile.PublicProfileScreen
+import app.pantopus.android.ui.screens.review_claims.ReviewClaimDetailScreen
+import app.pantopus.android.ui.screens.review_claims.ReviewClaimsScreen
 import app.pantopus.android.ui.screens.review_signups.ReviewSignupsScreen
 import app.pantopus.android.ui.screens.settings.NotificationSettingsScreen
 import app.pantopus.android.ui.screens.settings.PrivacySettingsScreen
@@ -387,6 +389,16 @@ private object ChildRoutes {
     const val REVIEW_SIGNUPS = "support-trains/{$REVIEW_SIGNUPS_ID_KEY}/review"
 
     fun reviewSignups(trainId: String): String = "support-trains/${java.net.URLEncoder.encode(trainId, "UTF-8")}/review"
+
+    /** P1.1 — Admin Review-claims queue. Gated by [SettingsRoute.ReviewClaims]. */
+    const val REVIEW_CLAIMS = "admin/review-claims"
+
+    /** P1.1 — Admin Review-claim detail (single claim). Keep in sync with
+     *  `ReviewClaimDetailViewModel.CLAIM_ID_KEY`. */
+    const val REVIEW_CLAIM_DETAIL_ID_KEY = "claimId"
+    const val REVIEW_CLAIM_DETAIL = "admin/review-claims/{$REVIEW_CLAIM_DETAIL_ID_KEY}"
+
+    fun reviewClaimDetail(claimId: String): String = "admin/review-claims/${java.net.URLEncoder.encode(claimId, "UTF-8")}"
 
     /**
      * Generic placeholder for intents whose destination hasn't been
@@ -1628,6 +1640,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             SettingsRoute.Help -> navController.navigate(ChildRoutes.SETTINGS_HELP)
                             SettingsRoute.Legal -> navController.navigate(ChildRoutes.SETTINGS_LEGAL)
                             SettingsRoute.About -> navController.navigate(ChildRoutes.SETTINGS_ABOUT)
+                            SettingsRoute.ReviewClaims -> {
+                                // Close settings, push the admin queue.
+                                navController.popBackStack()
+                                navController.navigate(ChildRoutes.REVIEW_CLAIMS)
+                            }
                             SettingsRoute.DidSignOut -> navController.popBackStack()
                         }
                     },
@@ -1812,6 +1829,30 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onMessageHelper = { reservationId ->
                         navController.navigate(ChildRoutes.placeholder("Message helper · $reservationId"))
                     },
+                )
+            }
+            composable(ChildRoutes.REVIEW_CLAIMS) {
+                ReviewClaimsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenClaim = { claimId ->
+                        navController.navigate(ChildRoutes.reviewClaimDetail(claimId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.REVIEW_CLAIM_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.REVIEW_CLAIM_DETAIL_ID_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                // VM reads `claimId` from SavedStateHandle via the
+                // `CLAIM_ID_KEY` constant, which mirrors
+                // `REVIEW_CLAIM_DETAIL_ID_KEY` above.
+                ReviewClaimDetailScreen(
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(

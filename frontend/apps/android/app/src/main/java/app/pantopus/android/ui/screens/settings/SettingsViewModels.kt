@@ -36,6 +36,12 @@ enum class SettingsRoute {
     Legal,
     About,
     DidSignOut,
+
+    /**
+     * P1.1 — admin-only Review-claims queue. Only surfaced on the
+     * Settings index when `auth.state.value.user.isAdmin == true`.
+     */
+    ReviewClaims,
 }
 
 // MARK: - Index
@@ -61,12 +67,14 @@ class SettingsIndexViewModel
         private var blockCount: Int = 0
         private var verified: Boolean = true
         private var stripeConnected: Boolean? = null
+        private var isAdmin: Boolean = false
 
         fun load() {
             _state.value = GroupedListUiState.Loading
             val state = auth.state.value
             if (state is AuthRepository.State.SignedIn) {
                 _footerCaption.value = "${state.user.email} · ID ${state.user.id.take(8)}"
+                isAdmin = state.user.isAdmin
             }
             viewModelScope.launch {
                 when (val blocks = privacy.blocks()) {
@@ -94,6 +102,7 @@ class SettingsIndexViewModel
                 "help" -> _navigation.value = SettingsRoute.Help
                 "legal" -> _navigation.value = SettingsRoute.Legal
                 "about" -> _navigation.value = SettingsRoute.About
+                "reviewClaims" -> _navigation.value = SettingsRoute.ReviewClaims
                 "signOut" -> {
                     viewModelScope.launch {
                         auth.signOut()
@@ -117,88 +126,118 @@ class SettingsIndexViewModel
                     RowControl.Chevron
                 }
             val versionString = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
-            _state.value =
-                GroupedListUiState.Loaded(
-                    groups =
-                        listOf(
-                            GroupedListGroup(
-                                id = "account",
-                                overline = "Account",
-                                rows =
-                                    listOf(
-                                        GroupedListRow(id = "editProfile", label = "Edit profile", control = RowControl.Chevron),
-                                        GroupedListRow(id = "password", label = "Password", control = RowControl.Chevron),
-                                        GroupedListRow(id = "verification", label = "Verification", control = verificationChip),
-                                    ),
-                            ),
-                            GroupedListGroup(
-                                id = "privacy",
-                                overline = "Privacy",
-                                rows =
-                                    listOf(
-                                        GroupedListRow(
-                                            id = "blocks",
-                                            label = "Blocked users",
-                                            subtext =
-                                                if (blockCount > 0) {
-                                                    "$blockCount ${if (blockCount == 1) "person" else "people"}"
-                                                } else {
-                                                    null
-                                                },
-                                            control = RowControl.Chevron,
-                                        ),
-                                        GroupedListRow(id = "visibility", label = "Profiles & Privacy", control = RowControl.Chevron),
-                                        GroupedListRow(id = "export", label = "Data export", control = RowControl.Chevron),
-                                    ),
-                            ),
-                            GroupedListGroup(
-                                id = "notifications",
-                                overline = "Notifications",
-                                rows =
-                                    listOf(
-                                        GroupedListRow(
-                                            id = "notificationPreferences",
-                                            label = "Notification preferences",
-                                            subtext = "Push, email, SMS",
-                                            control = RowControl.Chevron,
-                                        ),
-                                    ),
-                            ),
-                            GroupedListGroup(
-                                id = "payments",
-                                overline = "Payments",
-                                rows = listOf(GroupedListRow(id = "paymentsPayouts", label = "Payments & payouts", control = stripeChip)),
-                            ),
-                            GroupedListGroup(
-                                id = "support",
-                                overline = "Support",
-                                rows =
-                                    listOf(
-                                        GroupedListRow(id = "help", label = "Help", control = RowControl.Chevron),
-                                        GroupedListRow(id = "legal", label = "Legal", control = RowControl.Chevron),
-                                        GroupedListRow(
-                                            id = "about",
-                                            label = "About",
-                                            subtext = versionString,
-                                            control = RowControl.Chevron,
-                                        ),
-                                    ),
-                            ),
-                            GroupedListGroup(
-                                id = "session",
-                                overline = null,
-                                rows =
-                                    listOf(
-                                        GroupedListRow(
-                                            id = "signOut",
-                                            label = "Log out",
-                                            control = RowControl.Chevron,
-                                            destructive = true,
-                                        ),
-                                    ),
-                            ),
+            val groups =
+                buildList {
+                    add(
+                        GroupedListGroup(
+                            id = "account",
+                            overline = "Account",
+                            rows =
+                                listOf(
+                                    GroupedListRow(id = "editProfile", label = "Edit profile", control = RowControl.Chevron),
+                                    GroupedListRow(id = "password", label = "Password", control = RowControl.Chevron),
+                                    GroupedListRow(id = "verification", label = "Verification", control = verificationChip),
+                                ),
                         ),
-                )
+                    )
+                    add(
+                        GroupedListGroup(
+                            id = "privacy",
+                            overline = "Privacy",
+                            rows =
+                                listOf(
+                                    GroupedListRow(
+                                        id = "blocks",
+                                        label = "Blocked users",
+                                        subtext =
+                                            if (blockCount > 0) {
+                                                "$blockCount ${if (blockCount == 1) "person" else "people"}"
+                                            } else {
+                                                null
+                                            },
+                                        control = RowControl.Chevron,
+                                    ),
+                                    GroupedListRow(id = "visibility", label = "Profiles & Privacy", control = RowControl.Chevron),
+                                    GroupedListRow(id = "export", label = "Data export", control = RowControl.Chevron),
+                                ),
+                        ),
+                    )
+                    add(
+                        GroupedListGroup(
+                            id = "notifications",
+                            overline = "Notifications",
+                            rows =
+                                listOf(
+                                    GroupedListRow(
+                                        id = "notificationPreferences",
+                                        label = "Notification preferences",
+                                        subtext = "Push, email, SMS",
+                                        control = RowControl.Chevron,
+                                    ),
+                                ),
+                        ),
+                    )
+                    add(
+                        GroupedListGroup(
+                            id = "payments",
+                            overline = "Payments",
+                            rows = listOf(GroupedListRow(id = "paymentsPayouts", label = "Payments & payouts", control = stripeChip)),
+                        ),
+                    )
+                    add(
+                        GroupedListGroup(
+                            id = "support",
+                            overline = "Support",
+                            rows =
+                                listOf(
+                                    GroupedListRow(id = "help", label = "Help", control = RowControl.Chevron),
+                                    GroupedListRow(id = "legal", label = "Legal", control = RowControl.Chevron),
+                                    GroupedListRow(
+                                        id = "about",
+                                        label = "About",
+                                        subtext = versionString,
+                                        control = RowControl.Chevron,
+                                    ),
+                                ),
+                        ),
+                    )
+                    // P1.1 — admin-only Review-claims entry point. Sits
+                    // after the Support group and before the Session
+                    // group so the destructive Log-out row stays last.
+                    if (isAdmin) {
+                        add(
+                            GroupedListGroup(
+                                id = "admin",
+                                overline = "Admin",
+                                rows =
+                                    listOf(
+                                        GroupedListRow(
+                                            id = "reviewClaims",
+                                            label = "Review claims",
+                                            subtext = "Home-ownership claim queue",
+                                            control = RowControl.Chevron,
+                                        ),
+                                    ),
+                            ),
+                        )
+                    }
+                    add(
+                        GroupedListGroup(
+                            id = "session",
+                            overline = null,
+                            rows =
+                                listOf(
+                                    GroupedListRow(
+                                        id = "signOut",
+                                        label = "Log out",
+                                        control = RowControl.Chevron,
+                                        destructive = true,
+                                    ),
+                                ),
+                        ),
+                    )
+                }
+            _state.value = GroupedListUiState.Loaded(groups = groups)
         }
     }
 
