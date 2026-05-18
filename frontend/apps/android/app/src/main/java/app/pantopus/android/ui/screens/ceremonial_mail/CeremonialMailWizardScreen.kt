@@ -152,9 +152,12 @@ internal fun DecideStep(
     onSelectIntent: (CeremonialMailIntent) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = "Decide who and why", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+        Text(text = "Who are you writing to?", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         Text(
-            text = "Mail keeps your name and address private — the recipient only sees what you choose to share.",
+            text =
+                "Choose a verified neighbor, a saved correspondent, or paste a handle. " +
+                    "Mail keeps your name and address private — the recipient only sees what you " +
+                    "choose to share.",
             fontSize = 13.sp,
             color = PantopusColors.appTextSecondary,
         )
@@ -355,9 +358,9 @@ internal fun VerifyStep(
     onReturnAddressShared: (Boolean) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = "Verify the address", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+        Text(text = "Address it", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         Text(
-            text = "We'll ship to the address Pantopus has on file. The recipient never sees yours unless you opt in.",
+            text = "Pantopus verifies physical addresses. By sending, you're confirming this exact recipient. There's no undo.",
             fontSize = 13.sp,
             color = PantopusColors.appTextSecondary,
         )
@@ -454,7 +457,7 @@ internal fun ComposeStep(
     onClearVoice: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = "Compose the letter", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+        Text(text = "Write it", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         Text(
             text = "Pick a stationery + ink, write your note, optionally add a voice postscript.",
             fontSize = 13.sp,
@@ -659,9 +662,9 @@ internal fun CommitStep(
     onSelectTiming: (CeremonialMailSendTiming) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = "Commit and send", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+        Text(text = "Seal and send", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         Text(
-            text = "Take one more look — you can't edit a letter after it's delivered.",
+            text = "Take one more look — you can't edit a letter after it's delivered. Pick a wax seal, then send.",
             fontSize = 13.sp,
             color = PantopusColors.appTextSecondary,
         )

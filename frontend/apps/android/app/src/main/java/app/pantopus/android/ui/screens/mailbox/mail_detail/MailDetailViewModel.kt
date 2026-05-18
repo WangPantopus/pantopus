@@ -10,8 +10,10 @@ import app.pantopus.android.data.api.models.mailbox.v2.BookletDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
+import app.pantopus.android.data.api.models.mailbox.vault.VaultFolderDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
+import app.pantopus.android.data.mailbox.MailboxVaultRepository
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailTrust
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailDetailTrust
@@ -108,6 +110,7 @@ class MailDetailViewModel
     @Inject
     constructor(
         private val repo: MailboxRepository,
+        private val vaultRepo: MailboxVaultRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val mailId: String =
@@ -126,6 +129,17 @@ class MailDetailViewModel
 
         private val _rsvpInFlight = MutableStateFlow(false)
         val rsvpInFlight: StateFlow<Boolean> = _rsvpInFlight.asStateFlow()
+
+        /** T6.5e (P19.5) — Save-to-vault picker visibility. */
+        private val _showsSaveToVaultPicker = MutableStateFlow(false)
+        val showsSaveToVaultPicker: StateFlow<Boolean> = _showsSaveToVaultPicker.asStateFlow()
+
+        /** Vault folders cached after the first overflow-tap fetch. */
+        private val _saveToVaultFolders = MutableStateFlow<List<VaultFolderDto>>(emptyList())
+        val saveToVaultFolders: StateFlow<List<VaultFolderDto>> = _saveToVaultFolders.asStateFlow()
+
+        private val _saveToVaultInFlight = MutableStateFlow(false)
+        val saveToVaultInFlight: StateFlow<Boolean> = _saveToVaultInFlight.asStateFlow()
 
         fun load() {
             if (_state.value is MailDetailUiState.Loaded) return
@@ -225,6 +239,53 @@ class MailDetailViewModel
                 CommunityRsvpStatus.NotGoing -> "Marked as can't make it"
                 CommunityRsvpStatus.Undecided -> "RSVP cleared"
             }
+
+        // MARK: - Save to vault (T6.5e / P19.5)
+
+        /** Open the save-to-vault picker. Fetches folders on the first
+         *  tap; cached for the rest of the session. */
+        fun openSaveToVaultPicker() {
+            if (_saveToVaultFolders.value.isNotEmpty()) {
+                _showsSaveToVaultPicker.value = true
+                return
+            }
+            viewModelScope.launch {
+                when (val result = vaultRepo.folders(drawer = "personal")) {
+                    is NetworkResult.Success -> {
+                        _saveToVaultFolders.value = result.data.folders
+                        if (result.data.folders.isEmpty()) {
+                            _toast.value = "Add a folder in your Vault first."
+                        } else {
+                            _showsSaveToVaultPicker.value = true
+                        }
+                    }
+                    is NetworkResult.Failure ->
+                        _toast.value = result.error.message
+                }
+            }
+        }
+
+        fun dismissSaveToVaultPicker() {
+            _showsSaveToVaultPicker.value = false
+        }
+
+        /** POST the current mail to the supplied vault folder. */
+        fun saveToVault(folderId: String) {
+            if (_saveToVaultInFlight.value) return
+            _saveToVaultInFlight.value = true
+            viewModelScope.launch {
+                when (val result = vaultRepo.file(mailId = mailId, folderId = folderId)) {
+                    is NetworkResult.Success -> {
+                        val folderLabel = _saveToVaultFolders.value.firstOrNull { it.id == folderId }?.label
+                        _toast.value = folderLabel?.let { "Saved to $it" } ?: "Saved to vault"
+                    }
+                    is NetworkResult.Failure ->
+                        _toast.value = result.error.message
+                }
+                _showsSaveToVaultPicker.value = false
+                _saveToVaultInFlight.value = false
+            }
+        }
 
         companion object {
             /**

@@ -117,6 +117,7 @@ import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
+import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
 import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
 import app.pantopus.android.ui.screens.my_posts.MyPostsScreen
@@ -156,6 +157,9 @@ private object ChildRoutes {
     const val MAILBOX_DRAWERS = "mailbox/drawers"
     const val MAILBOX_SEARCH = "mailbox/search"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
+
+    /** T6.5e (P19.5) — Mailbox Vault list. Personal pillar. */
+    const val MAILBOX_VAULT = "mailbox/vault"
     const val HOME_DASHBOARD = "homes/{$HOME_DASHBOARD_HOME_ID_KEY}"
 
     /** Bills list (T5.2.2 / P13). */
@@ -1164,6 +1168,31 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 MailboxDrawersScreen(
                     onOpenDrawer = { drawer ->
                         navController.navigate(ChildRoutes.placeholder("Drawer · $drawer"))
+                    },
+                    onOpenVault = { navController.navigate(ChildRoutes.MAILBOX_VAULT) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.MAILBOX_VAULT) {
+                // T6.5e (P19.5) — Mailbox Vault list-of-rows surface.
+                VaultListScreen(
+                    onOpenItem = { mailId ->
+                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                    },
+                    onAddTapped = {
+                        // FAB shortcut — drop the user back to the inbox
+                        // list where mail items expose the kebab
+                        // "Save to vault" action.
+                        navController.navigate(ChildRoutes.MAILBOX_LIST) {
+                            popUpTo(ChildRoutes.MAILBOX_LIST) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    },
+                    onOpenMailbox = {
+                        navController.navigate(ChildRoutes.MAILBOX_LIST) {
+                            popUpTo(ChildRoutes.MAILBOX_LIST) { inclusive = false }
+                            launchSingleTop = true
+                        }
                     },
                     onBack = { navController.popBackStack() },
                 )

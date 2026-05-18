@@ -54,7 +54,9 @@ final class IconTests: XCTestCase {
         // T6.3c Household tasks — chore-category iconography + banner glyph.
         "leaf", "list-checks", "utensils", "baby",
         // T6.3b Maintenance — task category iconography.
-        "wrench", "fan", "cloud-rain", "refrigerator", "bug", "trees", "paint-roller", "bell-ring"
+        "wrench", "fan", "cloud-rain", "refrigerator", "bug", "trees", "paint-roller", "bell-ring",
+        // T6.5e Mailbox Vault — envelope state + folder palette + chrome.
+        "mail", "mail-open", "folder-plus", "piggy-bank", "plane", "receipt-text", "paperclip", "arrow-down-up"
     ]
 
     func testInventoryMatches() {

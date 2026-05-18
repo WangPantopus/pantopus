@@ -28,10 +28,16 @@ final class MailboxDrawersViewModel: ListOfRowsDataSource {
 
     private let api: APIClient
     private let onOpenDrawer: (String) -> Void
+    private let onOpenVault: () -> Void
 
-    init(api: APIClient = .shared, onOpenDrawer: @escaping (String) -> Void = { _ in }) {
+    init(
+        api: APIClient = .shared,
+        onOpenDrawer: @escaping (String) -> Void = { _ in },
+        onOpenVault: @escaping () -> Void = {}
+    ) {
         self.api = api
         self.onOpenDrawer = onOpenDrawer
+        self.onOpenVault = onOpenVault
     }
 
     func load() async {
@@ -58,8 +64,20 @@ final class MailboxDrawersViewModel: ListOfRowsDataSource {
                     )
                 )
             } else {
+                // T6.5e (P19.5) — Mailbox root surfaces a "Vault" entry
+                // alongside the four drawers so the saved-mail list is
+                // reachable without leaving the inbox shell.
+                let drawerRows = response.drawers.map(row(for:))
+                let vaultRow = RowModel(
+                    id: "vault",
+                    title: "Vault",
+                    subtitle: "Saved mail",
+                    template: .fileChevron,
+                    leading: .icon(.archive, tint: Theme.Color.primary600),
+                    trailing: .chevron
+                ) { @Sendable in Task { @MainActor in self.onOpenVault() } }
                 state = .loaded(
-                    sections: [RowSection(rows: response.drawers.map(row(for:)))],
+                    sections: [RowSection(rows: drawerRows + [vaultRow])],
                     hasMore: false
                 )
             }

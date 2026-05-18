@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -71,6 +73,8 @@ fun MailDetailScreen(
     val toast by viewModel.toast.collectAsStateWithLifecycle()
     val ackInFlight by viewModel.ackInFlight.collectAsStateWithLifecycle()
     val rsvpInFlight by viewModel.rsvpInFlight.collectAsStateWithLifecycle()
+    val showsSaveToVault by viewModel.showsSaveToVaultPicker.collectAsStateWithLifecycle()
+    val vaultFolders by viewModel.saveToVaultFolders.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
     LaunchedEffect(toast) {
@@ -92,9 +96,45 @@ fun MailDetailScreen(
                     onAcknowledge = viewModel::acknowledge,
                     onRsvp = viewModel::setRsvp,
                     onOpenSenderProfile = onOpenSenderProfile,
+                    onSaveToVault = viewModel::openSaveToVaultPicker,
                 )
             is MailDetailUiState.Error ->
                 ErrorLayout(message = current.message, onBack = onBack, onRetry = viewModel::refresh)
+        }
+        if (showsSaveToVault) {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissSaveToVaultPicker() },
+                title = { Text(text = "Save to vault") },
+                text = {
+                    Column {
+                        Text(
+                            text = "Pick a folder to keep this mail in.",
+                            fontSize = 13.sp,
+                            color = PantopusColors.appTextSecondary,
+                        )
+                        Spacer(modifier = Modifier.size(Spacing.s2))
+                        vaultFolders.forEach { folder ->
+                            Text(
+                                text = folder.label,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = PantopusColors.appText,
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clickable { viewModel.saveToVault(folder.id) }
+                                        .padding(vertical = Spacing.s2)
+                                        .testTag("mailDetail_saveToVault_${folder.id}"),
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.dismissSaveToVaultPicker() }) {
+                        Text(text = "Cancel", color = PantopusColors.appTextSecondary)
+                    }
+                },
+            )
         }
         if (toast != null) {
             Box(
@@ -128,6 +168,7 @@ private fun LoadedLayout(
     onAcknowledge: () -> Unit,
     onRsvp: (CommunityRsvpStatus) -> Unit,
     onOpenSenderProfile: (String) -> Unit,
+    onSaveToVault: () -> Unit,
 ) {
     // T6.5c–d — dispatch to variant layouts when the projected content
     // carries decoded payloads. Variants sit on the same
@@ -143,6 +184,7 @@ private fun LoadedLayout(
                 booklet = booklet,
                 onBack = onBack,
                 onOpenSenderProfile = onOpenSenderProfile,
+                onSaveToVault = onSaveToVault,
             )
             return
         }
@@ -154,6 +196,7 @@ private fun LoadedLayout(
                 onBack = onBack,
                 onAcknowledge = onAcknowledge,
                 onOpenSenderProfile = onOpenSenderProfile,
+                onSaveToVault = onSaveToVault,
             )
             return
         }
@@ -165,6 +208,7 @@ private fun LoadedLayout(
                 onBack = onBack,
                 onRsvp = onRsvp,
                 onOpenSenderProfile = onOpenSenderProfile,
+                onSaveToVault = onSaveToVault,
             )
             return
         }
@@ -180,6 +224,7 @@ private fun LoadedLayout(
                 overflowItems =
                     listOf(
                         MailOverflowItem("forward", PantopusIcon.Send, "Forward") {},
+                        MailOverflowItem("saveToVault", PantopusIcon.Bookmark, "Save to vault") { onSaveToVault() },
                         MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {},
                         MailOverflowItem("unread", PantopusIcon.Bell, "Mark unread") {},
                         MailOverflowItem(

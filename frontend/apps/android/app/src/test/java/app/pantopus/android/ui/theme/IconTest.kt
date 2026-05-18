@@ -175,6 +175,15 @@ class IconTest {
             "trees",
             "paint-roller",
             "bell-ring",
+            // T6.5e — Mailbox Vault envelope/folder palette.
+            "mail",
+            "mail-open",
+            "folder-plus",
+            "piggy-bank",
+            "plane",
+            "receipt-text",
+            "paperclip",
+            "arrow-down-up",
         )
 
     @Test

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Approval
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoFixHigh
@@ -48,14 +49,17 @@ import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditCalendar
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.EmergencyShare
 import androidx.compose.material.icons.filled.EnergySavingsLeaf
 import androidx.compose.material.icons.filled.Error
@@ -65,6 +69,7 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.FolderShared
 import androidx.compose.material.icons.filled.FormatPaint
 import androidx.compose.material.icons.filled.Gavel
@@ -88,6 +93,7 @@ import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MarkAsUnread
 import androidx.compose.material.icons.filled.MarkunreadMailbox
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Menu
@@ -117,6 +123,7 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.RocketLaunch
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Science
@@ -127,6 +134,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Tag
@@ -366,6 +374,19 @@ enum class PantopusIcon(
     Trees("trees"),
     PaintRoller("paint-roller"),
     BellRing("bell-ring"),
+
+    // T6.5e — Mailbox Vault: closed/open envelope glyphs + folder-plus
+    // FAB + receipt-text / piggy-bank / plane folder palette. Distinct
+    // from existing [Mailbox] so the new Mailbox-A17 surfaces can pick
+    // the correct envelope state per design.
+    Mail("mail"),
+    MailOpen("mail-open"),
+    FolderPlus("folder-plus"),
+    PiggyBank("piggy-bank"),
+    Plane("plane"),
+    ReceiptText("receipt-text"),
+    Paperclip("paperclip"),
+    ArrowDownUp("arrow-down-up"),
     ;
 
     companion object {
@@ -591,6 +612,21 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Trees -> IconSource.Material(Icons.Filled.Park)
         PantopusIcon.PaintRoller -> IconSource.Material(Icons.Filled.FormatPaint)
         PantopusIcon.BellRing -> IconSource.Material(Icons.Filled.NotificationsActive)
+
+        // T6.5e — Mailbox Vault. Material has direct envelope glyphs
+        // for `mail` / `mail-open` (`Email` / `MarkAsUnread`); the
+        // others fall back to the closest Material vector — `Flight`
+        // for plane, `CreateNewFolder` for folder-plus, `Savings` for
+        // piggy-bank, `AttachFile` for paperclip, `Sort` for
+        // arrow-down-up, `Description` for receipt-text.
+        PantopusIcon.Mail -> IconSource.Material(Icons.Filled.Email)
+        PantopusIcon.MailOpen -> IconSource.Material(Icons.Filled.MarkAsUnread)
+        PantopusIcon.FolderPlus -> IconSource.Material(Icons.Filled.CreateNewFolder)
+        PantopusIcon.PiggyBank -> IconSource.Material(Icons.Filled.Savings)
+        PantopusIcon.Plane -> IconSource.Material(Icons.Filled.Flight)
+        PantopusIcon.ReceiptText -> IconSource.Material(Icons.Filled.Description)
+        PantopusIcon.Paperclip -> IconSource.Material(Icons.Filled.AttachFile)
+        PantopusIcon.ArrowDownUp -> IconSource.Material(Icons.Filled.Sort)
     }
 
 /**
