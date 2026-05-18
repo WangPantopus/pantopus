@@ -221,6 +221,62 @@ locally before pushing.
 
 The longer doc-of-record for the archetype evolution lives at
 `docs/t5-buildout-plan.md`; the prompt-style notes are at
-`docs/mobile/pantopus-t5-notes.md`.
+`docs/mobile/pantopus-t5-notes.md`. T6 additions are documented in
+`docs/t6-buildout-plan.md` + `docs/t6-prs/T6-summary.md`.
 
 — Pantopus T5
+
+---
+
+## T6 additions (strictly additive — no v1 / T5 call site changes)
+
+T6 layered eight new surfaces onto the same shell. Every addition is
+optional / defaulted / a new enum case, so screens that don't opt in
+behave exactly as they did at the end of T5.
+
+| Addition | Cluster | Use |
+|---|---|---|
+| `RowLeading.magicArchetypeTile(...)` | `RowLeading` enum | 44pt rounded gradient tile + 18pt sparkles disc overlay (T6.0b My tasks V2 magic chrome). Distinct from `categoryGradientIcon` so the magic signal is scannable. |
+| `RowModel.archetypeOverline: String?` | `RowModel` field | 10pt lavender uppercase overline above the title, truncated at 24 chars (T6.0b My tasks V2). |
+| `FabVariant.magicCreate` | FAB enum | 60pt gradient FAB with sparkles disc (T6.0b "Post a task with Magic Task"). Adds to the existing `canonicalCreate (56pt)` / `secondaryCreate (52pt)` / `extendedNav (48pt)` set. |
+| `FabTint` + `FABAction.tint` | `FABAction` field | per-identity colour-ramp on the FAB (`.personal` / `.home` / `.business`). Defaults to `.none` for backwards compat. |
+| `RowModel.splitWith: SplitStackData?` | `RowModel` field | 18pt overlapping avatars at the right edge of the chip row (Bills T6.0a split-bill members). |
+| `BannerConfig.cta: BannerCTA?` + `BannerConfig.tint: BannerCTATint` | banner slot | adds a primary CTA (text + handler) inside the existing banner slot + tint enum for per-identity ramps (Bills T6.0a "Pay all"). |
+| `RowTrailing.iconActions(primary:secondary:)` | `RowTrailing` enum | 32pt sunken icon pair (e.g. copy + kebab) when a row needs two trailing actions without going full footer (Access codes T6.4a). |
+| `ListOfRowsDataSource.topBarSubtitle: String?` | data-source protocol | optional 2-line top bar (title + subtitle) — defaults to `nil` (Access codes T6.4a). |
+| `customHeader` view-builder slot | shell chrome | optional `@ViewBuilder` slot between the chrome (search / chip / tabs) and the state body. Carries feature-local headers like Home calendar's `MonthStripHeader` (T6.4c). |
+
+### Per-feature palette files (documented hex-exception locations)
+
+T6 added more category palettes — each feature owns a `*Palette.swift` /
+`*Palette.kt` / `*-palette.ts` triple. These are the **documented**
+hex-literal locations per `CLAUDE.md` / `make verify-icons`:
+
+- `UtilityCategoryPalette` — Bills (8 utilities)
+- `CourierPalette` — Packages (8 carriers)
+- `MaintenanceCategoryPalette` — Maintenance (12 task categories)
+- `HouseholdTaskCategoryPalette` — Household tasks (8 chore categories)
+- `PollKindPalette` — Polls (4 kinds)
+- `AccessCategoryPalette` — Access codes (7 categories)
+- `EmergencyCategoryPalette` — Emergency info (4 buckets)
+- `DocumentCategoryPalette` + `DocumentFileTypePalette` — Documents (7
+  categories + 6 file types)
+- `OwnerProofPalette` — Owners (4 tones)
+- `MemberRolePalette` — Members (5 roles)
+- `CalendarEventCategory` — Home calendar (12 categories)
+- `MailboxVaultFolderIcon` + `MailboxVaultMailType` — Vault (7
+  folders, 7 mail types)
+- `SpeciesPalette` — Pets (T5, carried over)
+
+These are not violations — they're the canonical place where category
+swatches live. Direct hex usage anywhere **else** in `Features/**`
+trips the CI hex-grep guard.
+
+### Cross-reference — sibling shells added in T6
+
+- `Features/Shared/MailItemDetail/` — A17 mailbox detail shell. See
+  `MailItemDetail/README.md` for the slot contract.
+- `Features/Shared/MapListHybrid/` — full-bleed-map + 3-detent sheet
+  shell. See `MapListHybrid/README.md` for the detent contract.
+
+— Pantopus T6
