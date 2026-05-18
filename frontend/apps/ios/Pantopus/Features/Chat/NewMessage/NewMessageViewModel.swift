@@ -19,7 +19,7 @@
 //  `person(otherUserId:)` thread mode.
 //
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable type_body_length
 
 import Foundation
 import Logging
@@ -57,7 +57,7 @@ public final class NewMessageViewModel {
     /// "All verified" rows always reflect the most recent query.
     private var searchSequence: Int = 0
 
-    public init(
+    init(
         api: APIClient = .shared,
         onSelect: @escaping @MainActor (NewMessageDestination) -> Void = { _ in },
         onCancel: @escaping @MainActor () -> Void = {},
@@ -152,10 +152,11 @@ public final class NewMessageViewModel {
             // surfaced elsewhere in the chat list). Keep the top 10
             // by backend-supplied ordering (already lastMessageAt
             // desc).
-            recents = response.conversations
-                .filter { $0.kind == .conversation }
-                .prefix(10)
-                .map { $0 }
+            recents = Array(
+                response.conversations
+                    .filter { $0.kind == .conversation }
+                    .prefix(10)
+            )
             return true
         } catch {
             logger.warning("Recents fetch failed: \(error)")

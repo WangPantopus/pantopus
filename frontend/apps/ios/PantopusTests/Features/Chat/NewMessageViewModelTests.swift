@@ -16,8 +16,6 @@
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable file_length type_body_length
-
 @MainActor
 final class NewMessageViewModelTests: XCTestCase {
     override func setUp() {
@@ -35,16 +33,9 @@ final class NewMessageViewModelTests: XCTestCase {
 
     private func makeVM(
         api: APIClient? = nil,
-        onSelect: @escaping @MainActor (NewMessageDestination) -> Void = { _ in },
-        onCancel: @escaping @MainActor () -> Void = {},
-        onInvite: @escaping @MainActor () -> Void = {}
+        onSelect: @escaping @MainActor (NewMessageDestination) -> Void = { _ in }
     ) -> NewMessageViewModel {
-        NewMessageViewModel(
-            api: api ?? makeAPI(),
-            onSelect: onSelect,
-            onCancel: onCancel,
-            onInvite: onInvite
-        )
+        NewMessageViewModel(api: api ?? makeAPI(), onSelect: onSelect)
     }
 
     private typealias StubResponse = SequencedURLProtocol.Response
@@ -261,11 +252,11 @@ final class NewMessageViewModelTests: XCTestCase {
 
     func testTapRowEmitsDestination() {
         let expectation = expectation(description: "selection emitted")
-        let viewModel = makeVM(onSelect: { destination in
+        let viewModel = makeVM { destination in
             XCTAssertEqual(destination.userId, "u_z")
             XCTAssertEqual(destination.displayName, "Pat")
             expectation.fulfill()
-        })
+        }
         let row = NewMessageContactRow(
             id: "x",
             userId: "u_z",

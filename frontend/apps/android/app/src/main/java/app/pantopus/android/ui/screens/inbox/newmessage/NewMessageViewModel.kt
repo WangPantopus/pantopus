@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.chats.UnifiedConversationDto
 import app.pantopus.android.data.api.models.relationships.RelationshipDto
+import app.pantopus.android.data.api.models.relationships.RelationshipUserDto
 import app.pantopus.android.data.api.models.users.UserSearchResultDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.chats.ChatRepository
@@ -276,8 +277,10 @@ class NewMessageViewModel
         internal fun rowForRecent(dto: UnifiedConversationDto): NewMessageContactRow? {
             val userId = dto.otherParticipantId ?: return null
             val displayName =
-                (dto.otherParticipantName?.takeIf { it.isNotEmpty() }
-                    ?: dto.otherParticipantIdentity?.displayName?.takeIf { it.isNotEmpty() })
+                (
+                    dto.otherParticipantName?.takeIf { it.isNotEmpty() }
+                        ?: dto.otherParticipantIdentity?.displayName?.takeIf { it.isNotEmpty() }
+                )
                     ?: "Pantopus user"
             val initials = initialsFrom(displayName)
             val verified = dto.otherParticipantIdentity?.verified == true
@@ -325,9 +328,7 @@ class NewMessageViewModel
 
         // MARK: - Helpers
 
-        private fun displayName(
-            user: app.pantopus.android.data.api.models.relationships.RelationshipUserDto?,
-        ): String? {
+        private fun displayName(user: RelationshipUserDto?): String? {
             if (user == null) return null
             user.name?.takeIf { it.isNotEmpty() }?.let { return it }
             val first = user.firstName?.takeIf { it.isNotEmpty() }
@@ -337,9 +338,7 @@ class NewMessageViewModel
             return user.username?.takeIf { it.isNotEmpty() }
         }
 
-        private fun localityText(
-            user: app.pantopus.android.data.api.models.relationships.RelationshipUserDto?,
-        ): String? {
+        private fun localityText(user: RelationshipUserDto?): String? {
             if (user == null) return null
             val city = (user.city ?: "").trim()
             val state = (user.state ?: "").trim()
@@ -368,9 +367,7 @@ class NewMessageViewModel
             return result.ifEmpty { "?" }
         }
 
-        private fun searchable(
-            user: app.pantopus.android.data.api.models.relationships.RelationshipUserDto?,
-        ): String {
+        private fun searchable(user: RelationshipUserDto?): String {
             if (user == null) return ""
             return listOfNotNull(displayName(user), user.username, user.city, user.state)
                 .joinToString(" ")

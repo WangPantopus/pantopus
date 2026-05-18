@@ -198,6 +198,12 @@ class NewMessageViewModelTest {
         runTest {
             coEvery { relationshipsRepo.list(status = "accepted") } returns NetworkResult.Success(acceptedFixture)
             coEvery { chatRepo.unifiedConversations(limit = 50) } returns NetworkResult.Success(unifiedFixture)
+            // UnconfinedTestDispatcher skips the 280ms debounce — the
+            // directory fetch fires synchronously. Stub it with no
+            // matches so the All-verified section stays hidden and the
+            // assertion focuses on Connections filtering.
+            coEvery { profileRepo.search(query = "Maria", limit = 20) } returns
+                NetworkResult.Success(UserSearchResponse(users = emptyList()))
             val viewModel = makeVM()
             viewModel.load()
             runCurrent()
