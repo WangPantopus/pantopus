@@ -96,7 +96,7 @@ final class BroadcastDetailViewModelTests: XCTestCase {
             return
         }
         XCTAssertEqual(loaded.tierBreakdown.total, 0)
-        XCTAssertEqual(loaded.tierBreakdown.segments.allSatisfy { $0.count == 0 }, true)
+        XCTAssertTrue(loaded.tierBreakdown.segments.allSatisfy { $0.count == loaded.tierBreakdown.total })
     }
 
     func testRepliesStartEmptyForFreshlyLoadedBroadcast() async {

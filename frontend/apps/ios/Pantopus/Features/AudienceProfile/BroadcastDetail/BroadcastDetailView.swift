@@ -516,7 +516,8 @@ public struct BroadcastDetailView: View {
             broadcastId: "b_demo",
             seed: UpdateCardContent(
                 id: "b_demo",
-                body: "Today's loaf has a crumb you could read poetry through. I'll set a few aside if you want to swing by the stoop between 4–6.",
+                body: "Today's loaf has a crumb you could read poetry through. " +
+                    "I'll set a few aside if you want to swing by the stoop between 4–6.",
                 timeAgo: "Today · 9:14am",
                 visibility: .publicVisible,
                 targetTierRank: nil,

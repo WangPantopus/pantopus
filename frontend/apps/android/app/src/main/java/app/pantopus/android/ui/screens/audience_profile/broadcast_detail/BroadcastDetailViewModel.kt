@@ -36,8 +36,9 @@ class BroadcastDetailViewModel
         savedStateHandle: SavedStateHandle,
         private val seedCache: BroadcastDetailSeedCache,
     ) : ViewModel() {
-        private val broadcastId: String = savedStateHandle[BROADCAST_DETAIL_ID_KEY]
-            ?: error("BROADCAST_DETAIL_ID_KEY missing from SavedStateHandle")
+        private val broadcastId: String =
+            savedStateHandle[BROADCAST_DETAIL_ID_KEY]
+                ?: error("BROADCAST_DETAIL_ID_KEY missing from SavedStateHandle")
 
         private val _state = MutableStateFlow<BroadcastDetailUiState>(BroadcastDetailUiState.Loading)
         val state: StateFlow<BroadcastDetailUiState> = _state.asStateFlow()

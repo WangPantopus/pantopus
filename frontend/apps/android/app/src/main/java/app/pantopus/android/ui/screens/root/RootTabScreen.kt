@@ -367,8 +367,7 @@ private object ChildRoutes {
      *  [BroadcastDetailSeedCache] (routes can only carry strings). */
     const val BROADCAST_DETAIL = "broadcasts/{$BROADCAST_DETAIL_ID_KEY}"
 
-    fun broadcastDetail(broadcastId: String): String =
-        "broadcasts/${java.net.URLEncoder.encode(broadcastId, "UTF-8")}"
+    fun broadcastDetail(broadcastId: String): String = "broadcasts/${java.net.URLEncoder.encode(broadcastId, "UTF-8")}"
 
     /** P1.2 — Creator Inbox (standalone DM thread list for creators).
      *  Reached from the You tab Personal section row + Audience Profile
