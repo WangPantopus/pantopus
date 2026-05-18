@@ -310,7 +310,7 @@ public final class MailDetailViewModel {
                     body: FileToVaultBody(mailId: mailId, folderId: folderId)
                 )
             )
-            let folderLabel = saveToVaultFolders.first(where: { $0.id == folderId })?.label
+            let folderLabel = saveToVaultFolders.first { $0.id == folderId }?.label
             toast = folderLabel.map { "Saved to \($0)" } ?? "Saved to vault"
         } catch {
             toast = (error as? APIError)?.errorDescription

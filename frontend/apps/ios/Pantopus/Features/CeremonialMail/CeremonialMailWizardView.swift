@@ -73,7 +73,10 @@ public struct CeremonialMailWizardView: View {
     private var decideStep: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             HeadlineBlock("Who are you writing to?")
-            SubcopyBlock("Choose a verified neighbor, a saved correspondent, or paste a handle. Mail keeps your name and address private — the recipient only sees what you choose to share.")
+            SubcopyBlock(
+                "Choose a verified neighbor, a saved correspondent, or paste a handle. Mail keeps your "
+                    + "name and address private — the recipient only sees what you choose to share."
+            )
             recipientSearchField
             if !viewModel.recipientResults.isEmpty {
                 recipientResults

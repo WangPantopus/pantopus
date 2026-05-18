@@ -160,23 +160,25 @@ class VaultListViewModelTest {
 
     @Test
     fun `filter matches title subtitle or folder label`() {
-        val f1 = folder("f1", "Civic & permits")
+        val civic = folder("f1", "Civic")
+        val receipts = folder("f2", "Receipts")
         val rows =
             listOf(
                 VaultListRow(
                     id = "m1",
                     item = item(id = "m1", folderId = "f1", subject = "Block-party permit approved", sender = "PBOT"),
-                    folder = f1,
+                    folder = civic,
                 ),
                 VaultListRow(
                     id = "m2",
-                    item = item(id = "m2", folderId = "f1", subject = "Costco statement", sender = "Costco"),
-                    folder = f1,
+                    item = item(id = "m2", folderId = "f2", subject = "Costco statement", sender = "Costco"),
+                    folder = receipts,
                 ),
             )
         assertEquals(listOf("m1"), VaultListViewModel.filter(rows, "permit").map { it.id })
         assertEquals(listOf("m2"), VaultListViewModel.filter(rows, "costco").map { it.id })
-        assertEquals(2, VaultListViewModel.filter(rows, "Civic").size)
+        assertEquals(listOf("m1"), VaultListViewModel.filter(rows, "Civic").map { it.id })
+        assertEquals(listOf("m2"), VaultListViewModel.filter(rows, "Receipts").map { it.id })
         assertEquals(2, VaultListViewModel.filter(rows, "").size)
     }
 
@@ -203,8 +205,14 @@ class VaultListViewModelTest {
                         items =
                             listOf(
                                 item("m1", "f1", mailType = "receipt", subject = "Costco statement", sender = "Costco"),
-                                item("m2", "f1", mailType = "receipt", subject = "TJ statement", sender = "TJ",
-                                    createdAt = "2026-05-14T12:00:00Z"),
+                                item(
+                                    "m2",
+                                    "f1",
+                                    mailType = "receipt",
+                                    subject = "TJ statement",
+                                    sender = "TJ",
+                                    createdAt = "2026-05-14T12:00:00Z",
+                                ),
                             ),
                         total = 2,
                     ),

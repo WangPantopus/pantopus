@@ -23,8 +23,7 @@ class MailboxVaultRepository
         private val api: MailboxVaultApi,
     ) {
         /** `GET /api/mailbox/v2/p2/vault/folders`. */
-        suspend fun folders(drawer: String? = "personal"): NetworkResult<VaultFoldersResponse> =
-            safeApiCall { api.folders(drawer) }
+        suspend fun folders(drawer: String? = "personal"): NetworkResult<VaultFoldersResponse> = safeApiCall { api.folders(drawer) }
 
         /** `POST /api/mailbox/v2/p2/vault/folder`. */
         suspend fun createFolder(request: CreateVaultFolderRequest): NetworkResult<VaultFolderResponse> =

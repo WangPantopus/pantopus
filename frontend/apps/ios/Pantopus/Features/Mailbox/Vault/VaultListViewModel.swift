@@ -42,11 +42,10 @@ public final class VaultListViewModel: ListOfRowsDataSource {
             icon: .plus,
             accessibilityLabel: "Save mail to vault",
             variant: .secondaryCreate,
-            tint: .sky,
-            handler: { @Sendable in
-                Task { @MainActor in self.onAddTapped() }
-            }
-        )
+            tint: .sky
+        ) { @Sendable in
+            Task { @MainActor in self.onAddTapped() }
+        }
     }
 
     public var state: ListOfRowsState {
@@ -59,12 +58,12 @@ public final class VaultListViewModel: ListOfRowsDataSource {
                     ListOfRowsState.EmptyContent(
                         icon: .archive,
                         headline: "Your vault is empty",
-                        subcopy: "Save mail to keep it. Anything you bookmark from your Mailbox lands here — civic notices, permits, receipts, scanned letters.",
-                        ctaTitle: "Open Mailbox",
-                        onCTA: { @Sendable in
-                            Task { @MainActor in self.onOpenMailbox() }
-                        }
-                    )
+                        subcopy: "Save mail to keep it. Anything you bookmark from your Mailbox lands here — "
+                            + "civic notices, permits, receipts, scanned letters.",
+                        ctaTitle: "Open Mailbox"
+                    ) { @Sendable in
+                        Task { @MainActor in self.onOpenMailbox() }
+                    }
                 )
             }
             return .loaded(
@@ -79,11 +78,10 @@ public final class VaultListViewModel: ListOfRowsDataSource {
     public var searchBar: SearchBarConfig? {
         SearchBarConfig(
             placeholder: "Search vault",
-            text: query,
-            onChange: { @Sendable text in
-                Task { @MainActor in self.onQueryChange(text) }
-            }
-        )
+            text: query
+        ) { @Sendable text in
+            Task { @MainActor in self.onQueryChange(text) }
+        }
     }
 
     // MARK: - Internal state
@@ -109,7 +107,7 @@ public final class VaultListViewModel: ListOfRowsDataSource {
     private let onAddTapped: () -> Void
     private let onOpenMailbox: () -> Void
 
-    public init(
+    init(
         api: APIClient = .shared,
         drawer: String = "personal",
         onOpenItem: @escaping (String) -> Void = { _ in },
@@ -216,7 +214,7 @@ public final class VaultListViewModel: ListOfRowsDataSource {
                 )
             }
         }
-        return allRows.sorted { (lhs, rhs) -> Bool in
+        return allRows.sorted { lhs, rhs -> Bool in
             (lhs.item.createdAt ?? "") > (rhs.item.createdAt ?? "")
         }
     }

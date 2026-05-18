@@ -10,8 +10,6 @@
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable force_try force_unwrapping
-
 @MainActor
 final class VaultListViewModelTests: XCTestCase {
     override func setUp() {
@@ -58,19 +56,39 @@ final class VaultListViewModelTests: XCTestCase {
         // list shows 3 rows sorted by createdAt desc.
         let foldersBody = """
         {"folders":[
-          {"id":"f1","user_id":"u1","drawer":"personal","label":"Civic","icon":"📋","color":"#1E40AF","system":true,"item_count":2,"sort_order":0,"created_at":"2026-05-01T00:00:00Z"},
-          {"id":"f2","user_id":"u1","drawer":"personal","label":"Receipts","icon":"🧾","color":"#D97706","system":true,"item_count":1,"sort_order":1,"created_at":"2026-05-02T00:00:00Z"}
+          {
+            "id":"f1","user_id":"u1","drawer":"personal","label":"Civic",
+            "icon":"📋","color":"#1E40AF","system":true,"item_count":2,
+            "sort_order":0,"created_at":"2026-05-01T00:00:00Z"
+          },
+          {
+            "id":"f2","user_id":"u1","drawer":"personal","label":"Receipts",
+            "icon":"🧾","color":"#D97706","system":true,"item_count":1,
+            "sort_order":1,"created_at":"2026-05-02T00:00:00Z"
+          }
         ]}
         """
         let f1Items = """
         {"items":[
-          {"id":"m1","mail_type":"notice","subject":"Block-party permit","sender_business_name":"PBOT","created_at":"2026-05-14T12:00:00Z","lifecycle":"filed","vault_folder_id":"f1"},
-          {"id":"m2","mail_type":"notice","subject":"Sewer cleaning","sender_business_name":"Water Bureau","created_at":"2026-05-13T12:00:00Z","lifecycle":"filed","vault_folder_id":"f1"}
+          {
+            "id":"m1","mail_type":"notice","subject":"Block-party permit",
+            "sender_business_name":"PBOT","created_at":"2026-05-14T12:00:00Z",
+            "lifecycle":"filed","vault_folder_id":"f1"
+          },
+          {
+            "id":"m2","mail_type":"notice","subject":"Sewer cleaning",
+            "sender_business_name":"Water Bureau","created_at":"2026-05-13T12:00:00Z",
+            "lifecycle":"filed","vault_folder_id":"f1"
+          }
         ],"total":2}
         """
         let f2Items = """
         {"items":[
-          {"id":"m3","mail_type":"receipt","subject":"Costco statement","sender_business_name":"Costco","created_at":"2026-05-15T12:00:00Z","lifecycle":"filed","vault_folder_id":"f2"}
+          {
+            "id":"m3","mail_type":"receipt","subject":"Costco statement",
+            "sender_business_name":"Costco","created_at":"2026-05-15T12:00:00Z",
+            "lifecycle":"filed","vault_folder_id":"f2"
+          }
         ],"total":1}
         """
         SequencedURLProtocol.sequence = [
@@ -93,23 +111,46 @@ final class VaultListViewModelTests: XCTestCase {
 
     func testFlattenSortsByCreatedAtDesc() {
         let folder = VaultFolderDTO(
-            id: "f1", userId: "u1", drawer: "personal", label: "Civic",
-            icon: nil, color: nil, system: true, itemCount: nil, sortOrder: 0,
+            id: "f1",
+            userId: "u1",
+            drawer: "personal",
+            label: "Civic",
+            icon: nil,
+            color: nil,
+            system: true,
+            itemCount: nil,
+            sortOrder: 0,
             createdAt: nil
         )
         let older = VaultMailItemDTO(
-            id: "m1", mailType: "notice", type: nil, subject: "A",
-            displayTitle: nil, previewText: nil,
-            senderAddress: nil, senderBusinessName: "X",
-            createdAt: "2026-05-13T00:00:00Z", lifecycle: "filed",
-            viewedAt: nil, attachments: nil, vaultFolderId: "f1"
+            id: "m1",
+            mailType: "notice",
+            type: nil,
+            subject: "A",
+            displayTitle: nil,
+            previewText: nil,
+            senderAddress: nil,
+            senderBusinessName: "X",
+            createdAt: "2026-05-13T00:00:00Z",
+            lifecycle: "filed",
+            viewedAt: nil,
+            attachments: nil,
+            vaultFolderId: "f1"
         )
         let newer = VaultMailItemDTO(
-            id: "m2", mailType: "notice", type: nil, subject: "B",
-            displayTitle: nil, previewText: nil,
-            senderAddress: nil, senderBusinessName: "Y",
-            createdAt: "2026-05-14T00:00:00Z", lifecycle: "filed",
-            viewedAt: nil, attachments: nil, vaultFolderId: "f1"
+            id: "m2",
+            mailType: "notice",
+            type: nil,
+            subject: "B",
+            displayTitle: nil,
+            previewText: nil,
+            senderAddress: nil,
+            senderBusinessName: "Y",
+            createdAt: "2026-05-14T00:00:00Z",
+            lifecycle: "filed",
+            viewedAt: nil,
+            attachments: nil,
+            vaultFolderId: "f1"
         )
         let rows = VaultListViewModel.flatten(
             folders: [folder],
@@ -119,39 +160,73 @@ final class VaultListViewModelTests: XCTestCase {
     }
 
     func testFilterMatchesTitleSubtitleOrFolderLabel() {
-        let folder = VaultFolderDTO(
-            id: "f1", userId: "u1", drawer: "personal", label: "Civic & permits",
-            icon: nil, color: nil, system: true, itemCount: nil, sortOrder: 0,
+        let civicFolder = VaultFolderDTO(
+            id: "f1",
+            userId: "u1",
+            drawer: "personal",
+            label: "Civic",
+            icon: nil,
+            color: nil,
+            system: true,
+            itemCount: nil,
+            sortOrder: 0,
+            createdAt: nil
+        )
+        let receiptsFolder = VaultFolderDTO(
+            id: "f2",
+            userId: "u1",
+            drawer: "personal",
+            label: "Receipts",
+            icon: nil,
+            color: nil,
+            system: true,
+            itemCount: nil,
+            sortOrder: 1,
             createdAt: nil
         )
         let permit = VaultListRow(
             id: "m1",
             item: VaultMailItemDTO(
-                id: "m1", mailType: "permit", type: nil,
+                id: "m1",
+                mailType: "permit",
+                type: nil,
                 subject: "Block-party permit approved",
-                displayTitle: nil, previewText: nil,
-                senderAddress: nil, senderBusinessName: "PBOT",
-                createdAt: nil, lifecycle: "filed",
-                viewedAt: nil, attachments: nil, vaultFolderId: "f1"
+                displayTitle: nil,
+                previewText: nil,
+                senderAddress: nil,
+                senderBusinessName: "PBOT",
+                createdAt: nil,
+                lifecycle: "filed",
+                viewedAt: nil,
+                attachments: nil,
+                vaultFolderId: "f1"
             ),
-            folder: folder
+            folder: civicFolder
         )
         let receipt = VaultListRow(
             id: "m2",
             item: VaultMailItemDTO(
-                id: "m2", mailType: "receipt", type: nil,
+                id: "m2",
+                mailType: "receipt",
+                type: nil,
                 subject: "Costco statement",
-                displayTitle: nil, previewText: nil,
-                senderAddress: nil, senderBusinessName: "Costco",
-                createdAt: nil, lifecycle: "filed",
-                viewedAt: nil, attachments: nil, vaultFolderId: "f1"
+                displayTitle: nil,
+                previewText: nil,
+                senderAddress: nil,
+                senderBusinessName: "Costco",
+                createdAt: nil,
+                lifecycle: "filed",
+                viewedAt: nil,
+                attachments: nil,
+                vaultFolderId: "f2"
             ),
-            folder: folder
+            folder: receiptsFolder
         )
         let rows = [permit, receipt]
         XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "permit").map { $0.id }, ["m1"])
         XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "costco").map { $0.id }, ["m2"])
-        XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "Civic").count, 2)
+        XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "Civic").map { $0.id }, ["m1"])
+        XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "Receipts").map { $0.id }, ["m2"])
         XCTAssertEqual(VaultListViewModel.filter(rows: rows, query: "").count, 2)
     }
 
@@ -172,13 +247,24 @@ final class VaultListViewModelTests: XCTestCase {
     func testQueryChangeUpdatesLoadedRows() async {
         let foldersBody = """
         {"folders":[
-          {"id":"f1","user_id":"u1","drawer":"personal","label":"Receipts","icon":"🧾","color":"#D97706","system":true,"item_count":2,"sort_order":0}
+          {
+            "id":"f1","user_id":"u1","drawer":"personal","label":"Receipts",
+            "icon":"🧾","color":"#D97706","system":true,"item_count":2,"sort_order":0
+          }
         ]}
         """
         let itemsBody = """
         {"items":[
-          {"id":"m1","mail_type":"receipt","subject":"Costco statement","sender_business_name":"Costco","created_at":"2026-05-15T12:00:00Z","lifecycle":"filed","vault_folder_id":"f1"},
-          {"id":"m2","mail_type":"receipt","subject":"Trader Joes statement","sender_business_name":"TJ","created_at":"2026-05-14T12:00:00Z","lifecycle":"filed","vault_folder_id":"f1"}
+          {
+            "id":"m1","mail_type":"receipt","subject":"Costco statement",
+            "sender_business_name":"Costco","created_at":"2026-05-15T12:00:00Z",
+            "lifecycle":"filed","vault_folder_id":"f1"
+          },
+          {
+            "id":"m2","mail_type":"receipt","subject":"Trader Joes statement",
+            "sender_business_name":"TJ","created_at":"2026-05-14T12:00:00Z",
+            "lifecycle":"filed","vault_folder_id":"f1"
+          }
         ],"total":2}
         """
         SequencedURLProtocol.sequence = [

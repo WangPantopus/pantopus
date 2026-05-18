@@ -26,10 +26,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import javax.inject.Inject
 
 /**
  * T6.5e (P19.5) — ViewModel for the Mailbox Vault list. The vault is
@@ -272,8 +272,9 @@ data class VaultListRow(
                 SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US),
             )
         parsers.forEach { it.timeZone = TimeZone.getTimeZone("UTC") }
-        val date = parsers.firstNotNullOfOrNull { runCatching { it.parse(iso) }.getOrNull() }
-            ?: return null
+        val date =
+            parsers.firstNotNullOfOrNull { runCatching { it.parse(iso) }.getOrNull() }
+                ?: return null
         return "Saved ${SimpleDateFormat("MMM d", Locale.US).format(date)}"
     }
 }

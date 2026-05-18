@@ -154,7 +154,10 @@ internal fun DecideStep(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(text = "Who are you writing to?", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         Text(
-            text = "Choose a verified neighbor, a saved correspondent, or paste a handle. Mail keeps your name and address private — the recipient only sees what you choose to share.",
+            text =
+                "Choose a verified neighbor, a saved correspondent, or paste a handle. " +
+                    "Mail keeps your name and address private — the recipient only sees what you " +
+                    "choose to share.",
             fontSize = 13.sp,
             color = PantopusColors.appTextSecondary,
         )
