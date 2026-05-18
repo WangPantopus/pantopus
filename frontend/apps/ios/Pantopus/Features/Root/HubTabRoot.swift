@@ -111,6 +111,8 @@ public enum HubRoute: Hashable {
     case chatConversation(InboxConversationDestination)
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
     case menu
+    /// Edit profile form — pushed by Settings → "Edit profile". P1.4.
+    case editProfile
     /// Mailbox search target. Replaced when `/api/mailbox` accepts a query.
     case mailboxSearch
     /// Generic placeholder for any intent whose destination hasn't been
@@ -887,9 +889,15 @@ public struct HubTabRoot: View {
         case .menu:
             SettingsView(
                 onClose: { if !path.isEmpty { path.removeLast() } },
-                onEditProfile: { Task { @MainActor in push(.placeholder(label: "Edit profile")) } },
+                onEditProfile: { Task { @MainActor in push(.editProfile) } },
                 onSignedOut: { if !path.isEmpty { path.removeLast() } }
             )
+        case .editProfile:
+            // `EditProfileView` reads `@Environment(\.dismiss)` and uses
+            // it for both Close and save-success pop. Inside a
+            // NavigationStack push, `dismiss()` pops to the previous
+            // route, so wiring an explicit `onClose` is unnecessary.
+            EditProfileView()
         case .mailboxSearch:
             NotYetAvailableView(tabName: "Mail search", icon: .search)
         case let .placeholder(label):

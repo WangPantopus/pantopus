@@ -130,6 +130,7 @@ import app.pantopus.android.ui.screens.notifications.NotificationsScreen
 import app.pantopus.android.ui.screens.offers.OffersScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
+import app.pantopus.android.ui.screens.profile.EditProfileScreen
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
 import app.pantopus.android.ui.screens.profile.PublicProfileScreen
 import app.pantopus.android.ui.screens.review_signups.ReviewSignupsScreen
@@ -317,6 +318,10 @@ private object ChildRoutes {
 
     /** Hub menu icon target. Replaced by Settings in T3.1. */
     const val MENU = "settings"
+
+    /** P1.4 — Settings → Edit profile. Pushed from the Hub menu and
+     *  from the You tab's "Edit profile" section row. */
+    const val EDIT_PROFILE = "profile/edit"
 
     /** Notification preferences (T3.1). */
     const val SETTINGS_NOTIFICATIONS = "settings/notifications"
@@ -802,7 +807,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenMailbox = { navController.navigate(ChildRoutes.MAILBOX_LIST) },
                     onOpenEditProfile = {
-                        navController.navigate(ChildRoutes.placeholder("Edit profile"))
+                        navController.navigate(ChildRoutes.EDIT_PROFILE)
                     },
                     onOpenPlaceholder = { label ->
                         navController.navigate(ChildRoutes.placeholder(label))
@@ -1617,7 +1622,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             SettingsRoute.Notifications -> navController.navigate(ChildRoutes.SETTINGS_NOTIFICATIONS)
                             SettingsRoute.Privacy -> navController.navigate(ChildRoutes.SETTINGS_PRIVACY)
                             SettingsRoute.IdentityCenter -> navController.navigate(ChildRoutes.IDENTITY_CENTER)
-                            SettingsRoute.EditProfile -> navController.navigate(ChildRoutes.placeholder("Edit profile"))
+                            SettingsRoute.EditProfile -> navController.navigate(ChildRoutes.EDIT_PROFILE)
                             SettingsRoute.Password -> navController.navigate(ChildRoutes.SETTINGS_PASSWORD)
                             SettingsRoute.Verification -> navController.navigate(ChildRoutes.SETTINGS_VERIFICATION)
                             SettingsRoute.Blocks -> navController.navigate(ChildRoutes.SETTINGS_BLOCKED_USERS)
@@ -1632,6 +1637,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         }
                     },
                 )
+            }
+            composable(ChildRoutes.EDIT_PROFILE) {
+                EditProfileScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.SETTINGS_NOTIFICATIONS) {
                 NotificationSettingsScreen(onBack = { navController.popBackStack() })
