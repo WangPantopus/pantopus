@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -41,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -59,7 +61,9 @@ fun AudienceProfileScreen(
     onBack: () -> Unit = {},
     onOpenFollower: (FollowerRowContent) -> Unit = {},
     onOpenThread: (ThreadRowContent) -> Unit = {},
+    onOpenBroadcast: (UpdateCardContent, List<TierBreakdownContent.TierSegment>) -> Unit = { _, _ -> },
     onOpenSetup: () -> Unit = {},
+    onOpenCreatorInbox: () -> Unit = {},
     viewModel: AudienceProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -86,19 +90,33 @@ fun AudienceProfileScreen(
                 ErrorFrame(message = current.message, onRetry = viewModel::load)
             is AudienceProfileUiState.Loaded ->
                 LoadedFrame(
-                    loaded = current.content,
-                    activeTab = activeTab,
-                    composer = composer,
-                    selectedTier = selectedTier,
-                    visibleFollowers = viewModel.visibleFollowers(),
-                    onSelectTab = viewModel::selectTab,
-                    onSelectTier = viewModel::selectTierFilter,
-                    onComposerText = viewModel::onComposerText,
-                    onComposerVisibility = viewModel::onComposerVisibility,
-                    onComposerTier = viewModel::onComposerTier,
-                    onSubmitUpdate = viewModel::submitUpdate,
-                    onOpenFollower = onOpenFollower,
-                    onOpenThread = onOpenThread,
+                    state =
+                        AudienceProfileLoadedFrameState(
+                            loaded = current.content,
+                            activeTab = activeTab,
+                            composer = composer,
+                            selectedTier = selectedTier,
+                            visibleFollowers = viewModel.visibleFollowers(),
+                        ),
+                    actions =
+                        AudienceProfileLoadedFrameActions(
+                            onSelectTab = viewModel::selectTab,
+                            onSelectTier = viewModel::selectTierFilter,
+                            composer =
+                                AudienceProfileComposerActions(
+                                    onText = viewModel::onComposerText,
+                                    onVisibility = viewModel::onComposerVisibility,
+                                    onTier = viewModel::onComposerTier,
+                                    onSubmit = viewModel::submitUpdate,
+                                ),
+                            navigation =
+                                AudienceProfileNavigationActions(
+                                    onOpenFollower = onOpenFollower,
+                                    onOpenThread = onOpenThread,
+                                    onOpenBroadcast = onOpenBroadcast,
+                                    onOpenCreatorInbox = onOpenCreatorInbox,
+                                ),
+                        ),
                 )
         }
     }
@@ -258,51 +276,73 @@ private fun ErrorFrame(
 
 @Composable
 internal fun LoadedFrame(
-    loaded: AudienceProfileLoaded,
-    activeTab: AudienceProfileTab,
-    composer: UpdateComposerState,
-    selectedTier: Int?,
-    visibleFollowers: List<FollowerRowContent>,
-    onSelectTab: (AudienceProfileTab) -> Unit,
-    onSelectTier: (Int?) -> Unit,
-    onComposerText: (String) -> Unit,
-    onComposerVisibility: (UpdateVisibility) -> Unit,
-    onComposerTier: (Int?) -> Unit,
-    onSubmitUpdate: () -> Unit,
-    onOpenFollower: (FollowerRowContent) -> Unit,
-    onOpenThread: (ThreadRowContent) -> Unit,
+    state: AudienceProfileLoadedFrameState,
+    actions: AudienceProfileLoadedFrameActions,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().testTag("audienceProfileContent"),
     ) {
-        HeaderCard(loaded.header)
-        TabStrip(activeTab = activeTab, onSelect = onSelectTab)
-        when (activeTab) {
+        HeaderCard(state.loaded.header)
+        TabStrip(activeTab = state.activeTab, onSelect = actions.onSelectTab)
+        when (state.activeTab) {
             AudienceProfileTab.Updates ->
                 UpdatesTab(
-                    updates = loaded.updates,
-                    composer = composer,
-                    channelId = loaded.channelId,
-                    onComposerText = onComposerText,
-                    onComposerVisibility = onComposerVisibility,
-                    onComposerTier = onComposerTier,
-                    onSubmit = onSubmitUpdate,
+                    updates = state.loaded.updates,
+                    composer = state.composer,
+                    channelId = state.loaded.channelId,
+                    composerActions = actions.composer,
+                    onOpenBroadcast = { card ->
+                        actions.navigation.onOpenBroadcast(card, state.loaded.tierBreakdown.segments)
+                    },
                 )
             AudienceProfileTab.Followers ->
                 FollowersTab(
-                    cells = loaded.analyticsCells,
-                    breakdown = loaded.tierBreakdown,
-                    chips = loaded.tierChips,
-                    selectedTier = selectedTier,
-                    followers = visibleFollowers,
-                    onSelectTier = onSelectTier,
-                    onOpenFollower = onOpenFollower,
+                    cells = state.loaded.analyticsCells,
+                    breakdown = state.loaded.tierBreakdown,
+                    chips = state.loaded.tierChips,
+                    selectedTier = state.selectedTier,
+                    followers = state.visibleFollowers,
+                    onSelectTier = actions.onSelectTier,
+                    onOpenFollower = actions.navigation.onOpenFollower,
                 )
             AudienceProfileTab.Threads ->
-                ThreadsTab(threads = loaded.threads, onOpenThread = onOpenThread)
+                ThreadsTab(
+                    threads = state.loaded.threads,
+                    onOpenThread = actions.navigation.onOpenThread,
+                    onOpenCreatorInbox = actions.navigation.onOpenCreatorInbox,
+                )
         }
     }
 }
+
+internal data class AudienceProfileLoadedFrameState(
+    val loaded: AudienceProfileLoaded,
+    val activeTab: AudienceProfileTab,
+    val composer: UpdateComposerState,
+    val selectedTier: Int?,
+    val visibleFollowers: List<FollowerRowContent>,
+)
+
+internal data class AudienceProfileLoadedFrameActions(
+    val onSelectTab: (AudienceProfileTab) -> Unit,
+    val onSelectTier: (Int?) -> Unit,
+    val composer: AudienceProfileComposerActions,
+    val navigation: AudienceProfileNavigationActions,
+)
+
+internal data class AudienceProfileComposerActions(
+    val onText: (String) -> Unit,
+    val onVisibility: (UpdateVisibility) -> Unit,
+    val onTier: (Int?) -> Unit,
+    val onSubmit: () -> Unit,
+)
+
+internal data class AudienceProfileNavigationActions(
+    val onOpenFollower: (FollowerRowContent) -> Unit,
+    val onOpenThread: (ThreadRowContent) -> Unit,
+    val onOpenBroadcast: (UpdateCardContent, List<TierBreakdownContent.TierSegment>) -> Unit = { _, _ -> },
+    val onOpenCreatorInbox: () -> Unit = {},
+)
 
 @Composable
 private fun HeaderCard(header: AudienceHeaderContent) {
@@ -404,10 +444,8 @@ private fun UpdatesTab(
     updates: List<UpdateCardContent>,
     composer: UpdateComposerState,
     channelId: String?,
-    onComposerText: (String) -> Unit,
-    onComposerVisibility: (UpdateVisibility) -> Unit,
-    onComposerTier: (Int?) -> Unit,
-    onSubmit: () -> Unit,
+    composerActions: AudienceProfileComposerActions,
+    onOpenBroadcast: (UpdateCardContent) -> Unit,
 ) {
     Column(
         modifier =
@@ -421,15 +459,17 @@ private fun UpdatesTab(
         ComposerCard(
             composer = composer,
             channelId = channelId,
-            onText = onComposerText,
-            onVisibility = onComposerVisibility,
-            onTier = onComposerTier,
-            onSubmit = onSubmit,
+            onText = composerActions.onText,
+            onVisibility = composerActions.onVisibility,
+            onTier = composerActions.onTier,
+            onSubmit = composerActions.onSubmit,
         )
         if (updates.isEmpty()) {
             EmptyUpdatesCard()
         } else {
-            updates.forEach { UpdateCard(it) }
+            updates.forEach { card ->
+                UpdateCard(card = card, onOpen = { onOpenBroadcast(card) })
+            }
         }
         Spacer(modifier = Modifier.height(24.dp))
     }
@@ -601,7 +641,10 @@ private fun EmptyUpdatesCard() {
 }
 
 @Composable
-private fun UpdateCard(card: UpdateCardContent) {
+private fun UpdateCard(
+    card: UpdateCardContent,
+    onOpen: () -> Unit,
+) {
     Column(
         modifier =
             Modifier
@@ -609,6 +652,7 @@ private fun UpdateCard(card: UpdateCardContent) {
                 .clip(RoundedCornerShape(12.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .clickable(onClick = onOpen)
                 .padding(14.dp)
                 .testTag("updateCard_${card.id}"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -632,7 +676,10 @@ private fun UpdateCard(card: UpdateCardContent) {
             Text(text = card.timeAgo, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
         }
         Text(text = card.body, fontSize = 14.sp, color = PantopusColors.appText)
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             Text(
                 text = "Delivered ${card.deliveredCount}",
                 fontSize = 11.sp,
@@ -644,6 +691,14 @@ private fun UpdateCard(card: UpdateCardContent) {
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = PantopusColors.appTextSecondary,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronRight,
+                contentDescription = null,
+                size = 13.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.appTextMuted,
             )
         }
     }
@@ -918,6 +973,7 @@ private fun EmptyFollowersCard() {
 private fun ThreadsTab(
     threads: List<ThreadRowContent>,
     onOpenThread: (ThreadRowContent) -> Unit,
+    onOpenCreatorInbox: () -> Unit = {},
 ) {
     Column(
         modifier =
@@ -931,9 +987,51 @@ private fun ThreadsTab(
         if (threads.isEmpty()) {
             EmptyThreadsCard()
         } else {
+            ViewAllMessagesCTA(onClick = onOpenCreatorInbox)
             threads.forEach { ThreadRow(it, onOpen = { onOpenThread(it) }) }
         }
         Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun ViewAllMessagesCTA(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(PantopusColors.primary50)
+                .border(1.dp, PantopusColors.primary100, RoundedCornerShape(8.dp))
+                .clickable(onClick = onClick)
+                .heightIn(min = 44.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .testTag("audienceProfileViewAllMessages")
+                .semantics { contentDescription = "View all messages in Creator Inbox" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Inbox,
+            contentDescription = null,
+            size = 14.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.primary600,
+        )
+        Text(
+            text = "View all messages",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.primary700,
+            modifier = Modifier.weight(1f),
+        )
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 12.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.primary600,
+        )
     }
 }
 

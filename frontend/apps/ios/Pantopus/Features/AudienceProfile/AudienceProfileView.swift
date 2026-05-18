@@ -18,20 +18,26 @@ public struct AudienceProfileView: View {
     private let onBack: @MainActor () -> Void
     private let onOpenFollower: @MainActor (FollowerRowContent) -> Void
     private let onOpenThread: @MainActor (ThreadRowContent) -> Void
+    private let onOpenBroadcast: @MainActor (UpdateCardContent, [TierBreakdownContent.TierSegment]) -> Void
     private let onOpenSetup: @MainActor () -> Void
+    private let onOpenCreatorInbox: @MainActor () -> Void
 
     init(
         viewModel: AudienceProfileViewModel = AudienceProfileViewModel(),
         onBack: @escaping @MainActor () -> Void = {},
         onOpenFollower: @escaping @MainActor (FollowerRowContent) -> Void = { _ in },
         onOpenThread: @escaping @MainActor (ThreadRowContent) -> Void = { _ in },
-        onOpenSetup: @escaping @MainActor () -> Void = {}
+        onOpenBroadcast: @escaping @MainActor (UpdateCardContent, [TierBreakdownContent.TierSegment]) -> Void = { _, _ in },
+        onOpenSetup: @escaping @MainActor () -> Void = {},
+        onOpenCreatorInbox: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
         self.onOpenFollower = onOpenFollower
         self.onOpenThread = onOpenThread
+        self.onOpenBroadcast = onOpenBroadcast
         self.onOpenSetup = onOpenSetup
+        self.onOpenCreatorInbox = onOpenCreatorInbox
     }
 
     public var body: some View {
@@ -260,7 +266,7 @@ public struct AudienceProfileView: View {
                     emptyUpdatesState
                 } else {
                     ForEach(loaded.updates) { card in
-                        updateCard(card)
+                        updateCard(card, tierSegments: loaded.tierBreakdown.segments)
                     }
                 }
                 Spacer(minLength: 24)
@@ -386,41 +392,57 @@ public struct AudienceProfileView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func updateCard(_ card: UpdateCardContent) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(card.visibilityLabel.uppercased())
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Theme.Color.primary700)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(Theme.Color.primary50)
-                    .clipShape(Capsule())
-                Spacer()
-                Text(card.timeAgo)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+    private func updateCard(
+        _ card: UpdateCardContent,
+        tierSegments: [TierBreakdownContent.TierSegment]
+    ) -> some View {
+        Button {
+            onOpenBroadcast(card, tierSegments)
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(card.visibilityLabel.uppercased())
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Theme.Color.primary700)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Theme.Color.primary50)
+                        .clipShape(Capsule())
+                    Spacer()
+                    Text(card.timeAgo)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Text(card.body)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.Color.appText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .multilineTextAlignment(.leading)
+                HStack(spacing: 14) {
+                    Text("Delivered \(card.deliveredCount)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    Text("Read \(card.readCount)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    Spacer()
+                    Icon(.chevronRight, size: 13, color: Theme.Color.appTextMuted)
+                }
             }
-            Text(card.body)
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.Color.appText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            HStack(spacing: 14) {
-                Text("Delivered \(card.deliveredCount)")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                Text("Read \(card.readCount)")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        .padding(14)
-        .background(Theme.Color.appSurface)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Broadcast \(card.body). Delivered \(card.deliveredCount), read \(card.readCount).")
+        .accessibilityHint("Opens broadcast detail")
+        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("updateCard_\(card.id)")
     }
 
@@ -632,6 +654,7 @@ public struct AudienceProfileView: View {
                 if loaded.threads.isEmpty {
                     emptyThreadsState
                 } else {
+                    viewAllMessagesCTA
                     ForEach(loaded.threads) { thread in
                         threadRow(thread)
                     }
@@ -641,6 +664,32 @@ public struct AudienceProfileView: View {
             .padding(16)
         }
         .accessibilityIdentifier("audienceProfileThreadsList")
+    }
+
+    private var viewAllMessagesCTA: some View {
+        Button(action: onOpenCreatorInbox) {
+            HStack(spacing: 8) {
+                Icon(.inbox, size: 14, color: Theme.Color.primary600)
+                Text("View all messages")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.primary700)
+                Spacer(minLength: 0)
+                Icon(.chevronRight, size: 12, color: Theme.Color.primary600)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 44)
+            .background(Theme.Color.primary50)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.primary100, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("audienceProfileViewAllMessages")
+        .accessibilityLabel("View all messages in Creator Inbox")
     }
 
     private func threadRow(_ row: ThreadRowContent) -> some View {

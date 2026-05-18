@@ -156,6 +156,12 @@ class MeViewModel
                                             "Audience profile",
                                             routeKey = "me.audience",
                                         ),
+                                        MeSectionRow(
+                                            "creatorInbox",
+                                            PantopusIcon.Inbox,
+                                            "Creator inbox",
+                                            routeKey = "me.creatorInbox",
+                                        ),
                                     ),
                             ),
                             MeSection(

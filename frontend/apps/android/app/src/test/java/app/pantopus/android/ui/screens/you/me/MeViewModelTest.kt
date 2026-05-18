@@ -137,7 +137,7 @@ class MeViewModelTest {
             assertTrue(loaded.personal.sections.any { it.header == "Activity" })
             assertTrue(loaded.personal.sections.any { it.header == "Help & Legal" })
             assertEquals(
-                listOf("me.editProfile", "me.identityCenter", "me.audience"),
+                listOf("me.editProfile", "me.identityCenter", "me.audience", "me.creatorInbox"),
                 loaded.personal.sections.first { it.header == "Profile & Privacy" }.rows.map { it.routeKey },
             )
 

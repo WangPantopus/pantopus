@@ -57,6 +57,21 @@ public enum YouRoute: Hashable {
     case identityCenter
     /// T3.3 — Audience profile. The "me.audience" Personal section row pushes here.
     case audienceProfile
+    /// P1.3 — Broadcast detail full-screen takeover, pushed when the
+    /// creator taps an update card on the Audience Profile. The
+    /// `card` payload seeds the hero + delivered/read counters so the
+    /// detail can render without a second fetch, and `tierSegments`
+    /// carries the persona's tier ladder so the read-share bar paints
+    /// per-tier widths immediately.
+    case broadcastDetail(broadcastId: String, card: UpdateCardContent, tierSegments: [TierBreakdownContent.TierSegment])
+    /// P1.2 — Creator Inbox (standalone DM thread list for creators).
+    /// The "me.creatorInbox" Personal section row pushes here, and the
+    /// Audience Profile Threads tab "View all messages" CTA also lands
+    /// here.
+    case creatorInbox
+    /// P1.2 — Conversation push from a Creator Inbox row tap. Reuses
+    /// the existing `ChatConversationView` shell in `.person` mode.
+    case creatorInboxConversation(CreatorInboxConversationDestination)
     /// T5.2.2 — Bills. The home-context "me.bills" action tile + Activity
     /// row push here with the primary home id resolved by the VM.
     case homeBills(homeId: String)
@@ -440,6 +455,9 @@ public struct YouTabRoot: View {
         case "me.audience":
             path.append(.audienceProfile)
             return
+        case "me.creatorInbox":
+            path.append(.creatorInbox)
+            return
         case "me.bills":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
@@ -800,12 +818,80 @@ public struct YouTabRoot: View {
                     Task { @MainActor in path.append(.placeholder(label: "Follower")) }
                 },
                 onOpenThread: { _ in
-                    Task { @MainActor in path.append(.placeholder(label: "Thread")) }
+                    Task { @MainActor in path.append(.creatorInbox) }
+                },
+                onOpenBroadcast: { card, tierSegments in
+                    Task { @MainActor in
+                        path.append(.broadcastDetail(
+                            broadcastId: card.id,
+                            card: card,
+                            tierSegments: tierSegments
+                        ))
+                    }
                 },
                 onOpenSetup: {
                     Task { @MainActor in path.append(.placeholder(label: "Audience setup")) }
+                },
+                onOpenCreatorInbox: {
+                    Task { @MainActor in path.append(.creatorInbox) }
                 }
             )
+        case let .broadcastDetail(broadcastId, card, tierSegments):
+            BroadcastDetailView(
+                viewModel: BroadcastDetailViewModel(
+                    broadcastId: broadcastId,
+                    seed: card,
+                    tierSegments: tierSegments
+                ),
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOverflow: {
+                    Task { @MainActor in path.append(.placeholder(label: "Broadcast actions")) }
+                },
+                onReply: {
+                    Task { @MainActor in path.append(.placeholder(label: "Reply to broadcast")) }
+                },
+                onBoost: {
+                    Task { @MainActor in path.append(.placeholder(label: "Boost broadcast")) }
+                },
+                onPin: {
+                    Task { @MainActor in path.append(.placeholder(label: "Pin broadcast")) }
+                }
+            )
+        case .creatorInbox:
+            CreatorInboxView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOpenThread: { row in
+                    Task { @MainActor in
+                        let dest = CreatorInboxConversationDestination(
+                            userId: row.counterpartyUserId ?? row.id,
+                            displayName: row.displayName.isEmpty ? row.handle : row.displayName,
+                            initials: row.initials,
+                            verified: row.verifiedLocal
+                        )
+                        path.append(.creatorInboxConversation(dest))
+                    }
+                },
+                onOpenBroadcast: {
+                    Task { @MainActor in path.append(.audienceProfile) }
+                },
+                onOpenSettings: {
+                    Task { @MainActor in path.append(.placeholder(label: "Inbox settings")) }
+                }
+            )
+        case let .creatorInboxConversation(dest):
+            ChatConversationView(
+                viewModel: ChatConversationViewModel(
+                    mode: .person(otherUserId: dest.userId),
+                    counterparty: .person(
+                        name: dest.displayName,
+                        initials: dest.initials,
+                        locality: nil,
+                        verified: dest.verified,
+                        online: false
+                    ),
+                    currentUserId: currentUserId ?? ""
+                )
+            ) { if !path.isEmpty { path.removeLast() } }
         case let .homeBills(homeId):
             BillsListView(
                 viewModel: BillsListViewModel(

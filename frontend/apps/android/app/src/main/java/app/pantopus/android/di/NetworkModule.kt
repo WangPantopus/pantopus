@@ -5,6 +5,7 @@ import app.pantopus.android.BuildConfig
 import app.pantopus.android.data.api.ApiService
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequestJsonAdapter
 import app.pantopus.android.data.api.net.RetryInterceptor
+import app.pantopus.android.data.api.services.AdminApi
 import app.pantopus.android.data.api.services.AudienceProfileApi
 import app.pantopus.android.data.api.services.AuthApi
 import app.pantopus.android.data.api.services.BlocksApi
@@ -236,6 +237,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideSupportTrainsApi(retrofit: Retrofit): SupportTrainsApi = retrofit.create(SupportTrainsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideAdminApi(retrofit: Retrofit): AdminApi = retrofit.create(AdminApi::class.java)
 
     // Legacy aggregate — retained for existing AuthRepository / FeedScreen.
     @Provides @Singleton
