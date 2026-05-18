@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -110,6 +111,17 @@ fun MapListHybridShell(
             position = CameraPosition.fromLatLngZoom(cameraStartCoord, 15f)
         }
 
+    // Recenter the camera when the supplied anchor changes — mirrors
+    // the iOS `onChange(of: anchor)` recenter + the web
+    // `RecenterOnAnchor` effect. Without this, callers that resolve
+    // the user's location after first composition see a stale camera.
+    LaunchedEffect(anchor?.latitude, anchor?.longitude) {
+        if (anchor != null) {
+            cameraState.position =
+                CameraPosition.fromLatLngZoom(LatLng(anchor.latitude, anchor.longitude), 15f)
+        }
+    }
+
     var dragDelta by remember { mutableStateOf(0f) }
     val baseHeightDp = detent.height
     val baseHeightPx = with(density) { baseHeightDp.toPx() }
@@ -144,7 +156,8 @@ fun MapListHybridShell(
                     .padding(WindowInsets.statusBars.asPaddingValues())
                     .padding(top = 8.dp, start = 14.dp, end = 14.dp)
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .testTag("mapListHybridTopPill"),
         ) {
             topPill()
         }
@@ -155,7 +168,8 @@ fun MapListHybridShell(
                     .padding(WindowInsets.statusBars.asPaddingValues())
                     .padding(top = 56.dp)
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .testTag("mapListHybridChips"),
         ) {
             categoryChips()
         }
@@ -283,8 +297,8 @@ private fun BottomSheet(
                 .testTag("mapListHybridSheet"),
     ) {
         MapListHybridSheetGrabber()
-        sheetHeader()
-        sheetBody()
+        Box(modifier = Modifier.testTag("mapListHybridSheetHeader")) { sheetHeader() }
+        Box(modifier = Modifier.testTag("mapListHybridSheetBody")) { sheetBody() }
     }
 }
 

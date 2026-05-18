@@ -96,7 +96,7 @@ function pinDivIcon(pin: MapPin, isActive: boolean, reduceMotion: boolean): L.Di
   return L.divIcon({
     className: 'mlhPin',
     html: `
-      <div class="mlhPinRoot" data-pin-id="${pin.id}">
+      <div class="mlhPinRoot" data-testid="mapListHybridPin_${pin.id}">
         ${haloHtml}
         <span class="mlhPinDot" style="background:${pin.color}; ${ringStyle}"></span>
       </div>

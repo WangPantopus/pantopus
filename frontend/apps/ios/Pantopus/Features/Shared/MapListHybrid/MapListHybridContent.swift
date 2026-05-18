@@ -85,10 +85,23 @@ public struct MapAnchor: Sendable, Hashable {
 /// unit tests can verify the snap-to-nearest + velocity-nudge math
 /// without spinning up the SwiftUI hierarchy.
 ///
+/// Sign convention is shared with the Android + web resolvers so the
+/// same gesture lands at the same stop on every platform:
+///
+/// - **Positive velocity = downward flick** → sheet shrinks
+///   (`expanded` → `standard` → `collapsed`)
+/// - **Negative velocity = upward flick** → sheet grows
+///   (`collapsed` → `standard` → `expanded`)
+///
+/// This matches Compose's `draggable` and the browser's pointer
+/// `clientY` delta conventions. iOS shells should pass the raw
+/// `gesture.predictedEndTranslation.height` (which UIKit makes positive
+/// when the finger moves down) without flipping the sign.
+///
 /// - Parameters:
 ///   - current: detent at drag start
-///   - velocity: predicted upward velocity in points / second (positive
-///     = flick-up gesture)
+///   - velocity: predicted vertical velocity in points / second
+///     (positive = downward)
 ///   - displacedHeight: live sheet height in points the moment the
 ///     gesture released
 /// - Returns: the detent the sheet should snap to.
@@ -108,16 +121,18 @@ public enum MapListHybridDetentResolver {
         var target = sorted.first ?? current
 
         if velocity > velocityThreshold {
-            switch current {
-            case .collapsed: target = .standard
-            case .standard: target = .expanded
-            case .expanded: target = .expanded
-            }
-        } else if velocity < -velocityThreshold {
+            // Flick down → shrink one detent.
             switch current {
             case .expanded: target = .standard
             case .standard: target = .collapsed
             case .collapsed: target = .collapsed
+            }
+        } else if velocity < -velocityThreshold {
+            // Flick up → grow one detent.
+            switch current {
+            case .collapsed: target = .standard
+            case .standard: target = .expanded
+            case .expanded: target = .expanded
             }
         }
         return target

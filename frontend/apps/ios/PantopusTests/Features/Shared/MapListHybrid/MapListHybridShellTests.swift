@@ -53,11 +53,15 @@ final class MapListHybridShellTests: XCTestCase {
     }
 
     // MARK: - Velocity nudge
+    //
+    // Sign convention: positive velocity = downward flick (shrinks the
+    // sheet); negative = upward (grows). Matches Compose's `draggable`
+    // and the browser's `clientY` delta — see the resolver docstring.
 
     func testFlickUpFromCollapsedAdvancesToStandard() {
         let target = MapListHybridDetentResolver.resolve(
             from: .collapsed,
-            velocity: 800, // > threshold
+            velocity: -800, // upward → grow
             displacedHeight: 170
         )
         XCTAssertEqual(target, .standard)
@@ -66,7 +70,7 @@ final class MapListHybridShellTests: XCTestCase {
     func testFlickUpFromStandardAdvancesToExpanded() {
         let target = MapListHybridDetentResolver.resolve(
             from: .standard,
-            velocity: 1000,
+            velocity: -1000,
             displacedHeight: 320
         )
         XCTAssertEqual(target, .expanded)
@@ -75,7 +79,7 @@ final class MapListHybridShellTests: XCTestCase {
     func testFlickUpFromExpandedStaysExpanded() {
         let target = MapListHybridDetentResolver.resolve(
             from: .expanded,
-            velocity: 1200,
+            velocity: -1200,
             displacedHeight: 520
         )
         XCTAssertEqual(target, .expanded)
@@ -84,7 +88,7 @@ final class MapListHybridShellTests: XCTestCase {
     func testFlickDownFromExpandedRetreatsToStandard() {
         let target = MapListHybridDetentResolver.resolve(
             from: .expanded,
-            velocity: -800,
+            velocity: 800, // downward → shrink
             displacedHeight: 500
         )
         XCTAssertEqual(target, .standard)
@@ -93,7 +97,7 @@ final class MapListHybridShellTests: XCTestCase {
     func testFlickDownFromStandardRetreatsToCollapsed() {
         let target = MapListHybridDetentResolver.resolve(
             from: .standard,
-            velocity: -1000,
+            velocity: 1000,
             displacedHeight: 280
         )
         XCTAssertEqual(target, .collapsed)
@@ -102,7 +106,7 @@ final class MapListHybridShellTests: XCTestCase {
     func testFlickDownFromCollapsedStaysCollapsed() {
         let target = MapListHybridDetentResolver.resolve(
             from: .collapsed,
-            velocity: -1200,
+            velocity: 1200,
             displacedHeight: 150
         )
         XCTAssertEqual(target, .collapsed)
@@ -111,7 +115,8 @@ final class MapListHybridShellTests: XCTestCase {
     // MARK: - Threshold boundary
 
     func testVelocityAtThresholdDoesNotNudge() {
-        // At the threshold exactly, snap-to-nearest should win.
+        // At the threshold exactly, snap-to-nearest should win
+        // (resolver uses strict `>` so equal-to-threshold defers).
         let target = MapListHybridDetentResolver.resolve(
             from: .collapsed,
             velocity: MapListHybridDetentResolver.velocityThreshold,

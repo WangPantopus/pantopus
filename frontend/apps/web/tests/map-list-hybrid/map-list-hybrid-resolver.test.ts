@@ -10,6 +10,7 @@
 import {
   MAP_LIST_HYBRID_DETENT_HEIGHTS,
   MAP_LIST_HYBRID_DETENT_ORDER,
+  MAP_LIST_HYBRID_VELOCITY_THRESHOLD,
   resolveMapListHybridDetent,
   type MapListHybridDetent,
 } from '../../src/components/map-list-hybrid/types';
@@ -74,6 +75,10 @@ describe('resolveMapListHybridDetent', () => {
     it('order is small → large', () => {
       const expected: MapListHybridDetent[] = ['collapsed', 'standard', 'expanded'];
       expect([...MAP_LIST_HYBRID_DETENT_ORDER]).toEqual(expected);
+    });
+
+    it('velocity threshold matches the iOS resolver (600 logical px/s)', () => {
+      expect(MAP_LIST_HYBRID_VELOCITY_THRESHOLD).toBe(600);
     });
   });
 });

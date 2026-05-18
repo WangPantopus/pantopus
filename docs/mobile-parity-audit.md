@@ -171,23 +171,49 @@ diffs cleanly).
 
 **Detent resolver.** A pure function — `MapListHybridDetentResolver`
 on iOS / Android, `resolveMapListHybridDetent` on web — runs the
-snap-to-nearest + velocity-nudge math. All three platforms share the
-same algorithm so the same gesture lands at the same stop:
+snap-to-nearest + velocity-nudge math. All three resolvers share the
+same algorithm and the same **sign convention** so the same gesture
+lands at the same stop:
 
-- snap to the detent closest to the released height
-- flick up (negative velocity on iOS / web, negative on Android's
-  draggable too) advances one stop
-- flick down retreats one stop
-- magnitudes equal to the threshold do **not** nudge — strict greater
-  than only — so the threshold edge defers to snap-to-nearest
+- positive velocity = downward flick → shrink one detent
+- negative velocity = upward flick → grow one detent
+- magnitudes equal to the threshold do **not** nudge — strict `>` /
+  `<` only — so the threshold edge defers to snap-to-nearest
+- snap-to-nearest by absolute distance to the released height
+  (`detent.height` − `displaced`) when neither flick branch fires
 
-**Test tag parity (root container).** Both platforms + web use the
-same identifier — `mapListHybridShell` — plus child tags
-`mapListHybridMap`, `mapListHybridPin_<id>`, `mapListHybridSheet`,
-`mapListHybridSheetHeader`, `mapListHybridSheetBody`,
-`mapListHybridMapControls`. The same string lives on iOS
-(`accessibilityIdentifier`), Android (`Modifier.testTag`), and web
-(`data-testid`).
+Velocity *units* differ by platform because the underlying gesture
+systems do; **the resolver threshold is calibrated per-platform so
+the same physical flick crosses it on every device**:
+
+| Platform | Units | Threshold |
+|---|---|---|
+| iOS | UIKit points / second | 600 (`velocityThreshold`) |
+| Android | raw pixels / second (Compose `draggable`) | 1 200 (`VELOCITY_THRESHOLD`) |
+| Web | CSS pixels / second (pointer events) | 600 (`MAP_LIST_HYBRID_VELOCITY_THRESHOLD`) |
+
+(600 pt/s ≈ 1 200 px/s on a 2x retina iOS device; CSS pixels are
+density-independent like iOS points, hence the 600 match.)
+
+**Test tag parity (root container).** All three platforms expose the
+same set of test identifiers on the shell-owned wrappers, so
+cross-platform UI tests can mirror by string:
+
+| Test ID | Wraps |
+|---|---|
+| `mapListHybridShell` | full canvas root |
+| `mapListHybridMap` | the live map layer (also a `mapListHybridMapSkeleton` on web while the dynamic import loads) |
+| `mapListHybridTopPill` | top-pill slot wrapper |
+| `mapListHybridChips` | category-chips slot wrapper |
+| `mapListHybridMapControls` | map-controls slot wrapper |
+| `mapListHybridSheet` | the rounded bottom-sheet container |
+| `mapListHybridSheetHeader` | sheet-header slot wrapper |
+| `mapListHybridSheetBody` | sheet-body slot wrapper |
+| `mapListHybridPin_<id>` | per-pin marker (web tags via the leaflet `DivIcon` HTML) |
+
+iOS uses `accessibilityIdentifier`; Android uses `Modifier.testTag`;
+web uses `data-testid`. Slot *contents* carry their own consumer-
+supplied identifiers — the shell only tags its own wrappers.
 
 **P24 acceptance.** Shell-only — the existing `NearbyMapView` (T2.4)
 keeps its own chrome and migrates in P26 (wiring sweep). Future

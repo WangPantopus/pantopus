@@ -42,12 +42,26 @@ export interface MapAnchor {
 }
 
 /**
+ * CSS-pixel-per-second threshold above which a flick gesture advances
+ * one detent past the snap-to-nearest target. Exposed alongside the
+ * iOS `MapListHybridDetentResolver.velocityThreshold` and the Android
+ * `MapListHybridDetentResolver.VELOCITY_THRESHOLD` so tests and
+ * consumers reach the same number on every platform.
+ */
+export const MAP_LIST_HYBRID_VELOCITY_THRESHOLD = 600;
+
+/**
  * Pure resolver for the next detent after a drag release. Mirrors the
  * iOS / Android resolvers so the same gesture lands at the same stop
  * on every platform.
  *
+ * Sign convention: **positive velocity = downward flick** → sheet
+ * shrinks (`expanded` → `standard` → `collapsed`). Negative = upward
+ * → grows. Matches Compose's `draggable` and the browser's `clientY`
+ * delta convention.
+ *
  * @param current      Detent at drag start
- * @param velocity     Pixels-per-second (positive = downward / shrink)
+ * @param velocity     CSS-px/second (positive = downward / shrink)
  * @param displacedPx  Live sheet height the moment the drag released
  */
 export function resolveMapListHybridDetent(
@@ -55,14 +69,12 @@ export function resolveMapListHybridDetent(
   velocity: number,
   displacedPx: number,
 ): MapListHybridDetent {
-  const VELOCITY_THRESHOLD = 600;
-
-  if (velocity > VELOCITY_THRESHOLD) {
+  if (velocity > MAP_LIST_HYBRID_VELOCITY_THRESHOLD) {
     if (current === 'expanded') return 'standard';
     if (current === 'standard') return 'collapsed';
     return 'collapsed';
   }
-  if (velocity < -VELOCITY_THRESHOLD) {
+  if (velocity < -MAP_LIST_HYBRID_VELOCITY_THRESHOLD) {
     if (current === 'collapsed') return 'standard';
     if (current === 'standard') return 'expanded';
     return 'expanded';

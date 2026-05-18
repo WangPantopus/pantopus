@@ -107,10 +107,19 @@ export default function MapListHybridShell({
       const lastY = dragLastY.current ?? e.clientY;
       const lastTime = dragLastTime.current ?? now;
       const dt = Math.max(16, now - lastTime);
-      // px-per-ms → px-per-second so the threshold matches the iOS and
-      // Android resolvers.
-      const velocity = (-(e.clientY - lastY) / dt) * 1000;
+      // px-per-second following the resolver's convention: positive =
+      // downward (clientY increases). A downward flick should shrink
+      // the sheet (`velocity > threshold` branch in the resolver).
+      const velocity = ((e.clientY - lastY) / dt) * 1000;
       const displaced = baseHeight + dragOffset;
+
+      // Release pointer capture so the browser's tracking is restored
+      // and subsequent gestures aren't intercepted by this button.
+      try {
+        (e.currentTarget as HTMLButtonElement).releasePointerCapture(e.pointerId);
+      } catch {
+        // Some browsers throw when capture wasn't set; ignore.
+      }
 
       // True tap (no measurable drag) → cycle forward to the next detent.
       // Otherwise resolve based on drag + velocity.
@@ -132,16 +141,18 @@ export default function MapListHybridShell({
     [baseHeight, dragOffset, detent, onDetentChange],
   );
 
-  const sheetStyle: CSSProperties = useMemo(
-    () => ({
-      height: liveHeight,
-      transition:
-        dragOffset === 0 && !prefersReducedMotion
-          ? 'height 240ms cubic-bezier(0.2, 0.8, 0.2, 1)'
-          : undefined,
-    }),
-    [liveHeight, dragOffset, prefersReducedMotion],
-  );
+  const sheetStyle: CSSProperties = useMemo(() => {
+    // No transition while the user is mid-drag (`dragOffset !== 0`),
+    // and an explicit `none` under reduce-motion so cascaded rules
+    // can't sneak an animation in.
+    let transition: string | undefined;
+    if (prefersReducedMotion) {
+      transition = 'none';
+    } else if (dragOffset === 0) {
+      transition = 'height 240ms cubic-bezier(0.2, 0.8, 0.2, 1)';
+    }
+    return { height: liveHeight, transition };
+  }, [liveHeight, dragOffset, prefersReducedMotion]);
 
   const mapControlsBottom = liveHeight + 14;
 
@@ -150,7 +161,7 @@ export default function MapListHybridShell({
       style={containerStyle}
       data-testid="mapListHybridShell"
     >
-      <div style={mapWrapperStyle}>
+      <div style={mapWrapperStyle} data-testid="mapListHybridMap">
         <MapListHybridMapLayer
           pins={pins}
           anchor={anchor}

@@ -81,7 +81,8 @@ fun MapListHybridShellStaticPreview(
                 Modifier
                     .padding(top = 20.dp, start = 14.dp, end = 14.dp)
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .testTag("mapListHybridTopPill"),
         ) {
             topPill()
         }
@@ -91,7 +92,8 @@ fun MapListHybridShellStaticPreview(
                 Modifier
                     .padding(top = 64.dp)
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .testTag("mapListHybridChips"),
         ) {
             categoryChips()
         }
@@ -100,7 +102,8 @@ fun MapListHybridShellStaticPreview(
             modifier =
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 14.dp, bottom = detent.height + 14.dp),
+                    .padding(end = 14.dp, bottom = detent.height + 14.dp)
+                    .testTag("mapListHybridMapControls"),
         ) {
             mapControls()
         }
@@ -117,8 +120,8 @@ fun MapListHybridShellStaticPreview(
                     .testTag("mapListHybridSheet"),
         ) {
             MapListHybridSheetGrabber()
-            sheetHeader()
-            sheetBody()
+            Box(modifier = Modifier.testTag("mapListHybridSheetHeader")) { sheetHeader() }
+            Box(modifier = Modifier.testTag("mapListHybridSheetBody")) { sheetBody() }
         }
     }
 }

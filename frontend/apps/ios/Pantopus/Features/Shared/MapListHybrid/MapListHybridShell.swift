@@ -93,8 +93,10 @@ public struct MapListHybridShell<
                 topPill()
                     .padding(.top, geo.safeAreaInsets.top + 4)
                     .padding(.horizontal, 14)
+                    .accessibilityIdentifier("mapListHybridTopPill")
                 categoryChips()
                     .padding(.top, geo.safeAreaInsets.top + 50)
+                    .accessibilityIdentifier("mapListHybridChips")
                 mapControlsLayer(bottomInset: sheetHeight + 14)
                 bottomSheet(height: sheetHeight)
             }
@@ -161,6 +163,7 @@ public struct MapListHybridShell<
             .padding(.trailing, 14)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             .padding(.bottom, bottomInset)
+            .accessibilityIdentifier("mapListHybridMapControls")
     }
 
     // MARK: - Bottom sheet
@@ -171,8 +174,10 @@ public struct MapListHybridShell<
             VStack(spacing: 0) {
                 MapListHybridSheetGrabber()
                 sheetHeader()
+                    .accessibilityIdentifier("mapListHybridSheetHeader")
                 sheetBody()
                     .frame(maxHeight: .infinity, alignment: .top)
+                    .accessibilityIdentifier("mapListHybridSheetBody")
             }
             .frame(maxWidth: .infinity)
             .frame(height: height)
@@ -182,10 +187,16 @@ public struct MapListHybridShell<
             .gesture(
                 DragGesture()
                     .onChanged { gesture in
+                        // `translation.height` is positive when the
+                        // finger moves down. Negate so `dragTranslation`
+                        // is positive when the sheet is being *grown*
+                        // (finger moves up).
                         dragTranslation = -gesture.translation.height
                     }
                     .onEnded { gesture in
-                        let velocity = -gesture.predictedEndTranslation.height
+                        // Pass raw velocity (positive = downward) so the
+                        // resolver semantics align with Android + web.
+                        let velocity = gesture.predictedEndTranslation.height
                         let displacedHeight = detent.height + dragTranslation
                         let target = MapListHybridDetentResolver.resolve(
                             from: detent,
