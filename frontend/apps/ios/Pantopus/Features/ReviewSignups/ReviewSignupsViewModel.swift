@@ -9,11 +9,16 @@
 //  the trailing edge and the per-reservation note as the row body.
 //
 //  Filter strip (replaces tabs on this surface):
-//    All · Pending · Confirmed · Conflicts · Edited
+//    All · Pending · Confirmed · Edited · Canceled
 //
-//  Optimistic confirm / dismiss are wired through the row's
-//  `RowFooter` actions — the action sends to the backend and rolls
-//  back on failure.
+//  Backend ground-truth: the `:id/reservations` handler returns
+//  `id / slot_id / user_id / guest_name / status / contribution_mode /
+//  dish_title / restaurant_name / estimated_arrival_at /
+//  note_to_recipient / private_note_to_organizer /
+//  created_at / updated_at / canceled_at / User`. The design's diet
+//  flag, conflict marker, and relationship chip are not yet projected
+//  — the VM omits them gracefully. "Edited" is derived client-side
+//  from `updated_at != created_at`.
 //
 
 import Foundation
@@ -24,8 +29,8 @@ public enum ReviewSignupsFilter {
     public static let all = "all"
     public static let pending = "pending"
     public static let confirmed = "confirmed"
-    public static let conflicts = "conflicts"
     public static let edited = "edited"
+    public static let canceled = "canceled"
 }
 
 @Observable
@@ -57,8 +62,8 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
                 ChipStripConfig.Chip(id: ReviewSignupsFilter.all, label: "All", icon: .listChecks),
                 ChipStripConfig.Chip(id: ReviewSignupsFilter.pending, label: "Pending", icon: .clock),
                 ChipStripConfig.Chip(id: ReviewSignupsFilter.confirmed, label: "Confirmed", icon: .check),
-                ChipStripConfig.Chip(id: ReviewSignupsFilter.conflicts, label: "Conflicts", icon: .alertTriangle),
-                ChipStripConfig.Chip(id: ReviewSignupsFilter.edited, label: "Edited", icon: .pencil)
+                ChipStripConfig.Chip(id: ReviewSignupsFilter.edited, label: "Edited", icon: .pencil),
+                ChipStripConfig.Chip(id: ReviewSignupsFilter.canceled, label: "Canceled", icon: .x)
             ],
             selectedId: selectedFilter,
             onSelect: { [weak self] id in
@@ -125,6 +130,10 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
     // MARK: - Fetching
 
     private func fetch() async {
+        guard !supportTrainId.isEmpty else {
+            state = .error(message: "Missing support train id.")
+            return
+        }
         do {
             let response: SupportTrainReservationsResponse = try await api.request(
                 SupportTrainsEndpoints.reservations(supportTrainId: supportTrainId)
@@ -157,18 +166,21 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
         state = .loaded(sections: [RowSection(id: "signups", rows: mapped)], hasMore: false)
     }
 
+    /// Visible-to-the-organizer filter projection. `canceled` rows are
+    /// hidden from every filter except `.canceled` so the queue reads
+    /// clean.
     private var filteredReservations: [SupportTrainReservationDTO] {
         switch selectedFilter {
         case ReviewSignupsFilter.pending:
             return reservations.filter { ($0.status ?? "") == "pending" }
         case ReviewSignupsFilter.confirmed:
             return reservations.filter { ($0.status ?? "") == "confirmed" }
-        case ReviewSignupsFilter.conflicts:
-            return reservations.filter { ($0.status ?? "") == "conflict" || $0.conflictWith != nil }
         case ReviewSignupsFilter.edited:
-            return reservations.filter { $0.editedAt != nil }
+            return reservations.filter { $0.wasEdited && ($0.status ?? "") != "canceled" }
+        case ReviewSignupsFilter.canceled:
+            return reservations.filter { ($0.status ?? "") == "canceled" }
         default:
-            return reservations
+            return reservations.filter { ($0.status ?? "") != "canceled" }
         }
     }
 
@@ -176,8 +188,8 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
         switch selectedFilter {
         case ReviewSignupsFilter.pending: "No pending signups"
         case ReviewSignupsFilter.confirmed: "No confirmed signups yet"
-        case ReviewSignupsFilter.conflicts: "No conflicts"
         case ReviewSignupsFilter.edited: "No recent edits"
+        case ReviewSignupsFilter.canceled: "No canceled signups"
         default: "No signups yet"
         }
     }
@@ -188,88 +200,92 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
             return "When a neighbor signs up for a slot, they'll appear here for you to review."
         case ReviewSignupsFilter.confirmed:
             return "Confirmed slots will show up here once you approve their signup."
-        case ReviewSignupsFilter.conflicts:
-            return "Slots booked by more than one helper would surface here."
         case ReviewSignupsFilter.edited:
-            return "When a helper updates a slot's note, the edit will appear here for confirmation."
+            return "When a helper updates their slot, the edit will appear here for confirmation."
+        case ReviewSignupsFilter.canceled:
+            return "When a helper cancels their slot, it moves here so you can backfill."
         default:
             return "Share the train so neighbors can grab a slot. You'll see new signups here for review before they're confirmed."
         }
     }
 
     private func rowModel(for r: SupportTrainReservationDTO) -> RowModel {
-        let helper = r.helper
-        let displayName = helper?.displayName ?? helper?.username ?? "Helper"
-        let verified = helper?.isVerified ?? false
-        let initials = String(displayName.split(separator: " ").compactMap { $0.first }.prefix(2)).uppercased()
-        let chip = statusChip(for: r.status, hasConflict: r.conflictWith != nil)
+        let chip = statusChipFor(r)
         let metaParts: [String] = [
-            r.slot?.dropWindow ?? r.dropWindow,
-            r.dietFlag
+            dropWindowLabel(for: r),
+            contributionMetaLabel(for: r)
         ].compactMap { $0 }
         let footerActions = footer(for: r)
 
         return RowModel(
             id: r.id,
-            title: displayName,
+            title: r.displayName,
             subtitle: subtitleLine(for: r),
             template: .statusChip,
             leading: .avatarWithBadge(
-                name: displayName,
-                imageURL: helper?.avatarUrl.flatMap(URL.init(string:)),
-                background: .gradient(avatarGradient(for: helper?.id ?? r.id)),
+                name: r.displayName,
+                imageURL: r.helper?.profilePictureUrl.flatMap(URL.init(string:)),
+                background: .gradient(avatarGradient(for: r.helper?.id ?? r.id)),
                 size: .medium,
-                verified: verified
+                verified: false
             ),
             trailing: .statusChip(text: chip.text, variant: chip.variant),
             onTap: { [weak self] in
                 MainActor.assumeIsolated { self?.onEdit(r.id) }
             },
-            body: r.note.map { "\u{201C}\($0)\u{201D}" },
+            body: r.noteToRecipient.map { "\u{201C}\($0)\u{201D}" },
             bodyIcon: nil,
-            inlineChip: helper?.relationship.map(relationshipChip(for:)),
-            timeMeta: r.slot?.date,
+            timeMeta: shortDateLabel(for: r),
             metaTail: metaParts.isEmpty ? nil : metaParts.joined(separator: " · "),
             footer: footerActions
         )
     }
 
+    /// Subtitle line — dish title (meals) or restaurant name (restaurant
+    /// trains) sits here as a small caption between the name and the
+    /// public note. Falls back to the contribution mode label when both
+    /// are nil.
     private func subtitleLine(for r: SupportTrainReservationDTO) -> String? {
-        if let conflict = r.conflictWith {
-            return "Double-booked with \(conflict)"
-        }
-        if let editedAt = r.editedAt {
-            return "Edited \(editedAt)"
-        }
-        return nil
+        if let dish = r.dishTitle, !dish.isEmpty { return dish }
+        if let restaurant = r.restaurantName, !restaurant.isEmpty { return restaurant }
+        return r.contributionMode.map { humanize($0) }
     }
 
-    private func statusChip(
-        for status: String?,
-        hasConflict: Bool
+    /// Maps `estimated_arrival_at` (ISO-8601) onto a readable
+    /// `Drop 6:00 pm` label. Returns `nil` when the field is missing or
+    /// unparseable so the row collapses cleanly instead of showing
+    /// "Drop —".
+    private func dropWindowLabel(for r: SupportTrainReservationDTO) -> String? {
+        guard let iso = r.estimatedArrivalAt,
+              let date = Self.isoFormatter.date(from: iso) else { return nil }
+        return "Drop \(Self.timeFormatter.string(from: date))"
+    }
+
+    private func shortDateLabel(for r: SupportTrainReservationDTO) -> String? {
+        guard let iso = r.estimatedArrivalAt,
+              let date = Self.isoFormatter.date(from: iso) else { return nil }
+        return Self.dateFormatter.string(from: date)
+    }
+
+    private func contributionMetaLabel(for r: SupportTrainReservationDTO) -> String? {
+        guard let mode = r.contributionMode else { return nil }
+        if r.dishTitle != nil || r.restaurantName != nil { return nil }
+        return humanize(mode)
+    }
+
+    private func statusChipFor(
+        _ r: SupportTrainReservationDTO
     ) -> (text: String, variant: StatusChipVariant) {
-        if hasConflict { return ("Conflict", .error) }
-        switch status ?? "" {
-        case "pending": return ("Pending", .warning)
-        case "confirmed": return ("Confirmed", .success)
-        case "edited": return ("Edited", .info)
-        case "conflict": return ("Conflict", .error)
-        default: return ("Pending", .warning)
-        }
-    }
-
-    private func relationshipChip(for relationship: String) -> RowChip {
-        switch relationship {
-        case "family":
-            return RowChip(text: "Family", icon: .heart, tint: .status(.error))
-        case "close":
-            return RowChip(text: "Close friend", icon: .users, tint: .status(.success))
-        case "neighbor":
-            return RowChip(text: "Neighbor", icon: .mapPin, tint: .status(.info))
-        case "newhelper":
-            return RowChip(text: "First-time", icon: .sparkles, tint: .status(.business))
+        switch r.status ?? "" {
+        case "confirmed":
+            if r.wasEdited { return ("Edited", .info) }
+            return ("Confirmed", .success)
+        case "pending":
+            return ("Pending", .warning)
+        case "canceled":
+            return ("Canceled", .neutral)
         default:
-            return RowChip(text: relationship.capitalized, tint: .status(.neutral))
+            return ("Pending", .warning)
         }
     }
 
@@ -292,7 +308,7 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
                     MainActor.assumeIsolated { self?.onEdit(r.id) }
                 }
             ])
-        case "conflict":
+        case "confirmed":
             return RowFooter(actions: [
                 RowFooterAction(
                     title: "Message",
@@ -319,66 +335,104 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
         return palette[abs(hash) % palette.count]
     }
 
+    private func humanize(_ snakeCase: String) -> String {
+        snakeCase
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
+    }
+
     // MARK: - Optimistic mutations
 
+    /// Optimistic confirm: bump local row to "confirmed" and hand the
+    /// network round-trip off to the host (`onConfirm`). The host is
+    /// responsible for the POST + rollback strategy — keeps this VM
+    /// platform-agnostic about retry behaviour.
     public func confirm(_ reservationId: String) {
         if let idx = reservations.firstIndex(where: { $0.id == reservationId }) {
             let original = reservations[idx]
-            // Optimistic patch — bump status to "confirmed" in place.
             reservations[idx] = SupportTrainReservationDTO(
                 id: original.id,
                 slotId: original.slotId,
+                userId: original.userId,
+                guestName: original.guestName,
                 status: "confirmed",
-                note: original.note,
-                dietFlag: original.dietFlag,
-                dietOk: original.dietOk,
-                dropWindow: original.dropWindow,
+                contributionMode: original.contributionMode,
+                dishTitle: original.dishTitle,
+                restaurantName: original.restaurantName,
+                estimatedArrivalAt: original.estimatedArrivalAt,
+                noteToRecipient: original.noteToRecipient,
+                privateNoteToOrganizer: original.privateNoteToOrganizer,
                 createdAt: original.createdAt,
-                editedAt: original.editedAt,
-                conflictWith: original.conflictWith,
-                helper: original.helper,
-                slot: original.slot
+                updatedAt: original.updatedAt,
+                canceledAt: original.canceledAt,
+                helper: original.helper
             )
             rebuild()
         }
-        // POST `/api/support-trains/:id/reservations/:reservationId/confirm`
-        // wiring lands with the editor surface; the host's `onConfirm`
-        // callback drives the network round-trip so this VM stays
-        // platform-agnostic about retry behaviour.
         onConfirm(reservationId)
     }
+
+    // MARK: - Date formatters
+
+    /// ISO-8601 with optional fractional seconds — matches Postgres'
+    /// `timestamp with time zone` JSON encoding.
+    nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    nonisolated(unsafe) private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return f
+    }()
+
+    nonisolated(unsafe) private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE MMM d"
+        return f
+    }()
 }
 
-// `SupportTrainReservationDTO` is `Decodable`-only by default; the
-// optimistic confirm path needs to construct an updated copy. This
-// memberwise initialiser sits alongside the auto-synthesised
-// `Decodable` init and preserves `Sendable` / `Hashable` conformance.
+// MARK: - Memberwise init for optimistic patches
+
+/// `SupportTrainReservationDTO` is `Decodable`-only by default; the
+/// optimistic confirm path needs to construct an updated copy. This
+/// memberwise initialiser sits alongside the auto-synthesised
+/// `Decodable` init and preserves `Sendable` / `Hashable` conformance.
 public extension SupportTrainReservationDTO {
     init(
         id: String,
         slotId: String?,
+        userId: String?,
+        guestName: String?,
         status: String?,
-        note: String?,
-        dietFlag: String?,
-        dietOk: Bool?,
-        dropWindow: String?,
+        contributionMode: String?,
+        dishTitle: String?,
+        restaurantName: String?,
+        estimatedArrivalAt: String?,
+        noteToRecipient: String?,
+        privateNoteToOrganizer: String?,
         createdAt: String?,
-        editedAt: String?,
-        conflictWith: String?,
-        helper: SupportTrainHelperDTO?,
-        slot: SupportTrainSlotDTO?
+        updatedAt: String?,
+        canceledAt: String?,
+        helper: SupportTrainHelperDTO?
     ) {
         self.id = id
         self.slotId = slotId
+        self.userId = userId
+        self.guestName = guestName
         self.status = status
-        self.note = note
-        self.dietFlag = dietFlag
-        self.dietOk = dietOk
-        self.dropWindow = dropWindow
+        self.contributionMode = contributionMode
+        self.dishTitle = dishTitle
+        self.restaurantName = restaurantName
+        self.estimatedArrivalAt = estimatedArrivalAt
+        self.noteToRecipient = noteToRecipient
+        self.privateNoteToOrganizer = privateNoteToOrganizer
         self.createdAt = createdAt
-        self.editedAt = editedAt
-        self.conflictWith = conflictWith
+        self.updatedAt = updatedAt
+        self.canceledAt = canceledAt
         self.helper = helper
-        self.slot = slot
     }
 }

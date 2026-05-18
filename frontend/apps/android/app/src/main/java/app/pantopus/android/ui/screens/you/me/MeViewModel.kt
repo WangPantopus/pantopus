@@ -128,6 +128,12 @@ class MeViewModel
                         MeActionTile("offers", PantopusIcon.HandCoins, "Offers", routeKey = "me.offers"),
                         MeActionTile("listings", PantopusIcon.ShoppingBag, "Listings", routeKey = "me.listings"),
                         MeActionTile("connections", PantopusIcon.UserPlus, "Connections", routeKey = "me.connections"),
+                        MeActionTile(
+                            "supportTrains",
+                            PantopusIcon.HandCoins,
+                            "Support trains",
+                            routeKey = "me.supportTrains",
+                        ),
                     ),
                 sections =
                     withDebug(

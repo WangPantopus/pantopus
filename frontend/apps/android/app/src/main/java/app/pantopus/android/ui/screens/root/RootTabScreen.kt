@@ -814,6 +814,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenMyTasks = { navController.navigate(ChildRoutes.MY_TASKS) },
                     onOpenMyPosts = { navController.navigate(ChildRoutes.MY_POSTS) },
                     onOpenConnections = { navController.navigate(ChildRoutes.CONNECTIONS) },
+                    onOpenSupportTrains = { navController.navigate(ChildRoutes.SUPPORT_TRAINS) },
                     onOpenIdentityCenter = { navController.navigate(ChildRoutes.IDENTITY_CENTER) },
                     onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenHomeBills = { homeId -> navController.navigate(ChildRoutes.homeBills(homeId)) },

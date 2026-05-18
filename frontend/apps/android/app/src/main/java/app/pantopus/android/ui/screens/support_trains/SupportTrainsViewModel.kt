@@ -72,6 +72,12 @@ enum class SupportTrainType(
             }
 
     companion object {
+        /**
+         * Backend `support_train_type` enum mirror. Returns [Generic] for
+         * empty/unknown values so the My-trains feed (which doesn't yet
+         * project the type column) renders a neutral mutual-aid glyph
+         * instead of mis-labeling every train as "Meal train".
+         */
         fun from(raw: String?): SupportTrainType =
             when (raw) {
                 "meal_support", "meals" -> Meals
@@ -80,7 +86,6 @@ enum class SupportTrainType(
                 "pet_care", "petcare", "pet" -> PetCare
                 "errands", "errand_support" -> Errands
                 "visits", "visit_support" -> Visits
-                null, "" -> Meals
                 else -> Generic
             }
     }
@@ -236,32 +241,31 @@ class SupportTrainsViewModel
         private fun makeTopBarAction(handler: () -> Unit): TopBarAction =
             TopBarAction(
                 icon = PantopusIcon.Search,
-                accessibilityLabel = "Search support trains",
-                handler = handler,
+                contentDescription = "Search support trains",
+                onClick = handler,
             )
 
         private fun makeFab(handler: () -> Unit): FabAction =
             FabAction(
                 icon = PantopusIcon.Plus,
-                accessibilityLabel = "Start a train",
+                contentDescription = "Start a train",
                 variant = FabVariant.ExtendedNav(label = "Start a train"),
-                handler = handler,
+                onClick = handler,
             )
 
         private fun rowFor(train: SupportTrainListItemDto): RowModel {
+            // The My-trains feed doesn't (yet) project `support_train_type`
+            // — `SupportTrainType.from(null)` returns Generic so the leading
+            // tile reads as a neutral mutual-aid glyph instead of mis-labeling
+            // every train as "Meal train". The Nearby RPC populates the
+            // field and the tile lights up to the per-archetype gradient.
             val type = SupportTrainType.from(train.supportTrainType)
             val title = train.recipientName ?: train.title ?: "Support train"
-            val subtitleParts =
-                listOfNotNull(
-                    type.label,
-                    train.title.takeIf { (train.recipientName ?: "").isNotEmpty() && !it.isNullOrBlank() },
-                    train.endsOn?.let { "ends $it" },
-                )
             val chip = statusChip(train.status)
             return RowModel(
                 id = train.id,
                 title = title,
-                subtitle = subtitleParts.joinToString(" · ").ifBlank { null },
+                subtitle = subtitleLine(train, type),
                 template = RowTemplate.StatusChip,
                 leading =
                     RowLeading.CategoryGradientIcon(
@@ -273,9 +277,44 @@ class SupportTrainsViewModel
                         text = chip.first,
                         variant = chip.second,
                     ),
-                metaTail = slotsLabel(train),
+                metaTail = rowMetaTail(train),
                 onTap = { onOpenTrain(train.id) },
             )
+        }
+
+        private fun subtitleLine(
+            train: SupportTrainListItemDto,
+            type: SupportTrainType,
+        ): String? {
+            val parts =
+                listOfNotNull(
+                    if (train.supportTrainType != null) type.label else null,
+                    roleLabel(train.myRole),
+                    if (train.recipientName != null) train.title else null,
+                ).filter { it.isNotBlank() }
+            return parts.joinToString(" · ").ifBlank { null }
+        }
+
+        private fun roleLabel(role: String?): String? =
+            when (role) {
+                "organizer" -> "You organize"
+                "co_organizer" -> "You co-organize"
+                "helper" -> "Helper"
+                else -> null
+            }
+
+        /**
+         * Meta-tail line. Prefers slot progress when projected, falls
+         * back to the date range, then distance for the Nearby tab,
+         * otherwise null so the chip line collapses cleanly.
+         */
+        private fun rowMetaTail(train: SupportTrainListItemDto): String? {
+            slotsLabel(train)?.let { return it }
+            if (!train.startsOn.isNullOrBlank() && !train.endsOn.isNullOrBlank()) {
+                return "${train.startsOn} — ${train.endsOn}"
+            }
+            distanceLabel(train)?.let { return it }
+            return null
         }
 
         private fun slotsLabel(train: SupportTrainListItemDto): String? {
@@ -283,6 +322,12 @@ class SupportTrainsViewModel
             val filled = train.slotsFilled ?: 0
             val left = (total - filled).coerceAtLeast(0)
             return if (left == 0) "$filled / $total slots" else "$filled / $total slots · $left open"
+        }
+
+        private fun distanceLabel(train: SupportTrainListItemDto): String? {
+            val metres = train.distanceMeters ?: return null
+            val miles = metres / 1609.34
+            return if (miles < 1) "<1 mi" else "${miles.toInt()} mi"
         }
 
         private fun statusChip(status: String?): Pair<String, StatusChipVariant> =

@@ -23,7 +23,6 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.ChipStripConfig
 import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.GradientPair
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowFooter
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowFooterAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
@@ -39,21 +38,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
-/** Stable filter ids exposed for tests + the screen. */
+/** Stable filter ids for tests + the screen. */
 object ReviewSignupsFilter {
     const val ALL = "all"
     const val PENDING = "pending"
     const val CONFIRMED = "confirmed"
-    const val CONFLICTS = "conflicts"
     const val EDITED = "edited"
+    const val CANCELED = "canceled"
 }
 
 /**
- * Drives the T6.6c (P26.5) Review-signups screen. Single train, filtered
- * by status chip strip. The avatar-first row template carries the helper
- * identity + per-reservation note + Confirm / Edit footer.
+ * Drives the T6.6c (P26.5) Review-signups screen. Mirrors iOS
+ * `ReviewSignupsViewModel` exactly — same filter chips, same row
+ * mapping, same optimistic confirm pattern with rollback delegated to
+ * the host callback.
  */
 @HiltViewModel
 class ReviewSignupsViewModel
@@ -85,6 +88,7 @@ class ReviewSignupsViewModel
                 field = value
                 _topBarAction.value = makeTopBarAction(value)
             }
+        var onConfirmReservation: (String) -> Unit = {}
         var onEditSignup: (String) -> Unit = {}
             set(value) {
                 field = value
@@ -110,6 +114,13 @@ class ReviewSignupsViewModel
             applyState()
         }
 
+        /**
+         * Optimistic confirm — patches the local row to "confirmed" and
+         * hands the network round-trip off to the host via
+         * [onConfirmReservation]. The host is responsible for the
+         * POST + rollback; this keeps the VM platform-agnostic about
+         * retry behaviour and matches iOS exactly.
+         */
         fun confirm(reservationId: String) {
             val idx = reservations.indexOfFirst { it.id == reservationId }
             if (idx >= 0) {
@@ -118,9 +129,7 @@ class ReviewSignupsViewModel
                 }
                 applyState()
             }
-            // POST `/api/support-trains/:id/reservations/:reservationId/confirm`
-            // wiring lands with the editor surface; this UI patch keeps
-            // the optimistic feedback while the upstream call is wired.
+            onConfirmReservation(reservationId)
         }
 
         private fun reload() {
@@ -157,63 +166,86 @@ class ReviewSignupsViewModel
                 )
         }
 
+        /**
+         * Visible-to-the-organizer filter projection. Canceled rows are
+         * hidden from every filter except [ReviewSignupsFilter.CANCELED].
+         */
         private fun filteredReservations(): List<SupportTrainReservationDto> =
             when (_selectedFilter.value) {
                 ReviewSignupsFilter.PENDING -> reservations.filter { it.status == "pending" }
                 ReviewSignupsFilter.CONFIRMED -> reservations.filter { it.status == "confirmed" }
-                ReviewSignupsFilter.CONFLICTS ->
-                    reservations.filter { it.status == "conflict" || !it.conflictWith.isNullOrBlank() }
-                ReviewSignupsFilter.EDITED -> reservations.filter { !it.editedAt.isNullOrBlank() }
-                else -> reservations
+                ReviewSignupsFilter.EDITED -> reservations.filter { it.wasEdited && it.status != "canceled" }
+                ReviewSignupsFilter.CANCELED -> reservations.filter { it.status == "canceled" }
+                else -> reservations.filter { it.status != "canceled" }
             }
 
         private fun rowFor(r: SupportTrainReservationDto): RowModel {
-            val helper = r.helper
-            val name = helper?.displayName ?: helper?.username ?: "Helper"
-            val initialsSeed = name
-            val gradient = avatarGradient(helper?.id ?: r.id)
-            val chip = statusChip(r.status, hasConflict = !r.conflictWith.isNullOrBlank())
-            val subtitle =
-                when {
-                    !r.conflictWith.isNullOrBlank() -> "Double-booked with ${r.conflictWith}"
-                    !r.editedAt.isNullOrBlank() -> "Edited ${r.editedAt}"
-                    else -> null
-                }
-            val body = r.note?.let { "“$it”" }
+            val chip = statusChipFor(r)
             val metaParts =
                 listOfNotNull(
-                    r.slot?.dropWindow ?: r.dropWindow,
-                    r.dietFlag,
+                    dropWindowLabel(r),
+                    contributionMetaLabel(r),
                 )
-            val footer = footerFor(r)
-            val inlineChip = helper?.relationship?.let(::relationshipChip)
 
             return RowModel(
                 id = r.id,
-                title = name,
-                subtitle = subtitle,
+                title = r.displayName,
+                subtitle = subtitleLine(r),
                 template = RowTemplate.StatusChip,
                 leading =
                     RowLeading.AvatarWithBadge(
-                        name = initialsSeed,
-                        imageUrl = helper?.avatarUrl,
-                        background = AvatarBackground.Gradient(gradient),
+                        name = r.displayName,
+                        imageUrl = r.helper?.profilePictureUrl,
+                        background = AvatarBackground.Gradient(avatarGradient(r.helper?.id ?: r.id)),
                         size = AvatarBadgeSize.Medium,
-                        verified = helper?.isVerified == true,
+                        verified = false,
                     ),
-                trailing =
-                    RowTrailing.Status(
-                        text = chip.first,
-                        variant = chip.second,
-                    ),
+                trailing = RowTrailing.Status(text = chip.first, variant = chip.second),
                 onTap = { onEditSignup(r.id) },
-                body = body,
-                inlineChip = inlineChip,
-                timeMeta = r.slot?.date,
+                body = r.noteToRecipient?.let { "“$it”" },
+                timeMeta = shortDateLabel(r),
                 metaTail = metaParts.joinToString(" · ").ifBlank { null },
-                footer = footer,
+                footer = footerFor(r),
             )
         }
+
+        private fun subtitleLine(r: SupportTrainReservationDto): String? =
+            when {
+                !r.dishTitle.isNullOrBlank() -> r.dishTitle
+                !r.restaurantName.isNullOrBlank() -> r.restaurantName
+                !r.contributionMode.isNullOrBlank() -> humanize(r.contributionMode)
+                else -> null
+            }
+
+        private fun dropWindowLabel(r: SupportTrainReservationDto): String? {
+            val iso = r.estimatedArrivalAt ?: return null
+            return runCatching {
+                val instant = Instant.parse(iso)
+                "Drop ${TIME_FMT.format(instant.atZone(ZoneId.systemDefault()))}"
+            }.getOrNull()
+        }
+
+        private fun shortDateLabel(r: SupportTrainReservationDto): String? {
+            val iso = r.estimatedArrivalAt ?: return null
+            return runCatching {
+                val instant = Instant.parse(iso)
+                DATE_FMT.format(instant.atZone(ZoneId.systemDefault()))
+            }.getOrNull()
+        }
+
+        private fun contributionMetaLabel(r: SupportTrainReservationDto): String? {
+            val mode = r.contributionMode ?: return null
+            if (!r.dishTitle.isNullOrBlank() || !r.restaurantName.isNullOrBlank()) return null
+            return humanize(mode)
+        }
+
+        private fun statusChipFor(r: SupportTrainReservationDto): Pair<String, StatusChipVariant> =
+            when (r.status) {
+                "confirmed" -> if (r.wasEdited) "Edited" to StatusChipVariant.Info else "Confirmed" to StatusChipVariant.Success
+                "pending" -> "Pending" to StatusChipVariant.Warning
+                "canceled" -> "Canceled" to StatusChipVariant.Neutral
+                else -> "Pending" to StatusChipVariant.Warning
+            }
 
         private fun footerFor(r: SupportTrainReservationDto): RowFooter? =
             when (r.status) {
@@ -233,7 +265,7 @@ class ReviewSignupsViewModel
                                 ) { onEditSignup(r.id) },
                             ),
                     )
-                "conflict" ->
+                "confirmed" ->
                     RowFooter(
                         actions =
                             listOf(
@@ -246,53 +278,6 @@ class ReviewSignupsViewModel
                     )
                 else -> null
             }
-
-        private fun relationshipChip(relationship: String): RowChip =
-            when (relationship) {
-                "family" ->
-                    RowChip(
-                        text = "Family",
-                        icon = PantopusIcon.Heart,
-                        tint = RowChip.Tint.Status(StatusChipVariant.Error),
-                    )
-                "close" ->
-                    RowChip(
-                        text = "Close friend",
-                        icon = PantopusIcon.Users,
-                        tint = RowChip.Tint.Status(StatusChipVariant.Success),
-                    )
-                "neighbor" ->
-                    RowChip(
-                        text = "Neighbor",
-                        icon = PantopusIcon.MapPin,
-                        tint = RowChip.Tint.Status(StatusChipVariant.Info),
-                    )
-                "newhelper" ->
-                    RowChip(
-                        text = "First-time",
-                        icon = PantopusIcon.Sparkles,
-                        tint = RowChip.Tint.Status(StatusChipVariant.Business),
-                    )
-                else ->
-                    RowChip(
-                        text = relationship.replaceFirstChar { it.uppercase() },
-                        tint = RowChip.Tint.Status(StatusChipVariant.Neutral),
-                    )
-            }
-
-        private fun statusChip(
-            status: String?,
-            hasConflict: Boolean,
-        ): Pair<String, StatusChipVariant> {
-            if (hasConflict) return "Conflict" to StatusChipVariant.Error
-            return when (status) {
-                "pending" -> "Pending" to StatusChipVariant.Warning
-                "confirmed" -> "Confirmed" to StatusChipVariant.Success
-                "edited" -> "Edited" to StatusChipVariant.Info
-                "conflict" -> "Conflict" to StatusChipVariant.Error
-                else -> "Pending" to StatusChipVariant.Warning
-            }
-        }
 
         private fun avatarGradient(seed: String): GradientPair {
             val palette =
@@ -308,11 +293,16 @@ class ReviewSignupsViewModel
             return palette[(hash % palette.size + palette.size) % palette.size]
         }
 
+        private fun humanize(snakeCase: String): String =
+            snakeCase
+                .replace('_', ' ')
+                .replaceFirstChar { it.uppercase() }
+
         private fun makeTopBarAction(handler: () -> Unit): TopBarAction =
             TopBarAction(
                 icon = PantopusIcon.Share,
-                accessibilityLabel = "Share train",
-                handler = handler,
+                contentDescription = "Share train",
+                onClick = handler,
             )
 
         private fun makeChipStrip(selected: String): ChipStripConfig =
@@ -335,14 +325,14 @@ class ReviewSignupsViewModel
                             icon = PantopusIcon.Check,
                         ),
                         ChipStripConfig.Chip(
-                            id = ReviewSignupsFilter.CONFLICTS,
-                            label = "Conflicts",
-                            icon = PantopusIcon.AlertTriangle,
-                        ),
-                        ChipStripConfig.Chip(
                             id = ReviewSignupsFilter.EDITED,
                             label = "Edited",
                             icon = PantopusIcon.Pencil,
+                        ),
+                        ChipStripConfig.Chip(
+                            id = ReviewSignupsFilter.CANCELED,
+                            label = "Canceled",
+                            icon = PantopusIcon.X,
                         ),
                     ),
                 selectedId = selected,
@@ -367,19 +357,19 @@ class ReviewSignupsViewModel
                         ctaTitle = null,
                         onCta = null,
                     )
-                ReviewSignupsFilter.CONFLICTS ->
-                    ListOfRowsUiState.Empty(
-                        icon = PantopusIcon.AlertTriangle,
-                        headline = "No conflicts",
-                        subcopy = "Slots booked by more than one helper would surface here.",
-                        ctaTitle = null,
-                        onCta = null,
-                    )
                 ReviewSignupsFilter.EDITED ->
                     ListOfRowsUiState.Empty(
                         icon = PantopusIcon.Pencil,
                         headline = "No recent edits",
-                        subcopy = "When a helper updates a slot's note, the edit will appear here for confirmation.",
+                        subcopy = "When a helper updates their slot, the edit will appear here for confirmation.",
+                        ctaTitle = null,
+                        onCta = null,
+                    )
+                ReviewSignupsFilter.CANCELED ->
+                    ListOfRowsUiState.Empty(
+                        icon = PantopusIcon.X,
+                        headline = "No canceled signups",
+                        subcopy = "When a helper cancels their slot, it moves here so you can backfill.",
                         ctaTitle = null,
                         onCta = null,
                     )
@@ -401,9 +391,11 @@ class ReviewSignupsViewModel
             /**
              * Nav-arg key for the Support Train UUID this screen reviews.
              * Mirrors `ChildRoutes.REVIEW_SIGNUPS_ID_KEY` in
-             * `RootTabScreen.kt` — kept in this VM so the destination
-             * declaration can stay private to the screens host.
+             * `RootTabScreen.kt`.
              */
             const val SUPPORT_TRAIN_ID_KEY = "supportTrainId"
+
+            private val TIME_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+            private val DATE_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE MMM d")
         }
     }

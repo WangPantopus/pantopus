@@ -87,6 +87,7 @@ fun YouScreen(
     onOpenMyTasks: () -> Unit = {},
     onOpenMyPosts: () -> Unit = {},
     onOpenConnections: () -> Unit = {},
+    onOpenSupportTrains: () -> Unit = {},
     onOpenIdentityCenter: () -> Unit = {},
     onOpenAudienceProfile: () -> Unit = {},
     onOpenHomeBills: (String) -> Unit = {},
@@ -130,6 +131,7 @@ fun YouScreen(
                 "me.posts" -> onOpenMyPosts()
                 "me.offers" -> onOpenOffers()
                 "me.connections" -> onOpenConnections()
+                "me.supportTrains" -> onOpenSupportTrains()
                 "me.listings" -> onOpenMyListings()
                 "me.businesses" -> onOpenMyBusinesses()
                 "me.homes" -> onOpenMyHomes()
@@ -179,6 +181,7 @@ fun YouScreen(
                 "me.gigs" -> onOpenMyTasks()
                 "me.offers" -> onOpenOffers()
                 "me.connections" -> onOpenConnections()
+                "me.supportTrains" -> onOpenSupportTrains()
                 "me.homes" -> onOpenMyHomes()
                 "me.listings" -> onOpenMyListings()
                 "me.businesses" -> onOpenMyBusinesses()

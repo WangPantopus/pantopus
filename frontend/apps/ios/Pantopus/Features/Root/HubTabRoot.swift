@@ -82,6 +82,13 @@ public enum HubRoute: Hashable {
     /// Connections center (T5.2.3). Reached from the You / Me action grid
     /// or via the `pantopus://connections` deep link.
     case connections
+    /// Support Trains list (T6.6c / P26.5) — mutual-aid rotations.
+    /// Personal pillar. Reached from the You tab action grid or via
+    /// the `pantopus://support-trains` deep link.
+    case supportTrains
+    /// Review-signups (T6.6c / P26.5) — organizer-only review queue
+    /// for one Support Train. Pushed from a Support Trains row tap.
+    case reviewSignups(supportTrainId: String)
     /// My bids — outgoing bids on neighbour gigs (T5.3.1). Reached from
     /// the You / Me action grid or from Hub's marketplace pillar shelf.
     case myBids
@@ -166,6 +173,16 @@ public struct HubTabRoot: View {
             _ = router.consume()
         case .discoverHub:
             path.append(.discoverHub)
+            _ = router.consume()
+        case let .supportTrain(id):
+            // pantopus://support-trains/:id deep links land on the
+            // organizer review queue when the caller has access; the
+            // backend's `/:id/reservations` handler returns 403 for
+            // non-organizers and the screen surfaces an error state.
+            path.append(.supportTrains)
+            if !id.isEmpty {
+                path.append(.reviewSignups(supportTrainId: id))
+            }
             _ = router.consume()
         default:
             break
@@ -726,6 +743,42 @@ public struct HubTabRoot: View {
                     },
                     onFindPeople: {
                         Task { @MainActor in push(.placeholder(label: "Find people")) }
+                    }
+                )
+            )
+        case .supportTrains:
+            SupportTrainsView(
+                viewModel: SupportTrainsViewModel(
+                    onStartTrain: {
+                        Task { @MainActor in push(.placeholder(label: "Start a support train")) }
+                    },
+                    onOpenTrain: { trainId in
+                        Task { @MainActor in push(.reviewSignups(supportTrainId: trainId)) }
+                    },
+                    onSearch: {
+                        Task { @MainActor in push(.placeholder(label: "Search support trains")) }
+                    }
+                )
+            )
+        case let .reviewSignups(supportTrainId):
+            ReviewSignupsView(
+                viewModel: ReviewSignupsViewModel(
+                    supportTrainId: supportTrainId,
+                    onShareTrain: {
+                        Task { @MainActor in push(.placeholder(label: "Share train")) }
+                    },
+                    onConfirm: { _ in
+                        // POST `/api/support-trains/:id/reservations/:reservationId/confirm`
+                        // wiring lands with the editor surface; the VM's
+                        // optimistic patch is the user-facing feedback today.
+                    },
+                    onMessage: { _ in
+                        Task { @MainActor in push(.placeholder(label: "Message helper")) }
+                    },
+                    onEdit: { reservationId in
+                        Task { @MainActor in
+                            push(.placeholder(label: "Edit signup · \(reservationId)"))
+                        }
                     }
                 )
             )

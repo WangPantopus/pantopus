@@ -226,26 +226,73 @@ public final class SupportTrainsViewModel: ListOfRowsDataSource {
     // MARK: - Mapping
 
     private func rowModel(for train: SupportTrainListItemDTO) -> RowModel {
+        // The My-trains feed doesn't (yet) project `support_train_type` —
+        // `SupportTrainType.from(nil)` returns `.generic` so the leading
+        // tile reads as a neutral mutual-aid glyph instead of mis-labeling
+        // every train as "Meal train". The Nearby RPC populates the field
+        // and the tile lights up to the per-archetype gradient.
         let type = SupportTrainType.from(train.supportTrainType)
         let recipientLine = train.recipientName ?? train.title ?? "Support train"
-        let bodyParts: [String] = [
-            type.label,
-            train.title,
-            train.endsOn != nil ? "ends \(train.endsOn!)" : nil
-        ].compactMap { $0 }
+        let subtitle = subtitleLine(for: train, type: type)
         let chip = statusChip(for: train.status)
         return RowModel(
             id: train.id,
             title: recipientLine,
-            subtitle: bodyParts.joined(separator: " · "),
+            subtitle: subtitle,
             template: .statusChip,
             leading: .categoryGradientIcon(type.icon, gradient: type.gradient),
             trailing: .statusChip(text: chip.text, variant: chip.variant),
             onTap: { [weak self] in
                 MainActor.assumeIsolated { self?.onOpenTrain(train.id) }
             },
-            metaTail: slotsLabel(for: train)
+            metaTail: rowMetaTail(for: train)
         )
+    }
+
+    /// Subtitle reads "Type · role" when the train type is known, "Role
+    /// · title" when only the role is known (My-trains feed without the
+    /// type column), or "Title" alone when neither is known.
+    private func subtitleLine(
+        for train: SupportTrainListItemDTO,
+        type: SupportTrainType
+    ) -> String? {
+        let parts: [String?] = [
+            train.supportTrainType.map { _ in type.label },
+            roleLabel(for: train.myRole),
+            train.recipientName != nil ? train.title : nil
+        ]
+        let flattened = parts.compactMap { $0 }.filter { !$0.isEmpty }
+        return flattened.isEmpty ? nil : flattened.joined(separator: " · ")
+    }
+
+    private func roleLabel(for role: String?) -> String? {
+        switch role ?? "" {
+        case "organizer": "You organize"
+        case "co_organizer": "You co-organize"
+        case "helper": "Helper"
+        default: nil
+        }
+    }
+
+    /// Returns the meta-tail line. Prefers the slot progress when the
+    /// feed projects it, otherwise falls back to the date range when
+    /// available, otherwise `nil` so the chip line collapses cleanly.
+    private func rowMetaTail(for train: SupportTrainListItemDTO) -> String? {
+        if let slots = slotsLabel(for: train) { return slots }
+        if let starts = train.startsOn, let ends = train.endsOn {
+            return "\(starts) — \(ends)"
+        }
+        if let distance = distanceLabel(for: train) { return distance }
+        return nil
+    }
+
+    /// Renders a short distance hint for the Nearby tab. `<1 mi` and
+    /// `N mi` (no decimal beyond 1 mi) keeps the meta line uncluttered.
+    private func distanceLabel(for train: SupportTrainListItemDTO) -> String? {
+        guard let metres = train.distanceMeters else { return nil }
+        let miles = metres / 1609.34
+        if miles < 1 { return "<1 mi" }
+        return "\(Int(miles.rounded())) mi"
     }
 
     private func statusChip(for status: String?) -> (text: String, variant: StatusChipVariant) {
@@ -284,8 +331,10 @@ public enum SupportTrainType: Sendable, Hashable, CaseIterable {
     case generic
 
     /// Backend `support_train_type` enum mirror. Falls back to
-    /// `.meals` when the column is empty (older trains predate the
-    /// type column).
+    /// `.generic` when the column is empty so My-trains rows (which
+    /// don't yet project the type column) render a neutral mutual-aid
+    /// glyph instead of mis-labeling every train as "Meal train". The
+    /// Nearby RPC populates the field and the tile lights up.
     public static func from(_ raw: String?) -> SupportTrainType {
         switch raw ?? "" {
         case "meal_support", "meals": return .meals
@@ -294,7 +343,6 @@ public enum SupportTrainType: Sendable, Hashable, CaseIterable {
         case "pet_care", "petcare", "pet": return .petcare
         case "errands", "errand_support": return .errands
         case "visits", "visit_support": return .visits
-        case "": return .meals
         default: return .generic
         }
     }
