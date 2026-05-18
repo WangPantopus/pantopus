@@ -111,12 +111,8 @@ class VaultListViewModel
             applyRows(allRows)
         }
 
-        /** FAB / empty-state CTA dispatchers. */
+        /** FAB tap dispatcher — wired to the screen's FAB onClick. */
         fun onFabTapped() = onAddTapped()
-
-        fun onOpenMailboxTapped() = onOpenMailbox()
-
-        fun onRowTapped(itemId: String) = onOpenItem(itemId)
 
         /** Visible for tests — apply a pre-built row list. */
         internal fun ingest(

@@ -584,30 +584,28 @@ public struct HubTabRoot: View {
         case let .drawerDetail(drawer):
             NotYetAvailableView(tabName: "Drawer · \(drawer)", icon: .mailbox)
         case .mailboxVault:
-            // T6.5e (P19.5) — Mailbox Vault list.
+            // T6.5e (P19.5) — Mailbox Vault list. Personal-pillar
+            // surface — both the FAB ("Save mail to vault") and the
+            // empty-state CTA ("Open Mailbox") navigate to the inbox
+            // list, popping to an existing instance if one is already
+            // on the stack so we don't pile mailbox screens on top of
+            // each other.
+            let goToMailbox: @MainActor () -> Void = {
+                if path.contains(.mailbox) {
+                    while let last = path.last, last != .mailbox {
+                        path.removeLast()
+                    }
+                } else {
+                    push(.mailbox)
+                }
+            }
             VaultListView(
                 viewModel: VaultListViewModel(
                     onOpenItem: { mailId in
                         Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
                     },
-                    onAddTapped: {
-                        Task { @MainActor in
-                            if path.contains(.mailbox) {
-                                while let last = path.last, last != .mailbox {
-                                    path.removeLast()
-                                }
-                            } else {
-                                push(.mailbox)
-                            }
-                        }
-                    },
-                    onOpenMailbox: {
-                        Task { @MainActor in
-                            if !path.contains(.mailbox) {
-                                push(.mailbox)
-                            }
-                        }
-                    }
+                    onAddTapped: { Task { @MainActor in goToMailbox() } },
+                    onOpenMailbox: { Task { @MainActor in goToMailbox() } }
                 )
             )
         case .pulseFeed:
