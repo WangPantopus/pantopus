@@ -148,10 +148,12 @@ class EditProfileViewModel
                         hydrate(result.data.user)
                         _state.value = EditProfileUiState.Loaded
                     }
-                    is NetworkResult.Failure ->
-                        _state.value = EditProfileUiState.Error(
-                            result.error.message.ifBlank { "Couldn't load profile." },
-                        )
+                    is NetworkResult.Failure -> {
+                        _state.value =
+                            EditProfileUiState.Error(
+                                result.error.message.ifBlank { "Couldn't load profile." },
+                            )
+                    }
                 }
             }
         }
@@ -291,6 +293,7 @@ class EditProfileViewModel
          */
         private fun buildRequest(): ProfileUpdateRequest {
             val map = _fields.value
+
             fun trimmed(field: EditProfileField): String? {
                 val snapshot = map[field] ?: return null
                 if (!snapshot.isDirty) return null

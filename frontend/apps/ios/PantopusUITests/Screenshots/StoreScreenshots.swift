@@ -33,7 +33,10 @@ final class StoreScreenshots: XCTestCase {
         // skip the screenshot capture instead of failing the suite. The
         // production beta-lane invocation (`fastlane snapshot`) gets a
         // fully-stubbed simulator and lands on Hub reliably.
-        guard app.staticTexts["Hub"].waitForExistence(timeout: 5) else { return nil }
+        guard app.staticTexts["Hub"].waitForExistence(timeout: 5) else {
+            app.terminateAfterSkippedLaunch()
+            return nil
+        }
         return app
     }
 
