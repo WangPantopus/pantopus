@@ -95,22 +95,19 @@ class RecentActivityViewModel
             /** Map an activity item's `route` to a typed destination case. */
             fun destinationFor(item: HubActivityItem): RecentActivityDestination {
                 val path = item.route
-                idAfter(path, "/gigs/", "/app/gigs/", "/gig/")?.let {
-                    return RecentActivityDestination.GigDetail(it)
+                val gigId = idAfter(path, "/gigs/", "/app/gigs/", "/gig/")
+                val listingId = idAfter(path, "/listings/", "/app/listings/", "/listing/", "/marketplace/")
+                val mailId = idAfter(path, "/mail/", "/mailbox/item/", "/app/mailbox/item/", "/app/mail/")
+                val postId = idAfter(path, "/posts/", "/post/", "/app/posts/", "/app/post/")
+                val homeId = idAfter(path, "/app/homes/", "/homes/")
+                return when {
+                    gigId != null -> RecentActivityDestination.GigDetail(gigId)
+                    listingId != null -> RecentActivityDestination.ListingDetail(listingId)
+                    mailId != null -> RecentActivityDestination.MailItemDetail(mailId)
+                    postId != null -> RecentActivityDestination.PulsePost(postId)
+                    homeId != null -> RecentActivityDestination.HomeDashboard(homeId)
+                    else -> RecentActivityDestination.Placeholder(item.title)
                 }
-                idAfter(path, "/listings/", "/app/listings/", "/listing/", "/marketplace/")?.let {
-                    return RecentActivityDestination.ListingDetail(it)
-                }
-                idAfter(path, "/mail/", "/mailbox/item/", "/app/mailbox/item/", "/app/mail/")?.let {
-                    return RecentActivityDestination.MailItemDetail(it)
-                }
-                idAfter(path, "/posts/", "/post/", "/app/posts/", "/app/post/")?.let {
-                    return RecentActivityDestination.PulsePost(it)
-                }
-                idAfter(path, "/app/homes/", "/homes/")?.let {
-                    return RecentActivityDestination.HomeDashboard(it)
-                }
-                return RecentActivityDestination.Placeholder(item.title)
             }
 
             /** Project one DTO into a `RowModel`. Public so tests + the
