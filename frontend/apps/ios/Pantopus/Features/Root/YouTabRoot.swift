@@ -35,6 +35,9 @@ public enum YouRoute: Hashable {
     /// T6.6c (P26.5) — Support Trains. The "me.supportTrains" Personal
     /// action tile pushes here. Personal pillar (mutual-aid surface).
     case supportTrains
+    /// P2.6 — Start-a-Support-Train wizard (organizer compose flow).
+    /// Pushed when the Support Trains FAB / empty-state CTA fires.
+    case startSupportTrain
     /// T6.6c (P26.5) — Review signups (organizer-only) for one Support
     /// Train. Pushed from a Support Trains row tap.
     case reviewSignups(supportTrainId: String)
@@ -793,7 +796,7 @@ public struct YouTabRoot: View {
             SupportTrainsView(
                 viewModel: SupportTrainsViewModel(
                     onStartTrain: {
-                        Task { @MainActor in path.append(.placeholder(label: "Start a support train")) }
+                        Task { @MainActor in path.append(.startSupportTrain) }
                     },
                     onOpenTrain: { trainId in
                         Task { @MainActor in path.append(.reviewSignups(supportTrainId: trainId)) }
@@ -802,6 +805,20 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.placeholder(label: "Search support trains")) }
                     }
                 )
+            )
+        case .startSupportTrain:
+            StartSupportTrainWizardView(
+                onDismiss: {
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                },
+                onOpenTrain: { trainId in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        path.append(.reviewSignups(supportTrainId: trainId))
+                    }
+                }
             )
         case let .reviewSignups(supportTrainId):
             ReviewSignupsView(

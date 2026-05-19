@@ -112,6 +112,9 @@ public enum HubRoute: Hashable {
     /// Personal pillar. Reached from the You tab action grid or via
     /// the `pantopus://support-trains` deep link.
     case supportTrains
+    /// P2.6 — Start-a-Support-Train wizard (organizer compose flow).
+    /// Pushed when the Support Trains FAB / empty-state CTA fires.
+    case startSupportTrain
     /// Review-signups (T6.6c / P26.5) — organizer-only review queue
     /// for one Support Train. Pushed from a Support Trains row tap.
     case reviewSignups(supportTrainId: String)
@@ -905,7 +908,7 @@ public struct HubTabRoot: View {
             SupportTrainsView(
                 viewModel: SupportTrainsViewModel(
                     onStartTrain: {
-                        Task { @MainActor in push(.placeholder(label: "Start a support train")) }
+                        Task { @MainActor in push(.startSupportTrain) }
                     },
                     onOpenTrain: { trainId in
                         Task { @MainActor in push(.reviewSignups(supportTrainId: trainId)) }
@@ -914,6 +917,20 @@ public struct HubTabRoot: View {
                         Task { @MainActor in push(.placeholder(label: "Search support trains")) }
                     }
                 )
+            )
+        case .startSupportTrain:
+            StartSupportTrainWizardView(
+                onDismiss: {
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                },
+                onOpenTrain: { trainId in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        path.append(.reviewSignups(supportTrainId: trainId))
+                    }
+                }
             )
         case let .reviewSignups(supportTrainId):
             ReviewSignupsView(
