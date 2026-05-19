@@ -117,6 +117,13 @@ public enum YouRoute: Hashable {
     /// home id resolved by the Me VM. Distinct from `.myTasks` which is
     /// the posted-to-neighbours gig list.
     case homeTasks(homeId: String)
+    /// P2.4 — Add a new household task. Reached from the household
+    /// tasks list FAB.
+    case addHouseholdTask(homeId: String)
+    /// P2.4 / P3.6 — Edit an existing household task. Reached from the
+    /// "Edit recurring" overflow action on a Recurring row. Re-uses the
+    /// `AddHouseholdTaskFormView` shell in Edit mode.
+    case editHouseholdTask(homeId: String, taskId: String)
     /// T6.3b / P10 — Maintenance. The home-context "me.maintenance"
     /// action tile pushes here.
     case homeMaintenance(homeId: String)
@@ -1191,13 +1198,30 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.placeholder(label: "Task detail")) }
                     },
                     onAddTask: {
-                        Task { @MainActor in path.append(.placeholder(label: "Add a task")) }
+                        Task { @MainActor in path.append(.addHouseholdTask(homeId: homeId)) }
                     },
-                    onEditRecurring: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Edit recurring task")) }
+                    onEditRecurring: { taskId in
+                        Task { @MainActor in
+                            path.append(.editHouseholdTask(homeId: homeId, taskId: taskId))
+                        }
                     }
                 )
             )
+        case let .addHouseholdTask(homeId):
+            AddHouseholdTaskFormView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCreated: { _ in
+                    if !path.isEmpty { path.removeLast() }
+                }
+            )
+        case let .editHouseholdTask(homeId, taskId):
+            AddHouseholdTaskFormView(
+                homeId: homeId,
+                taskId: taskId
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case let .homeMaintenance(homeId):
             MaintenanceListView(
                 viewModel: MaintenanceListViewModel(
