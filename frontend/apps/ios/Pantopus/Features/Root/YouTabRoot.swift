@@ -133,6 +133,10 @@ public enum YouRoute: Hashable {
     /// Listing detail destination reached from the listing-offers buyer
     /// row tap so the seller can drill back into the canonical view.
     case listingDetail(listingId: String)
+    /// Push the chat conversation for a given counterparty. Payload
+    /// mirrors the Inbox tab's `InboxConversationDestination` so the same
+    /// `ChatConversationView` can host the thread inside the You stack.
+    case chatConversation(InboxConversationDestination)
     #if DEBUG
     case publicProfile(userId: String)
     case pulsePost(postId: String)
@@ -561,6 +565,48 @@ public struct YouTabRoot: View {
         EmptyView()
     }
 
+    /// Two-letter initials derived from a display name. Falls back to
+    /// `··` when the input has no alphanumeric content so the chat header's
+    /// avatar still renders.
+    fileprivate static func initials(from name: String) -> String {
+        let parts = name.split(separator: " ").prefix(2)
+        let joined = parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
+        return joined.isEmpty ? "··" : joined
+    }
+
+    /// Project an `InboxConversationDestination.Mode` onto the
+    /// `ChatThreadMode` consumed by `ChatConversationViewModel`.
+    private static func chatMode(
+        for mode: InboxConversationDestination.Mode
+    ) -> ChatThreadMode {
+        switch mode {
+        case .ai: .ai
+        case let .room(id): .room(id: id)
+        case let .person(otherUserId): .person(otherUserId: otherUserId)
+        }
+    }
+
+    /// Project an `InboxConversationDestination` onto the
+    /// `ChatCounterparty` consumed by `ChatConversationViewModel`.
+    private static func chatCounterparty(
+        for dest: InboxConversationDestination
+    ) -> ChatCounterparty {
+        switch dest.mode {
+        case .ai:
+            .ai(name: dest.displayName)
+        case .room:
+            .group(name: dest.displayName, memberCount: nil)
+        case .person:
+            .person(
+                name: dest.displayName,
+                initials: dest.initials,
+                locality: nil,
+                verified: dest.verified,
+                online: false
+            )
+        }
+    }
+
     @ViewBuilder
     private func destination(for route: YouRoute) -> some View {
         switch route {
@@ -618,14 +664,37 @@ public struct YouTabRoot: View {
             GigDetailView(
                 viewModel: GigDetailViewModel(gigId: gigId),
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onMessage: { _ in
-                    Task { @MainActor in path.append(.placeholder(label: "Messages")) }
+                onMessage: { gig in
+                    Task { @MainActor in
+                        guard let posterId = gig.userId else { return }
+                        let name = gig.creator?.name ?? gig.creator?.username ?? gig.title
+                        path.append(.chatConversation(InboxConversationDestination(
+                            mode: .person(otherUserId: posterId),
+                            displayName: name,
+                            initials: Self.initials(from: name),
+                            identityKind: nil,
+                            verified: gig.creator?.verified ?? false
+                        )))
+                    }
                 }
             )
         case let .listingDetail(listingId):
             ListingDetailView(
                 viewModel: ListingDetailViewModel(listingId: listingId),
                 onBack: { if !path.isEmpty { path.removeLast() } },
+                onMessage: { listing in
+                    Task { @MainActor in
+                        guard let sellerId = listing.userId else { return }
+                        let name = listing.title ?? "Seller"
+                        path.append(.chatConversation(InboxConversationDestination(
+                            mode: .person(otherUserId: sellerId),
+                            displayName: name,
+                            initials: Self.initials(from: name),
+                            identityKind: nil,
+                            verified: false
+                        )))
+                    }
+                },
                 onViewOffers: { dto in
                     Task { @MainActor in
                         path.append(.listingOffers(listingId: dto.id, title: dto.title))
@@ -698,13 +767,16 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.placeholder(label: "Browse tasks")) }
                     },
                     onMessageClient: { dto in
-                        // The chat conversation surface lives on HubTabRoot
-                        // today; from You we push to gig detail where the
-                        // "Message poster" CTA opens the same thread.
                         Task { @MainActor in
-                            if let gigId = dto.gigId {
-                                path.append(.gigDetail(gigId: gigId))
-                            }
+                            guard let posterId = dto.gig?.userId else { return }
+                            let name = dto.gig?.title ?? "Conversation"
+                            path.append(.chatConversation(InboxConversationDestination(
+                                mode: .person(otherUserId: posterId),
+                                displayName: name,
+                                initials: Self.initials(from: name),
+                                identityKind: nil,
+                                verified: false
+                            )))
                         }
                     },
                     onEditBid: { dto in
@@ -760,8 +832,16 @@ public struct YouTabRoot: View {
         case .connections:
             ConnectionsView(
                 viewModel: ConnectionsViewModel(
-                    onMessage: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Messages")) }
+                    onMessage: { target in
+                        Task { @MainActor in
+                            path.append(.chatConversation(InboxConversationDestination(
+                                mode: .person(otherUserId: target.userId),
+                                displayName: target.displayName,
+                                initials: target.initials,
+                                identityKind: nil,
+                                verified: target.verified
+                            )))
+                        }
                     },
                     onFindPeople: {
                         Task { @MainActor in path.append(.placeholder(label: "Find people")) }
@@ -889,6 +969,14 @@ public struct YouTabRoot: View {
                         verified: dest.verified,
                         online: false
                     ),
+                    currentUserId: currentUserId ?? ""
+                )
+            ) { if !path.isEmpty { path.removeLast() } }
+        case let .chatConversation(dest):
+            ChatConversationView(
+                viewModel: ChatConversationViewModel(
+                    mode: Self.chatMode(for: dest.mode),
+                    counterparty: Self.chatCounterparty(for: dest),
                     currentUserId: currentUserId ?? ""
                 )
             ) { if !path.isEmpty { path.removeLast() } }

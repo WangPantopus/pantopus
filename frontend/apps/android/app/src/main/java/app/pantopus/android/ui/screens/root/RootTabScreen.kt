@@ -1211,7 +1211,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             ) {
                 PublicProfileScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                    onOpenMessages = { profile ->
+                        navController.navigate(
+                            ChildRoutes.chatConversationFromPicker(
+                                userId = profile.id,
+                                displayName = profile.displayName,
+                                initials = initialsFromName(profile.displayName),
+                                verified = profile.verified == true,
+                                locality = profile.locality,
+                            ),
+                        )
+                    },
                     onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report")) },
                 )
             }
@@ -1384,7 +1394,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             ) {
                 ListingDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                    onOpenMessages = { listing ->
+                        listing.userId?.let { sellerId ->
+                            val name = listing.title ?: "Seller"
+                            navController.navigate(
+                                ChildRoutes.chatConversationFromPicker(
+                                    userId = sellerId,
+                                    displayName = name,
+                                    initials = initialsFromName(name),
+                                    verified = false,
+                                    locality = listing.locationName,
+                                ),
+                            )
+                        }
+                    },
                     onViewOffers = { dto ->
                         navController.navigate(ChildRoutes.listingOffers(dto.id, dto.title))
                     },
@@ -1434,7 +1457,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             ) {
                 GigDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                    onOpenMessages = { gig ->
+                        gig.userId?.let { posterId ->
+                            val name = gig.creator?.name ?: gig.creator?.username ?: gig.title
+                            navController.navigate(
+                                ChildRoutes.chatConversationFromPicker(
+                                    userId = posterId,
+                                    displayName = name,
+                                    initials = initialsFromName(name),
+                                    verified = gig.creator?.verified == true,
+                                    locality = null,
+                                ),
+                            )
+                        }
+                    },
                 )
             }
             composable(
@@ -2062,4 +2098,20 @@ private fun homeIdFromRoute(route: String): String? {
     if (!route.startsWith(prefix)) return null
     val segment = route.removePrefix(prefix).substringBefore('/')
     return segment.takeIf { it.isNotEmpty() }
+}
+
+/**
+ * Two-letter initials derived from a display name. Falls back to `··`
+ * when the input has no alphanumeric content so the chat header's avatar
+ * still renders.
+ */
+private fun initialsFromName(name: String): String {
+    val joined =
+        name
+            .split(" ")
+            .take(2)
+            .mapNotNull { it.firstOrNull()?.toString() }
+            .joinToString("")
+            .uppercase()
+    return joined.ifEmpty { "··" }
 }

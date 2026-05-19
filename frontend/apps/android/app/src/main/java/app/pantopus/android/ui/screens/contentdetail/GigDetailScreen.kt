@@ -40,7 +40,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 @Composable
 fun GigDetailScreen(
     onBack: () -> Unit = {},
-    onOpenMessages: () -> Unit = {},
+    onOpenMessages: (app.pantopus.android.data.api.models.gigs.GigDto) -> Unit = {},
     viewModel: GigDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -49,13 +49,17 @@ fun GigDetailScreen(
 
     LaunchedEffect(Unit) { viewModel.load() }
 
+    val openMessages: () -> Unit = {
+        viewModel.gigSnapshot()?.let { onOpenMessages(it) }
+    }
+
     ContentDetailShell(
         state = state,
         onBack = onBack,
         onPrimaryAction = { sheetVisible = true },
-        onSecondaryAction = { onOpenMessages() },
+        onSecondaryAction = openMessages,
         onRetry = { viewModel.load() },
-        onMessageCounterparty = { onOpenMessages() },
+        onMessageCounterparty = openMessages,
     )
 
     if (sheetVisible) {
