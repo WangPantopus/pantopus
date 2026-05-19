@@ -113,6 +113,9 @@ import app.pantopus.android.ui.screens.homes.polls.POLL_DETAIL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.polls.POLL_DETAIL_POLL_ID_KEY
 import app.pantopus.android.ui.screens.homes.polls.PollDetailScreen
 import app.pantopus.android.ui.screens.homes.polls.PollsListScreen
+import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_TASK_ID_KEY
+import app.pantopus.android.ui.screens.homes.tasks.AddHouseholdTaskFormScreen
 import app.pantopus.android.ui.screens.homes.tasks.HOUSEHOLD_TASKS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.HouseholdTasksListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
@@ -313,6 +316,24 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home household tasks list. */
     fun homeTasks(homeId: String): String = "homes/$homeId/tasks"
+
+    /** P2.4 — Add a new household task. Reached from the household
+     *  tasks list FAB and the empty-state CTA. */
+    const val ADD_HOUSEHOLD_TASK = "homes/{$ADD_HOUSEHOLD_TASK_HOME_ID_KEY}/tasks/new"
+
+    /** Build the concrete path for the Add Household Task form. */
+    fun addHouseholdTask(homeId: String): String = "homes/$homeId/tasks/new"
+
+    /** P2.4 — Edit an existing household task. Reached from the
+     *  "Edit recurring" overflow action on a Recurring row. */
+    const val EDIT_HOUSEHOLD_TASK =
+        "homes/{$ADD_HOUSEHOLD_TASK_HOME_ID_KEY}/tasks/{$ADD_HOUSEHOLD_TASK_TASK_ID_KEY}/edit"
+
+    /** Build the concrete path for the Edit Household Task form. */
+    fun editHouseholdTask(
+        homeId: String,
+        taskId: String,
+    ): String = "homes/$homeId/tasks/$taskId/edit"
 
     /** Maintenance list per home (T6.3b / P10). */
     const val HOME_MAINTENANCE = "homes/{$MAINTENANCE_HOME_ID_KEY}/maintenance"
@@ -1238,18 +1259,44 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(
                 route = ChildRoutes.HOME_TASKS,
                 arguments = listOf(navArgument(HOUSEHOLD_TASKS_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
+            ) { entry ->
+                val homeId = entry.arguments?.getString(HOUSEHOLD_TASKS_HOME_ID_KEY).orEmpty()
                 HouseholdTasksListScreen(
                     onOpenTask = { _ ->
                         navController.navigate(ChildRoutes.placeholder("Task detail"))
                     },
                     onAddTask = {
-                        navController.navigate(ChildRoutes.placeholder("Add a task"))
+                        navController.navigate(ChildRoutes.addHouseholdTask(homeId))
                     },
-                    onEditRecurring = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Edit recurring task"))
+                    onEditRecurring = { taskId ->
+                        navController.navigate(ChildRoutes.editHouseholdTask(homeId, taskId))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.ADD_HOUSEHOLD_TASK,
+                arguments = listOf(navArgument(ADD_HOUSEHOLD_TASK_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                AddHouseholdTaskFormScreen(
+                    onClose = { navController.popBackStack() },
+                    onCreated = {
+                        // Pop back to the tasks list; the list refreshes
+                        // on next visit.
+                        navController.popBackStack()
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_HOUSEHOLD_TASK,
+                arguments =
+                    listOf(
+                        navArgument(ADD_HOUSEHOLD_TASK_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(ADD_HOUSEHOLD_TASK_TASK_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                AddHouseholdTaskFormScreen(
+                    onClose = { navController.popBackStack() },
                 )
             }
             composable(
