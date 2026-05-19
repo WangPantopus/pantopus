@@ -644,7 +644,12 @@ public struct HubTabRoot: View {
                 onBack: { if !path.isEmpty { path.removeLast() } }
             )
         case let .composePost(intent):
-            NotYetAvailableView(tabName: "Compose · \(intent.capitalized)", icon: .pencil)
+            PulseComposeView(
+                intent: PulseComposeIntent.from(rawValue: intent),
+                onPosted: { _ in
+                    if !path.isEmpty { path.removeLast() }
+                }
+            )
         case .gigsFeed:
             GigsFeedView(
                 onOpenGig: { gigId in

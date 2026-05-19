@@ -5,6 +5,8 @@ import app.pantopus.android.data.api.models.posts.MyPostsResponse
 import app.pantopus.android.data.api.models.posts.PostCommentCreateResponse
 import app.pantopus.android.data.api.models.posts.PostCommentRequest
 import app.pantopus.android.data.api.models.posts.PostCommentsResponse
+import app.pantopus.android.data.api.models.posts.PostCreateRequest
+import app.pantopus.android.data.api.models.posts.PostCreateResponse
 import app.pantopus.android.data.api.models.posts.PostDetailResponse
 import app.pantopus.android.data.api.models.posts.PostLikeResponse
 import app.pantopus.android.data.api.net.NetworkResult
@@ -37,6 +39,9 @@ class PostsRepository
                     limit = limit,
                 )
             }
+
+        /** `POST /api/posts` — create a new post. */
+        suspend fun createPost(body: PostCreateRequest): NetworkResult<PostCreateResponse> = safeApiCall { api.createPost(body) }
 
         /** `GET /api/posts/:id`. */
         suspend fun detail(id: String): NetworkResult<PostDetailResponse> = safeApiCall { api.detail(id) }
