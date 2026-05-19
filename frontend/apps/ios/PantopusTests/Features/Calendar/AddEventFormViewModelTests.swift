@@ -325,11 +325,11 @@ final class AddEventFormViewModelTests: XCTestCase {
         }
         XCTAssertEqual(json["event_type"] as? String, "generic")
         XCTAssertEqual(json["title"] as? String, "X")
-        // Optional fields encode as JSON `null` (synthesized Encodable
-        // does not omit them) — server's `|| null` fallback treats null
-        // and missing the same way.
-        XCTAssertTrue(json["location_notes"] is NSNull)
-        XCTAssertTrue(json["assigned_to"] is NSNull)
+        // Optional fields are omitted by Swift's synthesized Encodable
+        // when nil; the backend's `|| null` fallback treats null and
+        // missing the same way, so either form is acceptable.
+        XCTAssertNil(json["location_notes"] as? String)
+        XCTAssertNil(json["assigned_to"] as? [String])
     }
 
     /// `URLProtocol`-stubbed sessions strip `httpBody` and expose it as
