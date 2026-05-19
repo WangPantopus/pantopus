@@ -140,19 +140,32 @@ public struct CreateHomeTaskRequest: Encodable, Sendable {
 
 /// Body for `PUT /api/homes/:id/tasks/:taskId`. All fields optional —
 /// only those set are sent on the wire.
+///
+/// Backend `allowed` list at `home.js:4316` accepts `title /
+/// description / status / assigned_to / priority / due_at / budget /
+/// details / completed_at / visibility / viewer_user_ids` —
+/// `recurrence_rule` is **not** in that allowlist today. We carry
+/// `recurrenceRule` on the client side so the Add/Edit Task form has
+/// a single source of truth; when the backend extends its allowlist,
+/// no client change is needed. Until then the field is silently
+/// dropped by the server.
 public struct UpdateHomeTaskRequest: Encodable, Sendable {
     public let status: String?
     public let title: String?
+    public let description: String?
     public let assignedTo: String?
     public let dueAt: String?
+    public let recurrenceRule: String?
     public let priority: String?
     public let completedAt: String?
 
     private enum CodingKeys: String, CodingKey {
         case status
         case title
+        case description
         case assignedTo = "assigned_to"
         case dueAt = "due_at"
+        case recurrenceRule = "recurrence_rule"
         case priority
         case completedAt = "completed_at"
     }
@@ -160,15 +173,19 @@ public struct UpdateHomeTaskRequest: Encodable, Sendable {
     public init(
         status: String? = nil,
         title: String? = nil,
+        description: String? = nil,
         assignedTo: String? = nil,
         dueAt: String? = nil,
+        recurrenceRule: String? = nil,
         priority: String? = nil,
         completedAt: String? = nil
     ) {
         self.status = status
         self.title = title
+        self.description = description
         self.assignedTo = assignedTo
         self.dueAt = dueAt
+        self.recurrenceRule = recurrenceRule
         self.priority = priority
         self.completedAt = completedAt
     }
@@ -177,8 +194,10 @@ public struct UpdateHomeTaskRequest: Encodable, Sendable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(status, forKey: .status)
         try c.encodeIfPresent(title, forKey: .title)
+        try c.encodeIfPresent(description, forKey: .description)
         try c.encodeIfPresent(assignedTo, forKey: .assignedTo)
         try c.encodeIfPresent(dueAt, forKey: .dueAt)
+        try c.encodeIfPresent(recurrenceRule, forKey: .recurrenceRule)
         try c.encodeIfPresent(priority, forKey: .priority)
         try c.encodeIfPresent(completedAt, forKey: .completedAt)
     }
