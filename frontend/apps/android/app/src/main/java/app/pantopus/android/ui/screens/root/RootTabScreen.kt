@@ -34,6 +34,8 @@ import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileViewModel
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BROADCAST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BroadcastDetailScreen
+import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_BUSINESS_ID_KEY
+import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
@@ -289,7 +291,16 @@ private object ChildRoutes {
     fun homeMembers(homeId: String): String = "homes/$homeId/members"
 
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
+
+    /** P1.6 — Typed Business Profile screen. `businessId` is the
+     *  business User UUID. */
+    const val BUSINESS_PROFILE = "businesses/{$BUSINESS_PROFILE_BUSINESS_ID_KEY}"
+
+    /** Build the concrete path for a Business Profile. */
+    fun businessProfile(businessId: String): String = "businesses/$businessId"
+
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
+
     const val INVITE_OWNER =
         "homes/{$INVITE_OWNER_HOME_ID_KEY}/invite?email={$INVITE_OWNER_CURRENT_EMAIL_KEY}"
     const val DISAMBIGUATE_MAIL = "mailbox/disambiguate/{$DISAMBIGUATE_MAIL_ID_KEY}"
@@ -1224,6 +1235,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(
+                route = ChildRoutes.BUSINESS_PROFILE,
+                arguments = listOf(navArgument(BUSINESS_PROFILE_BUSINESS_ID_KEY) { type = NavType.StringType }),
+            ) {
+                val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                BusinessProfileScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                    onShare = { navController.navigate(ChildRoutes.placeholder("Share business")) },
+                    onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report business")) },
+                    onOpenWebsite = { uri -> runCatching { uriHandler.openUri(uri) } },
+                )
+            }
+            composable(
                 route = ChildRoutes.PULSE_POST,
                 arguments = listOf(navArgument(PULSE_POST_DETAIL_ID_KEY) { type = NavType.StringType }),
             ) {
@@ -1559,10 +1583,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             is DiscoverHubTarget.Person ->
                                 navController.navigate(ChildRoutes.publicProfile(target.userId))
                             is DiscoverHubTarget.Business ->
-                                // Per buildout plan F6, the typed business
-                                // profile screen lands later — push the
-                                // discover-businesses placeholder for now.
-                                navController.navigate(ChildRoutes.DISCOVER_BUSINESSES)
+                                navController.navigate(ChildRoutes.businessProfile(target.businessId))
                             is DiscoverHubTarget.Gig ->
                                 navController.navigate(ChildRoutes.gigDetail(target.gigId))
                             is DiscoverHubTarget.Listing ->
@@ -1587,12 +1608,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onSelect = { target ->
                         when (target) {
                             is DiscoverBusinessesTarget.Business ->
-                                // The dedicated business-profile screen is
-                                // still pending. Use the placeholder until
-                                // it lands.
-                                navController.navigate(
-                                    ChildRoutes.placeholder("Business: ${target.name} (${target.businessId})"),
-                                )
+                                navController.navigate(ChildRoutes.businessProfile(target.businessId))
                             DiscoverBusinessesTarget.OpenFilters ->
                                 navController.navigate(ChildRoutes.placeholder("Business filters"))
                             DiscoverBusinessesTarget.WidenRadius ->
@@ -2065,7 +2081,7 @@ private fun routeForDiscovery(item: DiscoveryCardContent): String =
         DiscoveryKind.Post -> ChildRoutes.pulsePost(item.id)
         DiscoveryKind.Person -> ChildRoutes.publicProfile(item.id)
         DiscoveryKind.Gig -> ChildRoutes.placeholder("Gig detail")
-        DiscoveryKind.Business -> ChildRoutes.placeholder("Business")
+        DiscoveryKind.Business -> ChildRoutes.businessProfile(item.id)
         DiscoveryKind.Unknown -> ChildRoutes.placeholder(item.title)
     }
 
