@@ -99,16 +99,22 @@ class PulseComposeSnapshotTest {
         ) {
             PulseComposeBody(
                 state = state,
-                onSelectIntent = {},
-                onSelectIdentity = {},
-                onSelectVisibility = {},
-                onSelectLostFoundKind = {},
-                onSelectAnnounceAudience = {},
-                onSelectAskCategory = {},
-                onSelectRecommendRating = {},
-                onUpdateField = { _, _ -> },
-                onPickPhotos = {},
-                onRemovePhoto = {},
+                actions =
+                    PulseComposeActions(
+                        selection =
+                            PulseComposeSelectionActions(
+                                onSelectIntent = {},
+                                onSelectIdentity = {},
+                                onSelectVisibility = {},
+                                onSelectLostFoundKind = {},
+                                onSelectAnnounceAudience = {},
+                                onSelectAskCategory = {},
+                                onSelectRecommendRating = {},
+                            ),
+                        onUpdateField = { _, _ -> },
+                        onPickPhotos = {},
+                        onRemovePhoto = {},
+                    ),
             )
         }
     }
