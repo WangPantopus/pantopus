@@ -667,4 +667,3 @@ public struct PulseComposeContent: View {
         return formatter.string(from: date)
     }
 }
-

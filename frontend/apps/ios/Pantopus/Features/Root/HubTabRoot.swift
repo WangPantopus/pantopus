@@ -147,6 +147,11 @@ public struct HubTabRoot: View {
         return ""
     }
 
+    @MainActor
+    private func pop() {
+        if !path.isEmpty { path.removeLast() }
+    }
+
     public var body: some View {
         NavigationStack(path: $path) {
             hub
@@ -644,12 +649,9 @@ public struct HubTabRoot: View {
                 onBack: { if !path.isEmpty { path.removeLast() } }
             )
         case let .composePost(intent):
-            PulseComposeView(
-                intent: PulseComposeIntent.from(rawValue: intent),
-                onPosted: { _ in
-                    if !path.isEmpty { path.removeLast() }
-                }
-            )
+            PulseComposeView(intent: PulseComposeIntent.from(rawValue: intent)) { _ in
+                pop()
+            }
         case .gigsFeed:
             GigsFeedView(
                 onOpenGig: { gigId in
@@ -663,7 +665,7 @@ public struct HubTabRoot: View {
                 },
                 onOpenSearch: { Task { @MainActor in push(.placeholder(label: "Gig search")) } },
                 onOpenFilters: { Task { @MainActor in push(.placeholder(label: "Gig filters")) } },
-                onBack: { if !path.isEmpty { path.removeLast() } }
+                onBack: pop
             )
         case let .gigDetail(gigId):
             GigDetailView(

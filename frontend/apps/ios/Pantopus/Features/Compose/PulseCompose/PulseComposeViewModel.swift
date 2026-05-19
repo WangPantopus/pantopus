@@ -7,7 +7,7 @@
 //  drives the `POST /api/posts` submit. Field shape mirrors
 //  `createPostSchema` at `backend/routes/posts.js:196-300`.
 //
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length
 
 import Foundation
 import Observation
@@ -254,7 +254,7 @@ public final class PulseComposeViewModel {
 
     private let api: APIClient
 
-    public init(
+    init(
         intent: PulseComposeIntent = .ask,
         identity: PulseComposeIdentity = .personal,
         api: APIClient = .shared
@@ -304,13 +304,12 @@ public final class PulseComposeViewModel {
 
     /// True iff any user-editable field has diverged from its baseline
     /// OR any selector has moved off its default OR a photo was picked.
-    // swiftlint:disable:next cyclomatic_complexity
     public var isDirty: Bool {
         if photos.isNotEmpty { return true }
         if identity != .personal { return true }
         if visibility != .neighbors { return true }
-        for field in fieldsActiveForCurrentIntent() {
-            if (fields[field]?.isDirty ?? false) { return true }
+        for field in fieldsActiveForCurrentIntent() where fields[field]?.isDirty ?? false {
+            return true
         }
         // Per-intent selector dirty checks.
         switch activeIntent {

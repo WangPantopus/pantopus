@@ -534,8 +534,7 @@ class PulseComposeViewModel
         private fun prefixLastSeen(
             body: String,
             location: String,
-        ): String =
-            if (location.isEmpty()) body else "Last seen: $location\n\n$body"
+        ): String = if (location.isEmpty()) body else "Last seen: $location\n\n$body"
 
         /**
          * Normalize an event date to ISO-8601. Accepts plain `yyyy-MM-dd`

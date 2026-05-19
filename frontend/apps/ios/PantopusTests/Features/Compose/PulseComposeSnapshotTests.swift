@@ -148,7 +148,6 @@ enum PulseComposeFixture {
         return map
     }
 
-    // swiftlint:disable function_parameter_count
     private static func fields(
         title: String = "",
         body: String = "",
@@ -170,5 +169,4 @@ enum PulseComposeFixture {
         map[.lostLastSeenDate] = FormFieldState(id: "lostLastSeenDate", originalValue: lostLastSeenDate)
         return map
     }
-    // swiftlint:enable function_parameter_count
 }
