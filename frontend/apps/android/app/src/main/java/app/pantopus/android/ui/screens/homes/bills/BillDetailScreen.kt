@@ -47,14 +47,18 @@ import java.time.Instant
 
 /**
  * Bill detail screen — read-mostly summary built on the shared
- * `ContentDetailShell`. Provides "Mark paid" + "Remove bill" actions.
+ * `ContentDetailShell`. Provides "Edit", "Mark paid", and "Remove bill"
+ * actions.
  *
  * @param onBack Pops back to the Bills list.
+ * @param onEdit Navigates to the Add Bill wizard in edit mode with the
+ *     current `billId` as a nav arg.
  * @param onChanged Fired after a successful PUT so the list can refresh.
  */
 @Composable
 fun BillDetailScreen(
     onBack: () -> Unit,
+    onEdit: () -> Unit = {},
     onChanged: () -> Unit = {},
     viewModel: BillDetailViewModel = hiltViewModel(),
 ) {
@@ -75,6 +79,7 @@ fun BillDetailScreen(
                     saving = current.saving,
                     saveError = current.saveError,
                     onBack = onBack,
+                    onEdit = onEdit,
                     onMarkPaid = viewModel::markPaid,
                     onRemove = viewModel::remove,
                 )
@@ -139,6 +144,7 @@ private fun LoadedShell(
     saving: Boolean,
     saveError: String?,
     onBack: () -> Unit,
+    onEdit: () -> Unit,
     onMarkPaid: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -177,6 +183,31 @@ private fun LoadedShell(
                         text = saveError,
                         style = PantopusTextStyle.small,
                         color = PantopusColors.error,
+                    )
+                }
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Radii.md))
+                            .background(PantopusColors.primary50)
+                            .clickable(enabled = !saving, onClick = onEdit)
+                            .padding(Spacing.s3)
+                            .testTag("billDetail_edit"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.Pencil,
+                        contentDescription = null,
+                        size = 16.dp,
+                        tint = PantopusColors.primary600,
+                    )
+                    Text(
+                        text = "Edit bill",
+                        style = PantopusTextStyle.small,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.primary600,
                     )
                 }
                 Row(

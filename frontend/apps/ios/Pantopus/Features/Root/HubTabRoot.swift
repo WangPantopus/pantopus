@@ -75,8 +75,9 @@ public enum HubRoute: Hashable {
     case homeCalendar(homeId: String)
     /// Bill detail (read-mostly summary with mark-paid / remove).
     case billDetail(homeId: String, billId: String)
-    /// Add Bill wizard.
-    case addBill(homeId: String)
+    /// Add / Edit Bill wizard. When `billId` is non-nil the wizard
+    /// loads the existing bill, seeds every step, and PUTs on submit.
+    case addBill(homeId: String, billId: String? = nil)
     /// Polls list for a home (T6.3e / P13).
     case homePolls(homeId: String)
     /// Poll detail — read + cast vote (T6.3e / P13).
@@ -472,15 +473,20 @@ public struct HubTabRoot: View {
         case let .billDetail(homeId, billId):
             BillDetailView(
                 homeId: homeId,
-                billId: billId
-            ) {
-                if !path.isEmpty { path.removeLast() }
-            }
-        case let .addBill(homeId):
+                billId: billId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onEdit: {
+                    Task { @MainActor in
+                        push(.addBill(homeId: homeId, billId: billId))
+                    }
+                }
+            )
+        case let .addBill(homeId, billId):
             AddBillWizardView(
                 homeId: homeId,
+                billId: billId,
                 onClose: { if !path.isEmpty { path.removeLast() } },
-                onCreated: { billId in
+                onCreated: { newBillId in
                     // Replace the wizard with the new bill's detail so
                     // Back returns to the Bills list, not the success
                     // step.
@@ -488,7 +494,13 @@ public struct HubTabRoot: View {
                         if case .addBill = route { return true }
                         return false
                     }
-                    path.append(.billDetail(homeId: homeId, billId: billId))
+                    path.append(.billDetail(homeId: homeId, billId: newBillId))
+                },
+                onUpdated: {
+                    // Edit mode pops back to the bill detail in place
+                    // — no new detail to push since the same bill is
+                    // already on the stack underneath the wizard.
+                    if !path.isEmpty { path.removeLast() }
                 }
             )
         case let .homePolls(homeId):

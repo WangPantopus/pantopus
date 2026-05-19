@@ -13,15 +13,19 @@ struct AddBillWizardView: View {
     @State private var viewModel: AddBillWizardViewModel
     private let onClose: () -> Void
     private let onCreated: (String) -> Void
+    private let onUpdated: () -> Void
 
     init(
         homeId: String,
+        billId: String? = nil,
         onClose: @escaping () -> Void,
-        onCreated: @escaping (String) -> Void
+        onCreated: @escaping (String) -> Void,
+        onUpdated: @escaping () -> Void = {}
     ) {
-        _viewModel = State(initialValue: AddBillWizardViewModel(homeId: homeId))
+        _viewModel = State(initialValue: AddBillWizardViewModel(homeId: homeId, billId: billId))
         self.onClose = onClose
         self.onCreated = onCreated
+        self.onUpdated = onUpdated
     }
 
     var body: some View {
@@ -30,18 +34,20 @@ struct AddBillWizardView: View {
             case .details: DetailsStep(viewModel: viewModel)
             case .schedule: ScheduleStep(viewModel: viewModel)
             case .review: ReviewStep(viewModel: viewModel)
-            case .success: SuccessStep()
+            case .success: SuccessStep(isEditing: viewModel.isEditing)
             }
         }
         .accessibilityIdentifier("addBillWizard")
         .onAppear {
             Analytics.track(.screenAddBillWizardStepViewed(stepNumber: 1, stepName: "details"))
         }
+        .task { await viewModel.load() }
         .onChange(of: viewModel.pendingEvent) { _, event in
             guard let event else { return }
             switch event {
             case .dismiss: onClose()
             case let .created(billId): onCreated(billId)
+            case .updated: onUpdated()
             }
         }
     }
@@ -57,7 +63,18 @@ private struct DetailsStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            HeadlineBlock("Add a bill", subtitle: "Track due dates, schedule payments, and keep the household on the same page.")
+            HeadlineBlock(
+                viewModel.isEditing ? "Edit bill" : "Add a bill",
+                subtitle: viewModel.isEditing
+                    ? "Update the payee, amount, due date, or schedule."
+                    : "Track due dates, schedule payments, and keep the household on the same page."
+            )
+            if let loadError = viewModel.loadError {
+                Text(loadError)
+                    .pantopusTextStyle(.small)
+                    .foregroundStyle(Theme.Color.error)
+                    .accessibilityIdentifier("addBill_loadError")
+            }
 
             FieldLabel("Payee")
             TextField("ConEd Electric", text: $viewModel.payee)
@@ -226,16 +243,22 @@ private struct ReviewStep: View {
 // MARK: - Step 4 · Success
 
 private struct SuccessStep: View {
+    let isEditing: Bool
+
     var body: some View {
         VStack(spacing: Spacing.s4) {
             ZStack {
                 Circle().fill(Theme.Color.successBg).frame(width: 72, height: 72)
                 Icon(.checkCircle, size: 32, color: Theme.Color.success)
             }
-            Text("Bill added")
+            Text(isEditing ? "Bill updated" : "Bill added")
                 .pantopusTextStyle(.h2)
                 .foregroundStyle(Theme.Color.appText)
-            Text("You can mark it paid or review the schedule from the Bills list.")
+            Text(
+                isEditing
+                    ? "Your changes are saved. The detail will reflect them now."
+                    : "You can mark it paid or review the schedule from the Bills list."
+            )
                 .pantopusTextStyle(.body)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
@@ -261,5 +284,5 @@ private struct FieldLabel: View {
 }
 
 #Preview {
-    AddBillWizardView(homeId: "preview", onClose: {}, onCreated: { _ in })
+    AddBillWizardView(homeId: "preview", onClose: {}, onCreated: { _ in }, onUpdated: {})
 }

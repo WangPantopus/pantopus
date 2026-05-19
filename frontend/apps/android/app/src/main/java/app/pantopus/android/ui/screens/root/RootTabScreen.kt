@@ -62,6 +62,7 @@ import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
 import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
+import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_BILL_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.AddBillWizardScreen
 import app.pantopus.android.ui.screens.homes.bills.BILLS_HOME_ID_KEY
@@ -204,6 +205,11 @@ private object ChildRoutes {
 
     /** Add Bill wizard. */
     const val ADD_BILL = "homes/{$ADD_BILL_HOME_ID_KEY}/bills/new"
+
+    /** Edit Bill wizard — same screen, hydrated from the existing row.
+     *  The VM reads the bill id from its `SavedStateHandle`. */
+    const val EDIT_BILL =
+        "homes/{$ADD_BILL_HOME_ID_KEY}/bills/{$ADD_BILL_BILL_ID_KEY}/edit"
 
     /** Pets list per home (T5.2.1). */
     const val HOME_PETS = "homes/{$PETS_LIST_HOME_ID_KEY}/pets"
@@ -636,6 +642,12 @@ private object ChildRoutes {
 
     /** Build the concrete path for the Add Bill wizard. */
     fun addBill(homeId: String): String = "homes/$homeId/bills/new"
+
+    /** Build the concrete path for the Edit Bill wizard. */
+    fun editBill(
+        homeId: String,
+        billId: String,
+    ): String = "homes/$homeId/bills/$billId/edit"
 
     /** Build the concrete path for a mailbox item detail. */
     fun mailboxItemDetail(id: String): String = "mailbox/item/$id"
@@ -1077,9 +1089,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navArgument(BILL_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
                         navArgument(BILL_DETAIL_BILL_ID_KEY) { type = NavType.StringType },
                     ),
-            ) {
+            ) { entry ->
+                val homeId = entry.arguments?.getString(BILL_DETAIL_HOME_ID_KEY).orEmpty()
+                val billId = entry.arguments?.getString(BILL_DETAIL_BILL_ID_KEY).orEmpty()
                 BillDetailScreen(
                     onBack = { navController.popBackStack() },
+                    onEdit = {
+                        navController.navigate(ChildRoutes.editBill(homeId, billId))
+                    },
                 )
             }
             composable(
@@ -1094,6 +1111,28 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         // returns to the Bills list, not the success step.
                         navController.popBackStack()
                         navController.navigate(ChildRoutes.billDetail(homeId, billId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_BILL,
+                arguments =
+                    listOf(
+                        navArgument(ADD_BILL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(ADD_BILL_BILL_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                AddBillWizardScreen(
+                    onClose = { navController.popBackStack() },
+                    onCreated = { _ ->
+                        // Unreachable in edit mode — wizard emits
+                        // `Updated` on save instead of `Created`.
+                        navController.popBackStack()
+                    },
+                    onUpdated = { _ ->
+                        // Pop the wizard so the bill detail (already on
+                        // the stack underneath) becomes visible again.
+                        navController.popBackStack()
                     },
                 )
             }
