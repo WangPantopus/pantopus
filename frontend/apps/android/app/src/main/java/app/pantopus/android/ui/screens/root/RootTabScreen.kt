@@ -126,6 +126,8 @@ import app.pantopus.android.ui.screens.homes.polls.POLL_DETAIL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.polls.POLL_DETAIL_POLL_ID_KEY
 import app.pantopus.android.ui.screens.homes.polls.PollDetailScreen
 import app.pantopus.android.ui.screens.homes.polls.PollsListScreen
+import app.pantopus.android.ui.screens.homes.polls.START_POLL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.polls.StartPollFormScreen
 import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_TASK_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.AddHouseholdTaskFormScreen
@@ -364,6 +366,12 @@ private object ChildRoutes {
         homeId: String,
         pollId: String,
     ): String = "homes/$homeId/polls/$pollId"
+
+    /** Start-a-poll composer (P2.5). */
+    const val START_POLL = "homes/{$START_POLL_HOME_ID_KEY}/polls/new"
+
+    /** Build the concrete path for the Start-a-Poll form. */
+    fun startPoll(homeId: String): String = "homes/$homeId/polls/new"
 
     /** Access codes per home (T6.4a). `homeName` rides as a query so the
      *  designed 2-line top bar can render without a second fetch. */
@@ -1347,9 +1355,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.pollDetail(homeId, pollId))
                     },
                     onStartPoll = {
-                        navController.navigate(ChildRoutes.placeholder("Start a poll"))
+                        navController.navigate(ChildRoutes.startPoll(homeId))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.START_POLL,
+                arguments = listOf(navArgument(START_POLL_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                StartPollFormScreen(
+                    onClose = { navController.popBackStack() },
                 )
             }
             composable(
