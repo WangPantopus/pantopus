@@ -19,6 +19,8 @@
 //  flip in one diff.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 import Observation
 import SwiftUI
