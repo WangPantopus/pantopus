@@ -23,15 +23,15 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
     // Event-specific
     public let eventDate: String?
     public let eventVenue: String?
-    // Lost & Found
+    /// Lost & Found
     public let lostFoundType: String?
-    // Recommend
+    /// Recommend
     public let businessName: String?
-    // Ask category
+    /// Ask category
     public let serviceCategory: String?
-    // Announce audience
+    /// Announce audience
     public let audience: String?
-    // v1.2 purpose tag (mirrors postType for sortability)
+    /// v1.2 purpose tag (mirrors postType for sortability)
     public let purpose: String?
 
     public init(

@@ -56,7 +56,9 @@ public enum PulseComposeIntent: String, CaseIterable, Sendable, Hashable {
     }
 
     /// Right-action label for the Form top-bar.
-    public var ctaLabel: String { "Post" }
+    public var ctaLabel: String {
+        "Post"
+    }
 
     /// Bridges `PulseIntent` (the feed enum) into the compose subset.
     /// `.all` falls back to `.ask`.
@@ -117,7 +119,9 @@ public enum PulseComposeIdentity: String, CaseIterable, Sendable, Hashable {
     }
 
     /// Maps to backend `postAs` enum on `createPostSchema`.
-    public var postAs: String { rawValue }
+    public var postAs: String {
+        rawValue
+    }
 }
 
 /// Visibility scope. Mirrors the three options surfaced in the form
@@ -342,9 +346,9 @@ public final class PulseComposeViewModel {
     private func validator(for field: PulseComposeField) -> FormValidator {
         switch field {
         case .title:
-            return .all([.required("Title"), .maxLength(FieldLimits.title)])
+            .all([.required("Title"), .maxLength(FieldLimits.title)])
         case .body:
-            return .all([
+            .all([
                 .required("Description"),
                 FormValidator { value in
                     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -356,7 +360,7 @@ public final class PulseComposeViewModel {
                 }
             ])
         case .recommendBusiness:
-            return FormValidator { value in
+            FormValidator { value in
                 let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
                 if trimmed.isEmpty { return "Add the business name." }
                 if trimmed.count > FieldLimits.businessName {
@@ -365,7 +369,7 @@ public final class PulseComposeViewModel {
                 return nil
             }
         case .eventDate:
-            return FormValidator { value in
+            FormValidator { value in
                 let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
                 if trimmed.isEmpty { return "Event date is required." }
                 // Accept either `yyyy-MM-dd` (clear-and-typed) or
@@ -383,20 +387,21 @@ public final class PulseComposeViewModel {
                 return "Use YYYY-MM-DD or pick a date."
             }
         case .eventLocation:
-            return .all([.required("Location"), .maxLength(FieldLimits.location)])
+            .all([.required("Location"), .maxLength(FieldLimits.location)])
         case .eventCapacity:
-            return FormValidator { value in
+            FormValidator { value in
                 let trimmed = value.trimmingCharacters(in: .whitespaces)
                 guard !trimmed.isEmpty else { return nil }
                 guard let n = Int(trimmed), n > 0 else { return "Capacity must be a positive number." }
                 return n > 100_000 ? "Capacity is too large." : nil
             }
         case .lostLastSeenLocation:
-            return .all([.required("Last seen"), .maxLength(FieldLimits.location)])
+            .all([.required("Last seen"), .maxLength(FieldLimits.location)])
         case .lostLastSeenDate:
-            return .isoDateOrEmpty()
+            .isoDateOrEmpty()
         }
     }
+
     // swiftlint:enable cyclomatic_complexity
 
     /// Which fields the active intent's form actually surfaces. Used
@@ -405,15 +410,15 @@ public final class PulseComposeViewModel {
     func fieldsActiveForCurrentIntent() -> [PulseComposeField] {
         switch activeIntent {
         case .ask:
-            return [.title, .body]
+            [.title, .body]
         case .recommend:
-            return [.recommendBusiness, .body]
+            [.recommendBusiness, .body]
         case .event:
-            return [.title, .eventDate, .eventLocation, .eventCapacity, .body]
+            [.title, .eventDate, .eventLocation, .eventCapacity, .body]
         case .lost:
-            return [.body, .lostLastSeenLocation, .lostLastSeenDate]
+            [.body, .lostLastSeenLocation, .lostLastSeenDate]
         case .announce:
-            return [.title, .body]
+            [.title, .body]
         }
     }
 
@@ -585,7 +590,9 @@ public final class PulseComposeViewModel {
 }
 
 private extension Array {
-    var isNotEmpty: Bool { !isEmpty }
+    var isNotEmpty: Bool {
+        !isEmpty
+    }
 }
 
 private extension PulseAnnounceAudience {

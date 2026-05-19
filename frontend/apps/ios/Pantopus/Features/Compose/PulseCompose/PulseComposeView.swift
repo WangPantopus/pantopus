@@ -133,8 +133,8 @@ public struct PulseComposeView: View {
 /// View-model → content-state projection. Lives on the view-model so
 /// fixture tests can produce the same shape without `@Observable`
 /// plumbing.
-extension PulseComposeViewModel {
-    public var contentState: PulseComposeContentState {
+public extension PulseComposeViewModel {
+    var contentState: PulseComposeContentState {
         PulseComposeContentState(
             activeIntent: activeIntent,
             identity: identity,

@@ -165,20 +165,26 @@ fun PulseComposeScreen(
                         fields = fields,
                         photos = photos,
                     ),
-                onSelectIntent = viewModel::selectIntent,
-                onSelectIdentity = viewModel::selectIdentity,
-                onSelectVisibility = viewModel::selectVisibility,
-                onSelectLostFoundKind = viewModel::selectLostFoundKind,
-                onSelectAnnounceAudience = viewModel::selectAnnounceAudience,
-                onSelectAskCategory = viewModel::selectAskCategory,
-                onSelectRecommendRating = viewModel::selectRecommendRating,
-                onUpdateField = viewModel::update,
-                onPickPhotos = {
-                    photoPicker.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
-                },
-                onRemovePhoto = viewModel::removePhoto,
+                actions =
+                    PulseComposeActions(
+                        selection =
+                            PulseComposeSelectionActions(
+                                onSelectIntent = viewModel::selectIntent,
+                                onSelectIdentity = viewModel::selectIdentity,
+                                onSelectVisibility = viewModel::selectVisibility,
+                                onSelectLostFoundKind = viewModel::selectLostFoundKind,
+                                onSelectAnnounceAudience = viewModel::selectAnnounceAudience,
+                                onSelectAskCategory = viewModel::selectAskCategory,
+                                onSelectRecommendRating = viewModel::selectRecommendRating,
+                            ),
+                        onUpdateField = viewModel::update,
+                        onPickPhotos = {
+                            photoPicker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                            )
+                        },
+                        onRemovePhoto = viewModel::removePhoto,
+                    ),
             )
         }
 
@@ -237,32 +243,40 @@ internal data class PulseComposeContentState(
     val photos: List<PulseComposePhoto> = emptyList(),
 )
 
+internal data class PulseComposeSelectionActions(
+    val onSelectIntent: (PulseComposeIntent) -> Unit,
+    val onSelectIdentity: (PulseComposeIdentity) -> Unit,
+    val onSelectVisibility: (PulseComposeVisibility) -> Unit,
+    val onSelectLostFoundKind: (PulseLostFoundKind) -> Unit,
+    val onSelectAnnounceAudience: (PulseAnnounceAudience) -> Unit,
+    val onSelectAskCategory: (PulseAskCategory) -> Unit,
+    val onSelectRecommendRating: (Int) -> Unit,
+)
+
+internal data class PulseComposeActions(
+    val selection: PulseComposeSelectionActions,
+    val onUpdateField: (PulseComposeField, String) -> Unit,
+    val onPickPhotos: () -> Unit,
+    val onRemovePhoto: (String) -> Unit,
+)
+
 @Composable
 internal fun PulseComposeBody(
     state: PulseComposeContentState,
-    onSelectIntent: (PulseComposeIntent) -> Unit,
-    onSelectIdentity: (PulseComposeIdentity) -> Unit,
-    onSelectVisibility: (PulseComposeVisibility) -> Unit,
-    onSelectLostFoundKind: (PulseLostFoundKind) -> Unit,
-    onSelectAnnounceAudience: (PulseAnnounceAudience) -> Unit,
-    onSelectAskCategory: (PulseAskCategory) -> Unit,
-    onSelectRecommendRating: (Int) -> Unit,
-    onUpdateField: (PulseComposeField, String) -> Unit,
-    onPickPhotos: () -> Unit,
-    onRemovePhoto: (String) -> Unit,
+    actions: PulseComposeActions,
 ) {
-    IntentPicker(active = state.activeIntent, onSelect = onSelectIntent)
-    IdentitySection(active = state.identity, onSelect = onSelectIdentity)
+    IntentPicker(active = state.activeIntent, onSelect = actions.selection.onSelectIntent)
+    IdentitySection(active = state.identity, onSelect = actions.selection.onSelectIdentity)
     IntentSpecificSection(
         state = state,
-        onUpdateField = onUpdateField,
-        onSelectLostFoundKind = onSelectLostFoundKind,
-        onSelectAnnounceAudience = onSelectAnnounceAudience,
-        onSelectAskCategory = onSelectAskCategory,
-        onSelectRecommendRating = onSelectRecommendRating,
+        onUpdateField = actions.onUpdateField,
+        onSelectLostFoundKind = actions.selection.onSelectLostFoundKind,
+        onSelectAnnounceAudience = actions.selection.onSelectAnnounceAudience,
+        onSelectAskCategory = actions.selection.onSelectAskCategory,
+        onSelectRecommendRating = actions.selection.onSelectRecommendRating,
     )
-    PhotosSection(photos = state.photos, onPick = onPickPhotos, onRemove = onRemovePhoto)
-    VisibilitySection(active = state.visibility, onSelect = onSelectVisibility)
+    PhotosSection(photos = state.photos, onPick = actions.onPickPhotos, onRemove = actions.onRemovePhoto)
+    VisibilitySection(active = state.visibility, onSelect = actions.selection.onSelectVisibility)
 }
 
 @Composable
@@ -313,7 +327,7 @@ private fun IntentChip(
             icon = iconFor(intent),
             contentDescription = null,
             size = 14.dp,
-            strokeWidth = 2.dp,
+            strokeWidth = 2f,
             tint = fg,
         )
         Text(
@@ -514,7 +528,7 @@ private fun RatingPicker(
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            (1..5).forEach { value ->
+            for (value in 1..5) {
                 Box(
                     modifier =
                         Modifier
@@ -530,7 +544,7 @@ private fun RatingPicker(
                         icon = PantopusIcon.Star,
                         contentDescription = null,
                         size = 28.dp,
-                        strokeWidth = 2.dp,
+                        strokeWidth = 2f,
                         tint = if (value <= rating) PantopusColors.warning else PantopusColors.appTextMuted,
                     )
                 }
@@ -757,7 +771,7 @@ private fun PhotoThumbnail(
                 icon = PantopusIcon.X,
                 contentDescription = "Remove photo",
                 size = 10.dp,
-                strokeWidth = 2.5.dp,
+                strokeWidth = 2.5f,
                 tint = PantopusColors.appTextInverse,
             )
         }
@@ -787,7 +801,7 @@ private fun AddPhotoTile(onPick: () -> Unit) {
             icon = PantopusIcon.Camera,
             contentDescription = null,
             size = 18.dp,
-            strokeWidth = 2.dp,
+            strokeWidth = 2f,
             tint = PantopusColors.appTextSecondary,
         )
         Text(
