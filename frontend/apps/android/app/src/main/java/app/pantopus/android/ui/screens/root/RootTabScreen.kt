@@ -74,7 +74,12 @@ import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOM
 import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENTS_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.documents.DOCUMENT_DETAIL_DOC_ID_KEY
+import app.pantopus.android.ui.screens.homes.documents.DOCUMENT_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.documents.DocumentDetailScreen
 import app.pantopus.android.ui.screens.homes.documents.DocumentsScreen
+import app.pantopus.android.ui.screens.homes.documents.UPLOAD_DOCUMENT_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.documents.UploadDocumentFormScreen
 import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
@@ -212,6 +217,22 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home documents screen. */
     fun homeDocs(homeId: String): String = "homes/$homeId/docs"
+
+    /** P2.10 — Upload document form for a home. */
+    const val UPLOAD_DOCUMENT = "homes/{$UPLOAD_DOCUMENT_HOME_ID_KEY}/docs/new"
+
+    /** Build the concrete path for the upload document form. */
+    fun uploadDocument(homeId: String): String = "homes/$homeId/docs/new"
+
+    /** P2.10 — Document detail (preview + metadata + footer actions). */
+    const val DOCUMENT_DETAIL =
+        "homes/{$DOCUMENT_DETAIL_HOME_ID_KEY}/docs/{$DOCUMENT_DETAIL_DOC_ID_KEY}"
+
+    /** Build the concrete path for the document detail screen. */
+    fun documentDetail(
+        homeId: String,
+        documentId: String,
+    ): String = "homes/$homeId/docs/$documentId"
 
     /** Packages list per home (T6.3d / P14). */
     const val HOME_PACKAGES = "homes/{$PACKAGES_HOME_ID_KEY}/packages"
@@ -1077,17 +1098,45 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.HOME_DOCS,
                 arguments = listOf(navArgument(DOCUMENTS_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
+                val docsHomeId = it.arguments?.getString(DOCUMENTS_HOME_ID_KEY).orEmpty()
                 DocumentsScreen(
-                    onOpenDocument = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Document detail"))
+                    onOpenDocument = { dto ->
+                        navController.navigate(ChildRoutes.documentDetail(dto.homeId, dto.id))
                     },
-                    onUpload = { navController.navigate(ChildRoutes.placeholder("Upload document")) },
+                    onUpload = {
+                        navController.navigate(ChildRoutes.uploadDocument(docsHomeId))
+                    },
                     onSearch = { navController.navigate(ChildRoutes.placeholder("Search documents")) },
                     onExport = { navController.navigate(ChildRoutes.placeholder("Export documents")) },
-                    onDocumentAction = { _, _ ->
-                        navController.navigate(ChildRoutes.placeholder("Document action"))
+                    onDocumentAction = { dto, _ ->
+                        navController.navigate(ChildRoutes.documentDetail(dto.homeId, dto.id))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.UPLOAD_DOCUMENT,
+                arguments = listOf(navArgument(UPLOAD_DOCUMENT_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                UploadDocumentFormScreen(
+                    onClose = { navController.popBackStack() },
+                    onUploaded = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.DOCUMENT_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(DOCUMENT_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(DOCUMENT_DETAIL_DOC_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(DOCUMENT_DETAIL_HOME_ID_KEY).orEmpty()
+                DocumentDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onReplace = {
+                        navController.navigate(ChildRoutes.uploadDocument(homeId))
+                    },
                 )
             }
             composable(

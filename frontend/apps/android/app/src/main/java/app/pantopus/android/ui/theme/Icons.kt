@@ -106,6 +106,7 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Pause
@@ -125,6 +126,7 @@ import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Savings
@@ -406,6 +408,11 @@ enum class PantopusIcon(
     // Material's Podcasts glyph (broadcast-from-tower mast lines).
     Reply("reply"),
     RadioTower("radio-tower"),
+
+    // P2.10 Document detail — sticky-footer action glyphs for Open
+    // externally + Replace. Fall back to Material OpenInNew / Refresh.
+    ExternalLink("external-link"),
+    RefreshCw("refresh-cw"),
     ;
 
     companion object {
@@ -661,6 +668,9 @@ internal fun PantopusIcon.source(): IconSource =
         // for Lucide's radio-tower (mast-with-waves).
         PantopusIcon.Reply -> IconSource.Material(Icons.AutoMirrored.Filled.Reply)
         PantopusIcon.RadioTower -> IconSource.Material(Icons.Filled.Podcasts)
+        // P2.10 — Document detail sticky-footer action glyphs.
+        PantopusIcon.ExternalLink -> IconSource.Material(Icons.Filled.OpenInNew)
+        PantopusIcon.RefreshCw -> IconSource.Material(Icons.Filled.Refresh)
     }
 
 /**

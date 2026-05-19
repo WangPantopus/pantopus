@@ -236,6 +236,11 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case reply
     case radioTower = "radio-tower"
 
+    // P2.10 Document detail — sticky-footer action icons (Open externally
+    // / Replace) that don't map to anything already in the enum.
+    case externalLink = "external-link"
+    case refreshCw = "refresh-cw"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -422,6 +427,9 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // P1.3 Broadcast detail.
         case .reply: "arrowshape.turn.up.left"
         case .radioTower: "antenna.radiowaves.left.and.right"
+        // P2.10 Document detail.
+        case .externalLink: "arrow.up.right.square"
+        case .refreshCw: "arrow.triangle.2.circlepath"
         }
     }
 }
