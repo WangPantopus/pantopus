@@ -349,7 +349,7 @@ final class ListingComposeWizardViewModelTests: XCTestCase {
 
     // MARK: - Back navigation
 
-    func testBackOnTitleStepGoesToPhotos() async {
+    func testBackOnTitleStepGoesToPhotos() {
         var seed = ListingComposeFormState.empty
         seed.step = ListingComposeStep.titleCategory.rawValue
         seed.photos = [ListingComposePhoto(token: "p")]

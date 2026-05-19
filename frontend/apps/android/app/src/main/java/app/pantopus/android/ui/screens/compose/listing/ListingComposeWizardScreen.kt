@@ -179,7 +179,6 @@ private fun PhotosStep(
         itemsIndexed(state.form.photos, key = { _, p -> p.id }) { index, photo ->
             PhotoTile(
                 index = index,
-                photo = photo,
                 onTap = { onRequestRemove(photo) },
                 onMoveUp = if (index > 0) ({ onMoveUp(index) }) else null,
                 onMoveDown = if (index < state.form.photos.lastIndex) ({ onMoveDown(index) }) else null,
@@ -203,7 +202,6 @@ private fun PhotosStep(
 @Composable
 private fun PhotoTile(
     index: Int,
-    photo: ListingComposePhoto,
     onTap: () -> Unit,
     onMoveUp: (() -> Unit)?,
     onMoveDown: (() -> Unit)?,

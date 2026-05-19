@@ -88,8 +88,13 @@ public enum ListingComposeCategory: String, CaseIterable, Codable, Sendable, Has
         }
     }
 
-    public var isFreeDefault: Bool { self == .free }
-    public var isWanted: Bool { self == .wanted }
+    public var isFreeDefault: Bool {
+        self == .free
+    }
+
+    public var isWanted: Bool {
+        self == .wanted
+    }
 
     /// Wanted requests skip the condition step (you're asking, not
     /// offering). All other categories collect condition.

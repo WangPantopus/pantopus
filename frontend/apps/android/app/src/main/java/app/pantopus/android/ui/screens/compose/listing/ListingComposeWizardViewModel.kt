@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val PHOTO_TOKEN_SUFFIX_LENGTH = 6
+
 /** Aggregate UI state for the Snap & Sell wizard. */
 data class ListingComposeUiState(
     val form: ListingComposeFormState = ListingComposeFormState.EMPTY,
@@ -95,7 +97,7 @@ open class ListingComposeWizardViewModel
         // MARK: - Photo step
 
         /** Append a new photo to the grid. Captures up to [MAX_PHOTOS]. */
-        fun addPhoto(token: String = "photo_${java.util.UUID.randomUUID().toString().take(6)}") {
+        fun addPhoto(token: String = "photo_${java.util.UUID.randomUUID().toString().take(PHOTO_TOKEN_SUFFIX_LENGTH)}") {
             _state.update { current ->
                 if (current.form.photos.size >= ListingComposeFormState.MAX_PHOTOS) return@update current
                 current.copy(form = current.form.copy(photos = current.form.photos + ListingComposePhoto(token = token)))
@@ -118,13 +120,24 @@ open class ListingComposeWizardViewModel
         ) {
             _state.update { current ->
                 val photos = current.form.photos.toMutableList()
-                if (from == to || from !in photos.indices || to < 0 || to > photos.size) return@update current
+                if (!canMovePhoto(from, to, photos)) return@update current
                 val photo = photos.removeAt(from)
                 val insertIndex = if (to > photos.size) photos.size else to
                 photos.add(insertIndex, photo)
                 current.copy(form = current.form.copy(photos = photos.toList()))
             }
             persist()
+        }
+
+        private fun canMovePhoto(
+            from: Int,
+            to: Int,
+            photos: List<ListingComposePhoto>,
+        ): Boolean {
+            if (from == to) return false
+            if (from !in photos.indices) return false
+            if (to < 0) return false
+            return to <= photos.size
         }
 
         /** Promote a photo to the hero slot (index 0). */

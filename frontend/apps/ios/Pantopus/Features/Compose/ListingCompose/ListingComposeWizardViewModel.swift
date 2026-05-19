@@ -204,7 +204,9 @@ final class ListingComposeWizardViewModel: WizardModel {
     }
 
     /// Hero photo for the review summary + step-1 chip rendering.
-    var heroPhoto: ListingComposePhoto? { form.photos.first }
+    var heroPhoto: ListingComposePhoto? {
+        form.photos.first
+    }
 
     /// Numeric value parsed from `priceAmount`, or nil when unparseable.
     var parsedPrice: Double? {
