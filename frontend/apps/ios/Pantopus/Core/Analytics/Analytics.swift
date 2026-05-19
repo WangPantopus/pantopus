@@ -32,6 +32,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenAddBillWizardStepViewed(stepNumber: Int, stepName: String)
     case ctaAddBillSubmit(result: AnalyticsResult)
     case screenHomeMaintenanceViewed
+    case screenLogMaintenanceViewed
+    case screenMaintenanceDetailViewed
+    case ctaLogMaintenanceSubmit(result: AnalyticsResult)
+    case ctaMaintenanceDelete(result: AnalyticsResult)
     case screenPetsListViewed
     case screenPetsWizardStepViewed(stepNumber: Int, stepName: String)
     case screenHomeCalendarViewed
@@ -56,6 +60,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case ctaHubPillarTapped(pillar: String)
     case ctaMailboxItemLogReceived
     case ctaAddHomeSubmit
+    /// P2.3 — Snap & Sell wizard step view event.
+    case screenListingComposeWizardStepViewed(stepNumber: Int, stepName: String)
+    /// P2.3 — submit the listing-compose wizard (final POST).
+    case ctaListingComposeSubmit
     case ctaClaimOwnershipSubmit(result: AnalyticsResult)
     case formEditProfileSubmit(result: AnalyticsResult)
     case formEditProfileValidationError(field: String)
@@ -91,6 +99,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenAddBillWizardStepViewed: "screen.add_bill_wizard.step_viewed"
         case .ctaAddBillSubmit: "cta.add_bill.submit"
         case .screenHomeMaintenanceViewed: "screen.home_maintenance.viewed"
+        case .screenLogMaintenanceViewed: "screen.log_maintenance.viewed"
+        case .screenMaintenanceDetailViewed: "screen.maintenance_detail.viewed"
+        case .ctaLogMaintenanceSubmit: "cta.log_maintenance.submit"
+        case .ctaMaintenanceDelete: "cta.maintenance.delete"
         case .screenPetsListViewed: "screen.pets_list.viewed"
         case .screenPetsWizardStepViewed: "screen.pets_wizard.step_viewed"
         case .screenHomeCalendarViewed: "screen.home_calendar.viewed"
@@ -113,6 +125,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .ctaHubPillarTapped: "cta.hub.pillar_tapped"
         case .ctaMailboxItemLogReceived: "cta.mailbox_item.log_received"
         case .ctaAddHomeSubmit: "cta.add_home.submit"
+        case .screenListingComposeWizardStepViewed: "screen.listing_compose_wizard.step_viewed"
+        case .ctaListingComposeSubmit: "cta.listing_compose.submit"
         case .ctaClaimOwnershipSubmit: "cta.claim_ownership.submit"
         case .formEditProfileSubmit: "form.edit_profile.submit"
         case .formEditProfileValidationError: "form.edit_profile.validation_error"
@@ -133,6 +147,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case let .screenAddHomeWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .screenComposeGigWizardStepViewed(stepNumber, stepName):
+            ["step_number": "\(stepNumber)", "step_name": stepName]
+        case let .screenListingComposeWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .screenPetsWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
@@ -164,6 +180,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["result": result.rawValue]
         case let .ctaLogPackageSubmit(result):
             ["result": result.rawValue]
+        case let .ctaLogMaintenanceSubmit(result):
+            ["result": result.rawValue]
+        case let .ctaMaintenanceDelete(result):
+            ["result": result.rawValue]
         case let .ctaPollVoteSubmit(result):
             ["result": result.rawValue]
         case .screenHubViewed,
@@ -175,6 +195,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenBillsViewed,
              .screenBillDetailViewed,
              .screenHomeMaintenanceViewed,
+             .screenLogMaintenanceViewed,
+             .screenMaintenanceDetailViewed,
              .screenPetsListViewed,
              .screenHomeCalendarViewed,
              .screenPackagesViewed,
@@ -191,7 +213,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenEditProfileViewed,
              .ctaMailboxItemLogReceived,
              .ctaAddHomeSubmit,
-             .ctaComposeGigSubmit:
+             .ctaComposeGigSubmit,
+             .ctaListingComposeSubmit:
             [:]
         }
     }

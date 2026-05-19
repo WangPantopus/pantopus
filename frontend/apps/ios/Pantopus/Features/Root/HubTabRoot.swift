@@ -25,6 +25,12 @@ public enum HubRoute: Hashable {
     case homePets(homeId: String)
     /// Emergency info sub-screen for a specific home (T6.4b / P17).
     case homeEmergency(homeId: String)
+    /// Add Emergency Info form (P2.8) — single-page editor backed by
+    /// `AddEmergencyInfoFormView`.
+    case addEmergencyInfo(homeId: String)
+    /// Emergency item detail (P2.8) — read-only summary backed by
+    /// `EmergencyInfoDetailView`.
+    case emergencyItem(homeId: String, emergencyId: String)
     /// Documents sub-screen for a specific home (T6.4b / P17).
     case homeDocs(homeId: String)
     /// P2.10 — Upload document form for a home.
@@ -41,8 +47,23 @@ public enum HubRoute: Hashable {
     /// (T6.3c / P11). Distinct from `.myBids` / `.myTasks` (the gig
     /// surfaces in the You tab).
     case homeTasks(homeId: String)
+    /// P2.4 — Add a new household task. Reached from the household
+    /// tasks list FAB.
+    case addHouseholdTask(homeId: String)
+    /// P2.4 — Edit an existing household task. Reached from the
+    /// "Edit recurring" overflow action on a Recurring row.
+    case editHouseholdTask(homeId: String, taskId: String)
     /// Maintenance sub-screen for a specific home (T6.3b / P10).
     case homeMaintenance(homeId: String)
+    /// P2.9 — Log a maintenance entry. Pushed from the Maintenance list
+    /// FAB; on success the host pops back and refreshes the list.
+    case logMaintenance(homeId: String)
+    /// P2.9 — Maintenance detail for a specific task. Pushed from a
+    /// per-row tap on the Maintenance list.
+    case maintenanceDetail(homeId: String, taskId: String)
+    /// P2.9 — Edit an existing maintenance entry. Re-uses the
+    /// `LogMaintenanceFormView` shell in edit mode.
+    case editMaintenance(homeId: String, taskId: String)
     /// Members sub-screen for a specific home (T6.3a / P9).
     case homeMembers(homeId: String)
     case publicProfile(userId: String)
@@ -400,13 +421,53 @@ public struct HubTabRoot: View {
             MaintenanceListView(
                 viewModel: MaintenanceListViewModel(
                     homeId: homeId,
-                    onOpenTask: { _ in
-                        Task { @MainActor in push(.placeholder(label: "Maintenance detail")) }
+                    onOpenTask: { taskId in
+                        Task { @MainActor in
+                            push(.maintenanceDetail(homeId: homeId, taskId: taskId))
+                        }
                     },
                     onAddTask: {
-                        Task { @MainActor in push(.placeholder(label: "Log maintenance")) }
+                        Task { @MainActor in push(.logMaintenance(homeId: homeId)) }
                     }
                 )
+            )
+        case let .logMaintenance(homeId):
+            LogMaintenanceFormView(
+                viewModel: LogMaintenanceFormViewModel(homeId: homeId),
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onSubmitted: { taskId in
+                    Task { @MainActor in
+                        path.removeAll { route in
+                            if case .logMaintenance = route { return true }
+                            return false
+                        }
+                        path.append(.maintenanceDetail(homeId: homeId, taskId: taskId))
+                    }
+                }
+            )
+        case let .maintenanceDetail(homeId, taskId):
+            MaintenanceDetailView(
+                homeId: homeId,
+                taskId: taskId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onEdit: {
+                    Task { @MainActor in
+                        push(.editMaintenance(homeId: homeId, taskId: taskId))
+                    }
+                }
+            )
+        case let .editMaintenance(homeId, taskId):
+            LogMaintenanceFormView(
+                viewModel: LogMaintenanceFormViewModel(
+                    homeId: homeId,
+                    mode: .edit(taskId: taskId)
+                ),
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onSubmitted: { _ in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
             )
         case let .homeBills(homeId):
             BillsListView(
@@ -463,14 +524,14 @@ public struct HubTabRoot: View {
             EmergencyInfoView(
                 viewModel: EmergencyInfoViewModel(
                     homeId: homeId,
-                    onAction: { _ in
+                    onAction: { dto in
                         Task { @MainActor in
-                            push(.placeholder(label: "Emergency item"))
+                            push(.emergencyItem(homeId: homeId, emergencyId: dto.id))
                         }
                     },
                     onAdd: {
                         Task { @MainActor in
-                            push(.placeholder(label: "Add emergency info"))
+                            push(.addEmergencyInfo(homeId: homeId))
                         }
                     },
                     onShare: {
@@ -485,6 +546,23 @@ public struct HubTabRoot: View {
                     }
                 )
             )
+        case let .addEmergencyInfo(homeId):
+            AddEmergencyInfoFormView(
+                viewModel: AddEmergencyInfoFormViewModel(homeId: homeId) { _ in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
+            )
+        case let .emergencyItem(homeId, emergencyId):
+            EmergencyInfoDetailView(
+                homeId: homeId,
+                emergencyId: emergencyId
+            ) {
+                Task { @MainActor in
+                    if !path.isEmpty { path.removeLast() }
+                }
+            }
         case let .homeDocs(homeId):
             DocumentsView(
                 viewModel: DocumentsViewModel(
@@ -580,13 +658,32 @@ public struct HubTabRoot: View {
                         Task { @MainActor in push(.placeholder(label: "Task detail")) }
                     },
                     onAddTask: {
-                        Task { @MainActor in push(.placeholder(label: "Add a task")) }
+                        Task { @MainActor in push(.addHouseholdTask(homeId: homeId)) }
                     },
-                    onEditRecurring: { _ in
-                        Task { @MainActor in push(.placeholder(label: "Edit recurring task")) }
+                    onEditRecurring: { taskId in
+                        Task { @MainActor in
+                            push(.editHouseholdTask(homeId: homeId, taskId: taskId))
+                        }
                     }
                 )
             )
+        case let .addHouseholdTask(homeId):
+            AddHouseholdTaskFormView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCreated: { _ in
+                    // Pop back to the tasks list; the list refreshes
+                    // on `.refreshable` / next visit.
+                    if !path.isEmpty { path.removeLast() }
+                }
+            )
+        case let .editHouseholdTask(homeId, taskId):
+            AddHouseholdTaskFormView(
+                homeId: homeId,
+                taskId: taskId
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId)
         case let .claimOwnership(homeId):
@@ -791,7 +888,12 @@ public struct HubTabRoot: View {
                 )
             )
         case .composeListing:
-            NotYetAvailableView(tabName: "Snap & sell", icon: .camera)
+            ListingComposeWizardView { listingId in
+                Task { @MainActor in
+                    pop()
+                    push(.listingDetail(listingId: listingId))
+                }
+            }
         case let .invoiceDetail(invoiceId):
             InvoiceDetailView(
                 viewModel: InvoiceDetailViewModel(invoiceId: invoiceId)

@@ -48,6 +48,26 @@ sealed class AnalyticsEvent(
     /** T6.3b / P10 — Maintenance list view. */
     data object ScreenHomeMaintenanceViewed : AnalyticsEvent("screen.home_maintenance.viewed")
 
+    /** P2.9 — Log maintenance form view. */
+    data object ScreenLogMaintenanceViewed : AnalyticsEvent("screen.log_maintenance.viewed")
+
+    /** P2.9 — Maintenance detail screen view. */
+    data object ScreenMaintenanceDetailViewed : AnalyticsEvent("screen.maintenance_detail.viewed")
+
+    /** P2.9 — Log maintenance form submit. */
+    data class CtaLogMaintenanceSubmit(
+        val result: AnalyticsResult,
+    ) : AnalyticsEvent("cta.log_maintenance.submit") {
+        override val properties = mapOf("result" to result.value)
+    }
+
+    /** P2.9 — Maintenance delete CTA. */
+    data class CtaMaintenanceDelete(
+        val result: AnalyticsResult,
+    ) : AnalyticsEvent("cta.maintenance.delete") {
+        override val properties = mapOf("result" to result.value)
+    }
+
     data object ScreenNotificationsViewed : AnalyticsEvent("screen.notifications.viewed")
 
     data object ScreenHomeCalendarViewed : AnalyticsEvent("screen.home_calendar.viewed")
@@ -115,6 +135,18 @@ sealed class AnalyticsEvent(
     data object CtaMailboxItemLogReceived : AnalyticsEvent("cta.mailbox_item.log_received")
 
     data object CtaAddHomeSubmit : AnalyticsEvent("cta.add_home.submit")
+
+    /** P2.3 — Snap & Sell wizard step view event. */
+    data class ScreenListingComposeWizardStepViewed(
+        val stepNumber: Int,
+        val stepName: String,
+    ) : AnalyticsEvent("screen.listing_compose_wizard.step_viewed") {
+        override val properties =
+            mapOf("step_number" to stepNumber.toString(), "step_name" to stepName)
+    }
+
+    /** P2.3 — submit the listing-compose wizard (final POST). */
+    data object CtaListingComposeSubmit : AnalyticsEvent("cta.listing_compose.submit")
 
     data class ScreenClaimOwnershipStepViewed(
         val stepName: String,
