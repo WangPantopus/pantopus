@@ -55,7 +55,7 @@ final class GigComposeViewModelTests: XCTestCase {
     }
 
     private func filledAtReview() -> GigComposeFormState {
-        let future = ISO8601DateFormatter().string(from: Date().addingTimeInterval(86_400))
+        let future = ISO8601DateFormatter().string(from: Date().addingTimeInterval(86400))
         return GigComposeFormState(
             step: GigComposeStep.review.rawValue,
             category: .handyman,
@@ -129,7 +129,9 @@ final class GigComposeViewModelTests: XCTestCase {
 
     func testPhotoCapEnforcedOnAdd() {
         let vm = makeVM(initialState: GigComposeFormState(step: GigComposeStep.basics.rawValue, category: .handyman))
-        for _ in 0 ..< GigComposeLimits.maxPhotos + 3 { vm.addPhoto("placeholder://photo") }
+        for _ in 0..<GigComposeLimits.maxPhotos + 3 {
+            vm.addPhoto("placeholder://photo")
+        }
         XCTAssertEqual(vm.form.photoIds.count, GigComposeLimits.maxPhotos)
     }
 

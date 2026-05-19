@@ -58,6 +58,14 @@ import java.time.format.FormatStyle
 /** Test tag applied to the GigCompose screen container. */
 const val GIG_COMPOSE_SCREEN_TAG = "composeGigWizard"
 
+private const val CATEGORY_GRID_COLUMNS = 3
+private const val SECONDS_PER_MINUTE = 60L
+private const val MINUTES_PER_HOUR = 60L
+private const val HOURS_PER_DAY = 24L
+private const val ONE_TIME_PICKER_PLACEHOLDER_SECONDS =
+    SECONDS_PER_MINUTE * MINUTES_PER_HOUR * HOURS_PER_DAY
+private const val REVIEW_DESCRIPTION_MAX_LENGTH = 140
+
 /**
  * Concrete Post-a-Task wizard composable. The view model survives
  * config changes via Hilt's `SavedStateHandle`, so the wizard restores
@@ -129,7 +137,7 @@ private fun CategoryStep(
 ) {
     HeadlineBlock("What kind of help do you need?")
     SubcopyBlock("Pick the closest match. You can refine it later.")
-    val rows = GigComposeCategory.entries.toList().chunked(3)
+    val rows = GigComposeCategory.entries.toList().chunked(CATEGORY_GRID_COLUMNS)
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         for (row in rows) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
@@ -144,7 +152,7 @@ private fun CategoryStep(
                 }
                 // Pad the last row out to 3 cells so the tiles don't
                 // stretch when the count isn't a multiple of 3.
-                repeat(3 - row.size) {
+                repeat(CATEGORY_GRID_COLUMNS - row.size) {
                     Box(modifier = Modifier.weight(1f))
                 }
             }
@@ -457,7 +465,7 @@ private fun OneTimeDateRow(
                         // form's "must be future" check passes and the
                         // wizard can advance. Real date / time pickers
                         // land with the calendar P18 follow-up.
-                        val nextDay = Instant.now().plusSeconds(60L * 60L * 24L)
+                        val nextDay = Instant.now().plusSeconds(ONE_TIME_PICKER_PLACEHOLDER_SECONDS)
                         vm.setScheduledStart(nextDay.toString())
                     }
                     .padding(Spacing.s3)
@@ -550,69 +558,89 @@ private fun ReviewStep(state: GigComposeUiState) {
     HeadlineBlock("Review and post")
     SubcopyBlock("Check the details. Helpers see what's below as your gig card.")
     val form = state.form
-    val condensedDescription = condensedDescription(form.description)
-    val photosSummary =
-        when (form.photoIds.size) {
-            0 -> "None"
-            1 -> "1 photo"
-            else -> "${form.photoIds.size} photos"
-        }
-    val budgetSummary =
-        when (val type = form.budgetType) {
-            null -> "—"
-            GigComposeBudgetType.Offers -> "Open to bids"
-            else -> {
-                val suffix = if (type == GigComposeBudgetType.Hourly) "/hr" else ""
-                if (form.budgetMax.isNotEmpty()) {
-                    "\$${form.budgetMin}–\$${form.budgetMax}$suffix"
-                } else {
-                    "\$${form.budgetMin}$suffix"
-                }
-            }
-        }
-    val scheduleSummary =
-        form.scheduleType?.let { type ->
-            if (type == GigComposeScheduleType.OneTime && form.scheduledStartISO != null) {
-                runCatching {
-                    LocalDateTime
-                        .ofInstant(Instant.parse(form.scheduledStartISO), ZoneId.systemDefault())
-                        .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT))
-                }.getOrNull() ?: type.label
-            } else {
-                type.label
-            }
-        } ?: "—"
-    val locationSummary =
-        when (form.locationMode) {
-            null -> "—"
-            GigComposeLocationMode.YourAddress -> "Your saved address"
-            GigComposeLocationMode.Virtual -> "Virtual"
-            GigComposeLocationMode.APlace ->
-                if (form.placeAddress.isComplete) {
-                    "${form.placeAddress.line1}, ${form.placeAddress.city}, ${form.placeAddress.state} ${form.placeAddress.zip}"
-                } else {
-                    "A place"
-                }
-        }
 
     ReviewSummaryBlock(
         rows =
             listOf(
                 ReviewSummaryRow("Category", form.category?.label ?: "—"),
                 ReviewSummaryRow("Title", form.title.ifEmpty { "—" }),
-                ReviewSummaryRow("Description", condensedDescription),
-                ReviewSummaryRow("Photos", photosSummary),
-                ReviewSummaryRow("Budget", budgetSummary),
-                ReviewSummaryRow("Schedule", scheduleSummary),
-                ReviewSummaryRow("Location", locationSummary),
+                ReviewSummaryRow("Description", condensedDescription(form.description)),
+                ReviewSummaryRow("Photos", photosSummary(form.photoIds.size)),
+                ReviewSummaryRow("Budget", budgetSummary(form)),
+                ReviewSummaryRow("Schedule", scheduleSummary(form)),
+                ReviewSummaryRow("Location", locationSummary(form)),
             ),
     )
 }
 
+private fun photosSummary(count: Int): String =
+    when (count) {
+        0 -> "None"
+        1 -> "1 photo"
+        else -> "$count photos"
+    }
+
+private fun budgetSummary(form: GigComposeFormState): String =
+    when (val type = form.budgetType) {
+        null -> "—"
+        GigComposeBudgetType.Offers -> "Open to bids"
+        else -> pricedBudgetSummary(form, type)
+    }
+
+private fun pricedBudgetSummary(
+    form: GigComposeFormState,
+    type: GigComposeBudgetType,
+): String {
+    val suffix = if (type == GigComposeBudgetType.Hourly) "/hr" else ""
+    return if (form.budgetMax.isNotEmpty()) {
+        "\$${form.budgetMin}–\$${form.budgetMax}$suffix"
+    } else {
+        "\$${form.budgetMin}$suffix"
+    }
+}
+
+private fun scheduleSummary(form: GigComposeFormState): String =
+    form.scheduleType?.let { type ->
+        if (type == GigComposeScheduleType.OneTime && form.scheduledStartISO != null) {
+            formattedScheduledStart(form.scheduledStartISO, type.label)
+        } else {
+            type.label
+        }
+    } ?: "—"
+
+private fun formattedScheduledStart(
+    iso: String,
+    fallback: String,
+): String =
+    runCatching {
+        LocalDateTime
+            .ofInstant(Instant.parse(iso), ZoneId.systemDefault())
+            .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT))
+    }.getOrNull() ?: fallback
+
+private fun locationSummary(form: GigComposeFormState): String =
+    when (form.locationMode) {
+        null -> "—"
+        GigComposeLocationMode.YourAddress -> "Your saved address"
+        GigComposeLocationMode.Virtual -> "Virtual"
+        GigComposeLocationMode.APlace -> placeSummary(form.placeAddress)
+    }
+
+private fun placeSummary(place: GigComposePlaceAddress): String =
+    if (place.isComplete) {
+        "${place.line1}, ${place.city}, ${place.state} ${place.zip}"
+    } else {
+        "A place"
+    }
+
 private fun condensedDescription(raw: String): String {
     val trimmed = raw.trim()
     if (trimmed.isEmpty()) return "—"
-    return if (trimmed.length > 140) trimmed.take(140) + "…" else trimmed
+    return if (trimmed.length > REVIEW_DESCRIPTION_MAX_LENGTH) {
+        trimmed.take(REVIEW_DESCRIPTION_MAX_LENGTH) + "…"
+    } else {
+        trimmed
+    }
 }
 
 // MARK: - Success

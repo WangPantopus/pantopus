@@ -428,8 +428,8 @@ extension GigComposeViewModel {
     /// `offers` it's 0 (we send `1` so the schema accepts it).
     private func priceFromBudget(type: GigComposeBudgetType) -> Double {
         switch type {
-        case .offers: return 0
-        case .fixed, .hourly: return Double(form.budgetMin) ?? 0
+        case .offers: 0
+        case .fixed, .hourly: Double(form.budgetMin) ?? 0
         }
     }
 }

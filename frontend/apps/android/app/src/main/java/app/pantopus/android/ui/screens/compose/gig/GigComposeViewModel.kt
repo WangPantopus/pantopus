@@ -301,37 +301,72 @@ open class GigComposeViewModel
          */
         fun buildCreateBody(): CreateGigBody? {
             val form = _state.value.form
-            val budgetType = form.budgetType ?: return null
-            val scheduleType = form.scheduleType ?: return null
-            val locationMode = form.locationMode ?: return null
-            val title = form.title.trim()
-            val description = form.description.trim()
-            if (title.length < GigComposeLimits.TITLE_MIN ||
-                title.length > GigComposeLimits.TITLE_MAX ||
-                description.length < GigComposeLimits.DESCRIPTION_MIN
-            ) {
-                return null
-            }
-            val price = priceFromBudget(budgetType, form.budgetMin)
-            if (price <= 0 && budgetType != GigComposeBudgetType.Offers) return null
-            val scheduledStart = if (scheduleType == GigComposeScheduleType.OneTime) form.scheduledStartISO else null
-            if (scheduleType == GigComposeScheduleType.OneTime && scheduledStart == null) return null
-            val taskFormat = if (locationMode == GigComposeLocationMode.Virtual) "remote" else null
-            val location = composedLocation(locationMode, form.placeAddress) ?: return null
+            val fields = createGigRequiredFields(form) ?: return null
             return CreateGigBody(
-                title = title,
-                description = description,
+                title = fields.title,
+                description = fields.description,
                 category = form.category?.key,
                 // Backend requires positive number; we send 1 for
                 // open-to-bids so the schema accepts it and treat
                 // `pay_type` as the source of truth.
-                price = if (price > 0) price else 1.0,
-                payType = budgetType.wireValue,
-                scheduleType = scheduleType.wireValue,
-                scheduledStart = scheduledStart,
-                taskFormat = taskFormat,
+                price = if (fields.price > 0) fields.price else 1.0,
+                payType = fields.budgetType.wireValue,
+                scheduleType = fields.scheduleType.wireValue,
+                scheduledStart = fields.scheduledStart,
+                taskFormat = fields.taskFormat,
                 attachments = form.photoIds.ifEmpty { null },
+                location = fields.location,
+            )
+        }
+
+        private data class CreateGigRequiredFields(
+            val budgetType: GigComposeBudgetType,
+            val scheduleType: GigComposeScheduleType,
+            val title: String,
+            val description: String,
+            val price: Double,
+            val scheduledStart: String?,
+            val taskFormat: String?,
+            val location: CreateGigLocation,
+        )
+
+        private data class CreateGigRequiredOptions(
+            val budgetType: GigComposeBudgetType,
+            val scheduleType: GigComposeScheduleType,
+            val locationMode: GigComposeLocationMode,
+        )
+
+        private fun createGigRequiredFields(form: GigComposeFormState): CreateGigRequiredFields? {
+            val options = requiredCreateOptions(form) ?: return null
+            val title = form.title.trim()
+            val description = form.description.trim()
+            val price = priceFromBudget(options.budgetType, form.budgetMin)
+            val scheduledStart = if (options.scheduleType == GigComposeScheduleType.OneTime) form.scheduledStartISO else null
+            val location = composedLocation(options.locationMode, form.placeAddress) ?: return null
+            return CreateGigRequiredFields(
+                budgetType = options.budgetType,
+                scheduleType = options.scheduleType,
+                title = title,
+                description = description,
+                price = price,
+                scheduledStart = scheduledStart,
+                taskFormat = taskFormatFor(options.locationMode),
                 location = location,
+            ).takeIf {
+                hasValidTitleAndDescription(title, description) &&
+                    hasValidPrice(options.budgetType, price) &&
+                    hasValidScheduledStart(options.scheduleType, scheduledStart)
+            }
+        }
+
+        private fun requiredCreateOptions(form: GigComposeFormState): CreateGigRequiredOptions? {
+            val budgetType = form.budgetType ?: return null
+            val scheduleType = form.scheduleType ?: return null
+            val locationMode = form.locationMode ?: return null
+            return CreateGigRequiredOptions(
+                budgetType = budgetType,
+                scheduleType = scheduleType,
+                locationMode = locationMode,
             )
         }
 
@@ -433,44 +468,70 @@ open class GigComposeViewModel
             val form = state.form
             return when (form.currentStep) {
                 GigComposeStep.Category -> form.category != null
-                GigComposeStep.Basics -> {
-                    val title = form.title.trim()
-                    val desc = form.description.trim()
-                    title.length in GigComposeLimits.TITLE_MIN..GigComposeLimits.TITLE_MAX &&
-                        desc.length in GigComposeLimits.DESCRIPTION_MIN..GigComposeLimits.DESCRIPTION_MAX &&
-                        form.photoIds.size <= GigComposeLimits.MAX_PHOTOS
-                }
-                GigComposeStep.Budget -> {
-                    val type = form.budgetType ?: return false
-                    when (type) {
-                        GigComposeBudgetType.Offers -> true
-                        GigComposeBudgetType.Fixed, GigComposeBudgetType.Hourly -> (form.budgetMin.toDoubleOrNull() ?: 0.0) > 0.0
-                    }
-                }
-                GigComposeStep.Schedule -> {
-                    val type = form.scheduleType ?: return false
-                    if (type == GigComposeScheduleType.OneTime) {
-                        val iso = form.scheduledStartISO ?: return false
-                        try {
-                            Instant.parse(iso).isAfter(Instant.now())
-                        } catch (_: DateTimeParseException) {
-                            false
-                        }
-                    } else {
-                        true
-                    }
-                }
-                GigComposeStep.Location -> {
-                    val mode = form.locationMode ?: return false
-                    when (mode) {
-                        GigComposeLocationMode.YourAddress, GigComposeLocationMode.Virtual -> true
-                        GigComposeLocationMode.APlace -> form.placeAddress.isComplete
-                    }
-                }
+                GigComposeStep.Basics -> hasValidBasics(form)
+                GigComposeStep.Budget -> hasValidBudget(form)
+                GigComposeStep.Schedule -> hasValidSchedule(form)
+                GigComposeStep.Location -> hasValidLocation(form)
                 GigComposeStep.Review -> buildCreateBody() != null
                 GigComposeStep.Success -> state.createdGigId != null
             }
         }
+
+        private fun hasValidBasics(form: GigComposeFormState): Boolean =
+            hasValidTitleAndDescription(form.title.trim(), form.description.trim()) &&
+                form.photoIds.size <= GigComposeLimits.MAX_PHOTOS
+
+        private fun hasValidTitleAndDescription(
+            title: String,
+            description: String,
+        ): Boolean =
+            title.length in GigComposeLimits.TITLE_MIN..GigComposeLimits.TITLE_MAX &&
+                description.length in GigComposeLimits.DESCRIPTION_MIN..GigComposeLimits.DESCRIPTION_MAX
+
+        private fun hasValidBudget(form: GigComposeFormState): Boolean =
+            form.budgetType?.let { type ->
+                hasValidPrice(type, priceFromBudget(type, form.budgetMin))
+            } ?: false
+
+        private fun hasValidPrice(
+            type: GigComposeBudgetType,
+            price: Double,
+        ): Boolean = type == GigComposeBudgetType.Offers || price > 0.0
+
+        private fun hasValidSchedule(form: GigComposeFormState): Boolean =
+            when (form.scheduleType) {
+                null -> false
+                GigComposeScheduleType.OneTime -> isFutureInstant(form.scheduledStartISO)
+                GigComposeScheduleType.Recurring, GigComposeScheduleType.Flexible -> true
+            }
+
+        private fun hasValidScheduledStart(
+            type: GigComposeScheduleType,
+            scheduledStart: String?,
+        ): Boolean = type != GigComposeScheduleType.OneTime || isFutureInstant(scheduledStart)
+
+        private fun isFutureInstant(iso: String?): Boolean =
+            iso?.let { value ->
+                try {
+                    Instant.parse(value).isAfter(Instant.now())
+                } catch (_: DateTimeParseException) {
+                    false
+                }
+            } ?: false
+
+        private fun hasValidLocation(form: GigComposeFormState): Boolean =
+            when (form.locationMode) {
+                null -> false
+                GigComposeLocationMode.YourAddress, GigComposeLocationMode.Virtual -> true
+                GigComposeLocationMode.APlace -> form.placeAddress.isComplete
+            }
+
+        private fun taskFormatFor(mode: GigComposeLocationMode): String? =
+            if (mode == GigComposeLocationMode.Virtual) {
+                "remote"
+            } else {
+                null
+            }
 
         // MARK: - Persistence
 

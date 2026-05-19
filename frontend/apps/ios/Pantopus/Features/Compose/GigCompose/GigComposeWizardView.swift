@@ -30,7 +30,7 @@ public struct GigComposeWizardView: View {
         viewModel: GigComposeViewModel? = nil,
         onOpenGigDetail: @escaping (String) -> Void
     ) {
-        self.preselectedCategory = GigComposeCategory.from(rawKey: preselectedCategoryKey)
+        preselectedCategory = GigComposeCategory.from(rawKey: preselectedCategoryKey)
         self.onOpenGigDetail = onOpenGigDetail
         // Always start with `.empty` so the SceneStorage restore can win
         // when the user backgrounds + resumes mid-wizard. The
@@ -296,7 +296,7 @@ private struct PhotoSlotsRow: View {
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             HStack(spacing: Spacing.s2) {
-                ForEach(0 ..< count, id: \.self) { index in
+                ForEach(0..<count, id: \.self) { index in
                     Button {
                         onRemove(index)
                     } label: {
