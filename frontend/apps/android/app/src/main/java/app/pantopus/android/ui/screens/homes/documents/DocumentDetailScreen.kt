@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,7 +41,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,7 +54,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.homes.HomeDocumentDto
@@ -254,9 +251,10 @@ private fun LoadedShell(
 ) {
     val fileType = remember(dto) { DocumentFileType.fromMime(dto.mimeType, dto.title) }
     val category = remember(dto) { DocumentCategory.fromDocType(dto.docType) }
-    val projection = remember(dto) {
-        DocumentsViewModel.project(dto, java.time.Instant.now())
-    }
+    val projection =
+        remember(dto) {
+            DocumentsViewModel.project(dto, java.time.Instant.now())
+        }
     val tags = remember(dto) { parseTags(dto.details ?: emptyMap()) }
     val linkedEntity = remember(dto) { parseLinkedEntity(dto.details ?: emptyMap()) }
 
@@ -781,9 +779,10 @@ private fun openExternally(
     dto: HomeDocumentDto,
 ) {
     val url = resolvePreviewUrl(dto) ?: return
-    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
+    val intent =
+        Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
     runCatching { context.startActivity(intent) }
 }
 

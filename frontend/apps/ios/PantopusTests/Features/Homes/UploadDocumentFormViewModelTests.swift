@@ -54,8 +54,11 @@ final class UploadDocumentFormViewModelTests: XCTestCase {
         vm.acceptPicked(url: url)
         XCTAssertEqual(vm.pickedFile?.filename, "Lease-Renewal.pdf")
         XCTAssertEqual(vm.titleField.value, "Lease-Renewal")
-        XCTAssertEqual(vm.category, .mortgage,
-                       "Heuristic should suggest mortgage for filenames containing 'Lease'.")
+        XCTAssertEqual(
+            vm.category,
+            .mortgage,
+            "Heuristic should suggest mortgage for filenames containing 'Lease'."
+        )
     }
 
     func testAcceptingFileWithExplicitTitleLeavesItUntouched() {

@@ -6,7 +6,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.CreateDocumentRequest
-import app.pantopus.android.data.api.models.homes.HomeDocumentDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomePetsRepository
 import app.pantopus.android.data.homes.HomesRepository
@@ -46,20 +45,24 @@ enum class UploadDocumentCategory(
     ;
 
     companion object {
+        private val SUGGESTION_KEYWORDS: List<Pair<UploadDocumentCategory, List<String>>> =
+            listOf(
+                Mortgage to listOf("lease", "mortgage"),
+                Insurance to listOf("insurance", "policy"),
+                Warranty to listOf("warranty", "manual"),
+                Tax to listOf("tax", "1098", "1099"),
+                Receipt to listOf("receipt"),
+                Contract to listOf("contract"),
+                Identity to listOf("passport", "license", "id "),
+                Medical to listOf("medical", "vet", "vaccine"),
+            )
+
         /** Filename heuristic — picks a sensible default category. */
         fun suggestFor(filename: String): UploadDocumentCategory? {
             val lower = filename.lowercase()
-            return when {
-                "lease" in lower || "mortgage" in lower -> Mortgage
-                "insurance" in lower || "policy" in lower -> Insurance
-                "warranty" in lower || "manual" in lower -> Warranty
-                "tax" in lower || "1098" in lower || "1099" in lower -> Tax
-                "receipt" in lower -> Receipt
-                "contract" in lower -> Contract
-                "passport" in lower || "license" in lower || "id " in lower -> Identity
-                "medical" in lower || "vet" in lower || "vaccine" in lower -> Medical
-                else -> null
-            }
+            return SUGGESTION_KEYWORDS.firstOrNull { (_, keywords) ->
+                keywords.any { it in lower }
+            }?.first
         }
     }
 }
@@ -88,8 +91,11 @@ data class UploadDocumentLinkOption(
 /** Lifecycle state for the linked-to picker. */
 sealed interface UploadDocumentLinkOptionsState {
     data object Idle : UploadDocumentLinkOptionsState
+
     data object Loading : UploadDocumentLinkOptionsState
+
     data class Loaded(val options: List<UploadDocumentLinkOption>) : UploadDocumentLinkOptionsState
+
     data class Error(val message: String) : UploadDocumentLinkOptionsState
 }
 
@@ -126,10 +132,11 @@ data class UploadDocumentFormState(
         get() = pickedFile != null && trimmedTitle.isNotEmpty() && title.error == null
 
     val isDirty: Boolean
-        get() = pickedFile != null ||
-            trimmedTitle.isNotEmpty() ||
-            tags.isNotEmpty() ||
-            linkedEntity != null
+        get() =
+            pickedFile != null ||
+                trimmedTitle.isNotEmpty() ||
+                tags.isNotEmpty() ||
+                linkedEntity != null
 }
 
 @HiltViewModel
@@ -153,17 +160,22 @@ class UploadDocumentFormViewModel
          * file. Seeds the title from the filename when the title field
          * is still untouched.
          */
-        fun acceptPicked(filename: String, sizeBytes: Long?, mimeType: String?) {
+        fun acceptPicked(
+            filename: String,
+            sizeBytes: Long?,
+            mimeType: String?,
+        ) {
             val previous = _state.value.pickedFile
             val picked = PickedFile(filename = filename, sizeBytes = sizeBytes, mimeType = mimeType)
             _state.update { snapshot ->
                 val needsTitle = snapshot.title.value.isEmpty() || !snapshot.title.touched
-                val newTitle = if (needsTitle) {
-                    val stripped = filename.substringBeforeLast('.', filename)
-                    FormFieldState(id = "title", value = stripped, originalValue = stripped)
-                } else {
-                    snapshot.title
-                }
+                val newTitle =
+                    if (needsTitle) {
+                        val stripped = filename.substringBeforeLast('.', filename)
+                        FormFieldState(id = "title", value = stripped, originalValue = stripped)
+                    } else {
+                        snapshot.title
+                    }
                 val suggested = UploadDocumentCategory.suggestFor(filename)
                 val newCategory = if (suggested != null && previous == null) suggested else snapshot.category
                 snapshot.copy(
@@ -181,11 +193,12 @@ class UploadDocumentFormViewModel
         fun updateTitle(value: String) {
             _state.update { snapshot ->
                 snapshot.copy(
-                    title = snapshot.title.copy(
-                        value = value,
-                        touched = true,
-                        error = validateTitle(value),
-                    ),
+                    title =
+                        snapshot.title.copy(
+                            value = value,
+                            touched = true,
+                            error = validateTitle(value),
+                        ),
                 )
             }
         }
@@ -309,10 +322,11 @@ class UploadDocumentFormViewModel
          */
         fun submit() {
             val snapshot = _state.value
-            val validatedTitle = snapshot.title.copy(
-                touched = true,
-                error = validateTitle(snapshot.title.value),
-            )
+            val validatedTitle =
+                snapshot.title.copy(
+                    touched = true,
+                    error = validateTitle(snapshot.title.value),
+                )
             _state.update { it.copy(title = validatedTitle) }
             if (snapshot.pickedFile == null || validatedTitle.error != null ||
                 validatedTitle.value.trim().isEmpty()
@@ -325,22 +339,24 @@ class UploadDocumentFormViewModel
             if (snapshot.isSaving) return
             _state.update { it.copy(isSaving = true, toast = null) }
 
-            val details = buildMap {
-                if (snapshot.tags.isNotEmpty()) put("tags", snapshot.tags.joinToString(","))
-                snapshot.linkedEntity?.let { link ->
-                    put("linked_entity_kind", link.kind.id)
-                    put("linked_entity_id", link.id)
-                    put("linked_entity_title", link.title)
+            val details =
+                buildMap {
+                    if (snapshot.tags.isNotEmpty()) put("tags", snapshot.tags.joinToString(","))
+                    snapshot.linkedEntity?.let { link ->
+                        put("linked_entity_kind", link.kind.id)
+                        put("linked_entity_id", link.id)
+                        put("linked_entity_title", link.title)
+                    }
                 }
-            }
-            val request = CreateDocumentRequest(
-                docType = snapshot.category.docType,
-                title = validatedTitle.value.trim(),
-                mimeType = snapshot.pickedFile.mimeType,
-                sizeBytes = snapshot.pickedFile.sizeBytes,
-                visibility = snapshot.visibility.wire,
-                details = if (details.isEmpty()) null else details,
-            )
+            val request =
+                CreateDocumentRequest(
+                    docType = snapshot.category.docType,
+                    title = validatedTitle.value.trim(),
+                    mimeType = snapshot.pickedFile.mimeType,
+                    sizeBytes = snapshot.pickedFile.sizeBytes,
+                    visibility = snapshot.visibility.wire,
+                    details = if (details.isEmpty()) null else details,
+                )
             viewModelScope.launch {
                 when (val result = homesRepo.createHomeDocument(homeId, request)) {
                     is NetworkResult.Success ->

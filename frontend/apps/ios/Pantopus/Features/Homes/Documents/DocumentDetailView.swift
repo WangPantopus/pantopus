@@ -23,7 +23,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class DocumentDetailViewModel {
-    enum State: Sendable, Equatable {
+    enum State: Equatable {
         case loading
         case loaded(HomeDocumentDTO)
         case error(message: String)
@@ -115,12 +115,11 @@ public struct DocumentDetailView: View {
         homeId: String,
         documentId: String,
         seedDocument: HomeDocumentDTO? = nil,
-        api: APIClient = .shared,
         onBack: @escaping () -> Void = {},
         onReplace: @escaping () -> Void = {},
         onOpenExternally: @escaping (HomeDocumentDTO) -> Void = { _ in }
     ) {
-        let vm = DocumentDetailViewModel(homeId: homeId, documentId: documentId, api: api)
+        let vm = DocumentDetailViewModel(homeId: homeId, documentId: documentId)
         if let seedDocument {
             vm.seed(seedDocument)
         }
@@ -143,6 +142,7 @@ public struct DocumentDetailView: View {
                     onOpenExternally: { onOpenExternally(dto) },
                     onShare: { shareItem = ShareItem(document: dto) },
                     onReplace: onReplace,
+                    // swiftlint:disable:next trailing_closure
                     onDelete: { showsDeleteConfirm = true }
                 )
             case let .error(message):
@@ -718,8 +718,8 @@ private struct FooterButton: View {
 
 // MARK: - Detail-only projection (tags + linked-to)
 
-struct DocumentLinkedEntity: Equatable, Sendable {
-    enum Kind: String, Sendable {
+struct DocumentLinkedEntity: Equatable {
+    enum Kind: String {
         case bill, maintenance, pet
 
         var label: String {
@@ -743,19 +743,18 @@ struct DocumentLinkedEntity: Equatable, Sendable {
     let title: String
 
     static func from(details: [String: String]) -> DocumentLinkedEntity? {
-        guard
-            let kindRaw = details["linked_entity_kind"],
-            let kind = Kind(rawValue: kindRaw),
-            let title = details["linked_entity_title"], !title.isEmpty
+        guard let kindRaw = details["linked_entity_kind"],
+              let kind = Kind(rawValue: kindRaw),
+              let title = details["linked_entity_title"], !title.isEmpty
         else { return nil }
         return DocumentLinkedEntity(kind: kind, title: title)
     }
 }
 
-extension DocumentDetailView {
+public extension DocumentDetailView {
     /// Pure helper exposed for tests — pulls the comma-separated `tags`
     /// payload out of the document's free-form `details` map.
-    public static func parseTags(from details: [String: String]) -> [String] {
+    static func parseTags(from details: [String: String]) -> [String] {
         guard let raw = details["tags"], !raw.isEmpty else { return [] }
         return raw
             .split(separator: ",")

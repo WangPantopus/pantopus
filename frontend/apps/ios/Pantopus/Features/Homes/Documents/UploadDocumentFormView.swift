@@ -31,13 +31,11 @@ public struct UploadDocumentFormView: View {
 
     public init(
         homeId: String,
-        api: APIClient = .shared,
         onClose: @escaping @MainActor () -> Void = {},
         onUploaded: @escaping @Sendable (HomeDocumentDTO) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: UploadDocumentFormViewModel(
             homeId: homeId,
-            api: api,
             onUploaded: onUploaded
         ))
         self.onClose = onClose
@@ -51,15 +49,16 @@ public struct UploadDocumentFormView: View {
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: handleClose,
-            onCommit: { Task { await viewModel.submit() } }
-        ) {
-            fileSection
-            titleSection
-            categorySection
-            tagsSection
-            linkedSection
-            visibilitySection
-        }
+            onCommit: { Task { await viewModel.submit() } },
+            content: {
+                fileSection
+                titleSection
+                categorySection
+                tagsSection
+                linkedSection
+                visibilitySection
+            }
+        )
         .formShakeOnChange(of: viewModel.shakeTrigger)
         .accessibilityIdentifier("uploadDocumentShell")
         .fileImporter(
@@ -90,7 +89,7 @@ public struct UploadDocumentFormView: View {
         dismiss()
     }
 
-    private func handlePicked(result: Result<[URL], Error>) {
+    private func handlePicked(result: Result<[URL], any Error>) {
         switch result {
         case let .success(urls):
             guard let url = urls.first else { return }
@@ -107,7 +106,7 @@ public struct UploadDocumentFormView: View {
 
     // MARK: - Sections
 
-    @ViewBuilder private var fileSection: some View {
+    private var fileSection: some View {
         FormFieldGroup("File") {
             if let file = viewModel.pickedFile {
                 PickedFileCard(file: file) {
@@ -121,7 +120,7 @@ public struct UploadDocumentFormView: View {
         }
     }
 
-    @ViewBuilder private var titleSection: some View {
+    private var titleSection: some View {
         FormFieldGroup("Title") {
             PantopusTextField(
                 "Document title",
@@ -146,7 +145,7 @@ public struct UploadDocumentFormView: View {
         return .default
     }
 
-    @ViewBuilder private var categorySection: some View {
+    private var categorySection: some View {
         FormFieldGroup("Category") {
             CategoryChipGrid(
                 selected: viewModel.category,
@@ -155,7 +154,7 @@ public struct UploadDocumentFormView: View {
         }
     }
 
-    @ViewBuilder private var tagsSection: some View {
+    private var tagsSection: some View {
         FormFieldGroup("Tags") {
             TagsEditor(
                 tags: viewModel.tags,
@@ -169,7 +168,7 @@ public struct UploadDocumentFormView: View {
         }
     }
 
-    @ViewBuilder private var linkedSection: some View {
+    private var linkedSection: some View {
         FormFieldGroup("Linked to") {
             if let linked = viewModel.linkedEntity {
                 LinkedRow(link: linked) {
@@ -201,7 +200,7 @@ public struct UploadDocumentFormView: View {
         }
     }
 
-    @ViewBuilder private var visibilitySection: some View {
+    private var visibilitySection: some View {
         FormFieldGroup("Visibility") {
             VisibilityPicker(
                 selected: viewModel.visibility,

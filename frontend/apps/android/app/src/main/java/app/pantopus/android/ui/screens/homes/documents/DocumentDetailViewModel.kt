@@ -23,6 +23,7 @@ const val DOCUMENT_DETAIL_DOC_ID_KEY = "documentId"
 /** UI state surfaces for the Document Detail screen. */
 sealed interface DocumentDetailUiState {
     data object Loading : DocumentDetailUiState
+
     data class Loaded(
         val document: HomeDocumentDto,
         val isMutating: Boolean = false,

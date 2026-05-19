@@ -28,20 +28,15 @@ import java.io.File
 class UploadDocumentSnapshotTest {
     private val baselineDir = File("src/test/snapshots/p2-10-documents")
 
-    @Test fun upload_document_empty_android_baseline_is_present() =
-        assertBaselineOrSkip("upload-empty")
+    @Test fun upload_document_empty_android_baseline_is_present() = assertBaselineOrSkip("upload-empty")
 
-    @Test fun upload_document_filled_android_baseline_is_present() =
-        assertBaselineOrSkip("upload-filled")
+    @Test fun upload_document_filled_android_baseline_is_present() = assertBaselineOrSkip("upload-filled")
 
-    @Test fun document_detail_pdf_android_baseline_is_present() =
-        assertBaselineOrSkip("detail-pdf")
+    @Test fun document_detail_pdf_android_baseline_is_present() = assertBaselineOrSkip("detail-pdf")
 
-    @Test fun document_detail_image_android_baseline_is_present() =
-        assertBaselineOrSkip("detail-image")
+    @Test fun document_detail_image_android_baseline_is_present() = assertBaselineOrSkip("detail-image")
 
-    @Test fun document_detail_unsupported_android_baseline_is_present() =
-        assertBaselineOrSkip("detail-unsupported")
+    @Test fun document_detail_unsupported_android_baseline_is_present() = assertBaselineOrSkip("detail-unsupported")
 
     private fun assertBaselineOrSkip(screen: String) {
         val file = File(baselineDir, "$screen-android.png")

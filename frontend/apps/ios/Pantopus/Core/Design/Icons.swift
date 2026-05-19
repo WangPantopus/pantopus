@@ -14,7 +14,7 @@
 
 import SwiftUI
 
-// swiftlint:disable type_body_length
+// swiftlint:disable file_length type_body_length
 
 /// Every icon the Pantopus design language uses. Cases are the raw Lucide
 /// token names (kebab-case preserved in `rawValue`).

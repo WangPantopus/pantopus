@@ -637,11 +637,12 @@ private fun LinkedSection(
 }
 
 private val UploadDocumentLinkKind.icon: PantopusIcon
-    get() = when (this) {
-        UploadDocumentLinkKind.Bill -> PantopusIcon.ReceiptText
-        UploadDocumentLinkKind.Maintenance -> PantopusIcon.Hammer
-        UploadDocumentLinkKind.Pet -> PantopusIcon.PawPrint
-    }
+    get() =
+        when (this) {
+            UploadDocumentLinkKind.Bill -> PantopusIcon.ReceiptText
+            UploadDocumentLinkKind.Maintenance -> PantopusIcon.Hammer
+            UploadDocumentLinkKind.Pet -> PantopusIcon.PawPrint
+        }
 
 // MARK: - Visibility section
 
@@ -883,9 +884,10 @@ private fun LinkOptionsList(
     options: List<UploadDocumentLinkOption>,
     onSelect: (UploadDocumentLinkOption) -> Unit,
 ) {
-    val grouped = UploadDocumentLinkKind.entries.associateWith { kind ->
-        options.filter { it.kind == kind }
-    }
+    val grouped =
+        UploadDocumentLinkKind.entries.associateWith { kind ->
+            options.filter { it.kind == kind }
+        }
     LazyColumn(
         modifier =
             Modifier
@@ -969,4 +971,3 @@ internal fun formatBytes(bytes: Long?): String? {
         else -> "$bytes B"
     }
 }
-

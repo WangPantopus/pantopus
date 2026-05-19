@@ -191,6 +191,9 @@ class IconTest {
             // P1.3 — Broadcast detail sub-route
             "reply",
             "radio-tower",
+            // P2.10 — Document detail sticky-footer action glyphs.
+            "external-link",
+            "refresh-cw",
         )
 
     @Test

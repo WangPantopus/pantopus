@@ -7,7 +7,6 @@ import app.pantopus.android.data.api.models.homes.BillDto
 import app.pantopus.android.data.api.models.homes.CreateDocumentRequest
 import app.pantopus.android.data.api.models.homes.CreateDocumentResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
-import app.pantopus.android.data.api.models.homes.GetHomeDocumentsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.HomeDocumentDto
 import app.pantopus.android.data.api.models.homes.MaintenanceTaskDto
