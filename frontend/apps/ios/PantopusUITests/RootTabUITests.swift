@@ -26,7 +26,10 @@ final class RootTabUITests: XCTestCase {
         app.launch()
         // If the app doesn't honour the flag (older builds), skip rather than fail.
         let hubTab = app.buttons["tab.hub"].firstMatch
-        guard hubTab.waitForExistence(timeout: 5) else { return nil }
+        guard hubTab.waitForExistence(timeout: 5) else {
+            app.terminateAfterSkippedLaunch()
+            return nil
+        }
         return app
     }
 

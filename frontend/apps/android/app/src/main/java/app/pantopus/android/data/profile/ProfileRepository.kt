@@ -2,6 +2,8 @@ package app.pantopus.android.data.profile
 
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.models.users.ProfileResponse
+import app.pantopus.android.data.api.models.users.ProfileUpdateRequest
+import app.pantopus.android.data.api.models.users.ProfileUpdateResponse
 import app.pantopus.android.data.api.models.users.UserSearchResponse
 import app.pantopus.android.data.api.models.users.UserStatsDto
 import app.pantopus.android.data.api.net.NetworkResult
@@ -22,6 +24,10 @@ class ProfileRepository
 
         /** `GET /api/users/profile` — route `backend/routes/users.js:1962`. */
         suspend fun ownProfile(): NetworkResult<ProfileResponse> = safeApiCall { api.profile() }
+
+        /** `PATCH /api/users/profile` — route `backend/routes/users.js:2052`. */
+        suspend fun updateProfile(body: ProfileUpdateRequest): NetworkResult<ProfileUpdateResponse> =
+            safeApiCall { api.updateProfile(body) }
 
         /** `GET /api/users/:id/stats` — route `backend/routes/users.js:2787`. */
         suspend fun stats(userId: String): NetworkResult<UserStatsDto> = safeApiCall { api.stats(userId) }
