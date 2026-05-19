@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.shared.content_detail.headers
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,10 +12,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -30,6 +34,8 @@ import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.components.VerifiedBadge
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /** Verification state for one identity pillar. */
@@ -67,6 +73,11 @@ data class IdentityPillarBadge(
 /**
  * Centered profile header: 72dp avatar + 28dp verified badge overlay,
  * name, handle/locality row, identity-pillar chip row.
+ *
+ * P6.5 adds two optional kind-aware chips between the handle/locality
+ * row and the identity-pillar chip row: a gold tier label for Persona
+ * profiles ("Persona · Verified") and a green "Verified neighbor"
+ * shield chip for residency-verified Local profiles.
  */
 @Composable
 fun ProfileHeader(
@@ -76,6 +87,8 @@ fun ProfileHeader(
     avatarUrl: String?,
     isVerified: Boolean,
     identityBadges: List<IdentityPillarBadge>,
+    tierLabel: String? = null,
+    isVerifiedNeighbor: Boolean = false,
     /** `null` renders the badges as non-tappable status chips. */
     onBadgeTap: ((IdentityPillar) -> Unit)? = null,
 ) {
@@ -124,6 +137,16 @@ fun ProfileHeader(
                 maxLines = 1,
             )
         }
+        if (tierLabel != null || isVerifiedNeighbor) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                if (tierLabel != null) {
+                    TierChip(label = tierLabel)
+                }
+                if (isVerifiedNeighbor) {
+                    VerifiedNeighborChip()
+                }
+            }
+        }
         if (identityBadges.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 identityBadges.forEach { badge ->
@@ -160,6 +183,72 @@ private fun buildHandleAndLocality(
         !locality.isNullOrEmpty() -> locality
         else -> ""
     }
+
+/**
+ * P6.5 — Gold tier chip ("Persona · Verified") for creator profiles.
+ * Uses the warning palette as a stand-in for the design's custom gold
+ * (warning is the closest semantic match in the token set when paired
+ * with the crown glyph).
+ */
+@Composable
+private fun TierChip(label: String) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.warningBg)
+                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .semantics { contentDescription = "$label tier" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Crown,
+            contentDescription = null,
+            size = 12.dp,
+            tint = PantopusColors.warning,
+        )
+        Text(
+            text = label.uppercase(),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.warning,
+        )
+    }
+}
+
+/**
+ * P6.5 — Green "Verified neighbor" shield chip for Local profiles.
+ * Renders inline between the handle/locality row and the identity-
+ * pillar chip row.
+ */
+@Composable
+private fun VerifiedNeighborChip() {
+    Row(
+        modifier =
+            Modifier
+                .testTag("publicProfileVerifiedNeighborChip")
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.homeBg)
+                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .semantics { contentDescription = "Verified neighbor" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.ShieldCheck,
+            contentDescription = null,
+            size = 12.dp,
+            tint = PantopusColors.home,
+        )
+        Text(
+            text = "VERIFIED NEIGHBOR",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.home,
+        )
+    }
+}
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 280)
 @Composable

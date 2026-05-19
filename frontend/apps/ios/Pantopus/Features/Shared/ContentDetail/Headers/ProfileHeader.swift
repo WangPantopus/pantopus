@@ -57,6 +57,11 @@ public struct IdentityPillarBadge: Sendable, Identifiable, Hashable {
 
 /// Centered profile header: 72pt avatar + verified-badge overlay, name,
 /// handle/locality, identity-pillar chip row.
+///
+/// P6.5 adds two optional kind-aware chips between the handle row and the
+/// identity-pillar chip row: a gold tier label (e.g. "Persona · Verified")
+/// for creator profiles, and a green "Verified neighbor" shield chip for
+/// residency-verified Local profiles.
 @MainActor
 public struct ProfileHeader: View {
     private let displayName: String
@@ -65,6 +70,8 @@ public struct ProfileHeader: View {
     private let avatarURL: URL?
     private let isVerified: Bool
     private let identityBadges: [IdentityPillarBadge]
+    private let tierLabel: String?
+    private let isVerifiedNeighbor: Bool
     /// `nil` renders the badges as non-tappable status chips. Pass a
     /// real handler to make them open an identity-detail surface.
     private let onBadgeTap: (@MainActor (IdentityPillar) -> Void)?
@@ -76,6 +83,8 @@ public struct ProfileHeader: View {
         avatarURL: URL?,
         isVerified: Bool,
         identityBadges: [IdentityPillarBadge],
+        tierLabel: String? = nil,
+        isVerifiedNeighbor: Bool = false,
         onBadgeTap: (@MainActor (IdentityPillar) -> Void)? = nil
     ) {
         self.displayName = displayName
@@ -84,6 +93,8 @@ public struct ProfileHeader: View {
         self.avatarURL = avatarURL
         self.isVerified = isVerified
         self.identityBadges = identityBadges
+        self.tierLabel = tierLabel
+        self.isVerifiedNeighbor = isVerifiedNeighbor
         self.onBadgeTap = onBadgeTap
     }
 
@@ -116,6 +127,17 @@ public struct ProfileHeader: View {
                     .font(.system(size: PantopusTextStyle.caption.size, weight: .regular))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .lineLimit(1)
+            }
+
+            if tierLabel != nil || isVerifiedNeighbor {
+                HStack(spacing: Spacing.s2) {
+                    if let tierLabel {
+                        TierChip(label: tierLabel)
+                    }
+                    if isVerifiedNeighbor {
+                        VerifiedNeighborChip()
+                    }
+                }
             }
 
             if !identityBadges.isEmpty {
@@ -162,6 +184,54 @@ public struct ProfileHeader: View {
         case let (_, l?) where !l.isEmpty: l
         default: ""
         }
+    }
+}
+
+/// Gold tier chip ("Persona · Verified" / "Gold member") rendered between
+/// the handle row and the identity-pillar chip row on Persona profiles.
+/// The accent uses the warning palette as a stand-in for the design's
+/// custom gold; warning is the closest semantic match in the token set
+/// (amber accent with caution-free meaning when it carries the crown
+/// glyph).
+@MainActor
+private struct TierChip: View {
+    let label: String
+
+    var body: some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(.crown, size: 12, color: Theme.Color.warning)
+            Text(label.uppercased())
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(Theme.Color.warning)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 4)
+        .background(Theme.Color.warningBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+        .accessibilityElement()
+        .accessibilityLabel("\(label) tier")
+    }
+}
+
+/// Green "Verified neighbor" shield chip rendered on Local profiles.
+@MainActor
+private struct VerifiedNeighborChip: View {
+    var body: some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(.shieldCheck, size: 12, color: Theme.Color.home)
+            Text("VERIFIED NEIGHBOR")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(Theme.Color.home)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 4)
+        .background(Theme.Color.homeBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+        .accessibilityElement()
+        .accessibilityLabel("Verified neighbor")
+        .accessibilityIdentifier("publicProfileVerifiedNeighborChip")
     }
 }
 

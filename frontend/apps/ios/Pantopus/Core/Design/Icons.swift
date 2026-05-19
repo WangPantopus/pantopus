@@ -236,6 +236,12 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case reply
     case radioTower = "radio-tower"
 
+    // P6.5 Public profile · Persona vs Local — `message-square` for the
+    // Local visitor's "Message" CTA, `globe` for the persona broadcast's
+    // "Free" visibility chip.
+    case messageSquare = "message-square"
+    case globe
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -422,6 +428,11 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // P1.3 Broadcast detail.
         case .reply: "arrowshape.turn.up.left"
         case .radioTower: "antenna.radiowaves.left.and.right"
+        // P6.5 Public profile · Persona vs Local. `message-square` maps
+        // to `message` (filled-bubble) for visual parity with the design;
+        // `globe` maps directly.
+        case .messageSquare: "message"
+        case .globe: "globe"
         }
     }
 }

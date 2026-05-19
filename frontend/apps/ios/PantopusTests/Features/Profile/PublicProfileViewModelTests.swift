@@ -94,6 +94,38 @@ final class PublicProfileViewModelTests: XCTestCase {
     }
     """
 
+    /// P6.5 — Local profile fixture. The `residency.verified == true`
+    /// blob is the signal the VM uses to switch the kind from
+    /// `.persona` to `.local`.
+    private static let profileLocalNeighbor = """
+    {
+      "id": "u3",
+      "username": "mariak",
+      "firstName": "Maria",
+      "lastName": "K.",
+      "name": "Maria K.",
+      "bio": "Apt 3B at 412 Elm. Around most evenings.",
+      "tagline": null,
+      "avatar_url": null,
+      "profile_picture_url": null,
+      "profilePicture": null,
+      "city": "Cambridge",
+      "state": "MA",
+      "accountType": "personal",
+      "verified": true,
+      "residency": { "verified": true, "address": "412 Elm St" },
+      "created_at": "2025-01-01T00:00:00.000Z",
+      "gigs_posted": 0,
+      "gigs_completed": 0,
+      "average_rating": 4.9,
+      "review_count": 12,
+      "followers_count": 128,
+      "reviews": [],
+      "socialLinks": {},
+      "skills": []
+    }
+    """
+
     // MARK: - Load
 
     func testLoadHappyPath() async {
@@ -206,5 +238,59 @@ final class PublicProfileViewModelTests: XCTestCase {
         XCTAssertFalse(vm.showOverflow)
         vm.showOverflow = true
         XCTAssertTrue(vm.showOverflow)
+    }
+
+    // MARK: - P6.5 — Persona vs Local kind discrimination
+
+    func testProfileWithoutResidencyIsPersonaKind() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.profileWithReviews)]
+        let vm = PublicProfileViewModel(userId: "u1", client: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        XCTAssertEqual(content.kind, .persona)
+        XCTAssertEqual(content.header.tierLabel, "Persona · Verified")
+        XCTAssertFalse(content.header.isVerifiedNeighbor)
+    }
+
+    func testProfileWithVerifiedResidencyIsLocalKind() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.profileLocalNeighbor)]
+        let vm = PublicProfileViewModel(userId: "u3", client: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        XCTAssertEqual(content.kind, .local)
+        XCTAssertTrue(content.header.isVerifiedNeighbor)
+        XCTAssertNil(content.header.tierLabel)
+    }
+
+    func testFollowMarksSucceededAndEmitsToast() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.profileWithReviews),
+            .status(201, body: "{\"message\":\"Connection request sent\"}")
+        ]
+        let vm = PublicProfileViewModel(userId: "u1", client: makeAPI())
+        await vm.load()
+        await vm.follow()
+        XCTAssertEqual(vm.followState, .succeeded)
+        XCTAssertEqual(vm.toastMessage, "Following")
+    }
+
+    func testFollowShowsErrorToastOnFailure() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.profileWithReviews),
+            .status(403, body: "{\"error\":\"forbidden\"}")
+        ]
+        let vm = PublicProfileViewModel(userId: "u1", client: makeAPI())
+        await vm.load()
+        await vm.follow()
+        if case .failed = vm.followState { /* ok */ } else {
+            XCTFail("Expected .failed follow state")
+        }
+        XCTAssertNotNil(vm.toastMessage)
     }
 }

@@ -55,6 +55,7 @@ class PublicProfileViewModelTest {
         reviews: List<PublicProfileReview> = emptyList(),
         rating: Double? = 4.8,
         gigs: Int? = 5,
+        residency: Map<String, Any?>? = null,
     ): PublicProfileDto =
         PublicProfileDto(
             id = "u1",
@@ -68,6 +69,7 @@ class PublicProfileViewModelTest {
             state = "MA",
             accountType = "personal",
             verified = verified,
+            residency = residency,
             createdAt = "2025-01-01T00:00:00.000Z",
             gigsPosted = 2,
             gigsCompleted = gigs,
@@ -165,5 +167,63 @@ class PublicProfileViewModelTest {
             assertFalse(vm.showOverflow.value)
             vm.setShowOverflow(true)
             assertTrue(vm.showOverflow.value)
+        }
+
+    // P6.5 — Persona vs Local kind discrimination
+
+    @Test fun profile_without_residency_is_persona_kind() =
+        runTest {
+            coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile(residency = null))
+            val vm = makeVm()
+            vm.load()
+            val loaded = vm.state.value as PublicProfileUiState.Loaded
+            assertEquals(PublicProfileKind.Persona, loaded.content.kind)
+            assertEquals("Persona · Verified", loaded.content.header.tierLabel)
+            assertFalse(loaded.content.header.isVerifiedNeighbor)
+        }
+
+    @Test fun profile_with_verified_residency_is_local_kind() =
+        runTest {
+            coEvery { repo.publicProfile("u1") } returns
+                NetworkResult.Success(profile(residency = mapOf("verified" to true, "address" to "412 Elm St")))
+            val vm = makeVm()
+            vm.load()
+            val loaded = vm.state.value as PublicProfileUiState.Loaded
+            assertEquals(PublicProfileKind.Local, loaded.content.kind)
+            assertTrue(loaded.content.header.isVerifiedNeighbor)
+            assertEquals(null, loaded.content.header.tierLabel)
+        }
+
+    @Test fun follow_marks_succeeded_and_emits_toast() =
+        runTest {
+            coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile())
+            coEvery { relationships.sendRequest("u1", null) } returns
+                NetworkResult.Success(ConnectionRequestResponse(message = "ok"))
+            val vm = makeVm()
+            vm.load()
+            vm.follow()
+            assertEquals(PublicProfileActionState.Succeeded, vm.followState.value)
+            assertEquals("Following", vm.toastMessage.value)
+        }
+
+    @Test fun follow_failure_surfaces_toast() =
+        runTest {
+            coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile())
+            coEvery { relationships.sendRequest("u1", null) } returns
+                NetworkResult.Failure(NetworkError.Forbidden)
+            val vm = makeVm()
+            vm.load()
+            vm.follow()
+            assertTrue(vm.followState.value is PublicProfileActionState.Failed)
+            assertTrue(!vm.toastMessage.value.isNullOrEmpty())
+        }
+
+    @Test fun show_subscribe_toast_emits_placeholder_message() =
+        runTest {
+            coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile())
+            val vm = makeVm()
+            vm.load()
+            vm.showSubscribeToast()
+            assertEquals("Subscribe flow coming soon", vm.toastMessage.value)
         }
 }

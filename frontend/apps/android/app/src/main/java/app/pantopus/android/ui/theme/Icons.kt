@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
@@ -406,6 +407,14 @@ enum class PantopusIcon(
     // Material's Podcasts glyph (broadcast-from-tower mast lines).
     Reply("reply"),
     RadioTower("radio-tower"),
+
+    // P6.5 — Public profile · Persona vs Local. `message-square` for the
+    // Local visitor's "Message" CTA; `globe` for the persona broadcast's
+    // "Free" tier visibility chip. Material's `ChatBubble` is the
+    // closest filled-square chat glyph (Lucide's message-square is a
+    // square speech bubble), and `Public` is Material's standard globe.
+    MessageSquare("message-square"),
+    Globe("globe"),
     ;
 
     companion object {
@@ -661,6 +670,12 @@ internal fun PantopusIcon.source(): IconSource =
         // for Lucide's radio-tower (mast-with-waves).
         PantopusIcon.Reply -> IconSource.Material(Icons.AutoMirrored.Filled.Reply)
         PantopusIcon.RadioTower -> IconSource.Material(Icons.Filled.Podcasts)
+        // P6.5 — Public profile · Persona vs Local. `message-square` is
+        // a square speech bubble in Lucide; `Sms` is Material's filled
+        // square chat glyph (closest visual match). `Public` is
+        // Material's globe ring.
+        PantopusIcon.MessageSquare -> IconSource.Material(Icons.AutoMirrored.Filled.Message)
+        PantopusIcon.Globe -> IconSource.Material(Icons.Filled.Public)
     }
 
 /**
