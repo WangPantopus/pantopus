@@ -9,7 +9,7 @@
 //  navigation host.
 //
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length
 
 import SwiftUI
 
@@ -25,7 +25,7 @@ public struct GigComposeWizardView: View {
     private let preselectedCategory: GigComposeCategory?
     private let onOpenGigDetail: (String) -> Void
 
-    public init(
+    init(
         preselectedCategoryKey: String? = nil,
         viewModel: GigComposeViewModel? = nil,
         onOpenGigDetail: @escaping (String) -> Void
@@ -253,7 +253,8 @@ private struct DescriptionField: View {
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             TextEditor(text: $text)
-                .pantopusTextStyle(.body)
+                .font(Theme.Font.body)
+                .foregroundStyle(Theme.Color.appText)
                 .frame(minHeight: 120)
                 .scrollContentBackground(.hidden)
                 .padding(Spacing.s2)
@@ -448,7 +449,7 @@ private struct OneTimeDatePicker: View {
             DatePicker(
                 "When",
                 selection: dateBinding,
-                in: Date().addingTimeInterval(60) ...,
+                in: Date().addingTimeInterval(60)...,
                 displayedComponents: [.date, .hourAndMinute]
             )
             .datePickerStyle(.compact)
@@ -717,4 +718,4 @@ private struct GigComposeErrorBanner: View {
     GigComposeWizardView(preselectedCategoryKey: "handyman") { _ in }
 }
 
-// swiftlint:enable file_length type_body_length
+// swiftlint:enable file_length

@@ -383,5 +383,4 @@ class GigComposeViewModelTest {
         assertEquals("Deep clean", vm.state.value.form.title)
         assertEquals(GigComposeBudgetType.Fixed, vm.state.value.form.budgetType)
     }
-
 }

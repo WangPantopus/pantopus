@@ -44,14 +44,14 @@ final class GigComposeViewModel: WizardModel {
     // MARK: - Private dependencies
 
     private let api: APIClient
-    private let location: LocationProviding
+    private let location: any LocationProviding
     private let isOnlineProvider: @MainActor () -> Bool
 
     // MARK: - Init
 
     init(
         api: APIClient = .shared,
-        location: LocationProviding = FallbackLocationProvider.shared,
+        location: any LocationProviding = FallbackLocationProvider.shared,
         initialState: GigComposeFormState = .empty,
         // Defaults to the live NetworkMonitor in production. Tests inject
         // a closure returning a fixed value so the simulator's
@@ -70,7 +70,9 @@ final class GigComposeViewModel: WizardModel {
         guard form == .empty else { return }
         form = snapshot
     }
+}
 
+extension GigComposeViewModel {
     // MARK: - WizardModel
 
     var chrome: WizardChrome {
@@ -228,7 +230,9 @@ final class GigComposeViewModel: WizardModel {
             )
         }
     }
+}
 
+extension GigComposeViewModel {
     // MARK: - API
 
     private func submit() async {
@@ -341,7 +345,9 @@ final class GigComposeViewModel: WizardModel {
             address: "Remote / Online"
         )
     }
+}
 
+extension GigComposeViewModel {
     // MARK: - Chrome derivation
 
     private func progressLabel(for step: GigComposeStep) -> WizardProgressLabel {
@@ -379,45 +385,19 @@ final class GigComposeViewModel: WizardModel {
     private func primaryEnabled(for step: GigComposeStep) -> Bool {
         switch step {
         case .category:
-            return form.category != nil
+            hasSelectedCategory
         case .basics:
-            let title = form.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            let desc = form.description.trimmingCharacters(in: .whitespacesAndNewlines)
-            return title.count >= GigComposeLimits.titleMin
-                && title.count <= GigComposeLimits.titleMax
-                && desc.count >= GigComposeLimits.descriptionMin
-                && desc.count <= GigComposeLimits.descriptionMax
-                && form.photoIds.count <= GigComposeLimits.maxPhotos
+            hasValidBasics
         case .budget:
-            guard let type = form.budgetType else { return false }
-            switch type {
-            case .offers:
-                return true
-            case .fixed, .hourly:
-                let min = Double(form.budgetMin) ?? 0
-                return min > 0
-            }
+            hasValidBudget
         case .schedule:
-            guard let type = form.scheduleType else { return false }
-            if type == .oneTime {
-                guard let iso = form.scheduledStartISO,
-                      let date = ISO8601DateFormatter().date(from: iso)
-                else { return false }
-                return date.timeIntervalSinceNow > 0
-            }
-            return true
+            hasValidSchedule
         case .location:
-            guard let mode = form.locationMode else { return false }
-            switch mode {
-            case .yourAddress, .virtual:
-                return true
-            case .aPlace:
-                return form.placeAddress.isComplete
-            }
+            hasValidLocation
         case .review:
-            return buildCreateBody() != nil
+            buildCreateBody() != nil
         case .success:
-            return createdGigId != nil
+            createdGigId != nil
         }
     }
 
@@ -450,6 +430,54 @@ final class GigComposeViewModel: WizardModel {
         switch type {
         case .offers: return 0
         case .fixed, .hourly: return Double(form.budgetMin) ?? 0
+        }
+    }
+}
+
+private extension GigComposeViewModel {
+    var hasSelectedCategory: Bool {
+        form.category != nil
+    }
+
+    var hasValidBasics: Bool {
+        let title = form.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let desc = form.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.count >= GigComposeLimits.titleMin
+            && title.count <= GigComposeLimits.titleMax
+            && desc.count >= GigComposeLimits.descriptionMin
+            && desc.count <= GigComposeLimits.descriptionMax
+            && form.photoIds.count <= GigComposeLimits.maxPhotos
+    }
+
+    var hasValidBudget: Bool {
+        guard let type = form.budgetType else { return false }
+        switch type {
+        case .offers:
+            return true
+        case .fixed, .hourly:
+            let min = Double(form.budgetMin) ?? 0
+            return min > 0
+        }
+    }
+
+    var hasValidSchedule: Bool {
+        guard let type = form.scheduleType else { return false }
+        if type == .oneTime {
+            guard let iso = form.scheduledStartISO,
+                  let date = ISO8601DateFormatter().date(from: iso)
+            else { return false }
+            return date.timeIntervalSinceNow > 0
+        }
+        return true
+    }
+
+    var hasValidLocation: Bool {
+        guard let mode = form.locationMode else { return false }
+        switch mode {
+        case .yourAddress, .virtual:
+            return true
+        case .aPlace:
+            return form.placeAddress.isComplete
         }
     }
 }

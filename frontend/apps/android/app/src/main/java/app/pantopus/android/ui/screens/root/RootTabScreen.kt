@@ -39,11 +39,11 @@ import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
+import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
 import app.pantopus.android.ui.screens.compose.pulse.PulseComposeScreen
 import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
 import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
-import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
 import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxScreen
