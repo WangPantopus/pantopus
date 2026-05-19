@@ -76,7 +76,13 @@ import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizar
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENTS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.documents.DocumentsScreen
+import app.pantopus.android.ui.screens.homes.emergency.ADD_EMERGENCY_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.emergency.ADD_EMERGENCY_ITEM_ID_KEY
+import app.pantopus.android.ui.screens.homes.emergency.AddEmergencyInfoFormScreen
+import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_DETAIL_ITEM_ID_KEY
 import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoDetailScreen
 import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
@@ -213,6 +219,35 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home emergency info screen. */
     fun homeEmergency(homeId: String): String = "homes/$homeId/emergency"
+
+    /** Add Emergency Info form (P2.8). */
+    const val ADD_EMERGENCY_INFO =
+        "homes/{$ADD_EMERGENCY_HOME_ID_KEY}/emergency/new"
+
+    /** Build the concrete path for the Add Emergency Info form. */
+    fun addEmergencyInfo(homeId: String): String = "homes/$homeId/emergency/new"
+
+    /** Edit Emergency Info form (P2.8). The form's VM reads the
+     *  emergencyId from SavedStateHandle and seeds itself from the
+     *  parent list. */
+    const val EDIT_EMERGENCY_INFO =
+        "homes/{$ADD_EMERGENCY_HOME_ID_KEY}/emergency/{$ADD_EMERGENCY_ITEM_ID_KEY}/edit"
+
+    /** Build the concrete path for the Edit Emergency Info form. */
+    fun editEmergencyInfo(
+        homeId: String,
+        emergencyId: String,
+    ): String = "homes/$homeId/emergency/$emergencyId/edit"
+
+    /** Emergency item detail (P2.8). */
+    const val EMERGENCY_ITEM =
+        "homes/{$EMERGENCY_DETAIL_HOME_ID_KEY}/emergency/{$EMERGENCY_DETAIL_ITEM_ID_KEY}"
+
+    /** Build the concrete path for an emergency item detail. */
+    fun emergencyItem(
+        homeId: String,
+        emergencyId: String,
+    ): String = "homes/$homeId/emergency/$emergencyId"
 
     /** Documents per home (T6.4b / P17). */
     const val HOME_DOCS = "homes/{$DOCUMENTS_HOME_ID_KEY}/docs"
@@ -1063,17 +1098,56 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(
                 route = ChildRoutes.HOME_EMERGENCY,
                 arguments = listOf(navArgument(EMERGENCY_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
+            ) { entry ->
+                val homeId = entry.arguments?.getString(EMERGENCY_HOME_ID_KEY).orEmpty()
                 EmergencyInfoScreen(
-                    onAction = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Emergency item"))
+                    onAction = { dto ->
+                        navController.navigate(ChildRoutes.emergencyItem(homeId, dto.id))
                     },
-                    onAdd = { navController.navigate(ChildRoutes.placeholder("Add emergency info")) },
+                    onAdd = { navController.navigate(ChildRoutes.addEmergencyInfo(homeId)) },
                     onShare = { navController.navigate(ChildRoutes.placeholder("Share emergency info")) },
                     onPrintCard = {
                         navController.navigate(ChildRoutes.placeholder("Print emergency card"))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.ADD_EMERGENCY_INFO,
+                arguments =
+                    listOf(navArgument(ADD_EMERGENCY_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                AddEmergencyInfoFormScreen(
+                    onClose = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_EMERGENCY_INFO,
+                arguments =
+                    listOf(
+                        navArgument(ADD_EMERGENCY_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(ADD_EMERGENCY_ITEM_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                AddEmergencyInfoFormScreen(
+                    onClose = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.EMERGENCY_ITEM,
+                arguments =
+                    listOf(
+                        navArgument(EMERGENCY_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(EMERGENCY_DETAIL_ITEM_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(EMERGENCY_DETAIL_HOME_ID_KEY).orEmpty()
+                val emergencyId = entry.arguments?.getString(EMERGENCY_DETAIL_ITEM_ID_KEY).orEmpty()
+                EmergencyInfoDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onEdit = {
+                        navController.navigate(ChildRoutes.editEmergencyInfo(homeId, emergencyId))
+                    },
                 )
             }
             composable(

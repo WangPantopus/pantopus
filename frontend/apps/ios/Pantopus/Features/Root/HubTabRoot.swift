@@ -25,6 +25,12 @@ public enum HubRoute: Hashable {
     case homePets(homeId: String)
     /// Emergency info sub-screen for a specific home (T6.4b / P17).
     case homeEmergency(homeId: String)
+    /// Add Emergency Info form (P2.8) — single-page editor backed by
+    /// `AddEmergencyInfoFormView`.
+    case addEmergencyInfo(homeId: String)
+    /// Emergency item detail (P2.8) — read-only summary backed by
+    /// `EmergencyInfoDetailView`.
+    case emergencyItem(homeId: String, emergencyId: String)
     /// Documents sub-screen for a specific home (T6.4b / P17).
     case homeDocs(homeId: String)
     /// Packages list for a home (T6.3d / P14).
@@ -508,14 +514,14 @@ public struct HubTabRoot: View {
             EmergencyInfoView(
                 viewModel: EmergencyInfoViewModel(
                     homeId: homeId,
-                    onAction: { _ in
+                    onAction: { dto in
                         Task { @MainActor in
-                            push(.placeholder(label: "Emergency item"))
+                            push(.emergencyItem(homeId: homeId, emergencyId: dto.id))
                         }
                     },
                     onAdd: {
                         Task { @MainActor in
-                            push(.placeholder(label: "Add emergency info"))
+                            push(.addEmergencyInfo(homeId: homeId))
                         }
                     },
                     onShare: {
@@ -530,6 +536,23 @@ public struct HubTabRoot: View {
                     }
                 )
             )
+        case let .addEmergencyInfo(homeId):
+            AddEmergencyInfoFormView(
+                viewModel: AddEmergencyInfoFormViewModel(homeId: homeId) { _ in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
+            )
+        case let .emergencyItem(homeId, emergencyId):
+            EmergencyInfoDetailView(
+                homeId: homeId,
+                emergencyId: emergencyId
+            ) {
+                Task { @MainActor in
+                    if !path.isEmpty { path.removeLast() }
+                }
+            }
         case let .homeDocs(homeId):
             DocumentsView(
                 viewModel: DocumentsViewModel(
