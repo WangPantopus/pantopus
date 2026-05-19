@@ -10,7 +10,7 @@
 import Foundation
 
 /// Recurrence choices the form exposes. Mapped to iCal RRULE on submit.
-enum AddEventRecurrence: String, CaseIterable, Sendable, Hashable {
+enum AddEventRecurrence: String, CaseIterable, Hashable {
     case none
     case daily
     case weekly
@@ -56,7 +56,7 @@ enum AddEventRecurrence: String, CaseIterable, Sendable, Hashable {
 /// records whether any reminder is set, not the minute count. On load
 /// we default to `.fifteenMin` when the event has alerts enabled so the
 /// picker shows something sensible.
-enum AddEventReminder: String, CaseIterable, Sendable, Hashable {
+enum AddEventReminder: String, CaseIterable, Hashable {
     case none
     case fiveMin
     case fifteenMin
@@ -81,14 +81,14 @@ enum AddEventReminder: String, CaseIterable, Sendable, Hashable {
 /// Stable identifiers for free-text fields. Date / category / attendee
 /// fields don't fit `FormFieldState`'s string shape so they live on the
 /// view-model directly.
-enum AddEventField: String, CaseIterable, Sendable {
+enum AddEventField: String, CaseIterable {
     case title
     case location
     case notes
 }
 
 /// Render state for the Add Event form.
-enum AddEventFormState: Sendable, Equatable {
+enum AddEventFormState: Equatable {
     /// Initial — fetching members + (when editing) the source event.
     case loading
     case editing
@@ -97,7 +97,7 @@ enum AddEventFormState: Sendable, Equatable {
 
 /// Outbound event after a successful commit. The host route reads
 /// `pendingEvent` and pops / replaces / pushes as needed.
-enum AddEventFormEvent: Sendable, Equatable {
+enum AddEventFormEvent: Equatable {
     case created(eventId: String)
     case updated(eventId: String)
 }
@@ -105,14 +105,8 @@ enum AddEventFormEvent: Sendable, Equatable {
 /// Attendee row surfaced in the multi-pick. Built from `OccupantDTO`
 /// but exposed as a tiny value type so view code doesn't depend on the
 /// wire shape.
-struct AddEventAttendee: Sendable, Hashable, Identifiable {
+struct AddEventAttendee: Hashable, Identifiable {
     let id: String
     let displayName: String
     let initials: String
-
-    init(id: String, displayName: String, initials: String) {
-        self.id = id
-        self.displayName = displayName
-        self.initials = initials
-    }
 }

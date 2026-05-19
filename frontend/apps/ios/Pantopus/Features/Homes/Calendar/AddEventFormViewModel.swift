@@ -87,53 +87,60 @@ final class AddEventFormViewModel {
         editingEventId = editingEvent?.id
         self.api = api
 
+        var initialFields: [AddEventField: FormFieldState] = [:]
         for field in AddEventField.allCases {
-            fields[field] = FormFieldState(id: field.rawValue, originalValue: "")
+            initialFields[field] = FormFieldState(id: field.rawValue, originalValue: "")
         }
 
         if let editingEvent {
             let parsedStart = Self.parseIsoInstant(editingEvent.startAt) ?? Date()
             let parsedEnd = editingEvent.endAt.flatMap(Self.parseIsoInstant)
+            let hydratedAllDay = Self.isAllDayHeuristic(
+                start: parsedStart,
+                end: parsedEnd,
+                endIso: editingEvent.endAt
+            )
+            let hydratedCategory = CalendarEventCategory.from(eventType: editingEvent.eventType)
+            let hydratedRecurrence = AddEventRecurrence.from(rrule: editingEvent.recurrenceRule)
+            let hydratedReminder: AddEventReminder = (editingEvent.alertsEnabled ?? false) ? .fifteenMin : .none
+            let attendeeIds = Set(editingEvent.assignedTo ?? [])
+
+            var titleField = FormFieldState(id: AddEventField.title.rawValue, originalValue: editingEvent.title)
+            titleField.error = Self.titleValidator.validate(editingEvent.title)
+            initialFields[.title] = titleField
+            initialFields[.location] = FormFieldState(
+                id: AddEventField.location.rawValue,
+                originalValue: editingEvent.locationNotes ?? ""
+            )
+            initialFields[.notes] = FormFieldState(
+                id: AddEventField.notes.rawValue,
+                originalValue: editingEvent.description ?? ""
+            )
+
             startDate = parsedStart
             originalStart = parsedStart
             endDate = parsedEnd
             originalEnd = parsedEnd
-            allDay = Self.isAllDayHeuristic(start: parsedStart, end: parsedEnd, endIso: editingEvent.endAt)
-            originalAllDay = allDay
-            category = CalendarEventCategory.from(eventType: editingEvent.eventType)
-            originalCategory = category
-            recurrence = AddEventRecurrence.from(rrule: editingEvent.recurrenceRule)
-            originalRecurrence = recurrence
-            reminder = (editingEvent.alertsEnabled ?? false) ? .fifteenMin : .none
-            originalReminder = reminder
-            let attendeeIds = Set(editingEvent.assignedTo ?? [])
+            allDay = hydratedAllDay
+            originalAllDay = hydratedAllDay
+            category = hydratedCategory
+            originalCategory = hydratedCategory
+            recurrence = hydratedRecurrence
+            originalRecurrence = hydratedRecurrence
+            reminder = hydratedReminder
+            originalReminder = hydratedReminder
             selectedAttendeeIds = attendeeIds
             originalAttendeeIds = attendeeIds
-
-            var titleField = FormFieldState(id: AddEventField.title.rawValue, originalValue: editingEvent.title)
-            titleField.error = Self.titleValidator.validate(editingEvent.title)
-            fields[.title] = titleField
-
-            let locationField = FormFieldState(
-                id: AddEventField.location.rawValue,
-                originalValue: editingEvent.locationNotes ?? ""
-            )
-            fields[.location] = locationField
-
-            let notesField = FormFieldState(
-                id: AddEventField.notes.rawValue,
-                originalValue: editingEvent.description ?? ""
-            )
-            fields[.notes] = notesField
         } else {
             let now = prefilledStart ?? Self.defaultStart(from: Date())
+            let resolvedCategory = prefilledCategory ?? .generic
             startDate = now
             originalStart = now
             endDate = nil
             originalEnd = nil
             allDay = false
             originalAllDay = false
-            category = prefilledCategory ?? .generic
+            category = resolvedCategory
             originalCategory = .generic
             recurrence = .none
             originalRecurrence = .none
@@ -142,6 +149,8 @@ final class AddEventFormViewModel {
             selectedAttendeeIds = []
             originalAttendeeIds = []
         }
+
+        fields = initialFields
     }
 
     // MARK: - Lifecycle
