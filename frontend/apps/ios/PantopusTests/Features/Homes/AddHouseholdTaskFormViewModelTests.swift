@@ -16,24 +16,8 @@
 import XCTest
 @testable import Pantopus
 
-@MainActor
-final class AddHouseholdTaskFormViewModelTests: XCTestCase {
-    override func setUp() {
-        super.setUp()
-        SequencedURLProtocol.reset()
-    }
-
-    private func makeAPI() -> APIClient {
-        APIClient(
-            environment: .current,
-            session: SequencedURLProtocol.makeSession(),
-            retryPolicy: .none
-        )
-    }
-
-    // ── Fixtures ──────────────────────────────────────────────
-
-    private static let occupantsJSON = """
+private enum AddHouseholdTaskFormFixtures {
+    static let occupantsJSON = """
     {
       "occupants": [
         {
@@ -57,7 +41,7 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
     }
     """
 
-    private static func tasksJSON(_ rule: String?, title: String = "Take out trash") -> String {
+    static func tasksJSON(_ rule: String?, title: String = "Take out trash") -> String {
         let ruleField = rule.map { "\"\($0)\"" } ?? "null"
         return """
         {
@@ -78,7 +62,7 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
         """
     }
 
-    private static let createdTaskJSON = """
+    static let createdTaskJSON = """
     {
       "task": {
         "id": "task-new",
@@ -90,7 +74,7 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
     }
     """
 
-    private static let updatedTaskJSON = """
+    static let updatedTaskJSON = """
     {
       "task": {
         "id": "task-1",
@@ -105,6 +89,39 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
       }
     }
     """
+}
+
+private struct CreateBody: Decodable {
+    let task_type: String
+    let title: String
+    let description: String?
+    let assigned_to: String?
+    let due_at: String?
+    let recurrence_rule: String?
+}
+
+private struct UpdateBody: Decodable {
+    let title: String?
+    let description: String?
+    let assigned_to: String?
+    let due_at: String?
+    let recurrence_rule: String?
+}
+
+@MainActor
+final class AddHouseholdTaskFormViewModelTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    private func makeAPI() -> APIClient {
+        APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
+    }
 
     // ── Initial pose ──────────────────────────────────────────
 
@@ -115,15 +132,17 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
         XCTAssertEqual(vm.selectedCategory, .other)
         XCTAssertNil(vm.selectedAssigneeId)
         XCTAssertFalse(vm.showsCustomRecurrenceSubForm)
-        XCTAssertNotNil(vm.fields[.title]?.error,
-                        "Empty title should fail required validator at seed.")
+        XCTAssertNotNil(
+            vm.fields[.title]?.error,
+            "Empty title should fail required validator at seed."
+        )
         XCTAssertFalse(vm.isValid)
     }
 
     func testEditMode_hydratesEveryFieldFromBackend() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: Self.tasksJSON("FREQ=WEEKLY")),
-            .status(200, body: Self.occupantsJSON)
+            .status(200, body: AddHouseholdTaskFormFixtures.tasksJSON("FREQ=WEEKLY")),
+            .status(200, body: AddHouseholdTaskFormFixtures.occupantsJSON)
         ]
         let vm = AddHouseholdTaskFormViewModel(homeId: "home-1", taskId: "task-1", api: makeAPI())
         await vm.load()
@@ -172,8 +191,10 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
         let vm = AddHouseholdTaskFormViewModel(homeId: "home-1", api: makeAPI())
         vm.selectRecurrence(.weekly)
         vm.update(.customInterval, to: "abc")
-        XCTAssertNil(vm.fields[.customInterval]?.error,
-                     "Custom validator should not fire when recurrence != .custom.")
+        XCTAssertNil(
+            vm.fields[.customInterval]?.error,
+            "Custom validator should not fire when recurrence != .custom."
+        )
         vm.selectRecurrence(.custom)
         vm.update(.customInterval, to: "abc")
         XCTAssertNotNil(vm.fields[.customInterval]?.error)
@@ -191,8 +212,10 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
         vm.selectRecurrence(.custom)
         XCTAssertTrue(vm.showsCustomRecurrenceSubForm)
         vm.selectRecurrence(.weekly)
-        XCTAssertFalse(vm.showsCustomRecurrenceSubForm,
-                       "Sub-form should hide once the user picks a fixed cadence.")
+        XCTAssertFalse(
+            vm.showsCustomRecurrenceSubForm,
+            "Sub-form should hide once the user picks a fixed cadence."
+        )
     }
 
     // ── Recurrence round-trip ──────────────────────────────────
@@ -219,27 +242,10 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
 
     // ── Submit happy path ─────────────────────────────────────
 
-    private struct CreateBody: Decodable {
-        let task_type: String
-        let title: String
-        let description: String?
-        let assigned_to: String?
-        let due_at: String?
-        let recurrence_rule: String?
-    }
-
-    private struct UpdateBody: Decodable {
-        let title: String?
-        let description: String?
-        let assigned_to: String?
-        let due_at: String?
-        let recurrence_rule: String?
-    }
-
     func testAddMode_savePostsExpectedBodyAndSignalsDismiss() async throws {
         SequencedURLProtocol.sequence = [
-            .status(200, body: Self.occupantsJSON),
-            .status(201, body: Self.createdTaskJSON)
+            .status(200, body: AddHouseholdTaskFormFixtures.occupantsJSON),
+            .status(201, body: AddHouseholdTaskFormFixtures.createdTaskJSON)
         ]
         let vm = AddHouseholdTaskFormViewModel(homeId: "home-1", api: makeAPI())
         await vm.load()
@@ -262,7 +268,7 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
         let post = captured[1]
         XCTAssertEqual(post.httpMethod, "POST")
         XCTAssertEqual(post.url?.path, "/api/homes/home-1/tasks")
-        let body = try Self.decodedBody(CreateBody.self, from: post)
+        let body = try decodedBody(CreateBody.self, from: post)
         XCTAssertEqual(body.title, "Wash dishes")
         XCTAssertEqual(body.task_type, "chore")
         XCTAssertEqual(body.assigned_to, "user-1")
@@ -273,9 +279,9 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
 
     func testEditMode_savePutsExpectedBody() async throws {
         SequencedURLProtocol.sequence = [
-            .status(200, body: Self.tasksJSON(nil)),
-            .status(200, body: Self.occupantsJSON),
-            .status(200, body: Self.updatedTaskJSON)
+            .status(200, body: AddHouseholdTaskFormFixtures.tasksJSON(nil)),
+            .status(200, body: AddHouseholdTaskFormFixtures.occupantsJSON),
+            .status(200, body: AddHouseholdTaskFormFixtures.updatedTaskJSON)
         ]
         let vm = AddHouseholdTaskFormViewModel(homeId: "home-1", taskId: "task-1", api: makeAPI())
         await vm.load()
@@ -290,11 +296,11 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
         let captured = SequencedURLProtocol.capturedRequests
         // [0] tasks GET, [1] occupants GET (kicked off async), [2] PUT.
         XCTAssertGreaterThanOrEqual(captured.count, 2)
-        let put = captured.first(where: { $0.httpMethod == "PUT" })
+        let put = captured.first { $0.httpMethod == "PUT" }
         XCTAssertNotNil(put)
         XCTAssertEqual(put?.url?.path, "/api/homes/home-1/tasks/task-1")
         if let put {
-            let body = try Self.decodedBody(UpdateBody.self, from: put)
+            let body = try decodedBody(UpdateBody.self, from: put)
             XCTAssertEqual(body.title, "Take out trash (Tuesday)")
             XCTAssertEqual(body.recurrence_rule, "FREQ=WEEKLY")
             XCTAssertEqual(body.description, "Tuesday curbside.")
@@ -304,8 +310,8 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
 
     func testAddMode_customRecurrenceBuildsIntervalRule() async throws {
         SequencedURLProtocol.sequence = [
-            .status(200, body: Self.occupantsJSON),
-            .status(201, body: Self.createdTaskJSON)
+            .status(200, body: AddHouseholdTaskFormFixtures.occupantsJSON),
+            .status(201, body: AddHouseholdTaskFormFixtures.createdTaskJSON)
         ]
         let vm = AddHouseholdTaskFormViewModel(homeId: "home-1", api: makeAPI())
         await vm.load()
@@ -316,9 +322,12 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
         vm.update(.customInterval, to: "3")
 
         _ = await vm.save()
-        let put = SequencedURLProtocol.capturedRequests.last
-        XCTAssertEqual(put?.httpMethod, "POST")
-        let body = try Self.decodedBody(CreateBody.self, from: put!)
+        guard let request = SequencedURLProtocol.capturedRequests.last else {
+            XCTFail("Expected a captured POST request.")
+            return
+        }
+        XCTAssertEqual(request.httpMethod, "POST")
+        let body = try decodedBody(CreateBody.self, from: request)
         XCTAssertEqual(body.recurrence_rule, "FREQ=DAILY;INTERVAL=3")
         XCTAssertEqual(body.task_type, "chore")
     }
@@ -327,7 +336,7 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
 
     func testSave_validationErrorShakesAndDoesNotFire() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: Self.occupantsJSON)
+            .status(200, body: AddHouseholdTaskFormFixtures.occupantsJSON)
         ]
         let vm = AddHouseholdTaskFormViewModel(homeId: "home-1", api: makeAPI())
         await vm.load()
@@ -345,7 +354,7 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
 
     func testSave_serverErrorSurfacesToast() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: Self.occupantsJSON),
+            .status(200, body: AddHouseholdTaskFormFixtures.occupantsJSON),
             .status(500, body: "{\"error\":\"down\"}")
         ]
         let vm = AddHouseholdTaskFormViewModel(homeId: "home-1", api: makeAPI())
@@ -360,8 +369,8 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
 
     func testEditMode_isDirtyTrueOnlyAfterEdit() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: Self.tasksJSON("FREQ=DAILY")),
-            .status(200, body: Self.occupantsJSON)
+            .status(200, body: AddHouseholdTaskFormFixtures.tasksJSON("FREQ=DAILY")),
+            .status(200, body: AddHouseholdTaskFormFixtures.occupantsJSON)
         ]
         let vm = AddHouseholdTaskFormViewModel(homeId: "home-1", taskId: "task-1", api: makeAPI())
         await vm.load()
@@ -372,28 +381,28 @@ final class AddHouseholdTaskFormViewModelTests: XCTestCase {
 
     func testAddMode_isDirtyAlwaysTrueSoSaveCanFireOnFirstEdit() {
         let vm = AddHouseholdTaskFormViewModel(homeId: "home-1", api: makeAPI())
-        XCTAssertTrue(vm.isDirty,
-                      "Add mode treats every field as new so Save is reachable from the start.")
-    }
-
-    // ── Helpers ───────────────────────────────────────────────
-
-    private static func decodedBody<T: Decodable>(
-        _ type: T.Type,
-        from request: URLRequest
-    ) throws -> T {
-        let data: Data = if let body = request.httpBody {
-            body
-        } else if let stream = request.httpBodyStream {
-            Data(reading: stream)
-        } else {
-            Data()
-        }
-        return try JSONDecoder().decode(T.self, from: data)
+        XCTAssertTrue(
+            vm.isDirty,
+            "Add mode treats every field as new so Save is reachable from the start."
+        )
     }
 }
 
 // MARK: - Helpers
+
+private func decodedBody<T: Decodable>(
+    _ type: T.Type,
+    from request: URLRequest
+) throws -> T {
+    let data: Data = if let body = request.httpBody {
+        body
+    } else if let stream = request.httpBodyStream {
+        Data(reading: stream)
+    } else {
+        Data()
+    }
+    return try JSONDecoder().decode(type, from: data)
+}
 
 private extension Data {
     init(reading stream: InputStream) {

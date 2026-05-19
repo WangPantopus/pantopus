@@ -570,9 +570,10 @@ public struct HubTabRoot: View {
         case let .editHouseholdTask(homeId, taskId):
             AddHouseholdTaskFormView(
                 homeId: homeId,
-                taskId: taskId,
-                onClose: { if !path.isEmpty { path.removeLast() } }
-            )
+                taskId: taskId
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId)
         case let .claimOwnership(homeId):

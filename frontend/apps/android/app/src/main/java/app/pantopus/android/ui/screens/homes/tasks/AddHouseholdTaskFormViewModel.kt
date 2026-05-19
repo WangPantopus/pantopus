@@ -84,8 +84,7 @@ enum class AddHouseholdTaskFormCategory(val rawValue: String) {
             }
 
     companion object {
-        fun fromRawValue(rawValue: String?): AddHouseholdTaskFormCategory =
-            entries.firstOrNull { it.rawValue == rawValue } ?: Other
+        fun fromRawValue(rawValue: String?): AddHouseholdTaskFormCategory = entries.firstOrNull { it.rawValue == rawValue } ?: Other
 
         /** Best-guess inference from an existing task's `task_type` +
          *  title — used in Edit mode to preselect the picker. */
@@ -170,8 +169,7 @@ enum class AddHouseholdTaskRecurrence(val rawValue: String) {
     val isRecurring: Boolean get() = this != OneTime
 
     companion object {
-        fun fromRawValue(rawValue: String?): AddHouseholdTaskRecurrence =
-            entries.firstOrNull { it.rawValue == rawValue } ?: OneTime
+        fun fromRawValue(rawValue: String?): AddHouseholdTaskRecurrence = entries.firstOrNull { it.rawValue == rawValue } ?: OneTime
     }
 }
 
@@ -199,8 +197,7 @@ enum class AddHouseholdTaskCustomUnit(val rawValue: String) {
             }
 
     companion object {
-        fun fromRawValue(rawValue: String?): AddHouseholdTaskCustomUnit =
-            entries.firstOrNull { it.rawValue == rawValue } ?: Weeks
+        fun fromRawValue(rawValue: String?): AddHouseholdTaskCustomUnit = entries.firstOrNull { it.rawValue == rawValue } ?: Weeks
     }
 }
 
@@ -341,8 +338,8 @@ class AddHouseholdTaskFormViewModel
         private val _createdTaskId = MutableStateFlow<String?>(null)
         val createdTaskId: StateFlow<String?> = _createdTaskId.asStateFlow()
 
-        private val _members = MutableStateFlow<List<HouseholdTaskAssignableMember>>(emptyList())
-        val assignableMembers: StateFlow<List<HouseholdTaskAssignableMember>> = _members.asStateFlow()
+        private val _assignableMembers = MutableStateFlow<List<HouseholdTaskAssignableMember>>(emptyList())
+        val assignableMembers: StateFlow<List<HouseholdTaskAssignableMember>> = _assignableMembers.asStateFlow()
 
         val aggregate: FormAggregate
             get() = FormAggregate.from(AddHouseholdTaskField.entries.mapNotNull { _fields.value[it] })
@@ -531,12 +528,12 @@ class AddHouseholdTaskFormViewModel
         private suspend fun loadMembers() {
             when (val result = membersRepo.listOccupants(homeId)) {
                 is NetworkResult.Success -> {
-                    _members.value = result.data.occupants.mapNotNull(HouseholdTaskAssignableMember::from)
+                    _assignableMembers.value = result.data.occupants.mapNotNull(HouseholdTaskAssignableMember::from)
                 }
                 is NetworkResult.Failure -> {
                     // Picker shows only "Unassigned (any member)" — editor
                     // doesn't gate on the roster.
-                    _members.value = emptyList()
+                    _assignableMembers.value = emptyList()
                 }
             }
         }

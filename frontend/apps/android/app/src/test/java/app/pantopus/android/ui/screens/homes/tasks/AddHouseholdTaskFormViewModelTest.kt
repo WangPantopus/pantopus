@@ -125,97 +125,109 @@ class AddHouseholdTaskFormViewModelTest {
 
     // ── Initial pose ──────────────────────────────────────────
 
-    @Test fun add_mode_initial_pose_one_time_other_category() = runTest {
-        stubMembers()
-        val vm = makeVm()
-        assertFalse(vm.isEditing)
-        assertEquals(AddHouseholdTaskRecurrence.OneTime, vm.selectedRecurrence)
-        assertEquals(AddHouseholdTaskFormCategory.Other, vm.selectedCategory)
-        assertNull(vm.selectedAssigneeId)
-        assertFalse(vm.showsCustomRecurrenceSubForm)
-        assertNotNull(
-            "Empty title should fail required validator at seed.",
-            vm.fields.value[AddHouseholdTaskField.Title]?.error,
-        )
-        assertFalse(vm.isValid)
-    }
+    @Test
+    fun add_mode_initial_pose_one_time_other_category() =
+        runTest {
+            stubMembers()
+            val vm = makeVm()
+            assertFalse(vm.isEditing)
+            assertEquals(AddHouseholdTaskRecurrence.OneTime, vm.selectedRecurrence)
+            assertEquals(AddHouseholdTaskFormCategory.Other, vm.selectedCategory)
+            assertNull(vm.selectedAssigneeId)
+            assertFalse(vm.showsCustomRecurrenceSubForm)
+            assertNotNull(
+                "Empty title should fail required validator at seed.",
+                vm.fields.value[AddHouseholdTaskField.Title]?.error,
+            )
+            assertFalse(vm.isValid)
+        }
 
-    @Test fun edit_mode_hydrates_every_field_from_backend() = runTest {
-        coEvery { tasksRepo.getHomeTasks("home-1") } returns
-            NetworkResult.Success(GetHomeTasksResponse(tasks = listOf(task(recurrenceRule = "FREQ=WEEKLY"))))
-        stubMembers()
-        val vm = makeVm(taskId = "task-1")
-        vm.load()
-        assertTrue(vm.isEditing)
-        assertEquals(AddHouseholdTaskFormUiState.Editing, vm.state.value)
-        assertEquals("Take out trash", vm.fields.value[AddHouseholdTaskField.Title]?.value)
-        assertEquals("Tuesday curbside.", vm.fields.value[AddHouseholdTaskField.Notes]?.value)
-        assertEquals("user-1", vm.selectedAssigneeId)
-        assertEquals("2026-06-01", vm.fields.value[AddHouseholdTaskField.DueAt]?.value)
-        assertEquals(AddHouseholdTaskRecurrence.Weekly, vm.selectedRecurrence)
-        // "Take out trash" → category Cleaning per the inference table.
-        assertEquals(AddHouseholdTaskFormCategory.Cleaning, vm.selectedCategory)
-        assertFalse(vm.isDirty)
-        assertTrue(vm.isValid)
-    }
+    @Test
+    fun edit_mode_hydrates_every_field_from_backend() =
+        runTest {
+            coEvery { tasksRepo.getHomeTasks("home-1") } returns
+                NetworkResult.Success(GetHomeTasksResponse(tasks = listOf(task(recurrenceRule = "FREQ=WEEKLY"))))
+            stubMembers()
+            val vm = makeVm(taskId = "task-1")
+            vm.load()
+            assertTrue(vm.isEditing)
+            assertEquals(AddHouseholdTaskFormUiState.Editing, vm.state.value)
+            assertEquals("Take out trash", vm.fields.value[AddHouseholdTaskField.Title]?.value)
+            assertEquals("Tuesday curbside.", vm.fields.value[AddHouseholdTaskField.Notes]?.value)
+            assertEquals("user-1", vm.selectedAssigneeId)
+            assertEquals("2026-06-01", vm.fields.value[AddHouseholdTaskField.DueAt]?.value)
+            assertEquals(AddHouseholdTaskRecurrence.Weekly, vm.selectedRecurrence)
+            // "Take out trash" → category Cleaning per the inference table.
+            assertEquals(AddHouseholdTaskFormCategory.Cleaning, vm.selectedCategory)
+            assertFalse(vm.isDirty)
+            assertTrue(vm.isValid)
+        }
 
-    @Test fun edit_mode_missing_task_surfaces_error() = runTest {
-        coEvery { tasksRepo.getHomeTasks("home-1") } returns
-            NetworkResult.Success(GetHomeTasksResponse(tasks = emptyList()))
-        val vm = makeVm(taskId = "task-1")
-        vm.load()
-        val state = vm.state.value
-        assertTrue(state is AddHouseholdTaskFormUiState.Error)
-        assertEquals("Couldn't find that task.", (state as AddHouseholdTaskFormUiState.Error).message)
-    }
+    @Test
+    fun edit_mode_missing_task_surfaces_error() =
+        runTest {
+            coEvery { tasksRepo.getHomeTasks("home-1") } returns
+                NetworkResult.Success(GetHomeTasksResponse(tasks = emptyList()))
+            val vm = makeVm(taskId = "task-1")
+            vm.load()
+            val state = vm.state.value
+            assertTrue(state is AddHouseholdTaskFormUiState.Error)
+            assertEquals("Couldn't find that task.", (state as AddHouseholdTaskFormUiState.Error).message)
+        }
 
     // ── Validators ─────────────────────────────────────────────
 
-    @Test fun title_required_and_max_length_80() = runTest {
-        stubMembers()
-        val vm = makeVm()
-        vm.update(AddHouseholdTaskField.Title, "")
-        assertNotNull(vm.fields.value[AddHouseholdTaskField.Title]?.error)
-        vm.update(AddHouseholdTaskField.Title, "a".repeat(81))
-        assertNotNull(vm.fields.value[AddHouseholdTaskField.Title]?.error)
-        vm.update(AddHouseholdTaskField.Title, "a".repeat(80))
-        assertNull(vm.fields.value[AddHouseholdTaskField.Title]?.error)
-        vm.update(AddHouseholdTaskField.Title, "Wash dishes")
-        assertNull(vm.fields.value[AddHouseholdTaskField.Title]?.error)
-    }
+    @Test
+    fun title_required_and_max_length_80() =
+        runTest {
+            stubMembers()
+            val vm = makeVm()
+            vm.update(AddHouseholdTaskField.Title, "")
+            assertNotNull(vm.fields.value[AddHouseholdTaskField.Title]?.error)
+            vm.update(AddHouseholdTaskField.Title, "a".repeat(81))
+            assertNotNull(vm.fields.value[AddHouseholdTaskField.Title]?.error)
+            vm.update(AddHouseholdTaskField.Title, "a".repeat(80))
+            assertNull(vm.fields.value[AddHouseholdTaskField.Title]?.error)
+            vm.update(AddHouseholdTaskField.Title, "Wash dishes")
+            assertNull(vm.fields.value[AddHouseholdTaskField.Title]?.error)
+        }
 
-    @Test fun custom_interval_validator_only_active_on_custom_recurrence() = runTest {
-        stubMembers()
-        val vm = makeVm()
-        vm.selectRecurrence(AddHouseholdTaskRecurrence.Weekly)
-        vm.update(AddHouseholdTaskField.CustomInterval, "abc")
-        assertNull(
-            "Custom validator should not fire when recurrence != Custom.",
-            vm.fields.value[AddHouseholdTaskField.CustomInterval]?.error,
-        )
-        vm.selectRecurrence(AddHouseholdTaskRecurrence.Custom)
-        vm.update(AddHouseholdTaskField.CustomInterval, "abc")
-        assertNotNull(vm.fields.value[AddHouseholdTaskField.CustomInterval]?.error)
-        vm.update(AddHouseholdTaskField.CustomInterval, "0")
-        assertNotNull(vm.fields.value[AddHouseholdTaskField.CustomInterval]?.error)
-        vm.update(AddHouseholdTaskField.CustomInterval, "3")
-        assertNull(vm.fields.value[AddHouseholdTaskField.CustomInterval]?.error)
-    }
+    @Test
+    fun custom_interval_validator_only_active_on_custom_recurrence() =
+        runTest {
+            stubMembers()
+            val vm = makeVm()
+            vm.selectRecurrence(AddHouseholdTaskRecurrence.Weekly)
+            vm.update(AddHouseholdTaskField.CustomInterval, "abc")
+            assertNull(
+                "Custom validator should not fire when recurrence != Custom.",
+                vm.fields.value[AddHouseholdTaskField.CustomInterval]?.error,
+            )
+            vm.selectRecurrence(AddHouseholdTaskRecurrence.Custom)
+            vm.update(AddHouseholdTaskField.CustomInterval, "abc")
+            assertNotNull(vm.fields.value[AddHouseholdTaskField.CustomInterval]?.error)
+            vm.update(AddHouseholdTaskField.CustomInterval, "0")
+            assertNotNull(vm.fields.value[AddHouseholdTaskField.CustomInterval]?.error)
+            vm.update(AddHouseholdTaskField.CustomInterval, "3")
+            assertNull(vm.fields.value[AddHouseholdTaskField.CustomInterval]?.error)
+        }
 
-    @Test fun custom_sub_form_visibility_tracks_recurrence_picker() = runTest {
-        stubMembers()
-        val vm = makeVm()
-        assertFalse(vm.showsCustomRecurrenceSubForm)
-        vm.selectRecurrence(AddHouseholdTaskRecurrence.Daily)
-        assertFalse(vm.showsCustomRecurrenceSubForm)
-        vm.selectRecurrence(AddHouseholdTaskRecurrence.Custom)
-        assertTrue(vm.showsCustomRecurrenceSubForm)
-        vm.selectRecurrence(AddHouseholdTaskRecurrence.Weekly)
-        assertFalse(
-            "Sub-form should hide once the user picks a fixed cadence.",
-            vm.showsCustomRecurrenceSubForm,
-        )
-    }
+    @Test
+    fun custom_sub_form_visibility_tracks_recurrence_picker() =
+        runTest {
+            stubMembers()
+            val vm = makeVm()
+            assertFalse(vm.showsCustomRecurrenceSubForm)
+            vm.selectRecurrence(AddHouseholdTaskRecurrence.Daily)
+            assertFalse(vm.showsCustomRecurrenceSubForm)
+            vm.selectRecurrence(AddHouseholdTaskRecurrence.Custom)
+            assertTrue(vm.showsCustomRecurrenceSubForm)
+            vm.selectRecurrence(AddHouseholdTaskRecurrence.Weekly)
+            assertFalse(
+                "Sub-form should hide once the user picks a fixed cadence.",
+                vm.showsCustomRecurrenceSubForm,
+            )
+        }
 
     // ── Recurrence parsing ─────────────────────────────────────
 
@@ -250,147 +262,161 @@ class AddHouseholdTaskFormViewModelTest {
 
     // ── Submit happy path ─────────────────────────────────────
 
-    @Test fun add_mode_save_posts_expected_body_and_signals_dismiss() = runTest {
-        stubMembers()
-        val capturedRequest = slot<CreateHomeTaskRequest>()
-        coEvery { tasksRepo.createHomeTask("home-1", capture(capturedRequest)) } returns
-            NetworkResult.Success(
-                HomeTaskResponse(
-                    task =
-                        HomeTaskDto(
-                            id = "task-new",
-                            homeId = "home-1",
-                            taskType = "chore",
-                            title = "Wash dishes",
-                            status = "open",
-                        ),
-                ),
-            )
+    @Test
+    fun add_mode_save_posts_expected_body_and_signals_dismiss() =
+        runTest {
+            stubMembers()
+            val capturedRequest = slot<CreateHomeTaskRequest>()
+            coEvery { tasksRepo.createHomeTask("home-1", capture(capturedRequest)) } returns
+                NetworkResult.Success(
+                    HomeTaskResponse(
+                        task =
+                            HomeTaskDto(
+                                id = "task-new",
+                                homeId = "home-1",
+                                taskType = "chore",
+                                title = "Wash dishes",
+                                status = "open",
+                            ),
+                    ),
+                )
 
-        val vm = makeVm()
-        vm.update(AddHouseholdTaskField.Title, "Wash dishes")
-        vm.selectCategory(AddHouseholdTaskFormCategory.Cleaning)
-        vm.selectRecurrence(AddHouseholdTaskRecurrence.Weekly)
-        vm.selectAssignee("user-1")
-        vm.setDueDate("2026-06-15")
-        vm.update(AddHouseholdTaskField.Notes, "After dinner.")
+            val vm = makeVm()
+            vm.update(AddHouseholdTaskField.Title, "Wash dishes")
+            vm.selectCategory(AddHouseholdTaskFormCategory.Cleaning)
+            vm.selectRecurrence(AddHouseholdTaskRecurrence.Weekly)
+            vm.selectAssignee("user-1")
+            vm.setDueDate("2026-06-15")
+            vm.update(AddHouseholdTaskField.Notes, "After dinner.")
 
-        vm.save()
+            vm.save()
 
-        assertEquals("task-new", vm.createdTaskId.value)
-        assertTrue(vm.shouldDismiss.value)
-        assertFalse(vm.toast.value?.isError ?: true)
+            assertEquals("task-new", vm.createdTaskId.value)
+            assertTrue(vm.shouldDismiss.value)
+            assertFalse(vm.toast.value?.isError ?: true)
 
-        val body = capturedRequest.captured
-        assertEquals("Wash dishes", body.title)
-        assertEquals("chore", body.taskType)
-        assertEquals("user-1", body.assignedTo)
-        assertEquals("2026-06-15", body.dueAt)
-        assertEquals("After dinner.", body.description)
-        assertEquals("FREQ=WEEKLY", body.recurrenceRule)
-    }
+            val body = capturedRequest.captured
+            assertEquals("Wash dishes", body.title)
+            assertEquals("chore", body.taskType)
+            assertEquals("user-1", body.assignedTo)
+            assertEquals("2026-06-15", body.dueAt)
+            assertEquals("After dinner.", body.description)
+            assertEquals("FREQ=WEEKLY", body.recurrenceRule)
+        }
 
-    @Test fun edit_mode_save_puts_expected_body() = runTest {
-        coEvery { tasksRepo.getHomeTasks("home-1") } returns
-            NetworkResult.Success(GetHomeTasksResponse(tasks = listOf(task(recurrenceRule = null))))
-        stubMembers()
-        val capturedRequest = slot<UpdateHomeTaskRequest>()
-        coEvery {
-            tasksRepo.updateHomeTask("home-1", "task-1", capture(capturedRequest))
-        } returns
-            NetworkResult.Success(
-                HomeTaskResponse(task = task(recurrenceRule = "FREQ=WEEKLY", title = "Take out trash (Tuesday)")),
-            )
+    @Test
+    fun edit_mode_save_puts_expected_body() =
+        runTest {
+            coEvery { tasksRepo.getHomeTasks("home-1") } returns
+                NetworkResult.Success(GetHomeTasksResponse(tasks = listOf(task(recurrenceRule = null))))
+            stubMembers()
+            val capturedRequest = slot<UpdateHomeTaskRequest>()
+            coEvery {
+                tasksRepo.updateHomeTask("home-1", "task-1", capture(capturedRequest))
+            } returns
+                NetworkResult.Success(
+                    HomeTaskResponse(task = task(recurrenceRule = "FREQ=WEEKLY", title = "Take out trash (Tuesday)")),
+                )
 
-        val vm = makeVm(taskId = "task-1")
-        vm.load()
-        vm.update(AddHouseholdTaskField.Title, "Take out trash (Tuesday)")
-        vm.selectRecurrence(AddHouseholdTaskRecurrence.Weekly)
+            val vm = makeVm(taskId = "task-1")
+            vm.load()
+            vm.update(AddHouseholdTaskField.Title, "Take out trash (Tuesday)")
+            vm.selectRecurrence(AddHouseholdTaskRecurrence.Weekly)
 
-        vm.save()
+            vm.save()
 
-        assertTrue(vm.shouldDismiss.value)
-        assertFalse(vm.toast.value?.isError ?: true)
-        val body = capturedRequest.captured
-        assertEquals("Take out trash (Tuesday)", body.title)
-        assertEquals("FREQ=WEEKLY", body.recurrenceRule)
-        assertEquals("Tuesday curbside.", body.description)
-        assertEquals("user-1", body.assignedTo)
-    }
+            assertTrue(vm.shouldDismiss.value)
+            assertFalse(vm.toast.value?.isError ?: true)
+            val body = capturedRequest.captured
+            assertEquals("Take out trash (Tuesday)", body.title)
+            assertEquals("FREQ=WEEKLY", body.recurrenceRule)
+            assertEquals("Tuesday curbside.", body.description)
+            assertEquals("user-1", body.assignedTo)
+        }
 
-    @Test fun add_mode_custom_recurrence_builds_interval_rule() = runTest {
-        stubMembers()
-        val capturedRequest = slot<CreateHomeTaskRequest>()
-        coEvery { tasksRepo.createHomeTask("home-1", capture(capturedRequest)) } returns
-            NetworkResult.Success(
-                HomeTaskResponse(
-                    task =
-                        HomeTaskDto(
-                            id = "task-new",
-                            homeId = "home-1",
-                            taskType = "chore",
-                            title = "Water plants",
-                            status = "open",
-                        ),
-                ),
-            )
+    @Test
+    fun add_mode_custom_recurrence_builds_interval_rule() =
+        runTest {
+            stubMembers()
+            val capturedRequest = slot<CreateHomeTaskRequest>()
+            coEvery { tasksRepo.createHomeTask("home-1", capture(capturedRequest)) } returns
+                NetworkResult.Success(
+                    HomeTaskResponse(
+                        task =
+                            HomeTaskDto(
+                                id = "task-new",
+                                homeId = "home-1",
+                                taskType = "chore",
+                                title = "Water plants",
+                                status = "open",
+                            ),
+                    ),
+                )
 
-        val vm = makeVm()
-        vm.update(AddHouseholdTaskField.Title, "Water plants")
-        vm.selectCategory(AddHouseholdTaskFormCategory.Yardwork)
-        vm.selectRecurrence(AddHouseholdTaskRecurrence.Custom)
-        vm.selectCustomUnit(AddHouseholdTaskCustomUnit.Days)
-        vm.update(AddHouseholdTaskField.CustomInterval, "3")
+            val vm = makeVm()
+            vm.update(AddHouseholdTaskField.Title, "Water plants")
+            vm.selectCategory(AddHouseholdTaskFormCategory.Yardwork)
+            vm.selectRecurrence(AddHouseholdTaskRecurrence.Custom)
+            vm.selectCustomUnit(AddHouseholdTaskCustomUnit.Days)
+            vm.update(AddHouseholdTaskField.CustomInterval, "3")
 
-        vm.save()
-        val body = capturedRequest.captured
-        assertEquals("FREQ=DAILY;INTERVAL=3", body.recurrenceRule)
-        assertEquals("chore", body.taskType)
-    }
+            vm.save()
+            val body = capturedRequest.captured
+            assertEquals("FREQ=DAILY;INTERVAL=3", body.recurrenceRule)
+            assertEquals("chore", body.taskType)
+        }
 
     // ── Submit failure ────────────────────────────────────────
 
-    @Test fun save_validation_error_shakes_and_does_not_fire() = runTest {
-        stubMembers()
-        val vm = makeVm()
-        val before = vm.shakeTrigger.value
-        vm.save() // title is empty — must fail
-        assertNotEquals(before, vm.shakeTrigger.value)
-        assertFalse(vm.shouldDismiss.value)
-        coVerify(exactly = 0) { tasksRepo.createHomeTask(any(), any()) }
-    }
+    @Test
+    fun save_validation_error_shakes_and_does_not_fire() =
+        runTest {
+            stubMembers()
+            val vm = makeVm()
+            val before = vm.shakeTrigger.value
+            vm.save() // title is empty — must fail
+            assertNotEquals(before, vm.shakeTrigger.value)
+            assertFalse(vm.shouldDismiss.value)
+            coVerify(exactly = 0) { tasksRepo.createHomeTask(any(), any()) }
+        }
 
-    @Test fun save_server_error_surfaces_toast() = runTest {
-        stubMembers()
-        coEvery { tasksRepo.createHomeTask("home-1", any()) } returns
-            NetworkResult.Failure(NetworkError.Server(500, "down"))
+    @Test
+    fun save_server_error_surfaces_toast() =
+        runTest {
+            stubMembers()
+            coEvery { tasksRepo.createHomeTask("home-1", any()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, "down"))
 
-        val vm = makeVm()
-        vm.update(AddHouseholdTaskField.Title, "Wash dishes")
-        vm.save()
-        assertTrue(vm.toast.value?.isError ?: false)
-        assertFalse(vm.shouldDismiss.value)
-    }
+            val vm = makeVm()
+            vm.update(AddHouseholdTaskField.Title, "Wash dishes")
+            vm.save()
+            assertTrue(vm.toast.value?.isError ?: false)
+            assertFalse(vm.shouldDismiss.value)
+        }
 
     // ── Dirty gating ──────────────────────────────────────────
 
-    @Test fun edit_mode_isDirty_true_only_after_edit() = runTest {
-        coEvery { tasksRepo.getHomeTasks("home-1") } returns
-            NetworkResult.Success(GetHomeTasksResponse(tasks = listOf(task(recurrenceRule = "FREQ=DAILY"))))
-        stubMembers()
-        val vm = makeVm(taskId = "task-1")
-        vm.load()
-        assertFalse(vm.isDirty)
-        vm.update(AddHouseholdTaskField.Title, "Take out trash NOW")
-        assertTrue(vm.isDirty)
-    }
+    @Test
+    fun edit_mode_isDirty_true_only_after_edit() =
+        runTest {
+            coEvery { tasksRepo.getHomeTasks("home-1") } returns
+                NetworkResult.Success(GetHomeTasksResponse(tasks = listOf(task(recurrenceRule = "FREQ=DAILY"))))
+            stubMembers()
+            val vm = makeVm(taskId = "task-1")
+            vm.load()
+            assertFalse(vm.isDirty)
+            vm.update(AddHouseholdTaskField.Title, "Take out trash NOW")
+            assertTrue(vm.isDirty)
+        }
 
-    @Test fun add_mode_isDirty_always_true_so_save_can_fire_on_first_edit() = runTest {
-        stubMembers()
-        val vm = makeVm()
-        assertTrue(
-            "Add mode treats every field as new so Save is reachable from the start.",
-            vm.isDirty,
-        )
-    }
+    @Test
+    fun add_mode_isDirty_always_true_so_save_can_fire_on_first_edit() =
+        runTest {
+            stubMembers()
+            val vm = makeVm()
+            assertTrue(
+                "Add mode treats every field as new so Save is reachable from the start.",
+                vm.isDirty,
+            )
+        }
 }
