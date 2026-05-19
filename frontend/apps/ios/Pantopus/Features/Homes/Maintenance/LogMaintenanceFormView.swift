@@ -9,6 +9,8 @@
 //  images.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 import Observation
 import PhotosUI
@@ -49,13 +51,11 @@ public struct LogMaintenanceFormView: View {
             CostAndNextDueGroup(viewModel: viewModel)
             NotesGroup(viewModel: viewModel)
             PhotosGroup(
-                viewModel: viewModel,
-                onPick: { photoPickerShown = true }
-            )
+                viewModel: viewModel
+            ) { photoPickerShown = true }
             ReceiptGroup(
-                viewModel: viewModel,
-                onPick: { receiptPickerShown = true }
-            )
+                viewModel: viewModel
+            ) { receiptPickerShown = true }
             if let err = viewModel.submitError {
                 Text(err)
                     .pantopusTextStyle(.small)
@@ -218,7 +218,9 @@ private struct DetailsGroup: View {
                 "Title",
                 text: Binding(
                     get: { viewModel.title },
-                    set: { viewModel.title = $0; viewModel.recomputeDirty() }
+                    set: { viewModel.title = $0
+                        viewModel.recomputeDirty()
+                    }
                 ),
                 placeholder: "Fall HVAC tune-up",
                 identifier: "logMaintenance_title"
@@ -232,7 +234,9 @@ private struct DetailsGroup: View {
                     "Date completed",
                     selection: Binding(
                         get: { viewModel.dateCompleted },
-                        set: { viewModel.dateCompleted = $0; viewModel.recomputeDirty() }
+                        set: { viewModel.dateCompleted = $0
+                            viewModel.recomputeDirty()
+                        }
                     ),
                     in: ...Date(),
                     displayedComponents: .date
@@ -255,7 +259,9 @@ private struct PerformedByGroup: View {
                     "Performed by",
                     selection: Binding(
                         get: { viewModel.performedBy },
-                        set: { viewModel.performedBy = $0; viewModel.recomputeDirty() }
+                        set: { viewModel.performedBy = $0
+                            viewModel.recomputeDirty()
+                        }
                     )
                 ) {
                     Text("Self").tag(MaintenancePerformedBy.self)
@@ -270,7 +276,9 @@ private struct PerformedByGroup: View {
                         viewModel.performedBy == .member ? "Member name" : "Contractor name",
                         text: Binding(
                             get: { viewModel.performerName },
-                            set: { viewModel.performerName = $0; viewModel.recomputeDirty() }
+                            set: { viewModel.performerName = $0
+                                viewModel.recomputeDirty()
+                            }
                         ),
                         placeholder: viewModel.performedBy == .member
                             ? "Alex"
@@ -283,7 +291,9 @@ private struct PerformedByGroup: View {
                         "Contact (optional)",
                         text: Binding(
                             get: { viewModel.performerContact },
-                            set: { viewModel.performerContact = $0; viewModel.recomputeDirty() }
+                            set: { viewModel.performerContact = $0
+                                viewModel.recomputeDirty()
+                            }
                         ),
                         placeholder: "(555) 555-0142 · hello@riverside.com",
                         identifier: "logMaintenance_performerContact"
@@ -303,7 +313,9 @@ private struct CostAndNextDueGroup: View {
                 "Cost",
                 text: Binding(
                     get: { viewModel.costText },
-                    set: { viewModel.costText = $0; viewModel.recomputeDirty() }
+                    set: { viewModel.costText = $0
+                        viewModel.recomputeDirty()
+                    }
                 ),
                 placeholder: "$0",
                 keyboardType: .decimalPad,
@@ -313,7 +325,9 @@ private struct CostAndNextDueGroup: View {
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 Toggle(isOn: Binding(
                     get: { viewModel.nextDueEnabled },
-                    set: { viewModel.nextDueEnabled = $0; viewModel.recomputeDirty() }
+                    set: { viewModel.nextDueEnabled = $0
+                        viewModel.recomputeDirty()
+                    }
                 )) {
                     Text("Set next-due reminder")
                         .pantopusTextStyle(.body)
@@ -327,7 +341,9 @@ private struct CostAndNextDueGroup: View {
                         "Next-due",
                         selection: Binding(
                             get: { viewModel.nextDueDate },
-                            set: { viewModel.nextDueDate = $0; viewModel.recomputeDirty() }
+                            set: { viewModel.nextDueDate = $0
+                                viewModel.recomputeDirty()
+                            }
                         ),
                         in: Date()...,
                         displayedComponents: .date
@@ -340,7 +356,9 @@ private struct CostAndNextDueGroup: View {
                         "Recurrence",
                         selection: Binding(
                             get: { viewModel.recurrence },
-                            set: { viewModel.recurrence = $0; viewModel.recomputeDirty() }
+                            set: { viewModel.recurrence = $0
+                                viewModel.recomputeDirty()
+                            }
                         )
                     ) {
                         ForEach(MaintenanceRecurrence.allCases, id: \.self) { recurrence in
@@ -372,7 +390,9 @@ private struct NotesGroup: View {
                     "Replaced filter, topped off coolant…",
                     text: Binding(
                         get: { viewModel.notes },
-                        set: { viewModel.notes = $0; viewModel.recomputeDirty() }
+                        set: { viewModel.notes = $0
+                            viewModel.recomputeDirty()
+                        }
                     ),
                     axis: .vertical
                 )
@@ -409,9 +429,8 @@ private struct PhotosGroup: View {
                     ForEach(viewModel.photoSlots) { slot in
                         PhotoTile(
                             slot: slot,
-                            onPick: onPick,
-                            onRemove: { id in viewModel.removePhoto(id: id) }
-                        )
+                            onPick: onPick
+                        ) { id in viewModel.removePhoto(id: id) }
                     }
                 }
                 .accessibilityIdentifier("logMaintenance_photos")
@@ -441,11 +460,14 @@ private struct PhotoTile: View {
                         .frame(height: 96)
                         .overlay(Icon(.image, size: 24, color: Theme.Color.appTextSecondary))
                 }
-                Button(action: { onRemove(file.id) }) {
-                    Icon(.x, size: 14, color: Theme.Color.appTextInverse)
-                        .padding(Spacing.s1)
-                        .background(Circle().fill(Theme.Color.appText.opacity(0.65)))
-                }
+                Button(
+                    action: { onRemove(file.id) },
+                    label: {
+                        Icon(.x, size: 14, color: Theme.Color.appTextInverse)
+                            .padding(Spacing.s1)
+                            .background(Circle().fill(Theme.Color.appText.opacity(0.65)))
+                    }
+                )
                 .padding(Spacing.s1)
                 .accessibilityLabel("Remove photo")
                 .accessibilityIdentifier("logMaintenance_photo_remove_\(slot.id)")
@@ -501,10 +523,13 @@ private struct ReceiptGroup: View {
                                 .foregroundStyle(Theme.Color.appTextSecondary)
                         }
                         Spacer()
-                        Button(action: { viewModel.pickReceipt(nil) }) {
-                            Icon(.x, size: 18, color: Theme.Color.appTextSecondary)
-                                .frame(width: 32, height: 32)
-                        }
+                        Button(
+                            action: { viewModel.pickReceipt(nil) },
+                            label: {
+                                Icon(.x, size: 18, color: Theme.Color.appTextSecondary)
+                                    .frame(width: 32, height: 32)
+                            }
+                        )
                         .buttonStyle(.plain)
                         .accessibilityLabel("Remove receipt")
                         .accessibilityIdentifier("logMaintenance_receipt_remove")

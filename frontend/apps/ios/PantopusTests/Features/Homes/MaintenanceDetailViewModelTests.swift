@@ -151,9 +151,8 @@ final class MaintenanceDetailViewModelTests: XCTestCase {
         let vm = MaintenanceDetailViewModel(
             homeId: "home-1",
             taskId: "task-3",
-            api: makeAPI(),
-            onDeleted: { Task { @MainActor in deleteCallbackHit = true } }
-        )
+            api: makeAPI()
+        ) { Task { @MainActor in deleteCallbackHit = true } }
         await vm.load()
         XCTAssertNotNil(MaintenanceDraftStore.shared.draft(for: "task-3"))
 

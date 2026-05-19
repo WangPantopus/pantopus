@@ -46,9 +46,8 @@ final class LogMaintenanceFormViewModelTests: XCTestCase {
             mode: mode,
             existing: nil,
             api: api ?? makeAPI(),
-            draftStore: store,
-            now: { frozen }
-        )
+            draftStore: store
+        ) { frozen }
     }
 
     // MARK: - Initial state (minimal)
@@ -78,7 +77,7 @@ final class LogMaintenanceFormViewModelTests: XCTestCase {
 
     // MARK: - Full submit (every field populated)
 
-    func test_full_submit_postsExpectedBody_andCalendarReminder() async throws {
+    func test_full_submit_postsExpectedBody_andCalendarReminder() async {
         SequencedURLProtocol.sequence = [
             // Maintenance POST → returns the new task id.
             .status(201, body: """

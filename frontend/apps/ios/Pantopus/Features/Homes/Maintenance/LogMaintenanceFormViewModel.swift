@@ -39,8 +39,10 @@ public enum LogMaintenanceFormMode: Sendable, Equatable {
 
 @Observable
 @MainActor
+// swiftlint:disable:next type_body_length
 final class LogMaintenanceFormViewModel {
     // MARK: - Form fields
+
     var category: MaintenanceCategory
     var title: String
     var dateCompleted: Date
@@ -56,6 +58,7 @@ final class LogMaintenanceFormViewModel {
     var recurrence: MaintenanceRecurrence
 
     // MARK: - Submit state
+
     private(set) var isSubmitting: Bool = false
     private(set) var submitError: String?
     private(set) var pendingEvent: LogMaintenanceFormEvent?
@@ -67,6 +70,7 @@ final class LogMaintenanceFormViewModel {
     private(set) var isLoadingExisting: Bool = false
 
     // MARK: - Dependencies
+
     private let homeId: String
     private let mode: LogMaintenanceFormMode
     private let api: APIClient
@@ -75,16 +79,16 @@ final class LogMaintenanceFormViewModel {
     private var initial: Snapshot
 
     /// Max photos the form accepts — matches the design's "up to 4".
-    public static let maxPhotos: Int = 4
+    static let maxPhotos: Int = 4
 
     /// One photo slot index → file pair. The slot index lets the UI
     /// pre-render four placeholder tiles even on a fresh form.
-    public struct PhotoSlot: Sendable, Hashable, Identifiable {
-        public let id: Int
-        public let file: MaintenanceDraftFile?
+    struct PhotoSlot: Hashable, Identifiable {
+        let id: Int
+        let file: MaintenanceDraftFile?
     }
 
-    public var photoSlots: [PhotoSlot] {
+    var photoSlots: [PhotoSlot] {
         (0..<Self.maxPhotos).map { idx in
             PhotoSlot(id: idx, file: idx < photos.count ? photos[idx] : nil)
         }
@@ -93,19 +97,19 @@ final class LogMaintenanceFormViewModel {
     /// Title is required; everything else is optional. The submit
     /// button activates when the title has at least one non-whitespace
     /// character — mirrors the backend's `task` validation.
-    public var canSubmit: Bool {
+    var canSubmit: Bool {
         !title.trimmingCharacters(in: .whitespaces).isEmpty && !isSubmitting
     }
 
     /// Headline for the form shell — switches between Log and Edit.
-    public var screenTitle: String {
+    var screenTitle: String {
         switch mode {
         case .create: "Log maintenance"
         case .edit: "Edit maintenance"
         }
     }
 
-    public var submitLabel: String {
+    var submitLabel: String {
         switch mode {
         case .create: "Log"
         case .edit: "Save"
@@ -128,7 +132,7 @@ final class LogMaintenanceFormViewModel {
         let recurrence: MaintenanceRecurrence
     }
 
-    public init(
+    init(
         homeId: String,
         mode: LogMaintenanceFormMode = .create,
         existing: MaintenanceTaskDTO? = nil,
@@ -248,6 +252,7 @@ final class LogMaintenanceFormViewModel {
     }
 
     // MARK: - Mutations
+
     func recomputeDirty() {
         isDirty = currentSnapshot() != initial
     }

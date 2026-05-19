@@ -15,6 +15,8 @@
 //  `DELETE /api/homes/:id/maintenance/:taskId` endpoints.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 import Observation
 import SwiftUI
@@ -22,15 +24,15 @@ import SwiftUI
 @Observable
 @MainActor
 final class MaintenanceDetailViewModel {
-    public enum State: Equatable {
+    enum State: Equatable {
         case loading
         case loaded(MaintenanceTaskDTO)
         case error(message: String)
     }
 
-    public private(set) var state: State = .loading
-    public private(set) var isMutating: Bool = false
-    public private(set) var actionError: String?
+    private(set) var state: State = .loading
+    private(set) var isMutating: Bool = false
+    private(set) var actionError: String?
 
     private let homeId: String
     private let taskId: String
@@ -39,7 +41,7 @@ final class MaintenanceDetailViewModel {
     private let onChanged: @Sendable () -> Void
     private let onDeleted: @Sendable () -> Void
 
-    public init(
+    init(
         homeId: String,
         taskId: String,
         api: APIClient = .shared,
@@ -55,20 +57,20 @@ final class MaintenanceDetailViewModel {
         self.onDeleted = onDeleted
     }
 
-    public var draft: MaintenanceDraft? {
+    var draft: MaintenanceDraft? {
         draftStore.draft(for: taskId)
     }
 
-    public func load() async {
+    func load() async {
         state = .loading
         await fetch()
     }
 
-    public func refresh() async {
+    func refresh() async {
         await fetch()
     }
 
-    public func delete() async {
+    func delete() async {
         guard !isMutating else { return }
         isMutating = true
         actionError = nil
@@ -124,9 +126,8 @@ public struct MaintenanceDetailView: View {
         _viewModel = State(initialValue: MaintenanceDetailViewModel(
             homeId: homeId,
             taskId: taskId,
-            onChanged: onChanged,
-            onDeleted: { Task { @MainActor in backHandler() } }
-        ))
+            onChanged: onChanged
+        ) { Task { @MainActor in backHandler() } })
         self.onBack = onBack
         self.onEdit = onEdit
     }
@@ -143,16 +144,14 @@ public struct MaintenanceDetailView: View {
                     isMutating: viewModel.isMutating,
                     actionError: viewModel.actionError,
                     onBack: onBack,
-                    onEdit: onEdit,
-                    onDelete: { showDeleteConfirm = true }
-                )
+                    onEdit: onEdit
+                ) { showDeleteConfirm = true }
             case let .error(message):
                 let vm = viewModel
                 ErrorBody(
                     message: message,
-                    onBack: onBack,
-                    onRetry: { Task { await vm.refresh() } }
-                )
+                    onBack: onBack
+                ) { Task { await vm.refresh() } }
             }
         }
         .background(Theme.Color.appBg.ignoresSafeArea())
