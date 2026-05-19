@@ -87,8 +87,7 @@ class ListingsRepository
         suspend fun categories(): NetworkResult<ListingsCategoriesResponse> = safeApiCall { api.categories() }
 
         /** Wraps `POST /api/listings`. Used by the Snap & Sell wizard. */
-        suspend fun create(request: CreateListingRequest): NetworkResult<CreateListingResponse> =
-            safeApiCall { api.create(request) }
+        suspend fun create(request: CreateListingRequest): NetworkResult<CreateListingResponse> = safeApiCall { api.create(request) }
 
         suspend fun save(id: String): NetworkResult<ListingSaveResponse> = safeApiCall { api.save(id) }
 

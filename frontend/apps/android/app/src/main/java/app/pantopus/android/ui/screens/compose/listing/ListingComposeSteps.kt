@@ -39,8 +39,7 @@ enum class ListingComposeStep(
         /** Total number of "step N of M" steps shown in the readout. */
         const val PROGRESS_TOTAL: Int = 6
 
-        fun fromOrdinal(value: Int): ListingComposeStep =
-            entries.firstOrNull { it.ordinal0 == value } ?: Photos
+        fun fromOrdinal(value: Int): ListingComposeStep = entries.firstOrNull { it.ordinal0 == value } ?: Photos
     }
 }
 

@@ -315,8 +315,7 @@ open class ListingComposeWizardViewModel
         /** True when the description trims to between min and max length. */
         fun isDescriptionValid(form: ListingComposeFormState): Boolean {
             val length = form.bodyText.trim().length
-            return length in ListingComposeFormState.DESCRIPTION_MIN_LENGTH..
-                ListingComposeFormState.DESCRIPTION_MAX_LENGTH
+            return length in ListingComposeFormState.DESCRIPTION_MIN_LENGTH..ListingComposeFormState.DESCRIPTION_MAX_LENGTH
         }
 
         /** Condition is mandatory unless the category is Wanted. */
