@@ -3,6 +3,8 @@ package app.pantopus.android.data.gigs
 import app.pantopus.android.data.api.models.gigs.BoostGigResponse
 import app.pantopus.android.data.api.models.gigs.CancelGigBody
 import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
+import app.pantopus.android.data.api.models.gigs.CreateGigBody
+import app.pantopus.android.data.api.models.gigs.CreateGigResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
@@ -96,4 +98,7 @@ class GigsRepository
             gigId: String,
             reason: String? = null,
         ): NetworkResult<CompleteGigResponse> = safeApiCall { api.cancelGig(gigId, CancelGigBody(reason = reason)) }
+
+        /** `POST /api/gigs` — create a new gig. */
+        suspend fun create(body: CreateGigBody): NetworkResult<CreateGigResponse> = safeApiCall { api.createGig(body) }
     }

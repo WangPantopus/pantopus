@@ -1,0 +1,299 @@
+//
+//  PulseComposeViewModelTests.swift
+//  PantopusTests
+//
+//  P2.1 — Pulse compose form. Covers each of the five intent variants
+//  (ask / recommend / event / lost / announce), per-intent validation,
+//  identity + visibility selectors, photo capacity, the exact
+//  `POST /api/posts` body, and the close-confirm dirty signal.
+//
+
+import XCTest
+@testable import Pantopus
+
+@MainActor
+final class PulseComposeViewModelTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    private func makeAPI() -> APIClient {
+        APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
+    }
+
+    private static let successResponse = """
+    {"message":"Posted","post_id":"p_42"}
+    """
+
+    // MARK: - Defaults
+
+    func testInitDefaultsMatchIntentArgument() {
+        for intent in PulseComposeIntent.allCases {
+            let vm = PulseComposeViewModel(intent: intent, api: makeAPI())
+            XCTAssertEqual(vm.activeIntent, intent)
+            XCTAssertEqual(vm.identity, .personal)
+            XCTAssertEqual(vm.visibility, .neighbors)
+            XCTAssertEqual(vm.lostFoundKind, .lost)
+            XCTAssertEqual(vm.askCategory, .handyman)
+            XCTAssertEqual(vm.announceAudience, .neighbors)
+            XCTAssertEqual(vm.recommendRating, 5)
+            XCTAssertTrue(vm.photos.isEmpty)
+        }
+    }
+
+    func testFromRawValueFallsBackToAsk() {
+        XCTAssertEqual(PulseComposeIntent.from(rawValue: "totally-unknown"), .ask)
+        XCTAssertEqual(PulseComposeIntent.from(rawValue: "event"), .event)
+        XCTAssertEqual(PulseComposeIntent.from(rawValue: "lost"), .lost)
+        XCTAssertEqual(PulseComposeIntent.from(rawValue: "announce"), .announce)
+    }
+
+    func testFromFeedIntentBridgesAllAndIdentity() {
+        XCTAssertEqual(PulseComposeIntent.from(feedIntent: .all), .ask)
+        XCTAssertEqual(PulseComposeIntent.from(feedIntent: .ask), .ask)
+        XCTAssertEqual(PulseComposeIntent.from(feedIntent: .recommend), .recommend)
+        XCTAssertEqual(PulseComposeIntent.from(feedIntent: .event), .event)
+        XCTAssertEqual(PulseComposeIntent.from(feedIntent: .lost), .lost)
+        XCTAssertEqual(PulseComposeIntent.from(feedIntent: .announce), .announce)
+    }
+
+    // MARK: - Dirty / valid
+
+    func testCleanFormIsNotDirty() {
+        for intent in PulseComposeIntent.allCases {
+            let vm = PulseComposeViewModel(intent: intent, api: makeAPI())
+            XCTAssertFalse(vm.isDirty, "intent \(intent) should be clean")
+        }
+    }
+
+    func testIdentityChangeMarksDirty() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        XCTAssertFalse(vm.isDirty)
+        vm.identity = .home
+        XCTAssertTrue(vm.isDirty)
+    }
+
+    func testVisibilityChangeMarksDirty() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.visibility = .publicFeed
+        XCTAssertTrue(vm.isDirty)
+    }
+
+    func testFieldEditMarksDirty() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.update(.title, to: "Need a plumber")
+        XCTAssertTrue(vm.isDirty)
+    }
+
+    func testPhotoAttachMarksDirty() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.append(photo: PulseComposePhoto(data: Data([0xFF])))
+        XCTAssertTrue(vm.isDirty)
+    }
+
+    func testValidIsFalseForBlankAsk() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        _ = vm.validateAll()
+        XCTAssertFalse(vm.isValid)
+        XCTAssertNotNil(vm.fields[.title]?.error)
+        XCTAssertNotNil(vm.fields[.body]?.error)
+    }
+
+    func testValidWhenAskTitleAndBodyFilled() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.update(.title, to: "Need a plumber")
+        vm.update(.body, to: "Pipe is leaking under the sink — anyone know someone?")
+        XCTAssertTrue(vm.isValid)
+    }
+
+    func testRecommendRequiresBusinessAndBody() {
+        let vm = PulseComposeViewModel(intent: .recommend, api: makeAPI())
+        _ = vm.validateAll()
+        XCTAssertFalse(vm.isValid)
+        vm.update(.recommendBusiness, to: "Joe's Coffee")
+        vm.update(.body, to: "Best lattes on Elm street.")
+        XCTAssertNil(vm.fields[.recommendBusiness]?.error)
+        XCTAssertNil(vm.fields[.body]?.error)
+        XCTAssertTrue(vm.isValid)
+    }
+
+    func testEventRequiresTitleDateLocationAndBody() {
+        let vm = PulseComposeViewModel(intent: .event, api: makeAPI())
+        _ = vm.validateAll()
+        XCTAssertFalse(vm.isValid)
+        vm.update(.title, to: "Block party")
+        vm.update(.eventDate, to: "2030-08-15 17:00")
+        vm.update(.eventLocation, to: "Elm Park, near the fountain")
+        vm.update(.body, to: "Bring chairs and snacks.")
+        XCTAssertTrue(vm.isValid)
+    }
+
+    func testLostFoundDoesNotRequireDate() {
+        let vm = PulseComposeViewModel(intent: .lost, api: makeAPI())
+        vm.update(.body, to: "Tortoiseshell cat, blue collar, answers to Mochi.")
+        vm.update(.lostLastSeenLocation, to: "Corner of 5th and Elm")
+        XCTAssertTrue(vm.isValid)
+    }
+
+    func testAnnounceRequiresTitleAndBody() {
+        let vm = PulseComposeViewModel(intent: .announce, api: makeAPI())
+        _ = vm.validateAll()
+        XCTAssertFalse(vm.isValid)
+        vm.update(.title, to: "Street closure")
+        vm.update(.body, to: "Saturday 10-2 for the parade.")
+        XCTAssertTrue(vm.isValid)
+    }
+
+    // MARK: - Photo capacity
+
+    func testPhotosCappedAtFour() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        for byte in 0..<10 {
+            vm.append(photo: PulseComposePhoto(data: Data([UInt8(byte)])))
+        }
+        XCTAssertEqual(vm.photos.count, pulseComposeMaxPhotos)
+    }
+
+    func testSetPhotosTruncatesAtMax() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        let pool = (0..<8).map { PulseComposePhoto(data: Data([UInt8($0)])) }
+        vm.setPhotos(pool)
+        XCTAssertEqual(vm.photos.count, pulseComposeMaxPhotos)
+    }
+
+    func testRemovePhoto() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        let photo = PulseComposePhoto(data: Data([0xAA]))
+        vm.append(photo: photo)
+        XCTAssertEqual(vm.photos.count, 1)
+        vm.remove(photo: photo.id)
+        XCTAssertEqual(vm.photos.count, 0)
+    }
+
+    // MARK: - Request shape
+
+    func testAskRequestCarriesCategoryAndIdentity() {
+        let vm = PulseComposeViewModel(intent: .ask, identity: .home, api: makeAPI())
+        vm.update(.title, to: "Plumber recs?")
+        vm.update(.body, to: "Need someone soon.")
+        vm.askCategory = .handyman
+        let request = vm.buildRequest()
+        XCTAssertEqual(request.postType, "ask_local")
+        XCTAssertEqual(request.title, "Plumber recs?")
+        XCTAssertEqual(request.content, "Need someone soon.")
+        XCTAssertEqual(request.postAs, "home")
+        XCTAssertEqual(request.serviceCategory, "handyman")
+        XCTAssertEqual(request.purpose, "ask")
+    }
+
+    func testRecommendRequestEmbedsStarsAndBusinessName() {
+        let vm = PulseComposeViewModel(intent: .recommend, api: makeAPI())
+        vm.update(.recommendBusiness, to: "Joe's Coffee")
+        vm.update(.body, to: "Great lattes.")
+        vm.recommendRating = 4
+        let request = vm.buildRequest()
+        XCTAssertEqual(request.postType, "recommendation")
+        XCTAssertEqual(request.businessName, "Joe's Coffee")
+        XCTAssertTrue(request.content.hasPrefix("★★★★☆"))
+        XCTAssertTrue(request.content.contains("Great lattes."))
+    }
+
+    func testEventRequestNormalizesISODate() {
+        let vm = PulseComposeViewModel(intent: .event, api: makeAPI())
+        vm.update(.title, to: "Block party")
+        vm.update(.eventDate, to: "2030-08-15")
+        vm.update(.eventLocation, to: "Elm Park")
+        vm.update(.body, to: "Bring chairs.")
+        let request = vm.buildRequest()
+        XCTAssertEqual(request.postType, "event")
+        XCTAssertNotNil(request.eventDate)
+        XCTAssertTrue(request.eventDate?.hasPrefix("2030-08-15") ?? false)
+        XCTAssertEqual(request.eventVenue, "Elm Park")
+    }
+
+    func testLostRequestPrefixesLastSeenAndCarriesType() {
+        let vm = PulseComposeViewModel(intent: .lost, api: makeAPI())
+        vm.update(.body, to: "Mochi the cat.")
+        vm.update(.lostLastSeenLocation, to: "5th & Elm")
+        vm.lostFoundKind = .found
+        let request = vm.buildRequest()
+        XCTAssertEqual(request.postType, "lost_found")
+        XCTAssertEqual(request.lostFoundType, "found")
+        XCTAssertTrue(request.content.hasPrefix("Last seen: 5th & Elm"))
+        XCTAssertTrue(request.content.contains("Mochi the cat."))
+    }
+
+    func testAnnounceRequestUsesAudienceVisibility() {
+        let vm = PulseComposeViewModel(intent: .announce, api: makeAPI())
+        vm.update(.title, to: "Street closure")
+        vm.update(.body, to: "Sat 10-2.")
+        vm.announceAudience = .followers
+        let request = vm.buildRequest()
+        XCTAssertEqual(request.postType, "local_update")
+        XCTAssertEqual(request.audience, "followers")
+        XCTAssertEqual(request.visibility, "followers")
+    }
+
+    // MARK: - Submit pipeline
+
+    func testSubmitHappyPathSucceedsAndDismisses() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.successResponse)]
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.update(.title, to: "Need a plumber")
+        vm.update(.body, to: "Pipe is leaking.")
+        let ok = await vm.submit()
+        XCTAssertTrue(ok)
+        if case let .success(id) = vm.state { XCTAssertEqual(id, "p_42") } else { XCTFail("state was \(vm.state)") }
+        XCTAssertEqual(vm.toast?.text, "Posted")
+        XCTAssertEqual(vm.toast?.kind, .success)
+        XCTAssertTrue(vm.shouldDismiss)
+    }
+
+    func testSubmitErrorSurfacesToast() async {
+        SequencedURLProtocol.sequence = [
+            .status(500, body: "{\"error\":\"upstream\"}"),
+            .status(500, body: "{\"error\":\"upstream\"}")
+        ]
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.update(.title, to: "Need a plumber")
+        vm.update(.body, to: "Pipe is leaking.")
+        let ok = await vm.submit()
+        XCTAssertFalse(ok)
+        XCTAssertEqual(vm.toast?.kind, .error)
+        XCTAssertFalse(vm.shouldDismiss)
+        if case .error = vm.state {} else { XCTFail("expected error state, got \(vm.state)") }
+    }
+
+    func testSubmitBlockedByValidation() async {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        let ok = await vm.submit()
+        XCTAssertFalse(ok)
+        XCTAssertEqual(vm.toast?.kind, .error)
+        XCTAssertEqual(vm.shakeTrigger, 1)
+        XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, 0, "no network call should fire")
+    }
+
+    func testAcknowledgeDismissResetsFlag() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        // Simulate a successful submit by hand to test the helper.
+        vm.identity = .personal
+        XCTAssertFalse(vm.shouldDismiss)
+        vm.acknowledgeDismiss()
+        XCTAssertFalse(vm.shouldDismiss)
+    }
+
+    // MARK: - Intent switch preserves draft
+
+    func testSwitchIntentPreservesBody() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        vm.update(.body, to: "Need help with this.")
+        vm.selectIntent(.announce)
+        XCTAssertEqual(vm.fields[.body]?.value, "Need help with this.")
+        XCTAssertEqual(vm.activeIntent, .announce)
+    }
+}

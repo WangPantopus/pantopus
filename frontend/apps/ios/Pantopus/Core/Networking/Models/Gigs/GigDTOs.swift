@@ -170,3 +170,93 @@ public struct PlaceBidResponse: Decodable, Sendable {
     public let bid: GigBidDTO?
     public let message: String?
 }
+
+/// Body for `POST /api/gigs`. Mirrors the subset of `createGigSchema`
+/// the Post-a-Task wizard surfaces (`backend/routes/gigs.js:425`). All
+/// optional fields are omitted from the encoded JSON when nil.
+public struct CreateGigBody: Encodable, Sendable, Equatable {
+    public let title: String
+    public let description: String
+    public let category: String?
+    public let price: Double
+    public let payType: String?
+    public let scheduleType: String?
+    public let scheduledStart: String?
+    public let taskFormat: String?
+    public let attachments: [String]?
+    public let location: CreateGigLocation
+
+    public init(
+        title: String,
+        description: String,
+        category: String?,
+        price: Double,
+        payType: String?,
+        scheduleType: String?,
+        scheduledStart: String?,
+        taskFormat: String?,
+        attachments: [String]?,
+        location: CreateGigLocation
+    ) {
+        self.title = title
+        self.description = description
+        self.category = category
+        self.price = price
+        self.payType = payType
+        self.scheduleType = scheduleType
+        self.scheduledStart = scheduledStart
+        self.taskFormat = taskFormat
+        self.attachments = attachments
+        self.location = location
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case title, description, category, price
+        case payType = "pay_type"
+        case scheduleType = "schedule_type"
+        case scheduledStart = "scheduled_start"
+        case taskFormat = "task_format"
+        case attachments
+        case location
+    }
+}
+
+/// Nested `location` object the backend requires
+/// (`backend/routes/gigs.js:521`).
+public struct CreateGigLocation: Encodable, Sendable, Equatable {
+    public let mode: String
+    public let latitude: Double
+    public let longitude: Double
+    public let address: String
+    public let city: String?
+    public let state: String?
+    public let zip: String?
+    public let homeId: String?
+
+    public init(
+        mode: String,
+        latitude: Double,
+        longitude: Double,
+        address: String,
+        city: String? = nil,
+        state: String? = nil,
+        zip: String? = nil,
+        homeId: String? = nil
+    ) {
+        self.mode = mode
+        self.latitude = latitude
+        self.longitude = longitude
+        self.address = address
+        self.city = city
+        self.state = state
+        self.zip = zip
+        self.homeId = homeId
+    }
+}
+
+/// Envelope from `POST /api/gigs`. The backend wraps the freshly
+/// created gig under `gig`.
+public struct CreateGigResponse: Decodable, Sendable {
+    public let gig: GigDTO
+    public let message: String?
+}

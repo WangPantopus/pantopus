@@ -1,5 +1,7 @@
 package app.pantopus.android.data.api.services
 
+import app.pantopus.android.data.api.models.listings.CreateListingRequest
+import app.pantopus.android.data.api.models.listings.CreateListingResponse
 import app.pantopus.android.data.api.models.listings.ListingDetailResponse
 import app.pantopus.android.data.api.models.listings.ListingSaveResponse
 import app.pantopus.android.data.api.models.listings.ListingsBrowseResponse
@@ -90,6 +92,12 @@ interface ListingsApi {
     /** `GET /api/listings/categories` — backend's canonical enums. */
     @GET("api/listings/categories")
     suspend fun categories(): ListingsCategoriesResponse
+
+    /** `POST /api/listings` — create a new listing. Route `backend/routes/listings.js:426`. */
+    @POST("api/listings")
+    suspend fun create(
+        @Body body: CreateListingRequest,
+    ): CreateListingResponse
 
     /** `POST /api/listings/:id/save` — bookmark. */
     @POST("api/listings/{id}/save")
