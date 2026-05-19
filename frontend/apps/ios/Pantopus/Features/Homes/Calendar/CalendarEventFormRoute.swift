@@ -13,7 +13,7 @@
 import SwiftUI
 
 @MainActor
-public struct CalendarEventFormRoute: View {
+struct CalendarEventFormRoute: View {
     private let homeId: String
     private let eventId: String?
     private let prefilledCategory: String?
@@ -23,7 +23,7 @@ public struct CalendarEventFormRoute: View {
 
     @State private var prefetch: PrefetchState
 
-    public init(
+    init(
         homeId: String,
         eventId: String?,
         prefilledCategory: String? = nil,
@@ -40,10 +40,10 @@ public struct CalendarEventFormRoute: View {
         _prefetch = State(initialValue: eventId == nil ? .ready(nil) : .loading)
     }
 
-    public var body: some View {
+    var body: some View {
         Group {
             switch prefetch {
-            case .ready(let editing):
+            case let .ready(editing):
                 AddEventFormView(
                     homeId: homeId,
                     editingEvent: editing,
@@ -56,7 +56,7 @@ public struct CalendarEventFormRoute: View {
                 )
             case .loading:
                 LoadingShell(title: "Loading event", onClose: onClose)
-            case .error(let message):
+            case let .error(message):
                 ErrorShell(message: message, onClose: onClose) {
                     await prefetchEditing()
                 }
@@ -103,7 +103,9 @@ private struct LoadingShell: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Button(action: { onClose() }) {
+                Button {
+                    onClose()
+                } label: {
                     Icon(.x, size: 22, color: Theme.Color.appText)
                         .frame(width: 44, height: 44)
                 }
@@ -140,7 +142,9 @@ private struct ErrorShell: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Button(action: { onClose() }) {
+                Button {
+                    onClose()
+                } label: {
                     Icon(.x, size: 22, color: Theme.Color.appText)
                         .frame(width: 44, height: 44)
                 }

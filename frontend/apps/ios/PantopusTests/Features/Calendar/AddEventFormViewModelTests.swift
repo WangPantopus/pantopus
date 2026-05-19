@@ -11,8 +11,6 @@
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable type_body_length file_length
-
 @MainActor
 final class AddEventFormViewModelTests: XCTestCase {
     override func setUp() {
@@ -74,7 +72,7 @@ final class AddEventFormViewModelTests: XCTestCase {
 
     // MARK: - Validation
 
-    func testTitleRequiredGatesSubmit() async {
+    func testTitleRequiredGatesSubmit() {
         let vm = makeVM()
         XCTAssertFalse(vm.isValid)
         vm.updateField(.title, to: "  ")
@@ -86,7 +84,7 @@ final class AddEventFormViewModelTests: XCTestCase {
     func testEndBeforeStartFlagsError() {
         let vm = makeVM()
         vm.updateField(.title, to: "Soccer game")
-        vm.endDate = Self.fixedStart.addingTimeInterval(-3_600)
+        vm.endDate = Self.fixedStart.addingTimeInterval(-3600)
         XCTAssertFalse(vm.isValid)
         XCTAssertNotNil(vm.endError)
     }
@@ -94,7 +92,7 @@ final class AddEventFormViewModelTests: XCTestCase {
     func testEndAfterStartIsValid() {
         let vm = makeVM()
         vm.updateField(.title, to: "Soccer game")
-        vm.endDate = Self.fixedStart.addingTimeInterval(3_600)
+        vm.endDate = Self.fixedStart.addingTimeInterval(3600)
         XCTAssertTrue(vm.isValid)
         XCTAssertNil(vm.endError)
     }
@@ -102,7 +100,7 @@ final class AddEventFormViewModelTests: XCTestCase {
     func testAllDayHidesAndClearsEnd() {
         let vm = makeVM()
         vm.updateField(.title, to: "Mom's birthday")
-        vm.endDate = Self.fixedStart.addingTimeInterval(3_600)
+        vm.endDate = Self.fixedStart.addingTimeInterval(3600)
         XCTAssertNotNil(vm.endDate)
         vm.allDay = true
         XCTAssertNil(vm.endDate)
@@ -352,5 +350,3 @@ final class AddEventFormViewModelTests: XCTestCase {
         return data
     }
 }
-
-// swiftlint:enable type_body_length file_length

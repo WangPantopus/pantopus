@@ -11,7 +11,7 @@
 //  has no `GET /:eventId` handler).
 //
 
-// swiftlint:disable file_length type_body_length multiline_function_chains
+// swiftlint:disable file_length
 
 import Foundation
 import Observation
@@ -19,24 +19,24 @@ import SwiftUI
 
 @Observable
 @MainActor
-public final class EventDetailViewModel {
-    public enum State: Equatable {
+final class EventDetailViewModel {
+    enum State: Equatable {
         case loading
         case loaded(CalendarEventDTO)
         case error(message: String)
     }
 
-    public private(set) var state: State = .loading
-    public private(set) var isDeleting: Bool = false
-    public private(set) var deleteError: String?
-    public private(set) var attendeeNames: [String: String] = [:]
+    private(set) var state: State = .loading
+    private(set) var isDeleting: Bool = false
+    private(set) var deleteError: String?
+    private(set) var attendeeNames: [String: String] = [:]
 
     private let homeId: String
     private let eventId: String
     private let api: APIClient
     private let onDeleted: @Sendable () -> Void
 
-    public init(
+    init(
         homeId: String,
         eventId: String,
         api: APIClient = .shared,
@@ -48,7 +48,7 @@ public final class EventDetailViewModel {
         self.onDeleted = onDeleted
     }
 
-    public func load() async {
+    func load() async {
         state = .loading
         do {
             async let eventsTask: GetHomeEventsResponse =
@@ -56,16 +56,17 @@ public final class EventDetailViewModel {
             async let membersTask: OccupantsResponse =
                 api.request(HomesEndpoints.listOccupants(homeId: homeId))
             let events = try await eventsTask.events
-            let members = (try? await membersTask.occupants) ?? []
+            let members = await (try? membersTask.occupants) ?? []
             guard let event = events.first(where: { $0.id == eventId }) else {
                 state = .error(message: "This event is no longer available.")
                 return
             }
             var lookup: [String: String] = [:]
             for member in members {
-                let name = member.displayName?.trimmingCharacters(in: .whitespaces).isEmpty == false
-                    ? member.displayName!
-                    : (member.username ?? "Member")
+                let trimmed = member.displayName?.trimmingCharacters(in: .whitespaces) ?? ""
+                let name = trimmed.isEmpty
+                    ? (member.username ?? "Member")
+                    : (member.displayName ?? trimmed)
                 lookup[member.userId] = name
             }
             attendeeNames = lookup
@@ -80,11 +81,11 @@ public final class EventDetailViewModel {
 
     /// Replace the loaded snapshot in place. Called by the host after a
     /// successful edit so the detail view doesn't have to re-GET.
-    public func replaceLoadedEvent(_ event: CalendarEventDTO) {
+    func replaceLoadedEvent(_ event: CalendarEventDTO) {
         state = .loaded(event)
     }
 
-    public func delete() async -> Bool {
+    func delete() async -> Bool {
         guard !isDeleting else { return false }
         isDeleting = true
         deleteError = nil
@@ -103,12 +104,12 @@ public final class EventDetailViewModel {
     }
 }
 
-public struct EventDetailView: View {
+struct EventDetailView: View {
     @State private var viewModel: EventDetailViewModel
     private let onBack: @MainActor () -> Void
     private let onEdit: @MainActor (CalendarEventDTO) -> Void
 
-    public init(
+    init(
         homeId: String,
         eventId: String,
         api: APIClient = .shared,
@@ -118,16 +119,15 @@ public struct EventDetailView: View {
         _viewModel = State(initialValue: EventDetailViewModel(
             homeId: homeId,
             eventId: eventId,
-            api: api,
-            onDeleted: {
-                Task { @MainActor in onBack() }
-            }
-        ))
+            api: api
+        ) {
+            Task { @MainActor in onBack() }
+        })
         self.onBack = onBack
         self.onEdit = onEdit
     }
 
-    public var body: some View {
+    var body: some View {
         Group {
             switch viewModel.state {
             case .loading:
@@ -154,7 +154,7 @@ public struct EventDetailView: View {
     }
 
     /// Lets the host swap the loaded event after an in-stack edit returns.
-    public func handleEdited(_ event: CalendarEventDTO) {
+    func handleEdited(_ event: CalendarEventDTO) {
         viewModel.replaceLoadedEvent(event)
     }
 }
@@ -548,4 +548,4 @@ private struct NotesSection: View {
     )
 }
 
-// swiftlint:enable file_length type_body_length multiline_function_chains
+// swiftlint:enable file_length

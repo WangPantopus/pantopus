@@ -8,17 +8,17 @@
 //  vocabulary.
 //
 
-// swiftlint:disable file_length type_body_length multiline_function_chains
+// swiftlint:disable file_length
 
 import SwiftUI
 
 @MainActor
-public struct AddEventFormView: View {
+struct AddEventFormView: View {
     @State private var viewModel: AddEventFormViewModel
     private let onClose: @MainActor () -> Void
     private let onCommitted: @MainActor (AddEventFormEvent) -> Void
 
-    public init(
+    init(
         homeId: String,
         editingEvent: CalendarEventDTO? = nil,
         prefilledCategory: CalendarEventCategory? = nil,
@@ -38,7 +38,7 @@ public struct AddEventFormView: View {
         self.onCommitted = onCommitted
     }
 
-    public var body: some View {
+    var body: some View {
         FormShell(
             title: viewModel.screenTitle,
             rightActionLabel: viewModel.commitLabel,
@@ -46,18 +46,19 @@ public struct AddEventFormView: View {
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: onClose,
-            onCommit: { Task { await viewModel.submit() } }
-        ) {
-            TitleGroup(viewModel: viewModel)
-            CategoryGroup(viewModel: viewModel)
-            ScheduleGroup(viewModel: viewModel)
-            LocationGroup(viewModel: viewModel)
-            RecurrenceGroup(viewModel: viewModel)
-            AttendeesGroup(viewModel: viewModel)
-            ReminderGroup(viewModel: viewModel)
-            NotesGroup(viewModel: viewModel)
-            Color.clear.frame(height: Spacing.s5)
-        }
+            onCommit: { Task { await viewModel.submit() } },
+            content: {
+                TitleGroup(viewModel: viewModel)
+                CategoryGroup(viewModel: viewModel)
+                ScheduleGroup(viewModel: viewModel)
+                LocationGroup(viewModel: viewModel)
+                RecurrenceGroup(viewModel: viewModel)
+                AttendeesGroup(viewModel: viewModel)
+                ReminderGroup(viewModel: viewModel)
+                NotesGroup(viewModel: viewModel)
+                Color.clear.frame(height: Spacing.s5)
+            }
+        )
         .formShakeOnChange(of: viewModel.shakeTrigger)
         .accessibilityIdentifier("addEventForm")
         .overlay(alignment: .bottom) { toastOverlay }
@@ -144,7 +145,9 @@ private struct CategoryChip: View {
     let onTap: @MainActor () -> Void
 
     var body: some View {
-        Button(action: { onTap() }) {
+        Button {
+            onTap()
+        } label: {
             HStack(spacing: Spacing.s2) {
                 ZStack {
                     RoundedRectangle(cornerRadius: Radii.sm)
@@ -354,7 +357,9 @@ private struct AttendeeRow: View {
     let onTap: @MainActor () -> Void
 
     var body: some View {
-        Button(action: { onTap() }) {
+        Button {
+            onTap()
+        } label: {
             HStack(spacing: Spacing.s3) {
                 AttendeeInitial(initials: attendee.initials)
                 Text(attendee.displayName)
@@ -503,7 +508,9 @@ private struct PickerRow: View {
     let onTap: @MainActor () -> Void
 
     var body: some View {
-        Button(action: { onTap() }) {
+        Button {
+            onTap()
+        } label: {
             HStack(spacing: Spacing.s3) {
                 Text(label)
                     .pantopusTextStyle(.body)
@@ -532,4 +539,4 @@ private struct PickerRow: View {
     )
 }
 
-// swiftlint:enable file_length type_body_length multiline_function_chains
+// swiftlint:enable file_length
