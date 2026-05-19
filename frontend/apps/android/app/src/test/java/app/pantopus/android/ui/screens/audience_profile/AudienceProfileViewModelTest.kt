@@ -169,6 +169,29 @@ class AudienceProfileViewModelTest {
                                 lastMessagePreview = "Loved the workshop",
                                 lastMessageAt = "2026-05-15T10:00:00Z",
                                 unreadCount = 2,
+                                flagged = false,
+                            ),
+                            PersonaThreadDto(
+                                id = "th2",
+                                membershipId = "m2",
+                                fanHandle = "billie",
+                                fanDisplayName = "Billie B.",
+                                tier = FanTierBadgeDto(rank = 3, name = "Insiders"),
+                                lastMessagePreview = "Question on step 4",
+                                lastMessageAt = "2026-05-15T08:00:00Z",
+                                unreadCount = 1,
+                                flagged = true,
+                            ),
+                            PersonaThreadDto(
+                                id = "th3",
+                                membershipId = "m3",
+                                fanHandle = "junie",
+                                fanDisplayName = "Junie L.",
+                                tier = FanTierBadgeDto(rank = 1, name = "Followers"),
+                                lastMessagePreview = "Following from the market!",
+                                lastMessageAt = "2026-05-12T08:00:00Z",
+                                unreadCount = 0,
+                                flagged = false,
                             ),
                         ),
                 ),
@@ -190,8 +213,10 @@ class AudienceProfileViewModelTest {
             assertEquals(UpdateVisibility.TierOrAbove, loaded.content.updates[1].visibility)
             assertEquals(2, loaded.content.updates[1].targetTierRank)
             assertEquals(2, loaded.content.followers.size)
-            assertEquals(1, loaded.content.threads.size)
+            assertEquals(3, loaded.content.threads.size)
             assertEquals(2, loaded.content.threads[0].unreadCount)
+            assertEquals(2, loaded.content.threads[0].tierRank)
+            assertEquals(true, loaded.content.threads.first { it.id == "th2" }.flagged)
             assertEquals("ch_demo", loaded.content.channelId)
         }
 
@@ -344,5 +369,59 @@ class AudienceProfileViewModelTest {
             vm.load()
             val loaded = vm.state.value as AudienceProfileUiState.Loaded
             assertEquals(8, loaded.content.tierChips.first { it.id == "tier_1" }.count)
+        }
+
+    @Test fun threads_filter_chips_surface_correct_counts() =
+        runTest {
+            stubLoaded()
+            val vm = makeVm()
+            vm.load()
+            val loaded = vm.state.value as AudienceProfileUiState.Loaded
+            val chips = loaded.content.threadsFilterChips
+            assertEquals(
+                listOf(ThreadsFilter.All, ThreadsFilter.Unread, ThreadsFilter.BronzePlus, ThreadsFilter.Flagged),
+                chips.map { it.filter },
+            )
+            assertEquals(3, chips.first { it.filter == ThreadsFilter.All }.count)
+            assertEquals(2, chips.first { it.filter == ThreadsFilter.Unread }.count)
+            assertEquals(2, chips.first { it.filter == ThreadsFilter.BronzePlus }.count)
+            assertNull(chips.first { it.filter == ThreadsFilter.Flagged }.count)
+        }
+
+    @Test fun thread_filter_all_shows_every_thread() =
+        runTest {
+            stubLoaded()
+            val vm = makeVm()
+            vm.load()
+            assertEquals(ThreadsFilter.All, vm.activeThreadFilter.value)
+            assertEquals(3, vm.visibleThreads().size)
+        }
+
+    @Test fun thread_filter_unread_drops_read_threads() =
+        runTest {
+            stubLoaded()
+            val vm = makeVm()
+            vm.load()
+            vm.selectThreadFilter(ThreadsFilter.Unread)
+            assertEquals(ThreadsFilter.Unread, vm.activeThreadFilter.value)
+            assertEquals(listOf("th1", "th2"), vm.visibleThreads().map { it.id })
+        }
+
+    @Test fun thread_filter_bronze_plus_drops_tier_1_threads() =
+        runTest {
+            stubLoaded()
+            val vm = makeVm()
+            vm.load()
+            vm.selectThreadFilter(ThreadsFilter.BronzePlus)
+            assertEquals(listOf("th1", "th2"), vm.visibleThreads().map { it.id })
+        }
+
+    @Test fun thread_filter_flagged_keeps_only_flagged_threads() =
+        runTest {
+            stubLoaded()
+            val vm = makeVm()
+            vm.load()
+            vm.selectThreadFilter(ThreadsFilter.Flagged)
+            assertEquals(listOf("th2"), vm.visibleThreads().map { it.id })
         }
 }

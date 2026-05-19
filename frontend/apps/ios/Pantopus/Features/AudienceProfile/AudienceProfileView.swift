@@ -649,21 +649,84 @@ public struct AudienceProfileView: View {
     // MARK: - Threads tab
 
     private func threadsTab(_ loaded: AudienceProfileLoaded) -> some View {
+        VStack(spacing: 0) {
+            threadsFilterStrip(chips: loaded.threadsFilterChips)
+            threadsListBody(loaded: loaded)
+        }
+        .accessibilityIdentifier("audienceProfileThreadsList")
+    }
+
+    private func threadsFilterStrip(chips: [ThreadsFilterChipContent]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(chips) { chip in
+                    threadsFilterChip(chip)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .padding(.vertical, 12)
+        .background(Theme.Color.appSurface)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+        }
+        .accessibilityIdentifier("audienceProfileThreadsFilterStrip")
+    }
+
+    private func threadsFilterChip(_ chip: ThreadsFilterChipContent) -> some View {
+        let isActive = viewModel.activeThreadFilter == chip.filter
+        return Button {
+            viewModel.selectThreadFilter(chip.filter)
+        } label: {
+            HStack(spacing: 5) {
+                Text(chip.label)
+                    .font(.system(size: 11.5, weight: .semibold))
+                if let count = chip.count {
+                    Text("\(count)")
+                        .font(.system(size: 9.5, weight: .bold))
+                        .opacity(0.85)
+                }
+            }
+            .foregroundStyle(isActive ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 5)
+            .frame(minHeight: 28)
+            .background(isActive ? Theme.Color.primary600 : Theme.Color.appSurface)
+            .overlay(
+                Capsule().stroke(
+                    isActive ? Theme.Color.primary600 : Theme.Color.appBorder,
+                    lineWidth: 1
+                )
+            )
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("threadsFilterChip_\(chip.id)")
+        .accessibilityLabel(chip.count.map { "\(chip.label), \($0)" } ?? chip.label)
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+    }
+
+    @ViewBuilder
+    private func threadsListBody(loaded: AudienceProfileLoaded) -> some View {
         ScrollView {
             VStack(spacing: 8) {
                 if loaded.threads.isEmpty {
                     emptyThreadsState
                 } else {
-                    viewAllMessagesCTA
-                    ForEach(loaded.threads) { thread in
-                        threadRow(thread)
+                    let visible = viewModel.visibleThreads
+                    if visible.isEmpty {
+                        emptyFilteredThreadsState
+                    } else {
+                        viewAllMessagesCTA
+                        ForEach(visible) { thread in
+                            threadRow(thread)
+                        }
                     }
                 }
                 Spacer(minLength: 24)
             }
             .padding(16)
         }
-        .accessibilityIdentifier("audienceProfileThreadsList")
     }
 
     private var viewAllMessagesCTA: some View {
@@ -763,6 +826,23 @@ public struct AudienceProfileView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity)
+    }
+
+    private var emptyFilteredThreadsState: some View {
+        VStack(spacing: 8) {
+            Icon(.inbox, size: 32, color: Theme.Color.appTextMuted)
+            Text("No threads in this view")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+                .accessibilityAddTraits(.isHeader)
+            Text("Try another filter to see the rest of your inbox.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("audienceProfileThreadsFilteredEmpty")
     }
 
     // MARK: - Tier color (rank 1=Follower / 2=Member / 3=Insider / 4=Direct)

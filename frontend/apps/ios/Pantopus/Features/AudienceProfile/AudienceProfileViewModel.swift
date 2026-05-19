@@ -21,6 +21,7 @@ public final class AudienceProfileViewModel {
     public private(set) var state: AudienceProfileState = .loading
     public var activeTab: AudienceProfileTab = .updates
     public var selectedTierRank: Int?
+    public var activeThreadFilter: ThreadsFilter = .all
     public var composer: UpdateComposerState = .init()
 
     private let api: APIClient
@@ -85,6 +86,10 @@ public final class AudienceProfileViewModel {
         selectedTierRank = rank
     }
 
+    public func selectThreadFilter(_ filter: ThreadsFilter) {
+        activeThreadFilter = filter
+    }
+
     /// POST the composer's body to the persona's broadcast channel.
     /// On success the composer text clears and `load()` reruns so the
     /// updates feed picks up the new row.
@@ -119,6 +124,21 @@ public final class AudienceProfileViewModel {
         return loaded.followers
     }
 
+    /// Threads filtered by `activeThreadFilter`.
+    public var visibleThreads: [ThreadRowContent] {
+        guard case let .loaded(loaded) = state else { return [] }
+        return loaded.threads.filter { Self.matchesThreadFilter($0, filter: activeThreadFilter) }
+    }
+
+    static func matchesThreadFilter(_ row: ThreadRowContent, filter: ThreadsFilter) -> Bool {
+        switch filter {
+        case .all: true
+        case .unread: row.unreadCount > 0
+        case .bronzePlus: row.tierRank >= 2
+        case .flagged: row.flagged
+        }
+    }
+
     // MARK: - Projection
 
     static func project(
@@ -143,6 +163,7 @@ public final class AudienceProfileViewModel {
         let chips = tierChips(counts: audience.counts, tiers: tiers)
         let followers = audience.items.compactMap(Self.followerRow)
         let threadRows = threads.compactMap(Self.threadRow)
+        let threadsFilterChips = Self.threadsFilterChips(threads: threadRows)
         return AudienceProfileLoaded(
             header: header,
             updates: updates,
@@ -151,8 +172,21 @@ public final class AudienceProfileViewModel {
             tierChips: chips,
             followers: followers,
             threads: threadRows,
+            threadsFilterChips: threadsFilterChips,
             channelId: channelId
         )
+    }
+
+    static func threadsFilterChips(threads: [ThreadRowContent]) -> [ThreadsFilterChipContent] {
+        let total = threads.count
+        let unread = threads.filter { $0.unreadCount > 0 }.count
+        let bronzePlus = threads.filter { $0.tierRank >= 2 }.count
+        return [
+            ThreadsFilterChipContent(filter: .all, count: total),
+            ThreadsFilterChipContent(filter: .unread, count: unread),
+            ThreadsFilterChipContent(filter: .bronzePlus, count: bronzePlus),
+            ThreadsFilterChipContent(filter: .flagged, count: nil)
+        ]
     }
 
     private static func updateCard(_ dto: PersonaPostDTO) -> UpdateCardContent? {
@@ -244,9 +278,11 @@ public final class AudienceProfileViewModel {
             handle: handle.isEmpty ? "" : "@\(handle)",
             avatarUrl: dto.fanAvatarUrl,
             tierName: dto.tier?.name,
+            tierRank: dto.tier?.rank ?? 1,
             preview: dto.lastMessagePreview ?? "",
             timeAgo: timeAgo(from: dto.lastMessageAt),
-            unreadCount: dto.unreadCount ?? 0
+            unreadCount: dto.unreadCount ?? 0,
+            flagged: dto.flagged ?? false
         )
     }
 
