@@ -58,8 +58,8 @@ public final class RecentActivityViewModel: ListOfRowsDataSource {
 
     init(
         api: APIClient = .shared,
-        now: @escaping @Sendable () -> Date = { Date() },
-        onOpen: @escaping @MainActor (RecentActivityDestination) -> Void = { _ in }
+        onOpen: @escaping @MainActor (RecentActivityDestination) -> Void = { _ in },
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.api = api
         self.now = now
@@ -107,11 +107,10 @@ public final class RecentActivityViewModel: ListOfRowsDataSource {
         let rows = items.map { item in
             Self.row(
                 for: item,
-                now: now(),
-                onSelect: { [weak self] destination in
-                    Task { @MainActor in self?.onOpen(destination) }
-                }
-            )
+                now: now()
+            ) { [weak self] destination in
+                Task { @MainActor in self?.onOpen(destination) }
+            }
         }
         state = .loaded(sections: [RowSection(id: "all", rows: rows)], hasMore: false)
     }

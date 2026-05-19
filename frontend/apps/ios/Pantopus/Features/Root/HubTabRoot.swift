@@ -735,7 +735,7 @@ public struct HubTabRoot: View {
             ) { if !path.isEmpty { path.removeLast() } }
         case .recentActivity:
             RecentActivityView(
-                viewModel: RecentActivityViewModel(onOpen: { destination in
+                viewModel: RecentActivityViewModel { destination in
                     switch destination {
                     case let .gigDetail(id): push(.gigDetail(gigId: id))
                     case let .listingDetail(id): push(.listingDetail(listingId: id))
@@ -744,7 +744,7 @@ public struct HubTabRoot: View {
                     case let .homeDashboard(id): push(.homeDashboard(homeId: id))
                     case let .placeholder(label): push(.placeholder(label: label))
                     }
-                })
+                }
             )
         case .notifications:
             NotificationsView(

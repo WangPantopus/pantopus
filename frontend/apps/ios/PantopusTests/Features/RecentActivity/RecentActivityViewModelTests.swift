@@ -20,9 +20,9 @@ final class RecentActivityViewModelTests: XCTestCase {
         SequencedURLProtocol.reset()
     }
 
-    private func makeVM(onOpen: @escaping @MainActor (RecentActivityDestination) -> Void = { _ in })
-        -> RecentActivityViewModel
-    {
+    private func makeVM(
+        onOpen: @escaping @MainActor (RecentActivityDestination) -> Void = { _ in }
+    ) -> RecentActivityViewModel {
         let api = APIClient(
             environment: .current,
             session: SequencedURLProtocol.makeSession(),
@@ -158,7 +158,11 @@ final class RecentActivityViewModelTests: XCTestCase {
 
     func testDestinationFallsBackToPlaceholderForUnknownRoute() {
         let item = HubResponse.HubActivityItem(
-            id: "a1", pillar: "personal", title: "Notification", at: "", read: true,
+            id: "a1",
+            pillar: "personal",
+            title: "Notification",
+            at: "",
+            read: true,
             route: "/app/notifications"
         )
         XCTAssertEqual(
@@ -171,14 +175,17 @@ final class RecentActivityViewModelTests: XCTestCase {
 
     func testRowProjectionUsesGigIconForGigRoute() {
         let item = HubResponse.HubActivityItem(
-            id: "a1", pillar: "personal", title: "Task posted: Mow",
-            at: "2026-05-15T09:00:00Z", read: true, route: "/gigs/g_1"
+            id: "a1",
+            pillar: "personal",
+            title: "Task posted: Mow",
+            at: "2026-05-15T09:00:00Z",
+            read: true,
+            route: "/gigs/g_1"
         )
         let row = RecentActivityViewModel.row(
             for: item,
-            now: ISO8601DateFormatter().date(from: "2026-05-15T10:00:00Z") ?? Date(),
-            onSelect: { _ in }
-        )
+            now: ISO8601DateFormatter().date(from: "2026-05-15T10:00:00Z") ?? Date()
+        ) { _ in }
         XCTAssertEqual(row.title, "Task posted: Mow")
         // Read items have no highlight.
         XCTAssertNil(row.highlight)
@@ -186,14 +193,17 @@ final class RecentActivityViewModelTests: XCTestCase {
 
     func testRowProjectionMarksUnreadRows() {
         let item = HubResponse.HubActivityItem(
-            id: "a1", pillar: "personal", title: "Maria replied",
-            at: "2026-05-15T10:00:00Z", read: false, route: "/posts/p_1"
+            id: "a1",
+            pillar: "personal",
+            title: "Maria replied",
+            at: "2026-05-15T10:00:00Z",
+            read: false,
+            route: "/posts/p_1"
         )
         let row = RecentActivityViewModel.row(
             for: item,
-            now: ISO8601DateFormatter().date(from: "2026-05-15T10:30:00Z") ?? Date(),
-            onSelect: { _ in }
-        )
+            now: ISO8601DateFormatter().date(from: "2026-05-15T10:30:00Z") ?? Date()
+        ) { _ in }
         XCTAssertEqual(row.highlight, .unread)
     }
 }

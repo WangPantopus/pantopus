@@ -132,13 +132,13 @@ import app.pantopus.android.ui.screens.nearby.map.MapEntity
 import app.pantopus.android.ui.screens.nearby.map.MapEntityKind
 import app.pantopus.android.ui.screens.nearby.map.NearbyMapScreen
 import app.pantopus.android.ui.screens.notifications.NotificationsScreen
-import app.pantopus.android.ui.screens.recent_activity.RecentActivityDestination
-import app.pantopus.android.ui.screens.recent_activity.RecentActivityScreen
 import app.pantopus.android.ui.screens.offers.OffersScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
 import app.pantopus.android.ui.screens.profile.PublicProfileScreen
+import app.pantopus.android.ui.screens.recent_activity.RecentActivityDestination
+import app.pantopus.android.ui.screens.recent_activity.RecentActivityScreen
 import app.pantopus.android.ui.screens.review_claims.ReviewClaimDetailScreen
 import app.pantopus.android.ui.screens.review_claims.ReviewClaimsScreen
 import app.pantopus.android.ui.screens.review_signups.ReviewSignupsScreen
