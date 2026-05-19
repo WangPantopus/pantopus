@@ -17,7 +17,7 @@ public struct StartSupportTrainWizardView: View {
     private let onDismiss: @MainActor () -> Void
     private let onOpenTrain: @MainActor (String) -> Void
 
-    public init(
+    init(
         viewModel: StartSupportTrainWizardViewModel = StartSupportTrainWizardViewModel(),
         onDismiss: @escaping @MainActor () -> Void = {},
         onOpenTrain: @escaping @MainActor (String) -> Void = { _ in }

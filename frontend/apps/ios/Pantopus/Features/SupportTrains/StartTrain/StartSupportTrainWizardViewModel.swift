@@ -49,7 +49,7 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
     private var searchTask: Task<Void, Never>?
     private var isSubmittingFlag: Bool = false
 
-    public init(
+    init(
         api: APIClient = .shared,
         startDate: Date = Date(),
         endDate: Date = Date().addingTimeInterval(60 * 60 * 24 * 6)

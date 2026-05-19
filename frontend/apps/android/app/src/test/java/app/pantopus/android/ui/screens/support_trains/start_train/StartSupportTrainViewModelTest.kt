@@ -78,6 +78,7 @@ class StartSupportTrainViewModelTest {
 
     @Test fun filling_beneficiary_and_reason_enables_continue() =
         runTest(dispatcher) {
+            stubBeneficiarySearch()
             val vm = StartSupportTrainViewModel(supportTrains, mailCompose)
             vm.updateBeneficiaryQuery("Chen family")
             vm.updateReason("Welcoming a new baby — meals would be wonderful.")
@@ -171,6 +172,7 @@ class StartSupportTrainViewModelTest {
 
     @Test fun leading_back_returns_to_previous_step() =
         runTest(dispatcher) {
+            stubBeneficiarySearch()
             val vm = StartSupportTrainViewModel(supportTrains, mailCompose)
             vm.updateBeneficiaryQuery("Chen")
             vm.updateReason("Reason.")
