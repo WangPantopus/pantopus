@@ -239,6 +239,114 @@ public struct SupportTrainReservationDTO: Decodable, Sendable, Identifiable, Has
     }
 }
 
+// MARK: - Create / launch (P2.6 — Start-a-Support-Train wizard)
+
+/// `POST /api/support-trains/` body. The backend's
+/// `createSupportTrainSchema` accepts a free-form `draft_payload` JSONB
+/// blob for fields that aren't first-class columns (e.g. recipient
+/// profile context); we only ride the `story` slot so the reason copy
+/// survives the round-trip onto the published-train detail screen.
+public struct CreateSupportTrainBody: Encodable, Sendable {
+    public let draftPayload: DraftPayload
+    public let title: String
+    public let recipientUserId: String?
+    public let sharingMode: String
+    public let enableHomeCookedMeals: Bool
+    public let enableTakeout: Bool
+    public let enableGroceries: Bool
+    public let enableGiftFunds: Bool
+    public let timezone: String
+
+    public init(
+        draftPayload: DraftPayload,
+        title: String,
+        recipientUserId: String?,
+        sharingMode: String,
+        enableHomeCookedMeals: Bool = true,
+        enableTakeout: Bool = true,
+        enableGroceries: Bool = true,
+        enableGiftFunds: Bool = false,
+        timezone: String = TimeZone.current.identifier
+    ) {
+        self.draftPayload = draftPayload
+        self.title = title
+        self.recipientUserId = recipientUserId
+        self.sharingMode = sharingMode
+        self.enableHomeCookedMeals = enableHomeCookedMeals
+        self.enableTakeout = enableTakeout
+        self.enableGroceries = enableGroceries
+        self.enableGiftFunds = enableGiftFunds
+        self.timezone = timezone
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case draftPayload = "draft_payload"
+        case title
+        case recipientUserId = "recipient_user_id"
+        case sharingMode = "sharing_mode"
+        case enableHomeCookedMeals = "enable_home_cooked_meals"
+        case enableTakeout = "enable_takeout"
+        case enableGroceries = "enable_groceries"
+        case enableGiftFunds = "enable_gift_funds"
+        case timezone
+    }
+
+    public struct DraftPayload: Encodable, Sendable {
+        public let story: String?
+
+        public init(story: String?) {
+            self.story = story
+        }
+    }
+}
+
+/// `POST /api/support-trains/` response envelope. Only the `id`
+/// matters for the wizard launch flow — the host pushes the new
+/// train's review-signups screen immediately after publish.
+public struct CreateSupportTrainResponse: Decodable, Sendable {
+    public let id: String
+
+    public init(id: String) {
+        self.id = id
+    }
+}
+
+/// `POST /api/support-trains/:id/slots` body. Backend validation lives
+/// at `customSlotSchema` (`supportTrains.js:404`).
+public struct AddSupportTrainSlotBody: Encodable, Sendable {
+    public let slotDate: String
+    public let slotLabel: String
+    public let supportMode: String
+    public let startTime: String?
+    public let endTime: String?
+    public let capacity: Int
+
+    public init(
+        slotDate: String,
+        slotLabel: String,
+        supportMode: String,
+        startTime: String?,
+        endTime: String?,
+        capacity: Int = 1
+    ) {
+        self.slotDate = slotDate
+        self.slotLabel = slotLabel
+        self.supportMode = supportMode
+        self.startTime = startTime
+        self.endTime = endTime
+        self.capacity = capacity
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case slotDate = "slot_date"
+        case slotLabel = "slot_label"
+        case supportMode = "support_mode"
+        case startTime = "start_time"
+        case endTime = "end_time"
+        case capacity
+    }
+}
+
 public struct SupportTrainHelperDTO: Decodable, Sendable, Hashable {
     public let id: String
     public let username: String?

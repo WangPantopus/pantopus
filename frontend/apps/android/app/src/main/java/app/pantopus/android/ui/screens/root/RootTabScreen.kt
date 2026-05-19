@@ -158,6 +158,7 @@ import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
+import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.you.YouScreen
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -421,6 +422,10 @@ private object ChildRoutes {
 
     /** T6.6c (P26.5) Support Trains list. */
     const val SUPPORT_TRAINS = "support-trains"
+
+    /** P2.6 — Start-a-Support-Train wizard. Pushed by the Support
+     *  Trains FAB / empty-state CTA. */
+    const val START_SUPPORT_TRAIN = "support-trains/start"
 
     /** T6.6c (P26.5) Review signups (organizer-only). `:id` is the
      *  Support Train UUID. Keep in sync with
@@ -1922,10 +1927,23 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.reviewSignups(trainId))
                     },
                     onStartTrain = {
-                        navController.navigate(ChildRoutes.placeholder("Start a support train"))
+                        navController.navigate(ChildRoutes.START_SUPPORT_TRAIN)
                     },
                     onSearch = {
                         navController.navigate(ChildRoutes.placeholder("Search support trains"))
+                    },
+                )
+            }
+            composable(ChildRoutes.START_SUPPORT_TRAIN) {
+                StartSupportTrainWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenTrain = { trainId ->
+                        // Pop the wizard then push the new train's
+                        // review-signups screen so Back goes back to
+                        // the Support Trains list rather than the
+                        // wizard.
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.reviewSignups(trainId))
                     },
                 )
             }
