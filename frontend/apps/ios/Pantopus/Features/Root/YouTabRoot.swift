@@ -115,6 +115,15 @@ public enum YouRoute: Hashable {
     /// T6.3b / P10 — Maintenance. The home-context "me.maintenance"
     /// action tile pushes here.
     case homeMaintenance(homeId: String)
+    /// P2.9 — Log a maintenance entry. Pushed from the Maintenance list
+    /// FAB; on success the host pops back and refreshes the list.
+    case logMaintenance(homeId: String)
+    /// P2.9 — Maintenance detail for a specific task. Pushed from a
+    /// per-row tap on the Maintenance list.
+    case maintenanceDetail(homeId: String, taskId: String)
+    /// P2.9 — Edit an existing maintenance entry. Re-uses the
+    /// `LogMaintenanceFormView` shell in edit mode.
+    case editMaintenance(homeId: String, taskId: String)
     /// P15 / T6.3g — Owners (legal-title roster). The "me.owners"
     /// Household-section row pushes here with the primary home id
     /// resolved by `MeViewModel.homeSections(...)`.
@@ -1152,13 +1161,50 @@ public struct YouTabRoot: View {
             MaintenanceListView(
                 viewModel: MaintenanceListViewModel(
                     homeId: homeId,
-                    onOpenTask: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Maintenance detail")) }
+                    onOpenTask: { taskId in
+                        Task { @MainActor in
+                            path.append(.maintenanceDetail(homeId: homeId, taskId: taskId))
+                        }
                     },
                     onAddTask: {
-                        Task { @MainActor in path.append(.placeholder(label: "Log maintenance")) }
+                        Task { @MainActor in path.append(.logMaintenance(homeId: homeId)) }
                     }
                 )
+            )
+        case let .logMaintenance(homeId):
+            LogMaintenanceFormView(
+                viewModel: LogMaintenanceFormViewModel(homeId: homeId),
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onSubmitted: { taskId in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        path.append(.maintenanceDetail(homeId: homeId, taskId: taskId))
+                    }
+                }
+            )
+        case let .maintenanceDetail(homeId, taskId):
+            MaintenanceDetailView(
+                homeId: homeId,
+                taskId: taskId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onEdit: {
+                    Task { @MainActor in
+                        path.append(.editMaintenance(homeId: homeId, taskId: taskId))
+                    }
+                }
+            )
+        case let .editMaintenance(homeId, taskId):
+            LogMaintenanceFormView(
+                viewModel: LogMaintenanceFormViewModel(
+                    homeId: homeId,
+                    mode: .edit(taskId: taskId)
+                ),
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onSubmitted: { _ in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
             )
         case let .homeOwners(homeId):
             let currentUserId: String? = {

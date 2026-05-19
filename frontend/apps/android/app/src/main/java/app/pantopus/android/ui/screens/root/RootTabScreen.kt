@@ -78,7 +78,13 @@ import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.homes.maintenance.LOG_MAINTENANCE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.maintenance.LOG_MAINTENANCE_TASK_ID_KEY
+import app.pantopus.android.ui.screens.homes.maintenance.LogMaintenanceFormScreen
+import app.pantopus.android.ui.screens.homes.maintenance.MAINTENANCE_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.maintenance.MAINTENANCE_DETAIL_TASK_ID_KEY
 import app.pantopus.android.ui.screens.homes.maintenance.MAINTENANCE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.maintenance.MaintenanceDetailScreen
 import app.pantopus.android.ui.screens.homes.maintenance.MaintenanceListScreen
 import app.pantopus.android.ui.screens.homes.members.MEMBERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.members.MembersListScreen
@@ -275,6 +281,32 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home maintenance list. */
     fun homeMaintenance(homeId: String): String = "homes/$homeId/maintenance"
+
+    /** P2.9 — Log a new maintenance entry. */
+    const val LOG_MAINTENANCE = "homes/{$LOG_MAINTENANCE_HOME_ID_KEY}/maintenance/new"
+
+    /** Build the concrete path for the log-maintenance form. */
+    fun logMaintenance(homeId: String): String = "homes/$homeId/maintenance/new"
+
+    /** P2.9 — Edit an existing maintenance entry. */
+    const val EDIT_MAINTENANCE =
+        "homes/{$LOG_MAINTENANCE_HOME_ID_KEY}/maintenance/{$LOG_MAINTENANCE_TASK_ID_KEY}/edit"
+
+    /** Build the concrete path for the edit-maintenance form. */
+    fun editMaintenance(
+        homeId: String,
+        taskId: String,
+    ): String = "homes/$homeId/maintenance/$taskId/edit"
+
+    /** P2.9 — Maintenance detail surface. */
+    const val MAINTENANCE_DETAIL =
+        "homes/{$MAINTENANCE_DETAIL_HOME_ID_KEY}/maintenance/{$MAINTENANCE_DETAIL_TASK_ID_KEY}"
+
+    /** Build the concrete path for the maintenance detail screen. */
+    fun maintenanceDetail(
+        homeId: String,
+        taskId: String,
+    ): String = "homes/$homeId/maintenance/$taskId"
 
     /** Owners list per home (P15 / T6.3g). The Owners VM pulls the
      *  viewer's id from [AuthRepository] internally, so no extra arg
@@ -1147,15 +1179,64 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(
                 route = ChildRoutes.HOME_MAINTENANCE,
                 arguments = listOf(navArgument(MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
+            ) { entry ->
+                val homeId =
+                    entry.arguments?.getString(MAINTENANCE_HOME_ID_KEY) ?: ""
                 MaintenanceListScreen(
-                    onOpenTask = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Maintenance detail"))
+                    onOpenTask = { taskId ->
+                        navController.navigate(ChildRoutes.maintenanceDetail(homeId, taskId))
                     },
                     onAddTask = {
-                        navController.navigate(ChildRoutes.placeholder("Log maintenance"))
+                        navController.navigate(ChildRoutes.logMaintenance(homeId))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.LOG_MAINTENANCE,
+                arguments = listOf(navArgument(LOG_MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val homeId =
+                    entry.arguments?.getString(LOG_MAINTENANCE_HOME_ID_KEY) ?: ""
+                LogMaintenanceFormScreen(
+                    onClose = { navController.popBackStack() },
+                    onSubmitted = { taskId ->
+                        navController.popBackStack(
+                            ChildRoutes.homeMaintenance(homeId),
+                            inclusive = false,
+                        )
+                        navController.navigate(ChildRoutes.maintenanceDetail(homeId, taskId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_MAINTENANCE,
+                arguments =
+                    listOf(
+                        navArgument(LOG_MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(LOG_MAINTENANCE_TASK_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                LogMaintenanceFormScreen(
+                    onClose = { navController.popBackStack() },
+                    onSubmitted = { _ -> navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.MAINTENANCE_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(MAINTENANCE_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(MAINTENANCE_DETAIL_TASK_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(MAINTENANCE_DETAIL_HOME_ID_KEY) ?: ""
+                val taskId = entry.arguments?.getString(MAINTENANCE_DETAIL_TASK_ID_KEY) ?: ""
+                MaintenanceDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onEdit = {
+                        navController.navigate(ChildRoutes.editMaintenance(homeId, taskId))
+                    },
                 )
             }
             composable(

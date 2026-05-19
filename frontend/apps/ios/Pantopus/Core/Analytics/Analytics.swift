@@ -32,6 +32,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenAddBillWizardStepViewed(stepNumber: Int, stepName: String)
     case ctaAddBillSubmit(result: AnalyticsResult)
     case screenHomeMaintenanceViewed
+    case screenLogMaintenanceViewed
+    case screenMaintenanceDetailViewed
+    case ctaLogMaintenanceSubmit(result: AnalyticsResult)
+    case ctaMaintenanceDelete(result: AnalyticsResult)
     case screenPetsListViewed
     case screenPetsWizardStepViewed(stepNumber: Int, stepName: String)
     case screenHomeCalendarViewed
@@ -79,6 +83,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenAddBillWizardStepViewed: "screen.add_bill_wizard.step_viewed"
         case .ctaAddBillSubmit: "cta.add_bill.submit"
         case .screenHomeMaintenanceViewed: "screen.home_maintenance.viewed"
+        case .screenLogMaintenanceViewed: "screen.log_maintenance.viewed"
+        case .screenMaintenanceDetailViewed: "screen.maintenance_detail.viewed"
+        case .ctaLogMaintenanceSubmit: "cta.log_maintenance.submit"
+        case .ctaMaintenanceDelete: "cta.maintenance.delete"
         case .screenPetsListViewed: "screen.pets_list.viewed"
         case .screenPetsWizardStepViewed: "screen.pets_wizard.step_viewed"
         case .screenHomeCalendarViewed: "screen.home_calendar.viewed"
@@ -139,6 +147,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["result": result.rawValue]
         case let .ctaLogPackageSubmit(result):
             ["result": result.rawValue]
+        case let .ctaLogMaintenanceSubmit(result):
+            ["result": result.rawValue]
+        case let .ctaMaintenanceDelete(result):
+            ["result": result.rawValue]
         case let .ctaPollVoteSubmit(result):
             ["result": result.rawValue]
         case .screenHubViewed,
@@ -150,6 +162,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenBillsViewed,
              .screenBillDetailViewed,
              .screenHomeMaintenanceViewed,
+             .screenLogMaintenanceViewed,
+             .screenMaintenanceDetailViewed,
              .screenPetsListViewed,
              .screenHomeCalendarViewed,
              .screenPackagesViewed,
