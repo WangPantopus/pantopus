@@ -90,6 +90,54 @@ fun LogMaintenanceFormScreen(
     val form by viewModel.form.collectAsStateWithLifecycle()
     val isDirty by viewModel.isDirty.collectAsStateWithLifecycle()
     val event by viewModel.event.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Picker launchers live on the screen (not the content composable)
+    // so the content can be exercised under Paparazzi — which does not
+    // provide an `ActivityResultRegistryOwner`.
+    val photoPicker =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickVisualMedia(),
+        ) { uri: Uri? ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            scope.launch {
+                val resolver = context.contentResolver
+                val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+                if (bytes != null) {
+                    viewModel.addPhoto(
+                        MaintenanceDraftFile(
+                            id = UUID.randomUUID().toString(),
+                            filename = "photo-${UUID.randomUUID().toString().take(6)}.jpg",
+                            mimeType = "image/jpeg",
+                            bytes = bytes,
+                        ),
+                    )
+                }
+            }
+        }
+
+    val receiptPicker =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri: Uri? ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            scope.launch {
+                val resolver = context.contentResolver
+                val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+                val name = uri.lastPathSegment?.substringAfterLast('/') ?: "receipt"
+                val mime = resolver.getType(uri) ?: "application/octet-stream"
+                if (bytes != null) {
+                    viewModel.pickReceipt(
+                        MaintenanceDraftFile(
+                            filename = name,
+                            mimeType = mime,
+                            bytes = bytes,
+                        ),
+                    )
+                }
+            }
+        }
 
     LaunchedEffect(Unit) {
         Analytics.track(AnalyticsEvent.ScreenLogMaintenanceViewed)
@@ -132,9 +180,18 @@ fun LogMaintenanceFormScreen(
                 onToggleNextDue = viewModel::toggleNextDue,
                 onUpdateNextDueDate = viewModel::updateNextDueDate,
                 onUpdateRecurrence = viewModel::updateRecurrence,
-                onAddPhoto = viewModel::addPhoto,
                 onRemovePhoto = viewModel::removePhoto,
-                onPickReceipt = viewModel::pickReceipt,
+                onClearReceipt = { viewModel.pickReceipt(null) },
+                onLaunchPhotoPicker = {
+                    photoPicker.launch(
+                        PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly,
+                        ),
+                    )
+                },
+                onLaunchReceiptPicker = {
+                    receiptPicker.launch(arrayOf("image/*", "application/pdf"))
+                },
                 onSubmit = viewModel::submit,
                 onCancel = viewModel::cancel,
             ),
@@ -145,7 +202,10 @@ fun LogMaintenanceFormScreen(
  * Bundle of [LogMaintenanceFormContent] callbacks. Grouped into one
  * type so the composable stays under detekt's `LongParameterList`
  * threshold and so call sites (real screen + Paparazzi tests) read
- * straight down.
+ * straight down. The activity-result launchers (`onLaunchPhotoPicker`
+ * / `onLaunchReceiptPicker`) live on the parent screen so the content
+ * can be rendered in a Paparazzi host that has no
+ * `ActivityResultRegistryOwner`.
  */
 internal data class LogMaintenanceFormCallbacks(
     val onUpdateCategory: (MaintenanceCategory) -> Unit = {},
@@ -159,9 +219,10 @@ internal data class LogMaintenanceFormCallbacks(
     val onToggleNextDue: (Boolean) -> Unit = {},
     val onUpdateNextDueDate: (Instant) -> Unit = {},
     val onUpdateRecurrence: (MaintenanceRecurrence) -> Unit = {},
-    val onAddPhoto: (MaintenanceDraftFile) -> Unit = {},
     val onRemovePhoto: (String) -> Unit = {},
-    val onPickReceipt: (MaintenanceDraftFile?) -> Unit = {},
+    val onClearReceipt: () -> Unit = {},
+    val onLaunchPhotoPicker: () -> Unit = {},
+    val onLaunchReceiptPicker: () -> Unit = {},
     val onSubmit: () -> Unit = {},
     val onCancel: () -> Unit = {},
 )
@@ -174,52 +235,6 @@ internal fun LogMaintenanceFormContent(
     submitLabel: String,
     callbacks: LogMaintenanceFormCallbacks,
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    val photoPicker =
-        rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.PickVisualMedia(),
-        ) { uri: Uri? ->
-            if (uri == null) return@rememberLauncherForActivityResult
-            scope.launch {
-                val resolver = context.contentResolver
-                val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
-                if (bytes != null) {
-                    callbacks.onAddPhoto(
-                        MaintenanceDraftFile(
-                            id = UUID.randomUUID().toString(),
-                            filename = "photo-${UUID.randomUUID().toString().take(6)}.jpg",
-                            mimeType = "image/jpeg",
-                            bytes = bytes,
-                        ),
-                    )
-                }
-            }
-        }
-
-    val receiptPicker =
-        rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.OpenDocument(),
-        ) { uri: Uri? ->
-            if (uri == null) return@rememberLauncherForActivityResult
-            scope.launch {
-                val resolver = context.contentResolver
-                val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
-                val name = uri.lastPathSegment?.substringAfterLast('/') ?: "receipt"
-                val mime = resolver.getType(uri) ?: "application/octet-stream"
-                if (bytes != null) {
-                    callbacks.onPickReceipt(
-                        MaintenanceDraftFile(
-                            filename = name,
-                            mimeType = mime,
-                            bytes = bytes,
-                        ),
-                    )
-                }
-            }
-        }
-
     Column(
         modifier =
             Modifier
@@ -376,13 +391,7 @@ internal fun LogMaintenanceFormContent(
                 Spacer(modifier = Modifier.height(Spacing.s2))
                 PhotoGrid(
                     slots = form.photoSlots(),
-                    onPick = {
-                        photoPicker.launch(
-                            PickVisualMediaRequest(
-                                ActivityResultContracts.PickVisualMedia.ImageOnly,
-                            ),
-                        )
-                    },
+                    onPick = callbacks.onLaunchPhotoPicker,
                     onRemove = callbacks.onRemovePhoto,
                 )
             }
@@ -390,8 +399,8 @@ internal fun LogMaintenanceFormContent(
             FieldGroup("RECEIPT") {
                 ReceiptBlock(
                     file = form.receipt,
-                    onPick = { receiptPicker.launch(arrayOf("image/*", "application/pdf")) },
-                    onRemove = { callbacks.onPickReceipt(null) },
+                    onPick = callbacks.onLaunchReceiptPicker,
+                    onRemove = callbacks.onClearReceipt,
                 )
             }
 
@@ -689,7 +698,9 @@ private fun DatePickerRow(
     testTag: String,
 ) {
     val context = LocalContext.current
-    val local = remember(value) { LocalDate.ofInstant(value, ZoneId.of("UTC")) }
+    // `LocalDate.ofInstant` is API 34+; the equivalent atZone + toLocalDate
+    // works on the minSdk 26 baseline without core-library desugaring.
+    val local = remember(value) { value.atZone(ZoneId.of("UTC")).toLocalDate() }
     val display =
         remember(local) {
             "${local.month.name.lowercase().replaceFirstChar { it.titlecase() }} ${local.dayOfMonth}, ${local.year}"

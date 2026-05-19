@@ -598,7 +598,9 @@ private fun formatDueDateForDetail(iso: String?): String? {
     // `parseDate` already guards every parser failure with `runCatching`
     // and falls back to `Instant.now()`, so the chain below cannot throw.
     val instant = LogMaintenanceFormViewModel.parseDate(iso)
-    val local = java.time.LocalDate.ofInstant(instant, java.time.ZoneId.of("UTC"))
+    // `LocalDate.ofInstant` is API 34+; using atZone + toLocalDate keeps
+    // this method usable on the minSdk 26 baseline.
+    val local = instant.atZone(java.time.ZoneId.of("UTC")).toLocalDate()
     val month = local.month.name.lowercase().replaceFirstChar { it.titlecase() }
     return "$month ${local.dayOfMonth}"
 }
