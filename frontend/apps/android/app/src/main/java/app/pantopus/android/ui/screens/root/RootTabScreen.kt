@@ -39,6 +39,7 @@ import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
+import app.pantopus.android.ui.screens.compose.pulse.PulseComposeScreen
 import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
 import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
@@ -1517,13 +1518,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             defaultValue = PulseIntent.All.key
                         },
                     ),
-            ) { entry ->
-                val raw = entry.arguments?.getString(ChildRoutes.COMPOSE_INTENT_KEY) ?: PulseIntent.All.key
-                val intent = PulseIntent.fromKey(raw)
-                NotYetAvailableView(
-                    tabName = "Compose · ${intent.label}",
-                    icon = PantopusIcon.Pencil,
-                )
+            ) {
+                PulseComposeScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.NOTIFICATIONS) {
                 NotificationsScreen(onBack = { navController.popBackStack() })

@@ -59,6 +59,14 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case ctaClaimOwnershipSubmit(result: AnalyticsResult)
     case formEditProfileSubmit(result: AnalyticsResult)
     case formEditProfileValidationError(field: String)
+    /// P2.1 — Pulse compose form submitted. `intent` is one of
+    /// `ask / recommend / event / lost / announce`.
+    case formPulseComposeSubmit(intent: String, result: AnalyticsResult)
+    /// P2.1 — Pulse compose validation failure. `intent` matches the
+    /// form's active variant; `field` is the failing field's id.
+    case formPulseComposeValidationError(intent: String, field: String)
+    /// P2.1 — Pulse compose screen viewed.
+    case screenPulseComposeViewed(intent: String)
 
     /// Wire-format event name. Stable across versions — vendor / dashboard
     /// owners depend on these strings.
@@ -104,6 +112,9 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .ctaClaimOwnershipSubmit: "cta.claim_ownership.submit"
         case .formEditProfileSubmit: "form.edit_profile.submit"
         case .formEditProfileValidationError: "form.edit_profile.validation_error"
+        case .formPulseComposeSubmit: "form.pulse_compose.submit"
+        case .formPulseComposeValidationError: "form.pulse_compose.validation_error"
+        case .screenPulseComposeViewed: "screen.pulse_compose.viewed"
         }
     }
 
@@ -133,6 +144,12 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["result": result.rawValue]
         case let .formEditProfileValidationError(field):
             ["field": field]
+        case let .formPulseComposeSubmit(intent, result):
+            ["intent": intent, "result": result.rawValue]
+        case let .formPulseComposeValidationError(intent, field):
+            ["intent": intent, "field": field]
+        case let .screenPulseComposeViewed(intent):
+            ["intent": intent]
         case let .screenAddBillWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .ctaAddBillSubmit(result):

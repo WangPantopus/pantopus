@@ -166,6 +166,29 @@ sealed class AnalyticsEvent(
     ) : AnalyticsEvent("form.edit_profile.validation_error") {
         override val properties = mapOf("field" to field)
     }
+
+    /** P2.1 — Pulse compose screen viewed. */
+    data class ScreenPulseComposeViewed(
+        val intent: String,
+    ) : AnalyticsEvent("screen.pulse_compose.viewed") {
+        override val properties = mapOf("intent" to intent)
+    }
+
+    /** P2.1 — Pulse compose form submitted. */
+    data class FormPulseComposeSubmit(
+        val intent: String,
+        val result: AnalyticsResult,
+    ) : AnalyticsEvent("form.pulse_compose.submit") {
+        override val properties = mapOf("intent" to intent, "result" to result.value)
+    }
+
+    /** P2.1 — Pulse compose validation failed before submit. */
+    data class FormPulseComposeValidationError(
+        val intent: String,
+        val field: String,
+    ) : AnalyticsEvent("form.pulse_compose.validation_error") {
+        override val properties = mapOf("intent" to intent, "field" to field)
+    }
 }
 
 /** Standard outcomes for form submissions and other yes/no telemetry. */
