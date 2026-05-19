@@ -1026,9 +1026,10 @@ private struct BusinessProfileDestination: View {
             onBack: onBack,
             onOpenMessages: onOpenMessages,
             onShare: onShare,
-            onOpenReport: onOpenReport,
-            onOpenWebsite: { url in openURL(url) }
-        )
+            onOpenReport: onOpenReport
+        ) { url in
+            openURL(url)
+        }
     }
 }
 

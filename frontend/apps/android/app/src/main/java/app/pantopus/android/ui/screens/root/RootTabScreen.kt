@@ -295,7 +295,9 @@ private object ChildRoutes {
 
     /** Build the concrete path for a Business Profile. */
     fun businessProfile(businessId: String): String = "businesses/$businessId"
+
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
+
     const val INVITE_OWNER =
         "homes/{$INVITE_OWNER_HOME_ID_KEY}/invite?email={$INVITE_OWNER_CURRENT_EMAIL_KEY}"
     const val DISAMBIGUATE_MAIL = "mailbox/disambiguate/{$DISAMBIGUATE_MAIL_ID_KEY}"

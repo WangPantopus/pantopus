@@ -44,7 +44,7 @@ public final class BusinessProfileViewModel {
     private let client: APIClient
     private let logger = Logger(label: "app.pantopus.ios.BusinessProfile")
 
-    public init(businessId: String, client: APIClient = .shared) {
+    init(businessId: String, client: APIClient = .shared) {
         self.businessId = businessId
         self.client = client
     }
@@ -129,9 +129,20 @@ public final class BusinessProfileViewModel {
         }
     }
 
-    // MARK: - Projection
+    fileprivate func friendlyMessage(for error: APIError) -> String {
+        switch error {
+        case .notFound: "We couldn't find this business."
+        case .forbidden: "This business profile is private."
+        case .transport: "Check your connection and try again."
+        default: "Something went wrong. Try again."
+        }
+    }
+}
 
-    private func build(
+// MARK: - Projection
+
+extension BusinessProfileViewModel {
+    fileprivate func build(
         from detail: BusinessDetailResponse,
         publicResponse: BusinessPublicResponse?,
         reviewsResponse: PublicProfile?
@@ -139,13 +150,21 @@ public final class BusinessProfileViewModel {
         let business = detail.business
         let profile = detail.profile
         let primaryLocation = profile?.primaryLocation
-            ?? detail.locations.first(where: { $0.isPrimary == true })
+            ?? detail.locations.first { $0.isPrimary == true }
             ?? detail.locations.first
 
+        let resolvedDisplayName: String = {
+            if let name = business.name, !name.isEmpty {
+                return name
+            }
+            if let username = business.username {
+                return "@\(username)"
+            }
+            return "Business"
+        }()
+
         let header = BusinessProfileHeader(
-            displayName: business.name?.isEmpty == false
-                ? business.name!
-                : (business.username.map { "@\($0)" } ?? "Business"),
+            displayName: resolvedDisplayName,
             handle: business.username,
             locality: localityString(business: business, location: primaryLocation),
             logoURL: business.profilePictureURL.flatMap(URL.init(string:)),
@@ -399,14 +418,5 @@ public final class BusinessProfileViewModel {
     private func prettyHost(for raw: String) -> String? {
         guard let url = normalizedWebsite(raw) else { return raw }
         return url.host?.replacingOccurrences(of: "www.", with: "")
-    }
-
-    private func friendlyMessage(for error: APIError) -> String {
-        switch error {
-        case .notFound: "We couldn't find this business."
-        case .forbidden: "This business profile is private."
-        case .transport: "Check your connection and try again."
-        default: "Something went wrong. Try again."
-        }
     }
 }

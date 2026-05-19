@@ -1177,10 +1177,9 @@ public struct YouTabRoot: View {
                 userId: userId
             ) { if !path.isEmpty { path.removeLast() } }
         case let .businessProfile(businessId):
-            BusinessProfileView(
-                businessId: businessId,
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+            BusinessProfileView(businessId: businessId) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case let .pulsePost(postId):
             PulsePostDetailView(
                 postId: postId,

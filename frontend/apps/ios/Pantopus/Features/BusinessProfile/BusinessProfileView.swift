@@ -8,7 +8,7 @@
 //  `.business`, the three-tab body (Overview / Services / Reviews),
 //  and a sticky Message + Save + Visit footer.
 //
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length
 
 import SwiftUI
 
@@ -94,10 +94,7 @@ public struct BusinessProfileView: View {
                 accessibilityLabel: "More actions"
             ) { Task { @MainActor in viewModel.showOverflow = true } },
             header: {
-                BusinessProfileHero(
-                    header: payload.header,
-                    onShare: { onShare() }
-                )
+                BusinessProfileHero(header: payload.header) { onShare() }
             },
             body: {
                 BusinessProfileBody(
@@ -105,9 +102,8 @@ public struct BusinessProfileView: View {
                     selectedTab: Binding(
                         get: { viewModel.selectedTab },
                         set: { viewModel.selectedTab = $0 }
-                    ),
-                    onOpenWebsite: { onOpenWebsite($0) }
-                )
+                    )
+                ) { onOpenWebsite($0) }
             },
             cta: {
                 BusinessProfileActionFooter(
@@ -138,7 +134,9 @@ private struct BusinessProfileHero: View {
                     .frame(height: 132)
                     .accessibilityHidden(true)
 
-                Button(action: { onShare() }) {
+                Button {
+                    onShare()
+                } label: {
                     Icon(.share, size: 18, color: Theme.Color.appText)
                         .frame(width: 44, height: 44)
                         .background(Theme.Color.appSurface.opacity(0.92))
@@ -349,7 +347,7 @@ private struct BusinessProfileBody: View {
                 BusinessSection(title: "Contact") {
                     VStack(spacing: 0) {
                         ForEach(Array(content.contact.enumerated()), id: \.element.id) { idx, row in
-                            ContactRowView(row: row, onTap: { url in onOpenWebsite(url) })
+                            ContactRowView(row: row) { url in onOpenWebsite(url) }
                             if idx != content.contact.count - 1 {
                                 Divider().padding(.leading, Spacing.s10)
                             }
@@ -425,9 +423,9 @@ private struct BusinessProfileBody: View {
 // MARK: - Sub-views
 
 @MainActor
-private struct BusinessSection<Body: View>: View {
+private struct BusinessSection<Content: View>: View {
     let title: String
-    @ViewBuilder let body: () -> Body
+    @ViewBuilder let content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
@@ -436,7 +434,7 @@ private struct BusinessSection<Body: View>: View {
                 .tracking(0.6)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .accessibilityAddTraits(.isHeader)
-            body()
+            content()
         }
     }
 }
@@ -657,7 +655,9 @@ private struct BusinessProfileActionFooter: View {
 
     var body: some View {
         HStack(spacing: Spacing.s2) {
-            Button(action: { onMessage() }) {
+            Button {
+                onMessage()
+            } label: {
                 HStack(spacing: Spacing.s1) {
                     Icon(.messageCircle, size: 16, color: Theme.Color.appTextInverse)
                     Text("Message")
@@ -672,7 +672,9 @@ private struct BusinessProfileActionFooter: View {
             .accessibilityLabel("Message")
             .accessibilityIdentifier("businessProfile.message")
 
-            Button(action: { onSave() }) {
+            Button {
+                onSave()
+            } label: {
                 HStack(spacing: Spacing.s1) {
                     Icon(
                         saveState == .saved ? .checkCircle : .bookmark,
@@ -696,7 +698,9 @@ private struct BusinessProfileActionFooter: View {
             .accessibilityIdentifier("businessProfile.save")
 
             if let websiteURL {
-                Button(action: { onVisit(websiteURL) }) {
+                Button {
+                    onVisit(websiteURL)
+                } label: {
                     HStack(spacing: Spacing.s1) {
                         Icon(.link, size: 16, color: Theme.Color.business)
                         Text("Visit")

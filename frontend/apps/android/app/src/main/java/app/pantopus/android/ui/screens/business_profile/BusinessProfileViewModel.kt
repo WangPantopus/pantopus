@@ -410,8 +410,9 @@ class BusinessProfileViewModel
                 seconds < 3_600 -> "${seconds / 60}m ago"
                 seconds < 86_400 -> "${seconds / 3_600}h ago"
                 seconds < 604_800 -> "${seconds / 86_400}d ago"
-                else -> instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-                    .format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
+                else ->
+                    instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                        .format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
             }
         }
 

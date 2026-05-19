@@ -21,8 +21,7 @@ open class BusinessesRepository
         open suspend fun myBusinesses(): NetworkResult<MyBusinessesResponse> = safeApiCall { api.myBusinesses() }
 
         /** P1.6 — backs the Business Profile detail fetch. */
-        open suspend fun business(businessId: String): NetworkResult<BusinessDetailResponse> =
-            safeApiCall { api.business(businessId) }
+        open suspend fun business(businessId: String): NetworkResult<BusinessDetailResponse> = safeApiCall { api.business(businessId) }
 
         /** P1.6 — best-effort public payload used to fold hours + catalog
          *  into the Business Profile screen. Callers expect this to
