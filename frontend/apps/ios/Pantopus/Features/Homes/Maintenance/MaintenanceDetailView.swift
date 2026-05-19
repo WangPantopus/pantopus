@@ -551,6 +551,6 @@ private struct DetailActions: View {
         homeId: "preview",
         taskId: "preview-task",
         onBack: {},
-        onEdit: { _ in }
+        onEdit: {}
     )
 }

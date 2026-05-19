@@ -146,62 +146,79 @@ final class LogMaintenanceFormViewModel {
         self.draftStore = draftStore
         self.now = now
 
-        // Pre-fill from an existing DTO (edit mode) or use sensible defaults.
-        let baseNow = now()
+        // Compute the initial pose into a Snapshot first so the
+        // stored-property assignments below can read from it without
+        // tripping Swift's "self used before all stored properties
+        // initialized" diagnostic.
+        let snapshot = Self.makeInitialSnapshot(
+            mode: mode,
+            existing: existing,
+            draftStore: draftStore,
+            baseNow: now()
+        )
+        category = snapshot.category
+        title = snapshot.title
+        dateCompleted = snapshot.dateCompleted
+        performedBy = snapshot.performedBy
+        performerName = snapshot.performerName
+        performerContact = snapshot.performerContact
+        costText = snapshot.costText
+        notes = snapshot.notes
+        photos = snapshot.photos
+        receipt = snapshot.receipt
+        nextDueEnabled = snapshot.nextDueEnabled
+        nextDueDate = snapshot.nextDueDate
+        recurrence = snapshot.recurrence
+        initial = snapshot
+    }
+
+    private static func makeInitialSnapshot(
+        mode: LogMaintenanceFormMode,
+        existing: MaintenanceTaskDTO?,
+        draftStore: MaintenanceDraftStore,
+        baseNow: Date
+    ) -> Snapshot {
         let nextWeek = baseNow.addingTimeInterval(30 * 24 * 60 * 60)
         if case let .edit(taskId) = mode {
             let dto = existing
             let stored = draftStore.draft(for: taskId)
             let inferredCategory = MaintenanceCategory.from(task: dto?.task)
-            category = stored?.category ?? inferredCategory
-            title = dto?.task ?? ""
-            dateCompleted = Self.parsePerformedDate(dto: dto) ?? baseNow
-            performedBy = stored?.performedBy ?? Self.inferPerformedBy(vendor: dto?.vendor)
-            performerName = stored?.performerName ?? (dto?.vendor ?? "")
-            performerContact = stored?.performerContact ?? ""
-            costText = Self.format(cost: dto?.cost)
-            notes = stored?.notes ?? ""
-            photos = stored?.photos ?? []
-            receipt = stored?.receipt
-            recurrence = MaintenanceRecurrence(raw: dto?.recurrence) ?? .none
-            if let dueIso = dto?.dueDate, let parsed = MaintenanceListViewModel.parseDate(dueIso) {
-                nextDueEnabled = true
-                nextDueDate = parsed
-            } else {
-                nextDueEnabled = false
-                nextDueDate = nextWeek
-            }
+            let dueParsed: Date? = {
+                guard let dueIso = dto?.dueDate else { return nil }
+                return MaintenanceListViewModel.parseDate(dueIso)
+            }()
+            return Snapshot(
+                category: stored?.category ?? inferredCategory,
+                title: dto?.task ?? "",
+                dateCompleted: Self.parsePerformedDate(dto: dto) ?? baseNow,
+                performedBy: stored?.performedBy ?? Self.inferPerformedBy(vendor: dto?.vendor),
+                performerName: stored?.performerName ?? (dto?.vendor ?? ""),
+                performerContact: stored?.performerContact ?? "",
+                costText: Self.format(cost: dto?.cost),
+                notes: stored?.notes ?? "",
+                photos: stored?.photos ?? [],
+                receipt: stored?.receipt,
+                nextDueEnabled: dueParsed != nil,
+                nextDueDate: dueParsed ?? nextWeek,
+                recurrence: MaintenanceRecurrence(raw: dto?.recurrence) ?? .none
+            )
         } else {
-            category = .generic
-            title = ""
-            dateCompleted = baseNow
-            performedBy = .self
-            performerName = ""
-            performerContact = ""
-            costText = ""
-            notes = ""
-            photos = []
-            receipt = nil
-            nextDueEnabled = false
-            nextDueDate = nextWeek
-            recurrence = .none
+            return Snapshot(
+                category: .generic,
+                title: "",
+                dateCompleted: baseNow,
+                performedBy: .self,
+                performerName: "",
+                performerContact: "",
+                costText: "",
+                notes: "",
+                photos: [],
+                receipt: nil,
+                nextDueEnabled: false,
+                nextDueDate: nextWeek,
+                recurrence: .none
+            )
         }
-
-        initial = Snapshot(
-            category: category,
-            title: title,
-            dateCompleted: dateCompleted,
-            performedBy: performedBy,
-            performerName: performerName,
-            performerContact: performerContact,
-            costText: costText,
-            notes: notes,
-            photos: photos,
-            receipt: receipt,
-            nextDueEnabled: nextDueEnabled,
-            nextDueDate: nextDueDate,
-            recurrence: recurrence
-        )
     }
 
     // MARK: - Async load (edit mode)

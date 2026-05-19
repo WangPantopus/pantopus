@@ -17,7 +17,7 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-public struct LogMaintenanceFormView: View {
+struct LogMaintenanceFormView: View {
     @State private var viewModel: LogMaintenanceFormViewModel
     @State private var photoPickerSelection: [PhotosPickerItem] = []
     @State private var photoPickerShown: Bool = false
@@ -25,7 +25,7 @@ public struct LogMaintenanceFormView: View {
     private let onClose: @Sendable () -> Void
     private let onSubmitted: @Sendable (String) -> Void
 
-    public init(
+    init(
         viewModel: LogMaintenanceFormViewModel,
         onClose: @escaping @Sendable () -> Void,
         onSubmitted: @escaping @Sendable (String) -> Void
@@ -35,7 +35,7 @@ public struct LogMaintenanceFormView: View {
         self.onSubmitted = onSubmitted
     }
 
-    public var body: some View {
+    var body: some View {
         FormShell(
             title: viewModel.screenTitle,
             rightActionLabel: viewModel.submitLabel,
@@ -264,7 +264,7 @@ private struct PerformedByGroup: View {
                         }
                     )
                 ) {
-                    Text("Self").tag(MaintenancePerformedBy.self)
+                    Text("Self").tag(MaintenancePerformedBy.`self`)
                     Text("Member").tag(MaintenancePerformedBy.member)
                     Text("Contractor").tag(MaintenancePerformedBy.contractor)
                 }
