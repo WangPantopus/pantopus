@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.data.api.models.listings.CreateListingRequest
+import app.pantopus.android.data.api.models.listings.ListingDto
+import app.pantopus.android.data.api.models.listings.UpdateListingRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.listings.ListingsRepository
 import app.pantopus.android.data.network.NetworkMonitor
@@ -32,6 +34,10 @@ data class ListingComposeUiState(
     val isSubmitting: Boolean = false,
     val createdListingId: String? = null,
     val errorMessage: String? = null,
+    /** True while the edit-mode prefill fetch is in flight. Drives a
+     *  shimmer in the wizard body so the user can't tap through stale
+     *  fields. Always false in create mode. */
+    val isLoadingExisting: Boolean = false,
 )
 
 /**
@@ -53,6 +59,17 @@ open class ListingComposeWizardViewModel
         private val networkMonitor: NetworkMonitor,
     ) : ViewModel(),
         WizardModel {
+        /** Whether the wizard is creating or editing. Derived once from
+         *  the nav-arg listing id at construction so the rest of the VM
+         *  can branch on it without re-reading SavedStateHandle. */
+        private val mode: ListingComposeMode = resolveMode(savedStateHandle)
+
+        /** True when editing an existing listing. */
+        val isEditMode: Boolean get() = mode.isEdit
+
+        /** The listing id being edited, or null in create mode. */
+        val editingListingId: String? get() = mode.editingListingId
+
         private val _state =
             MutableStateFlow(restoreFormState().let { ListingComposeUiState(form = it) })
 
@@ -84,14 +101,58 @@ open class ListingComposeWizardViewModel
         }
 
         override fun onSecondary() {
-            // Success step's "Back to Marketplace".
-            if (_state.value.form.currentStep == ListingComposeStep.Success) {
-                pendingEvent.value = ListingComposeOutboundEvent.Dismiss
-            }
+            // Success step's "Back to Marketplace" (create) / "Done" (edit).
+            if (_state.value.form.currentStep != ListingComposeStep.Success) return
+            val listingId = _state.value.createdListingId
+            pendingEvent.value =
+                if (isEditMode && listingId != null) {
+                    ListingComposeOutboundEvent.ListingUpdated(listingId)
+                } else {
+                    ListingComposeOutboundEvent.Dismiss
+                }
         }
 
         fun acknowledgeEvent() {
             pendingEvent.value = null
+        }
+
+        /**
+         * Fetch the existing listing and project it into the form.
+         * No-op in create mode or once the form has been touched.
+         * Idempotent — safe to call from `LaunchedEffect(Unit) { … }`.
+         */
+        suspend fun loadExistingIfNeeded() {
+            val edit = mode as? ListingComposeMode.Edit ?: return
+            if (_state.value.form != ListingComposeFormState.EMPTY) return
+            _state.update { it.copy(isLoadingExisting = true) }
+            try {
+                when (val result = repository.detail(edit.listingId)) {
+                    is NetworkResult.Success -> {
+                        val projected = project(result.data.listing, edit.jumpToStep)
+                        _state.update {
+                            it.copy(form = projected, errorMessage = null, isLoadingExisting = false)
+                        }
+                        persist()
+                    }
+                    is NetworkResult.Failure -> {
+                        _state.update {
+                            it.copy(
+                                errorMessage =
+                                    result.error.message
+                                        ?: "Couldn't load the listing. Pull to retry.",
+                                isLoadingExisting = false,
+                            )
+                        }
+                    }
+                }
+            } catch (t: Throwable) {
+                _state.update {
+                    it.copy(
+                        errorMessage = t.message ?: "Couldn't load the listing.",
+                        isLoadingExisting = false,
+                    )
+                }
+            }
         }
 
         // MARK: - Photo step
@@ -232,7 +293,12 @@ open class ListingComposeWizardViewModel
                 ListingComposeStep.Review -> submit()
                 ListingComposeStep.Success -> {
                     val listingId = _state.value.createdListingId ?: return
-                    pendingEvent.value = ListingComposeOutboundEvent.OpenListingDetail(listingId)
+                    pendingEvent.value =
+                        if (isEditMode) {
+                            ListingComposeOutboundEvent.ListingUpdated(listingId)
+                        } else {
+                            ListingComposeOutboundEvent.OpenListingDetail(listingId)
+                        }
                 }
             }
         }
@@ -276,44 +342,82 @@ open class ListingComposeWizardViewModel
 
             val isFree = priceKind == ListingComposePriceKind.Free || category == ListingComposeCategory.Free
             val price: Double? = if (isFree) null else form.priceAmount.toDoubleOrNull()
+            val mediaUrls = form.photos.map { it.token }
+            val locationName = form.locationLabel.takeIf { it.isNotEmpty() }
+            val deliveryAvailable = form.fulfillment == ListingComposeFulfillment.Delivery
 
-            val request =
-                CreateListingRequest(
-                    title = form.title.trim(),
-                    description = form.bodyText.trim(),
-                    price = price,
-                    isFree = isFree,
-                    category = category.key,
-                    condition = form.condition?.key,
-                    mediaUrls = form.photos.map { it.token },
-                    layer = category.layer,
-                    listingType = category.listingType,
-                    locationName = form.locationLabel.takeIf { it.isNotEmpty() },
-                    meetupPreference = form.fulfillment.meetupPreference,
-                    deliveryAvailable = form.fulfillment == ListingComposeFulfillment.Delivery,
-                    isWanted = category.isWanted,
-                )
-
-            when (val result = repository.create(request)) {
-                is NetworkResult.Success -> {
-                    _state.update {
-                        it.copy(
-                            createdListingId = result.data.listing.id,
-                            isSubmitting = false,
-                            form = it.form.copy(step = ListingComposeStep.Success.ordinal0),
+            when (val m = mode) {
+                is ListingComposeMode.Create -> {
+                    val request =
+                        CreateListingRequest(
+                            title = form.title.trim(),
+                            description = form.bodyText.trim(),
+                            price = price,
+                            isFree = isFree,
+                            category = category.key,
+                            condition = form.condition?.key,
+                            mediaUrls = mediaUrls,
+                            layer = category.layer,
+                            listingType = category.listingType,
+                            locationName = locationName,
+                            meetupPreference = form.fulfillment.meetupPreference,
+                            deliveryAvailable = deliveryAvailable,
+                            isWanted = category.isWanted,
                         )
-                    }
-                    persist()
-                }
-                is NetworkResult.Failure ->
-                    _state.update {
-                        it.copy(
-                            isSubmitting = false,
-                            errorMessage =
+                    when (val result = repository.create(request)) {
+                        is NetworkResult.Success ->
+                            applySuccess(result.data.listing.id)
+                        is NetworkResult.Failure ->
+                            applyFailure(
                                 result.error.message
                                     ?: "Couldn't list your item. Please try again.",
-                        )
+                            )
                     }
+                }
+                is ListingComposeMode.Edit -> {
+                    val request =
+                        UpdateListingRequest(
+                            title = form.title.trim(),
+                            description = form.bodyText.trim(),
+                            price = price,
+                            isFree = isFree,
+                            category = category.key,
+                            condition = form.condition?.key,
+                            mediaUrls = mediaUrls,
+                            layer = category.layer,
+                            listingType = category.listingType,
+                            locationName = locationName,
+                            meetupPreference = form.fulfillment.meetupPreference,
+                            deliveryAvailable = deliveryAvailable,
+                            isWanted = category.isWanted,
+                        )
+                    when (val result = repository.update(m.listingId, request)) {
+                        is NetworkResult.Success ->
+                            applySuccess(result.data.listing.id)
+                        is NetworkResult.Failure ->
+                            applyFailure(
+                                result.error.message
+                                    ?: "Couldn't save your changes. Please try again.",
+                            )
+                    }
+                }
+            }
+        }
+
+        private fun applySuccess(listingId: String) {
+            _state.update {
+                it.copy(
+                    createdListingId = listingId,
+                    isSubmitting = false,
+                    form = it.form.copy(step = ListingComposeStep.Success.ordinal0),
+                )
+            }
+            persist()
+        }
+
+        private fun applyFailure(message: String) {
+            _state.update {
+                it.copy(isSubmitting = false, errorMessage = message)
             }
         }
 
@@ -416,12 +520,13 @@ open class ListingComposeWizardViewModel
         private fun computeChrome(state: ListingComposeUiState): WizardChrome {
             val step = state.form.currentStep
             return WizardChrome(
-                title = "List an item",
+                title = if (isEditMode) "Edit listing" else "List an item",
                 progressLabel = progressLabel(step),
                 progressFraction = progressFraction(step),
                 leading = leadingControl(step),
                 primaryCtaLabel = primaryCtaLabel(step),
-                primaryCtaEnabled = primaryEnabled(state) && !state.isSubmitting,
+                primaryCtaEnabled =
+                    primaryEnabled(state) && !state.isSubmitting && !state.isLoadingExisting,
                 secondaryCta = secondaryCta(step),
                 isSubmitting = state.isSubmitting,
                 dirty = dirtyForCloseConfirm(state),
@@ -443,19 +548,24 @@ open class ListingComposeWizardViewModel
                 ListingComposeStep.Price,
                 ListingComposeStep.Location,
                 -> "Continue"
-                ListingComposeStep.Review -> "List it"
-                ListingComposeStep.Success -> "View listing"
+                ListingComposeStep.Review -> if (isEditMode) "Save changes" else "List it"
+                ListingComposeStep.Success -> if (isEditMode) "Back to listing" else "View listing"
             }
 
-        private fun secondaryCta(step: ListingComposeStep): WizardSecondaryCta? =
-            if (step == ListingComposeStep.Success) {
+        private fun secondaryCta(step: ListingComposeStep): WizardSecondaryCta? {
+            if (step != ListingComposeStep.Success) return null
+            return if (isEditMode) {
+                WizardSecondaryCta(
+                    label = "Done",
+                    testTag = "listingComposeEditDone",
+                )
+            } else {
                 WizardSecondaryCta(
                     label = "Back to Marketplace",
                     testTag = "listingComposeBackToMarketplace",
                 )
-            } else {
-                null
             }
+        }
 
         private fun progressLabel(step: ListingComposeStep): WizardProgressLabel {
             val number = step.stepNumber ?: return WizardProgressLabel.Hidden
@@ -483,13 +593,15 @@ open class ListingComposeWizardViewModel
             }
         }
 
-        private fun dirtyForCloseConfirm(state: ListingComposeUiState): Boolean =
-            state.form.currentStep != ListingComposeStep.Success &&
-                (
-                    state.form.photos.isNotEmpty() ||
-                        state.form.title.isNotEmpty() ||
-                        state.form.bodyText.isNotEmpty()
-                )
+        private fun dirtyForCloseConfirm(state: ListingComposeUiState): Boolean {
+            if (state.form.currentStep == ListingComposeStep.Success) return false
+            // Edit mode is always dirty pre-success — user came in
+            // intentionally so warn before discarding.
+            if (isEditMode) return true
+            return state.form.photos.isNotEmpty() ||
+                state.form.title.isNotEmpty() ||
+                state.form.bodyText.isNotEmpty()
+        }
 
         companion object {
             private const val KEY_STEP = "listingCompose.step"
@@ -504,5 +616,107 @@ open class ListingComposeWizardViewModel
             private const val KEY_FULFILLMENT = "listingCompose.fulfillment"
             private const val KEY_LOCATION_KIND = "listingCompose.locationKind"
             private const val KEY_LOCATION_LABEL = "listingCompose.locationLabel"
+
+            /** Nav-arg key for the listing being edited. Present when the
+             *  wizard is reached via the EDIT_LISTING route. */
+            const val EDIT_LISTING_ID_KEY = "editListingId"
+
+            /** Nav-arg key for the optional jump-to-step. Empty string
+             *  means "default landing (review)". */
+            const val EDIT_JUMP_TO_STEP_KEY = "editJumpToStep"
+
+            /** Resolve the mode from the nav-arg listing id. Null /
+             *  empty id falls back to `Create`. */
+            internal fun resolveMode(handle: SavedStateHandle): ListingComposeMode {
+                val listingId: String? = handle[EDIT_LISTING_ID_KEY]
+                if (listingId.isNullOrEmpty()) return ListingComposeMode.Create
+                val jumpRaw: String? = handle[EDIT_JUMP_TO_STEP_KEY]
+                val jumpStep =
+                    jumpRaw
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let { name -> ListingComposeStep.entries.firstOrNull { it.name == name } }
+                return ListingComposeMode.Edit(listingId = listingId, jumpToStep = jumpStep)
+            }
+
+            /**
+             * Pure projection from a backend [ListingDto] to the
+             * wizard's [ListingComposeFormState]. Public for unit tests
+             * asserting prefill correctness.
+             */
+            fun project(
+                listing: ListingDto,
+                jumpToStep: ListingComposeStep? = null,
+            ): ListingComposeFormState {
+                val category = mapCategory(listing)
+                val condition =
+                    listing.condition?.let { raw ->
+                        ListingComposeCondition.entries.firstOrNull { it.key == raw }
+                    }
+                val priceKind =
+                    when {
+                        listing.isFree == true || category == ListingComposeCategory.Free ->
+                            ListingComposePriceKind.Free
+                        listing.price != null -> ListingComposePriceKind.Fixed
+                        else -> null
+                    }
+                val priceAmount =
+                    when {
+                        listing.isFree == true -> ""
+                        listing.price == null -> ""
+                        listing.price % 1.0 == 0.0 -> listing.price.toInt().toString()
+                        else -> "%.2f".format(listing.price)
+                    }
+                val (locationKind, locationLabel) =
+                    if (!listing.locationName.isNullOrEmpty()) {
+                        ListingComposeLocationKind.MeetPoint to listing.locationName
+                    } else {
+                        ListingComposeLocationKind.SavedAddress to ""
+                    }
+                val photos =
+                    (listing.mediaUrls ?: emptyList()).map { url ->
+                        ListingComposePhoto(token = url)
+                    }
+                val landingStep = jumpToStep ?: ListingComposeStep.Review
+                return ListingComposeFormState(
+                    step = landingStep.ordinal0,
+                    photos = photos,
+                    title = listing.title.orEmpty(),
+                    category = category,
+                    condition = condition,
+                    bodyText = listing.description.orEmpty(),
+                    priceKind = priceKind,
+                    priceAmount = priceAmount,
+                    fulfillment = ListingComposeFulfillment.Pickup,
+                    locationKind = locationKind,
+                    locationLabel = locationLabel,
+                )
+            }
+
+            private fun mapCategory(listing: ListingDto): ListingComposeCategory? {
+                // listing_type is most precise — differentiates Wanted,
+                // Free, and rentals from a plain Goods listing.
+                when (listing.listingType) {
+                    "wanted_request" -> return ListingComposeCategory.Wanted
+                    "free_item" -> return ListingComposeCategory.Free
+                    "rent_item" -> return ListingComposeCategory.Rentals
+                    "sell_item" ->
+                        return if (listing.layer == "vehicles") {
+                            ListingComposeCategory.Vehicles
+                        } else {
+                            ListingComposeCategory.Goods
+                        }
+                }
+                return when (listing.layer) {
+                    "vehicles" -> ListingComposeCategory.Vehicles
+                    "rentals" -> ListingComposeCategory.Rentals
+                    "goods" ->
+                        if (listing.isFree == true) {
+                            ListingComposeCategory.Free
+                        } else {
+                            ListingComposeCategory.Goods
+                        }
+                    else -> null
+                }
+            }
         }
     }

@@ -4,7 +4,9 @@
 //
 //  Wizard view model for the Snap & Sell listing-compose flow. Drives
 //  the six-step + success state machine and submits to
-//  `POST /api/listings` (`backend/routes/listings.js:426`).
+//  `POST /api/listings` (`backend/routes/listings.js:426`) when creating
+//  a new listing, or `PATCH /api/listings/:id`
+//  (`backend/routes/listings.js:1479`) when editing an existing one.
 //
 
 import Foundation
@@ -16,6 +18,10 @@ public enum ListingComposeOutboundEvent: Sendable, Equatable {
     case dismiss
     /// Pop the wizard and route to the newly-created listing's detail.
     case openListingDetail(listingId: String)
+    /// Pop the wizard after an edit save — the host usually pops to the
+    /// listing detail (which then refreshes) rather than pushing a new
+    /// screen.
+    case listingUpdated(listingId: String)
 }
 
 @Observable
@@ -36,7 +42,14 @@ final class ListingComposeWizardViewModel: WizardModel {
 
     /// Set once the user reaches the success step, holds the new
     /// listing's id so the "View listing" CTA can route to its detail.
+    /// In edit mode this is set to the existing listing's id once the
+    /// PATCH resolves.
     private(set) var createdListingId: String?
+
+    /// True while the existing-listing fetch is in flight (edit mode
+    /// only). View overlays a shimmer when this is set so the user
+    /// can't tap through stale fields.
+    private(set) var isLoadingExisting: Bool = false
 
     /// One-shot navigation events the host view consumes.
     var pendingEvent: ListingComposeOutboundEvent?
@@ -45,24 +58,136 @@ final class ListingComposeWizardViewModel: WizardModel {
 
     private let api: APIClient
     private let isOnlineProvider: @MainActor () -> Bool
+    private let mode: ListingComposeMode
 
     // MARK: - Init
 
     init(
+        mode: ListingComposeMode = .create,
         api: APIClient = .shared,
         initialState: ListingComposeFormState = .empty,
         isOnlineProvider: @escaping @MainActor () -> Bool = { NetworkMonitor.shared.isOnline }
     ) {
+        self.mode = mode
         self.api = api
         self.isOnlineProvider = isOnlineProvider
         form = initialState
     }
 
+    /// True when the wizard is editing an existing listing.
+    var isEditMode: Bool { mode.isEdit }
+
+    /// The listing id being edited (nil when creating).
+    var editingListingId: String? { mode.editingListingId }
+
     /// Replace the in-memory form state from scene storage on first
     /// appear. No-op once the wizard has progressed past the restore.
+    /// Always a no-op in edit mode — edit fetches its own prefill from
+    /// the backend.
     func restore(from snapshot: ListingComposeFormState) {
+        guard !isEditMode else { return }
         guard form == .empty else { return }
         form = snapshot
+    }
+
+    /// Fetch the existing listing and project it into the form. No-op
+    /// for create mode. Idempotent — safe to call from `.task { … }`.
+    func loadExistingIfNeeded() async {
+        guard case let .edit(listingId, jumpToStep) = mode else { return }
+        // Only fetch on first land; if the user has already started
+        // editing fields, don't blow them away.
+        guard form == .empty else { return }
+        isLoadingExisting = true
+        defer { isLoadingExisting = false }
+        do {
+            let response: ListingDetailResponse = try await api.request(
+                ListingsEndpoints.detail(id: listingId)
+            )
+            form = Self.project(from: response.listing, jumpToStep: jumpToStep)
+        } catch {
+            errorMessage = (error as? APIError)?.errorDescription
+                ?? "Couldn't load the listing. Pull to retry."
+        }
+    }
+
+    /// Pure projection from a server `ListingDTO` to the wizard's
+    /// `ListingComposeFormState`. Used both by `loadExistingIfNeeded`
+    /// and by unit tests asserting prefill correctness.
+    static func project(
+        from listing: ListingDTO,
+        jumpToStep: ListingComposeStep? = nil
+    ) -> ListingComposeFormState {
+        let category = mapCategory(listing: listing)
+        let condition = listing.condition.flatMap(ListingComposeCondition.init(rawValue:))
+        let priceKind = mapPriceKind(listing: listing, category: category)
+        let priceAmount: String = {
+            guard let price = listing.price, !(listing.isFree ?? false) else { return "" }
+            if price.truncatingRemainder(dividingBy: 1) == 0 {
+                return String(Int(price))
+            }
+            return String(format: "%.2f", price)
+        }()
+        let locationKind: ListingComposeLocationKind? = {
+            guard let name = listing.locationName, !name.isEmpty else {
+                return .savedAddress
+            }
+            return .meetPoint
+        }()
+        let locationLabel: String = {
+            if locationKind == .meetPoint { return listing.locationName ?? "" }
+            return ""
+        }()
+        // Photos: hydrate the grid from `mediaUrls` so the user sees
+        // the existing images before they pick replacements.
+        let photos = (listing.mediaUrls ?? []).map { url in
+            ListingComposePhoto(token: url)
+        }
+        let initialStep = jumpToStep ?? .review
+        return ListingComposeFormState(
+            step: initialStep.rawValue,
+            photos: photos,
+            title: listing.title ?? "",
+            category: category,
+            condition: condition,
+            bodyText: listing.description ?? "",
+            priceKind: priceKind,
+            priceAmount: priceAmount,
+            fulfillment: .pickup,
+            locationKind: locationKind,
+            locationLabel: locationLabel
+        )
+    }
+
+    private static func mapCategory(listing: ListingDTO) -> ListingComposeCategory? {
+        // `listing_type` is the most precise — it differentiates Wanted,
+        // Free, and rentals from a plain `goods` listing. Fall back to
+        // `layer` for older rows.
+        switch listing.listingType {
+        case "wanted_request": return .wanted
+        case "free_item": return .free
+        case "rent_item": return .rentals
+        case "sell_item":
+            if listing.layer == "vehicles" { return .vehicles }
+            return .goods
+        default: break
+        }
+        switch listing.layer {
+        case "vehicles": return .vehicles
+        case "rentals": return .rentals
+        case "goods":
+            if listing.isFree == true { return .free }
+            return .goods
+        default: return nil
+        }
+    }
+
+    private static func mapPriceKind(
+        listing: ListingDTO,
+        category: ListingComposeCategory?
+    ) -> ListingComposePriceKind? {
+        if listing.isFree == true || category == .free { return .free }
+        if listing.price != nil { return .fixed }
+        return nil
     }
 
     // MARK: - WizardModel
@@ -70,12 +195,12 @@ final class ListingComposeWizardViewModel: WizardModel {
     var chrome: WizardChrome {
         let step = currentStep
         return WizardChrome(
-            title: "List an item",
+            title: isEditMode ? "Edit listing" : "List an item",
             progressLabel: progressLabel(for: step),
             progressFraction: progressFraction(for: step),
             leading: leadingControl(for: step),
             primaryCTALabel: primaryCTALabel(for: step),
-            primaryCTAEnabled: primaryEnabled(for: step) && !isSubmitting,
+            primaryCTAEnabled: primaryEnabled(for: step) && !isSubmitting && !isLoadingExisting,
             secondaryCTA: secondaryCTA(for: step),
             isSubmitting: isSubmitting,
             dirty: dirtyForCloseConfirm,
@@ -99,8 +224,16 @@ final class ListingComposeWizardViewModel: WizardModel {
     }
 
     func secondaryTapped() {
-        // Success step's "Back to Marketplace" — no other step uses the secondary.
-        if currentStep == .success { pendingEvent = .dismiss }
+        // Success step's "Back to Marketplace" (create) / "Done" (edit) —
+        // no other step uses the secondary. In edit mode "Done" still
+        // signals the host to pop and refresh the listing detail, so we
+        // emit the same event the primary fires.
+        guard currentStep == .success else { return }
+        if isEditMode, let listingId = createdListingId {
+            pendingEvent = .listingUpdated(listingId: listingId)
+        } else {
+            pendingEvent = .dismiss
+        }
     }
 
     #if DEBUG
@@ -232,7 +365,9 @@ final class ListingComposeWizardViewModel: WizardModel {
             await submit()
         case .success:
             if let listingId = createdListingId {
-                pendingEvent = .openListingDetail(listingId: listingId)
+                pendingEvent = isEditMode
+                    ? .listingUpdated(listingId: listingId)
+                    : .openListingDetail(listingId: listingId)
             }
         }
     }
@@ -271,35 +406,66 @@ final class ListingComposeWizardViewModel: WizardModel {
         let listingType = category.listingType
         let condition = form.condition?.rawValue
         let price: Double? = isFree ? nil : parsedPrice
+        let mediaUrls = form.photos.map(\.token)
+        let locationName: String? = form.locationLabel.isEmpty ? nil : form.locationLabel
+        let deliveryAvailable = form.fulfillment == .delivery
 
-        let request = CreateListingRequest(
-            title: trimmedTitle,
-            description: trimmedDescription,
-            price: price,
-            isFree: isFree,
-            category: category.rawValue,
-            condition: condition,
-            mediaUrls: form.photos.map(\.token),
-            layer: category.layer,
-            listingType: listingType,
-            latitude: nil,
-            longitude: nil,
-            locationName: form.locationLabel.isEmpty ? nil : form.locationLabel,
-            locationAddress: nil,
-            meetupPreference: form.fulfillment.meetupPreference,
-            deliveryAvailable: form.fulfillment == .delivery,
-            isWanted: category.isWanted
-        )
-
-        do {
-            let response: CreateListingResponse = try await api.request(
-                ListingsEndpoints.create(request)
+        switch mode {
+        case .create:
+            let request = CreateListingRequest(
+                title: trimmedTitle,
+                description: trimmedDescription,
+                price: price,
+                isFree: isFree,
+                category: category.rawValue,
+                condition: condition,
+                mediaUrls: mediaUrls,
+                layer: category.layer,
+                listingType: listingType,
+                latitude: nil,
+                longitude: nil,
+                locationName: locationName,
+                locationAddress: nil,
+                meetupPreference: form.fulfillment.meetupPreference,
+                deliveryAvailable: deliveryAvailable,
+                isWanted: category.isWanted
             )
-            createdListingId = response.listing.id
-            transition(to: .success)
-        } catch {
-            errorMessage = (error as? APIError)?.errorDescription
-                ?? "Couldn't list your item. Please try again."
+            do {
+                let response: CreateListingResponse = try await api.request(
+                    ListingsEndpoints.create(request)
+                )
+                createdListingId = response.listing.id
+                transition(to: .success)
+            } catch {
+                errorMessage = (error as? APIError)?.errorDescription
+                    ?? "Couldn't list your item. Please try again."
+            }
+        case let .edit(listingId, _):
+            let request = UpdateListingRequest(
+                title: trimmedTitle,
+                description: trimmedDescription,
+                price: price,
+                isFree: isFree,
+                category: category.rawValue,
+                condition: condition,
+                mediaUrls: mediaUrls,
+                layer: category.layer,
+                listingType: listingType,
+                locationName: locationName,
+                meetupPreference: form.fulfillment.meetupPreference,
+                deliveryAvailable: deliveryAvailable,
+                isWanted: category.isWanted
+            )
+            do {
+                let response: UpdateListingResponse = try await api.request(
+                    ListingsEndpoints.update(id: listingId, body: request)
+                )
+                createdListingId = response.listing.id
+                transition(to: .success)
+            } catch {
+                errorMessage = (error as? APIError)?.errorDescription
+                    ?? "Couldn't save your changes. Please try again."
+            }
         }
     }
 
@@ -327,14 +493,23 @@ final class ListingComposeWizardViewModel: WizardModel {
     private func primaryCTALabel(for step: ListingComposeStep) -> String {
         switch step {
         case .photos, .titleCategory, .conditionDescription, .price, .location: "Continue"
-        case .review: "List it"
-        case .success: "View listing"
+        case .review: isEditMode ? "Save changes" : "List it"
+        case .success: isEditMode ? "Back to listing" : "View listing"
         }
     }
 
     private func secondaryCTA(for step: ListingComposeStep) -> WizardSecondaryCTA? {
         guard step == .success else { return nil }
-        return WizardSecondaryCTA(label: "Back to Marketplace", identifier: "listingComposeBackToMarketplace")
+        if isEditMode {
+            return WizardSecondaryCTA(
+                label: "Done",
+                identifier: "listingComposeEditDone"
+            )
+        }
+        return WizardSecondaryCTA(
+            label: "Back to Marketplace",
+            identifier: "listingComposeBackToMarketplace"
+        )
     }
 
     private func primaryEnabled(for step: ListingComposeStep) -> Bool {
@@ -357,10 +532,14 @@ final class ListingComposeWizardViewModel: WizardModel {
     }
 
     private var dirtyForCloseConfirm: Bool {
-        currentStep != .success
-            && (!form.photos.isEmpty
-                || !form.title.isEmpty
-                || !form.bodyText.isEmpty)
+        guard currentStep != .success else { return false }
+        // Edit mode is always dirty pre-success — the user already had a
+        // listing's state loaded so even "no fields changed" should warn
+        // before discarding.
+        if isEditMode { return true }
+        return !form.photos.isEmpty
+            || !form.title.isEmpty
+            || !form.bodyText.isEmpty
     }
 
     // MARK: - Validation helpers

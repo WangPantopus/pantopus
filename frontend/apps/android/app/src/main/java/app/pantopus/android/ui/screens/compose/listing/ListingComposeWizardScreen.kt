@@ -48,6 +48,7 @@ import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.shared.wizard.WizardShell
 import app.pantopus.android.ui.screens.shared.wizard.blocks.HeadlineBlock
 import app.pantopus.android.ui.screens.shared.wizard.blocks.ReviewSummaryBlock
@@ -64,15 +65,23 @@ import app.pantopus.android.ui.theme.Spacing
 /** Test tag applied to the Snap & Sell wizard container. */
 const val LISTING_COMPOSE_SCREEN_TAG = "listingComposeWizard"
 
+/** Test tag applied to the wizard container in edit mode (P3.3). */
+const val LISTING_EDIT_SCREEN_TAG = "listingEditWizard"
+
 /**
  * Snap & Sell wizard composable. The view model survives config
  * changes via Hilt's `SavedStateHandle`, so the wizard restores after
- * process death.
+ * process death. The same composable backs both the create flow (from
+ * the Marketplace FAB) and the edit flow (P3.3) — the VM reads the
+ * mode from the nav-arg listing id, and the screen wires
+ * `onListingUpdated` so the host can pop back to the listing detail
+ * after a save.
  */
 @Composable
 fun ListingComposeWizardScreen(
     onDismiss: () -> Unit,
     onOpenListingDetail: (String) -> Unit,
+    onListingUpdated: ((String) -> Unit)? = null,
     viewModel: ListingComposeWizardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -89,11 +98,18 @@ fun ListingComposeWizardScreen(
                 viewModel.acknowledgeEvent()
                 onOpenListingDetail(event.listingId)
             }
+            is ListingComposeOutboundEvent.ListingUpdated -> {
+                viewModel.acknowledgeEvent()
+                onListingUpdated?.invoke(event.listingId) ?: onDismiss()
+            }
             null -> Unit
         }
     }
 
     LaunchedEffect(Unit) {
+        // Edit mode: kick the prefill fetch. Idempotent — the VM
+        // no-ops in create mode or once the form is non-empty.
+        viewModel.loadExistingIfNeeded()
         val current = state.form.currentStep
         current.stepNumber?.let { number ->
             Analytics.track(
@@ -105,32 +121,37 @@ fun ListingComposeWizardScreen(
         }
     }
 
+    val screenTag = if (viewModel.isEditMode) LISTING_EDIT_SCREEN_TAG else LISTING_COMPOSE_SCREEN_TAG
     WizardShell(
         model = viewModel,
-        modifier = Modifier.testTag(LISTING_COMPOSE_SCREEN_TAG),
+        modifier = Modifier.testTag(screenTag),
     ) {
-        when (state.form.currentStep) {
-            ListingComposeStep.Photos ->
-                PhotosStep(
-                    state = state,
-                    onAdd = { viewModel.addPhoto() },
-                    onRequestRemove = { photoPendingRemoval = it },
-                    onMoveUp = { index ->
-                        viewModel.movePhoto(from = index, to = index - 1)
-                    },
-                    onMoveDown = { index ->
-                        viewModel.movePhoto(from = index, to = index + 1)
-                    },
-                    onMakeHero = viewModel::makeHero,
-                )
-            ListingComposeStep.TitleCategory -> TitleCategoryStep(state, viewModel)
-            ListingComposeStep.ConditionDescription -> ConditionDescriptionStep(state, viewModel)
-            ListingComposeStep.Price -> PriceStep(state, viewModel)
-            ListingComposeStep.Location -> LocationStep(state, viewModel)
-            ListingComposeStep.Review -> ReviewStep(state)
-            ListingComposeStep.Success -> SuccessStep()
+        if (state.isLoadingExisting) {
+            EditPrefillLoadingBlock()
+        } else {
+            when (state.form.currentStep) {
+                ListingComposeStep.Photos ->
+                    PhotosStep(
+                        state = state,
+                        onAdd = { viewModel.addPhoto() },
+                        onRequestRemove = { photoPendingRemoval = it },
+                        onMoveUp = { index ->
+                            viewModel.movePhoto(from = index, to = index - 1)
+                        },
+                        onMoveDown = { index ->
+                            viewModel.movePhoto(from = index, to = index + 1)
+                        },
+                        onMakeHero = viewModel::makeHero,
+                    )
+                ListingComposeStep.TitleCategory -> TitleCategoryStep(state, viewModel)
+                ListingComposeStep.ConditionDescription -> ConditionDescriptionStep(state, viewModel)
+                ListingComposeStep.Price -> PriceStep(state, viewModel)
+                ListingComposeStep.Location -> LocationStep(state, viewModel)
+                ListingComposeStep.Review -> ReviewStep(state)
+                ListingComposeStep.Success -> SuccessStep()
+            }
+            state.errorMessage?.let { ErrorBanner(it) }
         }
-        state.errorMessage?.let { ErrorBanner(it) }
     }
 
     photoPendingRemoval?.let { photo ->
@@ -901,5 +922,24 @@ private fun ErrorBanner(message: String) {
             style = PantopusTextStyle.caption,
             color = PantopusColors.error,
         )
+    }
+}
+
+/**
+ * P3.3 — Shimmer placeholder shown while the edit-mode prefill fetch
+ * is in flight. Mirrors the rough geometry of the loaded review step
+ * (title block + a few rows + a body block) so the layout doesn't jump
+ * when the real fields land.
+ */
+@Composable
+private fun EditPrefillLoadingBlock() {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("listingComposeEditLoading"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Shimmer(width = 180.dp, height = 24.dp)
+        Shimmer(width = 320.dp, height = 16.dp, modifier = Modifier.fillMaxWidth())
+        Shimmer(width = 240.dp, height = 16.dp)
+        Shimmer(width = 320.dp, height = 128.dp, modifier = Modifier.fillMaxWidth())
     }
 }

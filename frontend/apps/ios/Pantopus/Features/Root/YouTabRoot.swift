@@ -144,6 +144,10 @@ public enum YouRoute: Hashable {
     /// Listing detail destination reached from the listing-offers buyer
     /// row tap so the seller can drill back into the canonical view.
     case listingDetail(listingId: String)
+    /// P3.3 — Edit an existing listing. Reached from the listing-detail
+    /// overflow ("Edit listing") for the owner, or from the listing-
+    /// offers panel's "Edit price" affordance.
+    case editListing(listingId: String, jumpToStep: ListingComposeStep?)
     #if DEBUG
     case publicProfile(userId: String)
     /// P1.6 — Typed Business Profile screen. Reached today only via
@@ -646,6 +650,11 @@ public struct YouTabRoot: View {
                     Task { @MainActor in
                         path.append(.listingOffers(listingId: dto.id, title: dto.title))
                     }
+                },
+                onEditListing: { dto in
+                    Task { @MainActor in
+                        path.append(.editListing(listingId: dto.id, jumpToStep: nil))
+                    }
                 }
             )
         case let .listingOffers(listingId, titleHint):
@@ -670,7 +679,7 @@ public struct YouTabRoot: View {
                     },
                     onEditPrice: {
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Edit listing"))
+                            path.append(.editListing(listingId: listingId, jumpToStep: .price))
                         }
                     },
                     onSort: {
@@ -679,6 +688,15 @@ public struct YouTabRoot: View {
                         }
                     }
                 )
+            )
+        case let .editListing(listingId, jumpToStep):
+            ListingComposeWizardView(
+                mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
+                onListingUpdated: { _ in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
             )
         case .myPosts:
             MyPostsView(

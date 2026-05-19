@@ -11,6 +11,8 @@ import app.pantopus.android.data.api.models.listings.ListingsNearbyResponse
 import app.pantopus.android.data.api.models.listings.MessageListingBody
 import app.pantopus.android.data.api.models.listings.MessageListingResponse
 import app.pantopus.android.data.api.models.listings.MyListingsResponse
+import app.pantopus.android.data.api.models.listings.UpdateListingRequest
+import app.pantopus.android.data.api.models.listings.UpdateListingResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.ListingsApi
@@ -88,6 +90,13 @@ class ListingsRepository
 
         /** Wraps `POST /api/listings`. Used by the Snap & Sell wizard. */
         suspend fun create(request: CreateListingRequest): NetworkResult<CreateListingResponse> = safeApiCall { api.create(request) }
+
+        /** Wraps `PATCH /api/listings/:id`. Used by the Edit-listing
+         *  flow (P3.3). Owner-only on the backend. */
+        suspend fun update(
+            id: String,
+            request: UpdateListingRequest,
+        ): NetworkResult<UpdateListingResponse> = safeApiCall { api.update(id, request) }
 
         suspend fun save(id: String): NetworkResult<ListingSaveResponse> = safeApiCall { api.save(id) }
 

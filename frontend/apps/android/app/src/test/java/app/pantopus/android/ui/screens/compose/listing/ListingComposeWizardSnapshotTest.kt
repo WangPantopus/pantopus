@@ -228,6 +228,72 @@ class ListingComposeWizardSnapshotTest {
         }
     }
 
+    // P3.3 — Edit-mode prefill, landing on Review. Same step-body
+    // geometry as the create flow but every field is filled (title,
+    // condition, price, fulfillment, location) so the user can scan
+    // and tap Save changes. The wizard chrome (title, CTA labels)
+    // lives at the shell level and isn't captured here.
+    @Test
+    fun listing_compose_edit_prefill_review() {
+        paparazzi.snapshot {
+            Frame {
+                ListingComposeStepPreview(
+                    state =
+                        ListingComposeUiState(
+                            form =
+                                ListingComposeFormState(
+                                    step = ListingComposeStep.Review.ordinal0,
+                                    photos = seededPhotos,
+                                    title = "Mid-century walnut credenza",
+                                    category = ListingComposeCategory.Goods,
+                                    condition = ListingComposeCondition.LikeNew,
+                                    bodyText =
+                                        "Solid walnut, four sliding doors, dovetail joinery. " +
+                                            "Lightly used — happy to deliver within Lincoln Park.",
+                                    priceKind = ListingComposePriceKind.Fixed,
+                                    priceAmount = "420",
+                                    fulfillment = ListingComposeFulfillment.Pickup,
+                                    locationKind = ListingComposeLocationKind.MeetPoint,
+                                    locationLabel = "Lincoln Park bandshell",
+                                ),
+                        ),
+                )
+            }
+        }
+    }
+
+    // P3.3 — Edit-mode "Edit price" entry point. Reached via the
+    // pencil chip on the listing-offers header. Prefilled form
+    // lands on the Price step so the seller can tweak the amount
+    // and save in one tap.
+    @Test
+    fun listing_compose_edit_jump_to_price() {
+        paparazzi.snapshot {
+            Frame {
+                ListingComposeStepPreview(
+                    state =
+                        ListingComposeUiState(
+                            form =
+                                ListingComposeFormState(
+                                    step = ListingComposeStep.Price.ordinal0,
+                                    photos = seededPhotos,
+                                    title = "Mid-century walnut credenza",
+                                    category = ListingComposeCategory.Goods,
+                                    condition = ListingComposeCondition.LikeNew,
+                                    bodyText =
+                                        "Solid walnut, four sliding doors, dovetail joinery.",
+                                    priceKind = ListingComposePriceKind.Fixed,
+                                    priceAmount = "420",
+                                    fulfillment = ListingComposeFulfillment.Pickup,
+                                    locationKind = ListingComposeLocationKind.MeetPoint,
+                                    locationLabel = "Lincoln Park bandshell",
+                                ),
+                        ),
+                )
+            }
+        }
+    }
+
     @Composable
     private fun Frame(content: @Composable () -> Unit) {
         PantopusTheme {

@@ -228,6 +228,92 @@ public struct CreateListingResponse: Decodable, Sendable {
     public let listing: ListingDTO
 }
 
+/// Body for `PATCH /api/listings/:id`. Owner-only update. Mirrors the
+/// fields the Snap & Sell wizard collects so the same form can drive
+/// create + edit. All fields optional — the backend Joi schema requires
+/// `min(1)` so encoding `nil` keys keeps the JSON sparse.
+public struct UpdateListingRequest: Encodable, Sendable {
+    public let title: String?
+    public let description: String?
+    public let price: Double?
+    public let isFree: Bool?
+    public let category: String?
+    public let condition: String?
+    public let mediaUrls: [String]?
+    public let layer: String?
+    public let listingType: String?
+    public let locationName: String?
+    public let meetupPreference: String?
+    public let deliveryAvailable: Bool?
+    public let isWanted: Bool?
+
+    public init(
+        title: String? = nil,
+        description: String? = nil,
+        price: Double? = nil,
+        isFree: Bool? = nil,
+        category: String? = nil,
+        condition: String? = nil,
+        mediaUrls: [String]? = nil,
+        layer: String? = nil,
+        listingType: String? = nil,
+        locationName: String? = nil,
+        meetupPreference: String? = nil,
+        deliveryAvailable: Bool? = nil,
+        isWanted: Bool? = nil
+    ) {
+        self.title = title
+        self.description = description
+        self.price = price
+        self.isFree = isFree
+        self.category = category
+        self.condition = condition
+        self.mediaUrls = mediaUrls
+        self.layer = layer
+        self.listingType = listingType
+        self.locationName = locationName
+        self.meetupPreference = meetupPreference
+        self.deliveryAvailable = deliveryAvailable
+        self.isWanted = isWanted
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(title, forKey: .title)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encodeIfPresent(price, forKey: .price)
+        try container.encodeIfPresent(isFree, forKey: .isFree)
+        try container.encodeIfPresent(category, forKey: .category)
+        try container.encodeIfPresent(condition, forKey: .condition)
+        try container.encodeIfPresent(mediaUrls, forKey: .mediaUrls)
+        try container.encodeIfPresent(layer, forKey: .layer)
+        try container.encodeIfPresent(listingType, forKey: .listingType)
+        try container.encodeIfPresent(locationName, forKey: .locationName)
+        try container.encodeIfPresent(meetupPreference, forKey: .meetupPreference)
+        try container.encodeIfPresent(deliveryAvailable, forKey: .deliveryAvailable)
+        try container.encodeIfPresent(isWanted, forKey: .isWanted)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case title, description, price
+        case isFree
+        case category, condition
+        case mediaUrls
+        case layer
+        case listingType
+        case locationName
+        case meetupPreference
+        case deliveryAvailable
+        case isWanted
+    }
+}
+
+/// Envelope from `PATCH /api/listings/:id`.
+public struct UpdateListingResponse: Decodable, Sendable {
+    public let message: String?
+    public let listing: ListingDTO
+}
+
 /// Envelope from `POST /api/listings/:id/message`.
 public struct MessageListingResponse: Decodable, Sendable {
     public let message: String?

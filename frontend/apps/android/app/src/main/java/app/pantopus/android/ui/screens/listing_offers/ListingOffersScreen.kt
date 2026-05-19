@@ -66,6 +66,7 @@ fun ListingOffersScreen(
     onShareListing: () -> Unit = {},
     onOpenBuyer: (ListingOfferUserDto) -> Unit = {},
     onOpenTransaction: (ListingOfferDto) -> Unit = {},
+    onEditPrice: () -> Unit = {},
     onSort: () -> Unit = {},
     viewModel: ListingOffersViewModel = hiltViewModel(),
 ) {
@@ -80,6 +81,7 @@ fun ListingOffersScreen(
             onShareListing = onShareListing,
             onOpenBuyer = onOpenBuyer,
             onOpenTransaction = onOpenTransaction,
+            onEditPrice = onEditPrice,
             onSort = onSort,
         )
         viewModel.load()

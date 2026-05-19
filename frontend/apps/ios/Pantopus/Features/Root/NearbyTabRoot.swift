@@ -17,6 +17,10 @@ public enum NearbyRoute: Hashable {
     /// T5.3.4 — per-listing offers panel reached from a listing detail
     /// "View offers" affordance.
     case listingOffers(listingId: String, title: String?)
+    /// P3.3 — Edit an existing listing. Reached from the listing-detail
+    /// overflow ("Edit listing") for the owner, or from the listing-
+    /// offers panel's "Edit price" affordance.
+    case editListing(listingId: String, jumpToStep: ListingComposeStep?)
 }
 
 /// NavigationStack wrapper for the Nearby tab.
@@ -59,6 +63,11 @@ public struct NearbyTabRoot: View {
                         Task { @MainActor in
                             path.append(.listingOffers(listingId: dto.id, title: dto.title))
                         }
+                    },
+                    onEditListing: { dto in
+                        Task { @MainActor in
+                            path.append(.editListing(listingId: dto.id, jumpToStep: nil))
+                        }
                     }
                 )
             }
@@ -81,12 +90,23 @@ public struct NearbyTabRoot: View {
                         Task { @MainActor in path.append(.placeholder(label: "Transaction detail")) }
                     },
                     onEditPrice: {
-                        Task { @MainActor in path.append(.placeholder(label: "Edit listing")) }
+                        Task { @MainActor in
+                            path.append(.editListing(listingId: listingId, jumpToStep: .price))
+                        }
                     },
                     onSort: {
                         Task { @MainActor in path.append(.placeholder(label: "Sort offers")) }
                     }
                 )
+            )
+        case let .editListing(listingId, jumpToStep):
+            ListingComposeWizardView(
+                mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
+                onListingUpdated: { _ in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
             )
         }
     }

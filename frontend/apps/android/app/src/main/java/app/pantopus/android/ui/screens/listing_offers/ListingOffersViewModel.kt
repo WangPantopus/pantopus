@@ -406,6 +406,7 @@ class ListingOffersViewModel
                 offerCount: Int,
                 sortLabel: String?,
                 onSort: (() -> Unit)?,
+                onEditPrice: (() -> Unit)? = null,
             ): ListingContextConfig {
                 val category = ListingOffersCategory.fromRaw(listing.category, listing.layer)
                 val thumbnail: ThumbnailImage =
@@ -434,6 +435,7 @@ class ListingOffersViewModel
                     offerCount = offerCount,
                     sortLabel = sortLabel,
                     onSort = onSort,
+                    onEditPrice = onEditPrice,
                 )
             }
 
@@ -558,6 +560,7 @@ class ListingOffersViewModel
         private var openBuyerHandler: (ListingOfferUserDto) -> Unit = {}
         private var openTransactionHandler: (ListingOfferDto) -> Unit = {}
         private var sortHandler: () -> Unit = {}
+        private var editPriceHandler: () -> Unit = {}
 
         init {
             // Seed the title hint subtitle so the top-bar surfaces the
@@ -574,12 +577,14 @@ class ListingOffersViewModel
             onOpenBuyer: (ListingOfferUserDto) -> Unit,
             onOpenTransaction: (ListingOfferDto) -> Unit,
             onSort: () -> Unit,
+            onEditPrice: () -> Unit = {},
             now: () -> Instant = { Instant.now() },
         ) {
             shareHandler = onShareListing
             openBuyerHandler = onOpenBuyer
             openTransactionHandler = onOpenTransaction
             sortHandler = onSort
+            editPriceHandler = onEditPrice
             nowProvider = now
             _topBarAction.value =
                 TopBarAction(
@@ -634,6 +639,7 @@ class ListingOffersViewModel
                         offerCount = offers.size,
                         sortLabel = "Highest first",
                         onSort = { sortHandler() },
+                        onEditPrice = { editPriceHandler() },
                     )
                 _subtitle.value = listingSnapshot.title ?: listingTitleHint
             }

@@ -11,9 +11,12 @@ import app.pantopus.android.data.api.models.listings.ListingsNearbyResponse
 import app.pantopus.android.data.api.models.listings.MessageListingBody
 import app.pantopus.android.data.api.models.listings.MessageListingResponse
 import app.pantopus.android.data.api.models.listings.MyListingsResponse
+import app.pantopus.android.data.api.models.listings.UpdateListingRequest
+import app.pantopus.android.data.api.models.listings.UpdateListingResponse
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -98,6 +101,13 @@ interface ListingsApi {
     suspend fun create(
         @Body body: CreateListingRequest,
     ): CreateListingResponse
+
+    /** `PATCH /api/listings/:id` — owner-only update. Route `backend/routes/listings.js:1479`. */
+    @PATCH("api/listings/{id}")
+    suspend fun update(
+        @Path("id") id: String,
+        @Body body: UpdateListingRequest,
+    ): UpdateListingResponse
 
     /** `POST /api/listings/:id/save` — bookmark. */
     @POST("api/listings/{id}/save")

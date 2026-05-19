@@ -40,6 +40,7 @@ import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
 import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
+import app.pantopus.android.ui.screens.compose.listing.ListingComposeStep
 import app.pantopus.android.ui.screens.compose.listing.ListingComposeWizardScreen
 import app.pantopus.android.ui.screens.compose.pulse.PulseComposeScreen
 import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
@@ -582,6 +583,24 @@ private object ChildRoutes {
 
     /** Snap & sell — the marketplace listing-compose wizard (P2.3). */
     const val COMPOSE_LISTING = "listings/compose"
+
+    /** P3.3 — Edit an existing listing. Reached from the listing-detail
+     *  overflow ("Edit listing") for the owner, or from the listing-
+     *  offers panel's "Edit price" affordance (which seeds the optional
+     *  `jumpToStep` query param to `Price`). */
+    const val EDIT_LISTING_ID_KEY = "editListingId"
+    const val EDIT_LISTING_JUMP_TO_STEP_KEY = "editJumpToStep"
+    const val EDIT_LISTING =
+        "listings/{$EDIT_LISTING_ID_KEY}/edit?$EDIT_LISTING_JUMP_TO_STEP_KEY={$EDIT_LISTING_JUMP_TO_STEP_KEY}"
+
+    /** Build the edit-listing path with an optional jump-to-step. */
+    fun editListing(
+        listingId: String,
+        jumpToStep: String? = null,
+    ): String {
+        val step = jumpToStep ?: ""
+        return "listings/$listingId/edit?$EDIT_LISTING_JUMP_TO_STEP_KEY=$step"
+    }
 
     /** T6.3f / P14 — My listings (seller's tabbed roster). */
     const val MY_LISTINGS = "listings/me"
@@ -1624,6 +1643,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onViewOffers = { dto ->
                         navController.navigate(ChildRoutes.listingOffers(dto.id, dto.title))
                     },
+                    onEditListing = { dto ->
+                        navController.navigate(ChildRoutes.editListing(dto.id))
+                    },
                 )
             }
             composable(
@@ -1636,12 +1658,21 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             defaultValue = ""
                         },
                     ),
-            ) {
+            ) { entry ->
+                val listingId = entry.arguments?.getString(ChildRoutes.LISTING_OFFERS_ID_KEY).orEmpty()
                 ListingOffersScreen(
                     onBack = { navController.popBackStack() },
                     onShareListing = { navController.navigate(ChildRoutes.placeholder("Share listing")) },
                     onOpenBuyer = { navController.navigate(ChildRoutes.placeholder("Buyer profile")) },
                     onOpenTransaction = { navController.navigate(ChildRoutes.placeholder("Transaction detail")) },
+                    onEditPrice = {
+                        navController.navigate(
+                            ChildRoutes.editListing(
+                                listingId = listingId,
+                                jumpToStep = ListingComposeStep.Price.name,
+                            ),
+                        )
+                    },
                     onSort = { navController.navigate(ChildRoutes.placeholder("Sort offers")) },
                 )
             }
@@ -1659,6 +1690,27 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         // Marketplace, not the success screen.
                         navController.popBackStack()
                         navController.navigate(ChildRoutes.listingDetail(listingId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_LISTING,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.EDIT_LISTING_ID_KEY) { type = NavType.StringType },
+                        navArgument(ChildRoutes.EDIT_LISTING_JUMP_TO_STEP_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                    ),
+            ) {
+                ListingComposeWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenListingDetail = { _ -> navController.popBackStack() },
+                    onListingUpdated = { _ ->
+                        // Pop the edit wizard. The detail / offers screen
+                        // underneath refreshes from its own LaunchedEffect.
+                        navController.popBackStack()
                     },
                 )
             }
