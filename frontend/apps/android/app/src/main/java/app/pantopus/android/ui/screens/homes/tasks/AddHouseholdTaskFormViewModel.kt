@@ -93,49 +93,41 @@ enum class AddHouseholdTaskFormCategory(val rawValue: String) {
             title: String?,
         ): AddHouseholdTaskFormCategory {
             val lower = title.orEmpty().lowercase(Locale.US)
-            if (lower.isNotEmpty()) {
-                if (matchAny(lower, listOf("cook", "meal", "dinner", "lunch", "breakfast"))) return Cooking
-                if (matchAny(
-                        lower,
-                        listOf(
-                            "dish", "clean", "vacuum", "dust", "mop", "wipe",
-                            "scrub", "sweep", "tidy", "bathroom", "bedroom",
-                        ),
-                    )
-                ) {
-                    return Cleaning
-                }
-                if (matchAny(lower, listOf("trash", "garbage", "recycle", "recycling", "compost"))) return Cleaning
-                if (matchAny(
-                        lower,
-                        listOf(
-                            "water plants", "plants", "garden", "mow", "lawn",
-                            "rake", "leaves", "yard", "weed",
-                        ),
-                    )
-                ) {
-                    return Yardwork
-                }
-                if (matchAny(lower, listOf("dog", "cat", "puppy", " pet ", "litter box", "vet "))) return Pets
-                if (matchAny(lower, listOf("fix", "repair", "replace", "patch", "screw", "leak"))) return Repairs
-                if (matchAny(
-                        lower,
-                        listOf(
-                            "costco", "grocery", "groceries", "shopping",
-                            "shop ", "pickup", "pick up", "store run",
-                            "errand", "buy ",
-                        ),
-                    )
-                ) {
-                    return Shopping
-                }
-            }
-            return when (taskType?.lowercase(Locale.US)) {
+            val titleMatch =
+                titleCategoryRules.firstOrNull { (_, needles) ->
+                    lower.isNotEmpty() && matchAny(lower, needles)
+                }?.first
+
+            return titleMatch ?: when (taskType?.lowercase(Locale.US)) {
                 "shopping" -> Shopping
                 "repair" -> Repairs
                 else -> Other
             }
         }
+
+        private val titleCategoryRules: List<Pair<AddHouseholdTaskFormCategory, List<String>>> =
+            listOf(
+                Cooking to listOf("cook", "meal", "dinner", "lunch", "breakfast"),
+                Cleaning to
+                    listOf(
+                        "dish", "clean", "vacuum", "dust", "mop", "wipe",
+                        "scrub", "sweep", "tidy", "bathroom", "bedroom",
+                    ),
+                Cleaning to listOf("trash", "garbage", "recycle", "recycling", "compost"),
+                Yardwork to
+                    listOf(
+                        "water plants", "plants", "garden", "mow", "lawn",
+                        "rake", "leaves", "yard", "weed",
+                    ),
+                Pets to listOf("dog", "cat", "puppy", " pet ", "litter box", "vet "),
+                Repairs to listOf("fix", "repair", "replace", "patch", "screw", "leak"),
+                Shopping to
+                    listOf(
+                        "costco", "grocery", "groceries", "shopping",
+                        "shop ", "pickup", "pick up", "store run",
+                        "errand", "buy ",
+                    ),
+            )
 
         private fun matchAny(
             haystack: String,

@@ -86,7 +86,7 @@ class AddHouseholdTaskFormSnapshotTest {
                 AddHouseholdTaskLoaded(
                     state =
                         emptyAddState().copy(
-                            fields = seededFields(title = "Wash dishes"),
+                            fields = seededFields(title = SeededTitle("Wash dishes")),
                             isValid = true,
                             isDirty = true,
                             isSaving = true,
@@ -113,10 +113,13 @@ class AddHouseholdTaskFormSnapshotTest {
                         emptyAddState().copy(
                             fields =
                                 seededFields(
-                                    title = "Water plants",
+                                    title = SeededTitle("Water plants"),
                                     recurrence = AddHouseholdTaskRecurrence.Custom,
-                                    customInterval = "3",
-                                    customUnit = AddHouseholdTaskCustomUnit.Days,
+                                    customRecurrence =
+                                        SeededCustomRecurrence(
+                                            interval = "3",
+                                            unit = AddHouseholdTaskCustomUnit.Days,
+                                        ),
                                 ),
                             isValid = true,
                             isDirty = true,
@@ -148,8 +151,7 @@ class AddHouseholdTaskFormSnapshotTest {
                             emptyAddState().copy(
                                 fields =
                                     seededFields(
-                                        title = "",
-                                        titleError = "Title is required.",
+                                        title = SeededTitle(error = "Title is required."),
                                     ),
                                 isValid = false,
                                 isDirty = true,
@@ -218,7 +220,7 @@ class AddHouseholdTaskFormSnapshotTest {
         AddHouseholdTaskLoadedState(
             fields =
                 seededFields(
-                    title = "Take out trash",
+                    title = SeededTitle("Take out trash"),
                     notes = "Tuesday curbside.",
                     assignedTo = "user-1",
                     dueAt = "2026-06-01",
@@ -246,15 +248,13 @@ class AddHouseholdTaskFormSnapshotTest {
     /** Build a populated field map. Lets callers override individual
      *  fields to simulate dirty / error / picker poses. */
     private fun seededFields(
-        title: String = "",
-        titleError: String? = null,
+        title: SeededTitle = SeededTitle(),
         notes: String = "",
         assignedTo: String = "",
         dueAt: String = "",
         category: AddHouseholdTaskFormCategory = AddHouseholdTaskFormCategory.Other,
         recurrence: AddHouseholdTaskRecurrence = AddHouseholdTaskRecurrence.OneTime,
-        customInterval: String = "1",
-        customUnit: AddHouseholdTaskCustomUnit = AddHouseholdTaskCustomUnit.Weeks,
+        customRecurrence: SeededCustomRecurrence = SeededCustomRecurrence(),
     ): Map<AddHouseholdTaskField, FormFieldState> {
         fun seeded(
             field: AddHouseholdTaskField,
@@ -273,9 +273,9 @@ class AddHouseholdTaskFormSnapshotTest {
             AddHouseholdTaskField.Title to
                 seeded(
                     AddHouseholdTaskField.Title,
-                    value = title,
-                    error = titleError,
-                    touched = titleError != null,
+                    value = title.value,
+                    error = title.error,
+                    touched = title.error != null,
                 ),
             AddHouseholdTaskField.Notes to seeded(AddHouseholdTaskField.Notes, notes),
             AddHouseholdTaskField.AssignedTo to seeded(AddHouseholdTaskField.AssignedTo, assignedTo),
@@ -283,8 +283,18 @@ class AddHouseholdTaskFormSnapshotTest {
             AddHouseholdTaskField.Category to seeded(AddHouseholdTaskField.Category, category.rawValue),
             AddHouseholdTaskField.Recurrence to seeded(AddHouseholdTaskField.Recurrence, recurrence.rawValue),
             AddHouseholdTaskField.CustomInterval to
-                seeded(AddHouseholdTaskField.CustomInterval, customInterval),
-            AddHouseholdTaskField.CustomUnit to seeded(AddHouseholdTaskField.CustomUnit, customUnit.rawValue),
+                seeded(AddHouseholdTaskField.CustomInterval, customRecurrence.interval),
+            AddHouseholdTaskField.CustomUnit to seeded(AddHouseholdTaskField.CustomUnit, customRecurrence.unit.rawValue),
         )
     }
+
+    private data class SeededCustomRecurrence(
+        val interval: String = "1",
+        val unit: AddHouseholdTaskCustomUnit = AddHouseholdTaskCustomUnit.Weeks,
+    )
+
+    private data class SeededTitle(
+        val value: String = "",
+        val error: String? = null,
+    )
 }
