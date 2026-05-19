@@ -105,6 +105,12 @@ public struct GetHomeDocumentsResponse: Decodable, Sendable {
     public let documents: [HomeDocumentDTO]
 }
 
+/// Wrapper for the create response — backend returns
+/// `{ "document": HomeDocumentDTO }` on `POST /api/homes/:id/documents`.
+public struct CreateDocumentResponse: Decodable, Sendable {
+    public let document: HomeDocumentDTO
+}
+
 /// Request body for `POST /api/homes/:id/documents`. Backend rejects
 /// the call without `doc_type` + `title`.
 public struct CreateDocumentRequest: Encodable, Sendable {

@@ -96,6 +96,10 @@ public enum YouRoute: Hashable {
     /// T6.4b — Documents. The home-context "me.docs" action tile pushes
     /// here with the primary home id resolved by the VM.
     case homeDocs(homeId: String)
+    /// P2.10 — Upload document form for a home.
+    case uploadDocument(homeId: String)
+    /// P2.10 — Document detail (preview + metadata + footer actions).
+    case documentDetail(homeId: String, documentId: String)
     /// T6.3d — Packages. The home-context "me.packages" Activity row +
     /// the Home Dashboard "view_packages" quick action push here.
     case homePackages(homeId: String)
@@ -1056,14 +1060,14 @@ public struct YouTabRoot: View {
             DocumentsView(
                 viewModel: DocumentsViewModel(
                     homeId: homeId,
-                    onOpenDocument: { _ in
+                    onOpenDocument: { dto in
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Document detail"))
+                            path.append(.documentDetail(homeId: homeId, documentId: dto.id))
                         }
                     },
                     onUpload: {
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Upload document"))
+                            path.append(.uploadDocument(homeId: homeId))
                         }
                     },
                     onSearch: {
@@ -1076,12 +1080,36 @@ public struct YouTabRoot: View {
                             path.append(.placeholder(label: "Export documents"))
                         }
                     },
-                    onDocumentAction: { _, _ in
+                    onDocumentAction: { dto, _ in
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Document action"))
+                            path.append(.documentDetail(homeId: homeId, documentId: dto.id))
                         }
                     }
                 )
+            )
+        case let .uploadDocument(homeId):
+            UploadDocumentFormView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onUploaded: { _ in
+                    Task { @MainActor in
+                        path.removeAll { route in
+                            if case .uploadDocument = route { return true }
+                            return false
+                        }
+                    }
+                }
+            )
+        case let .documentDetail(homeId, documentId):
+            DocumentDetailView(
+                homeId: homeId,
+                documentId: documentId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onReplace: {
+                    Task { @MainActor in
+                        path.append(.uploadDocument(homeId: homeId))
+                    }
+                }
             )
         case let .homePackages(homeId):
             PackagesListView(

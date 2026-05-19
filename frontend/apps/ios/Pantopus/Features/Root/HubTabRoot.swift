@@ -33,6 +33,10 @@ public enum HubRoute: Hashable {
     case emergencyItem(homeId: String, emergencyId: String)
     /// Documents sub-screen for a specific home (T6.4b / P17).
     case homeDocs(homeId: String)
+    /// P2.10 — Upload document form for a home.
+    case uploadDocument(homeId: String)
+    /// P2.10 — Document detail (preview + metadata + footer actions).
+    case documentDetail(homeId: String, documentId: String)
     /// Packages list for a home (T6.3d / P14).
     case homePackages(homeId: String)
     /// Package detail (read-mostly summary with mark-picked-up).
@@ -623,14 +627,14 @@ public struct HubTabRoot: View {
             DocumentsView(
                 viewModel: DocumentsViewModel(
                     homeId: homeId,
-                    onOpenDocument: { _ in
+                    onOpenDocument: { dto in
                         Task { @MainActor in
-                            push(.placeholder(label: "Document detail"))
+                            push(.documentDetail(homeId: homeId, documentId: dto.id))
                         }
                     },
                     onUpload: {
                         Task { @MainActor in
-                            push(.placeholder(label: "Upload document"))
+                            push(.uploadDocument(homeId: homeId))
                         }
                     },
                     onSearch: {
@@ -643,12 +647,41 @@ public struct HubTabRoot: View {
                             push(.placeholder(label: "Export documents"))
                         }
                     },
-                    onDocumentAction: { _, _ in
+                    onDocumentAction: { dto, action in
                         Task { @MainActor in
-                            push(.placeholder(label: "Document action"))
+                            switch action {
+                            case .view:
+                                push(.documentDetail(homeId: homeId, documentId: dto.id))
+                            case .share, .download, .delete:
+                                push(.documentDetail(homeId: homeId, documentId: dto.id))
+                            }
                         }
                     }
                 )
+            )
+        case let .uploadDocument(homeId):
+            UploadDocumentFormView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onUploaded: { _ in
+                    Task { @MainActor in
+                        path.removeAll { route in
+                            if case .uploadDocument = route { return true }
+                            return false
+                        }
+                    }
+                }
+            )
+        case let .documentDetail(homeId, documentId):
+            DocumentDetailView(
+                homeId: homeId,
+                documentId: documentId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onReplace: {
+                    Task { @MainActor in
+                        push(.uploadDocument(homeId: homeId))
+                    }
+                }
             )
         case let .homePackages(homeId):
             PackagesListView(
