@@ -32,9 +32,10 @@ public struct EmergencyInfoDetailView: View {
         _viewModel = State(initialValue: EmergencyInfoDetailViewModel(
             homeId: homeId,
             emergencyId: emergencyId,
-            onChanged: onChanged,
-            onClose: { Task { @MainActor in onBack() } }
-        ))
+            onChanged: onChanged
+        ) {
+            Task { @MainActor in onBack() }
+        })
     }
 
     public var body: some View {
@@ -74,6 +75,7 @@ public struct EmergencyInfoDetailView: View {
                         viewModel: AddEmergencyInfoFormViewModel(
                             homeId: homeId,
                             mode: .edit(draft),
+                            // swiftlint:disable:next trailing_closure
                             onUpdated: { [viewModel] updated in
                                 Task { @MainActor in viewModel.apply(updated: updated) }
                             }
@@ -348,7 +350,6 @@ private struct ActionsRow: View {
 #Preview {
     EmergencyInfoDetailView(
         homeId: "preview",
-        emergencyId: "preview-1",
-        onBack: {}
-    )
+        emergencyId: "preview-1"
+    ) {}
 }

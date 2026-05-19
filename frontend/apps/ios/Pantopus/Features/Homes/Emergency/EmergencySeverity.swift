@@ -20,7 +20,9 @@ public enum EmergencySeverity: String, CaseIterable, Sendable, Identifiable {
     case caution
     case critical
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {

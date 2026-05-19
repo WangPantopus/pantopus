@@ -130,7 +130,7 @@ public final class AddEmergencyInfoFormViewModel {
     private let originalSeverity: EmergencySeverity?
     private let originalVerifiedByUserId: String?
 
-    public init(
+    init(
         homeId: String,
         mode: Mode = .create,
         api: APIClient = .shared,
@@ -209,7 +209,7 @@ public final class AddEmergencyInfoFormViewModel {
             let response: OccupantsResponse = try await api.request(
                 HomesEndpoints.listOccupants(homeId: homeId)
             )
-            members = response.occupants.filter { $0.isActive }
+            members = response.occupants.filter(\.isActive)
         } catch {
             members = []
         }

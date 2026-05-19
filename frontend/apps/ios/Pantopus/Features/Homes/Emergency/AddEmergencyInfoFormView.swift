@@ -36,16 +36,18 @@ public struct AddEmergencyInfoFormView: View {
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: { dismiss() },
-            onCommit: commit
-        ) {
-            categorySection
-            titleSection
-            if viewModel.category.supportsSeverity {
-                severitySection
+            onCommit: commit,
+            // swiftlint:disable:next trailing_closure
+            content: {
+                categorySection
+                titleSection
+                if viewModel.category.supportsSeverity {
+                    severitySection
+                }
+                detailsSection
+                verifiedBySection
             }
-            detailsSection
-            verifiedBySection
-        }
+        )
         .background(Theme.Color.appBg)
         .task { await viewModel.loadMembers() }
         .accessibilityIdentifier("addEmergencyInfoForm")
@@ -93,7 +95,7 @@ public struct AddEmergencyInfoFormView: View {
         FormFieldGroup("Category") {
             VStack(spacing: Spacing.s2) {
                 let categories = EmergencyFormCategory.allCases
-                ForEach(0 ..< (categories.count + 1) / 2, id: \.self) { rowIndex in
+                ForEach(0..<(categories.count + 1) / 2, id: \.self) { rowIndex in
                     HStack(spacing: Spacing.s2) {
                         let left = categories[rowIndex * 2]
                         CategoryTile(

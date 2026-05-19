@@ -24,7 +24,9 @@ public enum EmergencyFormCategory: String, CaseIterable, Sendable, Identifiable 
     case powerOfAttorney = "power_of_attorney"
     case other
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Long-form label rendered on the category picker.
     public var label: String {
@@ -82,7 +84,9 @@ public enum EmergencyFormCategory: String, CaseIterable, Sendable, Identifiable 
     /// The server stores `type` as a free-form string so adding the
     /// seven form-side values alongside the nine list-of-rows values
     /// does not break the existing list projection.
-    public var backendType: String { rawValue }
+    public var backendType: String {
+        rawValue
+    }
 
     /// Resolve the form category for a backend type string. Returns
     /// `nil` for the legacy list-of-rows types (`shutoff_water` etc.)

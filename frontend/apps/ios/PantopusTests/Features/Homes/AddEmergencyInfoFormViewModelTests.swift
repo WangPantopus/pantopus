@@ -130,9 +130,10 @@ final class AddEmergencyInfoFormViewModelTests: XCTestCase {
         let vm = AddEmergencyInfoFormViewModel(
             homeId: "home-1",
             mode: .create,
-            api: makeAPI(),
-            onCreated: { dto in received.value = dto }
-        )
+            api: makeAPI()
+        ) { dto in
+            received.value = dto
+        }
         vm.category = .allergy
         vm.severity = .critical
         vm.updateTitle("Penicillin allergy")
@@ -184,6 +185,7 @@ final class AddEmergencyInfoFormViewModelTests: XCTestCase {
             homeId: "home-1",
             mode: .edit(draft),
             api: makeAPI(),
+            // swiftlint:disable:next trailing_closure
             onUpdated: { received.value = $0 }
         )
         vm.severity = .critical
@@ -251,8 +253,11 @@ final class AddEmergencyInfoFormViewModelTests: XCTestCase {
     }
 
     func testCriticalSeverityUsesErrorAndAlertIcon() {
-        XCTAssertEqual(EmergencySeverity.critical.icon, .alertTriangle,
-                       "Critical must pair with the alert-triangle glyph")
+        XCTAssertEqual(
+            EmergencySeverity.critical.icon,
+            .alertTriangle,
+            "Critical must pair with the alert-triangle glyph"
+        )
     }
 
     func testInfoSeverityUsesPrimaryTokens() {
@@ -266,5 +271,7 @@ final class AddEmergencyInfoFormViewModelTests: XCTestCase {
 /// `@Sendable` callbacks under the strict-concurrency checker.
 private final class Locked<T>: @unchecked Sendable {
     var value: T
-    init(_ value: T) { self.value = value }
+    init(_ value: T) {
+        self.value = value
+    }
 }

@@ -38,7 +38,7 @@ public final class EmergencyInfoDetailViewModel {
     private let onChanged: @Sendable () -> Void
     private let onClose: @Sendable () -> Void
 
-    public init(
+    init(
         homeId: String,
         emergencyId: String,
         api: APIClient = .shared,

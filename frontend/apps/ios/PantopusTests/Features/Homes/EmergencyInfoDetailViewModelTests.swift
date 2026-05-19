@@ -91,8 +91,11 @@ final class EmergencyInfoDetailViewModelTests: XCTestCase {
             XCTFail("Expected loaded, got \(vm.state)")
             return
         }
-        XCTAssertEqual(draft.category, .other,
-                       "Legacy backend types fall back to .other category in the detail surface")
+        XCTAssertEqual(
+            draft.category,
+            .other,
+            "Legacy backend types fall back to .other category in the detail surface"
+        )
         XCTAssertEqual(draft.title, "Main water")
         XCTAssertEqual(draft.details, "Behind heater")
     }

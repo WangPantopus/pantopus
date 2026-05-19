@@ -83,6 +83,12 @@ public struct GetHomeEmergenciesResponse: Decodable, Sendable {
     public let emergencies: [HomeEmergencyDTO]
 }
 
+/// Wrapper for the create response — backend returns
+/// `{ "emergency": HomeEmergencyDTO }` (`backend/routes/home.js:5682`).
+public struct CreateEmergencyResponse: Decodable, Sendable {
+    public let emergency: HomeEmergencyDTO
+}
+
 /// Request body for `POST /api/homes/:id/emergencies`. Backend rejects
 /// the call without `type` + `label`.
 public struct CreateEmergencyRequest: Encodable, Sendable {

@@ -959,25 +959,21 @@ public struct YouTabRoot: View {
             )
         case let .addEmergencyInfo(homeId):
             AddEmergencyInfoFormView(
-                viewModel: AddEmergencyInfoFormViewModel(
-                    homeId: homeId,
-                    onCreated: { _ in
-                        Task { @MainActor in
-                            if !path.isEmpty { path.removeLast() }
-                        }
-                    }
-                )
-            )
-        case let .emergencyItem(homeId, emergencyId):
-            EmergencyInfoDetailView(
-                homeId: homeId,
-                emergencyId: emergencyId,
-                onBack: {
+                viewModel: AddEmergencyInfoFormViewModel(homeId: homeId) { _ in
                     Task { @MainActor in
                         if !path.isEmpty { path.removeLast() }
                     }
                 }
             )
+        case let .emergencyItem(homeId, emergencyId):
+            EmergencyInfoDetailView(
+                homeId: homeId,
+                emergencyId: emergencyId
+            ) {
+                Task { @MainActor in
+                    if !path.isEmpty { path.removeLast() }
+                }
+            }
         case let .homeDocs(homeId):
             DocumentsView(
                 viewModel: DocumentsViewModel(
