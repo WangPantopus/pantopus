@@ -449,16 +449,24 @@ public struct AudienceProfileView: View {
     // MARK: - Followers tab
 
     private func followersTab(_ loaded: AudienceProfileLoaded) -> some View {
-        ScrollView {
+        let visible = viewModel.visibleFollowers
+        let hasQuery = !viewModel.followerSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 analyticsRow(loaded.analyticsCells)
                 tierStackedBar(loaded.tierBreakdown)
                 tierChipRow(loaded.tierChips)
-                if viewModel.visibleFollowers.isEmpty {
-                    emptyFollowersState
+                followerSearchField
+                followerSortChipRow
+                if visible.isEmpty {
+                    if hasQuery {
+                        emptyFollowerSearchState
+                    } else {
+                        emptyFollowersState
+                    }
                 } else {
                     VStack(spacing: 8) {
-                        ForEach(viewModel.visibleFollowers) { follower in
+                        ForEach(visible) { follower in
                             followerRow(follower)
                         }
                     }
@@ -468,6 +476,104 @@ public struct AudienceProfileView: View {
             .padding(16)
         }
         .accessibilityIdentifier("audienceProfileFollowersList")
+    }
+
+    private var followerSearchField: some View {
+        HStack(spacing: 8) {
+            Icon(.search, size: 15, color: Theme.Color.appTextMuted)
+            TextField(
+                "Search followers by name or handle",
+                text: Binding(
+                    get: { viewModel.followerSearchText },
+                    set: { viewModel.followerSearchText = $0 }
+                )
+            )
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Theme.Color.appText)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled(true)
+            .submitLabel(.search)
+            .accessibilityIdentifier("followerSearchInput")
+            if !viewModel.followerSearchText.isEmpty {
+                Button {
+                    viewModel.followerSearchText = ""
+                } label: {
+                    Icon(.x, size: 14, color: Theme.Color.appTextSecondary)
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+                .accessibilityIdentifier("followerSearchClear")
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 40)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .accessibilityIdentifier("followerSearchField")
+    }
+
+    private var followerSortChipRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(FollowerSort.allCases, id: \.self) { sort in
+                    followerSortChip(sort)
+                }
+            }
+        }
+        .accessibilityIdentifier("followerSortChipRow")
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Sort followers")
+    }
+
+    private func followerSortChip(_ sort: FollowerSort) -> some View {
+        let isActive = viewModel.followerSort == sort
+        return Button {
+            viewModel.selectFollowerSort(sort)
+        } label: {
+            HStack(spacing: 4) {
+                if isActive {
+                    Icon(.check, size: 11, strokeWidth: 2.6, color: Theme.Color.appTextInverse)
+                }
+                Text(sort.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isActive ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+            .background(isActive ? Theme.Color.primary600 : Theme.Color.appSurface)
+            .overlay(
+                Capsule().stroke(
+                    isActive ? Theme.Color.primary600 : Theme.Color.appBorder,
+                    lineWidth: 1
+                )
+            )
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(sort.title)
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+        .accessibilityIdentifier("followerSortChip_\(sort.rawValue)")
+    }
+
+    private var emptyFollowerSearchState: some View {
+        VStack(spacing: 8) {
+            Icon(.search, size: 32, color: Theme.Color.appTextMuted)
+            Text("No followers match that search")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+            Text("Try a different name or handle.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("followerSearchEmpty")
     }
 
     private func analyticsRow(_ cells: [AnalyticsCellContent]) -> some View {

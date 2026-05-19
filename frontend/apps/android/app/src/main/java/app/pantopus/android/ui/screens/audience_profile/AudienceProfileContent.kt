@@ -11,6 +11,18 @@ enum class AudienceProfileTab(val key: String, val title: String) {
     Threads("threads", "Threads"),
 }
 
+/**
+ * Single-select sort order for the Followers list. Default is
+ * [NewestActive] — the natural API order, which the backend serves
+ * most-recently-active-first.
+ */
+enum class FollowerSort(val key: String, val title: String) {
+    NewestActive("newestActive", "Newest active"),
+    HighestTier("highestTier", "Highest tier"),
+    RecentlyJoined("recentlyJoined", "Recently joined"),
+    MostEngaged("mostEngaged", "Most engaged"),
+}
+
 /** Tier visibility for the Updates composer. Matches the backend enum. */
 enum class UpdateVisibility(val wire: String, val title: String) {
     Public("public", "Public"),
@@ -100,6 +112,8 @@ data class FollowerRowContent(
     val tierName: String,
     val tierRank: Int,
     val tenureLabel: String?,
+    val tenureMonths: Int?,
+    val joinedMonth: String?,
     val verifiedLocal: Boolean,
 )
 

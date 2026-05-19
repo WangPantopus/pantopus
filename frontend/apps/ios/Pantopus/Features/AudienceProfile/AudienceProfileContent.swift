@@ -26,6 +26,25 @@ public enum AudienceProfileTab: String, Sendable, Hashable, CaseIterable {
     }
 }
 
+/// Single-select sort order for the Followers list. Default is
+/// `.newestActive` — the natural API order, which the backend serves
+/// most-recently-active-first.
+public enum FollowerSort: String, Sendable, Hashable, CaseIterable {
+    case newestActive
+    case highestTier
+    case recentlyJoined
+    case mostEngaged
+
+    public var title: String {
+        switch self {
+        case .newestActive: "Newest active"
+        case .highestTier: "Highest tier"
+        case .recentlyJoined: "Recently joined"
+        case .mostEngaged: "Most engaged"
+        }
+    }
+}
+
 /// Tier visibility for the Updates composer. Mirrors the backend's
 /// `visibility` enum exactly.
 public enum UpdateVisibility: String, Sendable, Hashable, CaseIterable {
@@ -187,6 +206,8 @@ public struct FollowerRowContent: Sendable, Hashable, Identifiable {
     public let tierName: String
     public let tierRank: Int
     public let tenureLabel: String?
+    public let tenureMonths: Int?
+    public let joinedMonth: String?
     public let verifiedLocal: Bool
 
     public init(
@@ -197,6 +218,8 @@ public struct FollowerRowContent: Sendable, Hashable, Identifiable {
         tierName: String,
         tierRank: Int,
         tenureLabel: String?,
+        tenureMonths: Int?,
+        joinedMonth: String?,
         verifiedLocal: Bool
     ) {
         self.id = id
@@ -206,6 +229,8 @@ public struct FollowerRowContent: Sendable, Hashable, Identifiable {
         self.tierName = tierName
         self.tierRank = tierRank
         self.tenureLabel = tenureLabel
+        self.tenureMonths = tenureMonths
+        self.joinedMonth = joinedMonth
         self.verifiedLocal = verifiedLocal
     }
 }

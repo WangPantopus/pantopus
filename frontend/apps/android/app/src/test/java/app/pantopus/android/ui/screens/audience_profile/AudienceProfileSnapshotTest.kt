@@ -56,6 +56,65 @@ class AudienceProfileSnapshotTest {
     }
 
     @Test
+    fun audience_profile_followers_sort_highest_tier() {
+        paparazzi.snapshot {
+            Frame {
+                LoadedFrame(
+                    state =
+                        sampleFrameState(
+                            activeTab = AudienceProfileTab.Followers,
+                            followerSort = FollowerSort.HighestTier,
+                            visibleFollowers =
+                                AudienceProfileViewModel.sortFollowers(
+                                    sampleLoaded().followers,
+                                    FollowerSort.HighestTier,
+                                ),
+                        ),
+                    actions = sampleFrameActions(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun audience_profile_followers_search_populated() {
+        paparazzi.snapshot {
+            Frame {
+                LoadedFrame(
+                    state =
+                        sampleFrameState(
+                            activeTab = AudienceProfileTab.Followers,
+                            searchText = "billie",
+                            visibleFollowers =
+                                sampleLoaded().followers.filter {
+                                    it.displayName.contains("Billie", true) ||
+                                        it.handle.contains("billie", true)
+                                },
+                        ),
+                    actions = sampleFrameActions(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun audience_profile_followers_search_empty() {
+        paparazzi.snapshot {
+            Frame {
+                LoadedFrame(
+                    state =
+                        sampleFrameState(
+                            activeTab = AudienceProfileTab.Followers,
+                            searchText = "zzz",
+                            visibleFollowers = emptyList(),
+                        ),
+                    actions = sampleFrameActions(),
+                )
+            }
+        }
+    }
+
+    @Test
     fun audience_profile_threads_tab() {
         paparazzi.snapshot {
             Frame {
@@ -73,6 +132,8 @@ class AudienceProfileSnapshotTest {
 
     private fun sampleFrameState(
         activeTab: AudienceProfileTab,
+        followerSort: FollowerSort = FollowerSort.NewestActive,
+        searchText: String = "",
         visibleFollowers: List<FollowerRowContent> = sampleLoaded().followers,
     ): AudienceProfileLoadedFrameState =
         AudienceProfileLoadedFrameState(
@@ -80,6 +141,8 @@ class AudienceProfileSnapshotTest {
             activeTab = activeTab,
             composer = UpdateComposerState(),
             selectedTier = null,
+            followerSearchText = searchText,
+            followerSort = followerSort,
             visibleFollowers = visibleFollowers,
         )
 
@@ -87,6 +150,8 @@ class AudienceProfileSnapshotTest {
         AudienceProfileLoadedFrameActions(
             onSelectTab = {},
             onSelectTier = {},
+            onFollowerSearch = {},
+            onFollowerSort = {},
             composer =
                 AudienceProfileComposerActions(
                     onText = {},
@@ -167,6 +232,8 @@ class AudienceProfileSnapshotTest {
                         tierName = "Followers",
                         tierRank = 1,
                         tenureLabel = "3 mo.",
+                        tenureMonths = 3,
+                        joinedMonth = "2026-02",
                         verifiedLocal = true,
                     ),
                     FollowerRowContent(
@@ -177,6 +244,8 @@ class AudienceProfileSnapshotTest {
                         tierName = "Members",
                         tierRank = 2,
                         tenureLabel = "12 mo.",
+                        tenureMonths = 12,
+                        joinedMonth = "2025-05",
                         verifiedLocal = false,
                     ),
                     FollowerRowContent(
@@ -187,6 +256,8 @@ class AudienceProfileSnapshotTest {
                         tierName = "Insiders",
                         tierRank = 3,
                         tenureLabel = "6 mo.",
+                        tenureMonths = 6,
+                        joinedMonth = "2025-11",
                         verifiedLocal = false,
                     ),
                 ),

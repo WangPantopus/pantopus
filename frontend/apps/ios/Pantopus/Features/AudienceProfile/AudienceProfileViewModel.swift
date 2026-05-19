@@ -21,6 +21,8 @@ public final class AudienceProfileViewModel {
     public private(set) var state: AudienceProfileState = .loading
     public var activeTab: AudienceProfileTab = .updates
     public var selectedTierRank: Int?
+    public var followerSearchText: String = ""
+    public var followerSort: FollowerSort = .newestActive
     public var composer: UpdateComposerState = .init()
 
     private let api: APIClient
@@ -85,6 +87,10 @@ public final class AudienceProfileViewModel {
         selectedTierRank = rank
     }
 
+    public func selectFollowerSort(_ sort: FollowerSort) {
+        followerSort = sort
+    }
+
     /// POST the composer's body to the persona's broadcast channel.
     /// On success the composer text clears and `load()` reruns so the
     /// updates feed picks up the new row.
@@ -110,13 +116,67 @@ public final class AudienceProfileViewModel {
         }
     }
 
-    /// Followers filtered by `selectedTierRank`.
+    /// Followers narrowed by `selectedTierRank`, then `followerSearchText`
+    /// (display name + handle, case-insensitive), then ordered by
+    /// `followerSort`. The default sort `.newestActive` preserves the
+    /// natural API order — the backend already serves most-recently-
+    /// active first.
     public var visibleFollowers: [FollowerRowContent] {
         guard case let .loaded(loaded) = state else { return [] }
+        var rows = loaded.followers
         if let rank = selectedTierRank {
-            return loaded.followers.filter { $0.tierRank == rank }
+            rows = rows.filter { $0.tierRank == rank }
         }
-        return loaded.followers
+        let query = followerSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !query.isEmpty {
+            rows = rows.filter { row in
+                row.displayName.lowercased().contains(query)
+                    || row.handle.lowercased().contains(query)
+            }
+        }
+        return Self.sortFollowers(rows, by: followerSort)
+    }
+
+    static func sortFollowers(
+        _ rows: [FollowerRowContent],
+        by sort: FollowerSort
+    ) -> [FollowerRowContent] {
+        if sort == .newestActive { return rows }
+        let indexed = Array(rows.enumerated())
+        switch sort {
+        case .newestActive:
+            return rows
+        case .highestTier:
+            return indexed
+                .sorted { lhs, rhs in
+                    if lhs.element.tierRank != rhs.element.tierRank {
+                        return lhs.element.tierRank > rhs.element.tierRank
+                    }
+                    return lhs.offset < rhs.offset
+                }
+                .map(\.element)
+        case .recentlyJoined:
+            return indexed
+                .sorted { lhs, rhs in
+                    let lhsKey = lhs.element.tenureMonths ?? Int.max
+                    let rhsKey = rhs.element.tenureMonths ?? Int.max
+                    if lhsKey != rhsKey { return lhsKey < rhsKey }
+                    return lhs.offset < rhs.offset
+                }
+                .map(\.element)
+        case .mostEngaged:
+            return indexed
+                .sorted { lhs, rhs in
+                    if lhs.element.tierRank != rhs.element.tierRank {
+                        return lhs.element.tierRank > rhs.element.tierRank
+                    }
+                    let lhsKey = lhs.element.tenureMonths ?? -1
+                    let rhsKey = rhs.element.tenureMonths ?? -1
+                    if lhsKey != rhsKey { return lhsKey > rhsKey }
+                    return lhs.offset < rhs.offset
+                }
+                .map(\.element)
+        }
     }
 
     // MARK: - Projection
@@ -232,6 +292,8 @@ public final class AudienceProfileViewModel {
             tierName: tierName,
             tierRank: rank,
             tenureLabel: tenure,
+            tenureMonths: dto.tenureMonths,
+            joinedMonth: dto.joinedMonth,
             verifiedLocal: dto.verifiedLocal ?? false
         )
     }
