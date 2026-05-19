@@ -133,6 +133,12 @@ public enum ListingsEndpoints {
     /// + conditions enums. Route `backend/routes/listings.js:1176`.
     public static let categories = Endpoint(method: .get, path: "/api/listings/categories")
 
+    /// `POST /api/listings` — create a new marketplace listing.
+    /// Route `backend/routes/listings.js:426`.
+    public static func create(_ request: CreateListingRequest) -> Endpoint {
+        Endpoint(method: .post, path: "/api/listings", body: request)
+    }
+
     /// `GET /api/listings/:id` — single-listing detail wrapper.
     public static func detail(id: String) -> Endpoint {
         Endpoint(method: .get, path: "/api/listings/\(id)")

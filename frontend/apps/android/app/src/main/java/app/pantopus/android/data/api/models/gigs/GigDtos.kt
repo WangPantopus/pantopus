@@ -143,3 +143,46 @@ data class MarkCompletedBody(
 data class MarkCompletedResponse(
     val message: String? = null,
 )
+
+/**
+ * Body for `POST /api/gigs`. Mirrors the subset of the backend's
+ * `createGigSchema` the Post-a-Task wizard surfaces
+ * (`backend/routes/gigs.js:425`). Optional fields are nullable so Moshi
+ * omits them from the JSON when unset.
+ */
+@JsonClass(generateAdapter = true)
+data class CreateGigBody(
+    val title: String,
+    val description: String,
+    val category: String? = null,
+    val price: Double,
+    @Json(name = "pay_type") val payType: String? = null,
+    @Json(name = "schedule_type") val scheduleType: String? = null,
+    @Json(name = "scheduled_start") val scheduledStart: String? = null,
+    @Json(name = "task_format") val taskFormat: String? = null,
+    val attachments: List<String>? = null,
+    val location: CreateGigLocation,
+)
+
+/**
+ * Nested `location` object the backend requires
+ * (`backend/routes/gigs.js:521`).
+ */
+@JsonClass(generateAdapter = true)
+data class CreateGigLocation(
+    val mode: String,
+    val latitude: Double,
+    val longitude: Double,
+    val address: String,
+    val city: String? = null,
+    val state: String? = null,
+    val zip: String? = null,
+    val homeId: String? = null,
+)
+
+/** Envelope from `POST /api/gigs`. */
+@JsonClass(generateAdapter = true)
+data class CreateGigResponse(
+    val gig: GigDto,
+    val message: String? = null,
+)

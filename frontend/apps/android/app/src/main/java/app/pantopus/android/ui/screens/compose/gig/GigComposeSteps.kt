@@ -1,0 +1,233 @@
+@file:Suppress("PackageNaming")
+
+package app.pantopus.android.ui.screens.compose.gig
+
+/**
+ * The six pre-success steps of the Post-a-Task wizard, in order. The
+ * success state is a sentinel terminal step used to render the success
+ * hero block.
+ */
+enum class GigComposeStep(
+    val ordinal0: Int,
+) {
+    Category(0),
+    Basics(1),
+    Budget(2),
+    Schedule(3),
+    Location(4),
+    Review(5),
+    Success(6),
+    ;
+
+    /**
+     * One-indexed position used in the "N of M" top-bar readout, or
+     * `null` for the success terminal.
+     */
+    val stepNumber: Int?
+        get() =
+            when (this) {
+                Category -> 1
+                Basics -> 2
+                Budget -> 3
+                Schedule -> 4
+                Location -> 5
+                Review -> 6
+                Success -> null
+            }
+
+    companion object {
+        /** Total number of "step N of M" steps shown in the readout. */
+        const val PROGRESS_TOTAL: Int = 6
+
+        fun fromOrdinal(value: Int): GigComposeStep = entries.firstOrNull { it.ordinal0 == value } ?: Category
+    }
+}
+
+/**
+ * One-of-nine category the user picks in step 1. Mirrors the chip
+ * palette in `gigs-frames.jsx` CATS plus an `Other` bucket that is
+ * surfaced in the composer but not in the feed filter.
+ */
+enum class GigComposeCategory(
+    val key: String,
+    val label: String,
+) {
+    Handyman("handyman", "Handyman"),
+    Cleaning("cleaning", "Cleaning"),
+    Moving("moving", "Moving"),
+    PetCare("petcare", "Pet care"),
+    ChildCare("childcare", "Child care"),
+    Tutoring("tutoring", "Tutoring"),
+    Delivery("delivery", "Delivery"),
+    Tech("tech", "Tech"),
+    Other("other", "Other"),
+    ;
+
+    companion object {
+        /**
+         * Maps a `GigsCategory.key` (or any unrecognised string) into
+         * the compose enum. Used so the Hub's category-specific entry
+         * preselects the right tile.
+         */
+        fun fromRawKey(raw: String?): GigComposeCategory? {
+            val key = raw?.lowercase().orEmpty()
+            if (key.isEmpty() || key == "all") return null
+            return entries.firstOrNull { it.key == key }
+        }
+    }
+}
+
+/** Budget-type radio in step 3. */
+enum class GigComposeBudgetType(
+    val wireValue: String,
+    val label: String,
+) {
+    Fixed("fixed", "Fixed price"),
+    Hourly("hourly", "Hourly"),
+    Offers("offers", "Open to bids"),
+    ;
+
+    fun subcopy(): String =
+        when (this) {
+            Fixed -> "One total price for the whole job."
+            Hourly -> "Pay by the hour worked."
+            Offers -> "Helpers send their own price and you pick."
+        }
+}
+
+/** Schedule-type radio in step 4. */
+enum class GigComposeScheduleType(
+    val label: String,
+) {
+    OneTime("One-time"),
+    Recurring("Recurring"),
+    Flexible("Flexible"),
+    ;
+
+    /**
+     * Wire value forwarded as `schedule_type` to `POST /api/gigs`.
+     * `Recurring` maps to `flexible` until the backend gains a true
+     * recurring schedule_type — the spec surfaces it in the UI but the
+     * API doesn't model it yet.
+     */
+    val wireValue: String
+        get() =
+            when (this) {
+                OneTime -> "scheduled"
+                Recurring -> "flexible"
+                Flexible -> "flexible"
+            }
+
+    fun subcopy(): String =
+        when (this) {
+            OneTime -> "A single date and time."
+            Recurring -> "Repeats on a regular cadence."
+            Flexible -> "Whenever works for both of you."
+        }
+}
+
+/** Location-mode radio in step 5. */
+enum class GigComposeLocationMode(
+    val label: String,
+) {
+    YourAddress("Your address"),
+    APlace("A place"),
+    Virtual("Virtual"),
+    ;
+
+    val wireMode: String
+        get() =
+            when (this) {
+                YourAddress -> "home"
+                APlace -> "address"
+                Virtual -> "custom"
+            }
+
+    fun subcopy(): String =
+        when (this) {
+            YourAddress -> "Helpers come to the address on your account."
+            APlace -> "Helpers come to a different address you'll enter."
+            Virtual -> "Done over phone, video, or messages — no on-site visit."
+        }
+}
+
+/** Plain-old-data address fields collected in step 5 for `APlace`. */
+data class GigComposePlaceAddress(
+    val line1: String = "",
+    val city: String = "",
+    val state: String = "",
+    val zip: String = "",
+) {
+    val isComplete: Boolean
+        get() =
+            line1.trim().isNotEmpty() &&
+                city.trim().isNotEmpty() &&
+                state.trim().isNotEmpty() &&
+                zip.trim().isNotEmpty()
+}
+
+/**
+ * Validation constants enforced at the UI layer. The backend also
+ * validates (`backend/routes/gigs.js:425`); these mirror the prompt's
+ * stricter UI rules.
+ */
+object GigComposeLimits {
+    const val TITLE_MIN: Int = 5
+    const val TITLE_MAX: Int = 100
+    const val DESCRIPTION_MIN: Int = 20
+    const val DESCRIPTION_MAX: Int = 2000
+    const val MAX_PHOTOS: Int = 6
+}
+
+/**
+ * Snapshot of all wizard form state. Mirrored into [androidx.lifecycle.SavedStateHandle]
+ * so the wizard survives config changes and process death.
+ */
+data class GigComposeFormState(
+    val step: Int = GigComposeStep.Category.ordinal0,
+    val category: GigComposeCategory? = null,
+    val title: String = "",
+    val description: String = "",
+    val photoIds: List<String> = emptyList(),
+    val budgetType: GigComposeBudgetType? = null,
+    val budgetMin: String = "",
+    val budgetMax: String = "",
+    val scheduleType: GigComposeScheduleType? = null,
+    val scheduledStartISO: String? = null,
+    val locationMode: GigComposeLocationMode? = null,
+    val placeAddress: GigComposePlaceAddress = GigComposePlaceAddress(),
+) {
+    val currentStep: GigComposeStep
+        get() = GigComposeStep.fromOrdinal(step)
+
+    /** True when any user-visible field carries data — drives the close-confirm gate. */
+    val hasAnyData: Boolean
+        get() =
+            category != null ||
+                title.isNotEmpty() ||
+                description.isNotEmpty() ||
+                photoIds.isNotEmpty() ||
+                budgetType != null ||
+                budgetMin.isNotEmpty() ||
+                budgetMax.isNotEmpty() ||
+                scheduleType != null ||
+                scheduledStartISO != null ||
+                locationMode != null ||
+                placeAddress.isComplete ||
+                placeAddress.line1.isNotEmpty()
+
+    companion object {
+        val EMPTY = GigComposeFormState()
+    }
+}
+
+/** Outbound navigation events the screen consumes. */
+sealed interface GigComposeOutboundEvent {
+    /** Pop the wizard with no further navigation. */
+    data object Dismiss : GigComposeOutboundEvent
+
+    /** Pop the wizard and route to the newly-created gig's detail. */
+    data class OpenGigDetail(
+        val gigId: String,
+    ) : GigComposeOutboundEvent
+}

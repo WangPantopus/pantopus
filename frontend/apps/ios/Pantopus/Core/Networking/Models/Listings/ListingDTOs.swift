@@ -148,6 +148,86 @@ public struct ListingDetailResponse: Decodable, Sendable {
     public let listing: ListingDTO
 }
 
+/// Body for `POST /api/listings`. Mirrors the destructure at
+/// `backend/routes/listings.js:430`. The wizard sends the commonly-used
+/// subset; backend defaults take care of the rest (visibility scope,
+/// radius, expirations, geocode provenance, …).
+public struct CreateListingRequest: Encodable, Sendable {
+    public let title: String
+    public let description: String?
+    public let price: Double?
+    public let isFree: Bool
+    public let category: String
+    public let condition: String?
+    public let mediaUrls: [String]
+    public let layer: String
+    public let listingType: String
+    public let latitude: Double?
+    public let longitude: Double?
+    public let locationName: String?
+    public let locationAddress: String?
+    public let meetupPreference: String?
+    public let deliveryAvailable: Bool
+    public let isWanted: Bool
+
+    public init(
+        title: String,
+        description: String?,
+        price: Double?,
+        isFree: Bool,
+        category: String,
+        condition: String?,
+        mediaUrls: [String],
+        layer: String,
+        listingType: String,
+        latitude: Double?,
+        longitude: Double?,
+        locationName: String?,
+        locationAddress: String?,
+        meetupPreference: String?,
+        deliveryAvailable: Bool,
+        isWanted: Bool
+    ) {
+        self.title = title
+        self.description = description
+        self.price = price
+        self.isFree = isFree
+        self.category = category
+        self.condition = condition
+        self.mediaUrls = mediaUrls
+        self.layer = layer
+        self.listingType = listingType
+        self.latitude = latitude
+        self.longitude = longitude
+        self.locationName = locationName
+        self.locationAddress = locationAddress
+        self.meetupPreference = meetupPreference
+        self.deliveryAvailable = deliveryAvailable
+        self.isWanted = isWanted
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case title, description, price
+        case isFree
+        case category, condition
+        case mediaUrls
+        case layer
+        case listingType
+        case latitude, longitude
+        case locationName
+        case locationAddress
+        case meetupPreference
+        case deliveryAvailable
+        case isWanted
+    }
+}
+
+/// Envelope from `POST /api/listings` (status 201).
+public struct CreateListingResponse: Decodable, Sendable {
+    public let message: String?
+    public let listing: ListingDTO
+}
+
 /// Envelope from `POST /api/listings/:id/message`.
 public struct MessageListingResponse: Decodable, Sendable {
     public let message: String?
