@@ -66,6 +66,14 @@ import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_BILL_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.BillDetailScreen
 import app.pantopus.android.ui.screens.homes.bills.BillsListScreen
+import app.pantopus.android.ui.screens.homes.calendar.ADD_EVENT_EVENT_ID_KEY
+import app.pantopus.android.ui.screens.homes.calendar.ADD_EVENT_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.calendar.ADD_EVENT_PREFILLED_CATEGORY_KEY
+import app.pantopus.android.ui.screens.homes.calendar.AddEventCommit
+import app.pantopus.android.ui.screens.homes.calendar.AddEventFormScreen
+import app.pantopus.android.ui.screens.homes.calendar.EVENT_DETAIL_EVENT_ID_KEY
+import app.pantopus.android.ui.screens.homes.calendar.EVENT_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.calendar.EventDetailScreen
 import app.pantopus.android.ui.screens.homes.calendar.HOME_CALENDAR_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.calendar.HomeCalendarScreen
 import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
@@ -198,6 +206,46 @@ private object ChildRoutes {
 
     /** Build the concrete path for a home calendar. */
     fun homeCalendar(homeId: String): String = "homes/$homeId/calendar"
+
+    /**
+     * P2.7 — Add / edit calendar event form. Optional query params carry
+     * the editing event id and a prefilled category when arriving from
+     * the empty-state quick-start tiles.
+     */
+    const val ADD_CALENDAR_EVENT =
+        "homes/{$ADD_EVENT_HOME_ID_KEY}/events/new" +
+            "?$ADD_EVENT_EVENT_ID_KEY={$ADD_EVENT_EVENT_ID_KEY}" +
+            "&$ADD_EVENT_PREFILLED_CATEGORY_KEY={$ADD_EVENT_PREFILLED_CATEGORY_KEY}"
+
+    /** Build the concrete path for the calendar event form. */
+    fun addCalendarEvent(
+        homeId: String,
+        eventId: String? = null,
+        prefilledCategory: String? = null,
+    ): String {
+        val base = "homes/$homeId/events/new"
+        val params =
+            buildList {
+                if (eventId != null) add("$ADD_EVENT_EVENT_ID_KEY=${java.net.URLEncoder.encode(eventId, "UTF-8")}")
+                if (prefilledCategory != null) {
+                    add(
+                        "$ADD_EVENT_PREFILLED_CATEGORY_KEY=" +
+                            java.net.URLEncoder.encode(prefilledCategory, "UTF-8"),
+                    )
+                }
+            }
+        return if (params.isEmpty()) base else "$base?${params.joinToString("&")}"
+    }
+
+    /** P2.7 — Read-only calendar event detail. */
+    const val CALENDAR_EVENT_DETAIL =
+        "homes/{$EVENT_DETAIL_HOME_ID_KEY}/events/{$EVENT_DETAIL_EVENT_ID_KEY}"
+
+    /** Build the concrete path for a calendar event detail. */
+    fun calendarEventDetail(
+        homeId: String,
+        eventId: String,
+    ): String = "homes/$homeId/events/$eventId"
 
     /** Emergency info per home (T6.4b / P17). */
     const val HOME_EMERGENCY = "homes/{$EMERGENCY_HOME_ID_KEY}/emergency"
@@ -1017,13 +1065,90 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.HOME_CALENDAR,
                 arguments =
                     listOf(navArgument(HOME_CALENDAR_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
+            ) { entry ->
+                val homeId = entry.arguments?.getString(HOME_CALENDAR_HOME_ID_KEY).orEmpty()
                 HomeCalendarScreen(
-                    onAddEvent = { navController.navigate(ChildRoutes.placeholder("Add event")) },
-                    onOpenEvent = {
-                        navController.navigate(ChildRoutes.placeholder("Event detail"))
+                    onAddEvent = {
+                        navController.navigate(ChildRoutes.addCalendarEvent(homeId = homeId))
+                    },
+                    onOpenEvent = { eventId ->
+                        navController.navigate(
+                            ChildRoutes.calendarEventDetail(homeId = homeId, eventId = eventId),
+                        )
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.ADD_CALENDAR_EVENT,
+                arguments =
+                    listOf(
+                        navArgument(ADD_EVENT_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(ADD_EVENT_EVENT_ID_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                        navArgument(ADD_EVENT_PREFILLED_CATEGORY_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                    ),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(ADD_EVENT_HOME_ID_KEY).orEmpty()
+                AddEventFormScreen(
+                    onClose = { navController.popBackStack() },
+                    onCommit = { commit ->
+                        when (commit) {
+                            is AddEventCommit.Created -> {
+                                navController.popBackStack()
+                                navController.navigate(
+                                    ChildRoutes.calendarEventDetail(
+                                        homeId = homeId,
+                                        eventId = commit.eventId,
+                                    ),
+                                )
+                            }
+                            is AddEventCommit.Updated -> {
+                                // Replace the form AND the stale detail with
+                                // a fresh detail so the re-fetched event
+                                // shows the updated fields.
+                                navController.navigate(
+                                    ChildRoutes.calendarEventDetail(
+                                        homeId = homeId,
+                                        eventId = commit.eventId,
+                                    ),
+                                ) {
+                                    popUpTo(ChildRoutes.CALENDAR_EVENT_DETAIL) {
+                                        inclusive = true
+                                    }
+                                }
+                            }
+                        }
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.CALENDAR_EVENT_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(EVENT_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(EVENT_DETAIL_EVENT_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(EVENT_DETAIL_HOME_ID_KEY).orEmpty()
+                EventDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onEdit = { event ->
+                        navController.navigate(
+                            ChildRoutes.addCalendarEvent(
+                                homeId = homeId,
+                                eventId = event.id,
+                                prefilledCategory = event.eventType,
+                            ),
+                        )
+                    },
                 )
             }
             composable(

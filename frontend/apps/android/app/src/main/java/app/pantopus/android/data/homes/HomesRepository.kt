@@ -41,6 +41,7 @@ import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
 import app.pantopus.android.data.api.models.homes.UpdateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
+import app.pantopus.android.data.api.models.homes.UpdateHomeEventRequest
 import app.pantopus.android.data.api.models.homes.UpdateHomeTaskRequest
 import app.pantopus.android.data.api.models.homes.UpdateMaintenanceRequest
 import app.pantopus.android.data.api.models.homes.UpdatePackageRequest
@@ -149,6 +150,13 @@ open class HomesRepository
             homeId: String,
             request: CreateHomeEventRequest,
         ): NetworkResult<HomeEventResponse> = safeApiCall { api.createHomeEvent(homeId, request) }
+
+        /** `PUT /api/homes/:id/events/:eventId`. */
+        open suspend fun updateHomeEvent(
+            homeId: String,
+            eventId: String,
+            request: UpdateHomeEventRequest,
+        ): NetworkResult<HomeEventResponse> = safeApiCall { api.updateHomeEvent(homeId, eventId, request) }
 
         /** `DELETE /api/homes/:id/events/:eventId`. */
         open suspend fun deleteHomeEvent(

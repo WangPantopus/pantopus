@@ -81,6 +81,10 @@ public enum YouRoute: Hashable {
     /// action tile + Home Dashboard "calendar" quick-action push here
     /// with the primary home id resolved by the VM.
     case homeCalendar(homeId: String)
+    /// P2.7 — Add / edit calendar event. `eventId` non-nil = edit.
+    case addCalendarEvent(homeId: String, eventId: String?, prefilledCategory: String?)
+    /// P2.7 — Calendar event detail with Edit + Delete actions.
+    case calendarEventDetail(homeId: String, eventId: String)
     /// T6.4b — Emergency info. The home-context "me.emergency" Activity
     /// row pushes here with the primary home id resolved by the VM.
     case homeEmergency(homeId: String)
@@ -917,15 +921,60 @@ public struct YouTabRoot: View {
                     homeId: homeId,
                     onAddEvent: {
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Add event"))
+                            path.append(.addCalendarEvent(
+                                homeId: homeId,
+                                eventId: nil,
+                                prefilledCategory: nil
+                            ))
                         }
                     },
-                    onOpenEvent: { _ in
+                    onOpenEvent: { eventId in
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Event detail"))
+                            path.append(.calendarEventDetail(homeId: homeId, eventId: eventId))
                         }
                     }
                 )
+            )
+        case let .addCalendarEvent(homeId, eventId, prefilledCategory):
+            CalendarEventFormRoute(
+                homeId: homeId,
+                eventId: eventId,
+                prefilledCategory: prefilledCategory,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCommitted: { event in
+                    switch event {
+                    case let .created(newId):
+                        path.removeAll { route in
+                            if case .addCalendarEvent = route { return true }
+                            return false
+                        }
+                        path.append(.calendarEventDetail(homeId: homeId, eventId: newId))
+                    case let .updated(updatedId):
+                        // Pop both the form AND the stale detail, then
+                        // push the detail again so it re-fetches.
+                        path.removeAll { route in
+                            if case .addCalendarEvent = route { return true }
+                            if case .calendarEventDetail = route { return true }
+                            return false
+                        }
+                        path.append(.calendarEventDetail(homeId: homeId, eventId: updatedId))
+                    }
+                }
+            )
+        case let .calendarEventDetail(homeId, eventId):
+            EventDetailView(
+                homeId: homeId,
+                eventId: eventId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onEdit: { event in
+                    Task { @MainActor in
+                        path.append(.addCalendarEvent(
+                            homeId: homeId,
+                            eventId: event.id,
+                            prefilledCategory: event.eventType
+                        ))
+                    }
+                }
             )
         case let .homeEmergency(homeId):
             EmergencyInfoView(
