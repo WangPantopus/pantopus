@@ -67,6 +67,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case formPulseComposeValidationError(intent: String, field: String)
     /// P2.1 — Pulse compose screen viewed.
     case screenPulseComposeViewed(intent: String)
+    /// P2.2 — Post-a-Task wizard step view.
+    case screenComposeGigWizardStepViewed(stepNumber: Int, stepName: String)
+    /// P2.2 — Post-a-Task wizard submit tap (fires before the POST).
+    case ctaComposeGigSubmit
 
     /// Wire-format event name. Stable across versions — vendor / dashboard
     /// owners depend on these strings.
@@ -115,6 +119,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .formPulseComposeSubmit: "form.pulse_compose.submit"
         case .formPulseComposeValidationError: "form.pulse_compose.validation_error"
         case .screenPulseComposeViewed: "screen.pulse_compose.viewed"
+        case .screenComposeGigWizardStepViewed: "screen.compose_gig_wizard.step_viewed"
+        case .ctaComposeGigSubmit: "cta.compose_gig.submit"
         }
     }
 
@@ -125,6 +131,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case let .screenMailboxItemDetailViewed(category, trustLevel):
             ["category": category, "trust_level": trustLevel]
         case let .screenAddHomeWizardStepViewed(stepNumber, stepName):
+            ["step_number": "\(stepNumber)", "step_name": stepName]
+        case let .screenComposeGigWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .screenPetsWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
@@ -182,7 +190,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenDocumentsViewed,
              .screenEditProfileViewed,
              .ctaMailboxItemLogReceived,
-             .ctaAddHomeSubmit:
+             .ctaAddHomeSubmit,
+             .ctaComposeGigSubmit:
             [:]
         }
     }

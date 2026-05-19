@@ -39,6 +39,7 @@ import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
+import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
 import app.pantopus.android.ui.screens.compose.pulse.PulseComposeScreen
 import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
 import app.pantopus.android.ui.screens.connections.ConnectionsScreen
@@ -326,8 +327,7 @@ private object ChildRoutes {
     /** My tasks V2 (T5.3.2). Reached from the You tab "My gigs" action tile. */
     const val MY_TASKS = "my-tasks"
 
-    /** Compose-task placeholder (T5.3.2). Replaced when T2.3 lands the
-     *  dedicated composer. */
+    /** P2.2 — Post-a-Task wizard. Reached from the My tasks FAB / empty CTA. */
     const val COMPOSE_TASK = "compose-task"
 
     /** My posts (T5.3.3). Reached from the You / Me Activity-section row. */
@@ -780,7 +780,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     ActionChipContent.Kind.ScanMail ->
                                         navController.navigate(ChildRoutes.MAILBOX_DRAWERS)
                                     ActionChipContent.Kind.PostTask ->
-                                        navController.navigate(ChildRoutes.placeholder("Post a gig"))
+                                        navController.navigate(ChildRoutes.composeGig(GigsCategory.All.key))
                                     ActionChipContent.Kind.SnapAndSell ->
                                         navController.navigate(ChildRoutes.placeholder("Snap & sell"))
                                 }
@@ -1505,9 +1505,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     ),
             ) { entry ->
                 val raw = entry.arguments?.getString(ChildRoutes.COMPOSE_GIG_CATEGORY_KEY) ?: GigsCategory.All.key
-                val label =
-                    GigsCategory.entries.firstOrNull { it.key == raw }?.label ?: raw.replaceFirstChar { it.uppercase() }
-                NotYetAvailableView(tabName = "Post a task · $label", icon = PantopusIcon.Pencil)
+                GigComposeWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenGigDetail = { gigId ->
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.gigDetail(gigId))
+                    },
+                    preselectedCategoryKey = raw,
+                )
             }
             composable(
                 route = ChildRoutes.COMPOSE_POST,
@@ -1626,7 +1631,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Offer filters")) },
                     onBrowseListings = { navController.navigate(ChildRoutes.placeholder("Browse listings")) },
-                    onPostTask = { navController.navigate(ChildRoutes.placeholder("Post a task")) },
+                    onPostTask = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
                 )
             }
             composable(ChildRoutes.MY_BIDS) {
@@ -1675,7 +1680,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.COMPOSE_TASK) {
-                NotYetAvailableView(tabName = "Post a task", icon = PantopusIcon.Pencil)
+                GigComposeWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenGigDetail = { gigId ->
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.gigDetail(gigId))
+                    },
+                    preselectedCategoryKey = null,
+                )
             }
             composable(ChildRoutes.MY_POSTS) {
                 MyPostsScreen(

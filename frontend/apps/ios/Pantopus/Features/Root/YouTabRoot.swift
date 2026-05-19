@@ -25,10 +25,8 @@ public enum YouRoute: Hashable {
     case myBids
     /// T5.3.2 — My tasks V2. The "me.gigs" action tile pushes here.
     case myTasks
-    /// Compose-task destination from the My tasks FAB. Today renders
-    /// the not-yet-available placeholder per
-    /// `docs/mobile-wiring-audit.md`; replaces with the real composer
-    /// when T2.3 lands the dedicated screen.
+    /// P2.2 — Post-a-Task wizard. Pushed from the My tasks FAB / empty
+    /// CTA. Routes to the new gig's detail on success.
     case composeTask
     /// T5.3.3 — My posts. The "me.posts" Activity-section row pushes here.
     case myPosts
@@ -761,7 +759,12 @@ public struct YouTabRoot: View {
                 )
             )
         case .composeTask:
-            NotYetAvailableView(tabName: "Post a task", icon: .pencil)
+            GigComposeWizardView(preselectedCategoryKey: nil) { gigId in
+                // Replace the wizard with the gig's detail so Back goes
+                // back to My tasks, not the success screen.
+                path.removeAll { $0 == .composeTask }
+                path.append(.gigDetail(gigId: gigId))
+            }
         case .connections:
             ConnectionsView(
                 viewModel: ConnectionsViewModel(
