@@ -119,24 +119,52 @@ fun LogMaintenanceFormScreen(
         isDirty = isDirty,
         screenTitle = viewModel.screenTitle,
         submitLabel = viewModel.submitLabel,
-        onUpdateCategory = viewModel::updateCategory,
-        onUpdateTitle = viewModel::updateTitle,
-        onUpdateDateCompleted = viewModel::updateDateCompleted,
-        onUpdatePerformedBy = viewModel::updatePerformedBy,
-        onUpdatePerformerName = viewModel::updatePerformerName,
-        onUpdatePerformerContact = viewModel::updatePerformerContact,
-        onUpdateCost = viewModel::updateCost,
-        onUpdateNotes = viewModel::updateNotes,
-        onToggleNextDue = viewModel::toggleNextDue,
-        onUpdateNextDueDate = viewModel::updateNextDueDate,
-        onUpdateRecurrence = viewModel::updateRecurrence,
-        onAddPhoto = viewModel::addPhoto,
-        onRemovePhoto = viewModel::removePhoto,
-        onPickReceipt = viewModel::pickReceipt,
-        onSubmit = viewModel::submit,
-        onCancel = viewModel::cancel,
+        callbacks =
+            LogMaintenanceFormCallbacks(
+                onUpdateCategory = viewModel::updateCategory,
+                onUpdateTitle = viewModel::updateTitle,
+                onUpdateDateCompleted = viewModel::updateDateCompleted,
+                onUpdatePerformedBy = viewModel::updatePerformedBy,
+                onUpdatePerformerName = viewModel::updatePerformerName,
+                onUpdatePerformerContact = viewModel::updatePerformerContact,
+                onUpdateCost = viewModel::updateCost,
+                onUpdateNotes = viewModel::updateNotes,
+                onToggleNextDue = viewModel::toggleNextDue,
+                onUpdateNextDueDate = viewModel::updateNextDueDate,
+                onUpdateRecurrence = viewModel::updateRecurrence,
+                onAddPhoto = viewModel::addPhoto,
+                onRemovePhoto = viewModel::removePhoto,
+                onPickReceipt = viewModel::pickReceipt,
+                onSubmit = viewModel::submit,
+                onCancel = viewModel::cancel,
+            ),
     )
 }
+
+/**
+ * Bundle of [LogMaintenanceFormContent] callbacks. Grouped into one
+ * type so the composable stays under detekt's `LongParameterList`
+ * threshold and so call sites (real screen + Paparazzi tests) read
+ * straight down.
+ */
+internal data class LogMaintenanceFormCallbacks(
+    val onUpdateCategory: (MaintenanceCategory) -> Unit = {},
+    val onUpdateTitle: (String) -> Unit = {},
+    val onUpdateDateCompleted: (Instant) -> Unit = {},
+    val onUpdatePerformedBy: (MaintenancePerformedBy) -> Unit = {},
+    val onUpdatePerformerName: (String) -> Unit = {},
+    val onUpdatePerformerContact: (String) -> Unit = {},
+    val onUpdateCost: (String) -> Unit = {},
+    val onUpdateNotes: (String) -> Unit = {},
+    val onToggleNextDue: (Boolean) -> Unit = {},
+    val onUpdateNextDueDate: (Instant) -> Unit = {},
+    val onUpdateRecurrence: (MaintenanceRecurrence) -> Unit = {},
+    val onAddPhoto: (MaintenanceDraftFile) -> Unit = {},
+    val onRemovePhoto: (String) -> Unit = {},
+    val onPickReceipt: (MaintenanceDraftFile?) -> Unit = {},
+    val onSubmit: () -> Unit = {},
+    val onCancel: () -> Unit = {},
+)
 
 @Composable
 internal fun LogMaintenanceFormContent(
@@ -144,22 +172,7 @@ internal fun LogMaintenanceFormContent(
     isDirty: Boolean,
     screenTitle: String,
     submitLabel: String,
-    onUpdateCategory: (MaintenanceCategory) -> Unit,
-    onUpdateTitle: (String) -> Unit,
-    onUpdateDateCompleted: (Instant) -> Unit,
-    onUpdatePerformedBy: (MaintenancePerformedBy) -> Unit,
-    onUpdatePerformerName: (String) -> Unit,
-    onUpdatePerformerContact: (String) -> Unit,
-    onUpdateCost: (String) -> Unit,
-    onUpdateNotes: (String) -> Unit,
-    onToggleNextDue: (Boolean) -> Unit,
-    onUpdateNextDueDate: (Instant) -> Unit,
-    onUpdateRecurrence: (MaintenanceRecurrence) -> Unit,
-    onAddPhoto: (MaintenanceDraftFile) -> Unit,
-    onRemovePhoto: (String) -> Unit,
-    onPickReceipt: (MaintenanceDraftFile?) -> Unit,
-    onSubmit: () -> Unit,
-    onCancel: () -> Unit,
+    callbacks: LogMaintenanceFormCallbacks,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -173,7 +186,7 @@ internal fun LogMaintenanceFormContent(
                 val resolver = context.contentResolver
                 val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
                 if (bytes != null) {
-                    onAddPhoto(
+                    callbacks.onAddPhoto(
                         MaintenanceDraftFile(
                             id = UUID.randomUUID().toString(),
                             filename = "photo-${UUID.randomUUID().toString().take(6)}.jpg",
@@ -196,7 +209,7 @@ internal fun LogMaintenanceFormContent(
                 val name = uri.lastPathSegment?.substringAfterLast('/') ?: "receipt"
                 val mime = resolver.getType(uri) ?: "application/octet-stream"
                 if (bytes != null) {
-                    onPickReceipt(
+                    callbacks.onPickReceipt(
                         MaintenanceDraftFile(
                             filename = name,
                             mimeType = mime,
@@ -220,8 +233,8 @@ internal fun LogMaintenanceFormContent(
             rightActionLabel = submitLabel,
             rightActionEnabled = form.canSubmit && isDirty && !form.isSubmitting,
             isSaving = form.isSubmitting,
-            onClose = onCancel,
-            onCommit = onSubmit,
+            onClose = callbacks.onCancel,
+            onCommit = callbacks.onSubmit,
         )
 
         Column(
@@ -235,7 +248,7 @@ internal fun LogMaintenanceFormContent(
             FieldGroup("CATEGORY") {
                 CategoryGrid(
                     selected = form.category,
-                    onSelect = onUpdateCategory,
+                    onSelect = callbacks.onUpdateCategory,
                 )
             }
 
@@ -243,7 +256,7 @@ internal fun LogMaintenanceFormContent(
                 LabeledTextField(
                     label = "Title",
                     value = form.title,
-                    onValueChange = onUpdateTitle,
+                    onValueChange = callbacks.onUpdateTitle,
                     placeholder = "Fall HVAC tune-up",
                     testTag = "logMaintenance_title",
                 )
@@ -251,7 +264,7 @@ internal fun LogMaintenanceFormContent(
                 DatePickerRow(
                     label = "Date completed",
                     value = form.dateCompleted,
-                    onChange = onUpdateDateCompleted,
+                    onChange = callbacks.onUpdateDateCompleted,
                     pickMax = Instant.now(),
                     testTag = "logMaintenance_dateCompleted",
                 )
@@ -260,23 +273,25 @@ internal fun LogMaintenanceFormContent(
             FieldGroup("PERFORMED BY") {
                 PerformedByTabs(
                     selected = form.performedBy,
-                    onSelect = onUpdatePerformedBy,
+                    onSelect = callbacks.onUpdatePerformedBy,
                 )
                 if (form.performedBy != MaintenancePerformedBy.Self) {
                     Spacer(modifier = Modifier.height(Spacing.s3))
                     LabeledTextField(
-                        label = if (form.performedBy == MaintenancePerformedBy.Member) {
-                            "Member name"
-                        } else {
-                            "Contractor name"
-                        },
+                        label =
+                            if (form.performedBy == MaintenancePerformedBy.Member) {
+                                "Member name"
+                            } else {
+                                "Contractor name"
+                            },
                         value = form.performerName,
-                        onValueChange = onUpdatePerformerName,
-                        placeholder = if (form.performedBy == MaintenancePerformedBy.Member) {
-                            "Alex"
-                        } else {
-                            "Riverside HVAC"
-                        },
+                        onValueChange = callbacks.onUpdatePerformerName,
+                        placeholder =
+                            if (form.performedBy == MaintenancePerformedBy.Member) {
+                                "Alex"
+                            } else {
+                                "Riverside HVAC"
+                            },
                         testTag = "logMaintenance_performerName",
                     )
                 }
@@ -285,7 +300,7 @@ internal fun LogMaintenanceFormContent(
                     LabeledTextField(
                         label = "Contact (optional)",
                         value = form.performerContact,
-                        onValueChange = onUpdatePerformerContact,
+                        onValueChange = callbacks.onUpdatePerformerContact,
                         placeholder = "(555) 555-0142 · hello@riverside.com",
                         testTag = "logMaintenance_performerContact",
                     )
@@ -296,7 +311,7 @@ internal fun LogMaintenanceFormContent(
                 LabeledTextField(
                     label = "Cost",
                     value = form.costText,
-                    onValueChange = onUpdateCost,
+                    onValueChange = callbacks.onUpdateCost,
                     placeholder = "$0",
                     testTag = "logMaintenance_cost",
                 )
@@ -313,7 +328,7 @@ internal fun LogMaintenanceFormContent(
                     )
                     Switch(
                         checked = form.nextDueEnabled,
-                        onCheckedChange = onToggleNextDue,
+                        onCheckedChange = callbacks.onToggleNextDue,
                         colors =
                             SwitchDefaults.colors(
                                 checkedThumbColor = PantopusColors.appSurface,
@@ -327,14 +342,14 @@ internal fun LogMaintenanceFormContent(
                     DatePickerRow(
                         label = "Next due",
                         value = form.nextDueDate,
-                        onChange = onUpdateNextDueDate,
+                        onChange = callbacks.onUpdateNextDueDate,
                         pickMin = Instant.now(),
                         testTag = "logMaintenance_nextDueDate",
                     )
                     Spacer(modifier = Modifier.height(Spacing.s3))
                     RecurrenceTabs(
                         selected = form.recurrence,
-                        onSelect = onUpdateRecurrence,
+                        onSelect = callbacks.onUpdateRecurrence,
                     )
                     Spacer(modifier = Modifier.height(Spacing.s2))
                     Text(
@@ -348,7 +363,7 @@ internal fun LogMaintenanceFormContent(
             FieldGroup("NOTES") {
                 NotesField(
                     value = form.notes,
-                    onValueChange = onUpdateNotes,
+                    onValueChange = callbacks.onUpdateNotes,
                 )
             }
 
@@ -368,7 +383,7 @@ internal fun LogMaintenanceFormContent(
                             ),
                         )
                     },
-                    onRemove = onRemovePhoto,
+                    onRemove = callbacks.onRemovePhoto,
                 )
             }
 
@@ -376,7 +391,7 @@ internal fun LogMaintenanceFormContent(
                 ReceiptBlock(
                     file = form.receipt,
                     onPick = { receiptPicker.launch(arrayOf("image/*", "application/pdf")) },
-                    onRemove = { onPickReceipt(null) },
+                    onRemove = { callbacks.onPickReceipt(null) },
                 )
             }
 

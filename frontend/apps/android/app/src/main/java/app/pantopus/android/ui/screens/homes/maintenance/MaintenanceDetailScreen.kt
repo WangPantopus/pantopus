@@ -218,7 +218,7 @@ private fun LoadedBody(
         onBack = onBack,
         header = {
             Column(modifier = Modifier.padding(horizontal = Spacing.s4)) {
-                MaintenanceHeader(task = task, projection = projection)
+                MaintenanceHeader(projection = projection)
             }
         },
         body = {
@@ -256,10 +256,7 @@ private fun LoadedBody(
 // MARK: - Sub-views
 
 @Composable
-private fun MaintenanceHeader(
-    task: MaintenanceTaskDto,
-    projection: MaintenanceRowProjection,
-) {
+private fun MaintenanceHeader(projection: MaintenanceRowProjection) {
     val category = projection.category
     Column(
         modifier =
@@ -570,18 +567,20 @@ private fun performedByValue(
     task: MaintenanceTaskDto,
     draft: MaintenanceDraft?,
 ): String {
-    if (draft != null) {
-        return when (draft.performedBy) {
-            MaintenancePerformedBy.Self -> "Self"
-            MaintenancePerformedBy.Member ->
-                draft.performerName.trim().ifEmpty { "Household member" }.let {
-                    if (it == "Household member") it else "Member · $it"
-                }
-            MaintenancePerformedBy.Contractor -> draft.performerName.trim().ifEmpty { "Contractor" }
-        }
+    if (draft == null) {
+        val vendor = task.vendor?.trim().orEmpty()
+        return if (vendor.isEmpty()) "Self" else vendor
     }
-    val vendor = task.vendor?.trim().orEmpty()
-    return if (vendor.isEmpty()) "Self" else vendor
+    return when (draft.performedBy) {
+        MaintenancePerformedBy.Self -> "Self"
+        MaintenancePerformedBy.Member -> memberPerformedByValue(draft.performerName)
+        MaintenancePerformedBy.Contractor -> draft.performerName.trim().ifEmpty { "Contractor" }
+    }
+}
+
+private fun memberPerformedByValue(rawName: String): String {
+    val name = rawName.trim()
+    return if (name.isEmpty()) "Household member" else "Member · $name"
 }
 
 private fun recurrenceLabel(raw: String): String =
@@ -596,12 +595,10 @@ private fun recurrenceLabel(raw: String): String =
 
 private fun formatDueDateForDetail(iso: String?): String? {
     if (iso.isNullOrBlank()) return null
-    return try {
-        val instant = LogMaintenanceFormViewModel.parseDate(iso)
-        val local = java.time.LocalDate.ofInstant(instant, java.time.ZoneId.of("UTC"))
-        val month = local.month.name.lowercase().replaceFirstChar { it.titlecase() }
-        "$month ${local.dayOfMonth}"
-    } catch (e: Exception) {
-        iso
-    }
+    // `parseDate` already guards every parser failure with `runCatching`
+    // and falls back to `Instant.now()`, so the chain below cannot throw.
+    val instant = LogMaintenanceFormViewModel.parseDate(iso)
+    val local = java.time.LocalDate.ofInstant(instant, java.time.ZoneId.of("UTC"))
+    val month = local.month.name.lowercase().replaceFirstChar { it.titlecase() }
+    return "$month ${local.dayOfMonth}"
 }

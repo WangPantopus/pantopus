@@ -48,8 +48,7 @@ enum class MaintenanceRecurrence(val raw: String, val label: String) {
     ;
 
     companion object {
-        fun fromRaw(raw: String?): MaintenanceRecurrence =
-            entries.firstOrNull { it.raw == raw } ?: None
+        fun fromRaw(raw: String?): MaintenanceRecurrence = entries.firstOrNull { it.raw == raw } ?: None
     }
 }
 
@@ -215,8 +214,7 @@ class LogMaintenanceFormViewModel
 
         fun updateDateCompleted(value: Instant) = mutate { it.copy(dateCompleted = value) }
 
-        fun updatePerformedBy(value: MaintenancePerformedBy) =
-            mutate { it.copy(performedBy = value) }
+        fun updatePerformedBy(value: MaintenancePerformedBy) = mutate { it.copy(performedBy = value) }
 
         fun updatePerformerName(value: String) = mutate { it.copy(performerName = value) }
 
@@ -241,8 +239,7 @@ class LogMaintenanceFormViewModel
                 }
             }
 
-        fun removePhoto(id: String) =
-            mutate { it.copy(photos = it.photos.filterNot { p -> p.id == id }) }
+        fun removePhoto(id: String) = mutate { it.copy(photos = it.photos.filterNot { p -> p.id == id }) }
 
         fun pickReceipt(file: MaintenanceDraftFile?) = mutate { it.copy(receipt = file) }
 
@@ -392,8 +389,7 @@ class LogMaintenanceFormViewModel
                     cost.toPlainString()
                 }
 
-            fun formatDay(instant: Instant): String =
-                dayFormatter.format(instant.atZone(ZoneOffset.UTC).toLocalDate())
+            fun formatDay(instant: Instant): String = dayFormatter.format(instant.atZone(ZoneOffset.UTC).toLocalDate())
 
             fun formatTimestamp(instant: Instant): String = timestampFormatter.format(instant)
 
