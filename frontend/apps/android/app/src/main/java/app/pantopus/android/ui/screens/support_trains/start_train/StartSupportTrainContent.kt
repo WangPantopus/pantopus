@@ -151,6 +151,7 @@ object StartSupportTrainSlotGenerator {
     private const val MINUTES_PER_HOUR: Int = 60
     private const val MAX_MINUTE_OF_HOUR: Int = 59
     private const val NOON_HOUR: Int = 12
+
     /** Backend caps a train at 90 slots; mirror that here. */
     private const val SLOT_CAPACITY: Int = 90
     private const val MAX_MINUTES_OF_DAY: Int = MAX_HOUR * MINUTES_PER_HOUR + MAX_MINUTE_OF_HOUR
