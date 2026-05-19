@@ -129,7 +129,7 @@ public final class BusinessProfileViewModel {
         }
     }
 
-    fileprivate func friendlyMessage(for error: APIError) -> String {
+    private func friendlyMessage(for error: APIError) -> String {
         switch error {
         case .notFound: "We couldn't find this business."
         case .forbidden: "This business profile is private."
@@ -142,7 +142,7 @@ public final class BusinessProfileViewModel {
 // MARK: - Projection
 
 extension BusinessProfileViewModel {
-    fileprivate func build(
+    private func build(
         from detail: BusinessDetailResponse,
         publicResponse: BusinessPublicResponse?,
         reviewsResponse: PublicProfile?
@@ -270,13 +270,12 @@ extension BusinessProfileViewModel {
             let dayIndex = max(0, min(6, row.dayOfWeek))
             let label = dayNames[dayIndex]
             let isClosed = row.isClosed == true
-            let time: String
-            if isClosed {
-                time = "Closed"
+            let time = if isClosed {
+                "Closed"
             } else if let open = row.openTime, let close = row.closeTime {
-                time = "\(formatTime(open)) – \(formatTime(close))"
+                "\(formatTime(open)) – \(formatTime(close))"
             } else {
-                time = "—"
+                "—"
             }
             return BusinessHoursRow(id: row.id, dayLabel: label, timeLabel: time, isClosed: isClosed)
         }

@@ -499,12 +499,12 @@ private fun OverviewTab(
             ContactList(rows = content.contact, onOpenWebsite = onOpenWebsite)
         }
 
-        if (
+        val hasNoOverviewContent =
             content.about.isNullOrEmpty() &&
-            content.hours.isEmpty() &&
-            content.address == null &&
-            content.contact.isEmpty()
-        ) {
+                content.hours.isEmpty() &&
+                content.address == null &&
+                content.contact.isEmpty()
+        if (hasNoOverviewContent) {
             EmptyStateInline(
                 icon = PantopusIcon.Building2,
                 headline = "Nothing here yet",

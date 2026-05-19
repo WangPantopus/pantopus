@@ -320,7 +320,7 @@ private struct BusinessProfileBody: View {
 
     // MARK: Overview
 
-    @ViewBuilder private var overviewTab: some View {
+    private var overviewTab: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             if let about = content.about, !about.isEmpty {
                 BusinessSection(title: "About") {
@@ -509,8 +509,6 @@ private struct AddressBlock: View {
                 Icon(.mapPin, size: 28, color: Theme.Color.business)
             }
             .frame(height: 96)
-        } else {
-            EmptyView()
         }
     }
 }

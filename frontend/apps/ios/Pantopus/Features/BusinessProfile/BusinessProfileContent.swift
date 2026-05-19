@@ -16,7 +16,9 @@ public enum BusinessProfileTab: String, Sendable, CaseIterable, Identifiable {
     case services
     case reviews
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
