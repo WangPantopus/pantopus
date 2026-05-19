@@ -534,8 +534,7 @@ private fun formattedTimeRange(event: CalendarEventDto): String {
 
 private fun isMidnight(date: ZonedDateTime): Boolean = date.hour == 0 && date.minute == 0 && date.second == 0
 
-private fun longDateLabel(date: ZonedDateTime): String =
-    DateTimeFormatter.ofPattern("EEEE MMM d", Locale.US).format(date)
+private fun longDateLabel(date: ZonedDateTime): String = DateTimeFormatter.ofPattern("EEEE MMM d", Locale.US).format(date)
 
 private fun formattedTime(
     start: ZonedDateTime,

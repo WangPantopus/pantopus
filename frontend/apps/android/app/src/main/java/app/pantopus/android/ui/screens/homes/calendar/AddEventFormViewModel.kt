@@ -164,7 +164,7 @@ data class AddEventUiState(
     val toast: AddEventToast? = null,
     val commit: AddEventCommit? = null,
     /** Snapshot of the original values for dirty tracking on edit. */
-    internal val baseline: AddEventBaseline,
+    val baseline: AddEventBaseline,
 ) {
     val aggregate: FormAggregate
         get() = FormAggregate.from(AddEventField.entries.mapNotNull { fields[it] })
@@ -177,11 +177,12 @@ data class AddEventUiState(
 
     /** End-date inline error when end < start. */
     val endError: String?
-        get() = if (endDate != null && endDate.isBefore(startDate)) {
-            "End must be on or after start."
-        } else {
-            null
-        }
+        get() =
+            if (endDate != null && endDate.isBefore(startDate)) {
+                "End must be on or after start."
+            } else {
+                null
+            }
 
     val isValid: Boolean
         get() {
@@ -208,7 +209,7 @@ data class AddEventUiState(
 }
 
 /** Frozen original-values used for dirty diffing. */
-internal data class AddEventBaseline(
+data class AddEventBaseline(
     val category: CalendarEventCategory,
     val allDay: Boolean,
     val start: ZonedDateTime,
