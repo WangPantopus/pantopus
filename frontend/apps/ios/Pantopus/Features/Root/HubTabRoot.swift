@@ -73,6 +73,12 @@ public enum HubRoute: Hashable {
     case homeBills(homeId: String)
     /// Home calendar list (T6.4c / P18).
     case homeCalendar(homeId: String)
+    /// Add / edit calendar event form (P2.7). `eventId` non-nil = edit;
+    /// `prefilledCategory` seeds the chip selector when arriving from
+    /// the empty-state quick-start tiles.
+    case addCalendarEvent(homeId: String, eventId: String?, prefilledCategory: String?)
+    /// Read-only event detail (P2.7). Edit + Delete actions live here.
+    case calendarEventDetail(homeId: String, eventId: String)
     /// Bill detail (read-mostly summary with mark-paid / remove).
     case billDetail(homeId: String, billId: String)
     /// Add Bill wizard.
@@ -512,12 +518,63 @@ public struct HubTabRoot: View {
                 viewModel: HomeCalendarViewModel(
                     homeId: homeId,
                     onAddEvent: {
-                        Task { @MainActor in push(.placeholder(label: "Add event")) }
+                        Task { @MainActor in
+                            push(.addCalendarEvent(
+                                homeId: homeId,
+                                eventId: nil,
+                                prefilledCategory: nil
+                            ))
+                        }
                     },
-                    onOpenEvent: { _ in
-                        Task { @MainActor in push(.placeholder(label: "Event detail")) }
+                    onOpenEvent: { eventId in
+                        Task { @MainActor in
+                            push(.calendarEventDetail(homeId: homeId, eventId: eventId))
+                        }
                     }
                 )
+            )
+        case let .addCalendarEvent(homeId, eventId, prefilledCategory):
+            CalendarEventFormRoute(
+                homeId: homeId,
+                eventId: eventId,
+                prefilledCategory: prefilledCategory,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCommitted: { event in
+                    switch event {
+                    case let .created(newId):
+                        // Replace the form with the new event's detail so
+                        // Back returns to the calendar list.
+                        path.removeAll { route in
+                            if case .addCalendarEvent = route { return true }
+                            return false
+                        }
+                        path.append(.calendarEventDetail(homeId: homeId, eventId: newId))
+                    case let .updated(updatedId):
+                        // Pop both the form AND the stale detail, then
+                        // push the detail again so it re-fetches.
+                        path.removeAll { route in
+                            if case .addCalendarEvent = route { return true }
+                            if case .calendarEventDetail = route { return true }
+                            return false
+                        }
+                        path.append(.calendarEventDetail(homeId: homeId, eventId: updatedId))
+                    }
+                }
+            )
+        case let .calendarEventDetail(homeId, eventId):
+            EventDetailView(
+                homeId: homeId,
+                eventId: eventId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onEdit: { event in
+                    Task { @MainActor in
+                        push(.addCalendarEvent(
+                            homeId: homeId,
+                            eventId: event.id,
+                            prefilledCategory: event.eventType
+                        ))
+                    }
+                }
             )
         case let .homeEmergency(homeId):
             EmergencyInfoView(

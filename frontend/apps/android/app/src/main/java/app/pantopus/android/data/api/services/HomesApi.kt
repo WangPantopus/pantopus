@@ -45,6 +45,7 @@ import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
 import app.pantopus.android.data.api.models.homes.UpdateAccessSecretRequest
 import app.pantopus.android.data.api.models.homes.UpdateBillRequest
+import app.pantopus.android.data.api.models.homes.UpdateHomeEventRequest
 import app.pantopus.android.data.api.models.homes.UpdateMaintenanceRequest
 import app.pantopus.android.data.api.models.homes.UpdatePackageRequest
 import app.pantopus.android.data.api.models.homes.UpdatePollRequest
@@ -207,8 +208,17 @@ interface HomesApi {
         @Body body: CreateHomeEventRequest,
     ): HomeEventResponse
 
+    /** `PUT /api/homes/:id/events/:eventId` — route
+     *  `backend/routes/home.js:5082`. */
+    @PUT("api/homes/{id}/events/{eventId}")
+    suspend fun updateHomeEvent(
+        @Path("id") homeId: String,
+        @Path("eventId") eventId: String,
+        @Body body: UpdateHomeEventRequest,
+    ): HomeEventResponse
+
     /** `DELETE /api/homes/:id/events/:eventId` — route
-     *  `backend/routes/home.js:4912`. */
+     *  `backend/routes/home.js:5120`. */
     @DELETE("api/homes/{id}/events/{eventId}")
     suspend fun deleteHomeEvent(
         @Path("id") homeId: String,

@@ -173,8 +173,23 @@ public enum HomesEndpoints {
         )
     }
 
+    /// `PUT /api/homes/:id/events/:eventId` — route
+    /// `backend/routes/home.js:5082`. Allow-listed body keys per the
+    /// destructure at line 5090.
+    public static func updateHomeEvent(
+        homeId: String,
+        eventId: String,
+        request: UpdateHomeEventRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .put,
+            path: "/api/homes/\(homeId)/events/\(eventId)",
+            body: request
+        )
+    }
+
     /// `DELETE /api/homes/:id/events/:eventId` — route
-    /// `backend/routes/home.js:4912`.
+    /// `backend/routes/home.js:5120`.
     public static func deleteHomeEvent(
         homeId: String,
         eventId: String
