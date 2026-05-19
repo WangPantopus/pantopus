@@ -12,20 +12,18 @@ import SwiftUI
 @MainActor
 public struct PublicProfileView: View {
     @State private var viewModel: PublicProfileViewModel
+    @State private var showReportSheet = false
     private let onBack: @MainActor () -> Void
     private let onOpenMessages: @MainActor () -> Void
-    private let onOpenReport: @MainActor () -> Void
 
     public init(
         userId: String,
         onBack: @escaping @MainActor () -> Void,
-        onOpenMessages: @escaping @MainActor () -> Void = {},
-        onOpenReport: @escaping @MainActor () -> Void = {}
+        onOpenMessages: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: PublicProfileViewModel(userId: userId))
         self.onBack = onBack
         self.onOpenMessages = onOpenMessages
-        self.onOpenReport = onOpenReport
     }
 
     public var body: some View {
@@ -53,11 +51,29 @@ public struct PublicProfileView: View {
             Button("Block this user", role: .destructive) {
                 Task { await viewModel.block() }
             }
-            Button("Report") { onOpenReport() }
+            Button("Report") { showReportSheet = true }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showReportSheet) {
+            reportSheet
         }
         .accessibilityIdentifier("publicProfile")
         .task { await viewModel.load() }
+    }
+
+    @ViewBuilder private var reportSheet: some View {
+        if case let .loaded(payload) = viewModel.state {
+            ReportUserSheet(
+                userId: payload.profile.id,
+                handle: payload.header.handle,
+                displayName: payload.header.displayName,
+                onClose: { showReportSheet = false },
+                onSubmitted: {
+                    showReportSheet = false
+                    viewModel.toastMessage = "Report received"
+                }
+            )
+        }
     }
 
     @ViewBuilder private var content: some View {

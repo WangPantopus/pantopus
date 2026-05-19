@@ -1233,7 +1233,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 PublicProfileScreen(
                     onBack = { navController.popBackStack() },
                     onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
-                    onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report")) },
                 )
             }
             composable(

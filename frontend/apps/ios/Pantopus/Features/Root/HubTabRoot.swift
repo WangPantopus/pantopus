@@ -596,8 +596,7 @@ public struct HubTabRoot: View {
             PublicProfileView(
                 userId: userId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
-                onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report")) } }
+                onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } }
             )
         case let .businessProfile(businessId):
             BusinessProfileDestination(

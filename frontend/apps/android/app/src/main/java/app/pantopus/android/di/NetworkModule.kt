@@ -34,6 +34,7 @@ import app.pantopus.android.data.api.services.PrivacyHandshakeApi
 import app.pantopus.android.data.api.services.RelationshipsApi
 import app.pantopus.android.data.api.services.SupportTrainsApi
 import app.pantopus.android.data.api.services.TokenAcceptApi
+import app.pantopus.android.data.api.services.UserReportsApi
 import app.pantopus.android.data.api.services.UsersApi
 import app.pantopus.android.data.auth.AuthInterceptor
 import com.squareup.moshi.Moshi
@@ -186,6 +187,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideBlocksApi(retrofit: Retrofit): BlocksApi = retrofit.create(BlocksApi::class.java)
+
+    @Provides @Singleton
+    fun provideUserReportsApi(retrofit: Retrofit): UserReportsApi = retrofit.create(UserReportsApi::class.java)
 
     @Provides @Singleton
     fun provideChatApi(retrofit: Retrofit): ChatApi = retrofit.create(ChatApi::class.java)
