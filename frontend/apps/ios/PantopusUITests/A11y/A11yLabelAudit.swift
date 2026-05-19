@@ -20,7 +20,10 @@ final class A11yLabelAudit: XCTestCase {
         app.launchEnvironment["UI_TESTS_SIGNED_IN"] = "1"
         app.launchEnvironment["UI_TESTS_STUB_API"] = "1"
         app.launch()
-        guard app.staticTexts["Hub"].waitForExistence(timeout: 5) else { return nil }
+        guard app.staticTexts["Hub"].waitForExistence(timeout: 5) else {
+            app.terminateAfterSkippedLaunch()
+            return nil
+        }
         return app
     }
 

@@ -22,7 +22,10 @@ final class DynamicTypeAudit: XCTestCase {
         // Forces the simulator's preferred content size category.
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXXL"]
         app.launch()
-        guard app.staticTexts["Hub"].waitForExistence(timeout: 5) else { return nil }
+        guard app.staticTexts["Hub"].waitForExistence(timeout: 5) else {
+            app.terminateAfterSkippedLaunch()
+            return nil
+        }
         return app
     }
 
