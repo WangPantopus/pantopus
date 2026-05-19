@@ -59,6 +59,7 @@ import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
+import app.pantopus.android.ui.screens.compose.listing.ListingComposeWizardScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
 import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
 import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_HOME_ID_KEY
@@ -491,7 +492,7 @@ private object ChildRoutes {
         return "listings/$listingId/offers?$LISTING_OFFERS_TITLE_KEY=$encodedTitle"
     }
 
-    /** Snap & sell — placeholder until the marketplace compose flow ships. */
+    /** Snap & sell — the marketplace listing-compose wizard (P2.3). */
     const val COMPOSE_LISTING = "listings/compose"
 
     /** T6.3f / P14 — My listings (seller's tabbed roster). */
@@ -1449,7 +1450,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 InvoiceDetailScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.COMPOSE_LISTING) {
-                NotYetAvailableView(tabName = "Snap & sell", icon = PantopusIcon.Camera)
+                ListingComposeWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenListingDetail = { listingId ->
+                        // Pop the wizard then push detail so Back returns to
+                        // Marketplace, not the success screen.
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.listingDetail(listingId))
+                    },
+                )
             }
             composable(ChildRoutes.GIGS_FEED) {
                 GigsFeedScreen(

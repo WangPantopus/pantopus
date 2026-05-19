@@ -1,5 +1,7 @@
 package app.pantopus.android.data.listings
 
+import app.pantopus.android.data.api.models.listings.CreateListingRequest
+import app.pantopus.android.data.api.models.listings.CreateListingResponse
 import app.pantopus.android.data.api.models.listings.ListingDetailResponse
 import app.pantopus.android.data.api.models.listings.ListingSaveResponse
 import app.pantopus.android.data.api.models.listings.ListingsBrowseResponse
@@ -83,6 +85,10 @@ class ListingsRepository
         ): NetworkResult<ListingsInBoundsResponse> = safeApiCall { api.inBounds(south, west, north, east, category) }
 
         suspend fun categories(): NetworkResult<ListingsCategoriesResponse> = safeApiCall { api.categories() }
+
+        /** Wraps `POST /api/listings`. Used by the Snap & Sell wizard. */
+        suspend fun create(request: CreateListingRequest): NetworkResult<CreateListingResponse> =
+            safeApiCall { api.create(request) }
 
         suspend fun save(id: String): NetworkResult<ListingSaveResponse> = safeApiCall { api.save(id) }
 

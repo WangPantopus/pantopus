@@ -116,6 +116,18 @@ sealed class AnalyticsEvent(
 
     data object CtaAddHomeSubmit : AnalyticsEvent("cta.add_home.submit")
 
+    /** P2.3 — Snap & Sell wizard step view event. */
+    data class ScreenListingComposeWizardStepViewed(
+        val stepNumber: Int,
+        val stepName: String,
+    ) : AnalyticsEvent("screen.listing_compose_wizard.step_viewed") {
+        override val properties =
+            mapOf("step_number" to stepNumber.toString(), "step_name" to stepName)
+    }
+
+    /** P2.3 — submit the listing-compose wizard (final POST). */
+    data object CtaListingComposeSubmit : AnalyticsEvent("cta.listing_compose.submit")
+
     data class ScreenClaimOwnershipStepViewed(
         val stepName: String,
     ) : AnalyticsEvent("screen.claim_ownership_wizard.step_viewed") {
