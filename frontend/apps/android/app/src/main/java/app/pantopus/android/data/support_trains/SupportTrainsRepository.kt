@@ -62,8 +62,7 @@ class SupportTrainsRepository
          * `POST /api/support-trains/` — create draft. Route
          * `backend/routes/supportTrains.js:639`. P2.6.
          */
-        suspend fun create(body: CreateSupportTrainBody): NetworkResult<CreateSupportTrainResponse> =
-            safeApiCall { api.create(body) }
+        suspend fun create(body: CreateSupportTrainBody): NetworkResult<CreateSupportTrainResponse> = safeApiCall { api.create(body) }
 
         /**
          * `POST /api/support-trains/:id/slots` — append one custom slot.

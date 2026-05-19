@@ -11,6 +11,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable force_unwrapping
+
 @MainActor
 final class StartSupportTrainWizardViewModelTests: XCTestCase {
     override func setUp() {
@@ -72,10 +74,10 @@ final class StartSupportTrainWizardViewModelTests: XCTestCase {
 
     // MARK: - Slot generation
 
-    func testSlotGenerationProducesOnePerDayInRange() {
+    func testSlotGenerationProducesOnePerDayInRange() throws {
         let calendar = Calendar(identifier: .gregorian)
-        let start = calendar.date(from: DateComponents(year: 2026, month: 5, day: 19))!
-        let end = calendar.date(from: DateComponents(year: 2026, month: 5, day: 21))!
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 5, day: 19)))
+        let end = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 5, day: 21)))
         let slots = StartSupportTrainSlotGenerator.generate(
             startDate: start,
             endDate: end,
@@ -90,19 +92,19 @@ final class StartSupportTrainWizardViewModelTests: XCTestCase {
         XCTAssertEqual(slots.last?.dateKey, "2026-05-21")
     }
 
-    func testEditingDatesInStepTwoUpdatesPreview() {
+    func testEditingDatesInStepTwoUpdatesPreview() throws {
         let vm = makeVM()
         XCTAssertEqual(vm.generatedSlots.count, 7)
         let calendar = Calendar.current
-        let newEnd = calendar.date(byAdding: .day, value: -3, to: vm.endDate)!
+        let newEnd = try XCTUnwrap(calendar.date(byAdding: .day, value: -3, to: vm.endDate))
         vm.setEndDate(newEnd)
         XCTAssertEqual(vm.generatedSlots.count, 4)
     }
 
-    func testSlotGenerationClampsAt90Days() {
+    func testSlotGenerationClampsAt90Days() throws {
         let calendar = Calendar(identifier: .gregorian)
-        let start = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1))!
-        let end = calendar.date(byAdding: .day, value: 200, to: start)!
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 1, day: 1)))
+        let end = try XCTUnwrap(calendar.date(byAdding: .day, value: 200, to: start))
         let slots = StartSupportTrainSlotGenerator.generate(
             startDate: start,
             endDate: end,
@@ -193,3 +195,5 @@ final class StartSupportTrainWizardViewModelTests: XCTestCase {
         XCTAssertNotNil(vm.launchError)
     }
 }
+
+// swiftlint:enable force_unwrapping

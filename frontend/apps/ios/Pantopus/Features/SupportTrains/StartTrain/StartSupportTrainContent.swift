@@ -48,7 +48,9 @@ public enum SupportTrainKind: String, CaseIterable, Sendable, Identifiable {
     case dogWalks = "dog_walks"
     case other
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Backend `support_train_type` enum value.
     public var wire: String {
@@ -125,7 +127,9 @@ public enum StartSupportTrainSlotDuration: Int, CaseIterable, Sendable, Identifi
     case ninety = 90
     case oneTwenty = 120
 
-    public var id: Int { rawValue }
+    public var id: Int {
+        rawValue
+    }
 
     public var title: String {
         switch self {
@@ -144,7 +148,9 @@ public enum StartSupportTrainVisibility: String, CaseIterable, Sendable, Identif
     case connections
     case linkOnly = "link_only"
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var title: String {
         switch self {
@@ -257,34 +263,40 @@ public enum StartSupportTrainSlotGenerator {
             guard let day = cal.date(byAdding: .day, value: i, to: start) else { continue }
             let dateKey = dateFmt.string(from: day)
             let dayLabel = dayFmt.string(from: day)
-            let (startStr, endStr, timeLabel) = timeRange(
+            let range = timeRange(
                 startHour: startHour,
                 durationMinutes: durationMinutes
             )
             slots.append(
                 StartSupportTrainSlot(
-                    id: "\(dateKey)_\(startStr)",
+                    id: "\(dateKey)_\(range.start)",
                     dateKey: dateKey,
                     dayLabel: dayLabel,
-                    timeLabel: timeLabel,
-                    startTime: startStr,
-                    endTime: endStr
+                    timeLabel: range.label,
+                    startTime: range.start,
+                    endTime: range.end
                 )
             )
         }
         return slots
     }
 
+    struct TimeRange {
+        let start: String
+        let end: String
+        let label: String
+    }
+
     private static func timeRange(
         startHour: Int,
         durationMinutes: Int
-    ) -> (start: String, end: String, label: String) {
+    ) -> TimeRange {
         let startMinutes = max(0, min(23 * 60 + 59, startHour * 60))
         let endMinutes = min(23 * 60 + 59, startMinutes + max(0, durationMinutes))
         let startStr = wireString(forMinutes: startMinutes)
         let endStr = wireString(forMinutes: endMinutes)
         let label = "\(displayString(forMinutes: startMinutes))–\(displayString(forMinutes: endMinutes))"
-        return (startStr, endStr, label)
+        return TimeRange(start: startStr, end: endStr, label: label)
     }
 
     private static func wireString(forMinutes total: Int) -> String {

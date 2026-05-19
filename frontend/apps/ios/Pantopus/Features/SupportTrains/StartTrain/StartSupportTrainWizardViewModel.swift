@@ -268,11 +268,11 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
     private var stepDirty: Bool {
         switch step {
         case .whoAndWhy:
-            return canAdvanceFromWhoAndWhy
+            canAdvanceFromWhoAndWhy
                 || !beneficiaryQuery.isEmpty
                 || !reason.isEmpty
-        case .whatAndWhen, .reviewAndLaunch: return true
-        case .success: return false
+        case .whatAndWhen, .reviewAndLaunch: true
+        case .success: false
         }
     }
 

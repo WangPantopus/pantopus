@@ -122,12 +122,15 @@ data class StartSupportTrainFormState(
     companion object {
         const val REASON_CHAR_LIMIT: Int = 500
 
+        /** Default end-of-window offset (inclusive) — a 7-day span. */
+        private const val DEFAULT_RANGE_DAYS_INCLUSIVE: Int = 6
+
         fun defaultStartMillis(): Long = Calendar.getInstance().apply { stripTime() }.timeInMillis
 
         fun defaultEndMillis(): Long =
             Calendar.getInstance().apply {
                 stripTime()
-                add(Calendar.DAY_OF_YEAR, 6)
+                add(Calendar.DAY_OF_YEAR, DEFAULT_RANGE_DAYS_INCLUSIVE)
             }.timeInMillis
     }
 }
@@ -144,16 +147,32 @@ sealed interface StartSupportTrainEvent {
 
 /** Slot-grid generator. Public so the unit test can drive it directly. */
 object StartSupportTrainSlotGenerator {
+    private const val MAX_HOUR: Int = 23
+    private const val MINUTES_PER_HOUR: Int = 60
+    private const val MAX_MINUTE_OF_HOUR: Int = 59
+    private const val NOON_HOUR: Int = 12
+    /** Backend caps a train at 90 slots; mirror that here. */
+    private const val SLOT_CAPACITY: Int = 90
+    private const val MAX_MINUTES_OF_DAY: Int = MAX_HOUR * MINUTES_PER_HOUR + MAX_MINUTE_OF_HOUR
+
     /** Build per-day slots covering `[startMillis, endMillis]` inclusive.
-     *  Returns at most 90 slots to match the backend's 90-day cap. */
+     *  Returns at most [SLOT_CAPACITY] slots to match the backend cap. */
     fun generate(
         startMillis: Long,
         endMillis: Long,
         durationMinutes: Int,
         startHour: Int,
     ): List<StartSupportTrainSlot> {
-        val start = Calendar.getInstance().apply { timeInMillis = startMillis; stripTime() }
-        val end = Calendar.getInstance().apply { timeInMillis = endMillis; stripTime() }
+        val start =
+            Calendar.getInstance().apply {
+                timeInMillis = startMillis
+                stripTime()
+            }
+        val end =
+            Calendar.getInstance().apply {
+                timeInMillis = endMillis
+                stripTime()
+            }
         if (end.before(start)) return emptyList()
         val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = TimeZone.getDefault() }
         val dayFmt = SimpleDateFormat("EEE MMM d", Locale.US).apply { timeZone = TimeZone.getDefault() }
@@ -161,8 +180,7 @@ object StartSupportTrainSlotGenerator {
         val slots = mutableListOf<StartSupportTrainSlot>()
         val cursor = start.clone() as Calendar
         var generated = 0
-        val capacity = 90
-        while (!cursor.after(end) && generated < capacity) {
+        while (!cursor.after(end) && generated < SLOT_CAPACITY) {
             val dateKey = dateFmt.format(cursor.time)
             val dayLabel = dayFmt.format(cursor.time)
             val (startStr, endStr, timeLabel) = timeRange(startHour, durationMinutes)
@@ -186,8 +204,8 @@ object StartSupportTrainSlotGenerator {
         startHour: Int,
         durationMinutes: Int,
     ): Triple<String, String, String> {
-        val startMinutes = (startHour.coerceIn(0, 23) * 60).coerceAtMost(23 * 60 + 59)
-        val endMinutes = (startMinutes + durationMinutes.coerceAtLeast(0)).coerceAtMost(23 * 60 + 59)
+        val startMinutes = (startHour.coerceIn(0, MAX_HOUR) * MINUTES_PER_HOUR).coerceAtMost(MAX_MINUTES_OF_DAY)
+        val endMinutes = (startMinutes + durationMinutes.coerceAtLeast(0)).coerceAtMost(MAX_MINUTES_OF_DAY)
         val startStr = wireString(startMinutes)
         val endStr = wireString(endMinutes)
         val label = "${displayString(startMinutes)}–${displayString(endMinutes)}"
@@ -195,16 +213,16 @@ object StartSupportTrainSlotGenerator {
     }
 
     private fun wireString(totalMinutes: Int): String {
-        val h = totalMinutes / 60
-        val m = totalMinutes % 60
+        val h = totalMinutes / MINUTES_PER_HOUR
+        val m = totalMinutes % MINUTES_PER_HOUR
         return String.format(Locale.US, "%02d:%02d", h, m)
     }
 
     private fun displayString(totalMinutes: Int): String {
-        val h24 = totalMinutes / 60
-        val m = totalMinutes % 60
-        val suffix = if (h24 < 12) "am" else "pm"
-        val h12 = if (h24 % 12 == 0) 12 else h24 % 12
+        val h24 = totalMinutes / MINUTES_PER_HOUR
+        val m = totalMinutes % MINUTES_PER_HOUR
+        val suffix = if (h24 < NOON_HOUR) "am" else "pm"
+        val h12 = if (h24 % NOON_HOUR == 0) NOON_HOUR else h24 % NOON_HOUR
         return if (m == 0) "$h12 $suffix" else String.format(Locale.US, "%d:%02d %s", h12, m, suffix)
     }
 }

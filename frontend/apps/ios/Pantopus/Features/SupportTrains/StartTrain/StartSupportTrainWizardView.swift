@@ -8,7 +8,7 @@
 //  train's id back to the host stack via `onOpenTrain`.
 //
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length
 
 import SwiftUI
 
@@ -450,7 +450,10 @@ private struct StartSupportTrainReviewStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             HeadlineBlock("Look it over")
-            SubcopyBlock("Here's the calendar — \(viewModel.generatedSlots.count) slots, one per day. Decide who can see this, then launch.")
+            SubcopyBlock(
+                "Here's the calendar — \(viewModel.generatedSlots.count) slots, one per day. " +
+                    "Decide who can see this, then launch."
+            )
             summaryCard
             slotGridSection
             optionsSection
@@ -459,9 +462,12 @@ private struct StartSupportTrainReviewStep: View {
 
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 6) {
-            reviewLine("Beneficiary", value: viewModel.selectedBeneficiary?.name
-                ?? viewModel.selectedBeneficiary?.username
-                ?? viewModel.beneficiaryQuery)
+            reviewLine(
+                "Beneficiary",
+                value: viewModel.selectedBeneficiary?.name
+                    ?? viewModel.selectedBeneficiary?.username
+                    ?? viewModel.beneficiaryQuery
+            )
             reviewLine("Kind", value: viewModel.kind.title)
             reviewLine("Slot length", value: viewModel.slotDuration.title)
             reviewLine("Slots", value: "\(viewModel.generatedSlots.count)")
@@ -661,11 +667,15 @@ private struct StartSupportTrainSuccessStep: View {
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
-            Text("\(viewModel.generatedSlots.count) slots are open and visible to \(viewModel.visibility.title.lowercased()). Review who signs up from the new train's dashboard.")
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Spacing.s3)
+            Text(
+                "\(viewModel.generatedSlots.count) slots are open and visible to " +
+                    "\(viewModel.visibility.title.lowercased()). " +
+                    "Review who signs up from the new train's dashboard."
+            )
+            .font(.system(size: 13))
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, Spacing.s3)
         }
         .frame(maxWidth: .infinity)
         .accessibilityIdentifier("startSupportTrainSuccess")

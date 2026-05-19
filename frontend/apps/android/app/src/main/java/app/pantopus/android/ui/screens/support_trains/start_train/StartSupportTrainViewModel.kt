@@ -152,8 +152,7 @@ class StartSupportTrainViewModel
             )
         }
 
-        fun reasonRemainingChars(): Int =
-            (StartSupportTrainFormState.REASON_CHAR_LIMIT - _form.value.reason.length).coerceAtLeast(0)
+        fun reasonRemainingChars(): Int = (StartSupportTrainFormState.REASON_CHAR_LIMIT - _form.value.reason.length).coerceAtLeast(0)
 
         fun derivedTitle(): String {
             val current = _form.value
@@ -294,8 +293,7 @@ class StartSupportTrainViewModel
                 StartSupportTrainStep.Success -> false
             }
 
-        private fun displayName(recipient: MailRecipientDto?): String =
-            recipient?.name ?: recipient?.username ?: ""
+        private fun displayName(recipient: MailRecipientDto?): String = recipient?.name ?: recipient?.username ?: ""
 
         private suspend fun searchBeneficiary(query: String) {
             _isSearching.value = true

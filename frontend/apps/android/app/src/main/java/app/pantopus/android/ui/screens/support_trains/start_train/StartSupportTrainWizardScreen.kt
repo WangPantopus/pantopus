@@ -979,4 +979,3 @@ private fun SimpleDatePickerDialog(
         androidx.compose.material3.DatePicker(state = state)
     }
 }
-
