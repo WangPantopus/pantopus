@@ -691,7 +691,15 @@ public struct HubTabRoot: View {
                 onMessage: { _ in Task { @MainActor in push(.placeholder(label: "Messages")) } }
             )
         case let .composeGig(category):
-            NotYetAvailableView(tabName: "Post a task · \(category.capitalized)", icon: .pencil)
+            GigComposeWizardView(preselectedCategoryKey: category) { gigId in
+                // Replace the wizard with the gig's detail so Back goes
+                // to the Gigs feed, not the success screen.
+                path.removeAll { route in
+                    if case .composeGig = route { return true }
+                    return false
+                }
+                path.append(.gigDetail(gigId: gigId))
+            }
         case let .nearbyMapForGigs(categoryKey):
             NearbyMapView(
                 viewModel: NearbyMapViewModel(

@@ -189,6 +189,18 @@ sealed class AnalyticsEvent(
     ) : AnalyticsEvent("form.pulse_compose.validation_error") {
         override val properties = mapOf("intent" to intent, "field" to field)
     }
+
+    /** P2.2 — Post-a-Task wizard step view. */
+    data class ScreenComposeGigWizardStepViewed(
+        val stepNumber: Int,
+        val stepName: String,
+    ) : AnalyticsEvent("screen.compose_gig_wizard.step_viewed") {
+        override val properties =
+            mapOf("step_number" to stepNumber.toString(), "step_name" to stepName)
+    }
+
+    /** P2.2 — Post-a-Task wizard submit tap (fires before the POST). */
+    data object CtaComposeGigSubmit : AnalyticsEvent("cta.compose_gig.submit")
 }
 
 /** Standard outcomes for form submissions and other yes/no telemetry. */
