@@ -305,37 +305,39 @@ class StartPollFormViewModel
 
         // MARK: - Aggregate accessors
 
-        fun isDirty(state: StartPollUiState = _state.value): Boolean {
-            val trimmed = state.question.trim()
-            if (trimmed.isNotEmpty()) return true
-            if (state.closesAt != null) return true
-            if (state.isAnonymous) return true
-            if (state.audience.isSelective) return true
-            if (state.kind != state.initialKind) return true
-            if (state.options.any { !it.isLocked && it.label.trim().isNotEmpty() }) return true
-            return false
-        }
+        fun isDirty(state: StartPollUiState = _state.value): Boolean =
+            state.question.trim().isNotEmpty() ||
+                state.closesAt != null ||
+                state.isAnonymous ||
+                state.audience.isSelective ||
+                state.kind != state.initialKind ||
+                state.options.any { !it.isLocked && it.label.trim().isNotEmpty() }
 
         fun isValid(state: StartPollUiState = _state.value): Boolean = firstValidationError(state) == null
 
         // MARK: - Validation
 
         /** First user-facing error, or `null` when the form is submittable. */
-        fun firstValidationError(state: StartPollUiState = _state.value): String? {
-            validateQuestion(state.question)?.let { return it }
-            if (state.kind.allowsCustomOptions) {
-                val labels = state.options.map { it.label.trim() }.filter { it.isNotEmpty() }
-                if (labels.size < StartPollBounds.MIN_OPTIONS) {
-                    return "Add at least ${StartPollBounds.MIN_OPTIONS} options."
-                }
-                val normalised = labels.map { it.lowercase() }.toSet()
-                if (normalised.size < labels.size) return "Each option must be unique."
+        fun firstValidationError(state: StartPollUiState = _state.value): String? =
+            validateQuestion(state.question)
+                ?: validateOptions(state)
+                ?: validateCloseDate(state)
+
+        private fun validateOptions(state: StartPollUiState): String? {
+            if (!state.kind.allowsCustomOptions) return null
+            val labels = state.options.map { it.label.trim() }.filter { it.isNotEmpty() }
+            if (labels.size < StartPollBounds.MIN_OPTIONS) {
+                return "Add at least ${StartPollBounds.MIN_OPTIONS} options."
             }
+            val normalised = labels.map { it.lowercase() }.toSet()
+            if (normalised.size < labels.size) return "Each option must be unique."
+            return null
+        }
+
+        private fun validateCloseDate(state: StartPollUiState): String? {
             val closesAt = state.closesAt ?: return "Pick a close date."
-            val zone = zone()
-            val nowInstant = clock()
-            val cutoff = nowInstant.plusSeconds(StartPollBounds.CLOSE_MIN_SECONDS_AHEAD)
-            val closesInstant = closesAt.atZone(zone).toInstant()
+            val cutoff = clock().plusSeconds(StartPollBounds.CLOSE_MIN_SECONDS_AHEAD)
+            val closesInstant = closesAt.atZone(zone()).toInstant()
             if (closesInstant.isBefore(cutoff)) {
                 return "Close date must be at least 1 hour in the future."
             }

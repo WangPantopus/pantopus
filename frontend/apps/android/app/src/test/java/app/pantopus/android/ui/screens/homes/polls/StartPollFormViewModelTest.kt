@@ -67,8 +67,7 @@ class StartPollFormViewModelTest {
         return vm
     }
 
-    private fun futureDate(hours: Long): LocalDateTime =
-        LocalDateTime.ofInstant(fixedNow.plusSeconds(hours * 3600), zone)
+    private fun futureDate(hours: Long): LocalDateTime = LocalDateTime.ofInstant(fixedNow.plusSeconds(hours * 3600), zone)
 
     // MARK: - Initial pose
 
@@ -342,6 +341,7 @@ class StartPollFormViewModelTest {
     // MARK: - Members hydration
 
     @Test fun load_members_populates_active_occupants() {
+        val vm = makeVm()
         coEvery { membersRepo.listOccupants("home-1") } returns
             NetworkResult.Success(
                 OccupantsResponse(
@@ -353,7 +353,6 @@ class StartPollFormViewModelTest {
                         ),
                 ),
             )
-        val vm = makeVm()
         vm.loadMembers()
         val state = vm.state.value
         assertEquals(2, state.members.size)

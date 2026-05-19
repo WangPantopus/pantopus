@@ -68,7 +68,7 @@ final class StartPollFormViewModelTests: XCTestCase {
             XCTAssertEqual(vm.kind, kind, "Kind should be \(kind.label)")
             XCTAssertEqual(vm.options.count, 2)
             XCTAssertTrue(vm.options.allSatisfy { !$0.isLocked }, "Choice kinds must not lock options")
-            XCTAssertTrue(vm.options.allSatisfy { $0.label.isEmpty })
+            XCTAssertTrue(vm.options.allSatisfy(\.label.isEmpty))
         }
     }
 
@@ -77,7 +77,7 @@ final class StartPollFormViewModelTests: XCTestCase {
         XCTAssertEqual(vm.options.count, 2)
         XCTAssertEqual(vm.options[0].label, "Yes")
         XCTAssertEqual(vm.options[1].label, "No")
-        XCTAssertTrue(vm.options.allSatisfy { $0.isLocked })
+        XCTAssertTrue(vm.options.allSatisfy(\.isLocked))
     }
 
     // MARK: - Kind switching reconfigures
@@ -88,7 +88,7 @@ final class StartPollFormViewModelTests: XCTestCase {
         vm.updateOption(id: vm.options[1].id, to: "Banana")
         vm.setKind(.yesNo)
         XCTAssertEqual(vm.options.map(\.label), ["Yes", "No"])
-        XCTAssertTrue(vm.options.allSatisfy { $0.isLocked })
+        XCTAssertTrue(vm.options.allSatisfy(\.isLocked))
     }
 
     func testSwitchingFromYesNoSeedsFreshEditableOptions() {
@@ -96,7 +96,7 @@ final class StartPollFormViewModelTests: XCTestCase {
         vm.setKind(.multiChoice)
         XCTAssertEqual(vm.options.count, 2)
         XCTAssertTrue(vm.options.allSatisfy { !$0.isLocked })
-        XCTAssertTrue(vm.options.allSatisfy { $0.label.isEmpty })
+        XCTAssertTrue(vm.options.allSatisfy(\.label.isEmpty))
     }
 
     func testSwitchingBetweenChoiceKindsPreservesUserInput() {
@@ -115,7 +115,9 @@ final class StartPollFormViewModelTests: XCTestCase {
 
     func testAddOptionStopsAtMax() {
         let vm = makeVM(kind: .multiChoice)
-        for _ in 0..<20 { vm.addOption() }
+        for _ in 0..<20 {
+            vm.addOption()
+        }
         XCTAssertEqual(vm.options.count, StartPollBounds.maxOptions)
     }
 

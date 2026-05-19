@@ -38,14 +38,15 @@ struct StartPollFormView: View {
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSubmitting,
             onClose: onClose,
-            onCommit: { Task { await viewModel.submit() } }
-        ) {
-            questionGroup
-            kindGroup
-            optionsGroup
-            audienceGroup
-            scheduleGroup
-        }
+            onCommit: { Task { await viewModel.submit() } },
+            content: {
+                questionGroup
+                kindGroup
+                optionsGroup
+                audienceGroup
+                scheduleGroup
+            }
+        )
         .formShakeOnChange(of: viewModel.shakeTrigger)
         .overlay(alignment: .bottom) { toastOverlay }
         .task { await viewModel.loadMembers() }
@@ -59,7 +60,7 @@ struct StartPollFormView: View {
 
     // MARK: - Sections
 
-    @ViewBuilder private var questionGroup: some View {
+    private var questionGroup: some View {
         FormFieldGroup("Question") {
             PantopusTextField(
                 "Question",
@@ -78,7 +79,7 @@ struct StartPollFormView: View {
         }
     }
 
-    @ViewBuilder private var kindGroup: some View {
+    private var kindGroup: some View {
         FormFieldGroup("Poll kind") {
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 ForEach(StartPollKind.allCases) { kind in
@@ -95,7 +96,7 @@ struct StartPollFormView: View {
         }
     }
 
-    @ViewBuilder private var optionsGroup: some View {
+    private var optionsGroup: some View {
         FormFieldGroup(viewModel.kind == .yesNo ? "Options (auto)" : "Options") {
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 ForEach(Array(viewModel.options.enumerated()), id: \.element.id) { index, option in
@@ -107,9 +108,8 @@ struct StartPollFormView: View {
                         label: Binding(
                             get: { viewModel.options.first { $0.id == option.id }?.label ?? "" },
                             set: { viewModel.updateOption(id: option.id, to: $0) }
-                        ),
-                        onRemove: { viewModel.removeOption(id: option.id) }
-                    )
+                        )
+                    ) { viewModel.removeOption(id: option.id) }
                 }
                 if viewModel.kind.allowsCustomOptions, viewModel.options.count < StartPollBounds.maxOptions {
                     Button {
@@ -137,7 +137,7 @@ struct StartPollFormView: View {
         }
     }
 
-    @ViewBuilder private var audienceGroup: some View {
+    private var audienceGroup: some View {
         FormFieldGroup("Audience") {
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 AudienceRow(
@@ -166,7 +166,7 @@ struct StartPollFormView: View {
         }
     }
 
-    @ViewBuilder private var scheduleGroup: some View {
+    private var scheduleGroup: some View {
         FormFieldGroup("Close date") {
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 DatePicker(
@@ -307,7 +307,7 @@ private struct OptionRow: View {
         }
     }
 
-    @ViewBuilder private var optionField: some View {
+    private var optionField: some View {
         HStack {
             if isLocked {
                 Text(label)

@@ -339,8 +339,9 @@ private fun OptionsSection(
             }
             if (kind.allowsCustomOptions) {
                 Text(
-                    text = "At least ${StartPollBounds.MIN_OPTIONS}, up to " +
-                        "${StartPollBounds.MAX_OPTIONS}. Each option must be unique.",
+                    text =
+                        "At least ${StartPollBounds.MIN_OPTIONS}, up to " +
+                            "${StartPollBounds.MAX_OPTIONS}. Each option must be unique.",
                     style = PantopusTextStyle.caption,
                     color = PantopusColors.appTextMuted,
                 )
