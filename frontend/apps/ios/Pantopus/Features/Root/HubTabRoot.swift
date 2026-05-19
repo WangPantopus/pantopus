@@ -42,6 +42,11 @@ public enum HubRoute: Hashable {
     /// Members sub-screen for a specific home (T6.3a / P9).
     case homeMembers(homeId: String)
     case publicProfile(userId: String)
+    /// P1.6 — Typed Business Profile screen. Pushed from DiscoverHub
+    /// business cards, DiscoverBusinesses row taps, and any other
+    /// surface that previously routed to a `Business: <name>`
+    /// placeholder.
+    case businessProfile(businessId: String)
     case pulsePost(postId: String)
     /// Bills list for a home (T5.2.2 / P13).
     case homeBills(homeId: String)
@@ -263,7 +268,7 @@ public struct HubTabRoot: View {
         case .post: .pulsePost(postId: item.id)
         case .person: .publicProfile(userId: item.id)
         case .gig: .placeholder(label: "Gig detail")
-        case .business: .placeholder(label: "Business")
+        case .business: .businessProfile(businessId: item.id)
         case .unknown: .placeholder(label: item.title)
         }
     }
@@ -583,6 +588,14 @@ public struct HubTabRoot: View {
                 onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
                 onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report")) } }
             )
+        case let .businessProfile(businessId):
+            BusinessProfileDestination(
+                businessId: businessId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
+                onShare: { Task { @MainActor in push(.placeholder(label: "Share business")) } },
+                onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } }
+            )
         case let .pulsePost(postId):
             PulsePostDetailView(
                 postId: postId,
@@ -795,11 +808,8 @@ public struct HubTabRoot: View {
                         switch target {
                         case let .person(userId, _):
                             push(.publicProfile(userId: userId))
-                        case .business:
-                            // Per buildout plan F6, the typed business
-                            // profile screen lands later — push the
-                            // discover-businesses placeholder for now.
-                            push(.discoverBusinesses)
+                        case let .business(businessId, _):
+                            push(.businessProfile(businessId: businessId))
                         case let .gig(gigId):
                             push(.gigDetail(gigId: gigId))
                         case let .listing(listingId):
@@ -823,11 +833,8 @@ public struct HubTabRoot: View {
                 viewModel: DiscoverBusinessesViewModel { target in
                     Task { @MainActor in
                         switch target {
-                        case let .business(businessId, name):
-                            // The dedicated business-profile screen is
-                            // still pending. Use the placeholder until
-                            // it lands.
-                            push(.placeholder(label: "Business: \(name) (\(businessId))"))
+                        case let .business(businessId, _):
+                            push(.businessProfile(businessId: businessId))
                         case .openFilters:
                             push(.placeholder(label: "Business filters"))
                         case .widenRadius:
@@ -999,6 +1006,31 @@ extension HubRoute: Identifiable {
     }
 }
 #endif
+
+/// Small wrapper that injects the `openURL` environment action into the
+/// Business Profile screen so the "Visit" button can punch out to Safari
+/// without the navigation host having to depend on `UIApplication`.
+@MainActor
+private struct BusinessProfileDestination: View {
+    let businessId: String
+    let onBack: @MainActor () -> Void
+    let onOpenMessages: @MainActor () -> Void
+    let onShare: @MainActor () -> Void
+    let onOpenReport: @MainActor () -> Void
+
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        BusinessProfileView(
+            businessId: businessId,
+            onBack: onBack,
+            onOpenMessages: onOpenMessages,
+            onShare: onShare,
+            onOpenReport: onOpenReport,
+            onOpenWebsite: { url in openURL(url) }
+        )
+    }
+}
 
 #Preview {
     HubTabRoot()

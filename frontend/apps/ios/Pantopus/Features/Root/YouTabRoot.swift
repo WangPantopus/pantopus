@@ -135,6 +135,11 @@ public enum YouRoute: Hashable {
     case listingDetail(listingId: String)
     #if DEBUG
     case publicProfile(userId: String)
+    /// P1.6 — Typed Business Profile screen. Reached today only via
+    /// the debug stack on the You tab so engineers can verify the
+    /// VM/view wiring without first navigating through DiscoverHub.
+    /// External entry points live on `HubRoute`.
+    case businessProfile(businessId: String)
     case pulsePost(postId: String)
     case privacyHandshake(personaHandle: String)
     case statusWaiting
@@ -1171,6 +1176,11 @@ public struct YouTabRoot: View {
             PublicProfileView(
                 userId: userId
             ) { if !path.isEmpty { path.removeLast() } }
+        case let .businessProfile(businessId):
+            BusinessProfileView(
+                businessId: businessId,
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
         case let .pulsePost(postId):
             PulsePostDetailView(
                 postId: postId,
