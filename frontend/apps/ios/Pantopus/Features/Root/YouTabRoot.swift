@@ -99,6 +99,9 @@ public enum YouRoute: Hashable {
     case homePolls(homeId: String)
     /// T6.3e — Poll detail. Pushed from a Polls list row.
     case pollDetail(homeId: String, pollId: String)
+    /// P2.5 — Start-a-poll composer. Pushed from the Polls list FAB +
+    /// empty-state CTA.
+    case startPoll(homeId: String)
     /// T6.4a — Access codes. Per-home roster of Wi-Fi / Alarm / Gate /
     /// Lockbox / Garage / Smart lock codes. The "me.access" Household-
     /// section row pushes here with the primary home id resolved by
@@ -1029,7 +1032,7 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.pollDetail(homeId: homeId, pollId: pollId)) }
                     },
                     onStartPoll: {
-                        Task { @MainActor in path.append(.placeholder(label: "Start a poll")) }
+                        Task { @MainActor in path.append(.startPoll(homeId: homeId)) }
                     }
                 )
             )
@@ -1038,6 +1041,10 @@ public struct YouTabRoot: View {
                 homeId: homeId,
                 pollId: pollId
             ) {
+                if !path.isEmpty { path.removeLast() }
+            }
+        case let .startPoll(homeId):
+            StartPollFormView(homeId: homeId) {
                 if !path.isEmpty { path.removeLast() }
             }
         case let .accessCodes(homeId, homeName):

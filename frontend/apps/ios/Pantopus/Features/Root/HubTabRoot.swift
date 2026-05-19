@@ -60,6 +60,9 @@ public enum HubRoute: Hashable {
     case homePolls(homeId: String)
     /// Poll detail — read + cast vote (T6.3e / P13).
     case pollDetail(homeId: String, pollId: String)
+    /// Start-a-poll composer (P2.5). Pushed from the Polls list FAB +
+    /// empty-state CTA.
+    case startPoll(homeId: String)
     /// Pulse tab (T1.2). Reached from Hub → pillar(.pulse).
     case pulseFeed
     /// Compose post target — placeholder until the compose flow ships.
@@ -434,6 +437,10 @@ public struct HubTabRoot: View {
                 homeId: homeId,
                 pollId: pollId
             ) {
+                if !path.isEmpty { path.removeLast() }
+            }
+        case let .startPoll(homeId):
+            StartPollFormView(homeId: homeId) {
                 if !path.isEmpty { path.removeLast() }
             }
         case let .homePets(homeId):
@@ -1003,9 +1010,8 @@ public struct HubTabRoot: View {
     }
 
     /// Construct the Polls list VM with navigation callbacks wired to
-    /// `push(.pollDetail(…))` for row taps. The FAB currently routes to
-    /// the not-yet-built composer placeholder — that screen lands in a
-    /// follow-up PR.
+    /// `push(.pollDetail(…))` for row taps and `push(.startPoll(…))` for
+    /// the FAB + empty-state CTA (P2.5 composer).
     private static func pollsListViewModel(
         homeId: String,
         push: @escaping (HubRoute) -> Void
@@ -1014,7 +1020,7 @@ public struct HubTabRoot: View {
             Task { @MainActor in push(.pollDetail(homeId: homeId, pollId: pollId)) }
         }
         let startPoll: @Sendable () -> Void = {
-            Task { @MainActor in push(.placeholder(label: "Start a poll")) }
+            Task { @MainActor in push(.startPoll(homeId: homeId)) }
         }
         return PollsListViewModel(
             homeId: homeId,
