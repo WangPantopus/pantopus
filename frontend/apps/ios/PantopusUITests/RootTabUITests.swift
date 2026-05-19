@@ -37,6 +37,12 @@ final class RootTabUITests: XCTestCase {
         app.buttons["tab.\(tab)"].firstMatch
     }
 
+    private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(identifier: identifier)
+            .firstMatch
+    }
+
     func testLaunchLandsOnHubTab() throws {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured; see RootTabUITests docs.")
@@ -60,12 +66,12 @@ final class RootTabUITests: XCTestCase {
         }
     }
 
-    func testTapNearbyShowsEmptyState() throws {
+    func testTapNearbyShowsMap() throws {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
         tabButton("nearby", in: app).tap()
-        XCTAssertTrue(app.staticTexts["Nearby isn't here yet"].waitForExistence(timeout: 2))
+        XCTAssertTrue(element("nearbyMap", in: app).waitForExistence(timeout: 5))
     }
 
     func testTapInboxShowsChatListEmptyState() throws {
@@ -81,6 +87,7 @@ final class RootTabUITests: XCTestCase {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
         tabButton("you", in: app).tap()
-        XCTAssertTrue(app.buttons["youSignOutButton"].waitForExistence(timeout: 2))
+        XCTAssertTrue(element("meScreen", in: app).waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["meDestructiveCard_personal"].waitForExistence(timeout: 2))
     }
 }
