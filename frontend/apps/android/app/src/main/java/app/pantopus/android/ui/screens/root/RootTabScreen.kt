@@ -40,6 +40,7 @@ import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
 import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
+import app.pantopus.android.ui.screens.compose.listing.ListingComposeWizardScreen
 import app.pantopus.android.ui.screens.compose.pulse.PulseComposeScreen
 import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
 import app.pantopus.android.ui.screens.connections.ConnectionsScreen
@@ -491,7 +492,7 @@ private object ChildRoutes {
         return "listings/$listingId/offers?$LISTING_OFFERS_TITLE_KEY=$encodedTitle"
     }
 
-    /** Snap & sell — placeholder until the marketplace compose flow ships. */
+    /** Snap & sell — the marketplace listing-compose wizard (P2.3). */
     const val COMPOSE_LISTING = "listings/compose"
 
     /** T6.3f / P14 — My listings (seller's tabbed roster). */
@@ -1449,7 +1450,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 InvoiceDetailScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.COMPOSE_LISTING) {
-                NotYetAvailableView(tabName = "Snap & sell", icon = PantopusIcon.Camera)
+                ListingComposeWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenListingDetail = { listingId ->
+                        // Pop the wizard then push detail so Back returns to
+                        // Marketplace, not the success screen.
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.listingDetail(listingId))
+                    },
+                )
             }
             composable(ChildRoutes.GIGS_FEED) {
                 GigsFeedScreen(

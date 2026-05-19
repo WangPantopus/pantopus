@@ -120,6 +120,39 @@ data class ListingDetailResponse(
     val listing: ListingDto,
 )
 
+/**
+ * Body for `POST /api/listings`. Mirrors the destructure at
+ * `backend/routes/listings.js:430`. The wizard sends the commonly-used
+ * subset; backend defaults take care of the rest (visibility scope,
+ * radius, expirations, geocode provenance, …).
+ */
+@JsonClass(generateAdapter = true)
+data class CreateListingRequest(
+    val title: String,
+    val description: String? = null,
+    val price: Double? = null,
+    val isFree: Boolean,
+    val category: String,
+    val condition: String? = null,
+    val mediaUrls: List<String> = emptyList(),
+    val layer: String,
+    val listingType: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val locationName: String? = null,
+    val locationAddress: String? = null,
+    val meetupPreference: String? = null,
+    val deliveryAvailable: Boolean = false,
+    val isWanted: Boolean = false,
+)
+
+/** Envelope from `POST /api/listings` (status 201). */
+@JsonClass(generateAdapter = true)
+data class CreateListingResponse(
+    val message: String? = null,
+    val listing: ListingDto,
+)
+
 /** `POST /api/listings/:id/message` body. */
 @JsonClass(generateAdapter = true)
 data class MessageListingBody(

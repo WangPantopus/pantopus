@@ -758,7 +758,12 @@ public struct HubTabRoot: View {
                 )
             )
         case .composeListing:
-            NotYetAvailableView(tabName: "Snap & sell", icon: .camera)
+            ListingComposeWizardView { listingId in
+                Task { @MainActor in
+                    pop()
+                    push(.listingDetail(listingId: listingId))
+                }
+            }
         case let .invoiceDetail(invoiceId):
             InvoiceDetailView(
                 viewModel: InvoiceDetailViewModel(invoiceId: invoiceId)
