@@ -184,10 +184,8 @@ public final class ChatSearchViewModel {
 
     private static func meta(from dto: UnifiedConversation) -> IndexedConversation {
         let kind: ChatSearchResult.Kind = dto.kind == .room ? .group : .dm
-        let displayName = dto.name?.isEmpty == false ? dto.name! : defaultName(for: dto)
-        let lastPreview = dto.lastMessagePreview?.isEmpty == false
-            ? dto.lastMessagePreview!
-            : defaultPreview(for: dto)
+        let displayName = dto.name?.nilIfEmpty ?? defaultName(for: dto)
+        let lastPreview = dto.lastMessagePreview?.nilIfEmpty ?? defaultPreview(for: dto)
         return IndexedConversation(
             id: dto.id,
             kind: kind,
@@ -241,4 +239,10 @@ private struct IndexedConversation {
     let verified: Bool
     let lastPreview: String
     let messages: [ChatMessageDTO]
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }

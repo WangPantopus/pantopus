@@ -60,7 +60,14 @@ final class ChatSearchViewModelTests: XCTestCase {
     private static let u1MessagesJSON = """
     {
       "messages": [
-        {"id":"m_u1","room_id":"r1","user_id":"u1","message_text":"Sounds good, see you then.","message_type":"text","created_at":"2026-04-20T10:00:00Z"}
+        {
+          "id": "m_u1",
+          "room_id": "r1",
+          "user_id": "u1",
+          "message_text": "Sounds good, see you then.",
+          "message_type": "text",
+          "created_at": "2026-04-20T10:00:00Z"
+        }
       ],
       "hasMore": false
     }
@@ -69,7 +76,14 @@ final class ChatSearchViewModelTests: XCTestCase {
     private static let g1MessagesJSON = """
     {
       "messages": [
-        {"id":"m_g1","room_id":"g1","user_id":"u9","message_text":"I'll grab the folding chairs. Anyone bringing ice?","message_type":"text","created_at":"2026-04-19T12:00:00Z"}
+        {
+          "id": "m_g1",
+          "room_id": "g1",
+          "user_id": "u9",
+          "message_text": "I'll grab the folding chairs. Anyone bringing ice?",
+          "message_type": "text",
+          "created_at": "2026-04-19T12:00:00Z"
+        }
       ],
       "hasMore": false
     }

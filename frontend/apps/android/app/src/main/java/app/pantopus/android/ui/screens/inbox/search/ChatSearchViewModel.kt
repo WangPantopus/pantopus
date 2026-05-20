@@ -153,36 +153,52 @@ class ChatSearchViewModel
 
         private fun meta(dto: UnifiedConversationDto): IndexedConversation {
             val isRoom = dto.type == "room"
-            val kind = if (isRoom) ChatSearchResultKind.Group else ChatSearchResultKind.Dm
-            val name =
-                if (isRoom) {
-                    dto.roomName ?: "Group"
-                } else {
-                    dto.otherParticipantName ?: dto.otherParticipantIdentity?.displayName ?: "Pantopus user"
-                }
-            val id =
-                if (isRoom) (dto.id ?: dto.gigId ?: dto.homeId ?: name) else (dto.otherParticipantId ?: name)
-            val identityKind = dto.otherParticipantIdentity?.identityKind
-            val identityChip =
-                when {
-                    !isRoom && identityKind == "business" -> ConversationIdentityChip.Business
-                    !isRoom && identityKind == "home" -> ConversationIdentityChip.Home
-                    isRoom && dto.roomType == "home" -> ConversationIdentityChip.Home
-                    else -> null
-                }
-            val verified = dto.otherParticipantIdentity?.verified == true
-            val lastPreview =
-                dto.lastMessagePreview ?: if (isRoom) "No messages yet" else "Start the conversation"
+            val name = displayName(dto, isRoom)
             return IndexedConversation(
-                id = id,
-                kind = kind,
+                id = conversationId(dto, isRoom, name),
+                kind = if (isRoom) ChatSearchResultKind.Group else ChatSearchResultKind.Dm,
                 displayName = name,
                 initials = initials(name),
-                identityChip = identityChip,
-                verified = verified,
-                lastPreview = lastPreview,
+                identityChip = identityChip(dto, isRoom),
+                verified = dto.otherParticipantIdentity?.verified == true,
+                lastPreview = lastPreview(dto, isRoom),
             )
         }
+
+        private fun displayName(
+            dto: UnifiedConversationDto,
+            isRoom: Boolean,
+        ): String =
+            if (isRoom) {
+                dto.roomName ?: "Group"
+            } else {
+                dto.otherParticipantName ?: dto.otherParticipantIdentity?.displayName ?: "Pantopus user"
+            }
+
+        private fun conversationId(
+            dto: UnifiedConversationDto,
+            isRoom: Boolean,
+            name: String,
+        ): String =
+            if (isRoom) (dto.id ?: dto.gigId ?: dto.homeId ?: name) else (dto.otherParticipantId ?: name)
+
+        private fun identityChip(
+            dto: UnifiedConversationDto,
+            isRoom: Boolean,
+        ): ConversationIdentityChip? {
+            val identityKind = dto.otherParticipantIdentity?.identityKind
+            return when {
+                !isRoom && identityKind == "business" -> ConversationIdentityChip.Business
+                !isRoom && identityKind == "home" -> ConversationIdentityChip.Home
+                isRoom && dto.roomType == "home" -> ConversationIdentityChip.Home
+                else -> null
+            }
+        }
+
+        private fun lastPreview(
+            dto: UnifiedConversationDto,
+            isRoom: Boolean,
+        ): String = dto.lastMessagePreview ?: if (isRoom) "No messages yet" else "Start the conversation"
 
         private fun initials(name: String): String {
             val parts = name.split(" ").take(2)
