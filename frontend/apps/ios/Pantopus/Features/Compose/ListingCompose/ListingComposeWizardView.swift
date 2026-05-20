@@ -187,6 +187,8 @@ private struct ListingComposeErrorBanner: View {
     }
 }
 
+private func previewOpenListingDetail(_: String) {}
+
 #Preview {
-    ListingComposeWizardView(onOpenListingDetail: { _ in })
+    ListingComposeWizardView(onOpenListingDetail: previewOpenListingDetail)
 }

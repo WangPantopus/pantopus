@@ -29,6 +29,12 @@ public struct NearbyTabRoot: View {
 
     public init() {}
 
+    private func popAfterListingUpdate(_: String) {
+        Task { @MainActor in
+            if !path.isEmpty { path.removeLast() }
+        }
+    }
+
     public var body: some View {
         NavigationStack(path: $path) {
             NearbyMapView(
@@ -102,11 +108,7 @@ public struct NearbyTabRoot: View {
         case let .editListing(listingId, jumpToStep):
             ListingComposeWizardView(
                 mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
-                onListingUpdated: { _ in
-                    Task { @MainActor in
-                        if !path.isEmpty { path.removeLast() }
-                    }
-                }
+                onListingUpdated: popAfterListingUpdate
             )
         }
     }

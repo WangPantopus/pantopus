@@ -574,6 +574,12 @@ public struct YouTabRoot: View {
         path.append(.placeholder(label: row.label))
     }
 
+    private func popAfterListingUpdate(_: String) {
+        Task { @MainActor in
+            if !path.isEmpty { path.removeLast() }
+        }
+    }
+
     /// No-op overlay slot — we previously routed debug affordances via
     /// a 5-tap gesture, but the designed DEBUG section in `MeView` now
     /// surfaces them directly.
@@ -692,11 +698,7 @@ public struct YouTabRoot: View {
         case let .editListing(listingId, jumpToStep):
             ListingComposeWizardView(
                 mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
-                onListingUpdated: { _ in
-                    Task { @MainActor in
-                        if !path.isEmpty { path.removeLast() }
-                    }
-                }
+                onListingUpdated: popAfterListingUpdate
             )
         case .myPosts:
             MyPostsView(

@@ -186,6 +186,25 @@ public struct HubTabRoot: View {
         if !path.isEmpty { path.removeLast() }
     }
 
+    private func handleListingCreated(_ listingId: String, push: @escaping (HubRoute) -> Void) {
+        Task { @MainActor in
+            pop()
+            push(.listingDetail(listingId: listingId))
+        }
+    }
+
+    private func listingCreatedHandler(push: @escaping (HubRoute) -> Void) -> (String) -> Void {
+        { listingId in
+            handleListingCreated(listingId, push: push)
+        }
+    }
+
+    private func handleListingUpdated(_: String) {
+        // Pop the wizard — the listing-detail (or offers) screen
+        // underneath refreshes on next `.task`.
+        Task { @MainActor in pop() }
+    }
+
     public var body: some View {
         NavigationStack(path: $path) {
             hub
@@ -868,21 +887,12 @@ public struct HubTabRoot: View {
             )
         case .composeListing:
             ListingComposeWizardView(
-                onOpenListingDetail: { listingId in
-                    Task { @MainActor in
-                        pop()
-                        push(.listingDetail(listingId: listingId))
-                    }
-                }
+                onOpenListingDetail: listingCreatedHandler(push: push)
             )
         case let .editListing(listingId, jumpToStep):
             ListingComposeWizardView(
                 mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
-                onListingUpdated: { _ in
-                    // Pop the wizard — the listing-detail (or offers)
-                    // screen underneath refreshes on next `.task`.
-                    Task { @MainActor in pop() }
-                }
+                onListingUpdated: handleListingUpdated
             )
         case let .invoiceDetail(invoiceId):
             InvoiceDetailView(

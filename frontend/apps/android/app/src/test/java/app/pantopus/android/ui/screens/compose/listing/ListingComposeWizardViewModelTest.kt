@@ -496,11 +496,12 @@ class ListingComposeWizardViewModelTest {
     @Test
     fun edit_mode_review_step_cta_reads_save_changes() =
         runTest {
-            coEvery { repo.detail("listing_42") } returns NetworkResult.Success(
-                app.pantopus.android.data.api.models.listings.ListingDetailResponse(
-                    listing = editListingDto(),
-                ),
-            )
+            coEvery { repo.detail("listing_42") } returns
+                NetworkResult.Success(
+                    app.pantopus.android.data.api.models.listings.ListingDetailResponse(
+                        listing = editListingDto(),
+                    ),
+                )
             val vm = makeEditVm()
             vm.loadExistingIfNeeded()
             assertEquals(ListingComposeStep.Review, vm.state.value.form.currentStep)
@@ -510,11 +511,12 @@ class ListingComposeWizardViewModelTest {
     @Test
     fun edit_prefill_projects_listing_dto_into_form() =
         runTest {
-            coEvery { repo.detail("listing_42") } returns NetworkResult.Success(
-                app.pantopus.android.data.api.models.listings.ListingDetailResponse(
-                    listing = editListingDto(),
-                ),
-            )
+            coEvery { repo.detail("listing_42") } returns
+                NetworkResult.Success(
+                    app.pantopus.android.data.api.models.listings.ListingDetailResponse(
+                        listing = editListingDto(),
+                    ),
+                )
             val vm = makeEditVm()
             vm.loadExistingIfNeeded()
             val form = vm.state.value.form
@@ -538,11 +540,12 @@ class ListingComposeWizardViewModelTest {
     @Test
     fun edit_prefill_jumps_to_price_step_when_requested() =
         runTest {
-            coEvery { repo.detail("listing_42") } returns NetworkResult.Success(
-                app.pantopus.android.data.api.models.listings.ListingDetailResponse(
-                    listing = editListingDto(),
-                ),
-            )
+            coEvery { repo.detail("listing_42") } returns
+                NetworkResult.Success(
+                    app.pantopus.android.data.api.models.listings.ListingDetailResponse(
+                        listing = editListingDto(),
+                    ),
+                )
             val vm = makeEditVm(jumpToStep = ListingComposeStep.Price)
             vm.loadExistingIfNeeded()
             assertEquals(ListingComposeStep.Price, vm.state.value.form.currentStep)
@@ -563,19 +566,20 @@ class ListingComposeWizardViewModelTest {
     @Test
     fun edit_prefill_free_listing_maps_to_free_category() =
         runTest {
-            coEvery { repo.detail("listing_free") } returns NetworkResult.Success(
-                app.pantopus.android.data.api.models.listings.ListingDetailResponse(
-                    listing =
-                        editListingDto(
-                            listingType = "free_item",
-                            layer = "goods",
-                            isFree = true,
-                            price = null,
-                            category = "free_stuff",
-                            condition = null,
-                        ).copy(id = "listing_free"),
-                ),
-            )
+            coEvery { repo.detail("listing_free") } returns
+                NetworkResult.Success(
+                    app.pantopus.android.data.api.models.listings.ListingDetailResponse(
+                        listing =
+                            editListingDto(
+                                listingType = "free_item",
+                                layer = "goods",
+                                isFree = true,
+                                price = null,
+                                category = "free_stuff",
+                                condition = null,
+                            ).copy(id = "listing_free"),
+                    ),
+                )
             val vm = makeEditVm(listingId = "listing_free")
             vm.loadExistingIfNeeded()
             assertEquals(ListingComposeCategory.Free, vm.state.value.form.category)
@@ -586,12 +590,13 @@ class ListingComposeWizardViewModelTest {
     @Test
     fun edit_prefill_wanted_listing_maps_to_wanted_category() =
         runTest {
-            coEvery { repo.detail("listing_w") } returns NetworkResult.Success(
-                app.pantopus.android.data.api.models.listings.ListingDetailResponse(
-                    listing =
-                        editListingDto(listingType = "wanted_request").copy(id = "listing_w"),
-                ),
-            )
+            coEvery { repo.detail("listing_w") } returns
+                NetworkResult.Success(
+                    app.pantopus.android.data.api.models.listings.ListingDetailResponse(
+                        listing =
+                            editListingDto(listingType = "wanted_request").copy(id = "listing_w"),
+                    ),
+                )
             val vm = makeEditVm(listingId = "listing_w")
             vm.loadExistingIfNeeded()
             assertEquals(ListingComposeCategory.Wanted, vm.state.value.form.category)
@@ -614,11 +619,12 @@ class ListingComposeWizardViewModelTest {
     @Test
     fun edit_submit_fires_PATCH_and_emits_listing_updated() =
         runTest {
-            coEvery { repo.detail("listing_42") } returns NetworkResult.Success(
-                app.pantopus.android.data.api.models.listings.ListingDetailResponse(
-                    listing = editListingDto(),
-                ),
-            )
+            coEvery { repo.detail("listing_42") } returns
+                NetworkResult.Success(
+                    app.pantopus.android.data.api.models.listings.ListingDetailResponse(
+                        listing = editListingDto(),
+                    ),
+                )
             coEvery {
                 repo.update(
                     "listing_42",
@@ -651,19 +657,21 @@ class ListingComposeWizardViewModelTest {
     @Test
     fun edit_submit_error_keeps_user_on_review_with_banner() =
         runTest {
-            coEvery { repo.detail("listing_42") } returns NetworkResult.Success(
-                app.pantopus.android.data.api.models.listings.ListingDetailResponse(
-                    listing = editListingDto(),
-                ),
-            )
+            coEvery { repo.detail("listing_42") } returns
+                NetworkResult.Success(
+                    app.pantopus.android.data.api.models.listings.ListingDetailResponse(
+                        listing = editListingDto(),
+                    ),
+                )
             coEvery {
                 repo.update(
                     "listing_42",
                     any<app.pantopus.android.data.api.models.listings.UpdateListingRequest>(),
                 )
-            } returns NetworkResult.Failure(
-                app.pantopus.android.data.api.net.NetworkError.Server(500, "boom"),
-            )
+            } returns
+                NetworkResult.Failure(
+                    app.pantopus.android.data.api.net.NetworkError.Server(500, "boom"),
+                )
             val vm = makeEditVm()
             vm.loadExistingIfNeeded()
             vm.onPrimary()
@@ -675,11 +683,12 @@ class ListingComposeWizardViewModelTest {
     @Test
     fun edit_mode_is_always_dirty_pre_success() =
         runTest {
-            coEvery { repo.detail("listing_42") } returns NetworkResult.Success(
-                app.pantopus.android.data.api.models.listings.ListingDetailResponse(
-                    listing = editListingDto(),
-                ),
-            )
+            coEvery { repo.detail("listing_42") } returns
+                NetworkResult.Success(
+                    app.pantopus.android.data.api.models.listings.ListingDetailResponse(
+                        listing = editListingDto(),
+                    ),
+                )
             val vm = makeEditVm()
             vm.loadExistingIfNeeded()
             assertTrue("Edit mode warns on close so the user doesn't lose intent.", vm.chrome.dirty)
@@ -688,11 +697,12 @@ class ListingComposeWizardViewModelTest {
     @Test
     fun edit_secondary_tap_emits_listing_updated() =
         runTest {
-            coEvery { repo.detail("listing_42") } returns NetworkResult.Success(
-                app.pantopus.android.data.api.models.listings.ListingDetailResponse(
-                    listing = editListingDto(),
-                ),
-            )
+            coEvery { repo.detail("listing_42") } returns
+                NetworkResult.Success(
+                    app.pantopus.android.data.api.models.listings.ListingDetailResponse(
+                        listing = editListingDto(),
+                    ),
+                )
             coEvery {
                 repo.update(
                     "listing_42",
