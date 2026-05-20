@@ -95,7 +95,6 @@ import kotlin.math.abs
 @Composable
 fun NearbyMapScreen(
     onOpenEntity: (MapEntity) -> Unit = {},
-    onOpenFilters: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     initialCategory: app.pantopus.android.ui.screens.gigs.GigsCategory? = null,
     viewModel: NearbyMapViewModel = hiltViewModel(),
@@ -105,6 +104,8 @@ fun NearbyMapScreen(
     val activeSort by viewModel.activeSort.collectAsStateWithLifecycle()
     val sheetStop by viewModel.sheetStop.collectAsStateWithLifecycle()
     val userCoord by viewModel.userCoordinate.collectAsStateWithLifecycle()
+    val filters by viewModel.filters.collectAsStateWithLifecycle()
+    var showFilters by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         // Seed the chip first so the initial fetch already filters
@@ -164,7 +165,7 @@ fun NearbyMapScreen(
         )
         FloatingTopPill(
             onBack = onBack,
-            onOpenFilters = onOpenFilters,
+            onOpenFilters = { showFilters = true },
             modifier =
                 Modifier
                     .padding(WindowInsets.statusBars.asPaddingValues())
@@ -204,9 +205,16 @@ fun NearbyMapScreen(
                     cameraState.position = CameraPosition.fromLatLngZoom(LatLng(coord.latitude, coord.longitude), 15f)
                 }
             },
-            onLayers = onOpenFilters,
+            onLayers = { showFilters = true },
             modifier = Modifier.align(Alignment.BottomEnd),
         )
+        if (showFilters) {
+            MapFilterSheet(
+                criteria = filters,
+                onApply = viewModel::applyFilters,
+                onDismiss = { showFilters = false },
+            )
+        }
     }
 }
 

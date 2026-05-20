@@ -1132,7 +1132,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             MapEntityKind.Listing -> navController.navigate(ChildRoutes.listingDetail(entity.id))
                         }
                     },
-                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Map filters")) },
                 )
             }
             composable(PantopusRoute.Inbox.path) {
@@ -2171,7 +2170,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
                     onOpenMap = { category -> navController.navigate(ChildRoutes.nearbyMapForGigs(category.key)) },
                     onOpenSearch = { navController.navigate(ChildRoutes.GIG_SEARCH) },
-                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Gig filters")) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -2222,7 +2220,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             MapEntityKind.Listing -> navController.navigate(ChildRoutes.listingDetail(entity.id))
                         }
                     },
-                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Map filters")) },
                     onBack = { navController.popBackStack() },
                     initialCategory = GigsCategory.fromBackendKey(raw),
                 )

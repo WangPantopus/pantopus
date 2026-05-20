@@ -18,19 +18,17 @@ public struct NearbyMapView: View {
     @State private var viewModel: NearbyMapViewModel
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var dragTranslation: CGFloat = 0
+    @State private var showFilterSheet = false
     private let onOpenEntity: @MainActor (MapEntity) -> Void
-    private let onOpenFilters: @MainActor () -> Void
     private let onBack: (@MainActor () -> Void)?
 
     init(
         viewModel: NearbyMapViewModel = NearbyMapViewModel(),
         onOpenEntity: @escaping @MainActor (MapEntity) -> Void = { _ in },
-        onOpenFilters: @escaping @MainActor () -> Void = {},
         onBack: (@MainActor () -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onOpenEntity = onOpenEntity
-        self.onOpenFilters = onOpenFilters
         self.onBack = onBack
     }
 
@@ -50,6 +48,13 @@ public struct NearbyMapView: View {
             .ignoresSafeArea(edges: .bottom)
         }
         .task { await viewModel.load() }
+        .sheet(isPresented: $showFilterSheet) {
+            MapFilterSheet(
+                criteria: viewModel.filters,
+                onApply: { viewModel.applyFilters($0) },
+                onClose: { showFilterSheet = false }
+            )
+        }
         .accessibilityIdentifier("nearbyMap")
     }
 
@@ -148,12 +153,15 @@ public struct NearbyMapView: View {
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
             Spacer(minLength: 4)
-            Button(action: onOpenFilters) {
+            Button {
+                showFilterSheet = true
+            } label: {
                 Icon(.slidersHorizontal, size: 16, strokeWidth: 2.2, color: Theme.Color.appText)
                     .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Filters")
+            .accessibilityIdentifier("mapFiltersButton")
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
@@ -213,7 +221,7 @@ public struct NearbyMapView: View {
                 recenter(on: viewModel.userCoordinate)
             }
             mapControlButton(icon: .map, label: "Layers") {
-                onOpenFilters()
+                showFilterSheet = true
             }
         }
         .padding(.trailing, 14)

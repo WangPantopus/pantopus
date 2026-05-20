@@ -974,7 +974,6 @@ public struct HubTabRoot: View {
                     Task { @MainActor in push(.nearbyMapForGigs(categoryKey: category.rawValue)) }
                 },
                 onOpenSearch: { Task { @MainActor in push(.gigSearch) } },
-                onOpenFilters: { Task { @MainActor in push(.placeholder(label: "Gig filters")) } },
                 onBack: pop
             )
         case .gigSearch:
@@ -1025,7 +1024,6 @@ public struct HubTabRoot: View {
                         }
                     }
                 },
-                onOpenFilters: { Task { @MainActor in push(.placeholder(label: "Map filters")) } },
                 onBack: { if !path.isEmpty { path.removeLast() } }
             )
         case .marketplace:
