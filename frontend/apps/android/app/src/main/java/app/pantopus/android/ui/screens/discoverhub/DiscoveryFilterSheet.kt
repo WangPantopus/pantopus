@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "MatchingDeclarationName")
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.discoverhub

@@ -18,6 +18,7 @@ class BusinessDiscoveryRepository
          * `GET /api/businesses/search`. T5.4.2 — Discover businesses
          * passes the selected chip id as `categories` (omitted on "all").
          */
+        @Suppress("LongParameterList")
         suspend fun search(
             q: String? = null,
             categories: List<String>? = null,
