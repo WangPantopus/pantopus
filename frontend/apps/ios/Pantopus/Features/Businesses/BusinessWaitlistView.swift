@@ -37,9 +37,12 @@ struct BusinessWaitlistView: View {
                         .foregroundStyle(Theme.Color.appText)
                         .multilineTextAlignment(.center)
 
-                    Text(joined
-                        ? "We'll let you know the moment business registration opens. Thanks for your interest."
-                        : "Business registration isn't open yet. Join the waitlist and we'll notify you when you can set up your business on Pantopus.")
+                    Text(
+                        joined
+                            ? "We'll let you know the moment business registration opens. Thanks for your interest."
+                            : "Business registration isn't open yet. Join the waitlist and we'll notify you " +
+                                "when you can set up your business on Pantopus."
+                    )
                         .pantopusTextStyle(.small)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .multilineTextAlignment(.center)

@@ -189,7 +189,12 @@ private fun WeatherHero(content: TodayDetailContent) {
 }
 
 @Composable
-private fun StatCard(icon: PantopusIcon, title: String, value: String, tag: String) {
+private fun StatCard(
+    icon: PantopusIcon,
+    title: String,
+    value: String,
+    tag: String,
+) {
     Row(
         modifier = cardModifier().semantics { contentDescription = "$tag $title $value" }.padding(Spacing.s4),
         verticalAlignment = Alignment.CenterVertically,

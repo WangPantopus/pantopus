@@ -42,8 +42,9 @@ data class TodayDetailContent(
 ) {
     val hasWeather: Boolean get() = temperatureFahrenheit != null || conditions != null
     val isEmpty: Boolean
-        get() = temperatureFahrenheit == null && conditions == null && aqiLabel == null &&
-            commute == null && events.isEmpty()
+        get() =
+            temperatureFahrenheit == null && conditions == null && aqiLabel == null &&
+                commute == null && events.isEmpty()
 }
 
 /**

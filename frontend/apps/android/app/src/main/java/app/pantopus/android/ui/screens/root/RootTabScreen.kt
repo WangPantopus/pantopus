@@ -36,6 +36,7 @@ import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BROADCA
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BroadcastDetailScreen
 import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_BUSINESS_ID_KEY
 import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
+import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
@@ -58,12 +59,7 @@ import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.gigs.GigSearchScreen
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
-import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
-import app.pantopus.android.ui.screens.hub.today.TodayDetailScreen
-import app.pantopus.android.ui.util.InviteLinks
-import app.pantopus.android.ui.util.composeEmail
-import app.pantopus.android.ui.util.shareText
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
@@ -154,6 +150,7 @@ import app.pantopus.android.ui.screens.hub.HubNavigationIntent
 import app.pantopus.android.ui.screens.hub.HubScreen
 import app.pantopus.android.ui.screens.hub.JumpBackItem
 import app.pantopus.android.ui.screens.hub.PillarTile
+import app.pantopus.android.ui.screens.hub.today.TodayDetailScreen
 import app.pantopus.android.ui.screens.identity_center.IdentityCenterScreen
 import app.pantopus.android.ui.screens.identity_center.IdentityKind
 import app.pantopus.android.ui.screens.inbox.InboxScreen
@@ -215,6 +212,9 @@ import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTr
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.you.YouScreen
 import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.util.InviteLinks
+import app.pantopus.android.ui.util.composeEmail
+import app.pantopus.android.ui.util.shareText
 
 /** Non-tab routes reachable from within the Hub stack. */
 private object ChildRoutes {
@@ -2375,8 +2375,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             DiscoverBusinessesTarget.InviteBusiness ->
                                 appContext.composeEmail(
                                     subject = "Join Pantopus",
-                                    body = "I'd love to see your business on Pantopus — neighbors near " +
-                                        "me are looking for trusted local pros. ${InviteLinks.DOWNLOAD_URL}",
+                                    body =
+                                        "I'd love to see your business on Pantopus — neighbors near " +
+                                            "me are looking for trusted local pros. ${InviteLinks.DOWNLOAD_URL}",
                                 )
                         }
                     },

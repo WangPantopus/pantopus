@@ -133,6 +133,16 @@ class TodayDetailViewModelTest {
         assertEquals(PantopusIcon.CalendarDays, TodayDetailViewModel.iconFor("social"))
     }
 
-    private fun event(id: String, type: String, start: String) =
-        CalendarEventDto(id = id, homeId = "h", eventType = type, title = "Event $id", startAt = start)
+    private fun event(
+        id: String,
+        type: String,
+        start: String,
+    ): CalendarEventDto =
+        CalendarEventDto(
+            id = id,
+            homeId = "h",
+            eventType = type,
+            title = "Event $id",
+            startAt = start,
+        )
 }

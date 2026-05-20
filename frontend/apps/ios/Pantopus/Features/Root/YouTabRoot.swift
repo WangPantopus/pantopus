@@ -1420,7 +1420,7 @@ public struct YouTabRoot: View {
                 )
             )
         case .businessWaitlist:
-            BusinessWaitlistView(onBack: { if !path.isEmpty { path.removeLast() } })
+            BusinessWaitlistView { if !path.isEmpty { path.removeLast() } }
         case let .homeDashboard(homeId):
             HomeDashboardView(
                 homeId: homeId,

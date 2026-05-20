@@ -109,8 +109,8 @@ final class TodayDetailViewModelTests: XCTestCase {
         CalendarEventDTO(id: id, homeId: "home-1", eventType: type, title: "Event \(id)", startAt: start)
     }
 
-    func testTodaysEventsFiltersToTodayAndSorts() {
-        let now = ISO8601DateFormatter().date(from: "2026-05-20T12:00:00Z")!
+    func testTodaysEventsFiltersToTodayAndSorts() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-05-20T12:00:00Z"))
         let events = [
             event(id: "e1", type: "social", start: "2026-05-20T16:00:00Z"),
             event(id: "e2", type: "chore", start: "2026-05-20T09:00:00Z"),
@@ -121,8 +121,8 @@ final class TodayDetailViewModelTests: XCTestCase {
         XCTAssertEqual(rows.first?.typeLabel, "Chore")
     }
 
-    func testTodaysEventsEmptyWhenNoneToday() {
-        let now = ISO8601DateFormatter().date(from: "2026-05-20T12:00:00Z")!
+    func testTodaysEventsEmptyWhenNoneToday() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-05-20T12:00:00Z"))
         let events = [event(id: "e3", type: "repair", start: "2026-05-25T10:00:00Z")]
         let rows = TodayDetailViewModel.todaysEvents(events, now: now, calendar: utcCalendar())
         XCTAssertTrue(rows.isEmpty)

@@ -35,7 +35,14 @@ import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthRepositoryTest {
-    private val sessionUser = UserDto(id = "u_1", email = "a@b.com", displayName = "Alice Doe", avatarUrl = null)
+    private val sessionUser =
+        UserDto(
+            id = "u_1",
+            email = "a@b.com",
+            displayName = "Alice Doe",
+            avatarUrl = null,
+            username = "alice",
+        )
 
     private val authUser =
         AuthenticatedUser(

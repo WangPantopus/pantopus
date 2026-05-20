@@ -19,12 +19,13 @@ import Foundation
 public struct UserDTO: Decodable, Sendable, Hashable, Identifiable {
     public let id: String
     public let email: String
+    public let username: String
     public let displayName: String?
     public let avatarURL: URL?
     public let isAdmin: Bool
 
     private enum CodingKeys: String, CodingKey {
-        case id, email
+        case id, email, username
         case displayName = "display_name"
         case avatarURL = "avatar_url"
         case isAdmin = "is_admin"
@@ -33,12 +34,14 @@ public struct UserDTO: Decodable, Sendable, Hashable, Identifiable {
     public init(
         id: String,
         email: String,
+        username: String = "",
         displayName: String?,
         avatarURL: URL?,
         isAdmin: Bool = false
     ) {
         self.id = id
         self.email = email
+        self.username = username
         self.displayName = displayName
         self.avatarURL = avatarURL
         self.isAdmin = isAdmin
@@ -48,6 +51,7 @@ public struct UserDTO: Decodable, Sendable, Hashable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         email = try container.decode(String.self, forKey: .email)
+        username = try container.decodeIfPresent(String.self, forKey: .username) ?? ""
         displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
         avatarURL = try container.decodeIfPresent(URL.self, forKey: .avatarURL)
         isAdmin = try container.decodeIfPresent(Bool.self, forKey: .isAdmin) ?? false
@@ -57,6 +61,7 @@ public struct UserDTO: Decodable, Sendable, Hashable, Identifiable {
     public init(from authUser: AuthenticatedUser) {
         id = authUser.id
         email = authUser.email
+        username = authUser.username
         displayName = authUser.name.isEmpty ? nil : authUser.name
         avatarURL = nil
         isAdmin = authUser.role == "admin"
@@ -66,6 +71,7 @@ public struct UserDTO: Decodable, Sendable, Hashable, Identifiable {
     public init(from profile: UserProfile) {
         id = profile.id
         email = profile.email
+        username = profile.username
         displayName = profile.name
         if let raw = profile.avatarURL ?? profile.profilePictureURL, let url = URL(string: raw) {
             avatarURL = url

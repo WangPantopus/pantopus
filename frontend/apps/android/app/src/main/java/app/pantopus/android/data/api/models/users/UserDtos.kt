@@ -21,6 +21,13 @@ data class UserDto(
      * unchanged.
      */
     @Json(name = "is_admin") val isAdmin: Boolean = false,
+    /**
+     * P6.6 — public handle (`@username`) surfaced in session state so
+     * [app.pantopus.android.ui.screens.root.RootSessionViewModel] can open
+     * the public-profile setup. Defaults to `""` so existing UserDto call
+     * sites compile unchanged.
+     */
+    val username: String = "",
 )
 
 /**

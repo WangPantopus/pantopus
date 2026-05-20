@@ -1111,7 +1111,7 @@ public struct HubTabRoot: View {
                 }
             )
         case .today:
-            TodayDetailView(onBack: { pop() })
+            TodayDetailView { pop() }
         case .notifications:
             NotificationsView(
                 viewModel: NotificationsViewModel()

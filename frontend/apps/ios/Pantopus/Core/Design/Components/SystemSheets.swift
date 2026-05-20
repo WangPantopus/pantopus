@@ -226,20 +226,24 @@ private struct FindPeopleSheetModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(isPresented: $isPresented, onDismiss: {
-                if pendingInvite {
-                    pendingInvite = false
-                    showInvite = true
+            .sheet(
+                isPresented: $isPresented,
+                onDismiss: {
+                    if pendingInvite {
+                        pendingInvite = false
+                        showInvite = true
+                    }
+                },
+                content: {
+                    ContactPickerSheet(
+                        onPicked: { _ in
+                            pendingInvite = true
+                            isPresented = false
+                        },
+                        onCancel: { isPresented = false }
+                    )
                 }
-            }) {
-                ContactPickerSheet(
-                    onPicked: { _ in
-                        pendingInvite = true
-                        isPresented = false
-                    },
-                    onCancel: { isPresented = false }
-                )
-            }
+            )
             .sheet(isPresented: $showInvite) {
                 SystemShareSheet(items: InviteLinks.shareItems)
             }

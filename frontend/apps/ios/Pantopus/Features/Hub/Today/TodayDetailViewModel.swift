@@ -41,6 +41,14 @@ public struct TodayDetailContent: Equatable, Sendable {
     }
 }
 
+public struct TodaySummaryProjection: Equatable, Sendable {
+    public let temperatureF: Int?
+    public let conditions: String?
+    public let aqiLabel: String?
+    public let aqiValue: Int?
+    public let commute: String?
+}
+
 @Observable
 @MainActor
 final class TodayDetailViewModel {
@@ -89,7 +97,7 @@ final class TodayDetailViewModel {
             if let hub: HubResponse = try? await api.request(HubEndpoints.overview()),
                let home = hub.homes.first(where: { $0.isPrimary }) ?? hub.homes.first,
                let eventsResponse: GetHomeEventsResponse =
-               try? await api.request(HomesEndpoints.events(homeId: home.id)) {
+               try? await api.request(HomesEndpoints.homeEvents(homeId: home.id)) {
                 events = Self.todaysEvents(eventsResponse.events, now: now(), calendar: calendar)
             }
 
@@ -115,11 +123,15 @@ final class TodayDetailViewModel {
     /// Extract the common weather/AQI/commute keys from the opaque Hub
     /// today payload — mirrors `HubViewModel`'s Hub-card projection so the
     /// detail never disagrees with the card.
-    static func projectToday(
-        _ response: HubTodayResponse?
-    ) -> (temperatureF: Int?, conditions: String?, aqiLabel: String?, aqiValue: Int?, commute: String?) {
+    static func projectToday(_ response: HubTodayResponse?) -> TodaySummaryProjection {
         guard let today = response?.today?.dictValue else {
-            return (nil, nil, nil, nil, nil)
+            return TodaySummaryProjection(
+                temperatureF: nil,
+                conditions: nil,
+                aqiLabel: nil,
+                aqiValue: nil,
+                commute: nil
+            )
         }
         let weather = today["weather"]?.dictValue
         let temperatureF = weather?["temperatureF"]?.numberValue.map { Int($0) }
@@ -128,7 +140,13 @@ final class TodayDetailViewModel {
         let aqiLabel = aqi?["label"]?.stringValue
         let aqiValue = aqi?["value"]?.numberValue.map { Int($0) }
         let commute = today["commute"]?.dictValue?["label"]?.stringValue
-        return (temperatureF, conditions, aqiLabel, aqiValue, commute)
+        return TodaySummaryProjection(
+            temperatureF: temperatureF,
+            conditions: conditions,
+            aqiLabel: aqiLabel,
+            aqiValue: aqiValue,
+            commute: commute
+        )
     }
 
     /// Keep only events whose start is the current local day, sorted by

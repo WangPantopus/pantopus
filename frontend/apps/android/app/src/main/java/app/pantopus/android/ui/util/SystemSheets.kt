@@ -21,7 +21,10 @@ object InviteLinks {
 }
 
 /** Fire the system share sheet for plain text (ACTION_SEND). */
-fun Context.shareText(text: String, chooserTitle: String = "Share") {
+fun Context.shareText(
+    text: String,
+    chooserTitle: String = "Share",
+) {
     val intent =
         Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
@@ -31,7 +34,11 @@ fun Context.shareText(text: String, chooserTitle: String = "Share") {
 }
 
 /** Fire the system share sheet for a content:// file (ACTION_SEND). */
-fun Context.shareFile(uri: Uri, mimeType: String, chooserTitle: String = "Share") {
+fun Context.shareFile(
+    uri: Uri,
+    mimeType: String,
+    chooserTitle: String = "Share",
+) {
     val intent =
         Intent(Intent.ACTION_SEND).apply {
             type = mimeType
@@ -45,7 +52,11 @@ fun Context.shareFile(uri: Uri, mimeType: String, chooserTitle: String = "Share"
  * Open the system mail composer (ACTION_SENDTO `mailto:`). Falls back to a
  * plain-text share when no mail app is configured.
  */
-fun Context.composeEmail(subject: String, body: String, recipient: String? = null) {
+fun Context.composeEmail(
+    subject: String,
+    body: String,
+    recipient: String? = null,
+) {
     val mailto =
         buildString {
             append("mailto:")

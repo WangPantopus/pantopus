@@ -82,7 +82,10 @@ object EmergencyCardPdf {
         return dto.location.orEmpty()
     }
 
-    fun render(context: Context, content: EmergencyCardContent): Uri? {
+    fun render(
+        context: Context,
+        content: EmergencyCardContent,
+    ): Uri? {
         if (content.isEmpty) return null
 
         val pageWidth = 595
@@ -91,20 +94,28 @@ object EmergencyCardPdf {
         val contentWidth = (pageWidth - margin * 2).toInt()
 
         val green = Color.rgb(22, 163, 74)
-        fun paint(size: Float, color: Int, bold: Boolean) =
-            TextPaint().apply {
-                isAntiAlias = true
-                textSize = size
-                this.color = color
-                typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-            }
+
+        fun paint(
+            size: Float,
+            color: Int,
+            bold: Boolean,
+        ) = TextPaint().apply {
+            isAntiAlias = true
+            textSize = size
+            this.color = color
+            typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        }
 
         val document = PdfDocument()
         var pageNumber = 1
         var page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
         var cursorY = margin
 
-        fun block(text: String, textPaint: TextPaint, spacingAfter: Float) {
+        fun block(
+            text: String,
+            textPaint: TextPaint,
+            spacingAfter: Float,
+        ) {
             val layout =
                 StaticLayout.Builder
                     .obtain(text, 0, text.length, textPaint, contentWidth)
@@ -112,9 +123,10 @@ object EmergencyCardPdf {
             if (cursorY + layout.height > pageHeight - margin) {
                 document.finishPage(page)
                 pageNumber += 1
-                page = document.startPage(
-                    PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create(),
-                )
+                page =
+                    document.startPage(
+                        PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create(),
+                    )
                 cursorY = margin
             }
             val canvas = page.canvas

@@ -91,7 +91,11 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
         TopBarAction(
             icon: .share,
             accessibilityLabel: "Share emergency info"
-        ) { [weak self] in self?.shareRequested = true }
+        ) { [weak self] in
+            Task { @MainActor in
+                self?.shareRequested = true
+            }
+        }
     }
 
     /// Set by the top-bar share action; `EmergencyInfoView` observes this to
@@ -161,7 +165,11 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
                 icon: .printer,
                 accessibilityLabel: "Print emergency card",
                 tint: .home
-            ) { [weak self] in self?.printRequested = true },
+            ) { [weak self] in
+                Task { @MainActor in
+                    self?.printRequested = true
+                }
+            },
             tint: .home
         )
     }
@@ -368,7 +376,7 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
 
     /// Pure mapping from a DTO to display strings. Public-static so
     /// tests can exercise it without standing the VM up.
-    static func project(dto: HomeEmergencyDTO, pinned: Bool) -> EmergencyRowProjection {
+    nonisolated static func project(dto: HomeEmergencyDTO, pinned: Bool) -> EmergencyRowProjection {
         let category = EmergencyCategory.from(type: dto.type)
         let glyph = EmergencyCategory.glyph(for: dto.type)
         let body = detailString(dto: dto)
@@ -393,7 +401,7 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
     /// Compose the row's body string from the DTO. Prefers
     /// `details.detail` (a free-form sentence), falling back to
     /// `location` then to an empty string.
-    private static func detailString(dto: HomeEmergencyDTO) -> String {
+    private nonisolated static func detailString(dto: HomeEmergencyDTO) -> String {
         if let detail = dto.details["detail"], !detail.isEmpty { return detail }
         if let phone = dto.details["phone"], !phone.isEmpty {
             if let note = dto.details["note"], !note.isEmpty {
@@ -405,7 +413,7 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
         return ""
     }
 
-    private static func bodyIconFor(
+    private nonisolated static func bodyIconFor(
         category: EmergencyCategory,
         dto: HomeEmergencyDTO
     ) -> PantopusIcon? {
@@ -419,7 +427,7 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
         }
     }
 
-    private static func actionTargetFor(
+    private nonisolated static func actionTargetFor(
         category: EmergencyCategory,
         dto: HomeEmergencyDTO
     ) -> String? {
