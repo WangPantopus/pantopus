@@ -39,10 +39,17 @@ class GigsFeedViewModel
         private val _activeFilterCount = MutableStateFlow(0)
         val activeFilterCount: StateFlow<Int> = _activeFilterCount.asStateFlow()
 
+        private val _filters = MutableStateFlow(GigFilterCriteria())
+        val filters: StateFlow<GigFilterCriteria> = _filters.asStateFlow()
+
         private var latitude: Double? = null
         private var longitude: Double? = null
         private var radiusMiles: Double = 1.0
         private var loading = false
+
+        /** Last fetched gigs, kept so a filter change re-derives the
+         * visible rows client-side without a refetch. */
+        private var loadedGigs: List<GigDto> = emptyList()
 
         /** Wire location coordinates + radius before the first load. */
         fun configureLocation(
@@ -74,6 +81,25 @@ class GigsFeedViewModel
             fetch()
         }
 
+        /** Apply structured filters from the sheet. Re-derives the
+         * visible rows from the already-loaded gigs without a refetch. */
+        fun applyFilters(criteria: GigFilterCriteria) {
+            _filters.value = criteria
+            _activeFilterCount.value = criteria.activeCount
+            rebuild()
+        }
+
+        private fun rebuild() {
+            val now = Instant.now().epochSecond
+            val visible = loadedGigs.filter { _filters.value.matches(it, now) }
+            _state.value =
+                if (visible.isEmpty()) {
+                    GigsFeedUiState.Empty(radiusMiles = radiusMiles)
+                } else {
+                    GigsFeedUiState.Loaded(rows = visible.map(::projectCard))
+                }
+        }
+
         private fun fetch() {
             if (loading) return
             loading = true
@@ -95,13 +121,8 @@ class GigsFeedViewModel
                             )
                     ) {
                         is NetworkResult.Success -> {
-                            val gigs = result.data.gigs
-                            _state.value =
-                                if (gigs.isEmpty()) {
-                                    GigsFeedUiState.Empty(radiusMiles = radiusMiles)
-                                } else {
-                                    GigsFeedUiState.Loaded(rows = gigs.map(::projectCard))
-                                }
+                            loadedGigs = result.data.gigs
+                            rebuild()
                         }
                         is NetworkResult.Failure -> {
                             _state.value = GigsFeedUiState.Error(result.error.message)

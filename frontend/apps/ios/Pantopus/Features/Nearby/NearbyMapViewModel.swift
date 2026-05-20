@@ -33,9 +33,19 @@ public final class NearbyMapViewModel {
     /// can render the "you are here" disc even before the first fetch.
     public private(set) var userCoordinate: UserCoordinate?
 
+    /// Applied map filters. Narrows the fetched entities client-side
+    /// (the in-bounds endpoints only model category) and re-projects on
+    /// Apply. Surfaced so the view can seed the filter sheet.
+    public private(set) var filters = MapFilterCriteria()
+
     private let api: APIClient
     private let location: any LocationProviding
     private var entities: [MapEntity] = []
+    /// Raw fetched rows + the anchor they were measured from, kept so a
+    /// filter change can re-project without a refetch.
+    private var rawGigs: [GigDTO] = []
+    private var rawListings: [ListingDTO] = []
+    private var anchor: UserCoordinate?
     private var fetchTask: Task<Void, Never>?
     /// Grid-bucket cluster radius. ~0.005° ≈ 500m at NYC latitude —
     /// good default for the standard zoom; the view shrinks it on
@@ -78,6 +88,44 @@ public final class NearbyMapViewModel {
         guard sort != activeSort else { return }
         activeSort = sort
         rebuild(selectedId: currentSelectedId())
+    }
+
+    /// Apply structured filters from the map filter sheet. Re-projects
+    /// the already-fetched rows without a refetch and drops the current
+    /// selection if it no longer survives the filter.
+    public func applyFilters(_ criteria: MapFilterCriteria) {
+        filters = criteria
+        recomputeEntities()
+        let prior = currentSelectedId()
+        let kept = entities.contains { $0.id == prior } ? prior : nil
+        rebuild(selectedId: kept)
+    }
+
+    /// Filter the raw rows by the active criteria (measured from the
+    /// fetch anchor) and project them into `entities`.
+    private func recomputeEntities() {
+        guard let anchor else {
+            entities = []
+            return
+        }
+        let now = Date()
+        let gigs = rawGigs.filter {
+            filters.matchesGig($0, distanceMiles: Self.distanceMiles(from: anchor, toGig: $0), now: now)
+        }
+        let listings = rawListings.filter {
+            filters.matchesListing($0, distanceMiles: Self.distanceMiles(from: anchor, toListing: $0))
+        }
+        entities = Self.project(gigs: gigs, listings: listings, userCoord: anchor)
+    }
+
+    private static func distanceMiles(from anchor: UserCoordinate, toGig gig: GigDTO) -> Double? {
+        guard let coord = coordinate(of: gig) else { return nil }
+        return distance(from: anchor, to: coord)
+    }
+
+    private static func distanceMiles(from anchor: UserCoordinate, toListing listing: ListingDTO) -> Double? {
+        guard let coord = coordinate(of: listing) else { return nil }
+        return distance(from: anchor, to: coord)
     }
 
     /// Pin tap or rail card tap — both feed into the same selection
@@ -141,7 +189,10 @@ public final class NearbyMapViewModel {
                 state = .error(message: "Couldn't load map data.")
                 return
             }
-            entities = Self.project(gigs: gigs?.gigs ?? [], listings: listings?.listings ?? [], userCoord: center)
+            rawGigs = gigs?.gigs ?? []
+            rawListings = listings?.listings ?? []
+            anchor = center
+            recomputeEntities()
             rebuild(selectedId: nil)
         }
         fetchTask = task

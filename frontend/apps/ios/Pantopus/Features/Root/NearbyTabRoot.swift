@@ -12,7 +12,6 @@ import SwiftUI
 /// Typed routes within the Nearby tab's NavigationStack.
 public enum NearbyRoute: Hashable {
     case entityDetail(kind: MapEntityKind, id: String)
-    case filters
     case placeholder(label: String)
     /// T5.3.4 — per-listing offers panel reached from a listing detail
     /// "View offers" affordance.
@@ -41,7 +40,6 @@ public struct NearbyTabRoot: View {
                 onOpenEntity: { entity in
                     path.append(.entityDetail(kind: entity.kind, id: entity.id))
                 },
-                onOpenFilters: { path.append(.filters) },
                 onBack: nil
             )
             .toolbar(.hidden, for: .navigationBar)
@@ -77,8 +75,6 @@ public struct NearbyTabRoot: View {
                     }
                 )
             }
-        case .filters:
-            NotYetAvailableView(tabName: "Map filters", icon: .slidersHorizontal)
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
         case let .listingOffers(listingId, titleHint):

@@ -63,7 +63,6 @@ fun GigsFeedScreen(
     onCompose: (GigsCategory) -> Unit = {},
     onOpenMap: (GigsCategory) -> Unit = {},
     onOpenSearch: () -> Unit = {},
-    onOpenFilters: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     viewModel: GigsFeedViewModel = hiltViewModel(),
 ) {
@@ -71,6 +70,8 @@ fun GigsFeedScreen(
     val activeCategory by viewModel.activeCategory.collectAsStateWithLifecycle()
     val activeSort by viewModel.activeSort.collectAsStateWithLifecycle()
     val activeFilterCount by viewModel.activeFilterCount.collectAsStateWithLifecycle()
+    val filters by viewModel.filters.collectAsStateWithLifecycle()
+    var showFilters by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -92,7 +93,7 @@ fun GigsFeedScreen(
                 activeSort = activeSort,
                 activeFilterCount = activeFilterCount,
                 onSelectSort = viewModel::selectSort,
-                onOpenFilters = onOpenFilters,
+                onOpenFilters = { showFilters = true },
             )
             when (val s = state) {
                 is GigsFeedUiState.Loading -> LoadingFrame()
@@ -111,6 +112,14 @@ fun GigsFeedScreen(
                     .align(Alignment.BottomEnd)
                     .padding(end = Spacing.s4, bottom = Spacing.s10)
                     .testTag("gigsComposeFab"),
+        )
+    }
+
+    if (showFilters) {
+        GigFilterSheet(
+            criteria = filters,
+            onApply = viewModel::applyFilters,
+            onDismiss = { showFilters = false },
         )
     }
 }
@@ -307,16 +316,26 @@ private fun GigsSortFilterRow(
             }
         }
         Spacer(modifier = Modifier.weight(1f))
-        if (activeFilterCount > 0) {
+        val filtersActive = activeFilterCount > 0
+        Box(
+            modifier =
+                Modifier
+                    .heightIn(min = 48.dp)
+                    .clickable(onClick = onOpenFilters)
+                    .testTag("gigsFiltersButton"),
+            contentAlignment = Alignment.Center,
+        ) {
             Row(
                 modifier =
                     Modifier
                         .clip(RoundedCornerShape(Radii.pill))
-                        .background(PantopusColors.primary50)
-                        .border(1.dp, PantopusColors.primary100, RoundedCornerShape(Radii.pill))
-                        .clickable(onClick = onOpenFilters)
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                        .testTag("gigsFiltersPill"),
+                        .background(if (filtersActive) PantopusColors.primary50 else PantopusColors.appSurface)
+                        .border(
+                            1.dp,
+                            if (filtersActive) PantopusColors.primary100 else PantopusColors.appBorder,
+                            RoundedCornerShape(Radii.pill),
+                        )
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
@@ -325,13 +344,13 @@ private fun GigsSortFilterRow(
                     contentDescription = null,
                     size = 11.dp,
                     strokeWidth = 2.4f,
-                    tint = PantopusColors.primary700,
+                    tint = if (filtersActive) PantopusColors.primary700 else PantopusColors.appTextSecondary,
                 )
                 Text(
-                    text = "$activeFilterCount filters",
+                    text = if (filtersActive) "$activeFilterCount filters" else "Filters",
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = PantopusColors.primary700,
+                    color = if (filtersActive) PantopusColors.primary700 else PantopusColors.appTextSecondary,
                 )
             }
         }

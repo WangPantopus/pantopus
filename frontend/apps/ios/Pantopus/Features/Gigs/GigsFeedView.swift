@@ -14,11 +14,11 @@ import SwiftUI
 /// Gigs feed entry point. Reached from Hub → Gigs pillar.
 public struct GigsFeedView: View {
     @State private var viewModel: GigsFeedViewModel
+    @State private var showFilterSheet = false
     private let onOpenGig: @MainActor (String) -> Void
     private let onCompose: @MainActor (GigsCategory) -> Void
     private let onOpenMap: @MainActor (GigsCategory) -> Void
     private let onOpenSearch: @MainActor () -> Void
-    private let onOpenFilters: @MainActor () -> Void
     private let onBack: (@MainActor () -> Void)?
 
     init(
@@ -27,7 +27,6 @@ public struct GigsFeedView: View {
         onCompose: @escaping @MainActor (GigsCategory) -> Void = { _ in },
         onOpenMap: @escaping @MainActor (GigsCategory) -> Void = { _ in },
         onOpenSearch: @escaping @MainActor () -> Void = {},
-        onOpenFilters: @escaping @MainActor () -> Void = {},
         onBack: (@MainActor () -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
@@ -35,7 +34,6 @@ public struct GigsFeedView: View {
         self.onCompose = onCompose
         self.onOpenMap = onOpenMap
         self.onOpenSearch = onOpenSearch
-        self.onOpenFilters = onOpenFilters
         self.onBack = onBack
     }
 
@@ -57,6 +55,13 @@ public struct GigsFeedView: View {
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
+        .sheet(isPresented: $showFilterSheet) {
+            GigFilterSheet(
+                criteria: viewModel.filters,
+                onApply: { viewModel.applyFilters($0) },
+                onClose: { showFilterSheet = false }
+            )
+        }
         .accessibilityIdentifier("gigsFeed")
     }
 
@@ -179,29 +184,43 @@ public struct GigsFeedView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("gigsSortMenu")
             Spacer()
-            if viewModel.activeFilterCount > 0 {
-                Button(action: onOpenFilters) {
-                    HStack(spacing: 5) {
-                        Icon(.slidersHorizontal, size: 11, strokeWidth: 2.4, color: Theme.Color.primary700)
-                        Text("\(viewModel.activeFilterCount) filters")
-                            .font(.system(size: 11.5, weight: .bold))
-                            .foregroundStyle(Theme.Color.primary700)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Theme.Color.primary50)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
-                            .stroke(Theme.Color.primary100, lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("gigsFiltersPill")
-            }
+            filterButton
         }
         .padding(.horizontal, Spacing.s4)
         .padding(.bottom, Spacing.s2)
+    }
+
+    private var filterButton: some View {
+        let count = viewModel.activeFilterCount
+        let active = count > 0
+        return Button {
+            showFilterSheet = true
+        } label: {
+            HStack(spacing: 5) {
+                Icon(
+                    .slidersHorizontal,
+                    size: 11,
+                    strokeWidth: 2.4,
+                    color: active ? Theme.Color.primary700 : Theme.Color.appTextSecondary
+                )
+                Text(active ? "\(count) filters" : "Filters")
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundStyle(active ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(active ? Theme.Color.primary50 : Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                    .stroke(active ? Theme.Color.primary100 : Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(active ? "Filters, \(count) active" : "Filters")
+        .accessibilityIdentifier("gigsFiltersButton")
     }
 
     // MARK: - Content frames

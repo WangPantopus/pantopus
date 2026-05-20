@@ -28,6 +28,11 @@ public final class GigsFeedViewModel {
     /// remote toggle, urgency, etc.). Drives the "N filters" pill.
     public private(set) var activeFilterCount: Int = 0
 
+    /// Applied structured filters. Narrows `loadedItems` client-side —
+    /// the list endpoint only models category + sort, so budget /
+    /// schedule / open-to-bids / posted-within are filtered locally.
+    public private(set) var filters = GigFilterCriteria()
+
     /// Radius used by the current query (in miles). Surfaced on the
     /// empty-state pill so the user knows their scope.
     public private(set) var radiusMiles: Double
@@ -74,6 +79,14 @@ public final class GigsFeedViewModel {
         await fetch()
     }
 
+    /// Apply structured filters from the filter sheet. Re-derives the
+    /// visible rows from the already-loaded gigs without a refetch.
+    public func applyFilters(_ criteria: GigFilterCriteria) {
+        filters = criteria
+        activeFilterCount = criteria.activeCount
+        rebuildState()
+    }
+
     // MARK: - Fetch
 
     private func fetch() async {
@@ -93,14 +106,23 @@ public final class GigsFeedViewModel {
                 )
             )
             loadedItems = response.gigs
-            if response.gigs.isEmpty {
-                state = .empty(GigsFeedEmpty(radiusMiles: radiusMiles))
-            } else {
-                state = .loaded(response.gigs.map(Self.project))
-            }
+            rebuildState()
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load gigs."
             state = .error(message: message)
+        }
+    }
+
+    /// Project `loadedItems` through the active filters into the render
+    /// state. An empty result (no gigs, or none survive the filters)
+    /// falls to the designed empty state.
+    private func rebuildState() {
+        let now = Date()
+        let visible = loadedItems.filter { filters.matches($0, now: now) }
+        if visible.isEmpty {
+            state = .empty(GigsFeedEmpty(radiusMiles: radiusMiles))
+        } else {
+            state = .loaded(visible.map(Self.project))
         }
     }
 
