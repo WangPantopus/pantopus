@@ -813,11 +813,6 @@ public struct YouTabRoot: View {
                         Task { @MainActor in
                             path.append(.editListing(listingId: listingId, jumpToStep: .price))
                         }
-                    },
-                    onSort: {
-                        Task { @MainActor in
-                            path.append(.placeholder(label: "Sort offers"))
-                        }
                     }
                 )
             )

@@ -44,6 +44,8 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
@@ -54,7 +56,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -589,6 +593,7 @@ private fun ListingContextHeader(config: ListingContextConfig) {
             ListingContextSortStrip(
                 count = config.offerCount,
                 sortLabel = config.sortLabel,
+                sortOptions = config.sortOptions,
                 onSort = config.onSort,
             )
         }
@@ -666,6 +671,7 @@ private fun ListingContextMetaRow(items: List<ListingContextMeta>) {
 private fun ListingContextSortStrip(
     count: Int?,
     sortLabel: String?,
+    sortOptions: List<ListingContextSortOption>,
     onSort: (() -> Unit)?,
 ) {
     Row(
@@ -683,37 +689,93 @@ private fun ListingContextSortStrip(
         }
         Spacer(Modifier.weight(1f))
         if (sortLabel != null) {
-            val rowModifier =
-                if (onSort != null) {
-                    Modifier
-                        .clip(RoundedCornerShape(Radii.sm))
-                        .clickable(onClick = onSort)
-                        .padding(horizontal = Spacing.s1, vertical = 2.dp)
-                        .testTag("listingContextSort")
-                } else {
-                    Modifier
-                }
-            Row(
-                modifier = rowModifier,
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.ArrowsRepeat,
-                    contentDescription = null,
-                    size = 12.dp,
-                    tint = PantopusColors.appTextSecondary,
-                )
-                Text(
-                    text = sortLabel,
-                    style = PantopusTextStyle.caption,
-                    color = PantopusColors.appTextSecondary,
-                )
-                PantopusIconImage(
-                    icon = PantopusIcon.ChevronDown,
-                    contentDescription = null,
-                    size = 12.dp,
-                    tint = PantopusColors.appTextSecondary,
+            when {
+                sortOptions.isNotEmpty() -> ListingContextSortMenu(sortLabel, sortOptions)
+                onSort != null ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(Radii.sm))
+                                .clickable(onClick = onSort)
+                                .padding(horizontal = Spacing.s1, vertical = 2.dp)
+                                .testTag("listingContextSort"),
+                    ) {
+                        SortLabelContent(sortLabel)
+                    }
+                else -> SortLabelContent(sortLabel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SortLabelContent(sortLabel: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.ArrowsRepeat,
+            contentDescription = null,
+            size = 12.dp,
+            tint = PantopusColors.appTextSecondary,
+        )
+        Text(
+            text = sortLabel,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+        )
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronDown,
+            contentDescription = null,
+            size = 12.dp,
+            tint = PantopusColors.appTextSecondary,
+        )
+    }
+}
+
+@Composable
+private fun ListingContextSortMenu(
+    sortLabel: String,
+    options: List<ListingContextSortOption>,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Box(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.sm))
+                    .clickable { expanded = true }
+                    .padding(horizontal = Spacing.s1, vertical = 2.dp)
+                    .testTag("listingContextSort"),
+        ) {
+            SortLabelContent(sortLabel)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    onClick = {
+                        expanded = false
+                        option.select()
+                    },
+                    trailingIcon =
+                        if (option.isSelected) {
+                            {
+                                PantopusIconImage(
+                                    icon = PantopusIcon.Check,
+                                    contentDescription = "Selected",
+                                    size = 16.dp,
+                                    tint = PantopusColors.primary600,
+                                )
+                            }
+                        } else {
+                            null
+                        },
+                    modifier = Modifier.testTag("listingContextSortOption-${option.id}"),
                 )
             }
         }

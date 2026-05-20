@@ -67,7 +67,6 @@ fun ListingOffersScreen(
     onOpenBuyer: (ListingOfferUserDto) -> Unit = {},
     onOpenTransaction: (ListingOfferDto) -> Unit = {},
     onEditPrice: () -> Unit = {},
-    onSort: () -> Unit = {},
     viewModel: ListingOffersViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -82,7 +81,6 @@ fun ListingOffersScreen(
             onOpenBuyer = onOpenBuyer,
             onOpenTransaction = onOpenTransaction,
             onEditPrice = onEditPrice,
-            onSort = onSort,
         )
         viewModel.load()
     }
