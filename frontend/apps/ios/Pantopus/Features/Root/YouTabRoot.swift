@@ -128,6 +128,10 @@ public enum YouRoute: Hashable {
     /// rendered under the title while the underlying home payload is
     /// in flight or unavailable.
     case accessCodes(homeId: String, homeName: String?)
+    /// P3.1 — Add (no secretId) / Edit (with secretId) access code.
+    /// `category` is set when the user lands here from the empty-state
+    /// quick-start chips so the form pre-selects the matching tile.
+    case editAccessCode(homeId: String, secretId: String?, categoryRaw: String?)
     /// T6.3c / P11 — Household tasks (per-home chore list). The
     /// "me.tasks" Activity-section row pushes here with the primary
     /// home id resolved by the Me VM. Distinct from `.myTasks` which is
@@ -170,6 +174,10 @@ public enum YouRoute: Hashable {
     /// Listing detail destination reached from the listing-offers buyer
     /// row tap so the seller can drill back into the canonical view.
     case listingDetail(listingId: String)
+    /// P3.3 — Edit an existing listing. Reached from the listing-detail
+    /// overflow ("Edit listing") for the owner, or from the listing-
+    /// offers panel's "Edit price" affordance.
+    case editListing(listingId: String, jumpToStep: ListingComposeStep?)
     #if DEBUG
     case publicProfile(userId: String)
     /// P1.6 — Typed Business Profile screen. Reached today only via
@@ -596,6 +604,12 @@ public struct YouTabRoot: View {
         path.append(.placeholder(label: row.label))
     }
 
+    private func popAfterListingUpdate(_: String) {
+        Task { @MainActor in
+            if !path.isEmpty { path.removeLast() }
+        }
+    }
+
     /// No-op overlay slot — we previously routed debug affordances via
     /// a 5-tap gesture, but the designed DEBUG section in `MeView` now
     /// surfaces them directly.
@@ -672,6 +686,11 @@ public struct YouTabRoot: View {
                     Task { @MainActor in
                         path.append(.listingOffers(listingId: dto.id, title: dto.title))
                     }
+                },
+                onEditListing: { dto in
+                    Task { @MainActor in
+                        path.append(.editListing(listingId: dto.id, jumpToStep: nil))
+                    }
                 }
             )
         case let .listingOffers(listingId, titleHint):
@@ -696,7 +715,7 @@ public struct YouTabRoot: View {
                     },
                     onEditPrice: {
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Edit listing"))
+                            path.append(.editListing(listingId: listingId, jumpToStep: .price))
                         }
                     },
                     onSort: {
@@ -705,6 +724,11 @@ public struct YouTabRoot: View {
                         }
                     }
                 )
+            )
+        case let .editListing(listingId, jumpToStep):
+            ListingComposeWizardView(
+                mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
+                onListingUpdated: popAfterListingUpdate
             )
         case .myPosts:
             MyPostsView(
@@ -1199,17 +1223,32 @@ public struct YouTabRoot: View {
                 ) { target in
                     Task { @MainActor in
                         switch target {
-                        case let .addCode(homeId: _, category: category):
-                            let label = category.map { "Add \($0.label) code" } ?? "Add access code"
-                            path.append(.placeholder(label: label))
-                        case .editCode:
-                            path.append(.placeholder(label: "Edit access code"))
+                        case let .addCode(homeId: targetHomeId, category: category):
+                            path.append(.editAccessCode(
+                                homeId: targetHomeId,
+                                secretId: nil,
+                                categoryRaw: category?.rawValue
+                            ))
+                        case let .editCode(homeId: targetHomeId, secretId: secretId):
+                            path.append(.editAccessCode(
+                                homeId: targetHomeId,
+                                secretId: secretId,
+                                categoryRaw: nil
+                            ))
                         case .search:
                             path.append(.placeholder(label: "Search access codes"))
                         }
                     }
                 }
             )
+        case let .editAccessCode(homeId, secretId, categoryRaw):
+            EditAccessCodeFormView(
+                homeId: homeId,
+                secretId: secretId,
+                initialCategory: categoryRaw.flatMap { AccessCategory(rawValue: $0) }
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case .myHomes:
             MyHomesListView(
                 viewModel: MyHomesListViewModel(

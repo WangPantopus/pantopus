@@ -573,6 +573,24 @@ private struct ListingContextHeader: View {
                         Text(config.askPrice)
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(Theme.Color.appText)
+                        if let onEditPrice = config.onEditPrice {
+                            Button {
+                                onEditPrice()
+                            } label: {
+                                Icon(
+                                    .pencil,
+                                    size: 14,
+                                    strokeWidth: 2.0,
+                                    color: Theme.Color.primary600
+                                )
+                                .frame(width: 28, height: 28)
+                                .background(Theme.Color.primary50)
+                                .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Edit price")
+                            .accessibilityIdentifier("listingContextEditPrice")
+                        }
                     }
                     if !config.meta.isEmpty {
                         metaRow

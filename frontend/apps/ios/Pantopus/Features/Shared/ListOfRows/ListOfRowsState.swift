@@ -216,6 +216,10 @@ public struct ListingContextConfig: Sendable {
     /// Triggered when the user taps the sort selector — opens a sort
     /// sheet, etc. `nil` makes the selector a non-interactive label.
     public let onSort: (@Sendable () -> Void)?
+    /// P3.3 — Triggered when the seller taps the pencil chip next to
+    /// the asking price. Owner-only — the projection sets it to `nil`
+    /// for buyers so the chip stays hidden.
+    public let onEditPrice: (@Sendable () -> Void)?
 
     public init(
         thumbnail: ThumbnailImage,
@@ -225,7 +229,8 @@ public struct ListingContextConfig: Sendable {
         statusChip: ListingContextStatus,
         offerCount: Int? = nil,
         sortLabel: String? = nil,
-        onSort: (@Sendable () -> Void)? = nil
+        onSort: (@Sendable () -> Void)? = nil,
+        onEditPrice: (@Sendable () -> Void)? = nil
     ) {
         self.thumbnail = thumbnail
         self.title = title
@@ -235,6 +240,7 @@ public struct ListingContextConfig: Sendable {
         self.offerCount = offerCount
         self.sortLabel = sortLabel
         self.onSort = onSort
+        self.onEditPrice = onEditPrice
     }
 }
 

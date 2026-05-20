@@ -114,6 +114,11 @@ public enum HubRoute: Hashable {
     case listingDetail(listingId: String)
     /// Snap & sell — placeholder until the marketplace compose flow ships.
     case composeListing
+    /// P3.3 — Edit an existing listing. Reached from the listing-detail
+    /// overflow ("Edit listing") for the owner, or from the listing-
+    /// offers panel's "Edit price" affordance (which seeds
+    /// `jumpToStep == .price`).
+    case editListing(listingId: String, jumpToStep: ListingComposeStep?)
     /// Invoice detail (T2.6 TransactionalDetailShell · invoice variant).
     /// Reached from wallet / payments surfaces when those land.
     case invoiceDetail(invoiceId: String)
@@ -201,6 +206,25 @@ public struct HubTabRoot: View {
     @MainActor
     private func pop() {
         if !path.isEmpty { path.removeLast() }
+    }
+
+    private func handleListingCreated(_ listingId: String, push: @escaping (HubRoute) -> Void) {
+        Task { @MainActor in
+            pop()
+            push(.listingDetail(listingId: listingId))
+        }
+    }
+
+    private func listingCreatedHandler(push: @escaping (HubRoute) -> Void) -> (String) -> Void {
+        { listingId in
+            handleListingCreated(listingId, push: push)
+        }
+    }
+
+    private func handleListingUpdated(_: String) {
+        // Pop the wizard — the listing-detail (or offers) screen
+        // underneath refreshes on next `.task`.
+        Task { @MainActor in pop() }
     }
 
     public var body: some View {
@@ -947,6 +971,11 @@ public struct HubTabRoot: View {
                     Task { @MainActor in
                         push(.listingOffers(listingId: dto.id, title: dto.title))
                     }
+                },
+                onEditListing: { dto in
+                    Task { @MainActor in
+                        push(.editListing(listingId: dto.id, jumpToStep: nil))
+                    }
                 }
             )
         case let .listingOffers(listingId, titleHint):
@@ -964,7 +993,9 @@ public struct HubTabRoot: View {
                         Task { @MainActor in push(.placeholder(label: "Transaction detail")) }
                     },
                     onEditPrice: {
-                        Task { @MainActor in push(.placeholder(label: "Edit listing")) }
+                        Task { @MainActor in
+                            push(.editListing(listingId: listingId, jumpToStep: .price))
+                        }
                     },
                     onSort: {
                         Task { @MainActor in push(.placeholder(label: "Sort offers")) }
@@ -972,12 +1003,14 @@ public struct HubTabRoot: View {
                 )
             )
         case .composeListing:
-            ListingComposeWizardView { listingId in
-                Task { @MainActor in
-                    pop()
-                    push(.listingDetail(listingId: listingId))
-                }
-            }
+            ListingComposeWizardView(
+                onOpenListingDetail: listingCreatedHandler(push: push)
+            )
+        case let .editListing(listingId, jumpToStep):
+            ListingComposeWizardView(
+                mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
+                onListingUpdated: handleListingUpdated
+            )
         case let .invoiceDetail(invoiceId):
             InvoiceDetailView(
                 viewModel: InvoiceDetailViewModel(invoiceId: invoiceId)

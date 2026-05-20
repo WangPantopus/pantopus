@@ -40,6 +40,7 @@ import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
 import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
+import app.pantopus.android.ui.screens.compose.listing.ListingComposeStep
 import app.pantopus.android.ui.screens.compose.listing.ListingComposeWizardScreen
 import app.pantopus.android.ui.screens.compose.pulse.PulseComposeScreen
 import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
@@ -61,6 +62,10 @@ import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
+import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_CATEGORY_KEY
+import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_SECRET_ID_KEY
+import app.pantopus.android.ui.screens.homes.accesscodes.EditAccessCodeFormScreen
 import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
 import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_BILL_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_HOME_ID_KEY
@@ -396,6 +401,30 @@ private object ChildRoutes {
         return "homes/$homeId/access?$ACCESS_CODES_HOME_NAME_KEY=$encoded"
     }
 
+    /**
+     * Add / Edit access code form (P3.1). `secretId` set ⇒ edit
+     * existing. `category` pre-selects the matching tile when reached
+     * from the empty-state quick-starts. Both optional via the query
+     * string.
+     */
+    const val EDIT_ACCESS_CODE =
+        "homes/{$EDIT_ACCESS_CODE_HOME_ID_KEY}/access/edit" +
+            "?$EDIT_ACCESS_CODE_SECRET_ID_KEY={$EDIT_ACCESS_CODE_SECRET_ID_KEY}" +
+            "&$EDIT_ACCESS_CODE_CATEGORY_KEY={$EDIT_ACCESS_CODE_CATEGORY_KEY}"
+
+    /** Build the concrete path for the Add / Edit access code form. */
+    fun editAccessCode(
+        homeId: String,
+        secretId: String?,
+        category: String?,
+    ): String {
+        val encodedSecret = secretId?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
+        val encodedCategory = category?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
+        return "homes/$homeId/access/edit" +
+            "?$EDIT_ACCESS_CODE_SECRET_ID_KEY=$encodedSecret" +
+            "&$EDIT_ACCESS_CODE_CATEGORY_KEY=$encodedCategory"
+    }
+
     /** Household tasks list per home (T6.3c / P11). */
     const val HOME_TASKS = "homes/{$HOUSEHOLD_TASKS_HOME_ID_KEY}/tasks"
 
@@ -683,6 +712,24 @@ private object ChildRoutes {
 
     /** Snap & sell — the marketplace listing-compose wizard (P2.3). */
     const val COMPOSE_LISTING = "listings/compose"
+
+    /** P3.3 — Edit an existing listing. Reached from the listing-detail
+     *  overflow ("Edit listing") for the owner, or from the listing-
+     *  offers panel's "Edit price" affordance (which seeds the optional
+     *  `jumpToStep` query param to `Price`). */
+    const val EDIT_LISTING_ID_KEY = "editListingId"
+    const val EDIT_LISTING_JUMP_TO_STEP_KEY = "editJumpToStep"
+    const val EDIT_LISTING =
+        "listings/{$EDIT_LISTING_ID_KEY}/edit?$EDIT_LISTING_JUMP_TO_STEP_KEY={$EDIT_LISTING_JUMP_TO_STEP_KEY}"
+
+    /** Build the edit-listing path with an optional jump-to-step. */
+    fun editListing(
+        listingId: String,
+        jumpToStep: String? = null,
+    ): String {
+        val step = jumpToStep ?: ""
+        return "listings/$listingId/edit?$EDIT_LISTING_JUMP_TO_STEP_KEY=$step"
+    }
 
     /** T6.3f / P14 — My listings (seller's tabbed roster). */
     const val MY_LISTINGS = "listings/me"
@@ -1488,19 +1535,52 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             defaultValue = null
                         },
                     ),
-            ) {
+            ) { backStackEntry ->
+                val homeIdArg = backStackEntry.arguments?.getString(ChildRoutes.ACCESS_CODES_HOME_ID_KEY).orEmpty()
                 AccessCodesScreen(
                     onAddCode = { category ->
-                        val label = category?.let { "Add ${it.label} code" } ?: "Add access code"
-                        navController.navigate(ChildRoutes.placeholder(label))
+                        navController.navigate(
+                            ChildRoutes.editAccessCode(
+                                homeId = homeIdArg,
+                                secretId = null,
+                                category = category?.wire,
+                            ),
+                        )
                     },
-                    onEditCode = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Edit access code"))
+                    onEditCode = { secretId ->
+                        navController.navigate(
+                            ChildRoutes.editAccessCode(
+                                homeId = homeIdArg,
+                                secretId = secretId,
+                                category = null,
+                            ),
+                        )
                     },
                     onSearch = {
                         navController.navigate(ChildRoutes.placeholder("Search access codes"))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_ACCESS_CODE,
+                arguments =
+                    listOf(
+                        navArgument(EDIT_ACCESS_CODE_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(EDIT_ACCESS_CODE_SECRET_ID_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                        navArgument(EDIT_ACCESS_CODE_CATEGORY_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                    ),
+            ) {
+                EditAccessCodeFormScreen(
+                    onClose = { navController.popBackStack() },
                 )
             }
             composable(
@@ -1871,6 +1951,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onViewOffers = { dto ->
                         navController.navigate(ChildRoutes.listingOffers(dto.id, dto.title))
                     },
+                    onEditListing = { dto ->
+                        navController.navigate(ChildRoutes.editListing(dto.id))
+                    },
                 )
             }
             composable(
@@ -1883,12 +1966,21 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             defaultValue = ""
                         },
                     ),
-            ) {
+            ) { entry ->
+                val listingId = entry.arguments?.getString(ChildRoutes.LISTING_OFFERS_ID_KEY).orEmpty()
                 ListingOffersScreen(
                     onBack = { navController.popBackStack() },
                     onShareListing = { navController.navigate(ChildRoutes.placeholder("Share listing")) },
                     onOpenBuyer = { navController.navigate(ChildRoutes.placeholder("Buyer profile")) },
                     onOpenTransaction = { navController.navigate(ChildRoutes.placeholder("Transaction detail")) },
+                    onEditPrice = {
+                        navController.navigate(
+                            ChildRoutes.editListing(
+                                listingId = listingId,
+                                jumpToStep = ListingComposeStep.Price.name,
+                            ),
+                        )
+                    },
                     onSort = { navController.navigate(ChildRoutes.placeholder("Sort offers")) },
                 )
             }
@@ -1906,6 +1998,27 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         // Marketplace, not the success screen.
                         navController.popBackStack()
                         navController.navigate(ChildRoutes.listingDetail(listingId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_LISTING,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.EDIT_LISTING_ID_KEY) { type = NavType.StringType },
+                        navArgument(ChildRoutes.EDIT_LISTING_JUMP_TO_STEP_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                    ),
+            ) {
+                ListingComposeWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenListingDetail = { _ -> navController.popBackStack() },
+                    onListingUpdated = { _ ->
+                        // Pop the edit wizard. The detail / offers screen
+                        // underneath refreshes from its own LaunchedEffect.
+                        navController.popBackStack()
                     },
                 )
             }

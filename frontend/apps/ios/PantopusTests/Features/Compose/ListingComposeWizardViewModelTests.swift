@@ -11,56 +11,7 @@ import XCTest
 @testable import Pantopus
 
 @MainActor
-final class ListingComposeWizardViewModelTests: XCTestCase {
-    override func setUp() {
-        super.setUp()
-        SequencedURLProtocol.reset()
-    }
-
-    private func makeAPI() -> APIClient {
-        APIClient(
-            environment: .current,
-            session: SequencedURLProtocol.makeSession(),
-            retryPolicy: .none
-        )
-    }
-
-    private func makeVM(initialState: ListingComposeFormState = .empty) -> ListingComposeWizardViewModel {
-        ListingComposeWizardViewModel(api: makeAPI(), initialState: initialState) { true }
-    }
-
-    private static let createListingJSON = """
-    {"message":"Listing created successfully","listing":{
-      "id":"listing_42",
-      "title":"Moving boxes — bundle of 18",
-      "is_free":false,
-      "price":25,
-      "category":"goods",
-      "layer":"goods",
-      "listing_type":"sell_item",
-      "status":"active"
-    }}
-    """
-
-    private func readyToSubmit() -> ListingComposeFormState {
-        ListingComposeFormState(
-            step: ListingComposeStep.review.rawValue,
-            photos: [
-                ListingComposePhoto(token: "photo_1"),
-                ListingComposePhoto(token: "photo_2")
-            ],
-            title: "Moving boxes — bundle of 18",
-            category: .goods,
-            condition: .likeNew,
-            bodyText: "Lightly used, perfect for a one-bedroom move across town.",
-            priceKind: .fixed,
-            priceAmount: "25",
-            fulfillment: .pickup,
-            locationKind: .savedAddress,
-            locationLabel: ""
-        )
-    }
-
+final class ListingComposeWizardViewModelTests: ListingComposeWizardViewModelTestCase {
     // MARK: - Chrome shape
 
     func testInitialChromeIsPhotosStep() {
