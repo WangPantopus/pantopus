@@ -308,5 +308,4 @@ final class ListingComposeWizardViewModelTests: ListingComposeWizardViewModelTes
         vm.leadingTapped()
         XCTAssertEqual(vm.currentStep, .photos)
     }
-
 }

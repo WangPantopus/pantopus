@@ -75,10 +75,14 @@ final class ListingComposeWizardViewModel: WizardModel {
     }
 
     /// True when the wizard is editing an existing listing.
-    var isEditMode: Bool { mode.isEdit }
+    var isEditMode: Bool {
+        mode.isEdit
+    }
 
     /// The listing id being edited (nil when creating).
-    var editingListingId: String? { mode.editingListingId }
+    var editingListingId: String? {
+        mode.editingListingId
+    }
 
     /// Replace the in-memory form state from scene storage on first
     /// appear. No-op once the wizard has progressed past the restore.
@@ -355,5 +359,4 @@ final class ListingComposeWizardViewModel: WizardModel {
             }
         }
     }
-
 }

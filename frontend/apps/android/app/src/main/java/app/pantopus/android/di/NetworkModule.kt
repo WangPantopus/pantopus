@@ -21,7 +21,8 @@ import app.pantopus.android.data.api.services.HomesApi
 import app.pantopus.android.data.api.services.HubApi
 import app.pantopus.android.data.api.services.IdentityCenterApi
 import app.pantopus.android.data.api.services.ListingOffersApi
-import app.pantopus.android.data.api.services.ListingsApi
+import app.pantopus.android.data.api.services.ListingsMutationApi
+import app.pantopus.android.data.api.services.ListingsReadApi
 import app.pantopus.android.data.api.services.MailComposeApi
 import app.pantopus.android.data.api.services.MailboxApi
 import app.pantopus.android.data.api.services.MailboxV2Api
@@ -196,7 +197,11 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideListingsApi(retrofit: Retrofit): ListingsApi = retrofit.create(ListingsApi::class.java)
+    fun provideListingsReadApi(retrofit: Retrofit): ListingsReadApi = retrofit.create(ListingsReadApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideListingsMutationApi(retrofit: Retrofit): ListingsMutationApi = retrofit.create(ListingsMutationApi::class.java)
 
     @Provides
     @Singleton

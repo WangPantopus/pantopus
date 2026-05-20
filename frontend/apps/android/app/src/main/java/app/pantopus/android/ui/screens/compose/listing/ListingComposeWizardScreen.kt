@@ -88,6 +88,45 @@ fun ListingComposeWizardScreen(
     val pendingEvent by viewModel.pendingEvent.collectAsStateWithLifecycle()
     var photoPendingRemoval by remember { mutableStateOf<ListingComposePhoto?>(null) }
 
+    ListingComposeEventEffect(
+        pendingEvent = pendingEvent,
+        viewModel = viewModel,
+        onDismiss = onDismiss,
+        onOpenListingDetail = onOpenListingDetail,
+        onListingUpdated = onListingUpdated,
+    )
+    ListingComposeInitialLoadEffect(state = state, viewModel = viewModel)
+
+    val screenTag = if (viewModel.isEditMode) LISTING_EDIT_SCREEN_TAG else LISTING_COMPOSE_SCREEN_TAG
+    WizardShell(
+        model = viewModel,
+        modifier = Modifier.testTag(screenTag),
+    ) {
+        ListingComposeWizardBody(
+            state = state,
+            viewModel = viewModel,
+            onRequestRemove = { photoPendingRemoval = it },
+        )
+    }
+
+    PhotoRemovalDialog(
+        photo = photoPendingRemoval,
+        onDismiss = { photoPendingRemoval = null },
+        onConfirm = { photo ->
+            viewModel.removePhoto(photo.id)
+            photoPendingRemoval = null
+        },
+    )
+}
+
+@Composable
+private fun ListingComposeEventEffect(
+    pendingEvent: ListingComposeOutboundEvent?,
+    viewModel: ListingComposeWizardViewModel,
+    onDismiss: () -> Unit,
+    onOpenListingDetail: (String) -> Unit,
+    onListingUpdated: ((String) -> Unit)?,
+) {
     LaunchedEffect(pendingEvent) {
         when (val event = pendingEvent) {
             ListingComposeOutboundEvent.Dismiss -> {
@@ -105,7 +144,13 @@ fun ListingComposeWizardScreen(
             null -> Unit
         }
     }
+}
 
+@Composable
+private fun ListingComposeInitialLoadEffect(
+    state: ListingComposeUiState,
+    viewModel: ListingComposeWizardViewModel,
+) {
     LaunchedEffect(Unit) {
         // Edit mode: kick the prefill fetch. Idempotent — the VM
         // no-ops in create mode or once the form is non-empty.
@@ -120,57 +165,75 @@ fun ListingComposeWizardScreen(
             )
         }
     }
+}
 
-    val screenTag = if (viewModel.isEditMode) LISTING_EDIT_SCREEN_TAG else LISTING_COMPOSE_SCREEN_TAG
-    WizardShell(
-        model = viewModel,
-        modifier = Modifier.testTag(screenTag),
-    ) {
-        if (state.isLoadingExisting) {
-            EditPrefillLoadingBlock()
-        } else {
-            when (state.form.currentStep) {
-                ListingComposeStep.Photos ->
-                    PhotosStep(
-                        state = state,
-                        onAdd = { viewModel.addPhoto() },
-                        onRequestRemove = { photoPendingRemoval = it },
-                        onMoveUp = { index ->
-                            viewModel.movePhoto(from = index, to = index - 1)
-                        },
-                        onMoveDown = { index ->
-                            viewModel.movePhoto(from = index, to = index + 1)
-                        },
-                        onMakeHero = viewModel::makeHero,
-                    )
-                ListingComposeStep.TitleCategory -> TitleCategoryStep(state, viewModel)
-                ListingComposeStep.ConditionDescription -> ConditionDescriptionStep(state, viewModel)
-                ListingComposeStep.Price -> PriceStep(state, viewModel)
-                ListingComposeStep.Location -> LocationStep(state, viewModel)
-                ListingComposeStep.Review -> ReviewStep(state)
-                ListingComposeStep.Success -> SuccessStep()
-            }
-            state.errorMessage?.let { ErrorBanner(it) }
-        }
+@Composable
+private fun ListingComposeWizardBody(
+    state: ListingComposeUiState,
+    viewModel: ListingComposeWizardViewModel,
+    onRequestRemove: (ListingComposePhoto) -> Unit,
+) {
+    if (state.isLoadingExisting) {
+        EditPrefillLoadingBlock()
+    } else {
+        ListingComposeStepContent(
+            state = state,
+            viewModel = viewModel,
+            onRequestRemove = onRequestRemove,
+        )
+        state.errorMessage?.let { ErrorBanner(it) }
     }
+}
 
-    photoPendingRemoval?.let { photo ->
+@Composable
+private fun ListingComposeStepContent(
+    state: ListingComposeUiState,
+    viewModel: ListingComposeWizardViewModel,
+    onRequestRemove: (ListingComposePhoto) -> Unit,
+) {
+    when (state.form.currentStep) {
+        ListingComposeStep.Photos ->
+            PhotosStep(
+                state = state,
+                onAdd = { viewModel.addPhoto() },
+                onRequestRemove = onRequestRemove,
+                onMoveUp = { index ->
+                    viewModel.movePhoto(from = index, to = index - 1)
+                },
+                onMoveDown = { index ->
+                    viewModel.movePhoto(from = index, to = index + 1)
+                },
+                onMakeHero = viewModel::makeHero,
+            )
+        ListingComposeStep.TitleCategory -> TitleCategoryStep(state, viewModel)
+        ListingComposeStep.ConditionDescription -> ConditionDescriptionStep(state, viewModel)
+        ListingComposeStep.Price -> PriceStep(state, viewModel)
+        ListingComposeStep.Location -> LocationStep(state, viewModel)
+        ListingComposeStep.Review -> ReviewStep(state)
+        ListingComposeStep.Success -> SuccessStep()
+    }
+}
+
+@Composable
+private fun PhotoRemovalDialog(
+    photo: ListingComposePhoto?,
+    onDismiss: () -> Unit,
+    onConfirm: (ListingComposePhoto) -> Unit,
+) {
+    photo?.let {
         AlertDialog(
-            onDismissRequest = { photoPendingRemoval = null },
+            onDismissRequest = onDismiss,
             title = { Text("Remove this photo?") },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        viewModel.removePhoto(photo.id)
-                        photoPendingRemoval = null
-                    },
+                    onClick = { onConfirm(it) },
                     modifier = Modifier.testTag("listingCompose_removePhotoConfirm"),
                 ) {
                     Text("Remove photo")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { photoPendingRemoval = null }) { Text("Cancel") }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
             },
         )
     }

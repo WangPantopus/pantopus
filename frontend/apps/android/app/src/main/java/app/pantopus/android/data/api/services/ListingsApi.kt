@@ -26,7 +26,8 @@ import retrofit2.http.Query
  * in-bounds for the Nearby map; T2.5 adds browse / nearby / categories
  * / save for the Marketplace tab.
  */
-interface ListingsApi {
+@Suppress("LongParameterList")
+interface ListingsReadApi {
     /** `GET /api/listings/browse` — paginated browse with bbox filter. */
     @GET("api/listings/browse")
     suspend fun browse(
@@ -96,6 +97,14 @@ interface ListingsApi {
     @GET("api/listings/categories")
     suspend fun categories(): ListingsCategoriesResponse
 
+    /** `GET /api/listings/:id` — single-listing detail wrapper. */
+    @GET("api/listings/{id}")
+    suspend fun detail(
+        @Path("id") id: String,
+    ): ListingDetailResponse
+}
+
+interface ListingsMutationApi {
     /** `POST /api/listings` — create a new listing. Route `backend/routes/listings.js:426`. */
     @POST("api/listings")
     suspend fun create(
@@ -120,12 +129,6 @@ interface ListingsApi {
     suspend fun unsave(
         @Path("id") id: String,
     ): ListingSaveResponse
-
-    /** `GET /api/listings/:id` — single-listing detail wrapper. */
-    @GET("api/listings/{id}")
-    suspend fun detail(
-        @Path("id") id: String,
-    ): ListingDetailResponse
 
     /** `POST /api/listings/:id/message` — buyer → seller message / offer. */
     @POST("api/listings/{id}/message")

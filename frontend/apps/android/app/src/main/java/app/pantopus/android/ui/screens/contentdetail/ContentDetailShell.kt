@@ -58,16 +58,6 @@ import app.pantopus.android.ui.theme.Radii
 import coil.compose.AsyncImage
 
 /**
- * One row in the top-bar overflow menu. Used by owner-mode listing
- * detail to surface "Edit listing" without crowding the dock.
- */
-data class ContentDetailOverflowItem(
-    val label: String,
-    val testTag: String,
-    val onClick: () -> Unit,
-)
-
-/**
  * T2.6 Transactional Detail shell — single canvas shared by gig,
  * listing, and invoice variants. Per-entity view-models project their
  * payload into a [ContentDetailContent]; the shell paints the slots.

@@ -125,32 +125,23 @@ open class ListingComposeWizardViewModel
             val edit = mode as? ListingComposeMode.Edit ?: return
             if (_state.value.form != ListingComposeFormState.EMPTY) return
             _state.update { it.copy(isLoadingExisting = true) }
-            try {
-                when (val result = repository.detail(edit.listingId)) {
-                    is NetworkResult.Success -> {
-                        val projected = project(result.data.listing, edit.jumpToStep)
-                        _state.update {
-                            it.copy(form = projected, errorMessage = null, isLoadingExisting = false)
-                        }
-                        persist()
+            when (val result = repository.detail(edit.listingId)) {
+                is NetworkResult.Success -> {
+                    val projected = project(result.data.listing, edit.jumpToStep)
+                    _state.update {
+                        it.copy(form = projected, errorMessage = null, isLoadingExisting = false)
                     }
-                    is NetworkResult.Failure -> {
-                        _state.update {
-                            it.copy(
-                                errorMessage =
-                                    result.error.message
-                                        ?: "Couldn't load the listing. Pull to retry.",
-                                isLoadingExisting = false,
-                            )
-                        }
-                    }
+                    persist()
                 }
-            } catch (t: Throwable) {
-                _state.update {
-                    it.copy(
-                        errorMessage = t.message ?: "Couldn't load the listing.",
-                        isLoadingExisting = false,
-                    )
+                is NetworkResult.Failure -> {
+                    _state.update {
+                        it.copy(
+                            errorMessage =
+                                result.error.message
+                                    ?: "Couldn't load the listing. Pull to retry.",
+                            isLoadingExisting = false,
+                        )
+                    }
                 }
             }
         }
@@ -692,21 +683,26 @@ open class ListingComposeWizardViewModel
                 )
             }
 
-            private fun mapCategory(listing: ListingDto): ListingComposeCategory? {
+            private fun mapCategory(listing: ListingDto): ListingComposeCategory? =
                 // listing_type is most precise — differentiates Wanted,
                 // Free, and rentals from a plain Goods listing.
                 when (listing.listingType) {
-                    "wanted_request" -> return ListingComposeCategory.Wanted
-                    "free_item" -> return ListingComposeCategory.Free
-                    "rent_item" -> return ListingComposeCategory.Rentals
-                    "sell_item" ->
-                        return if (listing.layer == "vehicles") {
-                            ListingComposeCategory.Vehicles
-                        } else {
-                            ListingComposeCategory.Goods
-                        }
+                    "wanted_request" -> ListingComposeCategory.Wanted
+                    "free_item" -> ListingComposeCategory.Free
+                    "rent_item" -> ListingComposeCategory.Rentals
+                    "sell_item" -> mapSellItemCategory(listing)
+                    else -> mapLayerCategory(listing)
                 }
-                return when (listing.layer) {
+
+            private fun mapSellItemCategory(listing: ListingDto): ListingComposeCategory =
+                if (listing.layer == "vehicles") {
+                    ListingComposeCategory.Vehicles
+                } else {
+                    ListingComposeCategory.Goods
+                }
+
+            private fun mapLayerCategory(listing: ListingDto): ListingComposeCategory? =
+                when (listing.layer) {
                     "vehicles" -> ListingComposeCategory.Vehicles
                     "rentals" -> ListingComposeCategory.Rentals
                     "goods" ->
@@ -717,6 +713,5 @@ open class ListingComposeWizardViewModel
                         }
                     else -> null
                 }
-            }
         }
     }
