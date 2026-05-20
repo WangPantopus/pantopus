@@ -25,7 +25,9 @@ public enum ReportReason: String, CaseIterable, Identifiable, Sendable {
     case hateSpeech = "hate_speech"
     case other
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Label rendered in the radio row.
     public var label: String {
@@ -82,7 +84,7 @@ public final class ReportUserSheetViewModel {
     private let client: APIClient
     private let logger = Logger(label: "app.pantopus.ios.ReportUser")
 
-    public init(userId: String, client: APIClient = .shared) {
+    init(userId: String, client: APIClient = .shared) {
         self.userId = userId
         self.client = client
     }
@@ -100,7 +102,9 @@ public final class ReportUserSheetViewModel {
 
     /// Whether the `details` field is gated as required by the current
     /// reason. Drives the "Required" caption + placeholder copy.
-    public var detailsRequired: Bool { selectedReason == .other }
+    public var detailsRequired: Bool {
+        selectedReason == .other
+    }
 
     public func submit() async {
         guard let selectedReason, canSubmit else { return }
@@ -215,7 +219,7 @@ public struct ReportUserSheet: View {
         return "Report \(displayName)"
     }
 
-    @ViewBuilder private var reasonGroup: some View {
+    private var reasonGroup: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             Text("Reason")
                 .pantopusTextStyle(.caption)
@@ -243,7 +247,7 @@ public struct ReportUserSheet: View {
         }
     }
 
-    @ViewBuilder private var detailsField: some View {
+    private var detailsField: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(spacing: Spacing.s2) {
                 Text("Details")

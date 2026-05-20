@@ -1,5 +1,5 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-@file:Suppress("LongMethod", "MagicNumber", "PackageNaming", "TooManyFunctions")
+@file:Suppress("LongMethod", "MagicNumber", "PackageNaming", "TooManyFunctions", "LongParameterList")
 
 package app.pantopus.android.ui.screens.profile
 
