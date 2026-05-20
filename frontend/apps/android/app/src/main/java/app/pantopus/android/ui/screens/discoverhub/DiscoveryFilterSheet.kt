@@ -62,10 +62,11 @@ private object DiscoveryOptionId {
 
 /** Build render sections from a typed model. */
 internal fun discoverySections(filters: DiscoverHubFilters): List<FilterSection> {
-    val optionIds = buildSet {
-        if (filters.verifiedOnly) add(DiscoveryOptionId.VERIFIED_ONLY)
-        if (filters.newestFirst) add(DiscoveryOptionId.NEWEST_FIRST)
-    }
+    val optionIds =
+        buildSet {
+            if (filters.verifiedOnly) add(DiscoveryOptionId.VERIFIED_ONLY)
+            if (filters.newestFirst) add(DiscoveryOptionId.NEWEST_FIRST)
+        }
     return listOf(
         FilterSection(
             id = DiscoverySectionId.CONTENT_TYPE,

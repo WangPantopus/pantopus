@@ -93,8 +93,7 @@ object BusinessFilterStops {
             radius.indexOfFirst { it.value == DiscoverBusinessFilters.DEFAULT_RADIUS_MILES }
                 .takeIf { it >= 0 } ?: (radius.size - 1).coerceAtLeast(0)
 
-    fun radiusIndex(miles: Double): Int =
-        radius.indexOfFirst { it.value == miles }.takeIf { it >= 0 } ?: defaultRadiusIndex
+    fun radiusIndex(miles: Double): Int = radius.indexOfFirst { it.value == miles }.takeIf { it >= 0 } ?: defaultRadiusIndex
 }
 
 private object BusinessSectionId {
