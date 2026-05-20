@@ -746,11 +746,10 @@ enum RowCardContext {
 
 /// Public free-standing renderer for a single `RowModel`, so surfaces
 /// that compose their own list container — notably the `SearchListShell`
-/// row builders (e.g. Mailbox Search P4.2, Document Search P4.5) — reuse
-/// the exact list-row visual (leading tile, content column, trailing
-/// slot, highlight chrome) without re-implementing it. Renders the
-/// standalone-card variant; group the rows yourself when you need the
-/// Discover-hub card-stack look.
+/// row builders — reuse the exact list-row visual (leading tile, content
+/// column, trailing slot, highlight chrome) without re-implementing it.
+/// Renders the standalone-card variant; group the rows yourself when you
+/// need the Discover-hub card-stack look.
 public struct ListRowCard: View {
     private let row: RowModel
 
