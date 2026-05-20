@@ -39,6 +39,9 @@ class GigDetailViewModel
 
         private var rawGig: GigDto? = null
 
+        /** Current gig snapshot — null until the first fetch resolves. */
+        fun gigSnapshot(): GigDto? = rawGig
+
         fun load() {
             _state.value = ContentDetailUiState.Loading
             viewModelScope.launch {

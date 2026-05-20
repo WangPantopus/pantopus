@@ -39,7 +39,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 @Composable
 fun ListingDetailScreen(
     onBack: () -> Unit = {},
-    onOpenMessages: () -> Unit = {},
+    onOpenMessages: (app.pantopus.android.data.api.models.listings.ListingDto) -> Unit = {},
     onViewOffers: ((app.pantopus.android.data.api.models.listings.ListingDto) -> Unit)? = null,
     onEditListing: ((app.pantopus.android.data.api.models.listings.ListingDto) -> Unit)? = null,
     viewModel: ListingDetailViewModel = hiltViewModel(),
@@ -49,6 +49,10 @@ fun ListingDetailScreen(
     val sheetState = rememberModalBottomSheetState()
 
     LaunchedEffect(Unit) { viewModel.load() }
+
+    val openMessages: () -> Unit = {
+        viewModel.listingSnapshot()?.let { onOpenMessages(it) }
+    }
 
     // Owner-only overflow: "Edit listing" surfaces here so the dock can
     // stay clean ("Message" + "View offers"). Buyers see no overflow.
@@ -81,9 +85,9 @@ fun ListingDetailScreen(
                 sheetVisible = true
             }
         },
-        onSecondaryAction = { onOpenMessages() },
+        onSecondaryAction = openMessages,
         onRetry = { viewModel.load() },
-        onMessageCounterparty = { onOpenMessages() },
+        onMessageCounterparty = openMessages,
         overflowItems = overflowItems,
     )
 
