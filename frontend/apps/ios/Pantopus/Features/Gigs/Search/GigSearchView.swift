@@ -58,6 +58,9 @@ public struct GigSearchView: View {
             onCancel: onBack
         )
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+        // The shell paints its own header (back chevron + field); hide the
+        // system bar so there's no double chrome.
+        .toolbar(.hidden, for: .navigationBar)
         .accessibilityIdentifier("gigSearch")
     }
 }
