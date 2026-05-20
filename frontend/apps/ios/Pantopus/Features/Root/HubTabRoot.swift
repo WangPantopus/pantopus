@@ -1072,9 +1072,6 @@ public struct HubTabRoot: View {
                         Task { @MainActor in
                             push(.editListing(listingId: listingId, jumpToStep: .price))
                         }
-                    },
-                    onSort: {
-                        Task { @MainActor in push(.placeholder(label: "Sort offers")) }
                     }
                 )
             )

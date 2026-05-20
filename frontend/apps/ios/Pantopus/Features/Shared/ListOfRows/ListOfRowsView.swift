@@ -681,7 +681,9 @@ private struct ListingContextHeader: View {
             }
             Spacer()
             if let sortLabel = config.sortLabel {
-                if let onSort = config.onSort {
+                if !config.sortOptions.isEmpty {
+                    sortMenu(label: sortLabel)
+                } else if let onSort = config.onSort {
                     Button(action: onSort) {
                         sortLabelView(sortLabel)
                     }
@@ -692,6 +694,27 @@ private struct ListingContextHeader: View {
                 }
             }
         }
+    }
+
+    private func sortMenu(label: String) -> some View {
+        Menu {
+            ForEach(config.sortOptions) { option in
+                Button {
+                    option.select()
+                } label: {
+                    if option.isSelected {
+                        Label(option.label, systemImage: "checkmark")
+                    } else {
+                        Text(option.label)
+                    }
+                }
+                .accessibilityIdentifier("listingContextSortOption-\(option.id)")
+            }
+        } label: {
+            sortLabelView(label)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("listingContextSort")
     }
 
     private func sortLabelView(_ label: String) -> some View {

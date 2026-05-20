@@ -28,6 +28,7 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.GradientPair
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListingContextConfig
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListingContextMeta
+import app.pantopus.android.ui.screens.shared.list_of_rows.ListingContextSortOption
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListingContextStatus
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowFooter
@@ -118,6 +119,39 @@ enum class ListingOfferFooter {
     UndoCounter,
     ViewTransaction,
     None,
+}
+
+/**
+ * Sort options surfaced via the sort menu on the listing-context strip.
+ * Default is [HighestOffer]. "Buyer rating" isn't offered — the
+ * listing-offers payload doesn't carry buyer reputation.
+ */
+enum class ListingOffersSort {
+    HighestOffer,
+    LowestOffer,
+    NewestFirst,
+    OldestFirst,
+    ;
+
+    /** Stable id mirrored by the iOS `rawValue` so the per-option
+     *  test tags match across platforms. */
+    val id: String
+        get() =
+            when (this) {
+                HighestOffer -> "highestOffer"
+                LowestOffer -> "lowestOffer"
+                NewestFirst -> "newestFirst"
+                OldestFirst -> "oldestFirst"
+            }
+
+    val label: String
+        get() =
+            when (this) {
+                HighestOffer -> "Highest offer"
+                LowestOffer -> "Lowest offer"
+                NewestFirst -> "Newest first"
+                OldestFirst -> "Oldest first"
+            }
 }
 
 /** Eight listing-category buckets driving the header thumbnail gradient. */
@@ -405,7 +439,8 @@ class ListingOffersViewModel
                 listing: ListingDto,
                 offerCount: Int,
                 sortLabel: String?,
-                onSort: (() -> Unit)?,
+                sortOptions: List<ListingContextSortOption> = emptyList(),
+                onSort: (() -> Unit)? = null,
                 onEditPrice: (() -> Unit)? = null,
             ): ListingContextConfig {
                 val category = ListingOffersCategory.fromRaw(listing.category, listing.layer)
@@ -434,6 +469,7 @@ class ListingOffersViewModel
                     statusChip = headerStatus(listing.status),
                     offerCount = offerCount,
                     sortLabel = sortLabel,
+                    sortOptions = sortOptions,
                     onSort = onSort,
                     onEditPrice = onEditPrice,
                 )
@@ -554,12 +590,12 @@ class ListingOffersViewModel
         private var listing: ListingDto? = null
         private var offers: List<ListingOfferDto> = emptyList()
         private var loadedAtLeastOnce = false
+        private var sort: ListingOffersSort = ListingOffersSort.HighestOffer
 
         private var nowProvider: () -> Instant = { Instant.now() }
         private var shareHandler: () -> Unit = {}
         private var openBuyerHandler: (ListingOfferUserDto) -> Unit = {}
         private var openTransactionHandler: (ListingOfferDto) -> Unit = {}
-        private var sortHandler: () -> Unit = {}
         private var editPriceHandler: () -> Unit = {}
 
         init {
@@ -576,14 +612,12 @@ class ListingOffersViewModel
             onShareListing: () -> Unit,
             onOpenBuyer: (ListingOfferUserDto) -> Unit,
             onOpenTransaction: (ListingOfferDto) -> Unit,
-            onSort: () -> Unit,
             onEditPrice: () -> Unit = {},
             now: () -> Instant = { Instant.now() },
         ) {
             shareHandler = onShareListing
             openBuyerHandler = onOpenBuyer
             openTransactionHandler = onOpenTransaction
-            sortHandler = onSort
             editPriceHandler = onEditPrice
             nowProvider = now
             _topBarAction.value =
@@ -602,6 +636,14 @@ class ListingOffersViewModel
         fun refresh() = reload()
 
         fun loadMoreIfNeeded() = Unit
+
+        /** Switch the active sort and re-project. Selection is in-memory,
+         *  so it persists for the session but resets on a fresh push. */
+        fun selectSort(newSort: ListingOffersSort) {
+            if (newSort == sort) return
+            sort = newSort
+            applyState()
+        }
 
         private fun reload() {
             if (!loadedAtLeastOnce) _state.value = ListOfRowsUiState.Loading
@@ -637,8 +679,8 @@ class ListingOffersViewModel
                     context(
                         listing = listingSnapshot,
                         offerCount = offers.size,
-                        sortLabel = "Highest first",
-                        onSort = { sortHandler() },
+                        sortLabel = sort.label,
+                        sortOptions = sortMenuOptions(),
                         onEditPrice = { editPriceHandler() },
                     )
                 _subtitle.value = listingSnapshot.title ?: listingTitleHint
@@ -647,8 +689,8 @@ class ListingOffersViewModel
                 _state.value = emptyState()
                 return
             }
-            val sorted = offers.sortedByDescending { it.amount ?: 0.0 }
-            val leadingId = sorted.firstOrNull { ListingOfferStatus.fromRaw(it.status) == ListingOfferStatus.Pending }?.id
+            val sorted = sortedOffers()
+            val leadingId = leadingOfferId()
             val total = sorted.size
             val now = nowProvider()
             val rows =
@@ -669,6 +711,34 @@ class ListingOffersViewModel
                     hasMore = false,
                 )
         }
+
+        private fun sortMenuOptions(): List<ListingContextSortOption> =
+            ListingOffersSort.entries.map { option ->
+                ListingContextSortOption(
+                    id = option.id,
+                    label = option.label,
+                    isSelected = option == sort,
+                    select = { selectSort(option) },
+                )
+            }
+
+        /** Order the offers for display per the active sort. The LEADING
+         *  badge is computed separately so it always tracks the top offer. */
+        private fun sortedOffers(): List<ListingOfferDto> =
+            when (sort) {
+                ListingOffersSort.HighestOffer -> offers.sortedByDescending { it.amount ?: 0.0 }
+                ListingOffersSort.LowestOffer -> offers.sortedBy { it.amount ?: 0.0 }
+                ListingOffersSort.NewestFirst -> offers.sortedByDescending { sortInstant(it) }
+                ListingOffersSort.OldestFirst -> offers.sortedBy { sortInstant(it) }
+            }
+
+        private fun sortInstant(offer: ListingOfferDto): Instant = parseInstant(offer.createdAt) ?: Instant.EPOCH
+
+        private fun leadingOfferId(): String? =
+            offers
+                .sortedByDescending { it.amount ?: 0.0 }
+                .firstOrNull { ListingOfferStatus.fromRaw(it.status) == ListingOfferStatus.Pending }
+                ?.id
 
         private fun emptyState(): ListOfRowsUiState.Empty =
             ListOfRowsUiState.Empty(

@@ -119,6 +119,33 @@ final class ListingOffersViewModelTests: XCTestCase {
 
     private static let emptyOffersJSON = "{\"offers\":[]}"
 
+    /// Three pending offers with amount and recency deliberately crossed
+    /// so every sort yields a distinct order:
+    ///   - o-low-new : $100, newest (05-15)
+    ///   - o-mid-old : $200, oldest (05-10)
+    ///   - o-high-mid: $300, middle (05-13) — top offer, wins LEADING
+    private static let sortFixtureJSON = """
+    {"offers":[
+      {"id":"o-low-new","listing_id":"listing-1","buyer_id":"u_low",
+       "seller_id":"u_me","amount":100,"status":"pending",
+       "created_at":"2026-05-15T10:00:00Z",
+       "buyer":{"id":"u_low","first_name":"Lena","last_name":"New"}},
+      {"id":"o-mid-old","listing_id":"listing-1","buyer_id":"u_mid",
+       "seller_id":"u_me","amount":200,"status":"pending",
+       "created_at":"2026-05-10T10:00:00Z",
+       "buyer":{"id":"u_mid","first_name":"Milo","last_name":"Old"}},
+      {"id":"o-high-mid","listing_id":"listing-1","buyer_id":"u_high",
+       "seller_id":"u_me","amount":300,"status":"pending",
+       "created_at":"2026-05-13T10:00:00Z",
+       "buyer":{"id":"u_high","first_name":"Hana","last_name":"Mid"}}
+    ]}
+    """
+
+    private func loadedRowIDs(_ vm: ListingOffersViewModel) -> [String] {
+        guard case let .loaded(sections, _) = vm.state else { return [] }
+        return sections.first?.rows.map(\.id) ?? []
+    }
+
     // MARK: - Lifecycle
 
     func testLoadPopulatedTransitionsToLoaded() async {
@@ -133,7 +160,7 @@ final class ListingOffersViewModelTests: XCTestCase {
             return
         }
         XCTAssertEqual(sections.first?.rows.count, 3)
-        // Highest first: $240, $225, $175
+        // Highest offer (default): $240, $225, $175
         XCTAssertEqual(sections.first?.rows[0].id, "o-anika")
         XCTAssertEqual(sections.first?.rows[1].id, "o-marcus")
         XCTAssertEqual(sections.first?.rows[2].id, "o-daniel")
@@ -194,7 +221,7 @@ final class ListingOffersViewModelTests: XCTestCase {
         XCTAssertEqual(context?.askPrice, "$250")
         XCTAssertEqual(context?.statusChip.label, "Active")
         XCTAssertEqual(context?.offerCount, 3)
-        XCTAssertEqual(context?.sortLabel, "Highest first")
+        XCTAssertEqual(context?.sortLabel, "Highest offer")
     }
 
     func testListingContextHeaderShowsLoadingHintBeforeFetch() {
@@ -454,6 +481,104 @@ final class ListingOffersViewModelTests: XCTestCase {
         }
         XCTAssertEqual(sections.first?.rows.first?.chips?.first?.text, "Countered")
         XCTAssertEqual(sections.first?.rows.first?.chips?.last?.text, "Your counter $230")
+    }
+
+    // MARK: - Sort menu
+
+    func testDefaultSortIsHighestOffer() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.listingJSON),
+            .status(200, body: Self.sortFixtureJSON)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        XCTAssertEqual(loadedRowIDs(vm), ["o-high-mid", "o-mid-old", "o-low-new"])
+        XCTAssertEqual(vm.listingContext?.sortLabel, "Highest offer")
+    }
+
+    func testSelectSortLowestOffer() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.listingJSON),
+            .status(200, body: Self.sortFixtureJSON)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        vm.selectSort(.lowestOffer)
+        XCTAssertEqual(loadedRowIDs(vm), ["o-low-new", "o-mid-old", "o-high-mid"])
+        XCTAssertEqual(vm.listingContext?.sortLabel, "Lowest offer")
+    }
+
+    func testSelectSortNewestFirst() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.listingJSON),
+            .status(200, body: Self.sortFixtureJSON)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        vm.selectSort(.newestFirst)
+        XCTAssertEqual(loadedRowIDs(vm), ["o-low-new", "o-high-mid", "o-mid-old"])
+        XCTAssertEqual(vm.listingContext?.sortLabel, "Newest first")
+    }
+
+    func testSelectSortOldestFirst() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.listingJSON),
+            .status(200, body: Self.sortFixtureJSON)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        vm.selectSort(.oldestFirst)
+        XCTAssertEqual(loadedRowIDs(vm), ["o-mid-old", "o-high-mid", "o-low-new"])
+        XCTAssertEqual(vm.listingContext?.sortLabel, "Oldest first")
+    }
+
+    /// LEADING badge always tracks the highest-amount pending offer, even
+    /// when the active sort buries it in the middle of the list.
+    func testLeadingHighlightTracksTopOfferRegardlessOfSort() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.listingJSON),
+            .status(200, body: Self.sortFixtureJSON)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        vm.selectSort(.oldestFirst)
+        guard case let .loaded(sections, _) = vm.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        let leading = sections.first?.rows.first { $0.highlight == .leading }
+        XCTAssertEqual(leading?.id, "o-high-mid")
+    }
+
+    /// Selection survives a pull-to-refresh within the same session.
+    func testSortPersistsAcrossRefresh() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.listingJSON),
+            .status(200, body: Self.sortFixtureJSON),
+            .status(200, body: Self.listingJSON),
+            .status(200, body: Self.sortFixtureJSON)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        vm.selectSort(.lowestOffer)
+        await vm.refresh()
+        XCTAssertEqual(loadedRowIDs(vm), ["o-low-new", "o-mid-old", "o-high-mid"])
+        XCTAssertEqual(vm.listingContext?.sortLabel, "Lowest offer")
+    }
+
+    func testSortMenuOptionsExposeFourEntriesWithSelection() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.listingJSON),
+            .status(200, body: Self.sortFixtureJSON)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        let options = vm.listingContext?.sortOptions ?? []
+        XCTAssertEqual(options.map(\.label), ["Highest offer", "Lowest offer", "Newest first", "Oldest first"])
+        XCTAssertEqual(options.filter(\.isSelected).map(\.id), ["highestOffer"])
+        vm.selectSort(.newestFirst)
+        let after = vm.listingContext?.sortOptions ?? []
+        XCTAssertEqual(after.filter(\.isSelected).map(\.id), ["newestFirst"])
     }
 
     // MARK: - No tabs / no FAB

@@ -14,7 +14,7 @@
 //    - NO FAB (offers are created from a listing detail, not here)
 //    - `ListingContextConfig` hero card with thumbnail, title, ask,
 //      views/watching/posted meta, status chip + a sort strip below
-//      ("5 offers · Highest first")
+//      ("5 offers · Highest offer")
 //    - Each row uses Shape C minus tabs:
 //        leading  : 44pt avatar of the buyer (with optional verified
 //                   badge)
@@ -300,15 +300,28 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
             for: listing,
             offerCount: offers.count,
             sortLabel: sort.label,
-            onSort: { [weak self] in
-                guard let self else { return }
-                Task { @MainActor in self.onSort() }
-            },
+            sortOptions: sortMenuOptions(),
             onEditPrice: { [weak self] in
                 guard let self else { return }
                 Task { @MainActor in self.onEditPrice() }
             }
         )
+    }
+
+    /// Build the sort-menu options off the canonical `ListingOffersSort`
+    /// list, marking the active one. The `select` handler hops to the
+    /// main actor and re-projects in place.
+    private func sortMenuOptions() -> [ListingContextSortOption] {
+        ListingOffersSort.allCases.map { option in
+            ListingContextSortOption(
+                id: option.rawValue,
+                label: option.label,
+                isSelected: option == sort,
+                select: { [weak self] in
+                    Task { @MainActor in self?.selectSort(option) }
+                }
+            )
+        }
     }
 
     /// Bound to the view's `.sheet(item:)` to drive the counter
@@ -324,7 +337,6 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
     private let onOpenBuyer: @MainActor (ListingOfferUserDTO) -> Void
     private let onOpenTransaction: @MainActor (ListingOfferDTO) -> Void
     private let onEditPrice: @MainActor () -> Void
-    private let onSortHandler: @MainActor () -> Void
     private let now: @Sendable () -> Date
 
     // MARK: - Local data
@@ -332,17 +344,23 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
     private var offers: [ListingOfferDTO] = []
     private(set) var listing: ListingDTO?
     private var loadedAtLeastOnce = false
-    private var sort: ListingOffersSort = .highestFirst
+    private var sort: ListingOffersSort = .highestOffer
 
-    /// Sort options surfaced via the SortStrip. Default and only option
-    /// today is "Highest first" — additional sorts (recency, etc.) land
-    /// in a follow-up.
-    public enum ListingOffersSort: Sendable, Hashable {
-        case highestFirst
+    /// Sort options surfaced via the sort menu on the listing-context
+    /// strip. Default is `.highestOffer`. "Buyer rating" isn't offered —
+    /// the listing-offers payload doesn't carry buyer reputation.
+    public enum ListingOffersSort: String, Sendable, Hashable, CaseIterable {
+        case highestOffer
+        case lowestOffer
+        case newestFirst
+        case oldestFirst
 
         public var label: String {
             switch self {
-            case .highestFirst: "Highest first"
+            case .highestOffer: "Highest offer"
+            case .lowestOffer: "Lowest offer"
+            case .newestFirst: "Newest first"
+            case .oldestFirst: "Oldest first"
             }
         }
     }
@@ -355,7 +373,6 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         onOpenBuyer: @escaping @MainActor (ListingOfferUserDTO) -> Void = { _ in },
         onOpenTransaction: @escaping @MainActor (ListingOfferDTO) -> Void = { _ in },
         onEditPrice: @escaping @MainActor () -> Void = {},
-        onSort: @escaping @MainActor () -> Void = {},
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.listingId = listingId
@@ -365,7 +382,6 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         self.onOpenBuyer = onOpenBuyer
         self.onOpenTransaction = onOpenTransaction
         self.onEditPrice = onEditPrice
-        onSortHandler = onSort
         self.now = now
     }
 
@@ -432,8 +448,8 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
             state = .empty(emptyContent())
             return
         }
-        let sorted = offers.sorted { ($0.amount ?? 0) > ($1.amount ?? 0) }
-        let leadingId = leadingOfferId(in: sorted)
+        let sorted = sortedOffers()
+        let leadingId = leadingOfferId()
         let total = sorted.count
         let nowSnapshot = now()
         let rows = sorted.enumerated().map { index, dto in
@@ -542,10 +558,12 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         )
     }
 
-    private func onSort() {
-        // Single sort option today — wire through to the host for
-        // future expansion. Keeps the sort selector tap real.
-        onSortHandler()
+    /// Switch the active sort and re-project. Selection is in-memory, so
+    /// it persists for the session but resets on a fresh push.
+    public func selectSort(_ newSort: ListingOffersSort) {
+        guard newSort != sort else { return }
+        sort = newSort
+        rebuild()
     }
 
     // MARK: - Mutations
@@ -801,7 +819,8 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         for listing: ListingDTO,
         offerCount: Int,
         sortLabel: String?,
-        onSort: (@Sendable () -> Void)?,
+        sortOptions: [ListingContextSortOption] = [],
+        onSort: (@Sendable () -> Void)? = nil,
         onEditPrice: (@Sendable () -> Void)? = nil
     ) -> ListingContextConfig {
         let category = ListingOffersCategory.from(
@@ -826,6 +845,7 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
             statusChip: status,
             offerCount: offerCount,
             sortLabel: sortLabel,
+            sortOptions: sortOptions,
             onSort: onSort,
             onEditPrice: onEditPrice
         )
@@ -881,12 +901,33 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
 
     // MARK: - Helpers
 
-    private func leadingOfferId(in sorted: [ListingOfferDTO]) -> String? {
-        // Highest-amount pending offer wins the LEADING badge.
-        for offer in sorted where ListingOfferStatus.fromRaw(offer.status) == .pending {
-            return offer.id
+    /// Order the offers for display per the active sort. The LEADING
+    /// badge is computed separately so it always tracks the top offer,
+    /// not whatever happens to sit first in the current order.
+    private func sortedOffers() -> [ListingOfferDTO] {
+        switch sort {
+        case .highestOffer:
+            offers.sorted { ($0.amount ?? 0) > ($1.amount ?? 0) }
+        case .lowestOffer:
+            offers.sorted { ($0.amount ?? 0) < ($1.amount ?? 0) }
+        case .newestFirst:
+            offers.sorted { sortDate($0) > sortDate($1) }
+        case .oldestFirst:
+            offers.sorted { sortDate($0) < sortDate($1) }
         }
-        return nil
+    }
+
+    private func sortDate(_ offer: ListingOfferDTO) -> Date {
+        Self.parseDate(offer.createdAt) ?? .distantPast
+    }
+
+    private func leadingOfferId() -> String? {
+        // Highest-amount pending offer wins the LEADING badge, regardless
+        // of the display sort.
+        offers
+            .sorted { ($0.amount ?? 0) > ($1.amount ?? 0) }
+            .first { ListingOfferStatus.fromRaw($0.status) == .pending }?
+            .id
     }
 
     private static func footerActions(
