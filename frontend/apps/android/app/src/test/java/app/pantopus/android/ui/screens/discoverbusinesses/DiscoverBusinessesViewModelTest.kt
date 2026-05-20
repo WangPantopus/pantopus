@@ -433,8 +433,14 @@ class DiscoverBusinessesViewModelTest {
 
             coVerify {
                 repo.search(
-                    q = null, categories = listOf("home-services"), sort = null, page = 1,
-                    pageSize = 50, radiusMiles = 1.0, openNow = true, ratingMin = 4.0,
+                    q = null,
+                    categories = listOf("home-services"),
+                    sort = null,
+                    page = 1,
+                    pageSize = 50,
+                    radiusMiles = 1.0,
+                    openNow = true,
+                    ratingMin = 4.0,
                 )
             }
             assertEquals(4, vm.filters.value.activeCount)
@@ -457,8 +463,14 @@ class DiscoverBusinessesViewModelTest {
 
             coVerify {
                 repo.search(
-                    q = null, categories = null, sort = null, page = 1,
-                    pageSize = 50, radiusMiles = null, openNow = null, ratingMin = null,
+                    q = null,
+                    categories = null,
+                    sort = null,
+                    page = 1,
+                    pageSize = 50,
+                    radiusMiles = null,
+                    openNow = null,
+                    ratingMin = null,
                 )
             }
             assertEquals(null, vm.topBarAction.value?.badgeCount)
@@ -482,8 +494,14 @@ class DiscoverBusinessesViewModelTest {
             // Sorted union of the chip (handyman) + sheet (home-services).
             coVerify {
                 repo.search(
-                    q = null, categories = listOf("handyman", "home-services"), sort = null,
-                    page = 1, pageSize = 50, radiusMiles = null, openNow = null, ratingMin = null,
+                    q = null,
+                    categories = listOf("handyman", "home-services"),
+                    sort = null,
+                    page = 1,
+                    pageSize = 50,
+                    radiusMiles = null,
+                    openNow = null,
+                    ratingMin = null,
                 )
             }
         }

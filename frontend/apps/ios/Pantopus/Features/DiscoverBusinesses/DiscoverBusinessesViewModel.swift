@@ -32,7 +32,7 @@
 //  "All".
 //
 
-// swiftlint:disable type_body_length
+// swiftlint:disable file_length type_body_length
 
 import Foundation
 import Observation

@@ -18,6 +18,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable file_length type_body_length
+
 private enum Fixture {
     static let peopleJSON = """
     {"filter":"people","items":[

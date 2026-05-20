@@ -16,6 +16,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable file_length
+
 private enum Fixture {
     /// Two handyman businesses + one cleaning business + one with
     /// an unrecognised category — exercises grouping + the "other"
