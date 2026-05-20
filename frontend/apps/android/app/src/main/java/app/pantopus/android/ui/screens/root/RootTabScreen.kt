@@ -61,6 +61,10 @@ import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
+import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_CATEGORY_KEY
+import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_SECRET_ID_KEY
+import app.pantopus.android.ui.screens.homes.accesscodes.EditAccessCodeFormScreen
 import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
 import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_BILL_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_HOME_ID_KEY
@@ -393,6 +397,30 @@ private object ChildRoutes {
     ): String {
         val encoded = homeName?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
         return "homes/$homeId/access?$ACCESS_CODES_HOME_NAME_KEY=$encoded"
+    }
+
+    /**
+     * Add / Edit access code form (P3.1). `secretId` set ⇒ edit
+     * existing. `category` pre-selects the matching tile when reached
+     * from the empty-state quick-starts. Both optional via the query
+     * string.
+     */
+    const val EDIT_ACCESS_CODE =
+        "homes/{$EDIT_ACCESS_CODE_HOME_ID_KEY}/access/edit" +
+            "?$EDIT_ACCESS_CODE_SECRET_ID_KEY={$EDIT_ACCESS_CODE_SECRET_ID_KEY}" +
+            "&$EDIT_ACCESS_CODE_CATEGORY_KEY={$EDIT_ACCESS_CODE_CATEGORY_KEY}"
+
+    /** Build the concrete path for the Add / Edit access code form. */
+    fun editAccessCode(
+        homeId: String,
+        secretId: String?,
+        category: String?,
+    ): String {
+        val encodedSecret = secretId?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
+        val encodedCategory = category?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
+        return "homes/$homeId/access/edit" +
+            "?$EDIT_ACCESS_CODE_SECRET_ID_KEY=$encodedSecret" +
+            "&$EDIT_ACCESS_CODE_CATEGORY_KEY=$encodedCategory"
     }
 
     /** Household tasks list per home (T6.3c / P11). */
@@ -1475,19 +1503,52 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             defaultValue = null
                         },
                     ),
-            ) {
+            ) { backStackEntry ->
+                val homeIdArg = backStackEntry.arguments?.getString(ChildRoutes.ACCESS_CODES_HOME_ID_KEY).orEmpty()
                 AccessCodesScreen(
                     onAddCode = { category ->
-                        val label = category?.let { "Add ${it.label} code" } ?: "Add access code"
-                        navController.navigate(ChildRoutes.placeholder(label))
+                        navController.navigate(
+                            ChildRoutes.editAccessCode(
+                                homeId = homeIdArg,
+                                secretId = null,
+                                category = category?.wire,
+                            ),
+                        )
                     },
-                    onEditCode = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Edit access code"))
+                    onEditCode = { secretId ->
+                        navController.navigate(
+                            ChildRoutes.editAccessCode(
+                                homeId = homeIdArg,
+                                secretId = secretId,
+                                category = null,
+                            ),
+                        )
                     },
                     onSearch = {
                         navController.navigate(ChildRoutes.placeholder("Search access codes"))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_ACCESS_CODE,
+                arguments =
+                    listOf(
+                        navArgument(EDIT_ACCESS_CODE_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(EDIT_ACCESS_CODE_SECRET_ID_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                        navArgument(EDIT_ACCESS_CODE_CATEGORY_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                    ),
+            ) {
+                EditAccessCodeFormScreen(
+                    onClose = { navController.popBackStack() },
                 )
             }
             composable(

@@ -123,6 +123,10 @@ public enum YouRoute: Hashable {
     /// rendered under the title while the underlying home payload is
     /// in flight or unavailable.
     case accessCodes(homeId: String, homeName: String?)
+    /// P3.1 — Add (no secretId) / Edit (with secretId) access code.
+    /// `category` is set when the user lands here from the empty-state
+    /// quick-start chips so the form pre-selects the matching tile.
+    case editAccessCode(homeId: String, secretId: String?, categoryRaw: String?)
     /// T6.3c / P11 — Household tasks (per-home chore list). The
     /// "me.tasks" Activity-section row pushes here with the primary
     /// home id resolved by the Me VM. Distinct from `.myTasks` which is
@@ -1189,17 +1193,32 @@ public struct YouTabRoot: View {
                 ) { target in
                     Task { @MainActor in
                         switch target {
-                        case let .addCode(homeId: _, category: category):
-                            let label = category.map { "Add \($0.label) code" } ?? "Add access code"
-                            path.append(.placeholder(label: label))
-                        case .editCode:
-                            path.append(.placeholder(label: "Edit access code"))
+                        case let .addCode(homeId: targetHomeId, category: category):
+                            path.append(.editAccessCode(
+                                homeId: targetHomeId,
+                                secretId: nil,
+                                categoryRaw: category?.rawValue
+                            ))
+                        case let .editCode(homeId: targetHomeId, secretId: secretId):
+                            path.append(.editAccessCode(
+                                homeId: targetHomeId,
+                                secretId: secretId,
+                                categoryRaw: nil
+                            ))
                         case .search:
                             path.append(.placeholder(label: "Search access codes"))
                         }
                     }
                 }
             )
+        case let .editAccessCode(homeId, secretId, categoryRaw):
+            EditAccessCodeFormView(
+                homeId: homeId,
+                secretId: secretId,
+                initialCategory: categoryRaw.flatMap { AccessCategory(rawValue: $0) }
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case .myHomes:
             MyHomesListView(
                 viewModel: MyHomesListViewModel(
