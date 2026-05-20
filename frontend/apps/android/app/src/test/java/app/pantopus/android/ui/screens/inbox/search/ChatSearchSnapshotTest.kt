@@ -49,7 +49,7 @@ class ChatSearchSnapshotTest {
         )
 
     @Test
-    fun chat_search_typing_shimmer() {
+    fun chat_search_typing_phase_shimmer() {
         paparazzi.snapshot {
             Root {
                 SearchListShell<ChatSearchResult>(
@@ -67,7 +67,7 @@ class ChatSearchSnapshotTest {
     }
 
     @Test
-    fun chat_search_results_with_highlight() {
+    fun chat_search_results_phase() {
         paparazzi.snapshot {
             Root {
                 SearchListShell(
@@ -85,7 +85,7 @@ class ChatSearchSnapshotTest {
     }
 
     @Test
-    fun chat_search_empty() {
+    fun chat_search_empty_phase() {
         paparazzi.snapshot {
             Root {
                 SearchListShell<ChatSearchResult>(
