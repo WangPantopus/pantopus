@@ -114,11 +114,13 @@ final class BillDetailViewModel {
 struct BillDetailView: View {
     @State private var viewModel: BillDetailViewModel
     private let onBack: @Sendable () -> Void
+    private let onEdit: @Sendable () -> Void
 
     init(
         homeId: String,
         billId: String,
         onBack: @escaping @Sendable () -> Void,
+        onEdit: @escaping @Sendable () -> Void = {},
         onChanged: @escaping @Sendable () -> Void = {}
     ) {
         _viewModel = State(initialValue: BillDetailViewModel(
@@ -129,6 +131,7 @@ struct BillDetailView: View {
             Task { @MainActor in onBack() }
         })
         self.onBack = onBack
+        self.onEdit = onEdit
     }
 
     var body: some View {
@@ -143,6 +146,7 @@ struct BillDetailView: View {
                     saving: viewModel.isSaving,
                     saveError: viewModel.saveError,
                     onBack: onBack,
+                    onEdit: { onEdit() },
                     onMarkPaid: markPaid,
                     onRemove: removeBill
                 )
@@ -221,6 +225,7 @@ private struct LoadedShell: View {
     let saving: Bool
     let saveError: String?
     let onBack: () -> Void
+    let onEdit: () -> Void
     let onMarkPaid: () -> Void
     let onRemove: () -> Void
 
@@ -254,6 +259,21 @@ private struct LoadedShell: View {
                             .pantopusTextStyle(.small)
                             .foregroundStyle(Theme.Color.error)
                     }
+                    Button(action: onEdit) {
+                        HStack(spacing: Spacing.s2) {
+                            Icon(.pencil, size: 16, color: Theme.Color.primary600)
+                            Text("Edit bill")
+                                .pantopusTextStyle(.small)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Theme.Color.primary600)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(Theme.Color.primary50)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(saving)
+                    .accessibilityIdentifier("billDetail_edit")
                     Button(role: .destructive, action: onRemove) {
                         HStack(spacing: Spacing.s2) {
                             Icon(.trash2, size: 16, color: Theme.Color.error)
@@ -439,5 +459,5 @@ private struct SplitsSection: View {
 }
 
 #Preview {
-    BillDetailView(homeId: "preview", billId: "bill-1") {}
+    BillDetailView(homeId: "preview", billId: "bill-1", onBack: {}, onEdit: {})
 }
