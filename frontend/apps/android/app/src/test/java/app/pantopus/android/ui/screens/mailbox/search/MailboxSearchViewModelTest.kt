@@ -48,9 +48,30 @@ class MailboxSearchViewModelTest {
     // m3 — sender "Acme Insurance", subject "Policy renewal", category insurance
     private val corpus =
         listOf(
-            mail(id = "m1", type = "bill", mailType = "bill", subject = "Water bill", previewText = "Due June 1", sender = "City of Oakland"),
-            mail(id = "m2", type = "booklet", mailType = "booklet", displayTitle = "Welcome packet", previewText = "Booklet enclosed", sender = "Maria Kovacs"),
-            mail(id = "m3", type = "insurance", mailType = "insurance", subject = "Policy renewal", previewText = "Renew by July", sender = "Acme Insurance"),
+            mail(
+                id = "m1",
+                type = "bill",
+                mailType = "bill",
+                subject = "Water bill",
+                previewText = "Due June 1",
+                sender = "City of Oakland",
+            ),
+            mail(
+                id = "m2",
+                type = "booklet",
+                mailType = "booklet",
+                displayTitle = "Welcome packet",
+                previewText = "Booklet enclosed",
+                sender = "Maria Kovacs",
+            ),
+            mail(
+                id = "m3",
+                type = "insurance",
+                mailType = "insurance",
+                subject = "Policy renewal",
+                previewText = "Renew by July",
+                sender = "Acme Insurance",
+            ),
         )
 
     private fun mail(
@@ -121,7 +142,8 @@ class MailboxSearchViewModelTest {
 
     @Test fun matches_by_category_label() {
         // mail_type "insurance" → category label "Insurance".
-        assertTrue(MailboxSearchViewModel.matches(mail(id = "x", type = "insurance", mailType = "insurance", subject = "Policy"), "insurance"))
+        val m = mail(id = "x", type = "insurance", mailType = "insurance", subject = "Policy")
+        assertTrue(MailboxSearchViewModel.matches(m, "insurance"))
     }
 
     @Test fun filter_blank_query_yields_empty() {

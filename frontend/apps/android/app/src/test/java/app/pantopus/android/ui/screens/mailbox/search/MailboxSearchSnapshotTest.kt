@@ -56,9 +56,32 @@ class MailboxSearchSnapshotTest {
 
     private val results =
         listOf(
-            mail(id = "m1", type = "bill", mailType = "bill", subject = "Water bill", previewText = "Due June 1", sender = "City of Oakland"),
-            mail(id = "m2", type = "booklet", mailType = "booklet", displayTitle = "Welcome packet", previewText = "Booklet enclosed", sender = "Maria Kovacs", viewed = true),
-            mail(id = "m3", type = "insurance", mailType = "insurance", subject = "Policy renewal", previewText = "Renew by July", sender = "Acme Insurance", viewed = true),
+            mail(
+                id = "m1",
+                type = "bill",
+                mailType = "bill",
+                subject = "Water bill",
+                previewText = "Due June 1",
+                sender = "City of Oakland",
+            ),
+            mail(
+                id = "m2",
+                type = "booklet",
+                mailType = "booklet",
+                displayTitle = "Welcome packet",
+                previewText = "Booklet enclosed",
+                sender = "Maria Kovacs",
+                viewed = true,
+            ),
+            mail(
+                id = "m3",
+                type = "insurance",
+                mailType = "insurance",
+                subject = "Policy renewal",
+                previewText = "Renew by July",
+                sender = "Acme Insurance",
+                viewed = true,
+            ),
         )
 
     @Test

@@ -92,9 +92,30 @@ final class MailboxSearchViewModelTests: XCTestCase {
     /// m3 — sender "Acme Insurance", subject "Policy renewal", category insurance
     private func corpus() -> [MailItem] {
         [
-            mail(id: "m1", type: "bill", mailType: "bill", subject: "Water bill", previewText: "Due June 1", sender: "City of Oakland"),
-            mail(id: "m2", type: "booklet", mailType: "booklet", displayTitle: "Welcome packet", previewText: "Booklet enclosed", sender: "Maria Kovacs"),
-            mail(id: "m3", type: "insurance", mailType: "insurance", subject: "Policy renewal", previewText: "Renew by July", sender: "Acme Insurance")
+            mail(
+                id: "m1",
+                type: "bill",
+                mailType: "bill",
+                subject: "Water bill",
+                previewText: "Due June 1",
+                sender: "City of Oakland"
+            ),
+            mail(
+                id: "m2",
+                type: "booklet",
+                mailType: "booklet",
+                displayTitle: "Welcome packet",
+                previewText: "Booklet enclosed",
+                sender: "Maria Kovacs"
+            ),
+            mail(
+                id: "m3",
+                type: "insurance",
+                mailType: "insurance",
+                subject: "Policy renewal",
+                previewText: "Renew by July",
+                sender: "Acme Insurance"
+            )
         ]
     }
 
@@ -190,7 +211,7 @@ final class MailboxSearchViewModelTests: XCTestCase {
     func testRowTapRoutesToMail() async {
         final class Captured: @unchecked Sendable { var id: String? }
         let captured = Captured()
-        let vm = await loadedVM(onOpenMail: { captured.id = $0 })
+        let vm = await loadedVM { captured.id = $0 }
         vm.query = "oakland"
         vm.rowModel(for: vm.results[0]).onTap()
         XCTAssertEqual(captured.id, "m1")
