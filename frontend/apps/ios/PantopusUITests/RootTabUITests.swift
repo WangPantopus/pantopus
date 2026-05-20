@@ -3,8 +3,8 @@
 //  PantopusUITests
 //
 //  Covers the 4-tab bottom bar: Hub is selected at launch (once signed in),
-//  each tab is tappable, un-designed tabs render the empty-state
-//  placeholder.
+//  each tab is tappable, and secondary tabs render their expected
+//  landing states.
 //
 //  These tests launch the app with `UI_TESTS_SIGNED_IN=1`, which the app
 //  honours by seeding an in-memory signed-in session without hitting the
@@ -22,10 +22,12 @@ final class RootTabUITests: XCTestCase {
     private func launchSignedIn() -> XCUIApplication? {
         let app = XCUIApplication()
         app.launchEnvironment["UI_TESTS_SIGNED_IN"] = "1"
+        app.launchEnvironment["UI_TESTS_STUB_API"] = "1"
+        app.launchEnvironment["UI_TESTS_DISABLE_NOTIFICATIONS"] = "1"
         app.launch()
         // If the app doesn't honour the flag (older builds), skip rather than fail.
-        let hubLabel = app.staticTexts["Hub"].firstMatch
-        guard hubLabel.waitForExistence(timeout: 5) else {
+        let hubTab = app.buttons["tab.hub"].firstMatch
+        guard hubTab.waitForExistence(timeout: 5) else {
             app.terminateAfterSkippedLaunch()
             return nil
         }
@@ -59,20 +61,20 @@ final class RootTabUITests: XCTestCase {
         }
     }
 
-    func testTapNearbyShowsEmptyState() throws {
+    func testTapNearbyShowsMap() throws {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
         tabButton("nearby", in: app).tap()
-        XCTAssertTrue(app.staticTexts["Nearby isn't here yet"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["nearbyCategoryChip_all"].waitForExistence(timeout: 5))
     }
 
-    func testTapInboxShowsEmptyState() throws {
+    func testTapInboxShowsChatListEmptyState() throws {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
         tabButton("inbox", in: app).tap()
-        XCTAssertTrue(app.staticTexts["Inbox isn't here yet"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["No conversations yet"].waitForExistence(timeout: 5))
     }
 
     func testTapYouShowsAccountAndSignOut() throws {
@@ -80,6 +82,7 @@ final class RootTabUITests: XCTestCase {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
         tabButton("you", in: app).tap()
-        XCTAssertTrue(app.buttons["youSignOutButton"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.scrollViews["meScreen"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["meDestructiveCard_personal"].waitForExistence(timeout: 2))
     }
 }

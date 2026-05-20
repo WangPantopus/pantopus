@@ -28,6 +28,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     // MARK: - Push notifications
 
     private func requestNotificationPermission() {
+        if ProcessInfo.processInfo.environment["UI_TESTS_DISABLE_NOTIFICATIONS"] == "1" {
+            return
+        }
+
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { [weak self] granted, error in
             if let error {
                 self?.logger.error("Push permission error", metadata: ["error": .string(error.localizedDescription)])
