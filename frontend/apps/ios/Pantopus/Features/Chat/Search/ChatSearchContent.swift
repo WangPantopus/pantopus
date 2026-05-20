@@ -42,7 +42,9 @@ public struct ChatSearchResult: Identifiable, Hashable, Sendable {
     /// without the shell having to thread it through separately.
     public let query: String
 
-    public var id: String { "\(conversationId)|\(matchedMessageId ?? "name")" }
+    public var id: String {
+        "\(conversationId)|\(matchedMessageId ?? "name")"
+    }
 
     public init(
         conversationId: String,

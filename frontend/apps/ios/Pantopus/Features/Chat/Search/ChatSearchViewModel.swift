@@ -146,7 +146,7 @@ public final class ChatSearchViewModel {
         }
 
         let conversations = response.conversations.map(Self.meta(from:))
-        let api = self.api
+        let api = api
         var messagesById: [String: [ChatMessageDTO]] = [:]
 
         await withTaskGroup(of: (String, [ChatMessageDTO]).self) { group in

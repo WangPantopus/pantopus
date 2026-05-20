@@ -26,7 +26,7 @@ final class ChatSearchViewModelTests: XCTestCase {
         )
     }
 
-    // u1 = DM "Marcus R." (verified). g1 = group room "Rose Court Block".
+    /// u1 = DM "Marcus R." (verified). g1 = group room "Rose Court Block".
     private static let listJSON = """
     {
       "conversations": [
