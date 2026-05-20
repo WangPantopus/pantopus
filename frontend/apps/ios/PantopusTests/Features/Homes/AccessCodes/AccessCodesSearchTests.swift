@@ -137,9 +137,8 @@ final class AccessCodesSearchViewModelTests: XCTestCase {
         var opened: String?
         let vm = AccessCodesSearchViewModel(
             homeId: "home_1",
-            api: makeAPI(),
-            onOpenCode: { opened = $0 }
-        )
+            api: makeAPI()
+        ) { opened = $0 }
         await vm.load()
         vm.query = "front door"
         vm.openResult(vm.results[0])
@@ -148,7 +147,8 @@ final class AccessCodesSearchViewModelTests: XCTestCase {
 
     func testCancelFiresCallback() {
         var cancelled = false
-        let vm = AccessCodesSearchViewModel(homeId: "home_1", onCancel: { cancelled = true })
+        let onCancel: @MainActor () -> Void = { cancelled = true }
+        let vm = AccessCodesSearchViewModel(homeId: "home_1", onCancel: onCancel)
         vm.cancel()
         XCTAssertTrue(cancelled)
     }

@@ -64,9 +64,32 @@ class SupportTrainsSearchViewModelTest {
 
     private fun corpus() =
         listOf(
-            train("st1", "For the Chen family", "filling", type = "meal_support", recipient = "For the Chen family", filled = 12, total = 18),
-            train("st2", "For Daniel R.", "active", type = "ride_support", recipient = "For Daniel R.", filled = 6, total = 14),
-            train("st3", "For Mrs. Alvarez", "wrapping", role = "helper", type = "pet_care", recipient = "For Mrs. Alvarez"),
+            train(
+                "st1",
+                "For the Chen family",
+                "filling",
+                type = "meal_support",
+                recipient = "For the Chen family",
+                filled = 12,
+                total = 18,
+            ),
+            train(
+                "st2",
+                "For Daniel R.",
+                "active",
+                type = "ride_support",
+                recipient = "For Daniel R.",
+                filled = 6,
+                total = 14,
+            ),
+            train(
+                "st3",
+                "For Mrs. Alvarez",
+                "wrapping",
+                role = "helper",
+                type = "pet_care",
+                recipient = "For Mrs. Alvarez",
+            ),
         )
 
     private fun loadedVm(rows: List<SupportTrainListItemDto> = corpus()): SupportTrainsSearchViewModel {

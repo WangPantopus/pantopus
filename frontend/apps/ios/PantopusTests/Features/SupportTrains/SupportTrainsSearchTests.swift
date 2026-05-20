@@ -132,9 +132,8 @@ final class SupportTrainsSearchViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [.status(200, body: Self.corpusJSON)]
         var opened: String?
         let vm = SupportTrainsSearchViewModel(
-            api: makeAPI(),
-            onOpenTrain: { opened = $0 }
-        )
+            api: makeAPI()
+        ) { opened = $0 }
         await vm.load()
         vm.query = "daniel"
         vm.openResult(vm.results[0])
@@ -143,7 +142,8 @@ final class SupportTrainsSearchViewModelTests: XCTestCase {
 
     func testCancelFiresCallback() {
         var cancelled = false
-        let vm = SupportTrainsSearchViewModel(onCancel: { cancelled = true })
+        let onCancel: @MainActor () -> Void = { cancelled = true }
+        let vm = SupportTrainsSearchViewModel(onCancel: onCancel)
         vm.cancel()
         XCTAssertTrue(cancelled)
     }
