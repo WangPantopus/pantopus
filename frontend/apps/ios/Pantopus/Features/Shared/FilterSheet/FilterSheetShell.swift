@@ -67,12 +67,9 @@ public struct FilterSheetShell: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s6) {
                     ForEach(working.indices, id: \.self) { idx in
-                        FilterSectionRow(
-                            section: working[idx],
-                            onUpdate: { updated in
-                                update(at: idx, with: updated)
-                            }
-                        )
+                        FilterSectionRow(section: working[idx]) { updated in
+                            update(at: idx, with: updated)
+                        }
                     }
                 }
                 .padding(.horizontal, Spacing.s4)
@@ -98,10 +95,13 @@ public struct FilterSheetShell: View {
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("filterSheetTitle")
             Spacer()
-            Button(action: { onClose() }) {
-                Icon(.x, size: 20, color: Theme.Color.appTextSecondary)
-                    .frame(width: 44, height: 44)
-            }
+            Button(
+                action: { onClose() },
+                label: {
+                    Icon(.x, size: 20, color: Theme.Color.appTextSecondary)
+                        .frame(width: 44, height: 44)
+                }
+            )
             .buttonStyle(.plain)
             .accessibilityLabel("Close")
             .accessibilityIdentifier("filterSheetCloseButton")
@@ -175,425 +175,46 @@ struct FilterSectionRow: View {
             FilterChipGroupControl(
                 sectionId: section.id,
                 options: options,
-                selectedIds: selectedIds,
-                onChange: { ids in
-                    onUpdate(FilterSection(
-                        id: section.id,
-                        title: section.title,
-                        control: .chipGroup(options: options, selectedIds: ids)
-                    ))
-                }
-            )
+                selectedIds: selectedIds
+            ) { ids in
+                onUpdate(FilterSection(
+                    id: section.id,
+                    title: section.title,
+                    control: .chipGroup(options: options, selectedIds: ids)
+                ))
+            }
         case let .radio(options, selectedId):
             FilterRadioControl(
                 sectionId: section.id,
                 options: options,
-                selectedId: selectedId,
-                onChange: { id in
-                    onUpdate(FilterSection(
-                        id: section.id,
-                        title: section.title,
-                        control: .radio(options: options, selectedId: id)
-                    ))
-                }
-            )
+                selectedId: selectedId
+            ) { id in
+                onUpdate(FilterSection(
+                    id: section.id,
+                    title: section.title,
+                    control: .radio(options: options, selectedId: id)
+                ))
+            }
         case let .multiSelect(options, selectedIds):
             FilterMultiSelectControl(
                 sectionId: section.id,
                 options: options,
-                selectedIds: selectedIds,
-                onChange: { ids in
-                    onUpdate(FilterSection(
-                        id: section.id,
-                        title: section.title,
-                        control: .multiSelect(options: options, selectedIds: ids)
-                    ))
-                }
-            )
+                selectedIds: selectedIds
+            ) { ids in
+                onUpdate(FilterSection(
+                    id: section.id,
+                    title: section.title,
+                    control: .multiSelect(options: options, selectedIds: ids)
+                ))
+            }
         case let .rangeSlider(range):
-            FilterRangeSliderControl(
-                sectionId: section.id,
-                range: range,
-                onChange: { newRange in
-                    onUpdate(FilterSection(
-                        id: section.id,
-                        title: section.title,
-                        control: .rangeSlider(newRange)
-                    ))
-                }
-            )
-        }
-    }
-}
-
-// MARK: - Chip group
-
-@MainActor
-struct FilterChipGroupControl: View {
-    let sectionId: String
-    let options: [FilterOption]
-    let selectedIds: Set<String>
-    let onChange: @MainActor (Set<String>) -> Void
-
-    var body: some View {
-        FlowLayout(spacing: Spacing.s2) {
-            ForEach(options) { option in
-                let isOn = selectedIds.contains(option.id)
-                Button {
-                    var next = selectedIds
-                    if isOn { next.remove(option.id) } else { next.insert(option.id) }
-                    onChange(next)
-                } label: {
-                    Text(option.label)
-                        .font(.system(size: 14, weight: isOn ? .semibold : .regular))
-                        .foregroundStyle(isOn ? Theme.Color.primary600 : Theme.Color.appText)
-                        .padding(.horizontal, Spacing.s3)
-                        .frame(minHeight: 36)
-                        .background(isOn ? Theme.Color.primary50 : Theme.Color.appSurface)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
-                                .stroke(
-                                    isOn ? Theme.Color.primary600 : Theme.Color.appBorder,
-                                    lineWidth: isOn ? 1.5 : 1
-                                )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .frame(minHeight: 44)
-                .accessibilityLabel(option.label)
-                .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
-                .accessibilityIdentifier("filterChip_\(sectionId)_\(option.id)")
+            FilterRangeSliderControl(sectionId: section.id, range: range) { newRange in
+                onUpdate(FilterSection(
+                    id: section.id,
+                    title: section.title,
+                    control: .rangeSlider(newRange)
+                ))
             }
         }
     }
-}
-
-// MARK: - Radio
-
-@MainActor
-struct FilterRadioControl: View {
-    let sectionId: String
-    let options: [FilterOption]
-    let selectedId: String?
-    let onChange: @MainActor (String?) -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ForEach(options) { option in
-                let isOn = selectedId == option.id
-                Button {
-                    onChange(isOn ? nil : option.id)
-                } label: {
-                    HStack(spacing: Spacing.s3) {
-                        radioGlyph(isOn: isOn)
-                        Text(option.label)
-                            .font(.system(size: 15, weight: isOn ? .semibold : .regular))
-                            .foregroundStyle(Theme.Color.appText)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.vertical, Spacing.s3)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(option.label)
-                .accessibilityValue(isOn ? "Selected" : "Not selected")
-                .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
-                .accessibilityIdentifier("filterRadio_\(sectionId)_\(option.id)")
-                if option.id != options.last?.id {
-                    Rectangle()
-                        .fill(Theme.Color.appBorderSubtle)
-                        .frame(height: 1)
-                        .padding(.leading, 32)
-                }
-            }
-        }
-    }
-
-    private func radioGlyph(isOn: Bool) -> some View {
-        ZStack {
-            Circle()
-                .stroke(
-                    isOn ? Theme.Color.primary600 : Theme.Color.appBorderStrong,
-                    lineWidth: 1.5
-                )
-                .frame(width: 20, height: 20)
-            if isOn {
-                Circle()
-                    .fill(Theme.Color.primary600)
-                    .frame(width: 10, height: 10)
-            }
-        }
-    }
-}
-
-// MARK: - Multi-select
-
-@MainActor
-struct FilterMultiSelectControl: View {
-    let sectionId: String
-    let options: [FilterOption]
-    let selectedIds: Set<String>
-    let onChange: @MainActor (Set<String>) -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ForEach(options) { option in
-                let isOn = selectedIds.contains(option.id)
-                Button {
-                    var next = selectedIds
-                    if isOn { next.remove(option.id) } else { next.insert(option.id) }
-                    onChange(next)
-                } label: {
-                    HStack(spacing: Spacing.s3) {
-                        checkboxGlyph(isOn: isOn)
-                        Text(option.label)
-                            .font(.system(size: 15, weight: .regular))
-                            .foregroundStyle(Theme.Color.appText)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.vertical, Spacing.s3)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(option.label)
-                .accessibilityValue(isOn ? "Checked" : "Not checked")
-                .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
-                .accessibilityIdentifier("filterMulti_\(sectionId)_\(option.id)")
-                if option.id != options.last?.id {
-                    Rectangle()
-                        .fill(Theme.Color.appBorderSubtle)
-                        .frame(height: 1)
-                        .padding(.leading, 32)
-                }
-            }
-        }
-    }
-
-    private func checkboxGlyph(isOn: Bool) -> some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: Radii.sm)
-                .fill(isOn ? Theme.Color.primary600 : Theme.Color.appSurface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radii.sm)
-                        .stroke(
-                            isOn ? Theme.Color.primary600 : Theme.Color.appBorderStrong,
-                            lineWidth: 1.5
-                        )
-                )
-                .frame(width: 20, height: 20)
-            if isOn {
-                Icon(.check, size: 12, color: Theme.Color.appTextInverse)
-            }
-        }
-    }
-}
-
-// MARK: - Range slider
-
-@MainActor
-struct FilterRangeSliderControl: View {
-    let sectionId: String
-    let range: FilterRange
-    let onChange: @MainActor (FilterRange) -> Void
-
-    private let trackHeight: CGFloat = 4
-    private let thumbSize: CGFloat = 24
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            GeometryReader { geo in
-                let usableWidth = max(geo.size.width - thumbSize, 1)
-                let lowerFraction = fraction(for: range.lower)
-                let upperFraction = fraction(for: range.upper)
-                let lowerX = lowerFraction * usableWidth
-                let upperX = upperFraction * usableWidth
-
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Theme.Color.appBorder)
-                        .frame(height: trackHeight)
-                        .padding(.horizontal, thumbSize / 2)
-                    Capsule()
-                        .fill(Theme.Color.primary600)
-                        .frame(width: max(upperX - lowerX, 0), height: trackHeight)
-                        .offset(x: lowerX + thumbSize / 2)
-                    thumb()
-                        .offset(x: lowerX)
-                        .gesture(makeDrag(usableWidth: usableWidth, isUpper: false, coordinateSpaceName: "filterRange_\(sectionId)"))
-                        .accessibilityLabel("Minimum")
-                        .accessibilityValue("\(Int(range.lower))")
-                        .accessibilityIdentifier("filterRangeLower_\(sectionId)")
-                    thumb()
-                        .offset(x: upperX)
-                        .gesture(makeDrag(usableWidth: usableWidth, isUpper: true, coordinateSpaceName: "filterRange_\(sectionId)"))
-                        .accessibilityLabel("Maximum")
-                        .accessibilityValue("\(Int(range.upper))")
-                        .accessibilityIdentifier("filterRangeUpper_\(sectionId)")
-                }
-                .coordinateSpace(name: "filterRange_\(sectionId)")
-                .frame(height: thumbSize)
-            }
-            .frame(height: thumbSize)
-            HStack {
-                Text("\(Int(range.lower))")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appText)
-                Spacer()
-                Text("\(Int(range.upper))")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appText)
-            }
-        }
-        .accessibilityElement(children: .contain)
-    }
-
-    private func thumb() -> some View {
-        Circle()
-            .fill(Theme.Color.appSurface)
-            .overlay(Circle().stroke(Theme.Color.primary600, lineWidth: 2))
-            .frame(width: thumbSize, height: thumbSize)
-            .pantopusShadow(.sm)
-    }
-
-    private func fraction(for value: Double) -> CGFloat {
-        let span = range.max - range.min
-        guard span > 0 else { return 0 }
-        return CGFloat((value - range.min) / span)
-    }
-
-    private func value(forFraction fraction: CGFloat) -> Double {
-        let span = range.max - range.min
-        let raw = range.min + Double(min(max(fraction, 0), 1)) * span
-        guard range.step > 0 else { return raw }
-        let stepped = (raw - range.min) / range.step
-        return range.min + stepped.rounded() * range.step
-    }
-
-    private func makeDrag(usableWidth: CGFloat, isUpper: Bool, coordinateSpaceName: String) -> some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .named(coordinateSpaceName))
-            .onChanged { drag in
-                // location is in the track's coordinate space — subtract
-                // half the thumb size to map from "track-space x" back
-                // to "thumb-leading-edge x", then divide by usable width.
-                let normalized = (drag.location.x - thumbSize / 2) / max(usableWidth, 1)
-                let newValue = value(forFraction: normalized)
-                var next = range
-                if isUpper {
-                    next.upper = min(max(newValue, range.lower), range.max)
-                } else {
-                    next.lower = max(min(newValue, range.upper), range.min)
-                }
-                onChange(next)
-            }
-    }
-}
-
-// MARK: - FlowLayout
-
-/// Simple left-to-right wrapping layout for chip groups.
-struct FlowLayout: Layout {
-    var spacing: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var totalHeight: CGFloat = 0
-        var maxRowWidth: CGFloat = 0
-        for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
-            if x + size.width > maxWidth, x > 0 {
-                totalHeight += rowHeight + spacing
-                maxRowWidth = max(maxRowWidth, x - spacing)
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-        totalHeight += rowHeight
-        maxRowWidth = max(maxRowWidth, x - spacing)
-        return CGSize(width: maxRowWidth, height: totalHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
-        let maxWidth = proposal.width ?? bounds.width
-        var x: CGFloat = bounds.minX
-        var y: CGFloat = bounds.minY
-        var rowHeight: CGFloat = 0
-        for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
-            if x + size.width > bounds.minX + maxWidth, x > bounds.minX {
-                x = bounds.minX
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            view.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-    }
-}
-
-#Preview("Populated") {
-    FilterSheetShell(
-        title: "Filters",
-        sections: [
-            FilterSection(
-                id: "category",
-                title: "Category",
-                control: .chipGroup(
-                    options: [
-                        FilterOption(id: "handyman", label: "Handyman"),
-                        FilterOption(id: "cleaning", label: "Cleaning"),
-                        FilterOption(id: "moving", label: "Moving"),
-                        FilterOption(id: "pets", label: "Pet care"),
-                        FilterOption(id: "tutoring", label: "Tutoring")
-                    ],
-                    selectedIds: ["handyman", "moving"]
-                )
-            ),
-            FilterSection(
-                id: "sort",
-                title: "Sort by",
-                control: .radio(
-                    options: [
-                        FilterOption(id: "recent", label: "Most recent"),
-                        FilterOption(id: "price-asc", label: "Price: low to high"),
-                        FilterOption(id: "price-desc", label: "Price: high to low"),
-                        FilterOption(id: "distance", label: "Distance")
-                    ],
-                    selectedId: "recent"
-                )
-            ),
-            FilterSection(
-                id: "tags",
-                title: "Tags",
-                control: .multiSelect(
-                    options: [
-                        FilterOption(id: "verified", label: "Verified posters"),
-                        FilterOption(id: "delivery", label: "Delivery available"),
-                        FilterOption(id: "negotiable", label: "Price negotiable")
-                    ],
-                    selectedIds: ["verified"]
-                )
-            ),
-            FilterSection(
-                id: "price",
-                title: "Price",
-                control: .rangeSlider(
-                    FilterRange(min: 0, max: 500, lower: 50, upper: 350, step: 10)
-                )
-            )
-        ],
-        onApply: { _ in },
-        onClose: {}
-    )
-    .frame(height: 600)
-    .background(Theme.Color.appBg)
 }

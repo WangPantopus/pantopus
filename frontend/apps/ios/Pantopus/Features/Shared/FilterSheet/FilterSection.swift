@@ -69,13 +69,13 @@ public enum FilterControl: Sendable, Hashable {
     public func cleared() -> FilterControl {
         switch self {
         case let .chipGroup(options, _):
-            return .chipGroup(options: options, selectedIds: [])
+            .chipGroup(options: options, selectedIds: [])
         case let .radio(options, _):
-            return .radio(options: options, selectedId: nil)
+            .radio(options: options, selectedId: nil)
         case let .multiSelect(options, _):
-            return .multiSelect(options: options, selectedIds: [])
+            .multiSelect(options: options, selectedIds: [])
         case let .rangeSlider(range):
-            return .rangeSlider(range.cleared())
+            .rangeSlider(range.cleared())
         }
     }
 }
@@ -99,7 +99,7 @@ public struct FilterSection: Sendable, Hashable, Identifiable {
     }
 }
 
-public extension Array where Element == FilterSection {
+public extension [FilterSection] {
     /// Map every section to its cleared form. Used by the shell when
     /// the user taps Reset.
     func cleared() -> [FilterSection] {
