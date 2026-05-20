@@ -177,10 +177,13 @@ class EditAccessCodeFormSnapshotTest {
                         sampleState(
                             category = AccessCategory.Wifi,
                             isEditing = true,
-                            label = "Main network",
-                            value = "MaplePan@2025!",
-                            valueDirty = true,
-                            notes = "Guests use the other one",
+                            values =
+                                SampleFieldValues(
+                                    label = "Main network",
+                                    value = "MaplePan@2025!",
+                                    valueDirty = true,
+                                    notes = "Guests use the other one",
+                                ),
                         ),
                     onClose = {},
                     onCommit = {},
@@ -230,15 +233,19 @@ class EditAccessCodeFormSnapshotTest {
             AccessVisibility.Sensitive -> listOf("Maria")
         }
 
+    private data class SampleFieldValues(
+        val label: String = "",
+        val value: String = "",
+        val valueDirty: Boolean = false,
+        val notes: String = "",
+    )
+
     private fun sampleState(
         category: AccessCategory,
         visibility: AccessVisibility = AccessVisibility.Members,
         revealed: Boolean = false,
         isEditing: Boolean = false,
-        label: String = "",
-        value: String = "",
-        valueDirty: Boolean = false,
-        notes: String = "",
+        values: SampleFieldValues = SampleFieldValues(),
     ): EditAccessCodeUiState {
         fun seed(
             field: EditAccessCodeField,
@@ -260,9 +267,9 @@ class EditAccessCodeFormSnapshotTest {
             fields =
                 mapOf(
                     EditAccessCodeField.Category to seed(EditAccessCodeField.Category, category.wire),
-                    EditAccessCodeField.Label to seed(EditAccessCodeField.Label, label),
-                    EditAccessCodeField.Value to seed(EditAccessCodeField.Value, value, dirty = valueDirty),
-                    EditAccessCodeField.Notes to seed(EditAccessCodeField.Notes, notes),
+                    EditAccessCodeField.Label to seed(EditAccessCodeField.Label, values.label),
+                    EditAccessCodeField.Value to seed(EditAccessCodeField.Value, values.value, dirty = values.valueDirty),
+                    EditAccessCodeField.Notes to seed(EditAccessCodeField.Notes, values.notes),
                     EditAccessCodeField.SharedWith to seed(EditAccessCodeField.SharedWith, visibility.wire),
                 ),
         )

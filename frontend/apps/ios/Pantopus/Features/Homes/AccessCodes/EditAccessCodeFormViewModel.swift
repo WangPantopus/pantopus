@@ -145,7 +145,9 @@ final class EditAccessCodeFormViewModel {
     private(set) var shouldDismiss: Bool = false
 
     /// `true` when this VM is editing an existing code.
-    var isEditing: Bool { secretId != nil }
+    var isEditing: Bool {
+        secretId != nil
+    }
 
     /// Form title — different for add vs edit per the P3.1 brief.
     var title: String {
@@ -153,7 +155,9 @@ final class EditAccessCodeFormViewModel {
     }
 
     /// Submit verb in the top-right action.
-    var commitLabel: String { "Save" }
+    var commitLabel: String {
+        "Save"
+    }
 
     // MARK: - Dependencies
 
@@ -267,7 +271,7 @@ final class EditAccessCodeFormViewModel {
         case .members:
             return count == 0 ? scope.headline : "All household members (\(count))"
         case .managers:
-            let managers = roster.filter { $0.canManageAccess }
+            let managers = roster.filter(\.canManageAccess)
             return managers.isEmpty
                 ? scope.headline
                 : "Owners & managers (\(managers.count))"
@@ -433,7 +437,7 @@ final class EditAccessCodeFormViewModel {
         do {
             let response: OccupantsResponse = try await api.request(endpoint)
             roster = response.occupants
-                .filter { $0.isActive }
+                .filter(\.isActive)
                 .map { occupant in
                     AccessRosterMember(
                         id: occupant.userId,
