@@ -108,24 +108,62 @@ jobs:
             | sed -E 's/[^a-z0-9]+/-/g; s/-+$//')
           echo "slug=$slug" >> "$GITHUB_OUTPUT"
 
+      - name: Boot simulator
+        id: boot
+        # Pre-boot the target simulator and wait until it is fully booted
+        # before xcodebuild installs the UI-test runner. Installing the
+        # runner on a still-booting simulator intermittently fails with
+        # 'Application "…uitests.xctrunner" is unknown to FrontBoard',
+        # which previously flaked the iPhone SE leg while the faster
+        # iPhone 16 sims happened to win the race.
+        run: |
+          set -o pipefail
+          udid=$(xcrun simctl list devices available \
+            | grep -F "${{ matrix.simulator }} (" \
+            | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}' \
+            | head -1) || true
+          if [ -z "$udid" ]; then
+            echo "::error::No available simulator named '${{ matrix.simulator }}'"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Booting $udid (${{ matrix.simulator }})"
+          xcrun simctl boot "$udid" || true
+          xcrun simctl bootstatus "$udid" -b
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
       - name: Run tests
         # CI runners have no Apple Developer signing identity. Disable
         # signing so the simulator-only test/build works without a
-        # provisioning profile.
+        # provisioning profile. Target the pre-booted simulator by UDID
+        # and retry once (re-booting first) to absorb the occasional
+        # runner-install/launch flake.
         run: |
           set -o pipefail
-          xcodebuild \
-            -project Pantopus.xcodeproj \
-            -scheme Pantopus \
-            -destination "platform=iOS Simulator,name=${{ matrix.simulator }},OS=latest" \
-            -configuration Debug \
-            -enableCodeCoverage YES \
-            -resultBundlePath "TestResults-${{ steps.sim.outputs.slug }}.xcresult" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS="" \
-            clean test | xcbeautify
+          bundle="TestResults-${{ steps.sim.outputs.slug }}.xcresult"
+          udid="${{ steps.boot.outputs.udid }}"
+          run_tests() {
+            xcodebuild \
+              -project Pantopus.xcodeproj \
+              -scheme Pantopus \
+              -destination "platform=iOS Simulator,id=$udid" \
+              -configuration Debug \
+              -enableCodeCoverage YES \
+              -resultBundlePath "$bundle" \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGN_ENTITLEMENTS="" \
+              clean test | xcbeautify
+          }
+          if ! run_tests; then
+            echo "::warning::xcodebuild test failed; re-booting simulator and retrying once"
+            rm -rf "$bundle"
+            xcrun simctl shutdown "$udid" || true
+            xcrun simctl boot "$udid" || true
+            xcrun simctl bootstatus "$udid" -b
+            run_tests
+          fi
 
       - name: Extract coverage summary
         if: always()
