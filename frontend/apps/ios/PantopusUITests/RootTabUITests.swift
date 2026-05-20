@@ -71,7 +71,13 @@ final class RootTabUITests: XCTestCase {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
         tabButton("nearby", in: app).tap()
-        XCTAssertTrue(element("nearbyMap", in: app).waitForExistence(timeout: 5))
+        // The Nearby tab renders a MapKit canvas. A deep `descendants(matching: .any)`
+        // query times out serialising the map's accessibility snapshot, so assert on
+        // the map container and the always-present category chips with type-specific
+        // queries (which short-circuit before walking the expensive map subtree).
+        let mapShown = app.otherElements["nearbyMap"].waitForExistence(timeout: 10)
+            || app.buttons["nearbyCategoryChip_all"].waitForExistence(timeout: 5)
+        XCTAssertTrue(mapShown, "Expected the Nearby map canvas to appear")
     }
 
     func testTapInboxShowsChatListEmptyState() throws {

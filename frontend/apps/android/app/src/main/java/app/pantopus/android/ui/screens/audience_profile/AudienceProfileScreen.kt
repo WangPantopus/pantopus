@@ -61,6 +61,7 @@ import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
 
 @Composable
 fun AudienceProfileScreen(
@@ -309,17 +310,23 @@ internal fun LoadedFrame(
                 )
             AudienceProfileTab.Followers ->
                 FollowersTab(
-                    cells = state.loaded.analyticsCells,
-                    breakdown = state.loaded.tierBreakdown,
-                    chips = state.loaded.tierChips,
-                    selectedTier = state.selectedTier,
-                    searchText = state.followerSearchText,
-                    activeSort = state.followerSort,
-                    followers = state.visibleFollowers,
-                    onSelectTier = actions.onSelectTier,
-                    onFollowerSearch = actions.onFollowerSearch,
-                    onFollowerSort = actions.onFollowerSort,
-                    onOpenFollower = actions.navigation.onOpenFollower,
+                    state =
+                        FollowersTabState(
+                            cells = state.loaded.analyticsCells,
+                            breakdown = state.loaded.tierBreakdown,
+                            chips = state.loaded.tierChips,
+                            selectedTier = state.selectedTier,
+                            searchText = state.followerSearchText,
+                            activeSort = state.followerSort,
+                            followers = state.visibleFollowers,
+                        ),
+                    actions =
+                        FollowersTabActions(
+                            onSelectTier = actions.onSelectTier,
+                            onFollowerSearch = actions.onFollowerSearch,
+                            onFollowerSort = actions.onFollowerSort,
+                            onOpenFollower = actions.navigation.onOpenFollower,
+                        ),
                 )
             AudienceProfileTab.Threads ->
                 ThreadsTab(
@@ -726,19 +733,27 @@ private fun UpdateCard(
 
 // MARK: - Followers tab
 
+private data class FollowersTabState(
+    val cells: List<AnalyticsCellContent>,
+    val breakdown: TierBreakdownContent,
+    val chips: List<TierChipContent>,
+    val selectedTier: Int?,
+    val searchText: String,
+    val activeSort: FollowerSort,
+    val followers: List<FollowerRowContent>,
+)
+
+private data class FollowersTabActions(
+    val onSelectTier: (Int?) -> Unit,
+    val onFollowerSearch: (String) -> Unit,
+    val onFollowerSort: (FollowerSort) -> Unit,
+    val onOpenFollower: (FollowerRowContent) -> Unit,
+)
+
 @Composable
 private fun FollowersTab(
-    cells: List<AnalyticsCellContent>,
-    breakdown: TierBreakdownContent,
-    chips: List<TierChipContent>,
-    selectedTier: Int?,
-    searchText: String,
-    activeSort: FollowerSort,
-    followers: List<FollowerRowContent>,
-    onSelectTier: (Int?) -> Unit,
-    onFollowerSearch: (String) -> Unit,
-    onFollowerSort: (FollowerSort) -> Unit,
-    onOpenFollower: (FollowerRowContent) -> Unit,
+    state: FollowersTabState,
+    actions: FollowersTabActions,
 ) {
     Column(
         modifier =
@@ -749,20 +764,20 @@ private fun FollowersTab(
                 .testTag("audienceProfileFollowersList"),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        AnalyticsRow(cells)
-        TierStackedBar(breakdown)
-        TierChipRow(chips = chips, selectedTier = selectedTier, onSelect = onSelectTier)
-        FollowerSearchField(text = searchText, onChange = onFollowerSearch)
-        FollowerSortChipRow(active = activeSort, onSelect = onFollowerSort)
-        if (followers.isEmpty()) {
-            if (searchText.trim().isNotEmpty()) {
+        AnalyticsRow(state.cells)
+        TierStackedBar(state.breakdown)
+        TierChipRow(chips = state.chips, selectedTier = state.selectedTier, onSelect = actions.onSelectTier)
+        FollowerSearchField(text = state.searchText, onChange = actions.onFollowerSearch)
+        FollowerSortChipRow(active = state.activeSort, onSelect = actions.onFollowerSort)
+        if (state.followers.isEmpty()) {
+            if (state.searchText.trim().isNotEmpty()) {
                 EmptyFollowerSearchCard()
             } else {
                 EmptyFollowersCard()
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                followers.forEach { FollowerRow(it, onOpen = { onOpenFollower(it) }) }
+                state.followers.forEach { follower -> FollowerRow(follower, onOpen = { actions.onOpenFollower(follower) }) }
             }
         }
         Spacer(modifier = Modifier.height(24.dp))
