@@ -28,6 +28,7 @@ class GigsRepository
     constructor(
         private val api: GigsApi,
     ) {
+        @Suppress("LongParameterList")
         suspend fun list(
             category: String? = null,
             sort: String? = null,
@@ -36,6 +37,7 @@ class GigsRepository
             radiusMiles: Double? = null,
             limit: Int = 20,
             offset: Int = 0,
+            search: String? = null,
         ): NetworkResult<GigsListResponse> =
             safeApiCall {
                 api.list(
@@ -44,6 +46,7 @@ class GigsRepository
                     latitude = latitude,
                     longitude = longitude,
                     radiusMiles = radiusMiles,
+                    search = search,
                     limit = limit,
                     offset = offset,
                 )

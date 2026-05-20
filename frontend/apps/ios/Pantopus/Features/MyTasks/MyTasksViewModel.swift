@@ -333,8 +333,38 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
             accessibilityLabel: "Filter tasks"
         ) { [weak self] in
             guard let self else { return }
-            Task { @MainActor in self.onOpenFilters() }
+            Task { @MainActor in self.isFilterPresented = true }
         }
+    }
+
+    // MARK: - Activity filter (P5.4)
+
+    /// Bound to the view's `.sheet(isPresented:)` so the shared
+    /// `ActivityFilterSheet` presents over the list.
+    public var isFilterPresented = false
+
+    /// The applied status / sort / date-range selection. Default is the
+    /// "no filter" position.
+    public private(set) var activityFilter = ActivityFilter()
+
+    /// Section header for the status chips in the sheet.
+    public let statusFilterTitle = "Task status"
+
+    /// Per-surface status chips (the four task lifecycle buckets).
+    public let statusFilterOptions: [FilterOption] = [
+        FilterOption(id: "open", label: "Open"),
+        FilterOption(id: "in_progress", label: "In progress"),
+        FilterOption(id: "done", label: "Done"),
+        FilterOption(id: "closed", label: "Closed")
+    ]
+
+    /// Tasks carry a budget, so the full sort set (incl. value) applies.
+    public let sortFilterOptions = ActivitySortOrder.all
+
+    /// Store the applied filter and re-project the visible rows.
+    public func applyFilter(_ filter: ActivityFilter) {
+        activityFilter = filter
+        rebuild()
     }
 
     public var banner: BannerConfig? {
@@ -362,7 +392,6 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
 
     private let api: APIClient
     private let onOpenTask: @MainActor (MyGigDTO) -> Void
-    private let onOpenFilters: @MainActor () -> Void
     private let onOpenBids: @MainActor (MyGigDTO) -> Void
     private let onEditTask: @MainActor (MyGigDTO) -> Void
     private let onMessageWorker: @MainActor (MyGigDTO) -> Void
@@ -391,7 +420,6 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
     init(
         api: APIClient = .shared,
         onOpenTask: @escaping @MainActor (MyGigDTO) -> Void = { _ in },
-        onOpenFilters: @escaping @MainActor () -> Void = {},
         onOpenBids: @escaping @MainActor (MyGigDTO) -> Void = { _ in },
         onEditTask: @escaping @MainActor (MyGigDTO) -> Void = { _ in },
         onMessageWorker: @escaping @MainActor (MyGigDTO) -> Void = { _ in },
@@ -402,7 +430,6 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
     ) {
         self.api = api
         self.onOpenTask = onOpenTask
-        self.onOpenFilters = onOpenFilters
         self.onOpenBids = onOpenBids
         self.onEditTask = onEditTask
         self.onMessageWorker = onMessageWorker
@@ -454,12 +481,20 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
         }
         counts = Self.tabCounts(for: projections, now: nowSnapshot)
 
-        let filtered = projections.filter { $0.tab == selectedTab }
-        if filtered.isEmpty {
-            state = .empty(emptyContent(for: selectedTab))
+        let tabItems = projections.filter { $0.tab == selectedTab }
+        let visible = activityFilter.apply(
+            to: tabItems,
+            now: nowSnapshot,
+            statusId: { Self.statusFilterId(for: $0.status) },
+            date: { Self.parseDate($0.dto.createdAt) },
+            value: { $0.dto.price }
+        )
+        if visible.isEmpty {
+            let isFiltered = activityFilter.isActive && !tabItems.isEmpty
+            state = .empty(isFiltered ? filteredEmptyContent() : emptyContent(for: selectedTab))
             return
         }
-        let rows = filtered.map { proj in
+        let rows = visible.map { proj in
             Self.row(
                 projection: proj,
                 now: nowSnapshot,
@@ -467,6 +502,29 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
             )
         }
         state = .loaded(sections: [RowSection(id: selectedTab, rows: rows)], hasMore: false)
+    }
+
+    /// Map a derived task status onto one of the four filter chip ids.
+    public static func statusFilterId(for status: MyTasksStatus) -> String {
+        switch status {
+        case .reviewing, .urgent, .noBids: "open"
+        case .inProgress, .scheduled: "in_progress"
+        case .completed, .awaitReview: "done"
+        case .cancelled, .expired: "closed"
+        }
+    }
+
+    /// Empty state shown when an active filter hides every row in the tab.
+    private func filteredEmptyContent() -> ListOfRowsState.EmptyContent {
+        ListOfRowsState.EmptyContent(
+            icon: .filter,
+            headline: "No tasks match your filters",
+            subcopy: "Try a different status, date range, or sort — or clear "
+                + "your filters to see everything in this tab.",
+            ctaTitle: "Clear filters"
+        ) { [weak self] in
+            Task { @MainActor in self?.applyFilter(ActivityFilter()) }
+        }
     }
 
     private func callbacks(for dto: MyGigDTO) -> RowCallbacks {

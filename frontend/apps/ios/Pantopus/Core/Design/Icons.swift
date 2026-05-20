@@ -14,7 +14,7 @@
 
 import SwiftUI
 
-// swiftlint:disable type_body_length
+// swiftlint:disable file_length type_body_length
 
 /// Every icon the Pantopus design language uses. Cases are the raw Lucide
 /// token names (kebab-case preserved in `rawValue`).
@@ -242,6 +242,11 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case messageSquare = "message-square"
     case globe
 
+    // P2.10 Document detail — sticky-footer action icons (Open externally
+    // / Replace) that don't map to anything already in the enum.
+    case externalLink = "external-link"
+    case refreshCw = "refresh-cw"
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -433,6 +438,9 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // `globe` maps directly.
         case .messageSquare: "message"
         case .globe: "globe"
+        // P2.10 Document detail.
+        case .externalLink: "arrow.up.right.square"
+        case .refreshCw: "arrow.triangle.2.circlepath"
         }
     }
 }

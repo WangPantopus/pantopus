@@ -12,7 +12,10 @@ import PhotosUI
 import SwiftUI
 
 /// Entry point for the Pulse compose flow. The `intent` argument
-/// pre-selects which sub-form renders below the intent picker.
+/// pre-selects which sub-form renders below the intent picker. Pass a
+/// non-nil `postId` to open the form in edit mode — the VM fetches the
+/// saved post, prefills every field, locks the intent picker, and the
+/// submit pipeline switches to `PATCH /api/posts/:id`.
 public struct PulseComposeView: View {
     @State private var viewModel: PulseComposeViewModel
     @State private var photosPickerSelection: [PhotosPickerItem] = []
@@ -24,9 +27,14 @@ public struct PulseComposeView: View {
     public init(
         intent: PulseComposeIntent = .ask,
         identity: PulseComposeIdentity = .personal,
+        postId: String? = nil,
         onPosted: @escaping @MainActor (String?) -> Void = { _ in }
     ) {
-        _viewModel = State(initialValue: PulseComposeViewModel(intent: intent, identity: identity))
+        _viewModel = State(initialValue: PulseComposeViewModel(
+            intent: intent,
+            identity: identity,
+            postId: postId
+        ))
         self.onPosted = onPosted
     }
 
@@ -39,8 +47,8 @@ public struct PulseComposeView: View {
 
     public var body: some View {
         FormShell(
-            title: "New post",
-            rightActionLabel: viewModel.activeIntent.ctaLabel,
+            title: viewModel.displayTitle,
+            rightActionLabel: viewModel.ctaLabel,
             isValid: viewModel.isValid,
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSubmitting,
@@ -49,10 +57,7 @@ public struct PulseComposeView: View {
                 Task { await viewModel.submit() }
             },
             content: {
-                PulseComposeContent(
-                    state: viewModel.contentState,
-                    actions: actions
-                )
+                shellContent
             }
         )
         .formShakeOnChange(of: viewModel.shakeTrigger)
@@ -79,6 +84,11 @@ public struct PulseComposeView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.toast)
+        .task {
+            if viewModel.isEditing, case .loading = viewModel.prefillState {
+                await viewModel.loadForEdit()
+            }
+        }
         .onAppear {
             Analytics.track(.screenPulseComposeViewed(intent: viewModel.activeIntent.rawValue))
         }
@@ -95,6 +105,23 @@ public struct PulseComposeView: View {
                 onPosted(postId)
                 dismiss()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var shellContent: some View {
+        switch viewModel.prefillState {
+        case .loading:
+            PulseComposePrefillSkeleton()
+        case let .error(message):
+            PulseComposePrefillError(message: message) {
+                Task { await viewModel.loadForEdit() }
+            }
+        case .ready:
+            PulseComposeContent(
+                state: viewModel.contentState,
+                actions: actions
+            )
         }
     }
 
@@ -144,8 +171,51 @@ public extension PulseComposeViewModel {
             askCategory: askCategory,
             recommendRating: recommendRating,
             fields: fields,
-            photos: photos
+            photos: photos,
+            isIntentLocked: isIntentLocked
         )
+    }
+}
+
+/// Shimmer skeleton shown while the edit-mode prefill is in flight.
+/// Mirrors the loaded geometry so layout doesn't jump on resolve.
+private struct PulseComposePrefillSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s5) {
+            Shimmer(width: 220, height: 16, cornerRadius: Radii.sm)
+            HStack(spacing: Spacing.s2) {
+                Shimmer(width: 64, height: 32, cornerRadius: Radii.pill)
+                Shimmer(width: 80, height: 32, cornerRadius: Radii.pill)
+                Shimmer(width: 72, height: 32, cornerRadius: Radii.pill)
+            }
+            Shimmer(width: 160, height: 16, cornerRadius: Radii.sm)
+            Shimmer(height: 44, cornerRadius: Radii.md)
+            Shimmer(width: 100, height: 16, cornerRadius: Radii.sm)
+            Shimmer(height: 96, cornerRadius: Radii.md)
+        }
+        .padding(.horizontal, Spacing.s4)
+        .accessibilityIdentifier("composePulsePrefillSkeleton")
+    }
+}
+
+/// Error state shown when the edit-mode prefill fetch fails. Pairs a
+/// short message with a retry CTA wired back to `loadForEdit`.
+private struct PulseComposePrefillError: View {
+    let message: String
+    let onRetry: @MainActor () -> Void
+
+    var body: some View {
+        EmptyState(
+            icon: .alertCircle,
+            headline: "Couldn't load this post",
+            subcopy: message,
+            cta: EmptyState.CTA(title: "Try again") {
+                await MainActor.run { onRetry() }
+            }
+        )
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, Spacing.s4)
+        .accessibilityIdentifier("composePulsePrefillError")
     }
 }
 

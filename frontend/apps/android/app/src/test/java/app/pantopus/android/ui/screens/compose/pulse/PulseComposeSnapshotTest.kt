@@ -75,6 +75,17 @@ class PulseComposeSnapshotTest {
         }
     }
 
+    /**
+     * Edit-mode prefill — the form opens with every field already seeded
+     * from the saved post and the intent picker locked. Mirror of the
+     * iOS `test_pulse_compose_edit_prefilled_renders` fixture.
+     */
+    @Test fun pulse_compose_edit_prefilled() {
+        paparazzi.snapshot {
+            Frame { Body(state = editPrefilledFixture()) }
+        }
+    }
+
     @Composable
     private fun Frame(content: @Composable () -> Unit) {
         PantopusTheme {
@@ -186,6 +197,24 @@ class PulseComposeSnapshotTest {
                 )
         }
     }
+
+    /**
+     * Edit-mode fixture for the Ask intent. The intent picker is locked
+     * (`isIntentLocked = true`) and every field arrives with a
+     * non-empty `originalValue` so dirty tracking starts at false.
+     */
+    private fun editPrefilledFixture(): PulseComposeContentState =
+        PulseComposeContentState(
+            activeIntent = PulseComposeIntent.Ask,
+            identity = PulseComposeIdentity.Personal,
+            askCategory = PulseAskCategory.Handyman,
+            fields =
+                seedFields(
+                    title = "Need a plumber",
+                    body = "Pipe leaking under the kitchen sink. Anyone know someone reliable?",
+                ),
+            isIntentLocked = true,
+        )
 
     private fun blankFields(): Map<PulseComposeField, FormFieldState> =
         PulseComposeField.entries.associateWith { FormFieldState(id = it.key) }

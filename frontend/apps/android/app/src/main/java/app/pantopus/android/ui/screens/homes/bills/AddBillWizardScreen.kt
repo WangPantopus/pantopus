@@ -49,18 +49,29 @@ import java.time.ZoneId
 import java.util.Date
 
 /**
- * 3-step Add Bill wizard wired to
- * `POST /api/homes/:id/bills` — `backend/routes/home.js:4539`.
+ * 3-step Add / Edit Bill wizard.
+ *
+ * Create — `POST /api/homes/:id/bills` (`backend/routes/home.js:4539`).
+ * Edit   — `PUT  /api/homes/:id/bills/:billId`
+ *          (`backend/routes/home.js:4585`). The VM reads `billId` from
+ *          `SavedStateHandle` so edit mode is entered by navigating to
+ *          `homes/{homeId}/bills/{billId}/edit`.
  */
 @Composable
 fun AddBillWizardScreen(
     onClose: () -> Unit,
     onCreated: (String) -> Unit,
+    onUpdated: (String) -> Unit = {},
     viewModel: AddBillWizardViewModel = hiltViewModel(),
 ) {
     val currentStep by viewModel.currentStep.collectAsStateWithLifecycle()
     val event by viewModel.events.collectAsStateWithLifecycle()
     val submitError by viewModel.submitError.collectAsStateWithLifecycle()
+    // Collected so the screen recomposes when hydration completes —
+    // the wizard chrome reads the flag via `model.chrome` and gates
+    // the primary CTA on it.
+    val isLoadingExisting by viewModel.isLoadingExisting.collectAsStateWithLifecycle()
+    val loadError by viewModel.loadError.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         Analytics.track(AnalyticsEvent.ScreenAddBillWizardStepViewed(1, "details"))
@@ -77,15 +88,24 @@ fun AddBillWizardScreen(
                 viewModel.consumeEvent()
                 onCreated(current.billId)
             }
+            is AddBillEvent.Updated -> {
+                viewModel.consumeEvent()
+                onUpdated(current.billId)
+            }
         }
     }
 
     WizardShell(model = viewModel, modifier = Modifier.testTag("addBillWizard")) {
         when (currentStep) {
-            AddBillStep.Details -> DetailsStep(viewModel)
+            AddBillStep.Details ->
+                DetailsStep(
+                    viewModel = viewModel,
+                    isLoadingExisting = isLoadingExisting,
+                    loadError = loadError,
+                )
             AddBillStep.Schedule -> ScheduleStep(viewModel)
             AddBillStep.Review -> ReviewStep(viewModel, submitError)
-            AddBillStep.Success -> SuccessStep()
+            AddBillStep.Success -> SuccessStep(isEditing = viewModel.isEditing)
         }
     }
 }
@@ -93,12 +113,35 @@ fun AddBillWizardScreen(
 // MARK: - Step 1
 
 @Composable
-private fun DetailsStep(viewModel: AddBillWizardViewModel) {
+private fun DetailsStep(
+    viewModel: AddBillWizardViewModel,
+    @Suppress("UNUSED_PARAMETER")
+    isLoadingExisting: Boolean,
+    loadError: String?,
+) {
+    // `isLoadingExisting` is observed at the screen scope so the
+    // wizard chrome (computed inside WizardShell from `model.chrome`)
+    // re-reads `_isLoadingExisting.value` and re-gates the primary
+    // CTA when hydration completes.
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
         HeadlineBlock(
-            title = "Add a bill",
-            subtitle = "Track due dates, schedule payments, and keep the household on the same page.",
+            title = if (viewModel.isEditing) "Edit bill" else "Add a bill",
+            subtitle =
+                if (viewModel.isEditing) {
+                    "Update the payee, amount, due date, or schedule."
+                } else {
+                    "Track due dates, schedule payments, and keep the household on the same page."
+                },
         )
+
+        if (loadError != null) {
+            Text(
+                text = loadError,
+                style = PantopusTextStyle.small,
+                color = PantopusColors.error,
+                modifier = Modifier.testTag("addBill_loadError"),
+            )
+        }
 
         FieldLabel("Payee")
         OutlinedField(testTag = "addBill_payee") {
@@ -341,7 +384,7 @@ private fun ReviewRow(
 // MARK: - Step 4
 
 @Composable
-private fun SuccessStep() {
+private fun SuccessStep(isEditing: Boolean) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = Spacing.s6),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -362,9 +405,18 @@ private fun SuccessStep() {
                 tint = PantopusColors.success,
             )
         }
-        Text("Bill added", style = PantopusTextStyle.h2, color = PantopusColors.appText)
         Text(
-            text = "You can mark it paid or review the schedule from the Bills list.",
+            text = if (isEditing) "Bill updated" else "Bill added",
+            style = PantopusTextStyle.h2,
+            color = PantopusColors.appText,
+        )
+        Text(
+            text =
+                if (isEditing) {
+                    "Your changes are saved. The detail will reflect them now."
+                } else {
+                    "You can mark it paid or review the schedule from the Bills list."
+                },
             style = PantopusTextStyle.body,
             color = PantopusColors.appTextSecondary,
         )

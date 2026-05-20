@@ -122,4 +122,20 @@ public enum AccessCategory: String, CaseIterable, Sendable, Hashable {
         if key.contains("smart") || key.contains("digital") { return .smartLock }
         return .lockbox
     }
+
+    /// Wire string sent to the backend on POST / PUT. The database
+    /// CHECK constraint at `HomeAccessSecret_type_chk` only accepts
+    /// `('wifi','door_code','gate_code','lockbox','garage','alarm','other')`
+    /// so the two extra UI-side categories (`gate`, `smart_lock`) round-
+    /// trip through the closest allowed strings (`gate_code`, `other`).
+    public var backendAccessType: String {
+        switch self {
+        case .wifi: "wifi"
+        case .alarm: "alarm"
+        case .gate: "gate_code"
+        case .lockbox: "lockbox"
+        case .garage: "garage"
+        case .smartLock: "other"
+        }
+    }
 }

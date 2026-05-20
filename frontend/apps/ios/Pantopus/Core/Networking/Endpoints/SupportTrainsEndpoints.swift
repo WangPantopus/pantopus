@@ -73,6 +73,49 @@ public enum SupportTrainsEndpoints {
             path: "/api/support-trains/\(supportTrainId)/reservations"
         )
     }
+
+    /// Create a new Support Train (status `draft`). P2.6 — the
+    /// Start-a-Support-Train wizard fires this on launch, then
+    /// `addSlot` for each generated slot, then `publish`.
+    ///
+    /// Route: `backend/routes/supportTrains.js:639` —
+    /// `POST /api/support-trains/`.
+    public static func create(body: CreateSupportTrainBody) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/support-trains",
+            body: body
+        )
+    }
+
+    /// Append one custom slot to a Support Train. The wizard calls
+    /// this once per generated slot so the user can edit dates in
+    /// step 2 and see the preview rebuild before launch.
+    ///
+    /// Route: `backend/routes/supportTrains.js:921` —
+    /// `POST /api/support-trains/:id/slots`.
+    public static func addSlot(
+        supportTrainId: String,
+        body: AddSupportTrainSlotBody
+    ) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/support-trains/\(supportTrainId)/slots",
+            body: body
+        )
+    }
+
+    /// Flip the draft to `published` so neighbors / connections can
+    /// sign up. Fires last in the wizard's launch sequence.
+    ///
+    /// Route: `backend/routes/supportTrains.js:1236` —
+    /// `POST /api/support-trains/:id/publish`.
+    public static func publish(supportTrainId: String) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/support-trains/\(supportTrainId)/publish"
+        )
+    }
 }
 
 /// Role filter for the `me/support-trains` feed.

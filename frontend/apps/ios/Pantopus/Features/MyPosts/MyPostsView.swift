@@ -72,6 +72,16 @@ public struct MyPostsView: View {
             } message: { _ in
                 Text("This post will be permanently removed from your profile and the Pulse feed.")
             }
+            .sheet(isPresented: $bindable.isFilterPresented) {
+                ActivityFilterSheet(
+                    statusTitle: viewModel.statusFilterTitle,
+                    statusOptions: viewModel.statusFilterOptions,
+                    sortOptions: viewModel.sortFilterOptions,
+                    filter: viewModel.activityFilter,
+                    onApply: { viewModel.applyFilter($0) },
+                    onClose: { viewModel.isFilterPresented = false }
+                )
+            }
     }
 
     // MARK: - Action helpers

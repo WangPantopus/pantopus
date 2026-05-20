@@ -51,15 +51,16 @@ import kotlinx.coroutines.delay
  * footer CTAs (Follow vs Message + Connect), and post styling
  * accordingly.
  *
- * `onOpenMessages` and `onOpenReport` are nav-host callbacks; their
- * destinations currently land on `NotYetAvailableView` placeholders
- * until the Chat and Report flows ship.
+ * `onOpenMessages` is invoked with the loaded `PublicProfileDto` so the
+ * host nav stack can construct a chat-conversation destination with the
+ * profile's user as counterparty. `onOpenReport` lands on the
+ * `NotYetAvailableView` placeholder until the Report flow ships.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublicProfileScreen(
     onBack: () -> Unit,
-    onOpenMessages: () -> Unit = {},
+    onOpenMessages: (app.pantopus.android.data.api.models.profile.PublicProfileDto) -> Unit = {},
     onOpenReport: () -> Unit = {},
     viewModel: PublicProfileViewModel = hiltViewModel(),
 ) {
@@ -99,7 +100,7 @@ fun PublicProfileScreen(
                     onBack = onBack,
                     onSelectTab = { viewModel.selectTab(it) },
                     onFollow = { viewModel.follow() },
-                    onMessage = onOpenMessages,
+                    onMessage = { onOpenMessages(s.content.profile) },
                     onConnect = { viewModel.connect() },
                     onOverflow = { viewModel.setShowOverflow(true) },
                     onUnlock = { viewModel.showSubscribeToast() },

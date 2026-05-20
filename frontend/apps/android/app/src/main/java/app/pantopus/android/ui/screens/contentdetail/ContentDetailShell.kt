@@ -26,8 +26,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,6 +70,7 @@ fun ContentDetailShell(
     onSecondaryAction: (() -> Unit)? = null,
     onRetry: () -> Unit = {},
     onMessageCounterparty: (() -> Unit)? = null,
+    overflowItems: List<ContentDetailOverflowItem> = emptyList(),
 ) {
     Box(
         modifier =
@@ -73,8 +80,14 @@ fun ContentDetailShell(
                 .testTag("contentDetailShell"),
     ) {
         when (state) {
-            is ContentDetailUiState.Loading -> LoadingFrame(onBack = onBack)
-            is ContentDetailUiState.Error -> ErrorFrame(message = state.message, onBack = onBack, onRetry = onRetry)
+            is ContentDetailUiState.Loading -> LoadingFrame(onBack = onBack, overflowItems = overflowItems)
+            is ContentDetailUiState.Error ->
+                ErrorFrame(
+                    message = state.message,
+                    onBack = onBack,
+                    onRetry = onRetry,
+                    overflowItems = overflowItems,
+                )
             is ContentDetailUiState.Loaded ->
                 LoadedFrame(
                     content = state.content,
@@ -82,15 +95,19 @@ fun ContentDetailShell(
                     onPrimaryAction = onPrimaryAction,
                     onSecondaryAction = onSecondaryAction,
                     onMessageCounterparty = onMessageCounterparty,
+                    overflowItems = overflowItems,
                 )
         }
     }
 }
 
 @Composable
-private fun LoadingFrame(onBack: () -> Unit) {
+private fun LoadingFrame(
+    onBack: () -> Unit,
+    overflowItems: List<ContentDetailOverflowItem>,
+) {
     Column(modifier = Modifier.fillMaxSize()) {
-        TopNav(onBack = onBack, transparent = false)
+        TopNav(onBack = onBack, transparent = false, overflowItems = overflowItems)
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = PantopusColors.primary600)
         }
@@ -102,9 +119,10 @@ private fun ErrorFrame(
     message: String,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    overflowItems: List<ContentDetailOverflowItem>,
 ) {
     Column(modifier = Modifier.fillMaxSize().testTag("contentDetailError")) {
-        TopNav(onBack = onBack, transparent = false)
+        TopNav(onBack = onBack, transparent = false, overflowItems = overflowItems)
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.Center,
@@ -145,6 +163,7 @@ private fun LoadedFrame(
     onPrimaryAction: () -> Unit,
     onSecondaryAction: (() -> Unit)?,
     onMessageCounterparty: (() -> Unit)?,
+    overflowItems: List<ContentDetailOverflowItem>,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -155,7 +174,7 @@ private fun LoadedFrame(
         ) {
             content.cover?.let { CoverImage(it) }
             if (content.cover == null) {
-                TopNav(onBack = onBack, transparent = false)
+                TopNav(onBack = onBack, transparent = false, overflowItems = overflowItems)
             }
             HeroBlock(content = content)
             if (content.statStrip.isNotEmpty()) {
@@ -177,7 +196,7 @@ private fun LoadedFrame(
             Spacer(modifier = Modifier.height(120.dp))
         }
         if (content.cover != null) {
-            TopNav(onBack = onBack, transparent = true)
+            TopNav(onBack = onBack, transparent = true, overflowItems = overflowItems)
         }
         StickyDock(
             dock = content.dock,
@@ -194,6 +213,7 @@ private fun LoadedFrame(
 private fun TopNav(
     onBack: () -> Unit,
     transparent: Boolean,
+    overflowItems: List<ContentDetailOverflowItem> = emptyList(),
 ) {
     Row(
         modifier =
@@ -222,6 +242,53 @@ private fun TopNav(
             )
         }
         Spacer(modifier = Modifier.weight(1f))
+        if (overflowItems.isNotEmpty()) {
+            OverflowMenu(items = overflowItems, transparent = transparent)
+        }
+    }
+}
+
+@Composable
+private fun OverflowMenu(
+    items: List<ContentDetailOverflowItem>,
+    transparent: Boolean,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Box(
+            modifier =
+                Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(if (transparent) Color.White.copy(alpha = 0.85f) else Color.Transparent)
+                    .clickable { expanded = true }
+                    .testTag("contentDetailOverflowMenu")
+                    .semantics { contentDescription = "More actions" },
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.MoreVertical,
+                contentDescription = null,
+                size = 20.dp,
+                strokeWidth = 2.2f,
+                tint = PantopusColors.appText,
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            items.forEach { item ->
+                DropdownMenuItem(
+                    text = { Text(item.label) },
+                    onClick = {
+                        expanded = false
+                        item.onClick()
+                    },
+                    modifier = Modifier.testTag(item.testTag),
+                )
+            }
+        }
     }
 }
 

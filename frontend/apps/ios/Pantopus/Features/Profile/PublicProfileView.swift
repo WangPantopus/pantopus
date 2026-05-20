@@ -25,13 +25,13 @@ import SwiftUI
 public struct PublicProfileView: View {
     @State private var viewModel: PublicProfileViewModel
     private let onBack: @MainActor () -> Void
-    private let onOpenMessages: @MainActor () -> Void
+    private let onOpenMessages: @MainActor (PublicProfile) -> Void
     private let onOpenReport: @MainActor () -> Void
 
     public init(
         userId: String,
         onBack: @escaping @MainActor () -> Void,
-        onOpenMessages: @escaping @MainActor () -> Void = {},
+        onOpenMessages: @escaping @MainActor (PublicProfile) -> Void = { _ in },
         onOpenReport: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: PublicProfileViewModel(userId: userId))
@@ -118,7 +118,7 @@ public struct PublicProfileView: View {
                             set: { viewModel.selectedTab = $0 }
                         ),
                         showActionRow: false,
-                        onMessage: { onOpenMessages() },
+                        onMessage: { onOpenMessages(payload.profile) },
                         onConnect: { Task { await viewModel.connect() } },
                         onOverflow: { viewModel.showOverflow = true }
                     )
@@ -145,7 +145,7 @@ public struct PublicProfileView: View {
             ActionRowCTA(kind: .local(
                 messageState: .idle,
                 connectState: viewModel.connectState,
-                onMessage: { onOpenMessages() },
+                onMessage: { onOpenMessages(payload.profile) },
                 onConnect: { Task { await viewModel.connect() } }
             ))
         }

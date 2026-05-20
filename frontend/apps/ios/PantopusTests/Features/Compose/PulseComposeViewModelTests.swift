@@ -8,6 +8,8 @@
 //  `POST /api/posts` body, and the close-confirm dirty signal.
 //
 
+// swiftlint:disable type_body_length
+
 import XCTest
 @testable import Pantopus
 
@@ -295,5 +297,188 @@ final class PulseComposeViewModelTests: XCTestCase {
         vm.selectIntent(.announce)
         XCTAssertEqual(vm.fields[.body]?.value, "Need help with this.")
         XCTAssertEqual(vm.activeIntent, .announce)
+    }
+
+    // MARK: - Edit mode (P3.5)
+
+    /// Build a JSON post-detail envelope with the supplied shape. Used
+    /// by the edit-mode tests to drive the prefill loader.
+    private static func postDetailJSON(
+        postType: String,
+        content: String,
+        title: String? = nil,
+        visibility: String = "neighborhood",
+        eventDate: String? = nil,
+        eventVenue: String? = nil,
+        lostFoundType: String? = nil,
+        serviceCategory: String? = nil,
+        dealBusinessName: String? = nil
+    ) -> String {
+        var post: [String: Any] = [
+            "id": "p_42",
+            "user_id": "u_1",
+            "content": content,
+            "post_type": postType,
+            "created_at": "2026-05-19T00:00:00Z",
+            "visibility": visibility,
+            "like_count": 0,
+            "comment_count": 0,
+            "comments": [],
+            "userHasLiked": false,
+            "userHasSaved": false,
+            "userHasReposted": false
+        ]
+        if let title { post["title"] = title }
+        if let eventDate { post["event_date"] = eventDate }
+        if let eventVenue { post["event_venue"] = eventVenue }
+        if let lostFoundType { post["lost_found_type"] = lostFoundType }
+        if let serviceCategory { post["service_category"] = serviceCategory }
+        if let dealBusinessName { post["deal_business_name"] = dealBusinessName }
+        let body: [String: Any] = ["post": post]
+        let data = (try? JSONSerialization.data(withJSONObject: body, options: [])) ?? Data()
+        return String(data: data, encoding: .utf8) ?? "{}"
+    }
+
+    func testIsEditingTrueWhenPostIdProvided() {
+        let vm = PulseComposeViewModel(intent: .ask, postId: "p_42", api: makeAPI())
+        XCTAssertTrue(vm.isEditing)
+        XCTAssertEqual(vm.editingPostId, "p_42")
+        XCTAssertEqual(vm.displayTitle, "Edit post")
+        XCTAssertEqual(vm.ctaLabel, "Save")
+        XCTAssertTrue(vm.isIntentLocked)
+    }
+
+    func testIsEditingFalseInCreateMode() {
+        let vm = PulseComposeViewModel(intent: .ask, api: makeAPI())
+        XCTAssertFalse(vm.isEditing)
+        XCTAssertNil(vm.editingPostId)
+        XCTAssertEqual(vm.displayTitle, "New post")
+        XCTAssertEqual(vm.ctaLabel, "Post")
+        XCTAssertFalse(vm.isIntentLocked)
+    }
+
+    func testSelectIntentLockedInEditMode() {
+        let vm = PulseComposeViewModel(intent: .ask, postId: "p_42", api: makeAPI())
+        vm.selectIntent(.announce)
+        XCTAssertEqual(vm.activeIntent, .ask, "selectIntent must be a no-op in edit mode")
+    }
+
+    func testLoadForEditAskPrefillSeedsFields() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.postDetailJSON(
+                postType: "ask_local",
+                content: "Pipe is leaking.",
+                title: "Need a plumber",
+                serviceCategory: "cleaning"
+            ))
+        ]
+        let vm = PulseComposeViewModel(intent: .ask, postId: "p_42", api: makeAPI())
+        XCTAssertEqual(vm.prefillState, .loading)
+        await vm.loadForEdit()
+        XCTAssertEqual(vm.prefillState, .ready)
+        XCTAssertEqual(vm.activeIntent, .ask)
+        XCTAssertEqual(vm.fields[.title]?.value, "Need a plumber")
+        XCTAssertEqual(vm.fields[.body]?.value, "Pipe is leaking.")
+        XCTAssertEqual(vm.askCategory, .cleaning)
+        // Re-baselined — every field starts non-dirty.
+        XCTAssertFalse(vm.isDirty)
+    }
+
+    func testLoadForEditRecommendUnwrapsStarsAndBody() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.postDetailJSON(
+                postType: "recommendation",
+                content: "★★★★☆\n\nGreat lattes.",
+                dealBusinessName: "Joe's Coffee"
+            ))
+        ]
+        let vm = PulseComposeViewModel(intent: .ask, postId: "p_42", api: makeAPI())
+        await vm.loadForEdit()
+        XCTAssertEqual(vm.activeIntent, .recommend)
+        XCTAssertEqual(vm.recommendRating, 4)
+        XCTAssertEqual(vm.fields[.body]?.value, "Great lattes.")
+        XCTAssertEqual(vm.fields[.recommendBusiness]?.value, "Joe's Coffee")
+        XCTAssertFalse(vm.isDirty)
+    }
+
+    func testLoadForEditLostUnwrapsLastSeenPrefix() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.postDetailJSON(
+                postType: "lost_found",
+                content: "Last seen: 5th & Elm\n\nMochi the cat.",
+                lostFoundType: "lost"
+            ))
+        ]
+        let vm = PulseComposeViewModel(intent: .ask, postId: "p_42", api: makeAPI())
+        await vm.loadForEdit()
+        XCTAssertEqual(vm.activeIntent, .lost)
+        XCTAssertEqual(vm.fields[.lostLastSeenLocation]?.value, "5th & Elm")
+        XCTAssertEqual(vm.fields[.body]?.value, "Mochi the cat.")
+        XCTAssertEqual(vm.lostFoundKind, .lost)
+        XCTAssertFalse(vm.isDirty)
+    }
+
+    func testLoadForEditEventNormalizesISODate() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.postDetailJSON(
+                postType: "event",
+                content: "Bring chairs.",
+                title: "Block party",
+                eventDate: "2030-08-15T17:00:00Z",
+                eventVenue: "Elm Park"
+            ))
+        ]
+        let vm = PulseComposeViewModel(intent: .ask, postId: "p_42", api: makeAPI())
+        await vm.loadForEdit()
+        XCTAssertEqual(vm.activeIntent, .event)
+        XCTAssertEqual(vm.fields[.title]?.value, "Block party")
+        XCTAssertEqual(vm.fields[.eventLocation]?.value, "Elm Park")
+        XCTAssertEqual(vm.fields[.eventDate]?.value, "2030-08-15 17:00")
+        XCTAssertFalse(vm.isDirty)
+    }
+
+    func testLoadForEditFailureSurfacesPrefillError() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"down\"}")]
+        let vm = PulseComposeViewModel(intent: .ask, postId: "p_42", api: makeAPI())
+        await vm.loadForEdit()
+        if case .error = vm.prefillState {} else {
+            XCTFail("expected prefillState.error, got \(vm.prefillState)")
+        }
+    }
+
+    func testBuildUpdateRequestForAskCarriesEditableFields() {
+        let vm = PulseComposeViewModel(intent: .ask, postId: "p_42", api: makeAPI())
+        vm.update(.title, to: "New title")
+        vm.update(.body, to: "Updated body.")
+        vm.askCategory = .advice
+        let request = vm.buildUpdateRequest()
+        XCTAssertEqual(request.title, "New title")
+        XCTAssertEqual(request.content, "Updated body.")
+        XCTAssertEqual(request.serviceCategory, "advice")
+        XCTAssertEqual(request.visibility, "neighborhood")
+    }
+
+    func testEditSubmitSendsPATCH() async {
+        // Prefill response first, then PATCH ack.
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.postDetailJSON(
+                postType: "ask_local",
+                content: "Pipe is leaking.",
+                title: "Need a plumber"
+            )),
+            .status(200, body: "{\"message\":\"Post updated successfully\",\"post\":{\"id\":\"p_42\"}}")
+        ]
+        let vm = PulseComposeViewModel(intent: .ask, postId: "p_42", api: makeAPI())
+        await vm.loadForEdit()
+        vm.update(.body, to: "Pipe still leaking.")
+        let ok = await vm.submit()
+        XCTAssertTrue(ok)
+        XCTAssertTrue(vm.shouldDismiss)
+        XCTAssertEqual(vm.toast?.text, "Saved")
+        // Second captured request is the PATCH.
+        let captured = SequencedURLProtocol.capturedRequests
+        XCTAssertEqual(captured.count, 2)
+        XCTAssertEqual(captured.last?.httpMethod, "PATCH")
+        XCTAssertEqual(captured.last?.url?.path, "/api/posts/p_42")
     }
 }

@@ -54,15 +54,20 @@ public final class GigDetailViewModel {
         }
     }
 
-    /// Place a bid with the caller-supplied amount + message. Returns
-    /// `true` on success so the host can dismiss its bid-entry sheet.
+    /// Place a bid with the caller-supplied amount + message + proposed
+    /// time. Returns `true` on success so the host can dismiss its
+    /// bid-entry sheet.
     @discardableResult
-    public func placeBid(amount: Double, message: String?) async -> Bool {
+    public func placeBid(amount: Double, message: String?, proposedTime: String? = nil) async -> Bool {
         do {
             let _: PlaceBidResponse = try await api.request(
                 GigsEndpoints.placeBid(
                     gigId: gigId,
-                    body: PlaceBidBody(bidAmount: amount, message: message)
+                    body: PlaceBidBody(
+                        bidAmount: amount,
+                        message: message,
+                        proposedTime: proposedTime
+                    )
                 )
             )
             await load()

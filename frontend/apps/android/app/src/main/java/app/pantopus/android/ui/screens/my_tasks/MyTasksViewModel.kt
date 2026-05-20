@@ -19,6 +19,9 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.offers.OffersCategory
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivityFilter
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivitySortOrder
+import app.pantopus.android.ui.screens.shared.filter_sheet.FilterOption
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
 import app.pantopus.android.ui.screens.shared.list_of_rows.Bidder
 import app.pantopus.android.ui.screens.shared.list_of_rows.BidderStackData
@@ -276,7 +279,6 @@ class MyTasksViewModel
         private var nowProvider: () -> Instant = { Instant.now() }
 
         private var openTaskHandler: (MyGigDto) -> Unit = {}
-        private var openFiltersHandler: () -> Unit = {}
         private var openBidsHandler: (MyGigDto) -> Unit = {}
         private var editTaskHandler: (MyGigDto) -> Unit = {}
         private var messageWorkerHandler: (MyGigDto) -> Unit = {}
@@ -298,10 +300,45 @@ class MyTasksViewModel
                 TopBarAction(
                     icon = PantopusIcon.Filter,
                     contentDescription = "Filter tasks",
-                    onClick = { openFiltersHandler() },
+                    onClick = { openFilterSheet() },
                 ),
             )
         val topBarAction: StateFlow<TopBarAction?> = _topBarAction.asStateFlow()
+
+        // Activity filter (P5.4)
+        private val _showFilterSheet = MutableStateFlow(false)
+        val showFilterSheet: StateFlow<Boolean> = _showFilterSheet.asStateFlow()
+
+        private val _activityFilter = MutableStateFlow(ActivityFilter())
+        val activityFilter: StateFlow<ActivityFilter> = _activityFilter.asStateFlow()
+
+        /** Section header for the status chips in the sheet. */
+        val statusFilterTitle = "Task status"
+
+        /** Per-surface status chips (the four task lifecycle buckets). */
+        val statusFilterOptions =
+            listOf(
+                FilterOption("open", "Open"),
+                FilterOption("in_progress", "In progress"),
+                FilterOption("done", "Done"),
+                FilterOption("closed", "Closed"),
+            )
+
+        /** Tasks carry a budget, so the full sort set applies. */
+        val sortFilterOptions = ActivitySortOrder.ALL
+
+        fun openFilterSheet() {
+            _showFilterSheet.value = true
+        }
+
+        fun dismissFilterSheet() {
+            _showFilterSheet.value = false
+        }
+
+        fun applyFilter(filter: ActivityFilter) {
+            _activityFilter.value = filter
+            applyState()
+        }
 
         private val _fab =
             MutableStateFlow<FabAction?>(
@@ -324,7 +361,6 @@ class MyTasksViewModel
          */
         fun bindCallbacks(
             onOpenTask: (MyGigDto) -> Unit,
-            onOpenFilters: () -> Unit,
             onOpenBids: (MyGigDto) -> Unit,
             onEditTask: (MyGigDto) -> Unit,
             onMessageWorker: (MyGigDto) -> Unit,
@@ -333,19 +369,12 @@ class MyTasksViewModel
             onRepost: (MyGigDto) -> Unit,
         ) {
             openTaskHandler = onOpenTask
-            openFiltersHandler = onOpenFilters
             openBidsHandler = onOpenBids
             editTaskHandler = onEditTask
             messageWorkerHandler = onMessageWorker
             leaveReviewHandler = onLeaveReview
             postTaskHandler = onPostTask
             repostHandler = onRepost
-            _topBarAction.value =
-                TopBarAction(
-                    icon = PantopusIcon.Filter,
-                    contentDescription = "Filter tasks",
-                    onClick = { openFiltersHandler() },
-                )
             _fab.value =
                 FabAction(
                     icon = PantopusIcon.Plus,
@@ -416,18 +445,42 @@ class MyTasksViewModel
                 )
             _banner.value = bannerFor(_selectedTab.value, counts)
 
-            val filtered = projections.filter { it.tab == _selectedTab.value }
-            if (filtered.isEmpty()) {
-                _state.value = emptyStateFor(_selectedTab.value)
+            val tabItems = projections.filter { it.tab == _selectedTab.value }
+            val visible =
+                _activityFilter.value.apply(
+                    items = tabItems,
+                    now = now,
+                    statusId = { statusFilterId(it.status) },
+                    date = { parseInstant(it.dto.createdAt) },
+                    value = { it.dto.price },
+                )
+            if (visible.isEmpty()) {
+                _state.value =
+                    if (_activityFilter.value.isActive && tabItems.isNotEmpty()) {
+                        filteredEmptyState()
+                    } else {
+                        emptyStateFor(_selectedTab.value)
+                    }
                 return
             }
-            val rows = filtered.map { row(it, now) }
+            val rows = visible.map { row(it, now) }
             _state.value =
                 ListOfRowsUiState.Loaded(
                     sections = listOf(RowSection(id = _selectedTab.value, rows = rows)),
                     hasMore = false,
                 )
         }
+
+        private fun filteredEmptyState(): ListOfRowsUiState.Empty =
+            ListOfRowsUiState.Empty(
+                icon = PantopusIcon.Filter,
+                headline = "No tasks match your filters",
+                subcopy =
+                    "Try a different status, date range, or sort — or clear " +
+                        "your filters to see everything in this tab.",
+                ctaTitle = "Clear filters",
+                onCta = { applyFilter(ActivityFilter()) },
+            )
 
         private fun emptyStateFor(tab: String): ListOfRowsUiState.Empty =
             when (tab) {
@@ -814,6 +867,15 @@ class MyTasksViewModel
                     is MyTasksStatus.AwaitReview -> MyTasksFooter.Review
                     is MyTasksStatus.Completed -> MyTasksFooter.None
                     is MyTasksStatus.Cancelled, is MyTasksStatus.Expired -> MyTasksFooter.Repost
+                }
+
+            /** Map a derived task status onto one of the four filter chip ids. */
+            fun statusFilterId(status: MyTasksStatus): String =
+                when (status) {
+                    is MyTasksStatus.Reviewing, is MyTasksStatus.Urgent, is MyTasksStatus.NoBids -> "open"
+                    is MyTasksStatus.InProgress, is MyTasksStatus.Scheduled -> "in_progress"
+                    is MyTasksStatus.Completed, is MyTasksStatus.AwaitReview -> "done"
+                    is MyTasksStatus.Cancelled, is MyTasksStatus.Expired -> "closed"
                 }
 
             fun highlight(status: MyTasksStatus): RowHighlight? =

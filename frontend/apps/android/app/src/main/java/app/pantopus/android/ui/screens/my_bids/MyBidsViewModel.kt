@@ -16,12 +16,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.offers.BidDto
 import app.pantopus.android.data.api.models.offers.BidGigDto
+import app.pantopus.android.data.api.models.offers.UpdateBidBody
 import app.pantopus.android.data.api.models.offers.WithdrawBidReason
+import app.pantopus.android.data.api.models.reviews.CreateReviewBody
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.offers.OffersRepository
+import app.pantopus.android.data.reviews.ReviewsRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.offers.OffersCategory
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivityFilter
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivitySortOrder
+import app.pantopus.android.ui.screens.shared.filter_sheet.FilterOption
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
 import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
@@ -165,6 +171,12 @@ data class WithdrawSheetTarget(
     val gigTitle: String,
 )
 
+/** Transient toast pushed from the VM after a successful mutation. */
+data class MyBidsToast(
+    val text: String,
+    val isError: Boolean = false,
+)
+
 /**
  * T5.3.1 — My bids. Drives the screen against the shared
  * [ListOfRowsScreen] archetype. See header comment in the iOS
@@ -176,17 +188,15 @@ class MyBidsViewModel
     constructor(
         private val offersRepo: OffersRepository,
         private val gigsRepo: GigsRepository,
+        private val reviewsRepo: ReviewsRepository,
     ) : ViewModel() {
         private var bids: List<BidDto> = emptyList()
         private var loadedAtLeastOnce = false
         private var nowProvider: () -> Instant = { Instant.now() }
 
         private var openBidHandler: (BidDto) -> Unit = {}
-        private var openFiltersHandler: () -> Unit = {}
         private var browseTasksHandler: () -> Unit = {}
         private var messageClientHandler: (BidDto) -> Unit = {}
-        private var editBidHandler: (BidDto) -> Unit = {}
-        private var leaveReviewHandler: (BidDto) -> Unit = {}
 
         private val _state = MutableStateFlow<ListOfRowsUiState>(ListOfRowsUiState.Loading)
         val state: StateFlow<ListOfRowsUiState> = _state.asStateFlow()
@@ -202,10 +212,45 @@ class MyBidsViewModel
                 TopBarAction(
                     icon = PantopusIcon.Filter,
                     contentDescription = "Filter bids",
-                    onClick = { openFiltersHandler() },
+                    onClick = { openFilterSheet() },
                 ),
             )
         val topBarAction: StateFlow<TopBarAction?> = _topBarAction.asStateFlow()
+
+        // Activity filter (P5.4)
+        private val _showFilterSheet = MutableStateFlow(false)
+        val showFilterSheet: StateFlow<Boolean> = _showFilterSheet.asStateFlow()
+
+        private val _activityFilter = MutableStateFlow(ActivityFilter())
+        val activityFilter: StateFlow<ActivityFilter> = _activityFilter.asStateFlow()
+
+        /** Section header for the status chips in the sheet. */
+        val statusFilterTitle = "Bid status"
+
+        /** Per-surface status chips (coarse bid lifecycle buckets). */
+        val statusFilterOptions =
+            listOf(
+                FilterOption("pending", "Pending"),
+                FilterOption("accepted", "Accepted"),
+                FilterOption("declined", "Declined"),
+                FilterOption("completed", "Completed"),
+            )
+
+        /** Bids carry an amount, so the full sort set applies. */
+        val sortFilterOptions = ActivitySortOrder.ALL
+
+        fun openFilterSheet() {
+            _showFilterSheet.value = true
+        }
+
+        fun dismissFilterSheet() {
+            _showFilterSheet.value = false
+        }
+
+        fun applyFilter(filter: ActivityFilter) {
+            _activityFilter.value = filter
+            applyState()
+        }
 
         private val _fab =
             MutableStateFlow<FabAction?>(
@@ -224,31 +269,30 @@ class MyBidsViewModel
         private val _withdrawTarget = MutableStateFlow<WithdrawSheetTarget?>(null)
         val withdrawTarget: StateFlow<WithdrawSheetTarget?> = _withdrawTarget.asStateFlow()
 
+        private val _editBidTarget = MutableStateFlow<EditBidSheetTarget?>(null)
+        val editBidTarget: StateFlow<EditBidSheetTarget?> = _editBidTarget.asStateFlow()
+
+        private val _leaveReviewTarget = MutableStateFlow<LeaveReviewSheetTarget?>(null)
+        val leaveReviewTarget: StateFlow<LeaveReviewSheetTarget?> = _leaveReviewTarget.asStateFlow()
+
+        private val _toast = MutableStateFlow<MyBidsToast?>(null)
+        val toast: StateFlow<MyBidsToast?> = _toast.asStateFlow()
+
         /**
          * Wire in the navigation callbacks before [load]. Mirrors the
          * Offers / Connections pattern — the screen composable owns the
-         * NavController and calls this once.
+         * NavController and calls this once. Edit-bid and Leave-review
+         * are sheet-presented locally (P3.4) so they're not in this
+         * callback bundle.
          */
         fun bindCallbacks(
             onOpenBid: (BidDto) -> Unit,
-            onOpenFilters: () -> Unit,
             onBrowseTasks: () -> Unit,
             onMessageClient: (BidDto) -> Unit,
-            onEditBid: (BidDto) -> Unit,
-            onLeaveReview: (BidDto) -> Unit,
         ) {
             openBidHandler = onOpenBid
-            openFiltersHandler = onOpenFilters
             browseTasksHandler = onBrowseTasks
             messageClientHandler = onMessageClient
-            editBidHandler = onEditBid
-            leaveReviewHandler = onLeaveReview
-            _topBarAction.value =
-                TopBarAction(
-                    icon = PantopusIcon.Filter,
-                    contentDescription = "Filter bids",
-                    onClick = { openFiltersHandler() },
-                )
             _fab.value =
                 FabAction(
                     icon = PantopusIcon.Compass,
@@ -319,18 +363,42 @@ class MyBidsViewModel
                 )
             _banner.value = bannerFor(_selectedTab.value, counts)
 
-            val filtered = projections.filter { it.tab == _selectedTab.value }
-            if (filtered.isEmpty()) {
-                _state.value = emptyStateFor(_selectedTab.value)
+            val tabItems = projections.filter { it.tab == _selectedTab.value }
+            val visible =
+                _activityFilter.value.apply(
+                    items = tabItems,
+                    now = now,
+                    statusId = { statusFilterId(it.status) },
+                    date = { parseInstant(it.dto.createdAt) },
+                    value = { it.dto.bidAmount },
+                )
+            if (visible.isEmpty()) {
+                _state.value =
+                    if (_activityFilter.value.isActive && tabItems.isNotEmpty()) {
+                        filteredEmptyState()
+                    } else {
+                        emptyStateFor(_selectedTab.value)
+                    }
                 return
             }
-            val rows = filtered.map { row(it, now) }
+            val rows = visible.map { row(it, now) }
             _state.value =
                 ListOfRowsUiState.Loaded(
                     sections = listOf(RowSection(id = _selectedTab.value, rows = rows)),
                     hasMore = false,
                 )
         }
+
+        private fun filteredEmptyState(): ListOfRowsUiState.Empty =
+            ListOfRowsUiState.Empty(
+                icon = PantopusIcon.Filter,
+                headline = "No bids match your filters",
+                subcopy =
+                    "Try a different status, date range, or sort — or clear " +
+                        "your filters to see everything in this tab.",
+                ctaTitle = "Clear filters",
+                onCta = { applyFilter(ActivityFilter()) },
+            )
 
         private fun emptyStateFor(tab: String): ListOfRowsUiState.Empty =
             when (tab) {
@@ -412,6 +480,126 @@ class MyBidsViewModel
                         bids = previous
                         applyState()
                     }
+                }
+            }
+        }
+
+        // MARK: - Edit bid sheet
+
+        /** Open the Edit Bid sheet pre-filled with the bid's current values. */
+        fun requestEditBid(dto: BidDto) {
+            val gigId = dto.gigId ?: return
+            val (msg, terms) = splitMessageAndTerms(dto.message)
+            _editBidTarget.value =
+                EditBidSheetTarget(
+                    id = dto.id,
+                    gigId = gigId,
+                    gigTitle = dto.gig?.title ?: "this task",
+                    bidId = dto.id,
+                    initialAmount = dto.bidAmount,
+                    initialMessage = msg,
+                    initialProposedTime = dto.proposedTime,
+                    initialTerms = terms,
+                )
+        }
+
+        /** Tear down the Edit Bid sheet without committing. */
+        fun cancelEditBid() {
+            _editBidTarget.value = null
+        }
+
+        /** Dismiss the toast (called by the screen after the auto-hide delay). */
+        fun dismissToast() {
+            _toast.value = null
+        }
+
+        /**
+         * Submit the Edit Bid draft. Returns `true` on success — the
+         * sheet uses this to self-dismiss. On success we also optimistically
+         * mutate the cached bid so the row reflects the new amount without
+         * a full refetch.
+         */
+        suspend fun submitEditBid(draft: EditBidDraft): Boolean {
+            val target = _editBidTarget.value ?: return false
+            val bidId = target.bidId ?: return false
+            val body =
+                UpdateBidBody(
+                    bidAmount = draft.amount,
+                    message = draft.message,
+                    proposedTime = draft.proposedTime,
+                )
+            return when (val result = offersRepo.updateBid(target.gigId, bidId, body)) {
+                is NetworkResult.Success -> {
+                    val index = bids.indexOfFirst { it.id == bidId }
+                    if (index >= 0) {
+                        bids =
+                            bids.toMutableList().also {
+                                it[index] = updatedCopy(bids[index], draft)
+                            }
+                        applyState()
+                    }
+                    _editBidTarget.value = null
+                    _toast.value = MyBidsToast(text = "Bid updated.")
+                    true
+                }
+                is NetworkResult.Failure -> {
+                    _toast.value =
+                        MyBidsToast(
+                            text = result.error.message.ifEmpty { "Couldn't update bid." },
+                            isError = true,
+                        )
+                    false
+                }
+            }
+        }
+
+        // MARK: - Leave review sheet
+
+        /**
+         * Open the Leave Review sheet for the bid's gig. The reviewee is
+         * the gig poster (worker → poster review after completion).
+         */
+        fun requestLeaveReview(dto: BidDto) {
+            val gigId = dto.gigId ?: return
+            val revieweeId = dto.gig?.userId ?: return
+            _leaveReviewTarget.value =
+                LeaveReviewSheetTarget(
+                    id = dto.id,
+                    gigId = gigId,
+                    revieweeId = revieweeId,
+                    gigTitle = dto.gig?.title ?: "this task",
+                    revieweeName = null,
+                )
+        }
+
+        /** Tear down the Leave Review sheet without committing. */
+        fun cancelLeaveReview() {
+            _leaveReviewTarget.value = null
+        }
+
+        /** Submit the review draft. Returns `true` on success. */
+        suspend fun submitLeaveReview(draft: LeaveReviewDraft): Boolean {
+            val target = _leaveReviewTarget.value ?: return false
+            val body =
+                CreateReviewBody(
+                    gigId = target.gigId,
+                    revieweeId = target.revieweeId,
+                    rating = draft.rating,
+                    comment = draft.comment,
+                )
+            return when (val result = reviewsRepo.create(body)) {
+                is NetworkResult.Success -> {
+                    _leaveReviewTarget.value = null
+                    _toast.value = MyBidsToast(text = "Review submitted. Thanks!")
+                    true
+                }
+                is NetworkResult.Failure -> {
+                    _toast.value =
+                        MyBidsToast(
+                            text = result.error.message.ifEmpty { "Couldn't submit review." },
+                            isError = true,
+                        )
+                    false
                 }
             }
         }
@@ -507,7 +695,7 @@ class MyBidsViewModel
                                     title = "Edit bid",
                                     icon = PantopusIcon.Pencil,
                                     variant = CompactButtonVariant.Primary,
-                                    onClick = { editBidHandler(dto) },
+                                    onClick = { requestEditBid(dto) },
                                 ),
                             ),
                     )
@@ -561,7 +749,7 @@ class MyBidsViewModel
                                     title = title,
                                     icon = PantopusIcon.Star,
                                     variant = CompactButtonVariant.Primary,
-                                    onClick = { leaveReviewHandler(dto) },
+                                    onClick = { requestLeaveReview(dto) },
                                 ),
                             ),
                     )
@@ -719,6 +907,17 @@ class MyBidsViewModel
                     else -> null
                 }
 
+            /** Map a derived bid status onto one of the four filter chip ids. */
+            fun statusFilterId(status: MyBidsStatus): String =
+                when (status) {
+                    is MyBidsStatus.TopBid, is MyBidsStatus.Shortlisted, is MyBidsStatus.Pending,
+                    is MyBidsStatus.Outbid, is MyBidsStatus.Expiring,
+                    -> "pending"
+                    is MyBidsStatus.Accepted, is MyBidsStatus.Scheduled -> "accepted"
+                    is MyBidsStatus.NotSelected, is MyBidsStatus.TaskCancelled -> "declined"
+                    is MyBidsStatus.Paid, is MyBidsStatus.LeaveReview -> "completed"
+                }
+
             fun metaTail(
                 dto: BidDto,
                 status: MyBidsStatus,
@@ -823,6 +1022,22 @@ class MyBidsViewModel
                     status = "withdrawn",
                     withdrawnAt = Instant.now().toString(),
                     withdrawalReason = reason?.wireValue,
+                    updatedAt = Instant.now().toString(),
+                )
+
+            /**
+             * Build an optimistic copy of a bid that's just been edited.
+             * Replaces amount + message + proposed_time; leaves everything
+             * else (status, rank, etc.) untouched.
+             */
+            fun updatedCopy(
+                dto: BidDto,
+                draft: EditBidDraft,
+            ): BidDto =
+                dto.copy(
+                    bidAmount = draft.amount,
+                    message = draft.message,
+                    proposedTime = draft.proposedTime,
                     updatedAt = Instant.now().toString(),
                 )
 

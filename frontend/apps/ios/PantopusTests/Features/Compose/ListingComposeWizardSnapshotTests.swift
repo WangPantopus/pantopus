@@ -52,6 +52,22 @@ final class ListingComposeWizardSnapshotTests: XCTestCase {
         try assertBaselineOrSkip("success")
     }
 
+    /// P3.3 — Edit mode landing baseline. Same six-step wizard, but
+    /// chrome adapts (title "Edit listing", CTA "Save changes") and the
+    /// form is prefilled from the listing detail fetch. The landing
+    /// step is `.review` so the user can scan + save with one tap.
+    func test_listing_compose_edit_prefill_review_baseline_is_present() throws {
+        try assertBaselineOrSkip("edit-prefill-review")
+    }
+
+    /// P3.3 — Edit mode jump-to-price baseline. Reached via the
+    /// "Edit price" action on the listing-offers panel. Form is
+    /// prefilled with the existing listing's data and the wizard
+    /// lands on the price step.
+    func test_listing_compose_edit_jump_to_price_baseline_is_present() throws {
+        try assertBaselineOrSkip("edit-jump-to-price")
+    }
+
     private func assertBaselineOrSkip(_ slug: String) throws {
         let url = baselineURL.appendingPathComponent("\(slug)-ios.png")
         guard FileManager.default.fileExists(atPath: url.path) else {

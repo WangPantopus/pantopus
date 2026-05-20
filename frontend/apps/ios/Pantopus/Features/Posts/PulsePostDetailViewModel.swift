@@ -81,14 +81,29 @@ public final class PulsePostDetailViewModel {
     /// True when the entire reply thread is expanded.
     public private(set) var showingAllReplies: Bool = false
 
+    /// Bound to the view's overflow confirmation dialog so the Edit
+    /// action sheet pops when the owner taps the top-bar's
+    /// more-horizontal icon.
+    public var showsOverflowMenu: Bool = false
+
     private let postId: String
+    private let currentUserId: String?
     private let client: APIClient
     private let logger = Logger(label: "app.pantopus.ios.PulsePostDetail")
     private let maxInitialReplies = 3
 
-    init(postId: String, client: APIClient = .shared) {
+    init(postId: String, currentUserId: String? = nil, client: APIClient = .shared) {
         self.postId = postId
+        self.currentUserId = currentUserId
         self.client = client
+    }
+
+    /// True when the signed-in user authored the post on screen — the
+    /// view uses this to gate the Edit overflow action.
+    public var isOwner: Bool {
+        guard let currentUserId, !currentUserId.isEmpty else { return false }
+        guard case let .loaded(content) = state else { return false }
+        return content.post.userId == currentUserId
     }
 
     /// First-load entry. Re-run via `refresh()` after a pull-to-refresh.
