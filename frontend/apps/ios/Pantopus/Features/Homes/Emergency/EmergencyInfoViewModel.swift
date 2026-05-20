@@ -91,8 +91,15 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
         TopBarAction(
             icon: .share,
             accessibilityLabel: "Share emergency info"
-        ) { [onShare] in onShare() }
+        ) { [weak self] in self?.shareRequested = true }
     }
+
+    /// Set by the top-bar share action; `EmergencyInfoView` observes this to
+    /// present the system share sheet, then clears it.
+    var shareRequested = false
+    /// Set by the banner's "Print card" CTA; `EmergencyInfoView` observes
+    /// this to render + present the emergency-card PDF, then clears it.
+    var printRequested = false
 
     /// Chip-strip filter — primary navigation for the screen. Lives on
     /// `chipStrip` (mutually exclusive with `tabs`); the shell renders
@@ -154,7 +161,7 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
                 icon: .printer,
                 accessibilityLabel: "Print emergency card",
                 tint: .home
-            ) { [onPrintCard] in onPrintCard() },
+            ) { [weak self] in self?.printRequested = true },
             tint: .home
         )
     }
@@ -169,8 +176,6 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
     private let api: APIClient
     private let onAction: @Sendable (HomeEmergencyDTO) -> Void
     private let onAdd: @Sendable () -> Void
-    private let onShare: @Sendable () -> Void
-    private let onPrintCard: @Sendable () -> Void
     /// Inject a stable "now" for tests; production uses `Date()`.
     private let now: @Sendable () -> Date
 
@@ -179,17 +184,43 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
         api: APIClient = .shared,
         onAction: @escaping @Sendable (HomeEmergencyDTO) -> Void = { _ in },
         onAdd: @escaping @Sendable () -> Void = {},
-        onShare: @escaping @Sendable () -> Void = {},
-        onPrintCard: @escaping @Sendable () -> Void = {},
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.homeId = homeId
         self.api = api
         self.onAction = onAction
         self.onAdd = onAdd
-        self.onShare = onShare
-        self.onPrintCard = onPrintCard
         self.now = now
+    }
+
+    // MARK: - Share / print payloads
+
+    /// Home label used on the share text + printed card header.
+    private var cardHomeLabel: String {
+        homeSubtitle.map { "\(title) · \($0)" } ?? title
+    }
+
+    /// Plain-text summary handed to the share sheet for "Share emergency
+    /// info". `nil` when nothing has loaded yet.
+    func shareSummaryText() -> String? {
+        guard let emergencies, !emergencies.isEmpty else { return nil }
+        let content = EmergencyCardPDF.content(from: emergencies, homeLabel: cardHomeLabel, now: now())
+        var lines = ["\(content.homeLabel) — emergency info"]
+        for section in content.sections where !section.items.isEmpty {
+            lines.append("")
+            lines.append(section.heading)
+            for item in section.items {
+                lines.append(item.detail.isEmpty ? "• \(item.title)" : "• \(item.title): \(item.detail)")
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// Printable A4 card content for "Print emergency card". `nil` when
+    /// nothing has loaded yet.
+    func printableCard() -> EmergencyCardContent? {
+        guard let emergencies, !emergencies.isEmpty else { return nil }
+        return EmergencyCardPDF.content(from: emergencies, homeLabel: cardHomeLabel, now: now())
     }
 
     func load() async {

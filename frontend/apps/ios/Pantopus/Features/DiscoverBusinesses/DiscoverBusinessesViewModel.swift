@@ -69,7 +69,10 @@ public enum DiscoverBusinessesSection {
 /// The host (`HubTabRoot`) maps these onto the appropriate push.
 public enum DiscoverBusinessesTarget: Sendable, Hashable {
     case business(businessId: String, name: String)
-    case widenRadius
+    /// Emitted by the no-location empty state — the host pushes the Add
+    /// Home wizard. (Radius-widening for the no-results state is handled
+    /// in-screen by the top-bar filter sheet's radius stepper.)
+    case setHomeAddress
     case inviteBusiness
 }
 
@@ -370,9 +373,9 @@ public final class DiscoverBusinessesViewModel: ListOfRowsDataSource {
             subcopy:
             "We need a verified home address to surface businesses near " +
                 "you. Add one in your profile and they'll appear here.",
-            ctaTitle: "Widen radius"
+            ctaTitle: "Set a home address"
         ) { [weak self] in
-            MainActor.assumeIsolated { self?.onSelect(.widenRadius) }
+            MainActor.assumeIsolated { self?.onSelect(.setHomeAddress) }
         }
     }
 

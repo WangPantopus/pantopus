@@ -7,6 +7,7 @@
 // swiftlint:disable cyclomatic_complexity function_body_length type_body_length file_length
 
 import SwiftUI
+import UIKit
 
 /// Typed routes within the Hub tab's NavigationStack.
 public enum HubRoute: Hashable {
@@ -182,6 +183,9 @@ public enum HubRoute: Hashable {
     /// P1.5 — Recent activity log. Pushed when the Hub's
     /// `HubRecentActivity` "See all" CTA fires.
     case recentActivity
+    /// P6.6 — Full "Today" detail (weather + AQI + commute + today's
+    /// events). Pushed when the Hub's Today card is tapped.
+    case today
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
     case menu
     /// Edit profile form — pushed by Settings → "Edit profile". P1.4.
@@ -204,6 +208,11 @@ public struct HubTabRoot: View {
     @Environment(AuthManager.self) private var auth
     @State private var path: [HubRoute] = []
     @State private var router = DeepLinkRouter.shared
+    /// P6.6 — share / mail system sheet driven by "Share listing",
+    /// "Share train", and "Invite a business".
+    @State private var systemSheet: SystemSheetRequest?
+    /// P6.6 — "Find people" → contacts picker → invite share.
+    @State private var showFindPeople = false
     #if DEBUG
     @State private var debugSheet: HubRoute?
     #endif
@@ -259,6 +268,8 @@ public struct HubTabRoot: View {
         .task {
             consumeDeepLinkIfNeeded(pending: router.pending)
         }
+        .sheet(item: $systemSheet) { request in request.makeView() }
+        .findPeopleSheet(isPresented: $showFindPeople)
     }
 
     /// Consume the subset of deep-link destinations that map onto a
@@ -306,11 +317,9 @@ public struct HubTabRoot: View {
             case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
             case .openDiscoverHub: path.append(.discoverHub)
             case let .jumpBackIn(item): path.append(Self.route(forJumpBackIn: item))
-            // `openToday` taps the weather/today card. The design's tap
-            // destination is "home calendar", scheduled for P11 — until
-            // then this is a no-op so the chevron-right feels live but
-            // doesn't push to a stub.
-            case .openToday: break
+            // `openToday` taps the weather/today card → full Today detail
+            // (weather + AQI + commute + today's events) per the Hub design.
+            case .openToday: path.append(.today)
             case .openRecentActivity: path.append(.recentActivity)
             }
         }
@@ -661,16 +670,6 @@ public struct HubTabRoot: View {
                     onAdd: {
                         Task { @MainActor in
                             push(.addEmergencyInfo(homeId: homeId))
-                        }
-                    },
-                    onShare: {
-                        Task { @MainActor in
-                            push(.placeholder(label: "Share emergency info"))
-                        }
-                    },
-                    onPrintCard: {
-                        Task { @MainActor in
-                            push(.placeholder(label: "Print emergency card"))
                         }
                     }
                 )
@@ -1067,7 +1066,10 @@ public struct HubTabRoot: View {
                     listingId: listingId,
                     listingTitleHint: titleHint,
                     onShareListing: {
-                        Task { @MainActor in push(.placeholder(label: "Share listing")) }
+                        let name = titleHint ?? "this listing"
+                        systemSheet = .share(
+                            items: ["Check out \(name) on Pantopus — \(InviteLinks.downloadURLString)"]
+                        )
                     },
                     onOpenBuyer: { _ in
                         Task { @MainActor in push(.placeholder(label: "Buyer profile")) }
@@ -1108,6 +1110,8 @@ public struct HubTabRoot: View {
                     }
                 }
             )
+        case .today:
+            TodayDetailView(onBack: { pop() })
         case .notifications:
             NotificationsView(
                 viewModel: NotificationsViewModel()
@@ -1126,9 +1130,7 @@ public struct HubTabRoot: View {
                             )))
                         }
                     },
-                    onFindPeople: {
-                        Task { @MainActor in push(.placeholder(label: "Find people")) }
-                    }
+                    onFindPeople: { showFindPeople = true }
                 )
             )
         case .supportTrains:
@@ -1173,7 +1175,9 @@ public struct HubTabRoot: View {
                 viewModel: ReviewSignupsViewModel(
                     supportTrainId: supportTrainId,
                     onShareTrain: {
-                        Task { @MainActor in push(.placeholder(label: "Share train")) }
+                        systemSheet = .share(
+                            items: ["Join my support train on Pantopus — \(InviteLinks.downloadURLString)"]
+                        )
                     },
                     onConfirm: { _ in
                         // POST `/api/support-trains/:id/reservations/:reservationId/confirm`
@@ -1226,10 +1230,19 @@ public struct HubTabRoot: View {
                         switch target {
                         case let .business(businessId, _):
                             push(.businessProfile(businessId: businessId))
-                        case .widenRadius:
-                            push(.placeholder(label: "Set home address"))
+                        case .setHomeAddress:
+                            push(.addHome)
                         case .inviteBusiness:
-                            push(.placeholder(label: "Invite a business"))
+                            let draft = MailDraft(
+                                subject: "Join Pantopus",
+                                body: "I'd love to see your business on Pantopus — neighbors near me are "
+                                    + "looking for trusted local pros. \(InviteLinks.downloadURLString)"
+                            )
+                            if MailDraft.canSendMail {
+                                systemSheet = .mail(draft)
+                            } else if let url = draft.mailtoURL {
+                                UIApplication.shared.open(url)
+                            }
                         }
                     }
                 }
