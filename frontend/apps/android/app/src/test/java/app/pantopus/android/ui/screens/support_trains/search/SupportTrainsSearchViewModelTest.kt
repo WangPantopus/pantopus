@@ -46,20 +46,11 @@ class SupportTrainsSearchViewModelTest {
         id: String,
         title: String,
         status: String,
-        role: String = "organizer",
-        type: String? = null,
-        recipient: String? = null,
-        filled: Int? = null,
-        total: Int? = null,
     ) = SupportTrainListItemDto(
         id = id,
         title = title,
         status = status,
-        myRole = role,
-        supportTrainType = type,
-        slotsFilled = filled,
-        slotsTotal = total,
-        recipientName = recipient,
+        myRole = "organizer",
     )
 
     private fun corpus() =
@@ -68,27 +59,30 @@ class SupportTrainsSearchViewModelTest {
                 "st1",
                 "For the Chen family",
                 "filling",
-                type = "meal_support",
-                recipient = "For the Chen family",
-                filled = 12,
-                total = 18,
+            ).copy(
+                supportTrainType = "meal_support",
+                recipientName = "For the Chen family",
+                slotsFilled = 12,
+                slotsTotal = 18,
             ),
             train(
                 "st2",
                 "For Daniel R.",
                 "active",
-                type = "ride_support",
-                recipient = "For Daniel R.",
-                filled = 6,
-                total = 14,
+            ).copy(
+                supportTrainType = "ride_support",
+                recipientName = "For Daniel R.",
+                slotsFilled = 6,
+                slotsTotal = 14,
             ),
             train(
                 "st3",
                 "For Mrs. Alvarez",
                 "wrapping",
-                role = "helper",
-                type = "pet_care",
-                recipient = "For Mrs. Alvarez",
+            ).copy(
+                myRole = "helper",
+                supportTrainType = "pet_care",
+                recipientName = "For Mrs. Alvarez",
             ),
         )
 
