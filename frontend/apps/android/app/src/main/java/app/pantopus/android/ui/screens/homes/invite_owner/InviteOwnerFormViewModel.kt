@@ -187,7 +187,10 @@ class InviteOwnerFormViewModel
         private fun mapInviteError(error: NetworkError): Pair<String?, String> {
             val raw = (error.message ?: "").lowercase()
             return when {
-                raw.contains("already active") ->
+                // Mirror iOS: a 409 is the "active claim" conflict regardless
+                // of body text, so map it to the friendly inline error even
+                // when the server message doesn't contain "already active".
+                error.code == 409 || raw.contains("already active") ->
                     "An ownership claim is already active for this home." to
                         "An ownership claim is already active for this home."
                 raw.contains("already an owner") ->
