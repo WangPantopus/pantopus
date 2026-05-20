@@ -184,7 +184,8 @@ public enum HubRoute: Hashable {
     case menu
     /// Edit profile form — pushed by Settings → "Edit profile". P1.4.
     case editProfile
-    /// Mailbox search target. Replaced when `/api/mailbox` accepts a query.
+    /// Mailbox search target (P4.2). Client-side filter over the user's
+    /// mailbox — sender / subject / body / category.
     case mailboxSearch
     /// Generic placeholder for any intent whose destination hasn't been
     /// built yet. The label is shown by `NotYetAvailableView`.
@@ -1306,7 +1307,18 @@ public struct HubTabRoot: View {
                 viewModel: ReviewClaimDetailViewModel(claimId: claimId)
             ) { if !path.isEmpty { path.removeLast() } }
         case .mailboxSearch:
-            NotYetAvailableView(tabName: "Mail search", icon: .search)
+            MailboxSearchView(
+                viewModel: MailboxSearchViewModel(
+                    onOpenMail: { mailId in
+                        Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
+                    },
+                    onCancel: {
+                        Task { @MainActor in
+                            if !path.isEmpty { path.removeLast() }
+                        }
+                    }
+                )
+            )
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
         case .addHome:

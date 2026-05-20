@@ -17,9 +17,8 @@ import app.pantopus.android.ui.theme.PantopusIcon
  * `GET /api/mailbox` wrapped in the List-of-Rows archetype with
  * All / Unread / Starred tabs, pagination, and pull-to-refresh.
  *
- * `onOpenSearch` is a nav-host callback; it currently routes to the
- * `NotYetAvailableScreen` placeholder until `/api/mailbox` supports a
- * query parameter.
+ * `onOpenSearch` is a nav-host callback that routes to the Mailbox Search
+ * surface (P4.2).
  */
 @Composable
 fun MailboxListScreen(
