@@ -30,6 +30,9 @@ public enum YouRoute: Hashable {
     case composeTask
     /// T5.3.3 — My posts. The "me.posts" Activity-section row pushes here.
     case myPosts
+    /// P3.5 — Edit an existing Pulse post. Pushed from the per-row Edit
+    /// CTA on My posts; re-uses the compose flow in edit mode.
+    case editPost(postId: String)
     /// T5.2.3 — Connections. The "me.connections" Personal action tile pushes here.
     case connections
     /// T6.6c (P26.5) — Support Trains. The "me.supportTrains" Personal
@@ -713,11 +716,15 @@ public struct YouTabRoot: View {
                     onCompose: {
                         Task { @MainActor in path.append(.placeholder(label: "Write a post")) }
                     },
-                    onEditPost: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Edit post")) }
+                    onEditPost: { dto in
+                        Task { @MainActor in path.append(.editPost(postId: dto.id)) }
                     }
                 )
             )
+        case let .editPost(postId):
+            PulseComposeView(postId: postId) { _ in
+                if !path.isEmpty { path.removeLast() }
+            }
         case .myBids:
             MyBidsView(
                 viewModel: MyBidsViewModel(

@@ -200,6 +200,17 @@ public enum PulseComposeState: Sendable, Equatable {
     case error(String)
 }
 
+/// Edit-mode prefill state. Surfaces a shimmer in the view while the
+/// post is being fetched and a retry CTA when the fetch fails.
+public enum PulseComposePrefillState: Sendable, Equatable {
+    /// Create mode (no prefill needed) or prefill already resolved.
+    case ready
+    /// Fetch in flight — view shows shimmer.
+    case loading
+    /// Fetch failed — view shows error with retry.
+    case error(String)
+}
+
 /// Max characters per field — mirrors `createPostSchema` bounds.
 private enum FieldLimits {
     static let title: Int = 255
@@ -214,7 +225,8 @@ public let pulseComposeMaxPhotos: Int = 4
 
 /// Backs `PulseComposeView`. Holds intent + identity + visibility,
 /// per-field state, picked photos, and a submit pipeline that maps
-/// to `POST /api/posts`.
+/// to `POST /api/posts` in create mode or `PATCH /api/posts/:id` in
+/// edit mode.
 @Observable
 @MainActor
 public final class PulseComposeViewModel {
@@ -256,19 +268,61 @@ public final class PulseComposeViewModel {
     /// Increments + then resets so the view knows when to dismiss.
     public private(set) var shouldDismiss: Bool = false
 
+    /// Post id when editing an existing post; `nil` in create mode.
+    public let editingPostId: String?
+
+    /// Edit-mode prefill state. `.ready` for create mode and after a
+    /// successful fetch.
+    public private(set) var prefillState: PulseComposePrefillState
+
+    /// Selector + identity baselines. Updated to the prefilled values
+    /// after a successful edit-mode fetch so `isDirty` compares against
+    /// the post's saved pose, not the create-mode defaults.
+    private var baselineIdentity: PulseComposeIdentity = .personal
+    private var baselineVisibility: PulseComposeVisibility = .neighbors
+    private var baselineLostFoundKind: PulseLostFoundKind = .lost
+    private var baselineAnnounceAudience: PulseAnnounceAudience = .neighbors
+    private var baselineAskCategory: PulseAskCategory = .handyman
+    private var baselineRecommendRating: Int = 5
+
     private let api: APIClient
 
     init(
         intent: PulseComposeIntent = .ask,
         identity: PulseComposeIdentity = .personal,
+        postId: String? = nil,
         api: APIClient = .shared
     ) {
         activeIntent = intent
         self.identity = identity
+        editingPostId = postId
+        prefillState = postId == nil ? .ready : .loading
         self.api = api
         for field in PulseComposeField.allCases {
             fields[field] = FormFieldState(id: field.rawValue, originalValue: "")
         }
+        baselineIdentity = identity
+    }
+
+    /// True iff this view-model is wired to edit an existing post.
+    public var isEditing: Bool {
+        editingPostId != nil
+    }
+
+    /// Top-bar title — "Edit post" in edit mode, "New post" otherwise.
+    public var displayTitle: String {
+        isEditing ? "Edit post" : "New post"
+    }
+
+    /// Right-action label — "Save" in edit mode, intent-driven otherwise.
+    public var ctaLabel: String {
+        isEditing ? "Save" : activeIntent.ctaLabel
+    }
+
+    /// True iff the intent picker is locked (edit mode cannot change
+    /// `post_type` without re-baselining the per-intent form).
+    public var isIntentLocked: Bool {
+        isEditing
     }
 
     // MARK: - Field updates
@@ -282,9 +336,10 @@ public final class PulseComposeViewModel {
     }
 
     /// Switch active intent without losing draft text — only refreshes
-    /// dirty + valid flags for the new variant's required fields.
+    /// dirty + valid flags for the new variant's required fields. No-op
+    /// in edit mode where `post_type` is fixed.
     public func selectIntent(_ intent: PulseComposeIntent) {
-        guard intent != activeIntent else { return }
+        guard !isIntentLocked, intent != activeIntent else { return }
         activeIntent = intent
     }
 
@@ -307,20 +362,21 @@ public final class PulseComposeViewModel {
     // MARK: - Dirty + validity
 
     /// True iff any user-editable field has diverged from its baseline
-    /// OR any selector has moved off its default OR a photo was picked.
+    /// OR any selector has moved off its baseline OR a photo was picked.
+    /// In create mode the baseline is the design's defaults; in edit
+    /// mode `loadForEdit` rebases the baselines to the post's saved pose.
     public var isDirty: Bool {
         if photos.isNotEmpty { return true }
-        if identity != .personal { return true }
-        if visibility != .neighbors { return true }
+        if identity != baselineIdentity { return true }
+        if visibility != baselineVisibility { return true }
         for field in fieldsActiveForCurrentIntent() where fields[field]?.isDirty ?? false {
             return true
         }
-        // Per-intent selector dirty checks.
         switch activeIntent {
-        case .ask: if askCategory != .handyman { return true }
-        case .recommend: if recommendRating != 5 { return true }
-        case .lost: if lostFoundKind != .lost { return true }
-        case .announce: if announceAudience != .neighbors { return true }
+        case .ask: if askCategory != baselineAskCategory { return true }
+        case .recommend: if recommendRating != baselineRecommendRating { return true }
+        case .lost: if lostFoundKind != baselineLostFoundKind { return true }
+        case .announce: if announceAudience != baselineAnnounceAudience { return true }
         case .event: break
         }
         return false
@@ -440,7 +496,7 @@ public final class PulseComposeViewModel {
 
     // MARK: - Submit
 
-    /// Send the `POST /api/posts` body. Returns true on success.
+    /// Send the create or update body. Returns true on success.
     @discardableResult
     public func submit() async -> Bool {
         if case .submitting = state { return false }
@@ -463,22 +519,162 @@ public final class PulseComposeViewModel {
         }
         state = .submitting
         do {
-            let request = buildRequest()
-            let response: PostCreateResponse = try await api.request(
-                PostsEndpoints.createPost(body: request)
-            )
-            state = .success(postId: response.postId)
-            toast = ToastMessage(text: "Posted", kind: .success)
+            let postId: String?
+            if let editingPostId {
+                let request = buildUpdateRequest()
+                let response: PostUpdateResponse = try await api.request(
+                    PostsEndpoints.updatePost(id: editingPostId, body: request)
+                )
+                postId = response.postId ?? editingPostId
+            } else {
+                let request = buildRequest()
+                let response: PostCreateResponse = try await api.request(
+                    PostsEndpoints.createPost(body: request)
+                )
+                postId = response.postId
+            }
+            state = .success(postId: postId)
+            toast = ToastMessage(text: isEditing ? "Saved" : "Posted", kind: .success)
             shouldDismiss = true
             Analytics.track(.formPulseComposeSubmit(intent: activeIntent.rawValue, result: .success))
             return true
         } catch {
-            let message = (error as? APIError)?.errorDescription ?? "Couldn't post. Try again."
+            let message = (error as? APIError)?.errorDescription ?? (
+                isEditing ? "Couldn't save. Try again." : "Couldn't post. Try again."
+            )
             state = .error(message)
             toast = ToastMessage(text: message, kind: .error)
             Analytics.track(.formPulseComposeSubmit(intent: activeIntent.rawValue, result: .error))
             return false
         }
+    }
+
+    // MARK: - Edit-mode prefill
+
+    /// Fetch the post being edited and seed every field + selector from
+    /// the wire payload. Idempotent — safe to call again from the retry
+    /// CTA when the first attempt failed.
+    public func loadForEdit() async {
+        guard let editingPostId else { return }
+        prefillState = .loading
+        do {
+            let response: PostDetailResponse = try await api.request(
+                PostsEndpoints.detail(id: editingPostId)
+            )
+            apply(prefill: response.post)
+            prefillState = .ready
+        } catch {
+            let message = (error as? APIError)?.errorDescription
+                ?? "Couldn't load this post. Try again."
+            prefillState = .error(message)
+        }
+    }
+
+    /// Seed every field + selector from the saved post. Re-baselines so
+    /// the form starts in a non-dirty pose.
+    private func apply(prefill post: PostDetailDTO) {
+        let intent = PulseComposeIntent.from(feedIntent: PulseIntent.from(postType: post.postType))
+        activeIntent = intent
+
+        // Visibility — fall back to neighbors when the wire value is one
+        // of the wider backend enum values we don't expose in the form.
+        if let raw = post.visibility, let mapped = PulseComposeVisibility(rawValue: raw) {
+            visibility = mapped
+        }
+        baselineVisibility = visibility
+
+        // Identity is fixed at create time (see updatePostSchema's
+        // missing `postAs`). The current creator is the signed-in user,
+        // so we keep the form's `identity` selection as-is.
+        baselineIdentity = identity
+
+        // Per-intent fields.
+        switch intent {
+        case .ask:
+            seedField(.title, value: post.title ?? "")
+            seedField(.body, value: post.content)
+            if let raw = post.serviceCategory, let mapped = PulseAskCategory(rawValue: raw) {
+                askCategory = mapped
+            }
+            baselineAskCategory = askCategory
+        case .recommend:
+            let (stars, body) = unwrapRecommendBody(post.content)
+            recommendRating = stars ?? 5
+            seedField(.body, value: body)
+            seedField(.recommendBusiness, value: post.dealBusinessName ?? "")
+            baselineRecommendRating = recommendRating
+        case .event:
+            seedField(.title, value: post.title ?? "")
+            seedField(.body, value: post.content)
+            seedField(.eventDate, value: formatEventDateForPicker(post.eventDate))
+            seedField(.eventLocation, value: post.eventVenue ?? "")
+        case .lost:
+            let (location, body) = unwrapLostBody(post.content)
+            seedField(.body, value: body)
+            seedField(.lostLastSeenLocation, value: location ?? "")
+            if let raw = post.lostFoundType, let mapped = PulseLostFoundKind(rawValue: raw) {
+                lostFoundKind = mapped
+            }
+            baselineLostFoundKind = lostFoundKind
+        case .announce:
+            seedField(.title, value: post.title ?? "")
+            seedField(.body, value: post.content)
+            if let raw = post.visibility, let mapped = PulseAnnounceAudience(rawValue: raw) {
+                announceAudience = mapped
+            }
+            baselineAnnounceAudience = announceAudience
+        }
+    }
+
+    private func seedField(_ field: PulseComposeField, value: String) {
+        fields[field] = FormFieldState(id: field.rawValue, originalValue: value)
+    }
+
+    /// Reverse of `composeRecommendBody`: splits "★★★☆☆\n\n<body>" back
+    /// into a star count + body. Falls back to (nil, raw) when the row
+    /// is missing — preserves the saved text verbatim.
+    private func unwrapRecommendBody(_ raw: String) -> (Int?, String) {
+        let firstLine = raw.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? raw
+        let filled = firstLine.filter { $0 == "★" }.count
+        let empty = firstLine.filter { $0 == "☆" }.count
+        if filled + empty == 5, !firstLine.isEmpty {
+            let remainder = raw.dropFirst(firstLine.count)
+            let body = remainder.drop(while: { $0 == "\n" })
+            return (filled, String(body))
+        }
+        return (nil, raw)
+    }
+
+    /// Reverse of `prefixLastSeen`: splits "Last seen: <loc>\n\n<body>"
+    /// back into (location, body). Falls back to (nil, raw) when the
+    /// prefix is missing.
+    private func unwrapLostBody(_ raw: String) -> (String?, String) {
+        let prefix = "Last seen: "
+        guard raw.hasPrefix(prefix) else { return (nil, raw) }
+        let afterPrefix = raw.dropFirst(prefix.count)
+        guard let newlineRange = afterPrefix.range(of: "\n") else {
+            return (String(afterPrefix), "")
+        }
+        let location = String(afterPrefix[..<newlineRange.lowerBound])
+        let bodyStart = afterPrefix[newlineRange.upperBound...].drop(while: { $0 == "\n" })
+        return (location, String(bodyStart))
+    }
+
+    /// Convert an ISO-8601 wire date into the `yyyy-MM-dd HH:mm` shape
+    /// the Event date picker emits. Returns "" when the wire value is
+    /// missing or unparsable so the picker shows "Tap to pick".
+    private func formatEventDateForPicker(_ raw: String?) -> String {
+        guard let raw, !raw.isEmpty else { return "" }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let parsed = iso.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+        guard let parsed else { return raw }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.string(from: parsed)
     }
 
     /// Called by the view once the dismissal has been honored.
@@ -547,6 +743,54 @@ public final class PulseComposeViewModel {
                 postAs: identity.postAs,
                 audience: announceAudience.rawValue,
                 purpose: activeIntent.purpose
+            )
+        }
+    }
+
+    /// Build the `PATCH /api/posts/:id` body from the active intent's
+    /// field values + selectors. Sends only the keys `updatePostSchema`
+    /// accepts (no `postAs` / `audience` / `purpose` / `businessName`).
+    /// Visibility comes from the announce audience for announce posts.
+    func buildUpdateRequest() -> PostUpdateRequest {
+        let bodyValue = trimmedValue(.body)
+        let titleValue = trimmedValue(.title)
+        switch activeIntent {
+        case .ask:
+            return PostUpdateRequest(
+                content: bodyValue,
+                title: titleValue,
+                visibility: visibility.rawValue,
+                serviceCategory: askCategory.rawValue
+            )
+        case .recommend:
+            let business = trimmedValue(.recommendBusiness)
+            return PostUpdateRequest(
+                content: composeRecommendBody(stars: recommendRating, body: bodyValue),
+                visibility: visibility.rawValue,
+                dealBusinessName: business.isEmpty ? nil : business
+            )
+        case .event:
+            let venue = trimmedValue(.eventLocation)
+            let dateRaw = trimmedValue(.eventDate)
+            return PostUpdateRequest(
+                content: bodyValue,
+                title: titleValue,
+                visibility: visibility.rawValue,
+                eventDate: dateRaw.isEmpty ? nil : isoDateTime(from: dateRaw),
+                eventVenue: venue.isEmpty ? nil : venue
+            )
+        case .lost:
+            let lastSeen = trimmedValue(.lostLastSeenLocation)
+            return PostUpdateRequest(
+                content: prefixLastSeen(body: bodyValue, location: lastSeen),
+                visibility: visibility.rawValue,
+                lostFoundType: lostFoundKind.rawValue
+            )
+        case .announce:
+            return PostUpdateRequest(
+                content: bodyValue,
+                title: titleValue,
+                visibility: announceAudience.backendVisibility
             )
         }
     }

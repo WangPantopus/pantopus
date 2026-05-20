@@ -12,10 +12,13 @@ import app.pantopus.android.data.api.models.posts.PostLikeResponse
 import app.pantopus.android.data.api.models.posts.PostReactionKind
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.ui.screens.shared.content_detail.headers.PostIntent
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -33,9 +36,13 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class PulsePostDetailViewModelTest {
     private val repo: PostsRepository = mockk()
+    private val authRepo: AuthRepository = mockk()
+    private val authState = MutableStateFlow<AuthRepository.State>(AuthRepository.State.SignedOut)
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        every { authRepo.state } returns authState
+        authState.value = AuthRepository.State.SignedOut
     }
 
     @After fun tearDown() {
@@ -45,6 +52,7 @@ class PulsePostDetailViewModelTest {
     private fun makeVm(): PulsePostDetailViewModel =
         PulsePostDetailViewModel(
             repo = repo,
+            authRepo = authRepo,
             savedStateHandle = SavedStateHandle(mapOf(PULSE_POST_DETAIL_ID_KEY to "p1")),
         )
 
