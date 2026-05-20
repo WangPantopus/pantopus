@@ -145,7 +145,12 @@ private fun PopulatedLayout(
             }
         }
         if (content.activity.isNotEmpty()) {
-            item(key = "activity") { HubRecentActivity(content.activity) }
+            item(key = "activity") {
+                HubRecentActivity(
+                    entries = content.activity,
+                    onSeeAll = { onIntent(HubNavigationIntent.OpenRecentActivity) },
+                )
+            }
         }
         item(key = "footer-spacer") { Spacer(Modifier.height(Spacing.s10)) }
     }

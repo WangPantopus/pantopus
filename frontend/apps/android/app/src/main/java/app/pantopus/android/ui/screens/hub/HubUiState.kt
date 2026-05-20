@@ -223,4 +223,7 @@ sealed interface HubNavigationIntent {
      * is a no-op at the host until that lands.
      */
     data object OpenToday : HubNavigationIntent
+
+    /** P1.5 — Recent activity "See all" CTA. Pushes the standalone log. */
+    data object OpenRecentActivity : HubNavigationIntent
 }

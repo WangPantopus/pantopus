@@ -36,6 +36,13 @@ public enum PostsEndpoints {
         return Endpoint(method: .get, path: "/api/posts/feed", query: query)
     }
 
+    /// `POST /api/posts` — create a new post. Body keys are validated
+    /// by `createPostSchema` at `backend/routes/posts.js:196-300`. Route
+    /// `backend/routes/posts.js:862`.
+    public static func createPost(body: PostCreateRequest) -> Endpoint {
+        Endpoint(method: .post, path: "/api/posts", body: body)
+    }
+
     /// `GET /api/posts/:id` — route `backend/routes/posts.js:2354`.
     public static func detail(id: String) -> Endpoint {
         Endpoint(method: .get, path: "/api/posts/\(id)")

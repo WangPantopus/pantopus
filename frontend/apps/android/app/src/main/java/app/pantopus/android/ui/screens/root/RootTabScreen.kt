@@ -34,9 +34,15 @@ import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileViewModel
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BROADCAST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BroadcastDetailScreen
+import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_BUSINESS_ID_KEY
+import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
+import app.pantopus.android.ui.screens.compose.gig.GigComposeWizardScreen
+import app.pantopus.android.ui.screens.compose.listing.ListingComposeStep
+import app.pantopus.android.ui.screens.compose.listing.ListingComposeWizardScreen
+import app.pantopus.android.ui.screens.compose.pulse.PulseComposeScreen
 import app.pantopus.android.ui.screens.connections.ConnectionsChatTarget
 import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
@@ -56,7 +62,12 @@ import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
+import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_CATEGORY_KEY
+import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_SECRET_ID_KEY
+import app.pantopus.android.ui.screens.homes.accesscodes.EditAccessCodeFormScreen
 import app.pantopus.android.ui.screens.homes.add_home.AddHomeWizardScreen
+import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_BILL_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.ADD_BILL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.AddBillWizardScreen
 import app.pantopus.android.ui.screens.homes.bills.BILLS_HOME_ID_KEY
@@ -64,19 +75,44 @@ import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_BILL_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.BILL_DETAIL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.bills.BillDetailScreen
 import app.pantopus.android.ui.screens.homes.bills.BillsListScreen
+import app.pantopus.android.ui.screens.homes.calendar.ADD_EVENT_EVENT_ID_KEY
+import app.pantopus.android.ui.screens.homes.calendar.ADD_EVENT_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.calendar.ADD_EVENT_PREFILLED_CATEGORY_KEY
+import app.pantopus.android.ui.screens.homes.calendar.AddEventCommit
+import app.pantopus.android.ui.screens.homes.calendar.AddEventFormScreen
+import app.pantopus.android.ui.screens.homes.calendar.EVENT_DETAIL_EVENT_ID_KEY
+import app.pantopus.android.ui.screens.homes.calendar.EVENT_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.calendar.EventDetailScreen
 import app.pantopus.android.ui.screens.homes.calendar.HOME_CALENDAR_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.calendar.HomeCalendarScreen
 import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENTS_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.documents.DOCUMENT_DETAIL_DOC_ID_KEY
+import app.pantopus.android.ui.screens.homes.documents.DOCUMENT_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.documents.DocumentDetailScreen
 import app.pantopus.android.ui.screens.homes.documents.DocumentsScreen
+import app.pantopus.android.ui.screens.homes.documents.UPLOAD_DOCUMENT_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.documents.UploadDocumentFormScreen
+import app.pantopus.android.ui.screens.homes.emergency.ADD_EMERGENCY_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.emergency.ADD_EMERGENCY_ITEM_ID_KEY
+import app.pantopus.android.ui.screens.homes.emergency.AddEmergencyInfoFormScreen
+import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_DETAIL_ITEM_ID_KEY
 import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoDetailScreen
 import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.homes.maintenance.LOG_MAINTENANCE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.maintenance.LOG_MAINTENANCE_TASK_ID_KEY
+import app.pantopus.android.ui.screens.homes.maintenance.LogMaintenanceFormScreen
+import app.pantopus.android.ui.screens.homes.maintenance.MAINTENANCE_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.maintenance.MAINTENANCE_DETAIL_TASK_ID_KEY
 import app.pantopus.android.ui.screens.homes.maintenance.MAINTENANCE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.maintenance.MaintenanceDetailScreen
 import app.pantopus.android.ui.screens.homes.maintenance.MaintenanceListScreen
 import app.pantopus.android.ui.screens.homes.members.MEMBERS_LIST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.members.MembersListScreen
@@ -96,6 +132,11 @@ import app.pantopus.android.ui.screens.homes.polls.POLL_DETAIL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.polls.POLL_DETAIL_POLL_ID_KEY
 import app.pantopus.android.ui.screens.homes.polls.PollDetailScreen
 import app.pantopus.android.ui.screens.homes.polls.PollsListScreen
+import app.pantopus.android.ui.screens.homes.polls.START_POLL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.polls.StartPollFormScreen
+import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_TASK_ID_KEY
+import app.pantopus.android.ui.screens.homes.tasks.AddHouseholdTaskFormScreen
 import app.pantopus.android.ui.screens.homes.tasks.HOUSEHOLD_TASKS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.HouseholdTasksListScreen
 import app.pantopus.android.ui.screens.hub.ActionChipContent
@@ -138,6 +179,8 @@ import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.EditProfileScreen
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
 import app.pantopus.android.ui.screens.profile.PublicProfileScreen
+import app.pantopus.android.ui.screens.recent_activity.RecentActivityDestination
+import app.pantopus.android.ui.screens.recent_activity.RecentActivityScreen
 import app.pantopus.android.ui.screens.review_claims.ReviewClaimDetailScreen
 import app.pantopus.android.ui.screens.review_claims.ReviewClaimsScreen
 import app.pantopus.android.ui.screens.review_signups.ReviewSignupsScreen
@@ -154,6 +197,7 @@ import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
+import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.you.YouScreen
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -183,6 +227,11 @@ private object ChildRoutes {
     /** Add Bill wizard. */
     const val ADD_BILL = "homes/{$ADD_BILL_HOME_ID_KEY}/bills/new"
 
+    /** Edit Bill wizard — same screen, hydrated from the existing row.
+     *  The VM reads the bill id from its `SavedStateHandle`. */
+    const val EDIT_BILL =
+        "homes/{$ADD_BILL_HOME_ID_KEY}/bills/{$ADD_BILL_BILL_ID_KEY}/edit"
+
     /** Pets list per home (T5.2.1). */
     const val HOME_PETS = "homes/{$PETS_LIST_HOME_ID_KEY}/pets"
 
@@ -195,17 +244,102 @@ private object ChildRoutes {
     /** Build the concrete path for a home calendar. */
     fun homeCalendar(homeId: String): String = "homes/$homeId/calendar"
 
+    /**
+     * P2.7 — Add / edit calendar event form. Optional query params carry
+     * the editing event id and a prefilled category when arriving from
+     * the empty-state quick-start tiles.
+     */
+    const val ADD_CALENDAR_EVENT =
+        "homes/{$ADD_EVENT_HOME_ID_KEY}/events/new" +
+            "?$ADD_EVENT_EVENT_ID_KEY={$ADD_EVENT_EVENT_ID_KEY}" +
+            "&$ADD_EVENT_PREFILLED_CATEGORY_KEY={$ADD_EVENT_PREFILLED_CATEGORY_KEY}"
+
+    /** Build the concrete path for the calendar event form. */
+    fun addCalendarEvent(
+        homeId: String,
+        eventId: String? = null,
+        prefilledCategory: String? = null,
+    ): String {
+        val base = "homes/$homeId/events/new"
+        val params =
+            buildList {
+                if (eventId != null) add("$ADD_EVENT_EVENT_ID_KEY=${java.net.URLEncoder.encode(eventId, "UTF-8")}")
+                if (prefilledCategory != null) {
+                    add(
+                        "$ADD_EVENT_PREFILLED_CATEGORY_KEY=" +
+                            java.net.URLEncoder.encode(prefilledCategory, "UTF-8"),
+                    )
+                }
+            }
+        return if (params.isEmpty()) base else "$base?${params.joinToString("&")}"
+    }
+
+    /** P2.7 — Read-only calendar event detail. */
+    const val CALENDAR_EVENT_DETAIL =
+        "homes/{$EVENT_DETAIL_HOME_ID_KEY}/events/{$EVENT_DETAIL_EVENT_ID_KEY}"
+
+    /** Build the concrete path for a calendar event detail. */
+    fun calendarEventDetail(
+        homeId: String,
+        eventId: String,
+    ): String = "homes/$homeId/events/$eventId"
+
     /** Emergency info per home (T6.4b / P17). */
     const val HOME_EMERGENCY = "homes/{$EMERGENCY_HOME_ID_KEY}/emergency"
 
     /** Build the concrete path for a home emergency info screen. */
     fun homeEmergency(homeId: String): String = "homes/$homeId/emergency"
 
+    /** Add Emergency Info form (P2.8). */
+    const val ADD_EMERGENCY_INFO =
+        "homes/{$ADD_EMERGENCY_HOME_ID_KEY}/emergency/new"
+
+    /** Build the concrete path for the Add Emergency Info form. */
+    fun addEmergencyInfo(homeId: String): String = "homes/$homeId/emergency/new"
+
+    /** Edit Emergency Info form (P2.8). The form's VM reads the
+     *  emergencyId from SavedStateHandle and seeds itself from the
+     *  parent list. */
+    const val EDIT_EMERGENCY_INFO =
+        "homes/{$ADD_EMERGENCY_HOME_ID_KEY}/emergency/{$ADD_EMERGENCY_ITEM_ID_KEY}/edit"
+
+    /** Build the concrete path for the Edit Emergency Info form. */
+    fun editEmergencyInfo(
+        homeId: String,
+        emergencyId: String,
+    ): String = "homes/$homeId/emergency/$emergencyId/edit"
+
+    /** Emergency item detail (P2.8). */
+    const val EMERGENCY_ITEM =
+        "homes/{$EMERGENCY_DETAIL_HOME_ID_KEY}/emergency/{$EMERGENCY_DETAIL_ITEM_ID_KEY}"
+
+    /** Build the concrete path for an emergency item detail. */
+    fun emergencyItem(
+        homeId: String,
+        emergencyId: String,
+    ): String = "homes/$homeId/emergency/$emergencyId"
+
     /** Documents per home (T6.4b / P17). */
     const val HOME_DOCS = "homes/{$DOCUMENTS_HOME_ID_KEY}/docs"
 
     /** Build the concrete path for a home documents screen. */
     fun homeDocs(homeId: String): String = "homes/$homeId/docs"
+
+    /** P2.10 — Upload document form for a home. */
+    const val UPLOAD_DOCUMENT = "homes/{$UPLOAD_DOCUMENT_HOME_ID_KEY}/docs/new"
+
+    /** Build the concrete path for the upload document form. */
+    fun uploadDocument(homeId: String): String = "homes/$homeId/docs/new"
+
+    /** P2.10 — Document detail (preview + metadata + footer actions). */
+    const val DOCUMENT_DETAIL =
+        "homes/{$DOCUMENT_DETAIL_HOME_ID_KEY}/docs/{$DOCUMENT_DETAIL_DOC_ID_KEY}"
+
+    /** Build the concrete path for the document detail screen. */
+    fun documentDetail(
+        homeId: String,
+        documentId: String,
+    ): String = "homes/$homeId/docs/$documentId"
 
     /** Packages list per home (T6.3d / P14). */
     const val HOME_PACKAGES = "homes/{$PACKAGES_HOME_ID_KEY}/packages"
@@ -244,6 +378,12 @@ private object ChildRoutes {
         pollId: String,
     ): String = "homes/$homeId/polls/$pollId"
 
+    /** Start-a-poll composer (P2.5). */
+    const val START_POLL = "homes/{$START_POLL_HOME_ID_KEY}/polls/new"
+
+    /** Build the concrete path for the Start-a-Poll form. */
+    fun startPoll(homeId: String): String = "homes/$homeId/polls/new"
+
     /** Access codes per home (T6.4a). `homeName` rides as a query so the
      *  designed 2-line top bar can render without a second fetch. */
     const val ACCESS_CODES_HOME_ID_KEY = "homeId"
@@ -260,17 +400,85 @@ private object ChildRoutes {
         return "homes/$homeId/access?$ACCESS_CODES_HOME_NAME_KEY=$encoded"
     }
 
+    /**
+     * Add / Edit access code form (P3.1). `secretId` set ⇒ edit
+     * existing. `category` pre-selects the matching tile when reached
+     * from the empty-state quick-starts. Both optional via the query
+     * string.
+     */
+    const val EDIT_ACCESS_CODE =
+        "homes/{$EDIT_ACCESS_CODE_HOME_ID_KEY}/access/edit" +
+            "?$EDIT_ACCESS_CODE_SECRET_ID_KEY={$EDIT_ACCESS_CODE_SECRET_ID_KEY}" +
+            "&$EDIT_ACCESS_CODE_CATEGORY_KEY={$EDIT_ACCESS_CODE_CATEGORY_KEY}"
+
+    /** Build the concrete path for the Add / Edit access code form. */
+    fun editAccessCode(
+        homeId: String,
+        secretId: String?,
+        category: String?,
+    ): String {
+        val encodedSecret = secretId?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
+        val encodedCategory = category?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
+        return "homes/$homeId/access/edit" +
+            "?$EDIT_ACCESS_CODE_SECRET_ID_KEY=$encodedSecret" +
+            "&$EDIT_ACCESS_CODE_CATEGORY_KEY=$encodedCategory"
+    }
+
     /** Household tasks list per home (T6.3c / P11). */
     const val HOME_TASKS = "homes/{$HOUSEHOLD_TASKS_HOME_ID_KEY}/tasks"
 
     /** Build the concrete path for a home household tasks list. */
     fun homeTasks(homeId: String): String = "homes/$homeId/tasks"
 
+    /** P2.4 — Add a new household task. Reached from the household
+     *  tasks list FAB and the empty-state CTA. */
+    const val ADD_HOUSEHOLD_TASK = "homes/{$ADD_HOUSEHOLD_TASK_HOME_ID_KEY}/tasks/new"
+
+    /** Build the concrete path for the Add Household Task form. */
+    fun addHouseholdTask(homeId: String): String = "homes/$homeId/tasks/new"
+
+    /** P2.4 — Edit an existing household task. Reached from the
+     *  "Edit recurring" overflow action on a Recurring row. */
+    const val EDIT_HOUSEHOLD_TASK =
+        "homes/{$ADD_HOUSEHOLD_TASK_HOME_ID_KEY}/tasks/{$ADD_HOUSEHOLD_TASK_TASK_ID_KEY}/edit"
+
+    /** Build the concrete path for the Edit Household Task form. */
+    fun editHouseholdTask(
+        homeId: String,
+        taskId: String,
+    ): String = "homes/$homeId/tasks/$taskId/edit"
+
     /** Maintenance list per home (T6.3b / P10). */
     const val HOME_MAINTENANCE = "homes/{$MAINTENANCE_HOME_ID_KEY}/maintenance"
 
     /** Build the concrete path for a home maintenance list. */
     fun homeMaintenance(homeId: String): String = "homes/$homeId/maintenance"
+
+    /** P2.9 — Log a new maintenance entry. */
+    const val LOG_MAINTENANCE = "homes/{$LOG_MAINTENANCE_HOME_ID_KEY}/maintenance/new"
+
+    /** Build the concrete path for the log-maintenance form. */
+    fun logMaintenance(homeId: String): String = "homes/$homeId/maintenance/new"
+
+    /** P2.9 — Edit an existing maintenance entry. */
+    const val EDIT_MAINTENANCE =
+        "homes/{$LOG_MAINTENANCE_HOME_ID_KEY}/maintenance/{$LOG_MAINTENANCE_TASK_ID_KEY}/edit"
+
+    /** Build the concrete path for the edit-maintenance form. */
+    fun editMaintenance(
+        homeId: String,
+        taskId: String,
+    ): String = "homes/$homeId/maintenance/$taskId/edit"
+
+    /** P2.9 — Maintenance detail surface. */
+    const val MAINTENANCE_DETAIL =
+        "homes/{$MAINTENANCE_DETAIL_HOME_ID_KEY}/maintenance/{$MAINTENANCE_DETAIL_TASK_ID_KEY}"
+
+    /** Build the concrete path for the maintenance detail screen. */
+    fun maintenanceDetail(
+        homeId: String,
+        taskId: String,
+    ): String = "homes/$homeId/maintenance/$taskId"
 
     /** Owners list per home (P15 / T6.3g). The Owners VM pulls the
      *  viewer's id from [AuthRepository] internally, so no extra arg
@@ -287,13 +495,26 @@ private object ChildRoutes {
     fun homeMembers(homeId: String): String = "homes/$homeId/members"
 
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
+
+    /** P1.6 — Typed Business Profile screen. `businessId` is the
+     *  business User UUID. */
+    const val BUSINESS_PROFILE = "businesses/{$BUSINESS_PROFILE_BUSINESS_ID_KEY}"
+
+    /** Build the concrete path for a Business Profile. */
+    fun businessProfile(businessId: String): String = "businesses/$businessId"
+
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
+
     const val INVITE_OWNER =
         "homes/{$INVITE_OWNER_HOME_ID_KEY}/invite?email={$INVITE_OWNER_CURRENT_EMAIL_KEY}"
     const val DISAMBIGUATE_MAIL = "mailbox/disambiguate/{$DISAMBIGUATE_MAIL_ID_KEY}"
 
     /** Notifications center (T4.1). Reached from the Hub bell icon. */
     const val NOTIFICATIONS = "notifications"
+
+    /** P1.5 — Recent activity log. Reached from the Hub
+     *  `HubRecentActivity` "See all" CTA. */
+    const val RECENT_ACTIVITY = "recent-activity"
 
     /** Connections center (T5.2.3). Reached from the You / Me action grid
      *  or via `pantopus://connections`. */
@@ -308,8 +529,7 @@ private object ChildRoutes {
     /** My tasks V2 (T5.3.2). Reached from the You tab "My gigs" action tile. */
     const val MY_TASKS = "my-tasks"
 
-    /** Compose-task placeholder (T5.3.2). Replaced when T2.3 lands the
-     *  dedicated composer. */
+    /** P2.2 — Post-a-Task wizard. Reached from the My tasks FAB / empty CTA. */
     const val COMPOSE_TASK = "compose-task"
 
     /** My posts (T5.3.3). Reached from the You / Me Activity-section row. */
@@ -405,6 +625,10 @@ private object ChildRoutes {
     /** T6.6c (P26.5) Support Trains list. */
     const val SUPPORT_TRAINS = "support-trains"
 
+    /** P2.6 — Start-a-Support-Train wizard. Pushed by the Support
+     *  Trains FAB / empty-state CTA. */
+    const val START_SUPPORT_TRAIN = "support-trains/start"
+
     /** T6.6c (P26.5) Review signups (organizer-only). `:id` is the
      *  Support Train UUID. Keep in sync with
      *  `ReviewSignupsViewModel.SUPPORT_TRAIN_ID_KEY`. */
@@ -473,8 +697,26 @@ private object ChildRoutes {
         return "listings/$listingId/offers?$LISTING_OFFERS_TITLE_KEY=$encodedTitle"
     }
 
-    /** Snap & sell — placeholder until the marketplace compose flow ships. */
+    /** Snap & sell — the marketplace listing-compose wizard (P2.3). */
     const val COMPOSE_LISTING = "listings/compose"
+
+    /** P3.3 — Edit an existing listing. Reached from the listing-detail
+     *  overflow ("Edit listing") for the owner, or from the listing-
+     *  offers panel's "Edit price" affordance (which seeds the optional
+     *  `jumpToStep` query param to `Price`). */
+    const val EDIT_LISTING_ID_KEY = "editListingId"
+    const val EDIT_LISTING_JUMP_TO_STEP_KEY = "editJumpToStep"
+    const val EDIT_LISTING =
+        "listings/{$EDIT_LISTING_ID_KEY}/edit?$EDIT_LISTING_JUMP_TO_STEP_KEY={$EDIT_LISTING_JUMP_TO_STEP_KEY}"
+
+    /** Build the edit-listing path with an optional jump-to-step. */
+    fun editListing(
+        listingId: String,
+        jumpToStep: String? = null,
+    ): String {
+        val step = jumpToStep ?: ""
+        return "listings/$listingId/edit?$EDIT_LISTING_JUMP_TO_STEP_KEY=$step"
+    }
 
     /** T6.3f / P14 — My listings (seller's tabbed roster). */
     const val MY_LISTINGS = "listings/me"
@@ -529,6 +771,12 @@ private object ChildRoutes {
 
     /** Build the concrete path for the Add Bill wizard. */
     fun addBill(homeId: String): String = "homes/$homeId/bills/new"
+
+    /** Build the concrete path for the Edit Bill wizard. */
+    fun editBill(
+        homeId: String,
+        billId: String,
+    ): String = "homes/$homeId/bills/$billId/edit"
 
     /** Build the concrete path for a mailbox item detail. */
     fun mailboxItemDetail(id: String): String = "mailbox/item/$id"
@@ -762,7 +1010,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     ActionChipContent.Kind.ScanMail ->
                                         navController.navigate(ChildRoutes.MAILBOX_DRAWERS)
                                     ActionChipContent.Kind.PostTask ->
-                                        navController.navigate(ChildRoutes.placeholder("Post a gig"))
+                                        navController.navigate(ChildRoutes.composeGig(GigsCategory.All.key))
                                     ActionChipContent.Kind.SnapAndSell ->
                                         navController.navigate(ChildRoutes.placeholder("Snap & sell"))
                                 }
@@ -785,6 +1033,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 routeForJumpBackIn(intent.item).also { navController.navigate(it) }
                             HubNavigationIntent.OpenToday ->
                                 navController.navigate(ChildRoutes.placeholder("Today"))
+                            HubNavigationIntent.OpenRecentActivity ->
+                                navController.navigate(ChildRoutes.RECENT_ACTIVITY)
                         }
                     })
                 }
@@ -968,9 +1218,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navArgument(BILL_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
                         navArgument(BILL_DETAIL_BILL_ID_KEY) { type = NavType.StringType },
                     ),
-            ) {
+            ) { entry ->
+                val homeId = entry.arguments?.getString(BILL_DETAIL_HOME_ID_KEY).orEmpty()
+                val billId = entry.arguments?.getString(BILL_DETAIL_BILL_ID_KEY).orEmpty()
                 BillDetailScreen(
                     onBack = { navController.popBackStack() },
+                    onEdit = {
+                        navController.navigate(ChildRoutes.editBill(homeId, billId))
+                    },
                 )
             }
             composable(
@@ -989,6 +1244,28 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(
+                route = ChildRoutes.EDIT_BILL,
+                arguments =
+                    listOf(
+                        navArgument(ADD_BILL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(ADD_BILL_BILL_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                AddBillWizardScreen(
+                    onClose = { navController.popBackStack() },
+                    onCreated = { _ ->
+                        // Unreachable in edit mode — wizard emits
+                        // `Updated` on save instead of `Created`.
+                        navController.popBackStack()
+                    },
+                    onUpdated = { _ ->
+                        // Pop the wizard so the bill detail (already on
+                        // the stack underneath) becomes visible again.
+                        navController.popBackStack()
+                    },
+                )
+            }
+            composable(
                 route = ChildRoutes.HOME_PETS,
                 arguments = listOf(navArgument(PETS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
@@ -998,29 +1275,145 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 route = ChildRoutes.HOME_CALENDAR,
                 arguments =
                     listOf(navArgument(HOME_CALENDAR_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
+            ) { entry ->
+                val homeId = entry.arguments?.getString(HOME_CALENDAR_HOME_ID_KEY).orEmpty()
                 HomeCalendarScreen(
-                    onAddEvent = { navController.navigate(ChildRoutes.placeholder("Add event")) },
-                    onOpenEvent = {
-                        navController.navigate(ChildRoutes.placeholder("Event detail"))
+                    onAddEvent = {
+                        navController.navigate(ChildRoutes.addCalendarEvent(homeId = homeId))
+                    },
+                    onOpenEvent = { eventId ->
+                        navController.navigate(
+                            ChildRoutes.calendarEventDetail(homeId = homeId, eventId = eventId),
+                        )
                     },
                     onBack = { navController.popBackStack() },
                 )
             }
             composable(
+                route = ChildRoutes.ADD_CALENDAR_EVENT,
+                arguments =
+                    listOf(
+                        navArgument(ADD_EVENT_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(ADD_EVENT_EVENT_ID_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                        navArgument(ADD_EVENT_PREFILLED_CATEGORY_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                    ),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(ADD_EVENT_HOME_ID_KEY).orEmpty()
+                AddEventFormScreen(
+                    onClose = { navController.popBackStack() },
+                    onCommit = { commit ->
+                        when (commit) {
+                            is AddEventCommit.Created -> {
+                                navController.popBackStack()
+                                navController.navigate(
+                                    ChildRoutes.calendarEventDetail(
+                                        homeId = homeId,
+                                        eventId = commit.eventId,
+                                    ),
+                                )
+                            }
+                            is AddEventCommit.Updated -> {
+                                // Replace the form AND the stale detail with
+                                // a fresh detail so the re-fetched event
+                                // shows the updated fields.
+                                navController.navigate(
+                                    ChildRoutes.calendarEventDetail(
+                                        homeId = homeId,
+                                        eventId = commit.eventId,
+                                    ),
+                                ) {
+                                    popUpTo(ChildRoutes.CALENDAR_EVENT_DETAIL) {
+                                        inclusive = true
+                                    }
+                                }
+                            }
+                        }
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.CALENDAR_EVENT_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(EVENT_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(EVENT_DETAIL_EVENT_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(EVENT_DETAIL_HOME_ID_KEY).orEmpty()
+                EventDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onEdit = { event ->
+                        navController.navigate(
+                            ChildRoutes.addCalendarEvent(
+                                homeId = homeId,
+                                eventId = event.id,
+                                prefilledCategory = event.eventType,
+                            ),
+                        )
+                    },
+                )
+            }
+            composable(
                 route = ChildRoutes.HOME_EMERGENCY,
                 arguments = listOf(navArgument(EMERGENCY_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
+            ) { entry ->
+                val homeId = entry.arguments?.getString(EMERGENCY_HOME_ID_KEY).orEmpty()
                 EmergencyInfoScreen(
-                    onAction = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Emergency item"))
+                    onAction = { dto ->
+                        navController.navigate(ChildRoutes.emergencyItem(homeId, dto.id))
                     },
-                    onAdd = { navController.navigate(ChildRoutes.placeholder("Add emergency info")) },
+                    onAdd = { navController.navigate(ChildRoutes.addEmergencyInfo(homeId)) },
                     onShare = { navController.navigate(ChildRoutes.placeholder("Share emergency info")) },
                     onPrintCard = {
                         navController.navigate(ChildRoutes.placeholder("Print emergency card"))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.ADD_EMERGENCY_INFO,
+                arguments =
+                    listOf(navArgument(ADD_EMERGENCY_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                AddEmergencyInfoFormScreen(
+                    onClose = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_EMERGENCY_INFO,
+                arguments =
+                    listOf(
+                        navArgument(ADD_EMERGENCY_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(ADD_EMERGENCY_ITEM_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                AddEmergencyInfoFormScreen(
+                    onClose = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.EMERGENCY_ITEM,
+                arguments =
+                    listOf(
+                        navArgument(EMERGENCY_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(EMERGENCY_DETAIL_ITEM_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(EMERGENCY_DETAIL_HOME_ID_KEY).orEmpty()
+                val emergencyId = entry.arguments?.getString(EMERGENCY_DETAIL_ITEM_ID_KEY).orEmpty()
+                EmergencyInfoDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onEdit = {
+                        navController.navigate(ChildRoutes.editEmergencyInfo(homeId, emergencyId))
+                    },
                 )
             }
             composable(
@@ -1048,26 +1441,62 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.pollDetail(homeId, pollId))
                     },
                     onStartPoll = {
-                        navController.navigate(ChildRoutes.placeholder("Start a poll"))
+                        navController.navigate(ChildRoutes.startPoll(homeId))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.START_POLL,
+                arguments = listOf(navArgument(START_POLL_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                StartPollFormScreen(
+                    onClose = { navController.popBackStack() },
                 )
             }
             composable(
                 route = ChildRoutes.HOME_DOCS,
                 arguments = listOf(navArgument(DOCUMENTS_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
+                val docsHomeId = it.arguments?.getString(DOCUMENTS_HOME_ID_KEY).orEmpty()
                 DocumentsScreen(
-                    onOpenDocument = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Document detail"))
+                    onOpenDocument = { dto ->
+                        navController.navigate(ChildRoutes.documentDetail(dto.homeId, dto.id))
                     },
-                    onUpload = { navController.navigate(ChildRoutes.placeholder("Upload document")) },
+                    onUpload = {
+                        navController.navigate(ChildRoutes.uploadDocument(docsHomeId))
+                    },
                     onSearch = { navController.navigate(ChildRoutes.placeholder("Search documents")) },
                     onExport = { navController.navigate(ChildRoutes.placeholder("Export documents")) },
-                    onDocumentAction = { _, _ ->
-                        navController.navigate(ChildRoutes.placeholder("Document action"))
+                    onDocumentAction = { dto, _ ->
+                        navController.navigate(ChildRoutes.documentDetail(dto.homeId, dto.id))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.UPLOAD_DOCUMENT,
+                arguments = listOf(navArgument(UPLOAD_DOCUMENT_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                UploadDocumentFormScreen(
+                    onClose = { navController.popBackStack() },
+                    onUploaded = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.DOCUMENT_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(DOCUMENT_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(DOCUMENT_DETAIL_DOC_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(DOCUMENT_DETAIL_HOME_ID_KEY).orEmpty()
+                DocumentDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onReplace = {
+                        navController.navigate(ChildRoutes.uploadDocument(homeId))
+                    },
                 )
             }
             composable(
@@ -1093,14 +1522,26 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             defaultValue = null
                         },
                     ),
-            ) {
+            ) { backStackEntry ->
+                val homeIdArg = backStackEntry.arguments?.getString(ChildRoutes.ACCESS_CODES_HOME_ID_KEY).orEmpty()
                 AccessCodesScreen(
                     onAddCode = { category ->
-                        val label = category?.let { "Add ${it.label} code" } ?: "Add access code"
-                        navController.navigate(ChildRoutes.placeholder(label))
+                        navController.navigate(
+                            ChildRoutes.editAccessCode(
+                                homeId = homeIdArg,
+                                secretId = null,
+                                category = category?.wire,
+                            ),
+                        )
                     },
-                    onEditCode = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Edit access code"))
+                    onEditCode = { secretId ->
+                        navController.navigate(
+                            ChildRoutes.editAccessCode(
+                                homeId = homeIdArg,
+                                secretId = secretId,
+                                category = null,
+                            ),
+                        )
                     },
                     onSearch = {
                         navController.navigate(ChildRoutes.placeholder("Search access codes"))
@@ -1109,34 +1550,130 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(
+                route = ChildRoutes.EDIT_ACCESS_CODE,
+                arguments =
+                    listOf(
+                        navArgument(EDIT_ACCESS_CODE_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(EDIT_ACCESS_CODE_SECRET_ID_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                        navArgument(EDIT_ACCESS_CODE_CATEGORY_KEY) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                    ),
+            ) {
+                EditAccessCodeFormScreen(
+                    onClose = { navController.popBackStack() },
+                )
+            }
+            composable(
                 route = ChildRoutes.HOME_TASKS,
                 arguments = listOf(navArgument(HOUSEHOLD_TASKS_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
+            ) { entry ->
+                val homeId = entry.arguments?.getString(HOUSEHOLD_TASKS_HOME_ID_KEY).orEmpty()
                 HouseholdTasksListScreen(
                     onOpenTask = { _ ->
                         navController.navigate(ChildRoutes.placeholder("Task detail"))
                     },
                     onAddTask = {
-                        navController.navigate(ChildRoutes.placeholder("Add a task"))
+                        navController.navigate(ChildRoutes.addHouseholdTask(homeId))
                     },
-                    onEditRecurring = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Edit recurring task"))
+                    onEditRecurring = { taskId ->
+                        navController.navigate(ChildRoutes.editHouseholdTask(homeId, taskId))
                     },
                     onBack = { navController.popBackStack() },
                 )
             }
             composable(
+                route = ChildRoutes.ADD_HOUSEHOLD_TASK,
+                arguments = listOf(navArgument(ADD_HOUSEHOLD_TASK_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                AddHouseholdTaskFormScreen(
+                    onClose = { navController.popBackStack() },
+                    onCreated = {
+                        // Pop back to the tasks list; the list refreshes
+                        // on next visit.
+                        navController.popBackStack()
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_HOUSEHOLD_TASK,
+                arguments =
+                    listOf(
+                        navArgument(ADD_HOUSEHOLD_TASK_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(ADD_HOUSEHOLD_TASK_TASK_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                AddHouseholdTaskFormScreen(
+                    onClose = { navController.popBackStack() },
+                )
+            }
+            composable(
                 route = ChildRoutes.HOME_MAINTENANCE,
                 arguments = listOf(navArgument(MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
+            ) { entry ->
+                val homeId =
+                    entry.arguments?.getString(MAINTENANCE_HOME_ID_KEY) ?: ""
                 MaintenanceListScreen(
-                    onOpenTask = { _ ->
-                        navController.navigate(ChildRoutes.placeholder("Maintenance detail"))
+                    onOpenTask = { taskId ->
+                        navController.navigate(ChildRoutes.maintenanceDetail(homeId, taskId))
                     },
                     onAddTask = {
-                        navController.navigate(ChildRoutes.placeholder("Log maintenance"))
+                        navController.navigate(ChildRoutes.logMaintenance(homeId))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.LOG_MAINTENANCE,
+                arguments = listOf(navArgument(LOG_MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType }),
+            ) { entry ->
+                val homeId =
+                    entry.arguments?.getString(LOG_MAINTENANCE_HOME_ID_KEY) ?: ""
+                LogMaintenanceFormScreen(
+                    onClose = { navController.popBackStack() },
+                    onSubmitted = { taskId ->
+                        navController.popBackStack(
+                            ChildRoutes.homeMaintenance(homeId),
+                            inclusive = false,
+                        )
+                        navController.navigate(ChildRoutes.maintenanceDetail(homeId, taskId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_MAINTENANCE,
+                arguments =
+                    listOf(
+                        navArgument(LOG_MAINTENANCE_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(LOG_MAINTENANCE_TASK_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) {
+                LogMaintenanceFormScreen(
+                    onClose = { navController.popBackStack() },
+                    onSubmitted = { _ -> navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.MAINTENANCE_DETAIL,
+                arguments =
+                    listOf(
+                        navArgument(MAINTENANCE_DETAIL_HOME_ID_KEY) { type = NavType.StringType },
+                        navArgument(MAINTENANCE_DETAIL_TASK_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) { entry ->
+                val homeId = entry.arguments?.getString(MAINTENANCE_DETAIL_HOME_ID_KEY) ?: ""
+                val taskId = entry.arguments?.getString(MAINTENANCE_DETAIL_TASK_ID_KEY) ?: ""
+                MaintenanceDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onEdit = {
+                        navController.navigate(ChildRoutes.editMaintenance(homeId, taskId))
+                    },
                 )
             }
             composable(
@@ -1223,6 +1760,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         )
                     },
                     onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report")) },
+                )
+            }
+            composable(
+                route = ChildRoutes.BUSINESS_PROFILE,
+                arguments = listOf(navArgument(BUSINESS_PROFILE_BUSINESS_ID_KEY) { type = NavType.StringType }),
+            ) {
+                val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                BusinessProfileScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                    onShare = { navController.navigate(ChildRoutes.placeholder("Share business")) },
+                    onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report business")) },
+                    onOpenWebsite = { uri -> runCatching { uriHandler.openUri(uri) } },
                 )
             }
             composable(
@@ -1411,6 +1961,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onViewOffers = { dto ->
                         navController.navigate(ChildRoutes.listingOffers(dto.id, dto.title))
                     },
+                    onEditListing = { dto ->
+                        navController.navigate(ChildRoutes.editListing(dto.id))
+                    },
                 )
             }
             composable(
@@ -1423,12 +1976,21 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             defaultValue = ""
                         },
                     ),
-            ) {
+            ) { entry ->
+                val listingId = entry.arguments?.getString(ChildRoutes.LISTING_OFFERS_ID_KEY).orEmpty()
                 ListingOffersScreen(
                     onBack = { navController.popBackStack() },
                     onShareListing = { navController.navigate(ChildRoutes.placeholder("Share listing")) },
                     onOpenBuyer = { navController.navigate(ChildRoutes.placeholder("Buyer profile")) },
                     onOpenTransaction = { navController.navigate(ChildRoutes.placeholder("Transaction detail")) },
+                    onEditPrice = {
+                        navController.navigate(
+                            ChildRoutes.editListing(
+                                listingId = listingId,
+                                jumpToStep = ListingComposeStep.Price.name,
+                            ),
+                        )
+                    },
                     onSort = { navController.navigate(ChildRoutes.placeholder("Sort offers")) },
                 )
             }
@@ -1439,7 +2001,36 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 InvoiceDetailScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.COMPOSE_LISTING) {
-                NotYetAvailableView(tabName = "Snap & sell", icon = PantopusIcon.Camera)
+                ListingComposeWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenListingDetail = { listingId ->
+                        // Pop the wizard then push detail so Back returns to
+                        // Marketplace, not the success screen.
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.listingDetail(listingId))
+                    },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_LISTING,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.EDIT_LISTING_ID_KEY) { type = NavType.StringType },
+                        navArgument(ChildRoutes.EDIT_LISTING_JUMP_TO_STEP_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                    ),
+            ) {
+                ListingComposeWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenListingDetail = { _ -> navController.popBackStack() },
+                    onListingUpdated = { _ ->
+                        // Pop the edit wizard. The detail / offers screen
+                        // underneath refreshes from its own LaunchedEffect.
+                        navController.popBackStack()
+                    },
+                )
             }
             composable(ChildRoutes.GIGS_FEED) {
                 GigsFeedScreen(
@@ -1508,9 +2099,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     ),
             ) { entry ->
                 val raw = entry.arguments?.getString(ChildRoutes.COMPOSE_GIG_CATEGORY_KEY) ?: GigsCategory.All.key
-                val label =
-                    GigsCategory.entries.firstOrNull { it.key == raw }?.label ?: raw.replaceFirstChar { it.uppercase() }
-                NotYetAvailableView(tabName = "Post a task · $label", icon = PantopusIcon.Pencil)
+                GigComposeWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenGigDetail = { gigId ->
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.gigDetail(gigId))
+                    },
+                    preselectedCategoryKey = raw,
+                )
             }
             composable(
                 route = ChildRoutes.COMPOSE_POST,
@@ -1521,16 +2117,32 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             defaultValue = PulseIntent.All.key
                         },
                     ),
-            ) { entry ->
-                val raw = entry.arguments?.getString(ChildRoutes.COMPOSE_INTENT_KEY) ?: PulseIntent.All.key
-                val intent = PulseIntent.fromKey(raw)
-                NotYetAvailableView(
-                    tabName = "Compose · ${intent.label}",
-                    icon = PantopusIcon.Pencil,
-                )
+            ) {
+                PulseComposeScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.NOTIFICATIONS) {
                 NotificationsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.RECENT_ACTIVITY) {
+                RecentActivityScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpen = { destination ->
+                        when (destination) {
+                            is RecentActivityDestination.GigDetail ->
+                                navController.navigate(ChildRoutes.gigDetail(destination.id))
+                            is RecentActivityDestination.ListingDetail ->
+                                navController.navigate(ChildRoutes.listingDetail(destination.id))
+                            is RecentActivityDestination.MailItemDetail ->
+                                navController.navigate(ChildRoutes.mailboxItemDetail(destination.id))
+                            is RecentActivityDestination.PulsePost ->
+                                navController.navigate(ChildRoutes.pulsePost(destination.id))
+                            is RecentActivityDestination.HomeDashboard ->
+                                navController.navigate(ChildRoutes.homeDashboard(destination.id))
+                            is RecentActivityDestination.Placeholder ->
+                                navController.navigate(ChildRoutes.placeholder(destination.label))
+                        }
+                    },
+                )
             }
             composable(ChildRoutes.CONNECTIONS) {
                 ConnectionsScreen(
@@ -1566,10 +2178,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             is DiscoverHubTarget.Person ->
                                 navController.navigate(ChildRoutes.publicProfile(target.userId))
                             is DiscoverHubTarget.Business ->
-                                // Per buildout plan F6, the typed business
-                                // profile screen lands later — push the
-                                // discover-businesses placeholder for now.
-                                navController.navigate(ChildRoutes.DISCOVER_BUSINESSES)
+                                navController.navigate(ChildRoutes.businessProfile(target.businessId))
                             is DiscoverHubTarget.Gig ->
                                 navController.navigate(ChildRoutes.gigDetail(target.gigId))
                             is DiscoverHubTarget.Listing ->
@@ -1594,12 +2203,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onSelect = { target ->
                         when (target) {
                             is DiscoverBusinessesTarget.Business ->
-                                // The dedicated business-profile screen is
-                                // still pending. Use the placeholder until
-                                // it lands.
-                                navController.navigate(
-                                    ChildRoutes.placeholder("Business: ${target.name} (${target.businessId})"),
-                                )
+                                navController.navigate(ChildRoutes.businessProfile(target.businessId))
                             DiscoverBusinessesTarget.OpenFilters ->
                                 navController.navigate(ChildRoutes.placeholder("Business filters"))
                             DiscoverBusinessesTarget.WidenRadius ->
@@ -1621,7 +2225,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Offer filters")) },
                     onBrowseListings = { navController.navigate(ChildRoutes.placeholder("Browse listings")) },
-                    onPostTask = { navController.navigate(ChildRoutes.placeholder("Post a task")) },
+                    onPostTask = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
                 )
             }
             composable(ChildRoutes.MY_BIDS) {
@@ -1670,7 +2274,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.COMPOSE_TASK) {
-                NotYetAvailableView(tabName = "Post a task", icon = PantopusIcon.Pencil)
+                GigComposeWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenGigDetail = { gigId ->
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.gigDetail(gigId))
+                    },
+                    preselectedCategoryKey = null,
+                )
             }
             composable(ChildRoutes.MY_POSTS) {
                 MyPostsScreen(
@@ -1913,10 +2524,23 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.reviewSignups(trainId))
                     },
                     onStartTrain = {
-                        navController.navigate(ChildRoutes.placeholder("Start a support train"))
+                        navController.navigate(ChildRoutes.START_SUPPORT_TRAIN)
                     },
                     onSearch = {
                         navController.navigate(ChildRoutes.placeholder("Search support trains"))
+                    },
+                )
+            }
+            composable(ChildRoutes.START_SUPPORT_TRAIN) {
+                StartSupportTrainWizardScreen(
+                    onDismiss = { navController.popBackStack() },
+                    onOpenTrain = { trainId ->
+                        // Pop the wizard then push the new train's
+                        // review-signups screen so Back goes back to
+                        // the Support Trains list rather than the
+                        // wizard.
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.reviewSignups(trainId))
                     },
                 )
             }
@@ -2072,7 +2696,7 @@ private fun routeForDiscovery(item: DiscoveryCardContent): String =
         DiscoveryKind.Post -> ChildRoutes.pulsePost(item.id)
         DiscoveryKind.Person -> ChildRoutes.publicProfile(item.id)
         DiscoveryKind.Gig -> ChildRoutes.placeholder("Gig detail")
-        DiscoveryKind.Business -> ChildRoutes.placeholder("Business")
+        DiscoveryKind.Business -> ChildRoutes.businessProfile(item.id)
         DiscoveryKind.Unknown -> ChildRoutes.placeholder(item.title)
     }
 

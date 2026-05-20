@@ -177,6 +177,15 @@ public enum GigsEndpoints {
             body: CancelGigBody(reason: reason)
         )
     }
+
+    /// `POST /api/gigs` — create a new gig. Route
+    /// `backend/routes/gigs.js:841`. The full schema accepts ~40 fields;
+    /// the Post-a-Task wizard sends the eight required ones plus a
+    /// handful of optional Magic Task tags (`schedule_type`, `pay_type`,
+    /// `task_format`).
+    public static func create(_ body: CreateGigBody) -> Endpoint {
+        Endpoint(method: .post, path: "/api/gigs", body: body)
+    }
 }
 
 /// Reasons the backend whitelists for `DELETE /api/gigs/:gigId/bids/:bidId`.

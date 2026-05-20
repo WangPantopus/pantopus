@@ -549,6 +549,28 @@ private fun ListingContextHeader(config: ListingContextConfig) {
                             fontWeight = FontWeight.Bold,
                             color = PantopusColors.appText,
                         )
+                        config.onEditPrice?.let { onEdit ->
+                            Spacer(Modifier.width(Spacing.s2))
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(PantopusColors.primary50)
+                                        .clickable { onEdit() }
+                                        .testTag("listingContextEditPrice")
+                                        .semantics { contentDescription = "Edit price" },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                PantopusIconImage(
+                                    icon = PantopusIcon.Pencil,
+                                    contentDescription = null,
+                                    size = 14.dp,
+                                    strokeWidth = 2.0f,
+                                    tint = PantopusColors.primary600,
+                                )
+                            }
+                        }
                     }
                     if (config.meta.isNotEmpty()) {
                         ListingContextMetaRow(items = config.meta)

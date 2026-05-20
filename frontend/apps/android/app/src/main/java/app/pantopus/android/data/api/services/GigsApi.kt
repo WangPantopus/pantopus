@@ -3,6 +3,8 @@ package app.pantopus.android.data.api.services
 import app.pantopus.android.data.api.models.gigs.BoostGigResponse
 import app.pantopus.android.data.api.models.gigs.CancelGigBody
 import app.pantopus.android.data.api.models.gigs.CompleteGigResponse
+import app.pantopus.android.data.api.models.gigs.CreateGigBody
+import app.pantopus.android.data.api.models.gigs.CreateGigResponse
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigSaveResponse
@@ -150,4 +152,15 @@ interface GigsApi {
         @Path("gigId") gigId: String,
         @Body body: CancelGigBody,
     ): CompleteGigResponse
+
+    /**
+     * `POST /api/gigs` — create a new gig. Route
+     * `backend/routes/gigs.js:841`. The full schema accepts ~40 fields;
+     * the Post-a-Task wizard sends the eight required ones plus a few
+     * Magic Task tags.
+     */
+    @POST("api/gigs")
+    suspend fun createGig(
+        @Body body: CreateGigBody,
+    ): CreateGigResponse
 }

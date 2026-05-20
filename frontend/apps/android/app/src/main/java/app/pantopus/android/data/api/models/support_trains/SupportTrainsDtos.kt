@@ -128,3 +128,53 @@ data class SupportTrainHelperDto(
     val name: String? = null,
     @Json(name = "profile_picture_url") val profilePictureUrl: String? = null,
 )
+
+// ─── Create / launch (P2.6 — Start-a-Support-Train wizard) ──────────────
+
+/**
+ * `POST /api/support-trains/` body. Backend validation lives at
+ * `createSupportTrainSchema` (`supportTrains.js:306`). We only ride
+ * the free-form `draft_payload.story` slot so the reason copy
+ * survives the round-trip onto the published-train detail screen.
+ */
+@JsonClass(generateAdapter = true)
+data class CreateSupportTrainBody(
+    @Json(name = "draft_payload") val draftPayload: DraftPayload,
+    val title: String,
+    @Json(name = "recipient_user_id") val recipientUserId: String?,
+    @Json(name = "sharing_mode") val sharingMode: String,
+    @Json(name = "enable_home_cooked_meals") val enableHomeCookedMeals: Boolean = true,
+    @Json(name = "enable_takeout") val enableTakeout: Boolean = true,
+    @Json(name = "enable_groceries") val enableGroceries: Boolean = true,
+    @Json(name = "enable_gift_funds") val enableGiftFunds: Boolean = false,
+    val timezone: String = java.util.TimeZone.getDefault().id,
+) {
+    @JsonClass(generateAdapter = true)
+    data class DraftPayload(
+        val story: String?,
+    )
+}
+
+/**
+ * `POST /api/support-trains/` response. Only `id` matters for the
+ * wizard launch flow — the host pushes the new train's review-signups
+ * screen immediately after publish.
+ */
+@JsonClass(generateAdapter = true)
+data class CreateSupportTrainResponse(
+    val id: String,
+)
+
+/**
+ * `POST /api/support-trains/:id/slots` body. Backend validation lives
+ * at `customSlotSchema` (`supportTrains.js:404`).
+ */
+@JsonClass(generateAdapter = true)
+data class AddSupportTrainSlotBody(
+    @Json(name = "slot_date") val slotDate: String,
+    @Json(name = "slot_label") val slotLabel: String,
+    @Json(name = "support_mode") val supportMode: String,
+    @Json(name = "start_time") val startTime: String?,
+    @Json(name = "end_time") val endTime: String?,
+    val capacity: Int = 1,
+)

@@ -5,6 +5,8 @@ import app.pantopus.android.data.api.models.posts.MyPostsResponse
 import app.pantopus.android.data.api.models.posts.PostCommentCreateResponse
 import app.pantopus.android.data.api.models.posts.PostCommentRequest
 import app.pantopus.android.data.api.models.posts.PostCommentsResponse
+import app.pantopus.android.data.api.models.posts.PostCreateRequest
+import app.pantopus.android.data.api.models.posts.PostCreateResponse
 import app.pantopus.android.data.api.models.posts.PostDetailResponse
 import app.pantopus.android.data.api.models.posts.PostLikeResponse
 import retrofit2.http.Body
@@ -32,6 +34,16 @@ interface PostsApi {
         @Query("cursorCreatedAt") cursorCreatedAt: String? = null,
         @Query("cursorId") cursorId: String? = null,
     ): FeedResponse
+
+    /**
+     * `POST /api/posts` — create a new post. Body keys are validated
+     * by `createPostSchema` at `backend/routes/posts.js:196-300`.
+     * Route `backend/routes/posts.js:862`.
+     */
+    @POST("api/posts")
+    suspend fun createPost(
+        @Body body: PostCreateRequest,
+    ): PostCreateResponse
 
     /** `GET /api/posts/:id` — route `backend/routes/posts.js:2354`. */
     @GET("api/posts/{id}")

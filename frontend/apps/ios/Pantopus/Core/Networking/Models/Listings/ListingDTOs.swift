@@ -148,6 +148,172 @@ public struct ListingDetailResponse: Decodable, Sendable {
     public let listing: ListingDTO
 }
 
+/// Body for `POST /api/listings`. Mirrors the destructure at
+/// `backend/routes/listings.js:430`. The wizard sends the commonly-used
+/// subset; backend defaults take care of the rest (visibility scope,
+/// radius, expirations, geocode provenance, …).
+public struct CreateListingRequest: Encodable, Sendable {
+    public let title: String
+    public let description: String?
+    public let price: Double?
+    public let isFree: Bool
+    public let category: String
+    public let condition: String?
+    public let mediaUrls: [String]
+    public let layer: String
+    public let listingType: String
+    public let latitude: Double?
+    public let longitude: Double?
+    public let locationName: String?
+    public let locationAddress: String?
+    public let meetupPreference: String?
+    public let deliveryAvailable: Bool
+    public let isWanted: Bool
+
+    public init(
+        title: String,
+        description: String?,
+        price: Double?,
+        isFree: Bool,
+        category: String,
+        condition: String?,
+        mediaUrls: [String],
+        layer: String,
+        listingType: String,
+        latitude: Double?,
+        longitude: Double?,
+        locationName: String?,
+        locationAddress: String?,
+        meetupPreference: String?,
+        deliveryAvailable: Bool,
+        isWanted: Bool
+    ) {
+        self.title = title
+        self.description = description
+        self.price = price
+        self.isFree = isFree
+        self.category = category
+        self.condition = condition
+        self.mediaUrls = mediaUrls
+        self.layer = layer
+        self.listingType = listingType
+        self.latitude = latitude
+        self.longitude = longitude
+        self.locationName = locationName
+        self.locationAddress = locationAddress
+        self.meetupPreference = meetupPreference
+        self.deliveryAvailable = deliveryAvailable
+        self.isWanted = isWanted
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case title, description, price
+        case isFree
+        case category, condition
+        case mediaUrls
+        case layer
+        case listingType
+        case latitude, longitude
+        case locationName
+        case locationAddress
+        case meetupPreference
+        case deliveryAvailable
+        case isWanted
+    }
+}
+
+/// Envelope from `POST /api/listings` (status 201).
+public struct CreateListingResponse: Decodable, Sendable {
+    public let message: String?
+    public let listing: ListingDTO
+}
+
+/// Body for `PATCH /api/listings/:id`. Owner-only update. Mirrors the
+/// fields the Snap & Sell wizard collects so the same form can drive
+/// create + edit. All fields optional — the backend Joi schema requires
+/// `min(1)` so encoding `nil` keys keeps the JSON sparse.
+public struct UpdateListingRequest: Encodable, Sendable {
+    public let title: String?
+    public let description: String?
+    public let price: Double?
+    public let isFree: Bool?
+    public let category: String?
+    public let condition: String?
+    public let mediaUrls: [String]?
+    public let layer: String?
+    public let listingType: String?
+    public let locationName: String?
+    public let meetupPreference: String?
+    public let deliveryAvailable: Bool?
+    public let isWanted: Bool?
+
+    public init(
+        title: String? = nil,
+        description: String? = nil,
+        price: Double? = nil,
+        isFree: Bool? = nil,
+        category: String? = nil,
+        condition: String? = nil,
+        mediaUrls: [String]? = nil,
+        layer: String? = nil,
+        listingType: String? = nil,
+        locationName: String? = nil,
+        meetupPreference: String? = nil,
+        deliveryAvailable: Bool? = nil,
+        isWanted: Bool? = nil
+    ) {
+        self.title = title
+        self.description = description
+        self.price = price
+        self.isFree = isFree
+        self.category = category
+        self.condition = condition
+        self.mediaUrls = mediaUrls
+        self.layer = layer
+        self.listingType = listingType
+        self.locationName = locationName
+        self.meetupPreference = meetupPreference
+        self.deliveryAvailable = deliveryAvailable
+        self.isWanted = isWanted
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(title, forKey: .title)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encodeIfPresent(price, forKey: .price)
+        try container.encodeIfPresent(isFree, forKey: .isFree)
+        try container.encodeIfPresent(category, forKey: .category)
+        try container.encodeIfPresent(condition, forKey: .condition)
+        try container.encodeIfPresent(mediaUrls, forKey: .mediaUrls)
+        try container.encodeIfPresent(layer, forKey: .layer)
+        try container.encodeIfPresent(listingType, forKey: .listingType)
+        try container.encodeIfPresent(locationName, forKey: .locationName)
+        try container.encodeIfPresent(meetupPreference, forKey: .meetupPreference)
+        try container.encodeIfPresent(deliveryAvailable, forKey: .deliveryAvailable)
+        try container.encodeIfPresent(isWanted, forKey: .isWanted)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case title, description, price
+        case isFree
+        case category, condition
+        case mediaUrls
+        case layer
+        case listingType
+        case locationName
+        case meetupPreference
+        case deliveryAvailable
+        case isWanted
+    }
+}
+
+/// Envelope from `PATCH /api/listings/:id`.
+public struct UpdateListingResponse: Decodable, Sendable {
+    public let message: String?
+    public let listing: ListingDTO
+}
+
 /// Envelope from `POST /api/listings/:id/message`.
 public struct MessageListingResponse: Decodable, Sendable {
     public let message: String?

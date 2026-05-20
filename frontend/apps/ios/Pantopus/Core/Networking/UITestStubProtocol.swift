@@ -184,6 +184,16 @@ final class UITestStubProtocol: URLProtocol {
         case ("GET", "/api/notifications/unread-count"):
             finishWith(status: 200, body: Data("{\"count\":2}".utf8))
 
+        case ("GET", "/api/chat/unified-conversations"):
+            let body = env["UI_TESTS_CHAT_CONVERSATIONS_BODY"] ?? Self.defaultChatConversationsJSON
+            let status = Int(env["UI_TESTS_CHAT_CONVERSATIONS_STATUS"] ?? "200") ?? 200
+            finishWith(status: status, body: Data(body.utf8))
+
+        case ("GET", "/api/chat/stats"):
+            let body = env["UI_TESTS_CHAT_STATS_BODY"] ?? Self.defaultChatStatsJSON
+            let status = Int(env["UI_TESTS_CHAT_STATS_STATUS"] ?? "200") ?? 200
+            finishWith(status: status, body: Data(body.utf8))
+
         case let ("PATCH", path) where path.hasPrefix("/api/notifications/") && path.hasSuffix("/read"):
             finishWith(status: 200, body: Data("{\"ok\":true}".utf8))
 
@@ -341,6 +351,14 @@ final class UITestStubProtocol: URLProtocol {
       "distance_miles":0.2,
       "pickup_address":"Rose Court, Unit 4B"
     }}
+    """
+
+    static let defaultChatConversationsJSON = """
+    {"conversations":[],"total":0,"totalUnread":0}
+    """
+
+    static let defaultChatStatsJSON = """
+    {"stats":{"total_chats":0,"total_messages":0,"total_unread":0,"direct_chats":0,"gig_chats":0,"home_chats":0}}
     """
 
     /// Persona overview for `/api/personas/me` — paired with the

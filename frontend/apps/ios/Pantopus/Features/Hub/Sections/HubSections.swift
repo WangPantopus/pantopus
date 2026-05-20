@@ -607,26 +607,24 @@ private struct JumpBackCard: View {
 
 struct HubRecentActivity: View {
     let entries: [ActivityEntry]
-    var onSeeAll: (() -> Void)?
+    let onSeeAll: @MainActor () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(spacing: Spacing.s2) {
                 SectionHeader("Recent activity")
                 Spacer()
-                if let onSeeAll {
-                    Button(action: onSeeAll) {
-                        HStack(spacing: 2) {
-                            Text("See all")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Theme.Color.primary600)
-                            Icon(.chevronRight, size: 13, color: Theme.Color.primary600)
-                        }
+                Button(action: onSeeAll) {
+                    HStack(spacing: 2) {
+                        Text("See all")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.Color.primary600)
+                        Icon(.chevronRight, size: 13, color: Theme.Color.primary600)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("See all activity")
-                    .accessibilityIdentifier("hubRecentActivity.seeAll")
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("See all activity")
+                .accessibilityIdentifier("hubRecentActivity.seeAll")
             }
             .padding(.horizontal, Spacing.s4)
             VStack(spacing: 0) {

@@ -11,7 +11,9 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.data.analytics.AnalyticsResult
+import app.pantopus.android.data.api.models.homes.BillDto
 import app.pantopus.android.data.api.models.homes.CreateBillRequest
+import app.pantopus.android.data.api.models.homes.UpdateBillRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
@@ -24,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -40,6 +43,19 @@ enum class AddBillSchedule(
     Monthly("Recurring monthly", "monthly"),
     Quarterly("Recurring quarterly", "quarterly"),
     Yearly("Recurring yearly", "yearly"),
+    ;
+
+    companion object {
+        /** Map a `details.schedule` (or `details.frequency`) value back
+         *  to the enum so the wizard can re-hydrate in edit mode. */
+        fun fromDetailsKey(raw: String?): AddBillSchedule =
+            when (raw) {
+                "monthly" -> Monthly
+                "quarterly" -> Quarterly
+                "yearly" -> Yearly
+                else -> OneTime
+            }
+    }
 }
 
 /** Outbound events for the host to react to. */
@@ -47,10 +63,15 @@ sealed interface AddBillEvent {
     data object Dismiss : AddBillEvent
 
     data class Created(val billId: String) : AddBillEvent
+
+    data class Updated(val billId: String) : AddBillEvent
 }
 
-/** Nav-arg key. */
+/** Nav-arg key for the home id. */
 const val ADD_BILL_HOME_ID_KEY = "homeId"
+
+/** Nav-arg key for an optional existing bill id (edit mode). */
+const val ADD_BILL_BILL_ID_KEY = "billId"
 
 @HiltViewModel
 class AddBillWizardViewModel
@@ -63,6 +84,12 @@ class AddBillWizardViewModel
             checkNotNull(savedStateHandle[ADD_BILL_HOME_ID_KEY]) {
                 "AddBillWizardViewModel requires a $ADD_BILL_HOME_ID_KEY nav argument"
             }
+
+        /** Optional nav arg: when present the wizard opens in edit mode,
+         *  hydrates from the parent list, and PUTs on submit. */
+        private val billId: String? = savedStateHandle[ADD_BILL_BILL_ID_KEY]
+
+        val isEditing: Boolean = billId != null
 
         // Step 1
         var payee: String by mutableStateOf("")
@@ -81,22 +108,85 @@ class AddBillWizardViewModel
         private val _submitError = MutableStateFlow<String?>(null)
         val submitError: StateFlow<String?> = _submitError.asStateFlow()
 
+        private val _isLoadingExisting = MutableStateFlow(isEditing)
+        val isLoadingExisting: StateFlow<Boolean> = _isLoadingExisting.asStateFlow()
+
+        private val _loadError = MutableStateFlow<String?>(null)
+        val loadError: StateFlow<String?> = _loadError.asStateFlow()
+
         private val _events = MutableStateFlow<AddBillEvent?>(null)
         val events: StateFlow<AddBillEvent?> = _events.asStateFlow()
 
         private var createdBillId: String? = null
+
+        /** Snapshot of the hydrated values. Used to detect dirtiness in
+         *  edit mode so a clean re-open doesn't show the discard sheet. */
+        private data class Snapshot(
+            val payee: String,
+            val amount: String,
+            val dueDate: LocalDate?,
+            val schedule: AddBillSchedule,
+        )
+
+        private var hydratedSnapshot: Snapshot? = null
+
+        init {
+            // Edit mode auto-loads on init — the screen doesn't have to
+            // remember to fire `load()`.
+            if (billId != null) {
+                viewModelScope.launch { load() }
+            }
+        }
+
+        /** Fetch the parent list and hydrate every step from the matching
+         *  row. No-op in create mode. Exposed for tests. */
+        suspend fun load() {
+            val id = billId ?: return
+            _isLoadingExisting.value = true
+            _loadError.value = null
+            when (val result = repo.getHomeBills(homeId)) {
+                is NetworkResult.Success -> {
+                    val bill = result.data.bills.firstOrNull { it.id == id }
+                    if (bill == null) {
+                        _loadError.value = "This bill is no longer available."
+                    } else {
+                        applyExisting(bill)
+                    }
+                }
+                is NetworkResult.Failure ->
+                    _loadError.value = result.error.message
+            }
+            _isLoadingExisting.value = false
+        }
+
+        private fun applyExisting(bill: BillDto) {
+            payee = bill.providerName.orEmpty()
+            amount = formatAmountForEditing(bill.displayAmount)
+            dueDate = parseDueDate(bill.dueDate)
+            // `details.schedule` is the canonical key the wizard writes
+            // on create. Older rows may have only `details.frequency`.
+            val scheduleKey = bill.details?.get("schedule") ?: bill.details?.get("frequency")
+            schedule = AddBillSchedule.fromDetailsKey(scheduleKey)
+            hydratedSnapshot =
+                Snapshot(
+                    payee = payee,
+                    amount = amount,
+                    dueDate = dueDate,
+                    schedule = schedule,
+                )
+        }
 
         override val chrome: WizardChrome
             get() =
                 when (_currentStep.value) {
                     AddBillStep.Details ->
                         WizardChrome(
-                            title = "Add a bill",
+                            title = if (isEditing) "Edit bill" else "Add a bill",
                             progressLabel = WizardProgressLabel.StepOf(current = 1, total = 3),
                             progressFraction = 1f / 3f,
                             leading = WizardLeadingControl.Close,
                             primaryCtaLabel = "Next",
-                            primaryCtaEnabled = detailsValid(),
+                            primaryCtaEnabled = detailsValid() && !_isLoadingExisting.value,
                             isSubmitting = false,
                             dirty = isDirty(),
                             showsProgressBar = true,
@@ -119,7 +209,7 @@ class AddBillWizardViewModel
                             progressLabel = WizardProgressLabel.StepOf(current = 3, total = 3),
                             progressFraction = 1f,
                             leading = WizardLeadingControl.Back,
-                            primaryCtaLabel = "Add bill",
+                            primaryCtaLabel = if (isEditing) "Save changes" else "Add bill",
                             primaryCtaEnabled = !_isSubmitting.value,
                             isSubmitting = _isSubmitting.value,
                             dirty = isDirty(),
@@ -127,7 +217,7 @@ class AddBillWizardViewModel
                         )
                     AddBillStep.Success ->
                         WizardChrome(
-                            title = "Bill added",
+                            title = if (isEditing) "Bill updated" else "Bill added",
                             progressLabel = WizardProgressLabel.Hidden,
                             progressFraction = null,
                             leading = WizardLeadingControl.Close,
@@ -164,8 +254,13 @@ class AddBillWizardViewModel
                 }
                 AddBillStep.Review -> submit()
                 AddBillStep.Success -> {
-                    val id = createdBillId
-                    _events.value = id?.let(AddBillEvent::Created) ?: AddBillEvent.Dismiss
+                    val event =
+                        when {
+                            isEditing && billId != null -> AddBillEvent.Updated(billId)
+                            createdBillId != null -> AddBillEvent.Created(createdBillId!!)
+                            else -> AddBillEvent.Dismiss
+                        }
+                    _events.value = event
                 }
             }
         }
@@ -182,11 +277,20 @@ class AddBillWizardViewModel
 
         fun detailsValid(): Boolean = payee.trim().isNotEmpty() && parsedAmount() != null
 
-        fun isDirty(): Boolean =
-            payee.trim().isNotEmpty() ||
-                amount.trim().isNotEmpty() ||
-                dueDate != null ||
-                schedule != AddBillSchedule.OneTime
+        fun isDirty(): Boolean {
+            val snapshot = hydratedSnapshot
+            return if (snapshot != null) {
+                payee != snapshot.payee ||
+                    amount != snapshot.amount ||
+                    dueDate != snapshot.dueDate ||
+                    schedule != snapshot.schedule
+            } else {
+                payee.trim().isNotEmpty() ||
+                    amount.trim().isNotEmpty() ||
+                    dueDate != null ||
+                    schedule != AddBillSchedule.OneTime
+            }
+        }
 
         private fun submit() {
             val amountValue = parsedAmount() ?: return
@@ -194,24 +298,38 @@ class AddBillWizardViewModel
             _isSubmitting.value = true
             _submitError.value = null
             viewModelScope.launch {
-                val details =
-                    buildMap {
-                        put("schedule", schedule.detailsKey)
-                        if (schedule != AddBillSchedule.OneTime) {
-                            put("frequency", schedule.detailsKey)
-                        }
+                val details = buildDetails(schedule)
+                val trimmedPayee = payee.trim()
+                val due = dueDate?.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                val result =
+                    if (billId != null) {
+                        repo.updateHomeBill(
+                            homeId = homeId,
+                            billId = billId,
+                            request =
+                                UpdateBillRequest(
+                                    amount = amountValue,
+                                    providerName = trimmedPayee,
+                                    dueDate = due,
+                                    details = details,
+                                ),
+                        )
+                    } else {
+                        repo.createHomeBill(
+                            homeId = homeId,
+                            request =
+                                CreateBillRequest(
+                                    billType = "other",
+                                    providerName = trimmedPayee,
+                                    amount = amountValue,
+                                    dueDate = due,
+                                    details = details,
+                                ),
+                        )
                     }
-                val request =
-                    CreateBillRequest(
-                        billType = "other",
-                        providerName = payee.trim(),
-                        amount = amountValue,
-                        dueDate = dueDate?.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                        details = details,
-                    )
-                when (val result = repo.createHomeBill(homeId, request)) {
+                when (result) {
                     is NetworkResult.Success -> {
-                        createdBillId = result.data.bill.id
+                        if (billId == null) createdBillId = result.data.bill.id
                         _isSubmitting.value = false
                         _currentStep.value = AddBillStep.Success
                         Analytics.track(AnalyticsEvent.CtaAddBillSubmit(AnalyticsResult.SUCCESS))
@@ -223,5 +341,30 @@ class AddBillWizardViewModel
                     }
                 }
             }
+        }
+
+        private fun buildDetails(schedule: AddBillSchedule): Map<String, String> =
+            buildMap {
+                put("schedule", schedule.detailsKey)
+                if (schedule != AddBillSchedule.OneTime) {
+                    put("frequency", schedule.detailsKey)
+                }
+            }
+
+        private fun formatAmountForEditing(value: BigDecimal): String {
+            val stripped = value.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros()
+            // `toPlainString` avoids scientific notation from
+            // `stripTrailingZeros` on values like `100`.
+            return stripped.toPlainString()
+        }
+
+        private fun parseDueDate(iso: String?): LocalDate? {
+            if (iso.isNullOrBlank()) return null
+            // Accept bare yyyy-MM-dd first since that's what the wizard
+            // writes; fall back to the leading 10 chars of a full ISO
+            // timestamp so older rows still hydrate.
+            return runCatching { LocalDate.parse(iso) }
+                .recoverCatching { LocalDate.parse(iso.take(10)) }
+                .getOrNull()
         }
     }
