@@ -2,12 +2,20 @@
 //  MailboxSearchSnapshotTests.swift
 //  PantopusTests
 //
-//  P4.2 — design-reference baseline tripwire for Mailbox Search. Same
-//  shape as `BroadcastDetailSnapshotTests`: asserts the baseline PNG for
-//  each render state exists at `PantopusTests/__Snapshots__/p4-mailbox-
-//  search/<state>-ios.png` and is a non-trivial PNG. Tests `XCTSkip` when
-//  a baseline is missing so the gate exists without failing CI on the
-//  first PR; the follow-up commits the renders.
+//  P4.2 — Design-reference baseline tripwire for the Mailbox Search
+//  surface. Same shape as `DocumentSearchSnapshotTests`: asserts the
+//  baseline PNGs exist at
+//
+//    `PantopusTests/__Snapshots__/p4-2-mailbox-search/<slug>-ios.png`
+//
+//  and are valid PNGs, `XCTSkip`-ing when a baseline is missing so the
+//  gate exists from day one and the follow-up commits the renders.
+//
+//  States covered (the SearchListShell phases):
+//    • search-recent   → blank recent canvas (empty query, no history)
+//    • search-typing   → typing shimmer while the corpus loads
+//    • search-results  → matches rendered as reused Mailbox rows
+//    • search-empty    → no-match empty state
 //
 
 import XCTest
@@ -20,23 +28,23 @@ final class MailboxSearchSnapshotTests: XCTestCase {
             .deletingLastPathComponent() // Features
             .deletingLastPathComponent() // PantopusTests
             .appendingPathComponent("__Snapshots__")
-            .appendingPathComponent("p4-mailbox-search")
+            .appendingPathComponent("p4-2-mailbox-search")
     }
 
-    func test_mailbox_search_loading_ios_baseline_is_present() throws {
-        try assertBaselineOrSkip("loading")
+    func test_mailbox_search_recent_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("search-recent")
     }
 
-    func test_mailbox_search_populated_ios_baseline_is_present() throws {
-        try assertBaselineOrSkip("populated")
+    func test_mailbox_search_typing_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("search-typing")
+    }
+
+    func test_mailbox_search_results_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("search-results")
     }
 
     func test_mailbox_search_empty_ios_baseline_is_present() throws {
-        try assertBaselineOrSkip("empty")
-    }
-
-    func test_mailbox_search_error_ios_baseline_is_present() throws {
-        try assertBaselineOrSkip("error")
+        try assertBaselineOrSkip("search-empty")
     }
 
     private func assertBaselineOrSkip(_ slug: String) throws {
@@ -45,7 +53,7 @@ final class MailboxSearchSnapshotTests: XCTestCase {
             throw XCTSkip("Baseline pending follow-up commit: \(url.path)")
         }
         let data = try Data(contentsOf: url)
-        XCTAssertGreaterThan(data.count, 8 * 1024, "Baseline too small (\(data.count) bytes)")
+        XCTAssertGreaterThan(data.count, 8 * 1024, "Baseline too small (\(data.count) bytes): \(url.path)")
         XCTAssertTrue(
             data.count > 4 &&
                 data[0] == 0x89 &&

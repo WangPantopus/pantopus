@@ -697,7 +697,11 @@ public struct YouTabRoot: View {
                     onOpenMail: { mailId in
                         Task { @MainActor in path.append(.mailItemDetail(mailId: mailId)) }
                     },
-                    onCancel: { if !path.isEmpty { path.removeLast() } }
+                    onCancel: {
+                        Task { @MainActor in
+                            if !path.isEmpty { path.removeLast() }
+                        }
+                    }
                 )
             )
         case let .mailItemDetail(mailId):

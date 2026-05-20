@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongParameterList")
+@file:Suppress("PackageNaming", "LongParameterList", "MagicNumber")
 
 package app.pantopus.android.ui.screens.mailbox.search
 
@@ -7,6 +7,7 @@ import app.pantopus.android.data.api.models.mailbox.MailboxListResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -22,17 +23,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+/**
+ * P4.2 — Covers the Mailbox Search VM:
+ *  - corpus loads once; isLoading clears on settle (success + failure)
+ *  - blank query → no results
+ *  - matching across sender / subject / body / category (case-insensitive)
+ *  - result rows reuse the Mailbox list row projection
+ *  - result taps route to the mail id
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MailboxSearchViewModelTest {
     private val repo: MailboxRepository = mockk()
 
-    @Before
-    fun setUp() {
+    @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
     }
 
-    @After
-    fun tearDown() {
+    @After fun tearDown() {
         Dispatchers.resetMain()
     }
 
@@ -55,7 +62,6 @@ class MailboxSearchViewModelTest {
         previewText: String? = null,
         content: String? = null,
         sender: String? = null,
-        viewed: Boolean = false,
     ) = MailItem(
         id = id,
         recipientUserId = null,
@@ -79,7 +85,7 @@ class MailboxSearchViewModelTest {
         senderUserId = null,
         senderBusinessName = sender,
         senderAddress = null,
-        viewed = viewed,
+        viewed = false,
         viewedAt = null,
         archived = false,
         starred = false,
@@ -98,148 +104,98 @@ class MailboxSearchViewModelTest {
             NetworkResult.Success(MailboxListResponse(mail = items, count = items.size))
     }
 
-    private fun loadedVM(): MailboxSearchViewModel {
-        stubSuccess()
-        return MailboxSearchViewModel(repo).also { it.load() }
+    // ─── Pure matching ─────────────────────────────────────────
+
+    @Test fun matches_by_sender() {
+        val m = mail(id = "x", sender = "City of Oakland")
+        assertTrue(MailboxSearchViewModel.matches(m, "oakland"))
+        assertTrue(MailboxSearchViewModel.matches(m, "CITY"))
+        assertFalse(MailboxSearchViewModel.matches(m, "berkeley"))
     }
 
-    // ─── Corpus lifecycle ──────────────────────────────────
+    @Test fun matches_by_subject_and_body() {
+        val m = mail(id = "x", subject = "Water bill", previewText = "Booklet enclosed")
+        assertTrue(MailboxSearchViewModel.matches(m, "water"))
+        assertTrue(MailboxSearchViewModel.matches(m, "enclosed"))
+    }
 
-    @Test
-    fun fresh_vm_starts_loading() {
-        // No load() call — the constructor must not touch the repo.
+    @Test fun matches_by_category_label() {
+        // mail_type "insurance" → category label "Insurance".
+        assertTrue(MailboxSearchViewModel.matches(mail(id = "x", type = "insurance", mailType = "insurance", subject = "Policy"), "insurance"))
+    }
+
+    @Test fun filter_blank_query_yields_empty() {
+        assertTrue(MailboxSearchViewModel.filter(corpus, "").isEmpty())
+        assertTrue(MailboxSearchViewModel.filter(corpus, "   ").isEmpty())
+    }
+
+    @Test fun filter_returns_only_matches() {
+        assertEquals(listOf("m3"), MailboxSearchViewModel.filter(corpus, "policy").map { it.id })
+    }
+
+    // ─── Load + query lifecycle ────────────────────────────────
+
+    @Test fun initial_state_is_loading_with_no_results() {
         val vm = MailboxSearchViewModel(repo)
-        assertEquals(MailboxSearchViewModel.LoadPhase.Loading, vm.loadPhase.value)
+        assertTrue(vm.isLoading.value)
+        assertTrue(vm.results.value.isEmpty())
     }
 
-    @Test
-    fun load_success_becomes_ready() =
+    @Test fun load_clears_loading_and_keeps_results_empty_for_blank_query() =
         runTest {
-            val vm = loadedVM()
-            assertEquals(MailboxSearchViewModel.LoadPhase.Ready, vm.loadPhase.value)
-        }
-
-    @Test
-    fun load_failure_becomes_error() =
-        runTest {
-            coEvery { repo.list(any(), any(), any(), any(), any()) } returns
-                NetworkResult.Failure(NetworkError.Server(500, "boom"))
-            val vm = MailboxSearchViewModel(repo).also { it.load() }
-            assertTrue(vm.loadPhase.value is MailboxSearchViewModel.LoadPhase.Error)
-        }
-
-    @Test
-    fun retry_after_error_recovers() =
-        runTest {
-            coEvery { repo.list(any(), any(), any(), any(), any()) } returns
-                NetworkResult.Failure(NetworkError.Server(500, "boom"))
-            val vm = MailboxSearchViewModel(repo).also { it.load() }
-            assertTrue(vm.loadPhase.value is MailboxSearchViewModel.LoadPhase.Error)
             stubSuccess()
-            vm.retry()
-            assertEquals(MailboxSearchViewModel.LoadPhase.Ready, vm.loadPhase.value)
-        }
-
-    // ─── Filtering ─────────────────────────────────────────
-
-    @Test
-    fun blank_query_yields_no_results() =
-        runTest {
-            val vm = loadedVM()
-            assertTrue(vm.results.value.isEmpty())
-            vm.onQueryChange("   ")
+            val vm = MailboxSearchViewModel(repo)
+            vm.load()
+            assertFalse(vm.isLoading.value)
             assertTrue(vm.results.value.isEmpty())
         }
 
-    @Test
-    fun filter_matches_sender() =
+    @Test fun query_filters_loaded_corpus() =
         runTest {
-            val vm = loadedVM()
+            stubSuccess()
+            val vm = MailboxSearchViewModel(repo)
+            vm.load()
             vm.onQueryChange("oakland")
             assertEquals(listOf("m1"), vm.results.value.map { it.id })
-        }
-
-    @Test
-    fun filter_matches_subject() =
-        runTest {
-            val vm = loadedVM()
-            vm.onQueryChange("policy")
-            assertEquals(listOf("m3"), vm.results.value.map { it.id })
-        }
-
-    @Test
-    fun filter_matches_body() =
-        runTest {
-            val vm = loadedVM()
-            vm.onQueryChange("enclosed")
+            vm.onQueryChange("booklet")
             assertEquals(listOf("m2"), vm.results.value.map { it.id })
-        }
-
-    @Test
-    fun filter_matches_category_label() =
-        runTest {
-            val vm = loadedVM()
-            vm.onQueryChange("insurance")
-            assertEquals(listOf("m3"), vm.results.value.map { it.id })
-        }
-
-    @Test
-    fun filter_is_case_insensitive() =
-        runTest {
-            val vm = loadedVM()
-            vm.onQueryChange("OAKLAND")
-            assertEquals(listOf("m1"), vm.results.value.map { it.id })
-        }
-
-    @Test
-    fun no_match_yields_empty() =
-        runTest {
-            val vm = loadedVM()
-            vm.onQueryChange("zzzzzz")
+            vm.onQueryChange("zzzzz")
             assertTrue(vm.results.value.isEmpty())
         }
 
-    @Test
-    fun clearing_query_resets_results() =
+    @Test fun load_failure_leaves_empty_results() =
         runTest {
-            val vm = loadedVM()
+            coEvery { repo.list(any(), any(), any(), any(), any()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = MailboxSearchViewModel(repo)
+            vm.load()
+            assertFalse(vm.isLoading.value)
             vm.onQueryChange("oakland")
-            assertEquals(1, vm.results.value.size)
-            vm.onQueryChange("")
             assertTrue(vm.results.value.isEmpty())
         }
 
-    // ─── matches() unit ────────────────────────────────────
+    @Test fun row_model_reuses_mailbox_row() =
+        runTest {
+            stubSuccess()
+            val vm = MailboxSearchViewModel(repo)
+            vm.load()
+            vm.onQueryChange("oakland")
+            val match = vm.results.value.first()
+            val row = vm.rowModel(match)
+            assertEquals("Water bill", row.title)
+            assertEquals("Bill", row.chips?.first()?.text) // reused category chip
+            assertTrue(row.leading is RowLeading.TypeIcon)
+        }
 
-    @Test
-    fun matches_each_field() {
-        val item =
-            mail(
-                id = "x",
-                type = "bill",
-                mailType = "bill",
-                subject = "Water bill",
-                previewText = "Due soon",
-                content = "long body text",
-                sender = "City of Oakland",
-            )
-        assertTrue(MailboxSearchViewModel.matches(item, "oakland")) // sender
-        assertTrue(MailboxSearchViewModel.matches(item, "water")) // subject
-        assertTrue(MailboxSearchViewModel.matches(item, "body")) // content
-        assertTrue(MailboxSearchViewModel.matches(item, "bill")) // category label
-        assertFalse(MailboxSearchViewModel.matches(item, "spaceship"))
-    }
-
-    // ─── Tap routing ───────────────────────────────────────
-
-    @Test
-    fun row_tap_routes_to_mail() =
+    @Test fun row_tap_routes_to_mail() =
         runTest {
             var opened: String? = null
-            val vm = loadedVM()
+            stubSuccess()
+            val vm = MailboxSearchViewModel(repo)
             vm.configureNavigation(onOpenMail = { opened = it })
+            vm.load()
             vm.onQueryChange("oakland")
-            vm.rowFor(vm.results.value[0]).onTap()
+            vm.rowModel(vm.results.value.first()).onTap()
             assertEquals("m1", opened)
         }
 }

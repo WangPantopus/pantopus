@@ -2,10 +2,13 @@
 //  MailboxSearchViewModelTests.swift
 //  PantopusTests
 //
-//  P4.2 — Mailbox Search. Covers the client-side filter (sender / subject
-//  / body / category), the corpus-fetch lifecycle (loading / ready /
-//  error), tap routing, and view construction in every render phase
-//  (loading / populated / empty / error).
+//  P4.2 — Covers the Mailbox Search VM:
+//    - corpus loads once; isLoading clears on settle (success + failure)
+//    - blank query → no results (shell falls back to recent/empty)
+//    - matching across sender / subject / body / category (case-insensitive)
+//    - result rows reuse the Mailbox list row projection
+//    - result taps route to the mail id
+//    - the view materialises in each render phase
 //
 
 import SwiftUI
@@ -13,203 +16,190 @@ import UIKit
 import XCTest
 @testable import Pantopus
 
-// swiftlint:disable force_try
-
 @MainActor
 final class MailboxSearchViewModelTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
     override func tearDown() {
         SequencedURLProtocol.reset()
         super.tearDown()
     }
 
-    // MARK: - Fixtures
-
-    /// Three mail items spanning the four searchable fields:
-    ///   m1 — sender "City of Oakland", subject "Water bill", category bill
-    ///   m2 — sender "Maria Kovacs", body "Booklet enclosed", category booklet
-    ///   m3 — sender "Acme Insurance", subject "Policy renewal", category insurance
-    private func corpusJSON() -> String {
-        """
-        {
-          "count": 3,
-          "mail": [
-            {
-              "id": "m1", "type": "bill", "mail_type": "bill",
-              "subject": "Water bill", "preview_text": "Due June 1",
-              "sender_business_name": "City of Oakland",
-              "viewed": false, "archived": false, "starred": false,
-              "tags": [], "priority": "normal",
-              "created_at": "2026-05-15T12:00:00Z"
-            },
-            {
-              "id": "m2", "type": "booklet", "mail_type": "booklet",
-              "display_title": "Welcome packet", "preview_text": "Booklet enclosed",
-              "sender_business_name": "Maria Kovacs",
-              "viewed": true, "archived": false, "starred": false,
-              "tags": [], "priority": "normal",
-              "created_at": "2026-05-14T12:00:00Z"
-            },
-            {
-              "id": "m3", "type": "insurance", "mail_type": "insurance",
-              "subject": "Policy renewal", "preview_text": "Renew by July",
-              "sender_business_name": "Acme Insurance",
-              "viewed": false, "archived": false, "starred": false,
-              "tags": [], "priority": "normal",
-              "created_at": "2026-05-13T12:00:00Z"
-            }
-          ]
-        }
-        """
+    private func makeAPI() -> APIClient {
+        APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
     }
 
-    private func makeClient() -> APIClient {
-        APIClient(session: SequencedURLProtocol.makeSession(), retryPolicy: .none)
+    private func mail(
+        id: String = "m1",
+        type: String = "general",
+        mailType: String? = nil,
+        subject: String? = nil,
+        displayTitle: String? = nil,
+        previewText: String? = nil,
+        content: String? = nil,
+        sender: String? = nil
+    ) -> MailItem {
+        let fields: [(String, String)?] = [
+            mailType.map { ("mail_type", $0) },
+            subject.map { ("subject", $0) },
+            displayTitle.map { ("display_title", $0) },
+            previewText.map { ("preview_text", $0) },
+            content.map { ("content", $0) },
+            sender.map { ("sender_business_name", $0) }
+        ]
+        let extras = fields.compactMap { $0 }.map { "\"\($0.0)\":\"\($0.1)\"," }.joined()
+        let json = """
+        {
+          "id": "\(id)", "type": "\(type)", \(extras)
+          "viewed": false, "archived": false, "starred": false,
+          "tags": [], "priority": "normal",
+          "created_at": "2026-05-15T12:00:00Z"
+        }
+        """
+        // swiftlint:disable:next force_try
+        return try! JSONDecoder().decode(MailItem.self, from: Data(json.utf8))
+    }
+
+    /// Build a `{ "mail": [...], "count": N }` response body.
+    private func body(_ items: [MailItem]) -> String {
+        let rows = items
+            .map { m -> String in
+                var parts = ["\"id\":\"\(m.id)\"", "\"type\":\"\(m.type)\""]
+                if let v = m.mailType { parts.append("\"mail_type\":\"\(v)\"") }
+                if let v = m.subject { parts.append("\"subject\":\"\(v)\"") }
+                if let v = m.displayTitle { parts.append("\"display_title\":\"\(v)\"") }
+                if let v = m.previewText { parts.append("\"preview_text\":\"\(v)\"") }
+                if let v = m.content { parts.append("\"content\":\"\(v)\"") }
+                if let v = m.senderBusinessName { parts.append("\"sender_business_name\":\"\(v)\"") }
+                parts.append("\"viewed\":false,\"archived\":false,\"starred\":false")
+                parts.append("\"tags\":[],\"priority\":\"normal\"")
+                parts.append("\"created_at\":\"2026-05-15T12:00:00Z\"")
+                return "{\(parts.joined(separator: ","))}"
+            }
+            .joined(separator: ",")
+        return "{\"mail\":[\(rows)],\"count\":\(items.count)}"
+    }
+
+    /// m1 — sender "City of Oakland", subject "Water bill", category bill
+    /// m2 — sender "Maria Kovacs", body "Booklet enclosed", category booklet
+    /// m3 — sender "Acme Insurance", subject "Policy renewal", category insurance
+    private func corpus() -> [MailItem] {
+        [
+            mail(id: "m1", type: "bill", mailType: "bill", subject: "Water bill", previewText: "Due June 1", sender: "City of Oakland"),
+            mail(id: "m2", type: "booklet", mailType: "booklet", displayTitle: "Welcome packet", previewText: "Booklet enclosed", sender: "Maria Kovacs"),
+            mail(id: "m3", type: "insurance", mailType: "insurance", subject: "Policy renewal", previewText: "Renew by July", sender: "Acme Insurance")
+        ]
     }
 
     private func loadedVM(
-        onOpenMail: @escaping (String) -> Void = { _ in }
+        onOpenMail: @escaping @Sendable (String) -> Void = { _ in }
     ) async -> MailboxSearchViewModel {
-        SequencedURLProtocol.reset()
-        SequencedURLProtocol.sequence = [.status(200, body: corpusJSON())]
-        let vm = MailboxSearchViewModel(api: makeClient(), onOpenMail: onOpenMail)
+        SequencedURLProtocol.sequence = [.status(200, body: body(corpus()))]
+        let vm = MailboxSearchViewModel(api: makeAPI(), onOpenMail: onOpenMail)
         await vm.load()
         return vm
     }
 
-    private func decodeMail(_ json: String) -> MailItem {
-        try! JSONDecoder().decode(MailItem.self, from: Data(json.utf8))
+    // MARK: - Pure search
+
+    func testMatchesBySender() {
+        let m = mail(sender: "City of Oakland")
+        XCTAssertTrue(MailboxSearchViewModel.matches(m, query: "oakland"))
+        XCTAssertTrue(MailboxSearchViewModel.matches(m, query: "CITY"))
+        XCTAssertFalse(MailboxSearchViewModel.matches(m, query: "berkeley"))
     }
 
-    // MARK: - Corpus lifecycle
+    func testMatchesBySubjectAndBody() {
+        let m = mail(subject: "Water bill", previewText: "Booklet enclosed")
+        XCTAssertTrue(MailboxSearchViewModel.matches(m, query: "water"))
+        XCTAssertTrue(MailboxSearchViewModel.matches(m, query: "enclosed"))
+    }
 
-    func testFreshVMStartsLoading() {
-        let vm = MailboxSearchViewModel(api: makeClient())
-        XCTAssertEqual(vm.loadPhase, .loading)
-        XCTAssertTrue(vm.isCorpusLoading)
+    func testMatchesByCategoryLabel() {
+        // mail_type "insurance" → category label "Insurance".
+        let m = mail(type: "insurance", mailType: "insurance", subject: "Policy")
+        XCTAssertTrue(MailboxSearchViewModel.matches(m, query: "insurance"))
+    }
+
+    func testFilterBlankQueryYieldsEmpty() {
+        let items = corpus()
+        XCTAssertTrue(MailboxSearchViewModel.filter(items, query: "").isEmpty)
+        XCTAssertTrue(MailboxSearchViewModel.filter(items, query: "   ").isEmpty)
+    }
+
+    func testFilterReturnsOnlyMatches() {
+        XCTAssertEqual(MailboxSearchViewModel.filter(corpus(), query: "policy").map(\.id), ["m3"])
+    }
+
+    // MARK: - Load + query lifecycle
+
+    func testInitialStateIsLoadingWithNoResults() {
+        let vm = MailboxSearchViewModel(api: makeAPI())
+        XCTAssertTrue(vm.isLoading)
         XCTAssertTrue(vm.results.isEmpty)
     }
 
-    func testLoadSuccessBecomesReady() async {
+    func testLoadClearsLoadingAndKeepsResultsEmptyForBlankQuery() async {
         let vm = await loadedVM()
-        XCTAssertEqual(vm.loadPhase, .ready)
-        XCTAssertFalse(vm.isCorpusLoading)
-    }
-
-    func testLoadFailureBecomesError() async {
-        SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"boom\"}")]
-        let vm = MailboxSearchViewModel(api: makeClient())
-        await vm.load()
-        guard case .error = vm.loadPhase else {
-            return XCTFail("Expected .error, got \(vm.loadPhase)")
-        }
-    }
-
-    func testRetryAfterErrorRecovers() async {
-        SequencedURLProtocol.sequence = [
-            .status(500, body: "{\"error\":\"boom\"}"),
-            .status(200, body: corpusJSON())
-        ]
-        let vm = MailboxSearchViewModel(api: makeClient())
-        await vm.load()
-        guard case .error = vm.loadPhase else {
-            return XCTFail("Expected .error after first load")
-        }
-        await vm.retry()
-        XCTAssertEqual(vm.loadPhase, .ready)
-    }
-
-    // MARK: - Filtering
-
-    func testBlankQueryYieldsNoResults() async {
-        let vm = await loadedVM()
-        XCTAssertTrue(vm.results.isEmpty)
-        vm.query = "   "
+        XCTAssertFalse(vm.isLoading)
         XCTAssertTrue(vm.results.isEmpty)
     }
 
-    func testFilterMatchesSender() async {
+    func testQueryFiltersLoadedCorpus() async {
         let vm = await loadedVM()
         vm.query = "oakland"
         XCTAssertEqual(vm.results.map(\.id), ["m1"])
-    }
-
-    func testFilterMatchesSubject() async {
-        let vm = await loadedVM()
-        vm.query = "policy"
-        XCTAssertEqual(vm.results.map(\.id), ["m3"])
-    }
-
-    func testFilterMatchesBody() async {
-        let vm = await loadedVM()
-        vm.query = "enclosed"
+        vm.query = "booklet"
         XCTAssertEqual(vm.results.map(\.id), ["m2"])
-    }
-
-    func testFilterMatchesCategoryLabel() async {
-        let vm = await loadedVM()
-        vm.query = "insurance"
-        XCTAssertEqual(vm.results.map(\.id), ["m3"])
-    }
-
-    func testFilterIsCaseInsensitive() async {
-        let vm = await loadedVM()
-        vm.query = "OAKLAND"
-        XCTAssertEqual(vm.results.map(\.id), ["m1"])
-    }
-
-    func testNoMatchYieldsEmpty() async {
-        let vm = await loadedVM()
-        vm.query = "zzzzzz"
+        vm.query = "zzzzz"
         XCTAssertTrue(vm.results.isEmpty)
-    }
-
-    func testClearingQueryResetsResults() async {
-        let vm = await loadedVM()
-        vm.query = "oakland"
-        XCTAssertEqual(vm.results.count, 1)
         vm.query = ""
         XCTAssertTrue(vm.results.isEmpty)
     }
 
-    // MARK: - matches() unit
-
-    func testMatchesEachField() {
-        let mail = decodeMail("""
-        {
-          "id": "x", "type": "bill", "mail_type": "bill",
-          "subject": "Water bill", "preview_text": "Due soon", "content": "long body text",
-          "sender_business_name": "City of Oakland",
-          "viewed": false, "archived": false, "starred": false,
-          "tags": [], "priority": "normal", "created_at": "2026-05-15T12:00:00Z"
-        }
-        """)
-        XCTAssertTrue(MailboxSearchViewModel.matches(mail, needle: "oakland")) // sender
-        XCTAssertTrue(MailboxSearchViewModel.matches(mail, needle: "water"))  // subject
-        XCTAssertTrue(MailboxSearchViewModel.matches(mail, needle: "body"))   // content
-        XCTAssertTrue(MailboxSearchViewModel.matches(mail, needle: "bill"))   // category label
-        XCTAssertFalse(MailboxSearchViewModel.matches(mail, needle: "spaceship"))
+    func testLoadFailureLeavesEmptyResults() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"boom\"}")]
+        let vm = MailboxSearchViewModel(api: makeAPI())
+        await vm.load()
+        XCTAssertFalse(vm.isLoading)
+        vm.query = "oakland"
+        XCTAssertTrue(vm.results.isEmpty)
     }
 
-    // MARK: - Tap routing
+    func testRowModelReusesMailboxRow() async {
+        let vm = await loadedVM()
+        vm.query = "oakland"
+        guard let match = vm.results.first else {
+            return XCTFail("Expected a result")
+        }
+        let row = vm.rowModel(for: match)
+        XCTAssertEqual(row.title, "Water bill")
+        XCTAssertEqual(row.chips?.first?.text, "Bill") // reused category chip
+        if case .typeIcon = row.leading {} else {
+            XCTFail("Expected reused typeIcon leading")
+        }
+    }
 
     func testRowTapRoutesToMail() async {
-        let exp = expectation(description: "onOpenMail")
-        var openedId: String?
-        let vm = await loadedVM { id in
-            openedId = id
-            exp.fulfill()
-        }
+        final class Captured: @unchecked Sendable { var id: String? }
+        let captured = Captured()
+        let vm = await loadedVM(onOpenMail: { captured.id = $0 })
         vm.query = "oakland"
-        let row = vm.row(for: vm.results[0])
-        row.onTap()
-        await fulfillment(of: [exp], timeout: 1)
-        XCTAssertEqual(openedId, "m1")
+        vm.rowModel(for: vm.results[0]).onTap()
+        XCTAssertEqual(captured.id, "m1")
     }
 
     // MARK: - View construction per phase
 
     func testViewConstructsWhileLoading() {
-        let vm = MailboxSearchViewModel(api: makeClient())
+        let vm = MailboxSearchViewModel(api: makeAPI())
         _ = UIHostingController(rootView: NavigationStack { MailboxSearchView(viewModel: vm) })
     }
 
@@ -221,14 +211,7 @@ final class MailboxSearchViewModelTests: XCTestCase {
 
     func testViewConstructsEmpty() async {
         let vm = await loadedVM()
-        vm.query = "zzzzzz"
-        _ = UIHostingController(rootView: NavigationStack { MailboxSearchView(viewModel: vm) })
-    }
-
-    func testViewConstructsError() async {
-        SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"boom\"}")]
-        let vm = MailboxSearchViewModel(api: makeClient())
-        await vm.load()
+        vm.query = "zzzzz"
         _ = UIHostingController(rootView: NavigationStack { MailboxSearchView(viewModel: vm) })
     }
 }

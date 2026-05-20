@@ -1,120 +1,136 @@
-@file:Suppress("PackageNaming", "LongParameterList", "LongMethod")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "LongParameterList")
 
 package app.pantopus.android.ui.screens.mailbox.search
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import app.pantopus.android.data.api.models.mailbox.MailItem
 import app.pantopus.android.ui.screens.mailbox.MailboxListViewModel
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowCardContext
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowView
+import app.pantopus.android.ui.screens.shared.search_list.EmptyStateContent
+import app.pantopus.android.ui.screens.shared.search_list.SearchListShell
 import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusTheme
+import app.pantopus.android.ui.theme.Spacing
 import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * Paparazzi snapshots for the P4.2 Mailbox Search surface. One baseline
- * per render state (loading / populated / empty / error).
+ * Paparazzi snapshots for the Mailbox Search surface (P4.2). One baseline
+ * per shell phase that carries new visuals — results (reused Mailbox
+ * rows), typing-shimmer, and empty.
  *
- * Baselines are recorded on first run via `./gradlew paparazziRecord` and
- * verified on every CI run via `./gradlew paparazziVerify`. Annotated
- * `@Ignore` until baselines land so the first PR doesn't fail CI on a
- * missing image — the follow-up records baselines and removes the
- * annotation.
+ * Annotated `@Ignore` until baselines land so the first PR doesn't fail CI
+ * on a missing image — the follow-up records baselines via
+ * `./gradlew paparazziRecord --tests "*MailboxSearchSnapshotTest*"` and
+ * removes the annotation.
  */
 @Ignore("Baselines recorded in follow-up — see commit body")
 class MailboxSearchSnapshotTest {
     @get:Rule
-    val paparazzi =
+    val paparazzi: Paparazzi =
         Paparazzi(
             deviceConfig =
                 DeviceConfig.PIXEL_5.copy(
-                    screenHeight = 1600,
+                    screenHeight = 1200,
                     softButtons = false,
                 ),
         )
 
-    private val corpus =
+    private val emptyState =
+        EmptyStateContent(
+            icon = PantopusIcon.Search,
+            headline = "No matching mail",
+            subcopy = "Try a different sender, subject, or category.",
+        )
+
+    private val results =
         listOf(
             mail(id = "m1", type = "bill", mailType = "bill", subject = "Water bill", previewText = "Due June 1", sender = "City of Oakland"),
             mail(id = "m2", type = "booklet", mailType = "booklet", displayTitle = "Welcome packet", previewText = "Booklet enclosed", sender = "Maria Kovacs", viewed = true),
+            mail(id = "m3", type = "insurance", mailType = "insurance", subject = "Policy renewal", previewText = "Renew by July", sender = "Acme Insurance", viewed = true),
         )
 
     @Test
-    fun mailbox_search_loading() {
+    fun mailbox_search_results_phase() {
         paparazzi.snapshot {
-            Frame {
-                MailboxSearchContent(
-                    loadPhase = MailboxSearchViewModel.LoadPhase.Loading,
-                    query = "wa",
-                    results = emptyList(),
-                    rowOf = { MailboxListViewModel.makeRow(it) {} },
+            Root {
+                SearchListShell(
+                    placeholder = "Search mail",
+                    query = "po",
                     onQueryChange = {},
+                    results = results,
+                    isLoading = false,
+                    emptyState = emptyState,
+                    row = { ResultRow(it) },
                     onCancel = {},
-                    onRetry = {},
                 )
             }
         }
     }
 
     @Test
-    fun mailbox_search_populated() {
+    fun mailbox_search_typing_phase_shimmer() {
         paparazzi.snapshot {
-            Frame {
-                MailboxSearchContent(
-                    loadPhase = MailboxSearchViewModel.LoadPhase.Ready,
-                    query = "wa",
-                    results = corpus,
-                    rowOf = { MailboxListViewModel.makeRow(it) {} },
+            Root {
+                SearchListShell(
+                    placeholder = "Search mail",
+                    query = "po",
                     onQueryChange = {},
+                    results = emptyList<MailItem>(),
+                    isLoading = true,
+                    emptyState = emptyState,
+                    row = { ResultRow(it) },
                     onCancel = {},
-                    onRetry = {},
                 )
             }
         }
     }
 
     @Test
-    fun mailbox_search_empty() {
+    fun mailbox_search_empty_phase() {
         paparazzi.snapshot {
-            Frame {
-                MailboxSearchContent(
-                    loadPhase = MailboxSearchViewModel.LoadPhase.Ready,
-                    query = "zzzzzz",
-                    results = emptyList(),
-                    rowOf = { MailboxListViewModel.makeRow(it) {} },
+            Root {
+                SearchListShell(
+                    placeholder = "Search mail",
+                    query = "zzzzz",
                     onQueryChange = {},
+                    results = emptyList<MailItem>(),
+                    isLoading = false,
+                    emptyState = emptyState,
+                    row = { ResultRow(it) },
                     onCancel = {},
-                    onRetry = {},
                 )
             }
         }
     }
 
-    @Test
-    fun mailbox_search_error() {
-        paparazzi.snapshot {
-            Frame {
-                MailboxSearchContent(
-                    loadPhase = MailboxSearchViewModel.LoadPhase.Error("Couldn't load your mailbox."),
-                    query = "",
-                    results = emptyList(),
-                    rowOf = { MailboxListViewModel.makeRow(it) {} },
-                    onQueryChange = {},
-                    onCancel = {},
-                    onRetry = {},
-                )
-            }
+    // ─── Helpers ───────────────────────────────────────────
+
+    @Composable
+    private fun ResultRow(mail: MailItem) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s1),
+        ) {
+            RowView(row = MailboxListViewModel.makeRow(mail) {}, cardContext = RowCardContext.Standalone)
         }
     }
 
     @Composable
-    private fun Frame(content: @Composable () -> Unit) {
+    private fun Root(content: @Composable () -> Unit) {
         PantopusTheme {
             Box(
                 modifier =

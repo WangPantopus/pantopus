@@ -18,12 +18,15 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * P4.2 — Backs `MailboxSearchScreen`. Fetches the user's mailbox once via
- * `GET /api/mailbox`, then filters that corpus client-side by query
- * (sender, subject, body, category). The V1 list route has no `q`
- * parameter yet, so search is local. Result rows reuse the canonical
- * mailbox row projection ([MailboxListViewModel.makeRow]) so they render
- * identically to the list.
+ * P4.2 — Backs `MailboxSearchScreen`. Fetches the user's mailbox once
+ * (`GET /api/mailbox`, route `backend/routes/mailbox.js:1306`) and filters
+ * the corpus client-side across sender, subject, body, and category. Rows
+ * project through [MailboxListViewModel.makeRow] so each result is
+ * identical to a Mailbox list row.
+ *
+ * Drives the shared `SearchListShell` (P4.1): the shell owns the search
+ * bar + debounce + four phases; this VM supplies `query`, `results`, and
+ * `isLoading`.
  */
 @HiltViewModel
 class MailboxSearchViewModel
@@ -31,107 +34,84 @@ class MailboxSearchViewModel
     constructor(
         private val repo: MailboxRepository,
     ) : ViewModel() {
-        /**
-         * One-time corpus-fetch lifecycle. The per-query result phases
-         * (typing-shimmer / results / empty) are derived by `SearchListShell`
-         * from `query` + `results` + `isLoading`; this only models the fetch
-         * of the searchable set.
-         */
-        sealed interface LoadPhase {
-            data object Loading : LoadPhase
-
-            data object Ready : LoadPhase
-
-            data class Error(
-                val message: String,
-            ) : LoadPhase
-        }
-
-        private val _loadPhase = MutableStateFlow<LoadPhase>(LoadPhase.Loading)
-
-        /** Corpus-fetch phase. */
-        val loadPhase: StateFlow<LoadPhase> = _loadPhase.asStateFlow()
-
         private val _query = MutableStateFlow("")
-
-        /** Live query, bound to the shell's field. */
         val query: StateFlow<String> = _query.asStateFlow()
 
         private val _results = MutableStateFlow<List<MailItem>>(emptyList())
-
-        /** Filtered matches for the current query. */
         val results: StateFlow<List<MailItem>> = _results.asStateFlow()
 
+        private val _isLoading = MutableStateFlow(true)
+        val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
         private var corpus: List<MailItem> = emptyList()
+        private var loaded = false
         private var onOpenMail: (String) -> Unit = {}
 
-        /** Wire nav callbacks before first load. */
-        fun configureNavigation(onOpenMail: (String) -> Unit) {
+        fun configureNavigation(onOpenMail: (String) -> Unit = {}) {
             this.onOpenMail = onOpenMail
         }
 
-        /** Fetch the searchable mailbox corpus. Idempotent once loaded. */
+        /** Fetch the corpus once; repeat calls are no-ops so typing
+         *  doesn't trigger refetches. */
         fun load() {
-            if (_loadPhase.value is LoadPhase.Ready) return
-            fetchCorpus()
+            if (loaded) return
+            _isLoading.value = true
+            viewModelScope.launch {
+                corpus =
+                    when (
+                        val result =
+                            repo.list(
+                                viewed = null,
+                                archived = false,
+                                starred = null,
+                                limit = CORPUS_LIMIT,
+                                offset = 0,
+                            )
+                    ) {
+                        is NetworkResult.Success -> result.data.mail
+                        // The shell has no error phase; an unreachable
+                        // mailbox simply yields no matches.
+                        is NetworkResult.Failure -> emptyList()
+                    }
+                loaded = true
+                _isLoading.value = false
+                recompute()
+            }
         }
 
-        /** Re-fetch after an error (wired to the error state's Retry CTA). */
-        fun retry() {
-            _loadPhase.value = LoadPhase.Loading
-            fetchCorpus()
-        }
-
-        /** Recompute results when the user types. */
         fun onQueryChange(value: String) {
             _query.value = value
             recompute()
         }
 
-        /**
-         * Result row reusing the mailbox list row template, routing taps to
-         * this surface's `onOpenMail`.
-         */
-        fun rowFor(mail: MailItem): RowModel = MailboxListViewModel.makeRow(mail, onOpenMail)
-
-        private fun fetchCorpus() {
-            viewModelScope.launch {
-                val result =
-                    repo.list(
-                        viewed = null,
-                        archived = false,
-                        starred = null,
-                        limit = CORPUS_LIMIT,
-                        offset = 0,
-                    )
-                when (result) {
-                    is NetworkResult.Success -> {
-                        corpus = result.data.mail
-                        _loadPhase.value = LoadPhase.Ready
-                        recompute()
-                    }
-                    is NetworkResult.Failure ->
-                        _loadPhase.value = LoadPhase.Error(result.error.message)
-                }
-            }
-        }
+        /** Result row identical to the Mailbox list row, routing taps to
+         *  this surface's `onOpenMail`. */
+        fun rowModel(mail: MailItem): RowModel = MailboxListViewModel.makeRow(mail, onOpenMail)
 
         private fun recompute() {
-            val needle = _query.value.trim().lowercase()
-            _results.value = if (needle.isEmpty()) emptyList() else corpus.filter { matches(it, needle) }
+            _results.value = filter(corpus, _query.value)
         }
 
         companion object {
             private const val CORPUS_LIMIT = 100
 
-            /**
-             * Case-insensitive substring match across the four fields the
-             * prompt calls out: sender, subject/title, body, and category.
-             */
+            /** Filter the corpus by a free-text query. Blank query → []. */
+            fun filter(
+                mail: List<MailItem>,
+                query: String,
+            ): List<MailItem> {
+                val trimmed = query.trim()
+                if (trimmed.isEmpty()) return emptyList()
+                return mail.filter { matches(it, trimmed) }
+            }
+
+            /** Case-insensitive substring match across sender, subject/title,
+             *  body, and category label. */
             fun matches(
                 mail: MailItem,
-                needle: String,
+                query: String,
             ): Boolean {
+                val needle = query.lowercase()
                 val category = MailItemCategory.fromRaw(mail.mailType ?: mail.type)
                 val fields =
                     listOf(

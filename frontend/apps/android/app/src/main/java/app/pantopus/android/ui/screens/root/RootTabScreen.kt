@@ -2596,7 +2596,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenMail = { mailId ->
                         navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
                     },
-                    onBack = { navController.popBackStack() },
+                    onCancel = { navController.popBackStack() },
                 )
             }
             composable(ChildRoutes.SUPPORT_TRAINS) {

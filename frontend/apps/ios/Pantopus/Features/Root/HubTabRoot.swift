@@ -1312,7 +1312,11 @@ public struct HubTabRoot: View {
                     onOpenMail: { mailId in
                         Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
                     },
-                    onCancel: { if !path.isEmpty { path.removeLast() } }
+                    onCancel: {
+                        Task { @MainActor in
+                            if !path.isEmpty { path.removeLast() }
+                        }
+                    }
                 )
             )
         case let .placeholder(label):

@@ -2,114 +2,108 @@
 //  MailboxSearchViewModel.swift
 //  Pantopus
 //
-//  P4.2 — Backs `MailboxSearchView`. Fetches the user's mailbox once via
-//  `GET /api/mailbox`, then filters that corpus client-side by query
-//  (sender, subject, body, category). The V1 list route has no `q`
-//  parameter yet, so search is local. Result rows reuse the canonical
-//  mailbox row projection (`MailboxListViewModel.makeRow`) so they render
-//  identically to the list.
+//  P4.2 — Backs `MailboxSearchView`. Fetches the user's mailbox once
+//  (`GET /api/mailbox`, route `backend/routes/mailbox.js:1306`) and
+//  filters that corpus client-side across sender, subject, body, and
+//  category. The V1 list route has no `q` parameter yet, so search is
+//  local. Rows project through `MailboxListViewModel.makeRow` so each
+//  result is identical to a row on the Mailbox list.
+//
+//  Drives the shared `SearchListShell` (P4.1): the shell owns the search
+//  bar + debounce + four lifecycle phases (recent / typing / results /
+//  empty); this VM just supplies `query`, `results`, and `isLoading`.
 //
 
 import Foundation
 import Observation
 
-/// ViewModel for the Mailbox Search surface.
 @Observable
 @MainActor
 final class MailboxSearchViewModel {
-    /// One-time corpus-fetch lifecycle. The per-query result phases
-    /// (typing-shimmer / results / empty) are derived by `SearchListShell`
-    /// from `query` + `results` + `isCorpusLoading`; this enum only models
-    /// the fetch of the searchable set.
-    enum LoadPhase: Sendable, Equatable {
-        case loading
-        case ready
-        case error(message: String)
-    }
-
-    private(set) var loadPhase: LoadPhase = .loading
-
-    /// Live query, bound to the shell's field. The setter recomputes
-    /// `results` synchronously so filtering feels instant; the shell's own
-    /// 250ms debounce gates the empty-state flash.
+    /// Bound to the shell's search field. `didSet` re-filters the cached
+    /// corpus synchronously — the corpus is a single fetched page.
     var query: String = "" {
         didSet { recompute() }
     }
 
-    /// Filtered matches for the current query. Empty while the query is
-    /// blank — the shell shows its recent/blank phase then.
     private(set) var results: [MailItem] = []
 
-    /// Drives the shell's typing-shimmer while the corpus is still loading.
-    var isCorpusLoading: Bool { loadPhase == .loading }
+    /// True until the corpus fetch settles. Gates the shell's
+    /// typing-shimmer: while mail is still loading and the user has typed,
+    /// the shell shows the skeleton instead of a false "no matches".
+    private(set) var isLoading: Bool = true
+
+    /// No-results payload for the shell's empty phase.
+    let emptyState = EmptyStateContent(
+        icon: .search,
+        headline: "No matching mail",
+        subcopy: "Try a different sender, subject, or category."
+    )
+
+    /// Pop the search surface — wired to the shell's back control.
+    let onCancel: @Sendable () -> Void
+
+    private var corpus: [MailItem] = []
+    private var didLoad = false
 
     private let api: APIClient
-    private let onOpenMail: (String) -> Void
-    private let onCancel: () -> Void
-    private var corpus: [MailItem] = []
+    private let onOpenMail: @Sendable (String) -> Void
     private let corpusLimit = 100
 
     init(
         api: APIClient = .shared,
-        onOpenMail: @escaping (String) -> Void = { _ in },
-        onCancel: @escaping () -> Void = {}
+        onOpenMail: @escaping @Sendable (String) -> Void = { _ in },
+        onCancel: @escaping @Sendable () -> Void = {}
     ) {
         self.api = api
         self.onOpenMail = onOpenMail
         self.onCancel = onCancel
     }
 
-    /// Fetch the searchable mailbox corpus. Idempotent once loaded.
+    /// Fetch the corpus once. Repeat calls (e.g. a re-entered `.task`)
+    /// are no-ops so typing doesn't trigger refetches.
     func load() async {
-        if case .ready = loadPhase { return }
-        await fetchCorpus()
-    }
-
-    /// Re-fetch after an error (wired to the error state's Retry CTA).
-    func retry() async {
-        loadPhase = .loading
-        await fetchCorpus()
-    }
-
-    /// Back out of search.
-    func cancel() {
-        onCancel()
-    }
-
-    /// Result row reusing the mailbox list row template, routing taps to
-    /// this surface's `onOpenMail`.
-    func row(for mail: MailItem) -> RowModel {
-        MailboxListViewModel.makeRow(for: mail) { [weak self] mailId in
-            Task { @MainActor in self?.onOpenMail(mailId) }
-        }
-    }
-
-    private func fetchCorpus() async {
-        let endpoint = MailboxEndpoints.list(archived: false, limit: corpusLimit, offset: 0)
+        guard !didLoad else { return }
+        isLoading = true
         do {
-            let response: MailboxListResponse = try await api.request(endpoint)
-            corpus = response.mail
-            loadPhase = .ready
-            recompute()
-        } catch {
-            loadPhase = .error(
-                message: (error as? APIError)?.errorDescription ?? "Couldn't load your mailbox."
+            let response: MailboxListResponse = try await api.request(
+                MailboxEndpoints.list(archived: false, limit: corpusLimit, offset: 0)
             )
+            corpus = response.mail
+        } catch {
+            // The shell has no error phase; an unreachable mailbox simply
+            // yields no matches rather than spinning forever.
+            corpus = []
         }
+        didLoad = true
+        isLoading = false
+        recompute()
+    }
+
+    /// Build a result row identical to the Mailbox list row, routing taps
+    /// to this surface's `onOpenMail`.
+    func rowModel(for mail: MailItem) -> RowModel {
+        MailboxListViewModel.makeRow(for: mail, onOpenMail: onOpenMail)
     }
 
     private func recompute() {
-        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !needle.isEmpty else {
-            results = []
-            return
-        }
-        results = corpus.filter { Self.matches($0, needle: needle) }
+        results = Self.filter(corpus, query: query)
+    }
+
+    // MARK: - Pure search (tested directly)
+
+    /// Filter the corpus by a free-text query. Returns `[]` for a blank
+    /// query so the shell falls back to its recent/empty canvas.
+    static func filter(_ mail: [MailItem], query: String) -> [MailItem] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        return mail.filter { matches($0, query: trimmed) }
     }
 
     /// Case-insensitive substring match across the four fields the prompt
-    /// calls out: sender, subject/title, body, and category.
-    static func matches(_ mail: MailItem, needle: String) -> Bool {
+    /// calls out: sender, subject/title, body, and category label.
+    static func matches(_ mail: MailItem, query: String) -> Bool {
+        let needle = query.lowercased()
         let category = MailItemCategory.fromRaw(mail.mailType ?? mail.type)
         let fields: [String?] = [
             mail.senderBusinessName,
