@@ -86,12 +86,17 @@ data class StatsTabsContent(
  * Stats strip + action row + tab strip + tab content panel. Caller owns
  * the [selectedTab] / [onSelectTab] state so navigation events stay
  * external.
+ *
+ * P6.5 — [showActionRow] lets callers suppress the inline Message /
+ * Connect / overflow row when the host screen renders kind-aware CTAs
+ * in a sticky footer instead (Public profile · Persona vs Local).
  */
 @Composable
 fun StatsTabsBody(
     content: StatsTabsContent,
     selectedTab: ProfileTab,
     onSelectTab: (ProfileTab) -> Unit,
+    showActionRow: Boolean = true,
     onMessage: () -> Unit = {},
     onConnect: () -> Unit = {},
     onOverflow: () -> Unit = {},
@@ -107,12 +112,14 @@ fun StatsTabsBody(
                     .padding(horizontal = Spacing.s4)
                     .offset(y = (-16).dp),
         )
-        ActionRow(
-            onMessage = onMessage,
-            onConnect = onConnect,
-            onOverflow = onOverflow,
-            modifier = Modifier.padding(horizontal = Spacing.s4),
-        )
+        if (showActionRow) {
+            ActionRow(
+                onMessage = onMessage,
+                onConnect = onConnect,
+                onOverflow = onOverflow,
+                modifier = Modifier.padding(horizontal = Spacing.s4),
+            )
+        }
         TabStrip(
             selectedTab = selectedTab,
             onSelectTab = onSelectTab,

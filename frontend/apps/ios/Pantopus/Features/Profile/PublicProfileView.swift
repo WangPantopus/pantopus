@@ -5,6 +5,18 @@
 //  Public profile screen wired through `ContentDetailShell` with
 //  `ProfileHeader` + `StatsTabsBody` + `ActionRowCTA`.
 //
+//  P6.5 — Differentiates between Persona (creator) and Local (verified
+//  neighbor) profiles. The view-model picks the kind from the loaded
+//  profile's metadata, then this view swaps:
+//
+//    - banner color (sky vs green) above the header,
+//    - in-header chips ("Persona · Verified" gold tier vs "Verified
+//      neighbor" green shield),
+//    - sticky footer CTAs (single Follow vs Message + Connect),
+//    - post styling beneath the stats/tabs body (broadcasts with a
+//      tier visibility chip + locked-paywall overlay vs Pulse-style
+//      posts with an intent chip).
+//
 
 import SwiftUI
 
@@ -94,29 +106,63 @@ public struct PublicProfileView: View {
             title: nil,
             onBack: onBack,
             header: {
-                ProfileHeader(
-                    displayName: payload.header.displayName,
-                    handle: payload.header.handle,
-                    locality: payload.header.locality,
-                    avatarURL: payload.header.avatarURL,
-                    isVerified: payload.header.isVerified,
-                    identityBadges: payload.header.identityBadges
+                VStack(spacing: 0) {
+                    PublicProfileBanner(kind: payload.kind)
+                    ProfileHeader(
+                        displayName: payload.header.displayName,
+                        handle: payload.header.handle,
+                        locality: payload.header.locality,
+                        avatarURL: payload.header.avatarURL,
+                        isVerified: payload.header.isVerified,
+                        identityBadges: payload.header.identityBadges,
+                        tierLabel: payload.header.tierLabel,
+                        isVerifiedNeighbor: payload.header.isVerifiedNeighbor
+                    )
+                }
+                .accessibilityIdentifier(
+                    payload.kind == .persona
+                        ? "publicProfilePersonaHeader"
+                        : "publicProfileLocalHeader"
                 )
             },
             body: {
-                StatsTabsBody(
-                    content: payload.stats,
-                    selectedTab: Binding(
-                        get: { viewModel.selectedTab },
-                        set: { viewModel.selectedTab = $0 }
-                    ),
-                    onMessage: { onOpenMessages(payload.profile) },
-                    onConnect: { Task { await viewModel.connect() } },
-                    onOverflow: { viewModel.showOverflow = true }
-                )
+                VStack(alignment: .leading, spacing: Spacing.s4) {
+                    StatsTabsBody(
+                        content: payload.stats,
+                        selectedTab: Binding(
+                            get: { viewModel.selectedTab },
+                            set: { viewModel.selectedTab = $0 }
+                        ),
+                        showActionRow: false,
+                        onMessage: { onOpenMessages(payload.profile) },
+                        onConnect: { Task { await viewModel.connect() } },
+                        onOverflow: { viewModel.showOverflow = true }
+                    )
+                    PublicProfilePostsFeed(
+                        kind: payload.kind,
+                        posts: payload.posts
+                    ) { _ in viewModel.toastMessage = "Subscribe flow coming soon" }
+                }
             },
-            cta: { ActionRowCTA() }
+            cta: { stickyFooter(for: payload) }
         )
+    }
+
+    @ViewBuilder
+    private func stickyFooter(for payload: PublicProfileContent) -> some View {
+        switch payload.kind {
+        case .persona:
+            ActionRowCTA(kind: .persona(followState: viewModel.followState) {
+                Task { await viewModel.follow() }
+            })
+        case .local:
+            ActionRowCTA(kind: .local(
+                messageState: .idle,
+                connectState: viewModel.connectState,
+                onMessage: { onOpenMessages(payload.profile) },
+                onConnect: { Task { await viewModel.connect() } }
+            ))
+        }
     }
 }
 

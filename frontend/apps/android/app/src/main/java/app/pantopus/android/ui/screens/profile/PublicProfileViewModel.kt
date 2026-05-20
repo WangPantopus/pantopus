@@ -31,6 +31,39 @@ import javax.inject.Inject
 /** Nav-arg key for the user ID. */
 const val PUBLIC_PROFILE_USER_ID_KEY = "userId"
 
+/**
+ * P6.5 — Profile-kind discriminator that swaps the chrome between the
+ * Persona (creator) and Local (verified neighbor) variants. Persona is
+ * the default; the VM bumps it to [Local] when the loaded profile
+ * carries a verified residency.
+ */
+enum class PublicProfileKind { Persona, Local }
+
+/**
+ * One post rendered beneath the stats/tabs body. Persona profiles
+ * carry creator-economy broadcasts (with tier visibility and the
+ * optional locked-paywall overlay); Local profiles carry Pulse-style
+ * neighborhood posts (with an intent chip — Offer / Alert / Event).
+ */
+data class PublicProfilePost(
+    val id: String,
+    val body: String,
+    val timeAgo: String,
+    val locality: String? = null,
+    val reactions: Int = 0,
+    val replies: Int = 0,
+    /** Persona-only — `null` on Local posts. */
+    val visibility: Visibility? = null,
+    /** Persona-only — `true` when this broadcast is gated. */
+    val isLocked: Boolean = false,
+    /** Local-only — `null` on Persona broadcasts. */
+    val intent: Intent? = null,
+) {
+    enum class Visibility { Free, Bronze, Silver, Gold }
+
+    enum class Intent { Offer, Alert, Event, Ask }
+}
+
 /** Header surface for the public profile. */
 data class PublicProfileHeader(
     val displayName: String,
@@ -39,13 +72,19 @@ data class PublicProfileHeader(
     val avatarUrl: String?,
     val isVerified: Boolean,
     val identityBadges: List<IdentityPillarBadge>,
+    /** P6.5 — Gold "Persona · Verified" chip on Persona profiles. */
+    val tierLabel: String? = null,
+    /** P6.5 — Green "Verified neighbor" shield chip on Local profiles. */
+    val isVerifiedNeighbor: Boolean = false,
 )
 
 /** Render-ready payload emitted by [PublicProfileViewModel]. */
 data class PublicProfileContent(
     val profile: PublicProfileDto,
+    val kind: PublicProfileKind,
     val header: PublicProfileHeader,
     val stats: StatsTabsContent,
+    val posts: List<PublicProfilePost> = emptyList(),
 )
 
 /** Observed UI state for the Public profile screen. */
@@ -100,6 +139,14 @@ class PublicProfileViewModel
             MutableStateFlow<PublicProfileActionState>(PublicProfileActionState.Idle)
         val blockState: StateFlow<PublicProfileActionState> = _blockState.asStateFlow()
 
+        /**
+         * P6.5 — Follow button state for Persona profiles. Toggles
+         * `Idle` → `InFlight` → `Succeeded` once the request lands.
+         */
+        private val _followState =
+            MutableStateFlow<PublicProfileActionState>(PublicProfileActionState.Idle)
+        val followState: StateFlow<PublicProfileActionState> = _followState.asStateFlow()
+
         private val _showOverflow = MutableStateFlow(false)
         val showOverflow: StateFlow<Boolean> = _showOverflow.asStateFlow()
 
@@ -130,6 +177,15 @@ class PublicProfileViewModel
             _showOverflow.value = show
         }
 
+        /**
+         * P6.5 — Surface the placeholder "Subscribe flow coming soon"
+         * toast when the visitor taps the locked-broadcast paywall
+         * overlay. The real subscribe-to-tier flow lands in a follow-up.
+         */
+        fun showSubscribeToast() {
+            _toastMessage.value = "Subscribe flow coming soon"
+        }
+
         /** Send a connection request via `POST /api/relationships/requests`. */
         fun connect() {
             if (_connectState.value is PublicProfileActionState.InFlight) return
@@ -144,6 +200,30 @@ class PublicProfileViewModel
                     is NetworkResult.Failure -> {
                         val message = friendlyMessage(result.error)
                         _connectState.value = PublicProfileActionState.Failed(message)
+                        _toastMessage.value = message
+                    }
+                }
+            }
+        }
+
+        /**
+         * P6.5 — Follow a Persona profile. Reuses the connection-request
+         * endpoint as the closest existing wire op; backend wires a
+         * dedicated `POST /api/follows/:userId` later if/when it ships.
+         */
+        fun follow() {
+            if (_followState.value is PublicProfileActionState.InFlight) return
+            if (_followState.value is PublicProfileActionState.Succeeded) return
+            _followState.value = PublicProfileActionState.InFlight
+            viewModelScope.launch {
+                when (val result = relationships.sendRequest(userId)) {
+                    is NetworkResult.Success -> {
+                        _followState.value = PublicProfileActionState.Succeeded
+                        _toastMessage.value = "Following"
+                    }
+                    is NetworkResult.Failure -> {
+                        val message = friendlyMessage(result.error)
+                        _followState.value = PublicProfileActionState.Failed(message)
                         _toastMessage.value = message
                     }
                 }
@@ -181,6 +261,7 @@ class PublicProfileViewModel
         }
 
         private fun build(profile: PublicProfileDto): PublicProfileContent {
+            val kind = derivedKind(profile)
             val header =
                 PublicProfileHeader(
                     displayName = profile.displayName,
@@ -189,6 +270,8 @@ class PublicProfileViewModel
                     avatarUrl = profile.profilePictureUrl ?: profile.avatarUrl,
                     isVerified = profile.verified == true,
                     identityBadges = buildBadges(profile),
+                    tierLabel = if (kind == PublicProfileKind.Persona) "Persona · Verified" else null,
+                    isVerifiedNeighbor = kind == PublicProfileKind.Local,
                 )
             val stats = mutableListOf<ProfileStatCell>()
             val reviewCount = profile.reviewCount ?: 0
@@ -235,6 +318,7 @@ class PublicProfileViewModel
 
             return PublicProfileContent(
                 profile = profile,
+                kind = kind,
                 header = header,
                 stats =
                     StatsTabsContent(
@@ -245,6 +329,16 @@ class PublicProfileViewModel
                     ),
             )
         }
+
+        /**
+         * P6.5 — Kind heuristic. A profile with a verified residency
+         * blob is a Local (verified neighbor) profile; everyone else is
+         * treated as a Persona (creator) profile. Backend doesn't ship
+         * an explicit creator/local discriminator yet — this signal is
+         * the closest stable proxy.
+         */
+        private fun derivedKind(profile: PublicProfileDto): PublicProfileKind =
+            if (hasHomeResidency(profile)) PublicProfileKind.Local else PublicProfileKind.Persona
 
         private fun buildBadges(profile: PublicProfileDto): List<IdentityPillarBadge> {
             val verified = profile.verified == true

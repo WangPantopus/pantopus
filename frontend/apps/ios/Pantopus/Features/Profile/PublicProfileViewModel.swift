@@ -6,6 +6,11 @@
 //  `StatsTabsBody` content model. Tab state lives in the VM so
 //  switching doesn't re-fetch.
 //
+//  P6.5 — Persona vs Local chrome. The VM derives the profile kind
+//  from the loaded DTO's metadata so the screen can swap banner color,
+//  header chips, sticky CTAs, and post styling. The kind is purely a
+//  presentation hint — backend doesn't carry an explicit field for it.
+//
 
 import Foundation
 import Logging
@@ -18,16 +23,91 @@ public enum PublicProfileState: Sendable, Equatable {
     case error(message: String)
 }
 
+/// P6.5 — Profile-kind discriminator that swaps the chrome between the
+/// Persona (creator) and Local (verified neighbor) variants. Persona is
+/// the default; the VM bumps it to `.local` when the loaded profile
+/// carries a verified residency.
+public enum PublicProfileKind: String, Sendable, Equatable, Hashable {
+    case persona
+    case local
+}
+
+/// One post rendered beneath the stats/tabs body. Persona profiles
+/// carry creator-economy broadcasts (with tier visibility chip and the
+/// optional locked-paywall overlay); Local profiles carry Pulse-style
+/// neighborhood posts (with an intent chip — Offer / Alert / Event).
+public struct PublicProfilePost: Sendable, Hashable, Identifiable {
+    public enum Visibility: String, Sendable, Hashable {
+        case free
+        case bronze
+        case silver
+        case gold
+    }
+
+    public enum Intent: String, Sendable, Hashable {
+        case offer
+        case alert
+        case event
+        case ask
+    }
+
+    public let id: String
+    public let body: String
+    public let timeAgo: String
+    public let locality: String?
+    public let reactions: Int
+    public let replies: Int
+    /// Persona-only — `nil` on Local posts.
+    public let visibility: Visibility?
+    /// Persona-only — `true` when this broadcast is gated behind a
+    /// paid tier the visitor doesn't hold.
+    public let isLocked: Bool
+    /// Local-only — `nil` on Persona broadcasts.
+    public let intent: Intent?
+
+    public init(
+        id: String,
+        body: String,
+        timeAgo: String,
+        locality: String? = nil,
+        reactions: Int = 0,
+        replies: Int = 0,
+        visibility: Visibility? = nil,
+        isLocked: Bool = false,
+        intent: Intent? = nil
+    ) {
+        self.id = id
+        self.body = body
+        self.timeAgo = timeAgo
+        self.locality = locality
+        self.reactions = reactions
+        self.replies = replies
+        self.visibility = visibility
+        self.isLocked = isLocked
+        self.intent = intent
+    }
+}
+
 /// Hydrated content emitted by `PublicProfileViewModel`.
 public struct PublicProfileContent: Sendable, Equatable, Hashable {
     public let profile: PublicProfile
+    public let kind: PublicProfileKind
     public let header: PublicProfileHeader
     public let stats: StatsTabsContent
+    public let posts: [PublicProfilePost]
 
-    public init(profile: PublicProfile, header: PublicProfileHeader, stats: StatsTabsContent) {
+    public init(
+        profile: PublicProfile,
+        kind: PublicProfileKind,
+        header: PublicProfileHeader,
+        stats: StatsTabsContent,
+        posts: [PublicProfilePost]
+    ) {
         self.profile = profile
+        self.kind = kind
         self.header = header
         self.stats = stats
+        self.posts = posts
     }
 }
 
@@ -40,6 +120,10 @@ public struct PublicProfileHeader: Sendable, Equatable, Hashable {
     public let avatarURL: URL?
     public let isVerified: Bool
     public let identityBadges: [IdentityPillarBadge]
+    /// P6.5 — Gold "Persona · Verified" chip on Persona profiles.
+    public let tierLabel: String?
+    /// P6.5 — Green "Verified neighbor" shield chip on Local profiles.
+    public let isVerifiedNeighbor: Bool
 
     public init(
         displayName: String,
@@ -47,7 +131,9 @@ public struct PublicProfileHeader: Sendable, Equatable, Hashable {
         locality: String?,
         avatarURL: URL?,
         isVerified: Bool,
-        identityBadges: [IdentityPillarBadge]
+        identityBadges: [IdentityPillarBadge],
+        tierLabel: String? = nil,
+        isVerifiedNeighbor: Bool = false
     ) {
         self.displayName = displayName
         self.handle = handle
@@ -55,6 +141,8 @@ public struct PublicProfileHeader: Sendable, Equatable, Hashable {
         self.avatarURL = avatarURL
         self.isVerified = isVerified
         self.identityBadges = identityBadges
+        self.tierLabel = tierLabel
+        self.isVerifiedNeighbor = isVerifiedNeighbor
     }
 }
 
@@ -83,6 +171,11 @@ public final class PublicProfileViewModel {
     /// Block action state — surfaces toast on success or failure of
     /// `POST /api/users/:userId/block`.
     public private(set) var blockState: PublicProfileActionState = .idle
+
+    /// P6.5 — Follow button state for Persona profiles. Toggles
+    /// `idle` → `inFlight` → `succeeded` once the request lands; the
+    /// CTA reflects this via the `ActionRowCTA(kind:)` projection.
+    public private(set) var followState: PublicProfileActionState = .idle
 
     /// Drives the overflow action sheet presentation.
     public var showOverflow: Bool = false
@@ -133,6 +226,33 @@ public final class PublicProfileViewModel {
         }
     }
 
+    /// P6.5 — Follow a Persona profile. Reuses the connection-request
+    /// endpoint as the closest existing wire op; backend wires a real
+    /// `POST /api/follows/:userId` later if/when it ships. The visitor
+    /// sees the CTA flip to "Following" on success.
+    public func follow() async {
+        guard followState != .inFlight, followState != .succeeded else { return }
+        followState = .inFlight
+        let body = ConnectionRequestBody(addresseeId: userId)
+        do {
+            _ = try await client.request(
+                RelationshipsEndpoints.sendRequest(body: body),
+                as: ConnectionRequestResponse.self
+            )
+            followState = .succeeded
+            toastMessage = "Following"
+        } catch let error as APIError {
+            let message = friendlyMessage(for: error)
+            followState = .failed(message: message)
+            toastMessage = message
+            logger.warning("Follow failed: \(error)")
+        } catch {
+            followState = .failed(message: "Something went wrong")
+            toastMessage = "Couldn't follow this profile"
+            logger.warning("Follow failed: \(error)")
+        }
+    }
+
     /// Block this user. Wraps `POST /api/users/:userId/block`
     /// (blocks.js:13).
     public func block() async {
@@ -174,13 +294,16 @@ public final class PublicProfileViewModel {
     }
 
     private func build(from profile: PublicProfile) -> PublicProfileContent {
+        let kind = derivedKind(from: profile)
         let header = PublicProfileHeader(
             displayName: profile.displayName,
             handle: profile.username.isEmpty ? nil : profile.username,
             locality: profile.locality,
             avatarURL: (profile.profilePictureURL ?? profile.avatarURL).flatMap(URL.init(string:)),
             isVerified: profile.verified ?? false,
-            identityBadges: buildBadges(profile)
+            identityBadges: buildBadges(profile),
+            tierLabel: kind == .persona ? "Persona · Verified" : nil,
+            isVerifiedNeighbor: kind == .local
         )
 
         var stats: [ProfileStatCell] = []
@@ -225,7 +348,22 @@ public final class PublicProfileViewModel {
             reviews: reviewCards
         )
 
-        return PublicProfileContent(profile: profile, header: header, stats: statsContent)
+        return PublicProfileContent(
+            profile: profile,
+            kind: kind,
+            header: header,
+            stats: statsContent,
+            posts: []
+        )
+    }
+
+    /// P6.5 — Kind heuristic. A profile with a verified residency
+    /// blob is a Local (verified neighbor) profile; everyone else is
+    /// treated as a Persona (creator) profile. Backend doesn't ship an
+    /// explicit creator/local discriminator yet — this signal is the
+    /// closest stable proxy.
+    private func derivedKind(from profile: PublicProfile) -> PublicProfileKind {
+        hasHomeResidency(profile) ? .local : .persona
     }
 
     private func buildBadges(_ profile: PublicProfile) -> [IdentityPillarBadge] {

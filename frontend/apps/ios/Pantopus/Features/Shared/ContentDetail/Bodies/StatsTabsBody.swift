@@ -88,10 +88,15 @@ public struct StatsTabsContent: Sendable, Hashable {
 
 /// Stats strip + action row + tab strip + tab body. Caller owns the
 /// selected-tab binding so navigation events stay external.
+///
+/// P6.5: `showActionRow` lets callers suppress the inline Message /
+/// Connect / overflow row when the host screen renders kind-aware CTAs
+/// in a sticky footer instead (Public profile · Persona vs Local).
 @MainActor
 public struct StatsTabsBody: View {
     private let content: StatsTabsContent
     @Binding private var selectedTab: ProfileTab
+    private let showActionRow: Bool
     private let onMessage: @MainActor () -> Void
     private let onConnect: @MainActor () -> Void
     private let onOverflow: @MainActor () -> Void
@@ -99,12 +104,14 @@ public struct StatsTabsBody: View {
     public init(
         content: StatsTabsContent,
         selectedTab: Binding<ProfileTab>,
+        showActionRow: Bool = true,
         onMessage: @escaping @MainActor () -> Void = {},
         onConnect: @escaping @MainActor () -> Void = {},
         onOverflow: @escaping @MainActor () -> Void = {}
     ) {
         self.content = content
         _selectedTab = selectedTab
+        self.showActionRow = showActionRow
         self.onMessage = onMessage
         self.onConnect = onConnect
         self.onOverflow = onOverflow
@@ -117,7 +124,9 @@ public struct StatsTabsBody: View {
                 .offset(y: -16) // overlap the header per FrameProfile spec
                 .padding(.bottom, -16)
 
-            actionRow.padding(.horizontal, Spacing.s4)
+            if showActionRow {
+                actionRow.padding(.horizontal, Spacing.s4)
+            }
 
             tabStrip.padding(.horizontal, Spacing.s4)
 
