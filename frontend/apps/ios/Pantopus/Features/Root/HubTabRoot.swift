@@ -132,6 +132,11 @@ public enum HubRoute: Hashable {
     /// Review-signups (T6.6c / P26.5) — organizer-only review queue
     /// for one Support Train. Pushed from a Support Trains row tap.
     case reviewSignups(supportTrainId: String)
+    /// P3.7 — Edit Signup form (organizer-side mutation of a helper
+    /// reservation). Pushed from the Review-signups per-row Edit
+    /// action with the seed DTO baked into the route so the form can
+    /// prefill without a re-fetch.
+    case editSignup(reservation: SupportTrainReservationDTO)
     /// Admin home-ownership-claims review queue. Gated by
     /// `auth.user.isAdmin` and reached from the Settings menu's Admin
     /// group. Mirrors the web `/app/admin/review-claims` page.
@@ -1056,12 +1061,17 @@ public struct HubTabRoot: View {
                     onMessage: { _ in
                         Task { @MainActor in push(.placeholder(label: "Message helper")) }
                     },
-                    onEdit: { reservationId in
+                    onEdit: { reservation in
                         Task { @MainActor in
-                            push(.placeholder(label: "Edit signup · \(reservationId)"))
+                            push(.editSignup(reservation: reservation))
                         }
                     }
                 )
+            )
+        case let .editSignup(reservation):
+            EditSignupFormView(
+                reservation: reservation,
+                onClose: { if !path.isEmpty { path.removeLast() } }
             )
         case .discoverHub:
             DiscoverHubView(

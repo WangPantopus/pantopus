@@ -117,6 +117,18 @@ public extension FormValidator {
         }
     }
 
+    /// 24-hour clock time in `HH:mm` or empty. Used by the Edit
+    /// Signup form to bound the drop-off picker.
+    static func timeHHmm() -> FormValidator {
+        FormValidator { value in
+            let trimmed = value.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { return nil }
+            let pattern = #"^([01]\d|2[0-3]):[0-5]\d$"#
+            let matches = trimmed.range(of: pattern, options: .regularExpression) != nil
+            return matches ? nil : "Use the format HH:mm (24-hour)."
+        }
+    }
+
     /// Applies each rule in order; stops at the first failure.
     static func all(_ rules: [FormValidator]) -> FormValidator {
         FormValidator { value in

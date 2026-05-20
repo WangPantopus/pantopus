@@ -98,7 +98,10 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
     private let onShareTrain: @MainActor () -> Void
     private let onConfirm: @MainActor (String) -> Void
     private let onMessage: @MainActor (String) -> Void
-    private let onEdit: @MainActor (String) -> Void
+    /// Hands the host the full reservation so it can push the
+    /// `EditSignupFormView` prefilled — the form needs the seed DTO,
+    /// so threading only the id would force a redundant re-fetch.
+    private let onEdit: @MainActor (SupportTrainReservationDTO) -> Void
 
     private var reservations: [SupportTrainReservationDTO] = []
     private var loadedOnce = false
@@ -109,7 +112,7 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
         onShareTrain: @escaping @MainActor () -> Void = {},
         onConfirm: @escaping @MainActor (String) -> Void = { _ in },
         onMessage: @escaping @MainActor (String) -> Void = { _ in },
-        onEdit: @escaping @MainActor (String) -> Void = { _ in }
+        onEdit: @escaping @MainActor (SupportTrainReservationDTO) -> Void = { _ in }
     ) {
         self.api = api
         self.supportTrainId = supportTrainId
@@ -246,7 +249,7 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
             ),
             trailing: .statusChip(text: chip.text, variant: chip.variant),
             onTap: { [weak self] in
-                MainActor.assumeIsolated { self?.onEdit(r.id) }
+                MainActor.assumeIsolated { self?.onEdit(r) }
             },
             body: r.noteToRecipient.map { "\u{201C}\($0)\u{201D}" },
             bodyIcon: nil,
@@ -320,7 +323,7 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
                     icon: .pencil,
                     variant: .ghost
                 ) { [weak self] in
-                    MainActor.assumeIsolated { self?.onEdit(r.id) }
+                    MainActor.assumeIsolated { self?.onEdit(r) }
                 }
             ])
         case "confirmed":
@@ -357,6 +360,22 @@ public final class ReviewSignupsViewModel: ListOfRowsDataSource {
     }
 
     // MARK: - Optimistic mutations
+
+    /// Drain pending optimistic patches from the shared store and
+    /// replay them into the in-memory cache. Called by the view on
+    /// `.onAppear` and whenever the store's revision bumps so an Edit
+    /// committed in `EditSignupFormView` is reflected the moment the
+    /// user lands back on this screen.
+    public func applyPendingEdits(from store: SupportTrainReservationsStore) {
+        var changed = false
+        for (idx, current) in reservations.enumerated() {
+            if let patch = store.consumePatch(forId: current.id) {
+                reservations[idx] = patch
+                changed = true
+            }
+        }
+        if changed { rebuild() }
+    }
 
     /// Optimistic confirm: bump local row to "confirmed" and hand the
     /// network round-trip off to the host (`onConfirm`). The host is

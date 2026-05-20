@@ -68,6 +68,23 @@ fun FormValidator.Companion.emailNotMatching(otherEmail: String): FormValidator 
     }
 }
 
+/**
+ * 24-hour clock time in `HH:mm` or empty. Used by the Edit Signup
+ * form to bound the drop-off picker. Mirrors the iOS `timeHHmm`
+ * validator.
+ */
+fun FormValidator.Companion.timeHHmm(): FormValidator =
+    FormValidator { value ->
+        val trimmed = value.trim()
+        if (trimmed.isEmpty()) {
+            null
+        } else if (TIME_HHMM_PATTERN.matches(trimmed)) {
+            null
+        } else {
+            "Use the format HH:mm (24-hour)."
+        }
+    }
+
 /** Applies each rule in order; stops at the first failure. */
 fun FormValidator.Companion.all(rules: List<FormValidator>): FormValidator =
     FormValidator { value ->
@@ -127,6 +144,7 @@ fun FormValidator.Companion.isoDateOrEmpty(): FormValidator =
     }
 
 private val E164_PATTERN = Regex("""^\+[1-9]\d{1,14}$""")
+private val TIME_HHMM_PATTERN = Regex("""^([01]\d|2[0-3]):[0-5]\d$""")
 private val EMAIL_PATTERN = Regex("""^[A-Z0-9a-z._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$""")
 private val URL_PATTERN = Regex("""^https?://[A-Za-z0-9.\-]+(?::\d+)?(?:/[^\s]*)?$""")
 private val ISO_DATE_PATTERN = Regex("""^\d{4}-\d{2}-\d{2}$""")

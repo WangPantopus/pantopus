@@ -179,6 +179,7 @@ import app.pantopus.android.ui.screens.recent_activity.RecentActivityScreen
 import app.pantopus.android.ui.screens.review_claims.ReviewClaimDetailScreen
 import app.pantopus.android.ui.screens.review_claims.ReviewClaimsScreen
 import app.pantopus.android.ui.screens.review_signups.ReviewSignupsScreen
+import app.pantopus.android.ui.screens.support_trains.edit_signup.EditSignupFormScreen
 import app.pantopus.android.ui.screens.settings.NotificationSettingsScreen
 import app.pantopus.android.ui.screens.settings.PrivacySettingsScreen
 import app.pantopus.android.ui.screens.settings.SettingsIndexScreen
@@ -607,6 +608,18 @@ private object ChildRoutes {
     const val REVIEW_SIGNUPS = "support-trains/{$REVIEW_SIGNUPS_ID_KEY}/review"
 
     fun reviewSignups(trainId: String): String = "support-trains/${java.net.URLEncoder.encode(trainId, "UTF-8")}/review"
+
+    /** P3.7 Edit Signup form. `:reservationId` is the reservation UUID;
+     *  the seed DTO is staged in
+     *  `SupportTrainReservationsStore` by the Review-signups
+     *  screen before navigation so the form can prefill without a
+     *  re-fetch. Keep in sync with
+     *  `EditSignupFormViewModel.RESERVATION_ID_KEY`. */
+    const val EDIT_SIGNUP_ID_KEY = "reservationId"
+    const val EDIT_SIGNUP = "support-trains/reservations/{$EDIT_SIGNUP_ID_KEY}/edit"
+
+    fun editSignup(reservationId: String): String =
+        "support-trains/reservations/${java.net.URLEncoder.encode(reservationId, "UTF-8")}/edit"
 
     /** P1.1 — Admin Review-claims queue. Gated by [SettingsRoute.ReviewClaims]. */
     const val REVIEW_CLAIMS = "admin/review-claims"
@@ -2410,11 +2423,24 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.placeholder("Share train"))
                     },
                     onEditSignup = { reservationId ->
-                        navController.navigate(ChildRoutes.placeholder("Edit signup · $reservationId"))
+                        navController.navigate(ChildRoutes.editSignup(reservationId))
                     },
                     onMessageHelper = { reservationId ->
                         navController.navigate(ChildRoutes.placeholder("Message helper · $reservationId"))
                     },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_SIGNUP,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.EDIT_SIGNUP_ID_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                EditSignupFormScreen(
+                    onClose = { navController.popBackStack() },
                 )
             }
             composable(ChildRoutes.REVIEW_CLAIMS) {
