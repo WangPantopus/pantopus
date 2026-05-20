@@ -31,7 +31,7 @@ final class EmergencyCardPDFTests: XCTestCase {
         let emergencies = [
             dto(id: "m", type: "first_aid", label: "Allergies"),
             dto(id: "s", type: "shutoff_water", label: "Water shutoff"),
-            dto(id: "c", type: "emergency_contacts", label: "Dr. Lin"),
+            dto(id: "c", type: "emergency_contacts", label: "Dr. Lin")
         ]
         let content = EmergencyCardPDF.content(from: emergencies, homeLabel: "412 Elm St")
         XCTAssertEqual(content.sections.map(\.heading), ["Shutoffs", "Contacts", "Medical"])
@@ -43,7 +43,7 @@ final class EmergencyCardPDFTests: XCTestCase {
     func testPinnedSectionLeads() {
         let emergencies = [
             dto(id: "s", type: "shutoff_water", label: "Water shutoff"),
-            dto(id: "p", type: "emergency_contacts", label: "911", pinned: true),
+            dto(id: "p", type: "emergency_contacts", label: "911", pinned: true)
         ]
         let content = EmergencyCardPDF.content(from: emergencies, homeLabel: "Home")
         XCTAssertEqual(content.sections.first?.heading, "Pinned · Quick access")

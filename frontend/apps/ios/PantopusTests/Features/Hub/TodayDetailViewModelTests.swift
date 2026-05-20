@@ -114,7 +114,7 @@ final class TodayDetailViewModelTests: XCTestCase {
         let events = [
             event(id: "e1", type: "social", start: "2026-05-20T16:00:00Z"),
             event(id: "e2", type: "chore", start: "2026-05-20T09:00:00Z"),
-            event(id: "e3", type: "repair", start: "2026-05-21T10:00:00Z"),
+            event(id: "e3", type: "repair", start: "2026-05-21T10:00:00Z")
         ]
         let rows = TodayDetailViewModel.todaysEvents(events, now: now, calendar: utcCalendar())
         XCTAssertEqual(rows.map(\.id), ["e2", "e1"])

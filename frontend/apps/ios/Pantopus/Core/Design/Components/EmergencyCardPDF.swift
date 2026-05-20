@@ -49,7 +49,7 @@ public struct EmergencyCardContent: Sendable, Equatable {
     }
 
     public var isEmpty: Bool {
-        sections.allSatisfy { $0.items.isEmpty }
+        sections.allSatisfy(\.items.isEmpty)
     }
 }
 
@@ -113,27 +113,27 @@ public enum EmergencyCardPDF {
 
         let titleAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 26, weight: .bold),
-            .foregroundColor: UIColor.label,
+            .foregroundColor: UIColor.label
         ]
         let kickerAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 11, weight: .bold),
-            .foregroundColor: UIColor.systemGreen,
+            .foregroundColor: UIColor.systemGreen
         ]
         let metaAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 11, weight: .regular),
-            .foregroundColor: UIColor.secondaryLabel,
+            .foregroundColor: UIColor.secondaryLabel
         ]
         let headingAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
-            .foregroundColor: UIColor.systemGreen,
+            .foregroundColor: UIColor.systemGreen
         ]
         let itemTitleAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 13, weight: .semibold),
-            .foregroundColor: UIColor.label,
+            .foregroundColor: UIColor.label
         ]
         let itemDetailAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 12, weight: .regular),
-            .foregroundColor: UIColor.secondaryLabel,
+            .foregroundColor: UIColor.secondaryLabel
         ]
 
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect)

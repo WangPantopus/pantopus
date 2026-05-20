@@ -34,7 +34,10 @@ public struct TodayDetailContent: Equatable, Sendable {
     public let commute: String?
     public let events: [TodayEventRow]
 
-    public var hasWeather: Bool { temperatureF != nil || conditions != nil }
+    public var hasWeather: Bool {
+        temperatureF != nil || conditions != nil
+    }
+
     public var isEmpty: Bool {
         temperatureF == nil && conditions == nil && aqiLabel == nil
             && commute == nil && events.isEmpty
@@ -80,7 +83,9 @@ final class TodayDetailViewModel {
         await fetch()
     }
 
-    func refresh() async { await fetch() }
+    func refresh() async {
+        await fetch()
+    }
 
     private func fetch() async {
         do {

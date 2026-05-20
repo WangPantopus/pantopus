@@ -41,12 +41,12 @@ struct BusinessWaitlistView: View {
                         joined
                             ? "We'll let you know the moment business registration opens. Thanks for your interest."
                             : "Business registration isn't open yet. Join the waitlist and we'll notify you " +
-                                "when you can set up your business on Pantopus."
+                            "when you can set up your business on Pantopus."
                     )
-                        .pantopusTextStyle(.small)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Spacing.s5)
+                    .pantopusTextStyle(.small)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Spacing.s5)
 
                     if !joined {
                         Button {

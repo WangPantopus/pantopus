@@ -51,34 +51,7 @@ fun BusinessWaitlistScreen(onBack: () -> Unit) {
                 .background(PantopusColors.appBg)
                 .semantics { contentDescription = "businessWaitlist" },
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .background(PantopusColors.appSurface),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("Register a business", style = PantopusTextStyle.h3, color = PantopusColors.appText)
-            Box(
-                modifier =
-                    Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = Spacing.s2)
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .clickable(onClick = onBack)
-                        .semantics { contentDescription = "Back" },
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.ChevronLeft,
-                    contentDescription = null,
-                    size = 22.dp,
-                    tint = PantopusColors.appText,
-                )
-            }
-        }
+        BusinessWaitlistTopBar(onBack)
         OfflineBanner(modifier = Modifier.fillMaxWidth())
 
         Column(
@@ -123,6 +96,38 @@ fun BusinessWaitlistScreen(onBack: () -> Unit) {
                     modifier = Modifier.testTag("businessWaitlistNotifyButton"),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun BusinessWaitlistTopBar(onBack: () -> Unit) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .background(PantopusColors.appSurface),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("Register a business", style = PantopusTextStyle.h3, color = PantopusColors.appText)
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = Spacing.s2)
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onBack)
+                    .semantics { contentDescription = "Back" },
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronLeft,
+                contentDescription = null,
+                size = 22.dp,
+                tint = PantopusColors.appText,
+            )
         }
     }
 }

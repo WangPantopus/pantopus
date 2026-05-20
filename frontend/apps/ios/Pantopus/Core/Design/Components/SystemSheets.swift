@@ -24,7 +24,9 @@ import UIKit
 public enum InviteLinks {
     public static let downloadURLString = "https://pantopus.app"
 
-    public static var downloadURL: URL? { URL(string: downloadURLString) }
+    public static var downloadURL: URL? {
+        URL(string: downloadURLString)
+    }
 
     public static let inviteMessage =
         "Join me on Pantopus — your neighborhood for trusted home help, " +
@@ -74,7 +76,9 @@ public struct MailDraft: Identifiable, Hashable, Sendable {
     }
 
     /// `true` when the device has at least one Mail account configured.
-    public static var canSendMail: Bool { MFMailComposeViewController.canSendMail() }
+    public static var canSendMail: Bool {
+        MFMailComposeViewController.canSendMail()
+    }
 
     /// `mailto:` URL used as a fallback when `canSendMail` is false.
     public var mailtoURL: URL? {
@@ -83,7 +87,7 @@ public struct MailDraft: Identifiable, Hashable, Sendable {
         comps.path = recipients.joined(separator: ",")
         comps.queryItems = [
             URLQueryItem(name: "subject", value: subject),
-            URLQueryItem(name: "body", value: body),
+            URLQueryItem(name: "body", value: body)
         ]
         return comps.url
     }
@@ -111,12 +115,16 @@ public struct MailComposeSheet: UIViewControllerRepresentable {
 
     public func updateUIViewController(_: MFMailComposeViewController, context _: Context) {}
 
-    public func makeCoordinator() -> Coordinator { Coordinator(onFinish: onFinish) }
+    public func makeCoordinator() -> Coordinator {
+        Coordinator(onFinish: onFinish)
+    }
 
     public final class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
         private let onFinish: () -> Void
 
-        init(onFinish: @escaping () -> Void) { self.onFinish = onFinish }
+        init(onFinish: @escaping () -> Void) {
+            self.onFinish = onFinish
+        }
 
         public func mailComposeController(
             _ controller: MFMailComposeViewController,
