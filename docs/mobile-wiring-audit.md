@@ -674,3 +674,32 @@ This list documents every wiring flip a T6 PR landed (from
 
 This is the final wiring-sweep state at T6 close. Future tiers re-run
 the grep + add a corresponding closeout section.
+
+## P6.6 — Remaining one-off placeholder sweep
+
+Swept the short-list of one-off placeholder labels that didn't justify
+their own prompt. Each is now a real destination (system sheet, existing
+screen, or a small new screen) — no `NotYetAvailableView` /
+`ChildRoutes.placeholder(...)` remains for any listed label on either
+platform.
+
+| Label | Disposition |
+|---|---|
+| Find people | System contacts picker → invite share (CNContactPicker / `ActivityResultContracts.PickContact`) |
+| Invite a business | Mail composer (`MFMailComposeViewController` / `Intent.ACTION_SENDTO`, share fallback) |
+| Invite to Pantopus | System share sheet with the store link |
+| Share emergency info / Share listing / Share train | System share sheet (`UIActivityViewController` / `Intent.ACTION_SEND`) |
+| Print emergency card | A4 PDF (`UIGraphicsPDFRenderer` / `PdfDocument` + FileProvider) → share/print |
+| Set home address | AddHomeWizard |
+| Widen radius | Existing BusinessFilterSheet radius stepper (top-bar filter) |
+| Set up Public Profile | PrivacyHandshakeWizard (current user handle) |
+| Register a business | New `BusinessWaitlist` "coming soon · Notify me" surface (local confirmation; `POST /api/business-waitlist` deferred to Phase 9) |
+| Today | New `TodayDetail` screen (weather + AQI + commute + today's events) |
+| Data export · Payments & payouts | **Parked** (unchanged) per the existing Settings decision |
+
+Verification grep (both should print no matches):
+
+```
+grep -rnE 'placeholder\(label: "(Find people|Invite a business|Invite to Pantopus|Share emergency info|Share listing|Share train|Print emergency card|Set home address|Set up Public Profile|Register a business)"\)|placeholder\(label: "Today"\)' frontend/apps/ios/Pantopus
+grep -rnE 'placeholder\("(Find people|Invite a business|Invite to Pantopus|Share emergency info|Share listing|Share train|Print emergency card|Set home address|Set up Public Profile|Register a business|Today)"\)' frontend/apps/android/app/src/main
+```

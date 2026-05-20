@@ -58,7 +58,12 @@ import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.gigs.GigSearchScreen
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
+import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
+import app.pantopus.android.ui.screens.hub.today.TodayDetailScreen
+import app.pantopus.android.ui.util.InviteLinks
+import app.pantopus.android.ui.util.composeEmail
+import app.pantopus.android.ui.util.shareText
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
@@ -216,6 +221,12 @@ private object ChildRoutes {
     const val MY_HOMES = "homes/my-homes"
     const val MY_CLAIMS = "homes/my-claims"
     const val ADD_HOME = "homes/add"
+
+    /** P6.6 — Today detail (weather + AQI + commute + today's events). */
+    const val TODAY = "hub/today"
+
+    /** P6.6 — "Register a business · coming soon" waitlist surface. */
+    const val BUSINESS_WAITLIST = "businesses/waitlist"
     const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
     const val MAILBOX_LIST = "mailbox/list"
     const val MAILBOX_DRAWERS = "mailbox/drawers"
@@ -967,6 +978,16 @@ private object ChildRoutes {
 @Composable
 fun RootTabScreen(inboxBadgeCount: Int = 0) {
     val navController = rememberNavController()
+    // P6.6 — system share / mail + contacts picker for the placeholder sweep.
+    val appContext = androidx.compose.ui.platform.LocalContext.current
+    val findPeopleLauncher =
+        androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.PickContact(),
+        ) { uri ->
+            if (uri != null) appContext.shareText(InviteLinks.INVITE_MESSAGE, "Invite to Pantopus")
+        }
+    val sessionViewModel: RootSessionViewModel = hiltViewModel()
+    val currentHandle by sessionViewModel.currentHandle.collectAsStateWithLifecycle()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = PantopusRoute.fromPath(backStackEntry?.destination?.route) ?: PantopusRoute.Hub
     val badges: Map<PantopusRoute, Int> =
@@ -1117,7 +1138,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             is HubNavigationIntent.JumpBackTapped ->
                                 routeForJumpBackIn(intent.item).also { navController.navigate(it) }
                             HubNavigationIntent.OpenToday ->
-                                navController.navigate(ChildRoutes.placeholder("Today"))
+                                navController.navigate(ChildRoutes.TODAY)
                             HubNavigationIntent.OpenRecentActivity ->
                                 navController.navigate(ChildRoutes.RECENT_ACTIVITY)
                         }
@@ -1227,7 +1248,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(ChildRoutes.MY_BUSINESSES) {
                 MyBusinessesScreen(
                     onOpenBusiness = { _ -> navController.navigate(ChildRoutes.placeholder("Business dashboard")) },
-                    onRegister = { navController.navigate(ChildRoutes.placeholder("Register a business")) },
+                    onRegister = { navController.navigate(ChildRoutes.BUSINESS_WAITLIST) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -1455,10 +1476,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.emergencyItem(homeId, dto.id))
                     },
                     onAdd = { navController.navigate(ChildRoutes.addEmergencyInfo(homeId)) },
-                    onShare = { navController.navigate(ChildRoutes.placeholder("Share emergency info")) },
-                    onPrintCard = {
-                        navController.navigate(ChildRoutes.placeholder("Print emergency card"))
-                    },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -2053,7 +2070,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             ),
                         )
                     },
-                    onInvite = { navController.navigate(ChildRoutes.placeholder("Invite to Pantopus")) },
+                    onInvite = { appContext.shareText(InviteLinks.INVITE_MESSAGE, "Invite to Pantopus") },
                 )
             }
             composable(ChildRoutes.PULSE_FEED) {
@@ -2112,7 +2129,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 val listingId = entry.arguments?.getString(ChildRoutes.LISTING_OFFERS_ID_KEY).orEmpty()
                 ListingOffersScreen(
                     onBack = { navController.popBackStack() },
-                    onShareListing = { navController.navigate(ChildRoutes.placeholder("Share listing")) },
+                    onShareListing = {
+                        appContext.shareText(
+                            "Check out this listing on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                            "Share listing",
+                        )
+                    },
                     onOpenBuyer = { navController.navigate(ChildRoutes.placeholder("Buyer profile")) },
                     onOpenTransaction = { navController.navigate(ChildRoutes.placeholder("Transaction detail")) },
                     onEditPrice = {
@@ -2312,7 +2334,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.chatConversation(row))
                     },
                     onFindPeople = {
-                        navController.navigate(ChildRoutes.placeholder("Find people"))
+                        findPeopleLauncher.launch(null)
                     },
                 )
             }
@@ -2348,10 +2370,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         when (target) {
                             is DiscoverBusinessesTarget.Business ->
                                 navController.navigate(ChildRoutes.businessProfile(target.businessId))
-                            DiscoverBusinessesTarget.WidenRadius ->
-                                navController.navigate(ChildRoutes.placeholder("Set home address"))
+                            DiscoverBusinessesTarget.SetHomeAddress ->
+                                navController.navigate(ChildRoutes.ADD_HOME)
                             DiscoverBusinessesTarget.InviteBusiness ->
-                                navController.navigate(ChildRoutes.placeholder("Invite a business"))
+                                appContext.composeEmail(
+                                    subject = "Join Pantopus",
+                                    body = "I'd love to see your business on Pantopus — neighbors near " +
+                                        "me are looking for trusted local pros. ${InviteLinks.DOWNLOAD_URL}",
+                                )
                         }
                     },
                 )
@@ -2575,7 +2601,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.broadcastDetail(card.id))
                     },
                     onOpenSetup = {
-                        navController.navigate(ChildRoutes.placeholder("Set up Public Profile"))
+                        navController.navigate(ChildRoutes.privacyHandshake(currentHandle))
                     },
                     onOpenCreatorInbox = {
                         navController.navigate(ChildRoutes.CREATOR_INBOX)
@@ -2697,7 +2723,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 ReviewSignupsScreen(
                     onBack = { navController.popBackStack() },
                     onShareTrain = {
-                        navController.navigate(ChildRoutes.placeholder("Share train"))
+                        appContext.shareText(
+                            "Join my support train on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                            "Share train",
+                        )
                     },
                     onEditSignup = { reservationId ->
                         navController.navigate(ChildRoutes.editSignup(reservationId))
@@ -2767,6 +2796,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.homeDashboard(homeId))
                     },
                 )
+            }
+            composable(ChildRoutes.TODAY) {
+                TodayDetailScreen(onBack = { navController.popBackStack() })
+            }
+            composable(ChildRoutes.BUSINESS_WAITLIST) {
+                BusinessWaitlistScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.CLAIM_OWNERSHIP,

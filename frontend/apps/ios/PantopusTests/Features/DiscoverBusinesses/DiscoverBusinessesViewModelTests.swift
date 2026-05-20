@@ -205,7 +205,7 @@ final class DiscoverBusinessesViewModelTests: XCTestCase {
             return
         }
         XCTAssertEqual(content.headline, "Set a home address")
-        XCTAssertEqual(content.ctaTitle, "Widen radius")
+        XCTAssertEqual(content.ctaTitle, "Set a home address")
     }
 
     func testLoadServerErrorTransitionsToError() async {
