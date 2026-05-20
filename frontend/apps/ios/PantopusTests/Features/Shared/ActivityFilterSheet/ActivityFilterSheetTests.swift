@@ -27,7 +27,7 @@ final class ActivityFilterSheetTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_700_000_000) // fixed clock
 
     private func item(_ id: String, status: String? = nil, ageDays: Double? = nil, value: Double? = nil) -> Item {
-        let date = ageDays.map { now.addingTimeInterval(-$0 * 86_400) }
+        let date = ageDays.map { now.addingTimeInterval(-$0 * 86400) }
         return Item(id: id, status: status, date: date, value: value)
     }
 

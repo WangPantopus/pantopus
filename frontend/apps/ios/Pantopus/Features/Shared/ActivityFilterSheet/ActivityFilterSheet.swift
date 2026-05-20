@@ -53,13 +53,13 @@ public enum ActivitySortOrder: String, Sendable, Hashable, CaseIterable {
     ) -> [T] {
         switch self {
         case .newest:
-            return items.sorted { (date($0) ?? .distantPast) > (date($1) ?? .distantPast) }
+            items.sorted { (date($0) ?? .distantPast) > (date($1) ?? .distantPast) }
         case .oldest:
-            return items.sorted { (date($0) ?? .distantFuture) < (date($1) ?? .distantFuture) }
+            items.sorted { (date($0) ?? .distantFuture) < (date($1) ?? .distantFuture) }
         case .valueHighToLow:
-            return items.sorted { (value($0) ?? -.greatestFiniteMagnitude) > (value($1) ?? -.greatestFiniteMagnitude) }
+            items.sorted { (value($0) ?? -.greatestFiniteMagnitude) > (value($1) ?? -.greatestFiniteMagnitude) }
         case .valueLowToHigh:
-            return items.sorted { (value($0) ?? .greatestFiniteMagnitude) < (value($1) ?? .greatestFiniteMagnitude) }
+            items.sorted { (value($0) ?? .greatestFiniteMagnitude) < (value($1) ?? .greatestFiniteMagnitude) }
         }
     }
 }
@@ -89,13 +89,13 @@ public enum ActivityDateRange: String, Sendable, Hashable, CaseIterable {
     public func contains(_ date: Date, now: Date, calendar: Calendar = .current) -> Bool {
         switch self {
         case .anytime:
-            return true
+            true
         case .today:
-            return calendar.isDate(date, inSameDayAs: now)
+            calendar.isDate(date, inSameDayAs: now)
         case .week:
-            return date >= now.addingTimeInterval(-7 * 86_400)
+            date >= now.addingTimeInterval(-7 * 86400)
         case .month:
-            return date >= now.addingTimeInterval(-30 * 86_400)
+            date >= now.addingTimeInterval(-30 * 86400)
         }
     }
 }
