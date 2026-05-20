@@ -17,17 +17,20 @@ public struct ListingDetailView: View {
     private let onBack: @MainActor () -> Void
     private let onMessage: (@MainActor (ListingDTO) -> Void)?
     private let onViewOffers: (@MainActor (ListingDTO) -> Void)?
+    private let onEditListing: (@MainActor (ListingDTO) -> Void)?
 
     public init(
         viewModel: ListingDetailViewModel,
         onBack: @escaping @MainActor () -> Void = {},
         onMessage: (@MainActor (ListingDTO) -> Void)? = nil,
-        onViewOffers: (@MainActor (ListingDTO) -> Void)? = nil
+        onViewOffers: (@MainActor (ListingDTO) -> Void)? = nil,
+        onEditListing: (@MainActor (ListingDTO) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
         self.onMessage = onMessage
         self.onViewOffers = onViewOffers
+        self.onEditListing = onEditListing
     }
 
     public var body: some View {
@@ -37,12 +40,32 @@ public struct ListingDetailView: View {
             onPrimaryAction: { handlePrimaryAction() },
             onSecondaryAction: { if let listing = viewModel.rawListing { onMessage?(listing) } },
             onRetry: { Task { await viewModel.load() } },
-            onMessageCounterparty: { if let listing = viewModel.rawListing { onMessage?(listing) } }
+            onMessageCounterparty: { if let listing = viewModel.rawListing { onMessage?(listing) } },
+            overflowItems: overflowItems
         )
         .task { await viewModel.load() }
         .sheet(isPresented: $offerSheetVisible) {
             offerSheet
         }
+    }
+
+    /// Owner-only overflow: "Edit listing" surfaces here so the dock can
+    /// stay clean ("Message" + "View offers"). Buyers see no overflow at
+    /// all (avoids signaling actions they can't perform).
+    private var overflowItems: [ContentDetailOverflowItem] {
+        guard let onEditListing,
+              let listing = viewModel.rawListing,
+              viewModel.isOwnedByMe
+        else { return [] }
+        return [
+            ContentDetailOverflowItem(
+                label: "Edit listing",
+                icon: .pencil,
+                identifier: "listingDetailEditListing"
+            ) {
+                onEditListing(listing)
+            }
+        ]
     }
 
     /// Drive the dock's primary action. When the listing is owned by

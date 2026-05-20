@@ -139,6 +139,12 @@ public enum ListingsEndpoints {
         Endpoint(method: .post, path: "/api/listings", body: request)
     }
 
+    /// `PATCH /api/listings/:id` — owner-only update of a listing.
+    /// Route `backend/routes/listings.js:1479`.
+    public static func update(id: String, body: UpdateListingRequest) -> Endpoint {
+        Endpoint(method: .patch, path: "/api/listings/\(id)", body: body)
+    }
+
     /// `GET /api/listings/:id` — single-listing detail wrapper.
     public static func detail(id: String) -> Endpoint {
         Endpoint(method: .get, path: "/api/listings/\(id)")

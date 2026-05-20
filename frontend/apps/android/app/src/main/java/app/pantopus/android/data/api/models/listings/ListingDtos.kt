@@ -153,6 +153,37 @@ data class CreateListingResponse(
     val listing: ListingDto,
 )
 
+/**
+ * Body for `PATCH /api/listings/:id`. Owner-only update. Mirrors the
+ * fields the Snap & Sell wizard collects so the same form can drive
+ * create + edit. All fields are nullable — Moshi omits `null` from the
+ * encoded JSON, matching the backend Joi schema's `min(1)` requirement
+ * that at least one updatable field be present.
+ */
+@JsonClass(generateAdapter = true)
+data class UpdateListingRequest(
+    val title: String? = null,
+    val description: String? = null,
+    val price: Double? = null,
+    val isFree: Boolean? = null,
+    val category: String? = null,
+    val condition: String? = null,
+    val mediaUrls: List<String>? = null,
+    val layer: String? = null,
+    val listingType: String? = null,
+    val locationName: String? = null,
+    val meetupPreference: String? = null,
+    val deliveryAvailable: Boolean? = null,
+    val isWanted: Boolean? = null,
+)
+
+/** Envelope from `PATCH /api/listings/:id`. */
+@JsonClass(generateAdapter = true)
+data class UpdateListingResponse(
+    val message: String? = null,
+    val listing: ListingDto,
+)
+
 /** `POST /api/listings/:id/message` body. */
 @JsonClass(generateAdapter = true)
 data class MessageListingBody(

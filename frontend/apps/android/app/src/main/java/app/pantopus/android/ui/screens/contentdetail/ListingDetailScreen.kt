@@ -41,6 +41,7 @@ fun ListingDetailScreen(
     onBack: () -> Unit = {},
     onOpenMessages: () -> Unit = {},
     onViewOffers: ((app.pantopus.android.data.api.models.listings.ListingDto) -> Unit)? = null,
+    onEditListing: ((app.pantopus.android.data.api.models.listings.ListingDto) -> Unit)? = null,
     viewModel: ListingDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -48,6 +49,26 @@ fun ListingDetailScreen(
     val sheetState = rememberModalBottomSheetState()
 
     LaunchedEffect(Unit) { viewModel.load() }
+
+    // Owner-only overflow: "Edit listing" surfaces here so the dock can
+    // stay clean ("Message" + "View offers"). Buyers see no overflow.
+    val overflowItems =
+        if (onEditListing != null && viewModel.isOwnedByMe()) {
+            val listing = viewModel.listingSnapshot()
+            if (listing != null) {
+                listOf(
+                    ContentDetailOverflowItem(
+                        label = "Edit listing",
+                        testTag = "listingDetailEditListing",
+                        onClick = { onEditListing(listing) },
+                    ),
+                )
+            } else {
+                emptyList()
+            }
+        } else {
+            emptyList()
+        }
 
     ContentDetailShell(
         state = state,
@@ -63,6 +84,7 @@ fun ListingDetailScreen(
         onSecondaryAction = { onOpenMessages() },
         onRetry = { viewModel.load() },
         onMessageCounterparty = { onOpenMessages() },
+        overflowItems = overflowItems,
     )
 
     if (sheetVisible) {

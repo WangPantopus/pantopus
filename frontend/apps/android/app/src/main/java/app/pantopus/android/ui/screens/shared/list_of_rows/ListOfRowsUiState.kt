@@ -238,6 +238,10 @@ data class ListingContextConfig(
     val sortLabel: String? = null,
     /** Triggered when the user taps the sort selector — opens a sort sheet, etc. */
     val onSort: (() -> Unit)? = null,
+    /** P3.3 — Triggered when the seller taps the pencil chip next to
+     *  the asking price. Owner-only — the projection sets it to `null`
+     *  for buyers so the chip stays hidden. */
+    val onEditPrice: (() -> Unit)? = null,
 )
 
 /** One meta item in the listing-context header (e.g. "2.4k views"). */
