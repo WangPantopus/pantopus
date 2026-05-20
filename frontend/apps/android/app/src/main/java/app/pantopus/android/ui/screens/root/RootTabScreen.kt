@@ -55,6 +55,7 @@ import app.pantopus.android.ui.screens.discoverhub.DiscoverHubScreen
 import app.pantopus.android.ui.screens.discoverhub.DiscoverHubTarget
 import app.pantopus.android.ui.screens.feed.FeedScreen
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
+import app.pantopus.android.ui.screens.gigs.GigSearchScreen
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
@@ -660,6 +661,9 @@ private object ChildRoutes {
 
     /** Gigs feed (T2.3). Reached from Hub → pillar(.Gigs). */
     const val GIGS_FEED = "gigs/feed"
+
+    /** Gig Search (P4.4). Pushed from the Gigs feed search bar. */
+    const val GIG_SEARCH = "gigs/search"
 
     /** Gig detail target — placeholder until T2.6 Transactional Detail. */
     const val GIG_DETAIL_ID_KEY = "gigId"
@@ -2024,8 +2028,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
                     onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
                     onOpenMap = { category -> navController.navigate(ChildRoutes.nearbyMapForGigs(category.key)) },
-                    onOpenSearch = { navController.navigate(ChildRoutes.placeholder("Gig search")) },
+                    onOpenSearch = { navController.navigate(ChildRoutes.GIG_SEARCH) },
                     onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Gig filters")) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.GIG_SEARCH) {
+                GigSearchScreen(
+                    onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
                     onBack = { navController.popBackStack() },
                 )
             }

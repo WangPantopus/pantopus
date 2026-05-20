@@ -118,35 +118,9 @@ public struct GigsFeedView: View {
     // MARK: - Category chip row
 
     private var categoryChipRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Spacing.s2) {
-                ForEach(GigsCategory.allCases, id: \.self) { category in
-                    let active = category == viewModel.activeCategory
-                    Button {
-                        Task { await viewModel.selectCategory(category) }
-                    } label: {
-                        Text(category.label)
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
-                            .padding(.horizontal, 14)
-                            .frame(height: 28)
-                            .background(active ? category.color : Theme.Color.appSurface)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
-                                    .stroke(active ? .clear : Theme.Color.appBorder, lineWidth: 1)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(category.label)
-                    .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
-                    .accessibilityIdentifier("gigsChip_\(category.rawValue)")
-                }
-            }
-            .padding(.horizontal, Spacing.s4)
-            .padding(.vertical, Spacing.s3)
+        GigsCategoryChipRow(active: viewModel.activeCategory) { category in
+            Task { await viewModel.selectCategory(category) }
         }
-        .accessibilityIdentifier("gigsChipRow")
     }
 
     // MARK: - Sort + filter
@@ -355,8 +329,8 @@ public struct GigsFeedView: View {
 
 /// One gig row — category chip + meta line, 2-line title, 2-line body,
 /// price, amber bid pill (hidden at 0 with "Be the first" affordance),
-/// right-aligned distance.
-private struct GigRow: View {
+/// right-aligned distance. Reused by the Gig Search results list.
+struct GigRow: View {
     let content: GigCardContent
 
     var body: some View {

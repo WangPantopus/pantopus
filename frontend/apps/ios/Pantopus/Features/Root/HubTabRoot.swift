@@ -104,6 +104,8 @@ public enum HubRoute: Hashable {
     case editPost(postId: String)
     /// Gigs feed (T2.3). Reached from Hub → pillar(.gigs).
     case gigsFeed
+    /// Gig Search (P4.4). Pushed from the Gigs feed search bar.
+    case gigSearch
     /// Gig detail target — placeholder until the Transactional Detail (T2.6) ships.
     case gigDetail(gigId: String)
     /// Map+List Hybrid opened from the Gigs feed map-toggle. Carries the
@@ -924,8 +926,15 @@ public struct HubTabRoot: View {
                 onOpenMap: { category in
                     Task { @MainActor in push(.nearbyMapForGigs(categoryKey: category.rawValue)) }
                 },
-                onOpenSearch: { Task { @MainActor in push(.placeholder(label: "Gig search")) } },
+                onOpenSearch: { Task { @MainActor in push(.gigSearch) } },
                 onOpenFilters: { Task { @MainActor in push(.placeholder(label: "Gig filters")) } },
+                onBack: pop
+            )
+        case .gigSearch:
+            GigSearchView(
+                onOpenGig: { gigId in
+                    Task { @MainActor in push(.gigDetail(gigId: gigId)) }
+                },
                 onBack: pop
             )
         case let .gigDetail(gigId):

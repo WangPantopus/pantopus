@@ -106,7 +106,10 @@ public final class GigsFeedViewModel {
 
     // MARK: - Projection
 
-    private static func project(_ gig: GigDTO) -> GigCardContent {
+    /// `GigDTO` → render-only `GigCardContent`. Exposed (internal) so the
+    /// Gig Search surface projects identical rows without duplicating the
+    /// meta / price / distance formatting.
+    static func project(_ gig: GigDTO) -> GigCardContent {
         let category = GigsCategory.from(backendKey: gig.category)
         let metaPieces: [String] = [
             Self.distanceLabel(miles: gig.distanceMiles),
