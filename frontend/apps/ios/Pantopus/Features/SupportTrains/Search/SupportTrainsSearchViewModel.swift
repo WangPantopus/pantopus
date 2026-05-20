@@ -42,7 +42,7 @@ public final class SupportTrainsSearchViewModel {
     ) {
         self.api = api
         self.onOpenTrain = onOpenTrain
-        self.onCancelSearch = onCancel
+        onCancelSearch = onCancel
     }
 
     /// Trains matching the current query, case-insensitive over the

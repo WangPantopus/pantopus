@@ -45,7 +45,7 @@ final class AccessCodesSearchViewModel {
         self.homeId = homeId
         self.api = api
         self.onOpenCode = onOpenCode
-        self.onCancelSearch = onCancel
+        onCancelSearch = onCancel
     }
 
     /// Codes matching the current query, case-insensitive over the label /
