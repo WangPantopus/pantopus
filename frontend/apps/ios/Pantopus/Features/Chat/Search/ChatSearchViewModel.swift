@@ -35,13 +35,32 @@ public final class ChatSearchViewModel {
     /// typing-shimmer when the user types before indexing completes.
     public private(set) var isLoading: Bool = true
 
+    /// No-results payload for the shell's empty phase.
+    let emptyState = EmptyStateContent(
+        icon: .search,
+        headline: "No matches",
+        subcopy: "Try a name or a word from a message."
+    )
+
+    /// Open a tapped result — wired by `InboxTabRoot` to push the
+    /// conversation (scrolled to the matched message when present).
+    let onOpenResult: @Sendable (ChatSearchResult) -> Void
+    /// Pop the search surface — wired to the shell's back control.
+    let onCancel: @Sendable () -> Void
+
     private let api: APIClient
     private let logger = Logger(label: "app.pantopus.ios.ChatSearch")
     private var index: [IndexedConversation] = []
     private var didLoad = false
 
-    init(api: APIClient = .shared) {
+    init(
+        api: APIClient = .shared,
+        onOpenResult: @escaping @Sendable (ChatSearchResult) -> Void = { _ in },
+        onCancel: @escaping @Sendable () -> Void = {}
+    ) {
         self.api = api
+        self.onOpenResult = onOpenResult
+        self.onCancel = onCancel
     }
 
     // MARK: - Public API
@@ -61,12 +80,6 @@ public final class ChatSearchViewModel {
     public func setQuery(_ value: String) {
         query = value
         recompute()
-    }
-
-    /// Re-issue a recent query (kept for shell parity; recents are not
-    /// persisted on this surface today).
-    public func onRecentTap(_ entry: String) {
-        setQuery(entry)
     }
 
     // MARK: - Filtering

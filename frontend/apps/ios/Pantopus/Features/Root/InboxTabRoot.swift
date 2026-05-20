@@ -150,10 +150,14 @@ public struct InboxTabRoot: View {
             NotYetAvailableView(tabName: "Invite to Pantopus", icon: .userPlus)
         case .search:
             ChatSearchView(
-                onOpenResult: { result in
-                    path.append(.conversation(destination(from: result)))
-                },
-                onCancel: { if !path.isEmpty { path.removeLast() } }
+                viewModel: ChatSearchViewModel(
+                    onOpenResult: { result in
+                        Task { @MainActor in path.append(.conversation(destination(from: result))) }
+                    },
+                    onCancel: {
+                        Task { @MainActor in if !path.isEmpty { path.removeLast() } }
+                    }
+                )
             )
         }
     }

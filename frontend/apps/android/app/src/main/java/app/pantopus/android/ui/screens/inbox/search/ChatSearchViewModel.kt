@@ -63,10 +63,6 @@ class ChatSearchViewModel
             recompute()
         }
 
-        /** Re-issue a recent query (kept for shell parity; recents are not
-         *  persisted on this surface today). */
-        fun onRecentTap(entry: String) = setQuery(entry)
-
         // MARK: - Filtering
 
         private fun recompute() {

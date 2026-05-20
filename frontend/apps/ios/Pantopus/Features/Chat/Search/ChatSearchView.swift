@@ -14,17 +14,9 @@ import SwiftUI
 /// Chat Search screen — the Inbox tab's `.search` destination.
 public struct ChatSearchView: View {
     @State private var viewModel: ChatSearchViewModel
-    private let onOpenResult: @MainActor (ChatSearchResult) -> Void
-    private let onCancel: @MainActor () -> Void
 
-    init(
-        viewModel: ChatSearchViewModel = ChatSearchViewModel(),
-        onOpenResult: @escaping @MainActor (ChatSearchResult) -> Void = { _ in },
-        onCancel: @escaping @MainActor () -> Void = {}
-    ) {
+    init(viewModel: ChatSearchViewModel) {
         _viewModel = State(initialValue: viewModel)
-        self.onOpenResult = onOpenResult
-        self.onCancel = onCancel
     }
 
     public var body: some View {
@@ -36,15 +28,11 @@ public struct ChatSearchView: View {
             ),
             results: viewModel.results,
             isLoading: viewModel.isLoading,
-            emptyState: EmptyStateContent(
-                icon: .search,
-                headline: "No matches",
-                subcopy: "Try a name or a word from a message."
-            ),
+            emptyState: viewModel.emptyState,
             row: { result in
-                ChatSearchResultRow(result: result) { onOpenResult(result) }
+                ChatSearchResultRow(result: result, onOpen: viewModel.onOpenResult)
             },
-            onCancel: onCancel
+            onCancel: { viewModel.onCancel() }
         )
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
@@ -56,10 +44,10 @@ public struct ChatSearchView: View {
 
 private struct ChatSearchResultRow: View {
     let result: ChatSearchResult
-    let onTap: @MainActor () -> Void
+    let onOpen: @Sendable (ChatSearchResult) -> Void
 
     var body: some View {
-        Button(action: onTap) {
+        Button { onOpen(result) } label: {
             HStack(alignment: .center, spacing: Spacing.s3) {
                 avatar
                 VStack(alignment: .leading, spacing: 2) {
