@@ -9,6 +9,8 @@ import app.pantopus.android.data.api.models.posts.PostCreateRequest
 import app.pantopus.android.data.api.models.posts.PostCreateResponse
 import app.pantopus.android.data.api.models.posts.PostDetailResponse
 import app.pantopus.android.data.api.models.posts.PostLikeResponse
+import app.pantopus.android.data.api.models.posts.PostUpdateRequest
+import app.pantopus.android.data.api.models.posts.PostUpdateResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.PostsApi
@@ -42,6 +44,12 @@ class PostsRepository
 
         /** `POST /api/posts` — create a new post. */
         suspend fun createPost(body: PostCreateRequest): NetworkResult<PostCreateResponse> = safeApiCall { api.createPost(body) }
+
+        /** `PATCH /api/posts/:id` — author-only edit. */
+        suspend fun updatePost(
+            id: String,
+            body: PostUpdateRequest,
+        ): NetworkResult<PostUpdateResponse> = safeApiCall { api.updatePost(id, body) }
 
         /** `GET /api/posts/:id`. */
         suspend fun detail(id: String): NetworkResult<PostDetailResponse> = safeApiCall { api.detail(id) }

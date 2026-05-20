@@ -9,9 +9,12 @@ import app.pantopus.android.data.api.models.posts.PostCreateRequest
 import app.pantopus.android.data.api.models.posts.PostCreateResponse
 import app.pantopus.android.data.api.models.posts.PostDetailResponse
 import app.pantopus.android.data.api.models.posts.PostLikeResponse
+import app.pantopus.android.data.api.models.posts.PostUpdateRequest
+import app.pantopus.android.data.api.models.posts.PostUpdateResponse
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -44,6 +47,17 @@ interface PostsApi {
     suspend fun createPost(
         @Body body: PostCreateRequest,
     ): PostCreateResponse
+
+    /**
+     * `PATCH /api/posts/:id` — author-only edit. Body keys are validated
+     * by `updatePostSchema` at `backend/routes/posts.js:298-328`. Route
+     * `backend/routes/posts.js:2428`.
+     */
+    @PATCH("api/posts/{id}")
+    suspend fun updatePost(
+        @Path("id") id: String,
+        @Body body: PostUpdateRequest,
+    ): PostUpdateResponse
 
     /** `GET /api/posts/:id` — route `backend/routes/posts.js:2354`. */
     @GET("api/posts/{id}")

@@ -754,6 +754,10 @@ private object ChildRoutes {
     const val COMPOSE_INTENT_KEY = "intent"
     const val COMPOSE_POST = "feed/compose?$COMPOSE_INTENT_KEY={$COMPOSE_INTENT_KEY}"
 
+    /** P3.5 — Edit an existing Pulse post. Re-uses the compose flow. */
+    const val EDIT_POST_POST_ID_KEY = "postId"
+    const val EDIT_POST = "feed/edit/{$EDIT_POST_POST_ID_KEY}"
+
     /** Debug-only route reached via 5-tap easter egg on the Hub. */
     const val TOKEN_GALLERY = "_debug/token-gallery"
 
@@ -807,6 +811,9 @@ private object ChildRoutes {
 
     /** Build the compose-post path with the pre-fill intent encoded. */
     fun composePost(intent: String): String = "feed/compose?$COMPOSE_INTENT_KEY=${java.net.URLEncoder.encode(intent, "UTF-8")}"
+
+    /** Build the edit-post path. The VM reads `postId` via SavedStateHandle. */
+    fun editPost(postId: String): String = "feed/edit/${java.net.URLEncoder.encode(postId, "UTF-8")}"
 
     /** Build the gig-detail path. */
     fun gigDetail(gigId: String): String = "gigs/$gigId"
@@ -1774,6 +1781,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenProfile = { userId ->
                         navController.navigate(ChildRoutes.publicProfile(userId))
                     },
+                    onEdit = { postId ->
+                        navController.navigate(ChildRoutes.editPost(postId))
+                    },
                 )
             }
             composable(
@@ -2084,6 +2094,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             ) {
                 PulseComposeScreen(onBack = { navController.popBackStack() })
             }
+            composable(
+                route = ChildRoutes.EDIT_POST,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.EDIT_POST_POST_ID_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                PulseComposeScreen(onBack = { navController.popBackStack() })
+            }
             composable(ChildRoutes.NOTIFICATIONS) {
                 NotificationsScreen(onBack = { navController.popBackStack() })
             }
@@ -2253,7 +2274,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenPost = { navController.navigate(ChildRoutes.placeholder("Post detail")) },
                     onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Filter posts")) },
                     onCompose = { navController.navigate(ChildRoutes.placeholder("Write a post")) },
-                    onEditPost = { navController.navigate(ChildRoutes.placeholder("Edit post")) },
+                    onEditPost = { dto -> navController.navigate(ChildRoutes.editPost(dto.id)) },
                 )
             }
             composable(ChildRoutes.MENU) {
