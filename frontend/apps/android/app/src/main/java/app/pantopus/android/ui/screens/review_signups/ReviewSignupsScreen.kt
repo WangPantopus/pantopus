@@ -33,12 +33,20 @@ fun ReviewSignupsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val topBarAction by viewModel.topBarAction.collectAsStateWithLifecycle()
     val chipStrip by viewModel.chipStrip.collectAsStateWithLifecycle()
+    val pendingEditsRevision by viewModel.pendingEditsRevision.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.onShareTrain = onShareTrain
         viewModel.onEditSignup = onEditSignup
         viewModel.onMessageHelper = onMessageHelper
         viewModel.load()
+    }
+
+    // Drain any pending optimistic patch dropped by the Edit Signup
+    // form while we were off the stack — keeps the row in sync
+    // without a re-fetch.
+    LaunchedEffect(pendingEditsRevision) {
+        viewModel.applyPendingEdits()
     }
 
     Box(modifier = Modifier.fillMaxSize().testTag(REVIEW_SIGNUPS_TAG)) {

@@ -44,6 +44,11 @@ public enum YouRoute: Hashable {
     /// T6.6c (P26.5) — Review signups (organizer-only) for one Support
     /// Train. Pushed from a Support Trains row tap.
     case reviewSignups(supportTrainId: String)
+    /// P3.7 — Edit Signup form (organizer-side mutation of a helper
+    /// reservation). Pushed from the Review-signups per-row Edit
+    /// action with the seed DTO baked in so the form can prefill
+    /// without a re-fetch.
+    case editSignup(reservation: SupportTrainReservationDTO)
     /// T6.3f / P14 — My homes (avatar-first roster). The "me.homes"
     /// Activity-section row pushes here; tapping a row drills into the
     /// home dashboard via `homeDashboard(homeId:)`.
@@ -872,13 +877,17 @@ public struct YouTabRoot: View {
                     onMessage: { _ in
                         Task { @MainActor in path.append(.placeholder(label: "Message helper")) }
                     },
-                    onEdit: { reservationId in
+                    onEdit: { reservation in
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Edit signup · \(reservationId)"))
+                            path.append(.editSignup(reservation: reservation))
                         }
                     }
                 )
             )
+        case let .editSignup(reservation):
+            EditSignupFormView(reservation: reservation) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case .identityCenter:
             IdentityCenterView(
                 onBack: { if !path.isEmpty { path.removeLast() } },
