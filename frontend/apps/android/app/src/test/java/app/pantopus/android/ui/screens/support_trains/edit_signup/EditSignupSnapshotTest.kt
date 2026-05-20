@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "LongParameterList")
 
 package app.pantopus.android.ui.screens.support_trains.edit_signup
 

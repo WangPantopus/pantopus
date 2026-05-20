@@ -184,7 +184,6 @@ import app.pantopus.android.ui.screens.recent_activity.RecentActivityScreen
 import app.pantopus.android.ui.screens.review_claims.ReviewClaimDetailScreen
 import app.pantopus.android.ui.screens.review_claims.ReviewClaimsScreen
 import app.pantopus.android.ui.screens.review_signups.ReviewSignupsScreen
-import app.pantopus.android.ui.screens.support_trains.edit_signup.EditSignupFormScreen
 import app.pantopus.android.ui.screens.settings.NotificationSettingsScreen
 import app.pantopus.android.ui.screens.settings.PrivacySettingsScreen
 import app.pantopus.android.ui.screens.settings.SettingsIndexScreen
@@ -198,6 +197,7 @@ import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
+import app.pantopus.android.ui.screens.support_trains.edit_signup.EditSignupFormScreen
 import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.you.YouScreen
@@ -647,8 +647,7 @@ private object ChildRoutes {
     const val EDIT_SIGNUP_ID_KEY = "reservationId"
     const val EDIT_SIGNUP = "support-trains/reservations/{$EDIT_SIGNUP_ID_KEY}/edit"
 
-    fun editSignup(reservationId: String): String =
-        "support-trains/reservations/${java.net.URLEncoder.encode(reservationId, "UTF-8")}/edit"
+    fun editSignup(reservationId: String): String = "support-trains/reservations/${java.net.URLEncoder.encode(reservationId, "UTF-8")}/edit"
 
     /** P1.1 — Admin Review-claims queue. Gated by [SettingsRoute.ReviewClaims]. */
     const val REVIEW_CLAIMS = "admin/review-claims"

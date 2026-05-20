@@ -139,9 +139,8 @@ final class EditSignupFormViewModelTests: XCTestCase {
         var captured: SupportTrainReservationDTO?
         let vm = EditSignupFormViewModel(
             reservation: makeReservation(),
-            store: store,
-            onSaved: { captured = $0 }
-        )
+            store: store
+        ) { captured = $0 }
         vm.update(.contribution, to: "Veggie chili + cornbread")
         vm.update(.dropoffTime, to: "18:30")
         vm.update(.dietaryNotes, to: "Strictly vegetarian.")

@@ -35,8 +35,10 @@ enum class EditSignupField(val key: String) {
      * `contributionMode`.
      */
     Contribution("contribution"),
+
     /** `HH:mm` drop-off time within the recipient's slot window. */
     DropoffTime("dropoffTime"),
+
     /**
      * Organizer-only dietary / accommodation notes
      * (`private_note_to_organizer`).
@@ -257,21 +259,23 @@ class EditSignupFormViewModel
         private fun newArrivalIso(seed: SupportTrainReservationDto): String? {
             val value = (_state.value.fields[EditSignupField.DropoffTime]?.value ?: "").trim()
             if (value.isEmpty()) return seed.estimatedArrivalAt
-            val (hour, minute) = runCatching {
-                val parts = value.split(":")
-                parts[0].toInt() to parts[1].toInt()
-            }.getOrNull() ?: return seed.estimatedArrivalAt
+            val (hour, minute) =
+                runCatching {
+                    val parts = value.split(":")
+                    parts[0].toInt() to parts[1].toInt()
+                }.getOrNull() ?: return seed.estimatedArrivalAt
             val zone = ZoneId.systemDefault()
             val base: ZonedDateTime =
                 runCatching { Instant.parse(seed.estimatedArrivalAt ?: "") }
                     .getOrNull()
                     ?.atZone(zone)
                     ?: ZonedDateTime.now(zone)
-            val composed = base
-                .withHour(hour)
-                .withMinute(minute)
-                .withSecond(0)
-                .withNano(0)
+            val composed =
+                base
+                    .withHour(hour)
+                    .withMinute(minute)
+                    .withSecond(0)
+                    .withNano(0)
             return composed.withZoneSameInstant(ZoneOffset.UTC).format(ISO_FMT)
         }
 

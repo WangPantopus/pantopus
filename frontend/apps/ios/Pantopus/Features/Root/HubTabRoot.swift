@@ -1102,10 +1102,9 @@ public struct HubTabRoot: View {
                 )
             )
         case let .editSignup(reservation):
-            EditSignupFormView(
-                reservation: reservation,
-                onClose: { if !path.isEmpty { path.removeLast() } }
-            )
+            EditSignupFormView(reservation: reservation) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case .discoverHub:
             DiscoverHubView(
                 viewModel: DiscoverHubViewModel { target in

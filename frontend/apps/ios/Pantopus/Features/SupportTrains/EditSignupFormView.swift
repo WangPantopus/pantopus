@@ -39,12 +39,13 @@ public struct EditSignupFormView: View {
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: onClose,
-            onCommit: { Task { await viewModel.save() } }
-        ) {
-            contributionGroup
-            timingGroup
-            notesGroup
-        }
+            onCommit: { Task { await viewModel.save() } },
+            content: {
+                contributionGroup
+                timingGroup
+                notesGroup
+            }
+        )
         .formShakeOnChange(of: viewModel.shakeTrigger)
         .overlay(alignment: .bottom) { toastOverlay }
         .onChange(of: viewModel.shouldDismiss) { _, dismiss in
@@ -166,9 +167,9 @@ public struct EditSignupFormView: View {
 
     private var notesBorderColor: Color {
         switch fieldState(.dietaryNotes) {
-        case .error: return Theme.Color.error
-        case .valid: return Theme.Color.success
-        case .default: return Theme.Color.appBorder
+        case .error: Theme.Color.error
+        case .valid: Theme.Color.success
+        case .default: Theme.Color.appBorder
         }
     }
 
@@ -213,8 +214,7 @@ public struct EditSignupFormView: View {
                     name: "Lena Park",
                     profilePictureUrl: nil
                 )
-            ),
-            onClose: {}
-        )
+            )
+        ) {}
     }
 }

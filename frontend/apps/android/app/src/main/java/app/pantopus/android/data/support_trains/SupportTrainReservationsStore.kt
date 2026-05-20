@@ -33,6 +33,7 @@ class SupportTrainReservationsStore
         private var staged: SupportTrainReservationDto? = null
 
         private val _revision = MutableStateFlow(0)
+
         /** Bumps every time a patch is applied — list VMs collect this. */
         val revision: StateFlow<Int> = _revision.asStateFlow()
 

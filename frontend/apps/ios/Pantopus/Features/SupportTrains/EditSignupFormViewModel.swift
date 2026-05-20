@@ -97,9 +97,13 @@ public final class EditSignupFormViewModel {
         FormAggregate(fields: EditSignupField.allCases.compactMap { fields[$0] })
     }
 
-    public var isValid: Bool { aggregate.isValid }
+    public var isValid: Bool {
+        aggregate.isValid
+    }
 
-    public var isDirty: Bool { aggregate.isDirty }
+    public var isDirty: Bool {
+        aggregate.isDirty
+    }
 
     // MARK: - Copy
 
@@ -110,26 +114,26 @@ public final class EditSignupFormViewModel {
     public var contributionLabel: String {
         switch reservation.contributionMode ?? "" {
         case "cook":
-            return "Meal description"
+            "Meal description"
         case "groceries":
-            return "Groceries description"
+            "Groceries description"
         case "takeout":
-            return "Restaurant"
+            "Restaurant"
         default:
-            return "Contribution"
+            "Contribution"
         }
     }
 
     public var contributionPlaceholder: String {
         switch reservation.contributionMode ?? "" {
         case "cook":
-            return "e.g. Veggie chili with cornbread"
+            "e.g. Veggie chili with cornbread"
         case "groceries":
-            return "e.g. Pantry staples + fresh produce"
+            "e.g. Pantry staples + fresh produce"
         case "takeout":
-            return "e.g. Sweetgreen on Market"
+            "e.g. Sweetgreen on Market"
         default:
-            return "What you're bringing"
+            "What you're bringing"
         }
     }
 
@@ -193,11 +197,11 @@ public final class EditSignupFormViewModel {
         case .contribution:
             // Optional on the wire (Joi `.allow(null, '')`) but we
             // cap at 200 chars to match the reserve schema.
-            return .all([.maxLength(200)])
+            .all([.maxLength(200)])
         case .dropoffTime:
-            return .all([.timeHHmm()])
+            .all([.timeHHmm()])
         case .dietaryNotes:
-            return .all([.maxLength(1000)])
+            .all([.maxLength(1000)])
         }
     }
 
@@ -251,12 +255,11 @@ public final class EditSignupFormViewModel {
               let hour = Int(parts[0]),
               let minute = Int(parts[1]) else { return reservation.estimatedArrivalAt }
         let calendar = Calendar(identifier: .gregorian)
-        let baseDate: Date
-        if let original = reservation.estimatedArrivalAt,
-           let parsed = Self.isoFormatter.date(from: original) {
-            baseDate = parsed
+        let baseDate: Date = if let original = reservation.estimatedArrivalAt,
+                                let parsed = Self.isoFormatter.date(from: original) {
+            parsed
         } else {
-            baseDate = Date()
+            Date()
         }
         var components = calendar.dateComponents(
             [.year, .month, .day, .timeZone],
