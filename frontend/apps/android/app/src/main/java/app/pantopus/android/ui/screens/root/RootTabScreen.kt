@@ -198,6 +198,7 @@ import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
+import app.pantopus.android.ui.screens.support_trains.edit_signup.EditSignupFormScreen
 import app.pantopus.android.ui.screens.support_trains.search.SupportTrainsSearchScreen
 import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
@@ -650,6 +651,17 @@ private object ChildRoutes {
     const val REVIEW_SIGNUPS = "support-trains/{$REVIEW_SIGNUPS_ID_KEY}/review"
 
     fun reviewSignups(trainId: String): String = "support-trains/${java.net.URLEncoder.encode(trainId, "UTF-8")}/review"
+
+    /** P3.7 Edit Signup form. `:reservationId` is the reservation UUID;
+     *  the seed DTO is staged in
+     *  `SupportTrainReservationsStore` by the Review-signups
+     *  screen before navigation so the form can prefill without a
+     *  re-fetch. Keep in sync with
+     *  `EditSignupFormViewModel.RESERVATION_ID_KEY`. */
+    const val EDIT_SIGNUP_ID_KEY = "reservationId"
+    const val EDIT_SIGNUP = "support-trains/reservations/{$EDIT_SIGNUP_ID_KEY}/edit"
+
+    fun editSignup(reservationId: String): String = "support-trains/reservations/${java.net.URLEncoder.encode(reservationId, "UTF-8")}/edit"
 
     /** P1.1 — Admin Review-claims queue. Gated by [SettingsRoute.ReviewClaims]. */
     const val REVIEW_CLAIMS = "admin/review-claims"
@@ -1790,7 +1802,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             ) {
                 PublicProfileScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                    onOpenMessages = { profile ->
+                        navController.navigate(
+                            ChildRoutes.chatConversationFromPicker(
+                                userId = profile.id,
+                                displayName = profile.displayName,
+                                initials = initialsFromName(profile.displayName),
+                                verified = profile.verified == true,
+                                locality = profile.locality,
+                            ),
+                        )
+                    },
                     onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report")) },
                 )
             }
@@ -1979,7 +2001,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             ) {
                 ListingDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                    onOpenMessages = { listing ->
+                        listing.userId?.let { sellerId ->
+                            val name = listing.title ?: "Seller"
+                            navController.navigate(
+                                ChildRoutes.chatConversationFromPicker(
+                                    userId = sellerId,
+                                    displayName = name,
+                                    initials = initialsFromName(name),
+                                    verified = false,
+                                    locality = listing.locationName,
+                                ),
+                            )
+                        }
+                    },
                     onViewOffers = { dto ->
                         navController.navigate(ChildRoutes.listingOffers(dto.id, dto.title))
                     },
@@ -2070,7 +2105,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             ) {
                 GigDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                    onOpenMessages = { gig ->
+                        gig.userId?.let { posterId ->
+                            val name = gig.creator?.name ?: gig.creator?.username ?: gig.title
+                            navController.navigate(
+                                ChildRoutes.chatConversationFromPicker(
+                                    userId = posterId,
+                                    displayName = name,
+                                    initials = initialsFromName(name),
+                                    verified = gig.creator?.verified == true,
+                                    locality = null,
+                                ),
+                            )
+                        }
+                    },
                 )
             }
             composable(
@@ -2577,11 +2625,24 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.placeholder("Share train"))
                     },
                     onEditSignup = { reservationId ->
-                        navController.navigate(ChildRoutes.placeholder("Edit signup · $reservationId"))
+                        navController.navigate(ChildRoutes.editSignup(reservationId))
                     },
                     onMessageHelper = { reservationId ->
                         navController.navigate(ChildRoutes.placeholder("Message helper · $reservationId"))
                     },
+                )
+            }
+            composable(
+                route = ChildRoutes.EDIT_SIGNUP,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.EDIT_SIGNUP_ID_KEY) {
+                            type = NavType.StringType
+                        },
+                    ),
+            ) {
+                EditSignupFormScreen(
+                    onClose = { navController.popBackStack() },
                 )
             }
             composable(ChildRoutes.REVIEW_CLAIMS) {
@@ -2740,4 +2801,20 @@ private fun homeIdFromRoute(route: String): String? {
     if (!route.startsWith(prefix)) return null
     val segment = route.removePrefix(prefix).substringBefore('/')
     return segment.takeIf { it.isNotEmpty() }
+}
+
+/**
+ * Two-letter initials derived from a display name. Falls back to `··`
+ * when the input has no alphanumeric content so the chat header's avatar
+ * still renders.
+ */
+private fun initialsFromName(name: String): String {
+    val joined =
+        name
+            .split(" ")
+            .take(2)
+            .mapNotNull { it.firstOrNull()?.toString() }
+            .joinToString("")
+            .uppercase()
+    return joined.ifEmpty { "··" }
 }

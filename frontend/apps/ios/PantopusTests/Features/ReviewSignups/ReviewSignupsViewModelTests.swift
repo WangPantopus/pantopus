@@ -40,7 +40,7 @@ final class ReviewSignupsViewModelTests: XCTestCase {
         onShareTrain: @escaping @MainActor () -> Void = {},
         onConfirm: @escaping @MainActor (String) -> Void = { _ in },
         onMessage: @escaping @MainActor (String) -> Void = { _ in },
-        onEdit: @escaping @MainActor (String) -> Void = { _ in }
+        onEdit: @escaping @MainActor (SupportTrainReservationDTO) -> Void = { _ in }
     ) -> ReviewSignupsViewModel {
         ReviewSignupsViewModel(
             supportTrainId: supportTrainId,

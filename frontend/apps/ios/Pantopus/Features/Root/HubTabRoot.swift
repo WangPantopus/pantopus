@@ -143,6 +143,11 @@ public enum HubRoute: Hashable {
     /// P4.6 — Support Trains search. Pushed from the Support Trains list
     /// top-bar search action; reuses the shared `SearchListShell`.
     case searchSupportTrains
+    /// P3.7 — Edit Signup form (organizer-side mutation of a helper
+    /// reservation). Pushed from the Review-signups per-row Edit
+    /// action with the seed DTO baked into the route so the form can
+    /// prefill without a re-fetch.
+    case editSignup(reservation: SupportTrainReservationDTO)
     /// Admin home-ownership-claims review queue. Gated by
     /// `auth.user.isAdmin` and reached from the Settings menu's Admin
     /// group. Mirrors the web `/app/admin/review-claims` page.
@@ -374,6 +379,15 @@ public struct HubTabRoot: View {
             return .gigsFeed
         }
         return .placeholder(label: item.title)
+    }
+
+    /// Two-letter initials derived from a display name. Falls back to
+    /// `··` when the input has no alphanumeric content so the chat header's
+    /// avatar still renders.
+    fileprivate static func initials(from name: String) -> String {
+        let parts = name.split(separator: " ").prefix(2)
+        let joined = parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
+        return joined.isEmpty ? "··" : joined
     }
 
     /// Extracts `<id>` from `/app/homes/<id>/dashboard`. Returns `nil`
@@ -835,7 +849,17 @@ public struct HubTabRoot: View {
             PublicProfileView(
                 userId: userId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
+                onOpenMessages: { profile in
+                    Task { @MainActor in
+                        push(.chatConversation(InboxConversationDestination(
+                            mode: .person(otherUserId: profile.id),
+                            displayName: profile.displayName,
+                            initials: Self.initials(from: profile.displayName),
+                            identityKind: nil,
+                            verified: profile.verified ?? false
+                        )))
+                    }
+                },
                 onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report")) } }
             )
         case let .businessProfile(businessId):
@@ -935,7 +959,19 @@ public struct HubTabRoot: View {
             GigDetailView(
                 viewModel: GigDetailViewModel(gigId: gigId),
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onMessage: { _ in Task { @MainActor in push(.placeholder(label: "Messages")) } }
+                onMessage: { gig in
+                    Task { @MainActor in
+                        guard let posterId = gig.userId else { return }
+                        let name = gig.creator?.name ?? gig.creator?.username ?? gig.title
+                        push(.chatConversation(InboxConversationDestination(
+                            mode: .person(otherUserId: posterId),
+                            displayName: name,
+                            initials: Self.initials(from: name),
+                            identityKind: nil,
+                            verified: gig.creator?.verified ?? false
+                        )))
+                    }
+                }
             )
         case let .composeGig(category):
             GigComposeWizardView(preselectedCategoryKey: category) { gigId in
@@ -975,7 +1011,19 @@ public struct HubTabRoot: View {
             ListingDetailView(
                 viewModel: ListingDetailViewModel(listingId: listingId),
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onMessage: { _ in Task { @MainActor in push(.placeholder(label: "Messages")) } },
+                onMessage: { listing in
+                    Task { @MainActor in
+                        guard let sellerId = listing.userId else { return }
+                        let name = listing.title ?? "Seller"
+                        push(.chatConversation(InboxConversationDestination(
+                            mode: .person(otherUserId: sellerId),
+                            displayName: name,
+                            initials: Self.initials(from: name),
+                            identityKind: nil,
+                            verified: false
+                        )))
+                    }
+                },
                 onViewOffers: { dto in
                     Task { @MainActor in
                         push(.listingOffers(listingId: dto.id, title: dto.title))
@@ -1112,13 +1160,17 @@ public struct HubTabRoot: View {
                     onMessage: { _ in
                         Task { @MainActor in push(.placeholder(label: "Message helper")) }
                     },
-                    onEdit: { reservationId in
+                    onEdit: { reservation in
                         Task { @MainActor in
-                            push(.placeholder(label: "Edit signup · \(reservationId)"))
+                            push(.editSignup(reservation: reservation))
                         }
                     }
                 )
             )
+        case let .editSignup(reservation):
+            EditSignupFormView(reservation: reservation) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case .discoverHub:
             DiscoverHubView(
                 viewModel: DiscoverHubViewModel { target in

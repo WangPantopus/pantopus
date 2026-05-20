@@ -35,7 +35,7 @@ public final class SupportTrainsSearchViewModel {
     private let onOpenTrain: @MainActor (String) -> Void
     private let onCancelSearch: @MainActor () -> Void
 
-    public init(
+    init(
         api: APIClient = .shared,
         onOpenTrain: @escaping @MainActor (String) -> Void = { _ in },
         onCancel: @escaping @MainActor () -> Void = {}
