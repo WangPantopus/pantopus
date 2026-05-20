@@ -49,7 +49,9 @@ public struct EditBidSheetTarget: Identifiable, Sendable, Hashable {
     }
 
     /// True when the sheet is editing an existing bid (vs placing new).
-    public var isEditing: Bool { bidId != nil }
+    public var isEditing: Bool {
+        bidId != nil
+    }
 }
 
 /// Form draft pushed back to the host on submit. The host turns this

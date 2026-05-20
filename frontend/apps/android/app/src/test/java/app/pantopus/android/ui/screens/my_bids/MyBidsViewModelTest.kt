@@ -4,6 +4,7 @@
     "LongParameterList",
     "TooManyFunctions",
     "MagicNumber",
+    "LargeClass",
 )
 
 package app.pantopus.android.ui.screens.my_bids
@@ -12,7 +13,6 @@ import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
 import app.pantopus.android.data.api.models.offers.BidDto
 import app.pantopus.android.data.api.models.offers.BidGigDto
 import app.pantopus.android.data.api.models.offers.MyBidsResponse
-import app.pantopus.android.data.api.models.offers.UpdateBidBody
 import app.pantopus.android.data.api.models.offers.WithdrawBidReason
 import app.pantopus.android.data.api.models.offers.WithdrawBidResponse
 import app.pantopus.android.data.api.models.reviews.CreateReviewResponse
@@ -819,16 +819,20 @@ class MyBidsViewModelTest {
     @Test
     fun split_message_and_terms_handles_every_shape() {
         val (msg1, t1) = splitMessageAndTerms(null)
-        assertNull(msg1); assertNull(t1)
+        assertNull(msg1)
+        assertNull(t1)
 
         val (msg2, t2) = splitMessageAndTerms("Just a message")
-        assertEquals("Just a message", msg2); assertNull(t2)
+        assertEquals("Just a message", msg2)
+        assertNull(t2)
 
         val (msg3, t3) = splitMessageAndTerms("Terms: Deposit upfront")
-        assertNull(msg3); assertEquals("Deposit upfront", t3)
+        assertNull(msg3)
+        assertEquals("Deposit upfront", t3)
 
         val (msg4, t4) = splitMessageAndTerms("Hi\n\nTerms: Deposit upfront")
-        assertEquals("Hi", msg4); assertEquals("Deposit upfront", t4)
+        assertEquals("Hi", msg4)
+        assertEquals("Deposit upfront", t4)
     }
 
     @Test

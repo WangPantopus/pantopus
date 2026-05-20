@@ -1,4 +1,5 @@
 @file:Suppress("PackageNaming")
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.my_bids
 
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -46,6 +46,8 @@ import app.pantopus.android.ui.theme.Spacing
 /** Test tag on the My bids root container. */
 const val MY_BIDS_TAG = "my-bids"
 
+private const val TOAST_DISMISS_DELAY_MS = 2_500L
+
 /**
  * T5.3.1 — My bids. Thin wrapper around [ListOfRowsScreen]. Four tabs
  * (Active / Accepted / Rejected / Done), 48dp extended-pill FAB
@@ -54,7 +56,6 @@ const val MY_BIDS_TAG = "my-bids"
  * pieces attached at the bottom are the WithdrawBidSheet plus the
  * P3.4 Edit Bid + Leave Review sheets.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("LongParameterList")
 fun MyBidsScreen(
@@ -88,7 +89,7 @@ fun MyBidsScreen(
 
     LaunchedEffect(toast) {
         if (toast != null) {
-            kotlinx.coroutines.delay(2_500)
+            kotlinx.coroutines.delay(TOAST_DISMISS_DELAY_MS)
             viewModel.dismissToast()
         }
     }
@@ -108,75 +109,114 @@ fun MyBidsScreen(
             onBack = onBack,
         )
 
-        toast?.let { payload ->
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .padding(bottom = Spacing.s10, start = Spacing.s4, end = Spacing.s4)
-                            .clip(RoundedCornerShape(Radii.pill))
-                            .background(
-                                if (payload.isError) PantopusColors.error else PantopusColors.success,
-                            )
-                            .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
-                            .testTag("my-bids-toast"),
-                ) {
-                    Text(
-                        text = payload.text,
-                        style = PantopusTextStyle.small,
-                        color = PantopusColors.appTextInverse,
+        toast?.let { payload -> MyBidsToastOverlay(payload) }
+    }
+
+    WithdrawBidSheet(
+        target = withdrawTarget,
+        onCancel = { viewModel.cancelWithdraw() },
+        onConfirm = { reason -> viewModel.confirmWithdraw(reason) },
+    )
+
+    EditBidSheet(
+        target = editBidTarget,
+        onCancel = { viewModel.cancelEditBid() },
+        onSubmit = { draft -> viewModel.submitEditBid(draft) },
+    )
+
+    LeaveReviewSheet(
+        target = leaveReviewTarget,
+        onCancel = { viewModel.cancelLeaveReview() },
+        onSubmit = { draft -> viewModel.submitLeaveReview(draft) },
+    )
+}
+
+@Composable
+private fun MyBidsToastOverlay(payload: MyBidsToast) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .padding(bottom = Spacing.s10, start = Spacing.s4, end = Spacing.s4)
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(
+                        if (payload.isError) PantopusColors.error else PantopusColors.success,
                     )
-                }
-            }
-        }
-    }
-
-    val target = withdrawTarget
-    if (target != null) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.cancelWithdraw() },
-            sheetState = sheetState,
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                    .testTag("my-bids-toast"),
         ) {
-            WithdrawBidSheetContent(
-                target = target,
-                onCancel = { viewModel.cancelWithdraw() },
-                onConfirm = { reason -> viewModel.confirmWithdraw(reason) },
+            Text(
+                text = payload.text,
+                style = PantopusTextStyle.small,
+                color = PantopusColors.appTextInverse,
             )
         }
     }
+}
 
-    val edit = editBidTarget
-    if (edit != null) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.cancelEditBid() },
-            sheetState = sheetState,
-        ) {
-            EditBidSheetContent(
-                target = edit,
-                onSubmit = { draft -> viewModel.submitEditBid(draft) },
-                onCancel = { viewModel.cancelEditBid() },
-            )
-        }
+@Composable
+private fun WithdrawBidSheet(
+    target: WithdrawSheetTarget?,
+    onCancel: () -> Unit,
+    onConfirm: (WithdrawBidReason?) -> Unit,
+) {
+    if (target == null) return
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onCancel,
+        sheetState = sheetState,
+    ) {
+        WithdrawBidSheetContent(
+            target = target,
+            onCancel = onCancel,
+            onConfirm = onConfirm,
+        )
     }
+}
 
-    val review = leaveReviewTarget
-    if (review != null) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.cancelLeaveReview() },
-            sheetState = sheetState,
-        ) {
-            LeaveReviewSheetContent(
-                target = review,
-                onSubmit = { draft -> viewModel.submitLeaveReview(draft) },
-                onCancel = { viewModel.cancelLeaveReview() },
-            )
-        }
+@Composable
+private fun EditBidSheet(
+    target: EditBidSheetTarget?,
+    onCancel: () -> Unit,
+    onSubmit: suspend (EditBidDraft) -> Boolean,
+) {
+    if (target == null) return
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onCancel,
+        sheetState = sheetState,
+    ) {
+        EditBidSheetContent(
+            target = target,
+            onSubmit = onSubmit,
+            onCancel = onCancel,
+        )
+    }
+}
+
+@Composable
+private fun LeaveReviewSheet(
+    target: LeaveReviewSheetTarget?,
+    onCancel: () -> Unit,
+    onSubmit: suspend (LeaveReviewDraft) -> Boolean,
+) {
+    if (target == null) return
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onCancel,
+        sheetState = sheetState,
+    ) {
+        LeaveReviewSheetContent(
+            target = target,
+            onSubmit = onSubmit,
+            onCancel = onCancel,
+        )
     }
 }
 

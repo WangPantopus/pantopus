@@ -36,6 +36,7 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 /**
  * Presentation handed to the bid sheet. `bidId` is `null` when placing
@@ -81,7 +82,11 @@ fun EditBidSheetContent(
 
     val initialAmountString =
         target.initialAmount?.let { value ->
-            if (value % 1.0 == 0.0) value.toInt().toString() else String.format("%.2f", value)
+            if (value % 1.0 == 0.0) {
+                value.toInt().toString()
+            } else {
+                String.format(Locale.US, "%.2f", value)
+            }
         } ?: ""
     var amount by rememberSaveable(target.id) { mutableStateOf(initialAmountString) }
     var message by rememberSaveable(target.id) { mutableStateOf(target.initialMessage.orEmpty()) }
