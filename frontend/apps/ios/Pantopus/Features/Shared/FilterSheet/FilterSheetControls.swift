@@ -219,8 +219,14 @@ struct FilterStepSliderControl: View {
     let selectedIndex: Int
     let onChange: @MainActor (Int) -> Void
 
-    private var maxIndex: Int { max(stops.count - 1, 0) }
-    private var clampedIndex: Int { min(max(selectedIndex, 0), maxIndex) }
+    private var maxIndex: Int {
+        max(stops.count - 1, 0)
+    }
+
+    private var clampedIndex: Int {
+        min(max(selectedIndex, 0), maxIndex)
+    }
+
     private var currentStop: FilterOption? {
         stops.indices.contains(clampedIndex) ? stops[clampedIndex] : nil
     }
@@ -232,7 +238,7 @@ struct FilterStepSliderControl: View {
                     get: { Double(clampedIndex) },
                     set: { onChange(Int($0.rounded())) }
                 ),
-                in: 0 ... Double(maxIndex),
+                in: 0...Double(maxIndex),
                 step: 1
             )
             .tint(Theme.Color.primary600)

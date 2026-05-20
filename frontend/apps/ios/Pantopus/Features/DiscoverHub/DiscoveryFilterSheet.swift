@@ -46,7 +46,9 @@ public struct DiscoverHubFilters: Sendable, Hashable {
     /// The "no filters" baseline (what Reset returns to).
     public static let `default` = DiscoverHubFilters()
 
-    public var isDefault: Bool { self == .default }
+    public var isDefault: Bool {
+        self == .default
+    }
 
     /// Number of active filter dimensions — drives the surface's
     /// filter-count badge. A non-empty content-type selection counts as

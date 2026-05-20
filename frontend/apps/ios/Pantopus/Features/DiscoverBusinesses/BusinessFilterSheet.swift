@@ -65,7 +65,9 @@ public struct DiscoverBusinessFilters: Sendable, Hashable {
 
     public static let `default` = DiscoverBusinessFilters()
 
-    public var isDefault: Bool { self == .default }
+    public var isDefault: Bool {
+        self == .default
+    }
 
     /// Number of active filter dimensions — drives the surface's
     /// filter-count badge.
