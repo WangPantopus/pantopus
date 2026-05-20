@@ -300,12 +300,11 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
             for: listing,
             offerCount: offers.count,
             sortLabel: sort.label,
-            sortOptions: sortMenuOptions(),
-            onEditPrice: { [weak self] in
-                guard let self else { return }
-                Task { @MainActor in self.onEditPrice() }
-            }
-        )
+            sortOptions: sortMenuOptions()
+        ) { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in self.onEditPrice() }
+        }
     }
 
     /// Build the sort-menu options off the canonical `ListingOffersSort`
@@ -316,11 +315,10 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
             ListingContextSortOption(
                 id: option.rawValue,
                 label: option.label,
-                isSelected: option == sort,
-                select: { [weak self] in
-                    Task { @MainActor in self?.selectSort(option) }
-                }
-            )
+                isSelected: option == sort
+            ) { [weak self] in
+                Task { @MainActor in self?.selectSort(option) }
+            }
         }
     }
 
