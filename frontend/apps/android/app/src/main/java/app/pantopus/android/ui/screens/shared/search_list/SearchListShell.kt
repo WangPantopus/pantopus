@@ -118,6 +118,10 @@ data class EmptyStateContent(
  * @param emptyState Payload for the [SearchListPhase.Empty] phase.
  * @param row Composable that renders one [Result] cell.
  * @param onCancel Invoked when the user taps the leading back button.
+ * @param filters Optional chrome rendered between the search field and the
+ *     phase body — e.g. a category-chip filter strip. Visible in every
+ *     phase so the user can pre-filter before (or while) typing. The
+ *     default empty slot keeps the original field-then-results layout.
  */
 @Composable
 fun <Result : Any> SearchListShell(
@@ -131,6 +135,7 @@ fun <Result : Any> SearchListShell(
     onCancel: () -> Unit,
     recentQueries: List<String> = emptyList(),
     onRecentTap: (String) -> Unit = {},
+    filters: @Composable () -> Unit = {},
 ) {
     // 250ms-debounced echo of `query`. The shell uses this to gate
     // the transition from typing-shimmer to empty so the user doesn't
@@ -163,6 +168,7 @@ fun <Result : Any> SearchListShell(
             onCancel = onCancel,
         )
         HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
+        filters()
         Box(modifier = Modifier.fillMaxSize()) {
             when (phase) {
                 SearchListPhase.Recent ->

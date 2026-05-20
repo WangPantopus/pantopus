@@ -36,6 +36,11 @@ public struct SearchListShell<Result: Hashable & Sendable, Row: View>: View {
     private let recentQueries: [String]
     private let onRecentTap: (String) -> Void
     private let emptyState: EmptyStateContent
+    /// Optional chrome rendered between the search field and the phase
+    /// body — e.g. a category-chip filter strip. Visible in every phase
+    /// so the user can pre-filter before (or while) typing. `nil` keeps
+    /// the original field-then-results layout for callers without filters.
+    private let filters: AnyView?
     private let row: (Result) -> Row
     private let onCancel: () -> Void
 
@@ -52,6 +57,7 @@ public struct SearchListShell<Result: Hashable & Sendable, Row: View>: View {
         isLoading: Bool,
         recentQueries: [String] = [],
         onRecentTap: @escaping (String) -> Void = { _ in },
+        filters: AnyView? = nil,
         emptyState: EmptyStateContent,
         @ViewBuilder row: @escaping (Result) -> Row,
         onCancel: @escaping () -> Void
@@ -62,6 +68,7 @@ public struct SearchListShell<Result: Hashable & Sendable, Row: View>: View {
         self.isLoading = isLoading
         self.recentQueries = recentQueries
         self.onRecentTap = onRecentTap
+        self.filters = filters
         self.emptyState = emptyState
         self.row = row
         self.onCancel = onCancel
@@ -71,6 +78,9 @@ public struct SearchListShell<Result: Hashable & Sendable, Row: View>: View {
         VStack(spacing: 0) {
             header
             Divider().background(Theme.Color.appBorderSubtle)
+            if let filters {
+                filters
+            }
             phaseBody
         }
         .background(Theme.Color.appBg)

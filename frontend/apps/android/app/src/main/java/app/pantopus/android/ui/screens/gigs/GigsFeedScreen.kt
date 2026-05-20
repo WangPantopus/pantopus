@@ -513,7 +513,7 @@ internal fun PopulatedFrame(
 }
 
 @Composable
-private fun GigRow(
+internal fun GigRow(
     content: GigCardContent,
     onTap: () -> Unit,
 ) {

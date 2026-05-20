@@ -22,7 +22,9 @@ public enum MapEntityType: String, CaseIterable, Sendable, Hashable, Identifiabl
     case gigs
     case listings
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -32,8 +34,13 @@ public enum MapEntityType: String, CaseIterable, Sendable, Hashable, Identifiabl
         }
     }
 
-    var allowsGigs: Bool { self != .listings }
-    var allowsListings: Bool { self != .gigs }
+    var allowsGigs: Bool {
+        self != .listings
+    }
+
+    var allowsListings: Bool {
+        self != .gigs
+    }
 }
 
 // MARK: - Criteria

@@ -55,6 +55,7 @@ import app.pantopus.android.ui.screens.discoverhub.DiscoverHubScreen
 import app.pantopus.android.ui.screens.discoverhub.DiscoverHubTarget
 import app.pantopus.android.ui.screens.feed.FeedScreen
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
+import app.pantopus.android.ui.screens.gigs.GigSearchScreen
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
@@ -166,6 +167,7 @@ import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
+import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
 import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
 import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
@@ -693,6 +695,9 @@ private object ChildRoutes {
 
     /** Gigs feed (T2.3). Reached from Hub → pillar(.Gigs). */
     const val GIGS_FEED = "gigs/feed"
+
+    /** Gig Search (P4.4). Pushed from the Gigs feed search bar. */
+    const val GIG_SEARCH = "gigs/search"
 
     /** Gig detail target — placeholder until T2.6 Transactional Detail. */
     const val GIG_DETAIL_ID_KEY = "gigId"
@@ -2111,7 +2116,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
                     onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
                     onOpenMap = { category -> navController.navigate(ChildRoutes.nearbyMapForGigs(category.key)) },
-                    onOpenSearch = { navController.navigate(ChildRoutes.placeholder("Gig search")) },
+                    onOpenSearch = { navController.navigate(ChildRoutes.GIG_SEARCH) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ChildRoutes.GIG_SEARCH) {
+                GigSearchScreen(
+                    onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -2588,7 +2599,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.MAILBOX_SEARCH) {
-                NotYetAvailableView(tabName = "Mail search", icon = PantopusIcon.Search)
+                MailboxSearchScreen(
+                    onOpenMail = { mailId ->
+                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                    },
+                    onCancel = { navController.popBackStack() },
+                )
             }
             composable(ChildRoutes.SUPPORT_TRAINS) {
                 SupportTrainsScreen(

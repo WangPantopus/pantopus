@@ -23,7 +23,9 @@ public enum GigScheduleFilter: String, CaseIterable, Sendable, Hashable, Identif
     case recurring
     case flexible
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -56,7 +58,9 @@ public enum GigPostedWithin: String, CaseIterable, Sendable, Hashable, Identifia
     case week
     case month
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -72,7 +76,7 @@ public enum GigPostedWithin: String, CaseIterable, Sendable, Hashable, Identifia
     public func cutoff(from now: Date) -> Date? {
         switch self {
         case .anytime: nil
-        case .today: now.addingTimeInterval(-86_400)
+        case .today: now.addingTimeInterval(-86400)
         case .week: now.addingTimeInterval(-604_800)
         case .month: now.addingTimeInterval(-2_592_000)
         }

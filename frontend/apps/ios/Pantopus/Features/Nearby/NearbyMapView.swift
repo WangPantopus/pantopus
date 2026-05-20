@@ -153,7 +153,9 @@ public struct NearbyMapView: View {
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
             Spacer(minLength: 4)
-            Button(action: { showFilterSheet = true }) {
+            Button {
+                showFilterSheet = true
+            } label: {
                 Icon(.slidersHorizontal, size: 16, strokeWidth: 2.2, color: Theme.Color.appText)
                     .frame(width: 32, height: 32)
             }

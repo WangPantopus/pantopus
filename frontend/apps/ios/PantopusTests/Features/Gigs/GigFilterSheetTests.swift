@@ -83,7 +83,7 @@ final class GigFilterSheetTests: XCTestCase {
     func testPostedWithinCutoffs() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         XCTAssertNil(GigPostedWithin.anytime.cutoff(from: now))
-        XCTAssertEqual(GigPostedWithin.today.cutoff(from: now), now.addingTimeInterval(-86_400))
+        XCTAssertEqual(GigPostedWithin.today.cutoff(from: now), now.addingTimeInterval(-86400))
         XCTAssertEqual(GigPostedWithin.week.cutoff(from: now), now.addingTimeInterval(-604_800))
     }
 

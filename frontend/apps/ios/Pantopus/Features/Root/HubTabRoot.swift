@@ -107,6 +107,8 @@ public enum HubRoute: Hashable {
     case editPost(postId: String)
     /// Gigs feed (T2.3). Reached from Hub → pillar(.gigs).
     case gigsFeed
+    /// Gig Search (P4.4). Pushed from the Gigs feed search bar.
+    case gigSearch
     /// Gig detail target — placeholder until the Transactional Detail (T2.6) ships.
     case gigDetail(gigId: String)
     /// Map+List Hybrid opened from the Gigs feed map-toggle. Carries the
@@ -184,7 +186,8 @@ public enum HubRoute: Hashable {
     case menu
     /// Edit profile form — pushed by Settings → "Edit profile". P1.4.
     case editProfile
-    /// Mailbox search target. Replaced when `/api/mailbox` accepts a query.
+    /// Mailbox search target (P4.2). Client-side filter over the user's
+    /// mailbox — sender / subject / body / category.
     case mailboxSearch
     /// Generic placeholder for any intent whose destination hasn't been
     /// built yet. The label is shown by `NotYetAvailableView`.
@@ -970,7 +973,14 @@ public struct HubTabRoot: View {
                 onOpenMap: { category in
                     Task { @MainActor in push(.nearbyMapForGigs(categoryKey: category.rawValue)) }
                 },
-                onOpenSearch: { Task { @MainActor in push(.placeholder(label: "Gig search")) } },
+                onOpenSearch: { Task { @MainActor in push(.gigSearch) } },
+                onBack: pop
+            )
+        case .gigSearch:
+            GigSearchView(
+                onOpenGig: { gigId in
+                    Task { @MainActor in push(.gigDetail(gigId: gigId)) }
+                },
                 onBack: pop
             )
         case let .gigDetail(gigId):
@@ -1304,7 +1314,18 @@ public struct HubTabRoot: View {
                 viewModel: ReviewClaimDetailViewModel(claimId: claimId)
             ) { if !path.isEmpty { path.removeLast() } }
         case .mailboxSearch:
-            NotYetAvailableView(tabName: "Mail search", icon: .search)
+            MailboxSearchView(
+                viewModel: MailboxSearchViewModel(
+                    onOpenMail: { mailId in
+                        Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
+                    },
+                    onCancel: {
+                        Task { @MainActor in
+                            if !path.isEmpty { path.removeLast() }
+                        }
+                    }
+                )
+            )
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
         case .addHome:

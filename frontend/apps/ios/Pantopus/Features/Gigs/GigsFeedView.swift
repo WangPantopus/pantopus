@@ -7,8 +7,6 @@
 //  rows). Category chips are per-category brand-colored when active.
 //
 
-// swiftlint:disable type_body_length
-
 import SwiftUI
 
 /// Gigs feed entry point. Reached from Hub → Gigs pillar.
@@ -123,35 +121,9 @@ public struct GigsFeedView: View {
     // MARK: - Category chip row
 
     private var categoryChipRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Spacing.s2) {
-                ForEach(GigsCategory.allCases, id: \.self) { category in
-                    let active = category == viewModel.activeCategory
-                    Button {
-                        Task { await viewModel.selectCategory(category) }
-                    } label: {
-                        Text(category.label)
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
-                            .padding(.horizontal, 14)
-                            .frame(height: 28)
-                            .background(active ? category.color : Theme.Color.appSurface)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
-                                    .stroke(active ? .clear : Theme.Color.appBorder, lineWidth: 1)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(category.label)
-                    .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
-                    .accessibilityIdentifier("gigsChip_\(category.rawValue)")
-                }
-            }
-            .padding(.horizontal, Spacing.s4)
-            .padding(.vertical, Spacing.s3)
+        GigsCategoryChipRow(active: viewModel.activeCategory) { category in
+            Task { await viewModel.selectCategory(category) }
         }
-        .accessibilityIdentifier("gigsChipRow")
     }
 
     // MARK: - Sort + filter
@@ -184,43 +156,12 @@ public struct GigsFeedView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("gigsSortMenu")
             Spacer()
-            filterButton
+            GigsFilterButton(activeCount: viewModel.activeFilterCount) {
+                showFilterSheet = true
+            }
         }
         .padding(.horizontal, Spacing.s4)
         .padding(.bottom, Spacing.s2)
-    }
-
-    private var filterButton: some View {
-        let count = viewModel.activeFilterCount
-        let active = count > 0
-        return Button {
-            showFilterSheet = true
-        } label: {
-            HStack(spacing: 5) {
-                Icon(
-                    .slidersHorizontal,
-                    size: 11,
-                    strokeWidth: 2.4,
-                    color: active ? Theme.Color.primary700 : Theme.Color.appTextSecondary
-                )
-                Text(active ? "\(count) filters" : "Filters")
-                    .font(.system(size: 11.5, weight: .bold))
-                    .foregroundStyle(active ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(active ? Theme.Color.primary50 : Theme.Color.appSurface)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
-                    .stroke(active ? Theme.Color.primary100 : Theme.Color.appBorder, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(active ? "Filters, \(count) active" : "Filters")
-        .accessibilityIdentifier("gigsFiltersButton")
     }
 
     // MARK: - Content frames
@@ -374,8 +315,8 @@ public struct GigsFeedView: View {
 
 /// One gig row — category chip + meta line, 2-line title, 2-line body,
 /// price, amber bid pill (hidden at 0 with "Be the first" affordance),
-/// right-aligned distance.
-private struct GigRow: View {
+/// right-aligned distance. Reused by the Gig Search results list.
+struct GigRow: View {
     let content: GigCardContent
 
     var body: some View {
@@ -429,6 +370,43 @@ private struct GigRow: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+}
+
+/// Sort+filter row affordance opening the Gig filter sheet. Shows the
+/// active filter count when filters are applied.
+private struct GigsFilterButton: View {
+    let activeCount: Int
+    let onTap: () -> Void
+
+    var body: some View {
+        let active = activeCount > 0
+        return Button(action: onTap) {
+            HStack(spacing: 5) {
+                Icon(
+                    .slidersHorizontal,
+                    size: 11,
+                    strokeWidth: 2.4,
+                    color: active ? Theme.Color.primary700 : Theme.Color.appTextSecondary
+                )
+                Text(active ? "\(activeCount) filters" : "Filters")
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundStyle(active ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(active ? Theme.Color.primary50 : Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                    .stroke(active ? Theme.Color.primary100 : Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(active ? "Filters, \(activeCount) active" : "Filters")
+        .accessibilityIdentifier("gigsFiltersButton")
     }
 }
 

@@ -1,4 +1,5 @@
 @file:Suppress("MagicNumber", "PackageNaming")
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.nearby.map
 

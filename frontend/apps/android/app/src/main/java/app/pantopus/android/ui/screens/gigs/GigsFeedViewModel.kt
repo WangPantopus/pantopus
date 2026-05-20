@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
+import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -96,7 +97,7 @@ class GigsFeedViewModel
                 if (visible.isEmpty()) {
                     GigsFeedUiState.Empty(radiusMiles = radiusMiles)
                 } else {
-                    GigsFeedUiState.Loaded(rows = visible.map(::projectCard))
+                    GigsFeedUiState.Loaded(rows = visible.map { projectCard(it) })
                 }
         }
 
@@ -134,64 +135,71 @@ class GigsFeedViewModel
             }
         }
 
-        private fun projectCard(gig: GigDto): GigCardContent {
-            val category = GigsCategory.fromBackendKey(gig.category)
-            val distance = distanceLabel(gig.distanceMiles)
-            val age = ageLabel(gig.createdAt)?.let { "$it ago" }
-            val meta = listOfNotNull(distance, age).joinToString(" · ")
-            return GigCardContent(
-                id = gig.id,
-                category = category,
-                metaLine = meta,
-                title = gig.title,
-                body = gig.description.orEmpty(),
-                price = priceLabel(gig.price, gig.payType),
-                bidCount = gig.bidCount ?: 0,
-                distanceLabel = distance,
-            )
-        }
-
-        private fun priceLabel(
-            price: Double?,
-            payType: String?,
-        ): String {
-            if (price == null) return "—"
-            val base =
-                if (price % 1.0 == 0.0) {
-                    "$${price.toInt()}"
-                } else {
-                    String.format("$%.2f", price)
-                }
-            return when (payType) {
-                "hourly" -> "$base / hr"
-                "per_session" -> "$base / session"
-                "per_walk" -> "$base / walk"
-                "per_visit" -> "$base / visit"
-                else -> base
+        companion object {
+            /**
+             * `GigDto` → render-only [GigCardContent]. Exposed on the
+             * companion so the Gig Search surface projects identical rows
+             * without duplicating the meta / price / distance formatting.
+             */
+            fun projectCard(gig: GigDto): GigCardContent {
+                val category = GigsCategory.fromBackendKey(gig.category)
+                val distance = distanceLabel(gig.distanceMiles)
+                val age = ageLabel(gig.createdAt)?.let { "$it ago" }
+                val meta = listOfNotNull(distance, age).joinToString(" · ")
+                return GigCardContent(
+                    id = gig.id,
+                    category = category,
+                    metaLine = meta,
+                    title = gig.title,
+                    body = gig.description.orEmpty(),
+                    price = priceLabel(gig.price, gig.payType),
+                    bidCount = gig.bidCount ?: 0,
+                    distanceLabel = distance,
+                )
             }
-        }
 
-        private fun distanceLabel(miles: Double?): String? {
-            if (miles == null) return null
-            return when {
-                miles < 0.1 -> "< 0.1mi"
-                miles < 10 -> String.format("%.1fmi", miles)
-                else -> "${miles.toInt()}mi"
-            }
-        }
-
-        private fun ageLabel(iso: String?): String? {
-            if (iso.isNullOrEmpty()) return null
-            return runCatching {
-                val instant = Instant.parse(iso)
-                val seconds = Duration.between(instant, Instant.now()).seconds
-                when {
-                    seconds < 60 -> "now"
-                    seconds < 3_600 -> "${seconds / 60}m"
-                    seconds < 86_400 -> "${seconds / 3_600}h"
-                    seconds < 604_800 -> "${seconds / 86_400}d"
-                    else -> "${seconds / 604_800}w"
+            private fun priceLabel(
+                price: Double?,
+                payType: String?,
+            ): String {
+                if (price == null) return "—"
+                val base =
+                    if (price % 1.0 == 0.0) {
+                        "$${price.toInt()}"
+                    } else {
+                        String.format(Locale.US, "$%.2f", price)
+                    }
+                return when (payType) {
+                    "hourly" -> "$base / hr"
+                    "per_session" -> "$base / session"
+                    "per_walk" -> "$base / walk"
+                    "per_visit" -> "$base / visit"
+                    else -> base
                 }
-            }.getOrNull()
+            }
+
+            private fun distanceLabel(miles: Double?): String? {
+                if (miles == null) return null
+                return when {
+                    miles < 0.1 -> "< 0.1mi"
+                    miles < 10 -> String.format(Locale.US, "%.1fmi", miles)
+                    else -> "${miles.toInt()}mi"
+                }
+            }
+
+            private fun ageLabel(iso: String?): String? {
+                if (iso.isNullOrEmpty()) return null
+                return runCatching {
+                    val instant = Instant.parse(iso)
+                    val seconds = Duration.between(instant, Instant.now()).seconds
+                    when {
+                        seconds < 60 -> "now"
+                        seconds < 3_600 -> "${seconds / 60}m"
+                        seconds < 86_400 -> "${seconds / 3_600}h"
+                        seconds < 604_800 -> "${seconds / 86_400}d"
+                        else -> "${seconds / 604_800}w"
+                    }
+                }.getOrNull()
+            }
         }
     }
