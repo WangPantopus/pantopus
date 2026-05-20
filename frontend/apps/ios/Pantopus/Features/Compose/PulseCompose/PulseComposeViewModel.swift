@@ -7,7 +7,7 @@
 //  drives the `POST /api/posts` submit. Field shape mirrors
 //  `createPostSchema` at `backend/routes/posts.js:196-300`.
 //
-// swiftlint:disable file_length
+// swiftlint:disable file_length type_body_length
 
 import Foundation
 import Observation
@@ -639,7 +639,7 @@ public final class PulseComposeViewModel {
         let empty = firstLine.filter { $0 == "☆" }.count
         if filled + empty == 5, !firstLine.isEmpty {
             let remainder = raw.dropFirst(firstLine.count)
-            let body = remainder.drop(while: { $0 == "\n" })
+            let body = remainder.drop { $0 == "\n" }
             return (filled, String(body))
         }
         return (nil, raw)
@@ -656,7 +656,7 @@ public final class PulseComposeViewModel {
             return (String(afterPrefix), "")
         }
         let location = String(afterPrefix[..<newlineRange.lowerBound])
-        let bodyStart = afterPrefix[newlineRange.upperBound...].drop(while: { $0 == "\n" })
+        let bodyStart = afterPrefix[newlineRange.upperBound...].drop { $0 == "\n" }
         return (location, String(bodyStart))
     }
 

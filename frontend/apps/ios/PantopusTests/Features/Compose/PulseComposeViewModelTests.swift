@@ -8,6 +8,8 @@
 //  `POST /api/posts` body, and the close-confirm dirty signal.
 //
 
+// swiftlint:disable type_body_length
+
 import XCTest
 @testable import Pantopus
 
@@ -333,7 +335,7 @@ final class PulseComposeViewModelTests: XCTestCase {
         if let serviceCategory { post["service_category"] = serviceCategory }
         if let dealBusinessName { post["deal_business_name"] = dealBusinessName }
         let body: [String: Any] = ["post": post]
-        let data = try! JSONSerialization.data(withJSONObject: body, options: [])
+        let data = (try? JSONSerialization.data(withJSONObject: body, options: [])) ?? Data()
         return String(data: data, encoding: .utf8) ?? "{}"
     }
 
