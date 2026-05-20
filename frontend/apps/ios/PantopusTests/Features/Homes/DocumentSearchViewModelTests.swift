@@ -125,7 +125,7 @@ final class DocumentSearchViewModelTests: XCTestCase {
     func testFilterReturnsOnlyMatches() {
         let docs = [
             dto(id: "lease", docType: "lease", title: "Lease.pdf"),
-            dto(id: "ins", docType: "insurance", title: "Renters Policy.pdf"),
+            dto(id: "ins", docType: "insurance", title: "Renters Policy.pdf")
         ]
         XCTAssertEqual(DocumentSearchViewModel.filter(docs, query: "renters").map(\.id), ["ins"])
     }
@@ -155,10 +155,10 @@ final class DocumentSearchViewModelTests: XCTestCase {
                 200,
                 body: Self.body(
                     [
-                        Self.fixture("d1", "lease", "Lease.pdf"),
+                        Self.fixture("d1", "lease", "Lease.pdf")
                     ]
                 )
-            ),
+            )
         ]
         let vm = makeVM()
         await vm.load()
@@ -173,10 +173,10 @@ final class DocumentSearchViewModelTests: XCTestCase {
                 body: Self.body(
                     [
                         Self.fixture("d1", "lease", "Lease.pdf", "signed"),
-                        Self.fixture("d2", "insurance", "Renters Policy.pdf", "renters,policy"),
+                        Self.fixture("d2", "insurance", "Renters Policy.pdf", "renters,policy")
                     ]
                 )
-            ),
+            )
         ]
         let vm = makeVM()
         await vm.load()
@@ -201,10 +201,10 @@ final class DocumentSearchViewModelTests: XCTestCase {
                 200,
                 body: Self.body(
                     [
-                        Self.fixture("d1", "insurance", "Renters Policy.pdf", "renters,policy"),
+                        Self.fixture("d1", "insurance", "Renters Policy.pdf", "renters,policy")
                     ]
                 )
-            ),
+            )
         ]
         let vm = makeVM()
         await vm.load()
