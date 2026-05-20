@@ -130,21 +130,143 @@ class AudienceProfileSnapshotTest {
         }
     }
 
+    @Test
+    fun audience_profile_threads_filter_unread() {
+        paparazzi.snapshot {
+            Frame {
+                LoadedFrame(
+                    state =
+                        sampleFrameState(
+                            activeTab = AudienceProfileTab.Threads,
+                            visibleFollowers = emptyList(),
+                            activeThreadFilter = ThreadsFilter.Unread,
+                        ),
+                    actions = sampleFrameActions(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun audience_profile_threads_filter_bronze_plus() {
+        paparazzi.snapshot {
+            Frame {
+                LoadedFrame(
+                    state =
+                        sampleFrameState(
+                            activeTab = AudienceProfileTab.Threads,
+                            visibleFollowers = emptyList(),
+                            activeThreadFilter = ThreadsFilter.BronzePlus,
+                        ),
+                    actions = sampleFrameActions(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun audience_profile_threads_filter_flagged() {
+        paparazzi.snapshot {
+            Frame {
+                LoadedFrame(
+                    state =
+                        sampleFrameState(
+                            activeTab = AudienceProfileTab.Threads,
+                            visibleFollowers = emptyList(),
+                            activeThreadFilter = ThreadsFilter.Flagged,
+                        ),
+                    actions = sampleFrameActions(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun audience_profile_threads_filter_empty() {
+        // Bronze+ filter applied to a roster of tier-1 threads — exercises
+        // the filtered-empty branch (threads exist but the filter drops all).
+        val loaded = sampleLoaded()
+        val tierOneOnly =
+            loaded.threads.map { it.copy(tierRank = 1, tierName = "Followers", flagged = false) }
+        val tweaked =
+            loaded.copy(
+                threads = tierOneOnly,
+                threadsFilterChips =
+                    listOf(
+                        ThreadsFilterChipContent(
+                            id = ThreadsFilter.All.key,
+                            filter = ThreadsFilter.All,
+                            label = ThreadsFilter.All.title,
+                            count = tierOneOnly.size,
+                        ),
+                        ThreadsFilterChipContent(
+                            id = ThreadsFilter.Unread.key,
+                            filter = ThreadsFilter.Unread,
+                            label = ThreadsFilter.Unread.title,
+                            count = tierOneOnly.count { it.unreadCount > 0 },
+                        ),
+                        ThreadsFilterChipContent(
+                            id = ThreadsFilter.BronzePlus.key,
+                            filter = ThreadsFilter.BronzePlus,
+                            label = ThreadsFilter.BronzePlus.title,
+                            count = 0,
+                        ),
+                        ThreadsFilterChipContent(
+                            id = ThreadsFilter.Flagged.key,
+                            filter = ThreadsFilter.Flagged,
+                            label = ThreadsFilter.Flagged.title,
+                            count = null,
+                        ),
+                    ),
+            )
+        paparazzi.snapshot {
+            Frame {
+                LoadedFrame(
+                    state =
+                        AudienceProfileLoadedFrameState(
+                            loaded = tweaked,
+                            activeTab = AudienceProfileTab.Threads,
+                            composer = UpdateComposerState(),
+                            selectedTier = null,
+                            visibleFollowers = emptyList(),
+                            activeThreadFilter = ThreadsFilter.BronzePlus,
+                            visibleThreads = emptyList(),
+                        ),
+                    actions = sampleFrameActions(),
+                )
+            }
+        }
+    }
+
     private fun sampleFrameState(
         activeTab: AudienceProfileTab,
         followerSort: FollowerSort = FollowerSort.NewestActive,
         searchText: String = "",
         visibleFollowers: List<FollowerRowContent> = sampleLoaded().followers,
-    ): AudienceProfileLoadedFrameState =
-        AudienceProfileLoadedFrameState(
-            loaded = sampleLoaded(),
+        activeThreadFilter: ThreadsFilter = ThreadsFilter.All,
+    ): AudienceProfileLoadedFrameState {
+        val loaded = sampleLoaded()
+        val visibleThreads =
+            loaded.threads.filter { row ->
+                when (activeThreadFilter) {
+                    ThreadsFilter.All -> true
+                    ThreadsFilter.Unread -> row.unreadCount > 0
+                    ThreadsFilter.BronzePlus -> row.tierRank >= 2
+                    ThreadsFilter.Flagged -> row.flagged
+                }
+            }
+        return AudienceProfileLoadedFrameState(
+            loaded = loaded,
             activeTab = activeTab,
             composer = UpdateComposerState(),
             selectedTier = null,
             followerSearchText = searchText,
             followerSort = followerSort,
             visibleFollowers = visibleFollowers,
+            activeThreadFilter = activeThreadFilter,
+            visibleThreads = visibleThreads,
         )
+    }
 
     private fun sampleFrameActions(): AudienceProfileLoadedFrameActions =
         AudienceProfileLoadedFrameActions(
@@ -152,6 +274,7 @@ class AudienceProfileSnapshotTest {
             onSelectTier = {},
             onFollowerSearch = {},
             onFollowerSort = {},
+            onSelectThreadFilter = {},
             composer =
                 AudienceProfileComposerActions(
                     onText = {},
@@ -269,9 +392,62 @@ class AudienceProfileSnapshotTest {
                         handle = "@alex",
                         avatarUrl = null,
                         tierName = "Members",
+                        tierRank = 2,
                         preview = "Loved the workshop! Any plans for July?",
                         timeAgo = "5h ago",
                         unreadCount = 2,
+                        flagged = false,
+                    ),
+                    ThreadRowContent(
+                        id = "th2",
+                        displayName = "Billie B.",
+                        handle = "@billie",
+                        avatarUrl = null,
+                        tierName = "Insiders",
+                        tierRank = 3,
+                        preview = "Question on step 4 — does the fold count depend on flour?",
+                        timeAgo = "18m",
+                        unreadCount = 1,
+                        flagged = true,
+                    ),
+                    ThreadRowContent(
+                        id = "th3",
+                        displayName = "Junie L.",
+                        handle = "@junie",
+                        avatarUrl = null,
+                        tierName = "Followers",
+                        tierRank = 1,
+                        preview = "Following from the market! Will swing by next time.",
+                        timeAgo = "3d",
+                        unreadCount = 0,
+                        flagged = false,
+                    ),
+                ),
+            threadsFilterChips =
+                listOf(
+                    ThreadsFilterChipContent(
+                        id = ThreadsFilter.All.key,
+                        filter = ThreadsFilter.All,
+                        label = ThreadsFilter.All.title,
+                        count = 3,
+                    ),
+                    ThreadsFilterChipContent(
+                        id = ThreadsFilter.Unread.key,
+                        filter = ThreadsFilter.Unread,
+                        label = ThreadsFilter.Unread.title,
+                        count = 2,
+                    ),
+                    ThreadsFilterChipContent(
+                        id = ThreadsFilter.BronzePlus.key,
+                        filter = ThreadsFilter.BronzePlus,
+                        label = ThreadsFilter.BronzePlus.title,
+                        count = 2,
+                    ),
+                    ThreadsFilterChipContent(
+                        id = ThreadsFilter.Flagged.key,
+                        filter = ThreadsFilter.Flagged,
+                        label = ThreadsFilter.Flagged.title,
+                        count = null,
                     ),
                 ),
             channelId = "ch_demo",

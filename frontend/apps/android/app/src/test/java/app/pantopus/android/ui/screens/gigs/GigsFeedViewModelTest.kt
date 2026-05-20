@@ -139,4 +139,43 @@ class GigsFeedViewModelTest {
             val loaded = vm.state.value as GigsFeedUiState.Loaded
             assertEquals(GigsCategory.Cleaning, loaded.rows.first().category)
         }
+
+    @Test fun apply_budget_filter_narrows_loaded_list() =
+        runTest {
+            coEvery {
+                repo.list(null, "newest", null, null, 1.0, 20, 0)
+            } returns NetworkResult.Success(GigsListResponse(listOf(handymanGig(), cleaningGig()), 2))
+            val vm = GigsFeedViewModel(repo)
+            vm.load()
+            // handyman is $60, cleaning is $180 → a $0–$100 budget keeps only the first.
+            vm.applyFilters(GigFilterCriteria(budgetLower = 0f, budgetUpper = 100f))
+            val loaded = vm.state.value as GigsFeedUiState.Loaded
+            assertEquals(listOf("g1"), loaded.rows.map { it.id })
+            assertEquals(1, vm.activeFilterCount.value)
+        }
+
+    @Test fun apply_filter_with_no_matches_falls_to_empty() =
+        runTest {
+            coEvery {
+                repo.list(null, "newest", null, null, 1.0, 20, 0)
+            } returns NetworkResult.Success(GigsListResponse(listOf(handymanGig(), cleaningGig()), 2))
+            val vm = GigsFeedViewModel(repo)
+            vm.load()
+            vm.applyFilters(GigFilterCriteria(categories = setOf(GigsCategory.Tech)))
+            assertTrue(vm.state.value is GigsFeedUiState.Empty)
+        }
+
+    @Test fun resetting_filters_restores_full_list() =
+        runTest {
+            coEvery {
+                repo.list(null, "newest", null, null, 1.0, 20, 0)
+            } returns NetworkResult.Success(GigsListResponse(listOf(handymanGig(), cleaningGig()), 2))
+            val vm = GigsFeedViewModel(repo)
+            vm.load()
+            vm.applyFilters(GigFilterCriteria(categories = setOf(GigsCategory.Tech)))
+            vm.applyFilters(GigFilterCriteria())
+            val loaded = vm.state.value as GigsFeedUiState.Loaded
+            assertEquals(2, loaded.rows.size)
+            assertEquals(0, vm.activeFilterCount.value)
+        }
 }

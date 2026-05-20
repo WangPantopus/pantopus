@@ -54,6 +54,9 @@ class AudienceProfileViewModel
         private val _followerSort = MutableStateFlow(FollowerSort.NewestActive)
         val followerSort: StateFlow<FollowerSort> = _followerSort.asStateFlow()
 
+        private val _activeThreadFilter = MutableStateFlow(ThreadsFilter.All)
+        val activeThreadFilter: StateFlow<ThreadsFilter> = _activeThreadFilter.asStateFlow()
+
         private val _composer = MutableStateFlow(UpdateComposerState())
         val composer: StateFlow<UpdateComposerState> = _composer.asStateFlow()
 
@@ -155,6 +158,10 @@ class AudienceProfileViewModel
             _followerSort.value = sort
         }
 
+        fun selectThreadFilter(filter: ThreadsFilter) {
+            _activeThreadFilter.value = filter
+        }
+
         fun onComposerText(text: String) {
             _composer.value = _composer.value.copy(text = text)
         }
@@ -225,6 +232,13 @@ class AudienceProfileViewModel
             return sortFollowers(rows, _followerSort.value)
         }
 
+        /** Threads filtered by `activeThreadFilter`. */
+        fun visibleThreads(): List<ThreadRowContent> {
+            val current = _state.value as? AudienceProfileUiState.Loaded ?: return emptyList()
+            val filter = _activeThreadFilter.value
+            return current.content.threads.filter { matchesThreadFilter(it, filter) }
+        }
+
         companion object {
             /**
              * Pure sort over the supplied [rows]. Stable across equal keys
@@ -278,6 +292,7 @@ class AudienceProfileViewModel
                 val chips = tierChips(audience.counts, tiers)
                 val followers = audience.items.mapNotNull(::followerRow)
                 val threadRows = threads.mapNotNull(::threadRow)
+                val threadsChips = threadsFilterChips(threadRows)
                 return AudienceProfileLoaded(
                     header = header,
                     updates = updates,
@@ -286,9 +301,53 @@ class AudienceProfileViewModel
                     tierChips = chips,
                     followers = followers,
                     threads = threadRows,
+                    threadsFilterChips = threadsChips,
                     channelId = channelId,
                 )
             }
+
+            internal fun threadsFilterChips(threads: List<ThreadRowContent>): List<ThreadsFilterChipContent> {
+                val total = threads.size
+                val unread = threads.count { it.unreadCount > 0 }
+                val bronzePlus = threads.count { it.tierRank >= 2 }
+                return listOf(
+                    ThreadsFilterChipContent(
+                        id = ThreadsFilter.All.key,
+                        filter = ThreadsFilter.All,
+                        label = ThreadsFilter.All.title,
+                        count = total,
+                    ),
+                    ThreadsFilterChipContent(
+                        id = ThreadsFilter.Unread.key,
+                        filter = ThreadsFilter.Unread,
+                        label = ThreadsFilter.Unread.title,
+                        count = unread,
+                    ),
+                    ThreadsFilterChipContent(
+                        id = ThreadsFilter.BronzePlus.key,
+                        filter = ThreadsFilter.BronzePlus,
+                        label = ThreadsFilter.BronzePlus.title,
+                        count = bronzePlus,
+                    ),
+                    ThreadsFilterChipContent(
+                        id = ThreadsFilter.Flagged.key,
+                        filter = ThreadsFilter.Flagged,
+                        label = ThreadsFilter.Flagged.title,
+                        count = null,
+                    ),
+                )
+            }
+
+            internal fun matchesThreadFilter(
+                row: ThreadRowContent,
+                filter: ThreadsFilter,
+            ): Boolean =
+                when (filter) {
+                    ThreadsFilter.All -> true
+                    ThreadsFilter.Unread -> row.unreadCount > 0
+                    ThreadsFilter.BronzePlus -> row.tierRank >= 2
+                    ThreadsFilter.Flagged -> row.flagged
+                }
 
             private fun updateCard(dto: PersonaPostDto): UpdateCardContent =
                 UpdateCardContent(
@@ -381,9 +440,11 @@ class AudienceProfileViewModel
                     handle = if (handle.isEmpty()) "" else "@$handle",
                     avatarUrl = dto.fanAvatarUrl,
                     tierName = dto.tier?.name,
+                    tierRank = dto.tier?.rank ?: 1,
                     preview = dto.lastMessagePreview.orEmpty(),
                     timeAgo = timeAgo(dto.lastMessageAt),
                     unreadCount = dto.unreadCount ?: 0,
+                    flagged = dto.flagged ?: false,
                 )
             }
 

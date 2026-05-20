@@ -26,71 +26,6 @@ final class AudienceProfileViewModelTests: XCTestCase {
         )
     }
 
-    private static let meJSON = """
-    {
-      "persona": {
-        "id": "p_demo",
-        "handle": "mayabuilds",
-        "displayName": "Maya Builds",
-        "avatarUrl": null,
-        "bio": "Builder.",
-        "category": "creator",
-        "audienceLabel": "followers",
-        "followerCount": 42,
-        "postCount": 7
-      },
-      "channel": { "id": "ch_demo", "title": "Maya Broadcast", "status": "active" }
-    }
-    """
-
-    private static let audienceJSON = """
-    {
-      "persona": null,
-      "items": [
-        {"membershipId": "m1", "fanHandle": "alex", "fanDisplayName": "Alex",
-         "status": "active", "tier": {"rank": 1, "name": "Followers"},
-         "verifiedLocal": true, "tenureMonths": 3, "joinedMonth": "2026-02"},
-        {"membershipId": "m2", "fanHandle": "billie", "fanDisplayName": "Billie B.",
-         "status": "active", "tier": {"rank": 2, "name": "Members"},
-         "tenureMonths": 12, "joinedMonth": "2025-05"},
-        {"membershipId": "m3", "fanHandle": "cory", "fanDisplayName": "Cory K.",
-         "status": "active", "tier": {"rank": 3, "name": "Insiders"},
-         "tenureMonths": 1, "joinedMonth": "2026-04"}
-      ],
-      "counts": {"totalActive": 12, "pending": 3, "byTier": {"1": 8, "2": 3, "3": 1, "4": 0}}
-    }
-    """
-
-    private static let postsJSON = """
-    {"posts":[
-      {"id":"u1","body":"New mural going up next week.","created_at":"2026-05-14T18:00:00Z",
-       "visibility":"followers","delivered_count":40,"read_count":31},
-      {"id":"u2","body":"Workshop seats open.","created_at":"2026-05-13T09:00:00Z",
-       "visibility":"tier_or_above","target_tier_rank":2,"delivered_count":3,"read_count":2}
-    ]}
-    """
-
-    private static let tiersJSON = """
-    {"tiers":[
-      {"id":"t1","rank":1,"name":"Followers","priceCents":0,"currency":"usd"},
-      {"id":"t2","rank":2,"name":"Members","priceCents":500,"currency":"usd"},
-      {"id":"t3","rank":3,"name":"Insiders","priceCents":2500,"currency":"usd"}
-    ]}
-    """
-
-    private static let statsJSON = """
-    {"counts":{"followers":8,"members":3,"insiders":1,"direct":0}}
-    """
-
-    private static let threadsJSON = """
-    {"threads":[
-      {"id":"th1","membershipId":"m1","fanHandle":"alex","fanDisplayName":"Alex",
-       "tier":{"rank":2,"name":"Members"},
-       "lastMessagePreview":"Loved the workshop","lastMessageAt":"2026-05-15T10:00:00Z",
-       "unreadCount":2}
-    ]}
-    """
-
     private func loadedSequence() -> [SequencedURLProtocol.Response] {
         [
             .status(200, body: Self.meJSON),
@@ -122,8 +57,10 @@ final class AudienceProfileViewModelTests: XCTestCase {
         XCTAssertEqual(loaded.followers.first?.tierName, "Followers")
         XCTAssertEqual(loaded.followers.first?.tenureMonths, 3)
         XCTAssertEqual(loaded.followers.first?.joinedMonth, "2026-02")
-        XCTAssertEqual(loaded.threads.count, 1)
+        XCTAssertEqual(loaded.threads.count, 3)
         XCTAssertEqual(loaded.threads.first?.unreadCount, 2)
+        XCTAssertEqual(loaded.threads.first?.tierRank, 2)
+        XCTAssertEqual(loaded.threads.first { $0.id == "th2" }?.flagged, true)
         XCTAssertEqual(loaded.channelId, "ch_demo")
     }
 
@@ -353,9 +290,134 @@ final class AudienceProfileViewModelTests: XCTestCase {
         let chip = loaded.tierChips.first { $0.id == "tier_1" }
         XCTAssertEqual(chip?.count, 8)
     }
+
+    func testThreadsFilterChipsSurfaceCorrectCounts() async {
+        SequencedURLProtocol.sequence = loadedSequence()
+        let vm = AudienceProfileViewModel(api: makeAPI())
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        XCTAssertEqual(
+            loaded.threadsFilterChips.map(\.filter),
+            [.all, .unread, .bronzePlus, .flagged]
+        )
+        XCTAssertEqual(loaded.threadsFilterChips.first { $0.filter == .all }?.count, 3)
+        XCTAssertEqual(loaded.threadsFilterChips.first { $0.filter == .unread }?.count, 2)
+        XCTAssertEqual(loaded.threadsFilterChips.first { $0.filter == .bronzePlus }?.count, 2)
+        // The Flagged chip carries no count in the design.
+        XCTAssertNil(loaded.threadsFilterChips.first { $0.filter == .flagged }?.count)
+    }
+
+    func testThreadFilterAllShowsEveryThread() async {
+        SequencedURLProtocol.sequence = loadedSequence()
+        let vm = AudienceProfileViewModel(api: makeAPI())
+        await vm.load()
+        XCTAssertEqual(vm.activeThreadFilter, .all)
+        XCTAssertEqual(vm.visibleThreads.count, 3)
+    }
+
+    func testThreadFilterUnreadDropsReadThreads() async {
+        SequencedURLProtocol.sequence = loadedSequence()
+        let vm = AudienceProfileViewModel(api: makeAPI())
+        await vm.load()
+        vm.selectThreadFilter(.unread)
+        XCTAssertEqual(vm.activeThreadFilter, .unread)
+        XCTAssertEqual(vm.visibleThreads.map(\.id), ["th1", "th2"])
+    }
+
+    func testThreadFilterBronzePlusDropsTier1Threads() async {
+        SequencedURLProtocol.sequence = loadedSequence()
+        let vm = AudienceProfileViewModel(api: makeAPI())
+        await vm.load()
+        vm.selectThreadFilter(.bronzePlus)
+        XCTAssertEqual(vm.visibleThreads.map(\.id), ["th1", "th2"])
+    }
+
+    func testThreadFilterFlaggedKeepsOnlyFlaggedThreads() async {
+        SequencedURLProtocol.sequence = loadedSequence()
+        let vm = AudienceProfileViewModel(api: makeAPI())
+        await vm.load()
+        vm.selectThreadFilter(.flagged)
+        XCTAssertEqual(vm.visibleThreads.map(\.id), ["th2"])
+    }
 }
 
 private extension AudienceProfileViewModelTests {
+    static let meJSON = """
+    {
+      "persona": {
+        "id": "p_demo",
+        "handle": "mayabuilds",
+        "displayName": "Maya Builds",
+        "avatarUrl": null,
+        "bio": "Builder.",
+        "category": "creator",
+        "audienceLabel": "followers",
+        "followerCount": 42,
+        "postCount": 7
+      },
+      "channel": { "id": "ch_demo", "title": "Maya Broadcast", "status": "active" }
+    }
+    """
+
+    static let audienceJSON = """
+    {
+      "persona": null,
+      "items": [
+        {"membershipId": "m1", "fanHandle": "alex", "fanDisplayName": "Alex",
+         "status": "active", "tier": {"rank": 1, "name": "Followers"},
+         "verifiedLocal": true, "tenureMonths": 3, "joinedMonth": "2026-02"},
+        {"membershipId": "m2", "fanHandle": "billie", "fanDisplayName": "Billie B.",
+         "status": "active", "tier": {"rank": 2, "name": "Members"},
+         "tenureMonths": 12, "joinedMonth": "2025-05"},
+        {"membershipId": "m3", "fanHandle": "cory", "fanDisplayName": "Cory K.",
+         "status": "active", "tier": {"rank": 3, "name": "Insiders"},
+         "tenureMonths": 1, "joinedMonth": "2026-04"}
+      ],
+      "counts": {"totalActive": 12, "pending": 3, "byTier": {"1": 8, "2": 3, "3": 1, "4": 0}}
+    }
+    """
+
+    static let postsJSON = """
+    {"posts":[
+      {"id":"u1","body":"New mural going up next week.","created_at":"2026-05-14T18:00:00Z",
+       "visibility":"followers","delivered_count":40,"read_count":31},
+      {"id":"u2","body":"Workshop seats open.","created_at":"2026-05-13T09:00:00Z",
+       "visibility":"tier_or_above","target_tier_rank":2,"delivered_count":3,"read_count":2}
+    ]}
+    """
+
+    static let tiersJSON = """
+    {"tiers":[
+      {"id":"t1","rank":1,"name":"Followers","priceCents":0,"currency":"usd"},
+      {"id":"t2","rank":2,"name":"Members","priceCents":500,"currency":"usd"},
+      {"id":"t3","rank":3,"name":"Insiders","priceCents":2500,"currency":"usd"}
+    ]}
+    """
+
+    static let statsJSON = """
+    {"counts":{"followers":8,"members":3,"insiders":1,"direct":0}}
+    """
+
+    static let threadsJSON = """
+    {"threads":[
+      {"id":"th1","membershipId":"m1","fanHandle":"alex","fanDisplayName":"Alex",
+       "tier":{"rank":2,"name":"Members"},
+       "lastMessagePreview":"Loved the workshop","lastMessageAt":"2026-05-15T10:00:00Z",
+       "unreadCount":2,"flagged":false},
+      {"id":"th2","membershipId":"m2","fanHandle":"billie","fanDisplayName":"Billie B.",
+       "tier":{"rank":3,"name":"Insiders"},
+       "lastMessagePreview":"Question on step 4","lastMessageAt":"2026-05-15T08:00:00Z",
+       "unreadCount":1,"flagged":true},
+      {"id":"th3","membershipId":"m3","fanHandle":"junie","fanDisplayName":"Junie L.",
+       "tier":{"rank":1,"name":"Followers"},
+       "lastMessagePreview":"Following from the market!","lastMessageAt":"2026-05-12T08:00:00Z",
+       "unreadCount":0,"flagged":false}
+    ]}
+    """
+
     /// Builds a `FollowerRowContent` fixture, defaulting the fields a test
     /// doesn't care about so call sites stay on one line.
     func follower(

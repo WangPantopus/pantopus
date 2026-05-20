@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.Instant
 import javax.inject.Inject
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -53,8 +54,17 @@ class NearbyMapViewModel
         private val _userCoordinate = MutableStateFlow(location.cachedCoordinate())
         val userCoordinate: StateFlow<UserCoordinate?> = _userCoordinate.asStateFlow()
 
+        private val _filters = MutableStateFlow(MapFilterCriteria())
+        val filters: StateFlow<MapFilterCriteria> = _filters.asStateFlow()
+
         private var entities: List<MapEntity> = emptyList()
         private var loading = false
+
+        /** Raw fetched rows + the anchor they were measured from, kept so
+         * a filter change can re-project without a refetch. */
+        private var rawGigs: List<GigDto> = emptyList()
+        private var rawListings: List<ListingDto> = emptyList()
+        private var anchor: UserCoordinate? = null
 
         /**
          * Grid-bucket cluster radius in degrees. ~0.005° ≈ 500m at
@@ -80,6 +90,41 @@ class NearbyMapViewModel
             if (_activeSort.value == sort) return
             _activeSort.value = sort
             rebuild(currentSelectedId())
+        }
+
+        /** Apply structured filters from the map filter sheet. Re-projects
+         * the already-fetched rows without a refetch and drops the current
+         * selection if it no longer survives the filter. */
+        fun applyFilters(criteria: MapFilterCriteria) {
+            _filters.value = criteria
+            entities = recomputeEntities()
+            val prior = currentSelectedId()
+            val kept = if (entities.any { it.id == prior }) prior else null
+            rebuild(selectedId = kept)
+        }
+
+        private fun recomputeEntities(): List<MapEntity> {
+            val anc = anchor ?: return emptyList()
+            val now = Instant.now().epochSecond
+            val gigsFiltered = rawGigs.filter { _filters.value.matchesGig(it, gigDistance(anc, it), now) }
+            val listingsFiltered = rawListings.filter { _filters.value.matchesListing(it, listingDistance(anc, it)) }
+            return project(gigs = gigsFiltered, listings = listingsFiltered, anchor = anc)
+        }
+
+        private fun gigDistance(
+            anchor: UserCoordinate,
+            gig: GigDto,
+        ): Double? {
+            val coord = gigCoord(gig) ?: return null
+            return distanceMiles(anchor, coord.first, coord.second)
+        }
+
+        private fun listingDistance(
+            anchor: UserCoordinate,
+            listing: ListingDto,
+        ): Double? {
+            val coord = listingCoord(listing) ?: return null
+            return distanceMiles(anchor, coord.first, coord.second)
         }
 
         fun selectEntity(id: String?) {
@@ -132,7 +177,10 @@ class NearbyMapViewModel
                         _state.value = NearbyMapUiState.Error(message)
                         return@launch
                     }
-                    entities = project(gigs = gigRows, listings = listingRows, anchor = center)
+                    rawGigs = gigRows
+                    rawListings = listingRows
+                    anchor = center
+                    entities = recomputeEntities()
                     rebuild(selectedId = null)
                 } finally {
                     loading = false

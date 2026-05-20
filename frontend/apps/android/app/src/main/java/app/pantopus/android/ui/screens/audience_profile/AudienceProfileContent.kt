@@ -132,9 +132,36 @@ data class ThreadRowContent(
     val handle: String,
     val avatarUrl: String?,
     val tierName: String?,
+    /** Tier rank (1=Free / Follower, 2=Bronze, 3=Silver, 4=Gold). Drives
+     *  the "Bronze+" filter chip (matches when `tierRank >= 2`). */
+    val tierRank: Int,
     val preview: String,
     val timeAgo: String,
     val unreadCount: Int,
+    /** Creator-flagged thread — drives the Flagged filter chip. */
+    val flagged: Boolean,
+)
+
+/** Filter chip selection on the Threads tab. Mirrors iOS `ThreadsFilter`
+ *  and the matching chip strip used by the standalone Creator Inbox. */
+enum class ThreadsFilter(val key: String, val title: String) {
+    All("all", "All threads"),
+    Unread("unread", "Unread"),
+
+    /** Bronze tier and above. Projection treats this as `tierRank >= 2`
+     *  (rank 1 is Free / Follower). */
+    BronzePlus("bronze_plus", "Bronze+"),
+    Flagged("flagged", "Flagged"),
+}
+
+/** Render model for a single Threads-tab filter chip.
+ *  `count` is null for the Flagged chip — the design omits a count there. */
+@Immutable
+data class ThreadsFilterChipContent(
+    val id: String,
+    val filter: ThreadsFilter,
+    val label: String,
+    val count: Int?,
 )
 
 @Immutable
@@ -146,6 +173,7 @@ data class AudienceProfileLoaded(
     val tierChips: List<TierChipContent>,
     val followers: List<FollowerRowContent>,
     val threads: List<ThreadRowContent>,
+    val threadsFilterChips: List<ThreadsFilterChipContent>,
     val channelId: String?,
 )
 

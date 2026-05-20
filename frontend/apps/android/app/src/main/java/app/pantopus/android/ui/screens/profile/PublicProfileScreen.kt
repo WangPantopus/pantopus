@@ -1,4 +1,4 @@
-@file:Suppress("LongMethod", "MagicNumber", "PackageNaming")
+@file:Suppress("LongMethod", "MagicNumber", "PackageNaming", "LongParameterList")
 
 package app.pantopus.android.ui.screens.profile
 
@@ -19,9 +19,13 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -29,8 +33,10 @@ import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailShell
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBar
+import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileTab
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.StatsTabsBody
 import app.pantopus.android.ui.screens.shared.content_detail.ctas.ActionRowCta
+import app.pantopus.android.ui.screens.shared.content_detail.ctas.ActionRowCtaKind
 import app.pantopus.android.ui.screens.shared.content_detail.headers.ProfileHeader
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -43,24 +49,32 @@ import kotlinx.coroutines.delay
  * Public profile detail screen. ViewModel reads the user id via the
  * nav-backstack [androidx.lifecycle.SavedStateHandle].
  *
+ * P6.5 — The view-model picks the profile kind (Persona vs Local) from
+ * the loaded DTO. The screen swaps banner color, header chips, sticky
+ * footer CTAs (Follow vs Message + Connect), and post styling
+ * accordingly.
+ *
  * `onOpenMessages` is invoked with the loaded `PublicProfileDto` so the
  * host nav stack can construct a chat-conversation destination with the
- * profile's user as counterparty. `onOpenReport` lands on the
- * `NotYetAvailableView` placeholder until the Report flow ships.
+ * profile's user as counterparty. The Report flow is presented as a
+ * [ReportUserSheet] hosted locally here, not via the nav graph (per P6.2).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublicProfileScreen(
     onBack: () -> Unit,
     onOpenMessages: (app.pantopus.android.data.api.models.profile.PublicProfileDto) -> Unit = {},
-    onOpenReport: () -> Unit = {},
     viewModel: PublicProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
     val showOverflow by viewModel.showOverflow.collectAsStateWithLifecycle()
+    val connectState by viewModel.connectState.collectAsStateWithLifecycle()
+    val followState by viewModel.followState.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState()
+    val reportSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showReportSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -71,38 +85,30 @@ fun PublicProfileScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(PantopusColors.appBg)
+                .testTag("publicProfile"),
+    ) {
         when (val s = state) {
             PublicProfileUiState.Loading -> LoadingLayout(onBack = onBack)
             is PublicProfileUiState.Error -> ErrorLayout(message = s.message, onRetry = { viewModel.refresh() })
-            is PublicProfileUiState.Loaded -> {
-                val content = s.content
-                ContentDetailShell(
-                    title = null,
+            is PublicProfileUiState.Loaded ->
+                PublicProfileLoadedFrame(
+                    content = s.content,
+                    selectedTab = selectedTab,
+                    followState = followState,
+                    connectState = connectState,
                     onBack = onBack,
-                    cta = { ActionRowCta() },
-                    header = {
-                        ProfileHeader(
-                            displayName = content.header.displayName,
-                            handle = content.header.handle,
-                            locality = content.header.locality,
-                            avatarUrl = content.header.avatarUrl,
-                            isVerified = content.header.isVerified,
-                            identityBadges = content.header.identityBadges,
-                        )
-                    },
-                    body = {
-                        StatsTabsBody(
-                            content = content.stats,
-                            selectedTab = selectedTab,
-                            onSelectTab = { viewModel.selectTab(it) },
-                            onMessage = { onOpenMessages(content.profile) },
-                            onConnect = { viewModel.connect() },
-                            onOverflow = { viewModel.setShowOverflow(true) },
-                        )
-                    },
+                    onSelectTab = { viewModel.selectTab(it) },
+                    onFollow = { viewModel.follow() },
+                    onMessage = { onOpenMessages(s.content.profile) },
+                    onConnect = { viewModel.connect() },
+                    onOverflow = { viewModel.setShowOverflow(true) },
+                    onUnlock = { viewModel.showSubscribeToast() },
                 )
-            }
         }
         toast?.let { message ->
             Box(
@@ -129,13 +135,120 @@ fun PublicProfileScreen(
                     },
                     onReport = {
                         viewModel.setShowOverflow(false)
-                        onOpenReport()
+                        showReportSheet = true
                     },
                     onCancel = { viewModel.setShowOverflow(false) },
                 )
             }
         }
+        if (showReportSheet) {
+            val loaded = state as? PublicProfileUiState.Loaded
+            if (loaded != null) {
+                ReportUserSheet(
+                    userId = loaded.content.profile.id,
+                    handle = loaded.content.header.handle,
+                    displayName = loaded.content.header.displayName,
+                    sheetState = reportSheetState,
+                    onDismiss = { showReportSheet = false },
+                    onSubmitted = {
+                        showReportSheet = false
+                        viewModel.showToast("Report received")
+                    },
+                )
+            }
+        }
     }
+}
+
+/**
+ * P6.5 — Kind-aware loaded frame, exposed as `internal` so Paparazzi
+ * snapshot tests can render the populated view without spinning up a
+ * Hilt VM.
+ */
+@Composable
+internal fun PublicProfileLoadedFrame(
+    content: PublicProfileContent,
+    selectedTab: ProfileTab,
+    followState: PublicProfileActionState,
+    connectState: PublicProfileActionState,
+    onBack: () -> Unit,
+    onSelectTab: (ProfileTab) -> Unit,
+    onFollow: () -> Unit,
+    onMessage: () -> Unit,
+    onConnect: () -> Unit,
+    onOverflow: () -> Unit,
+    onUnlock: () -> Unit,
+) {
+    ContentDetailShell(
+        title = null,
+        onBack = onBack,
+        cta = {
+            when (content.kind) {
+                PublicProfileKind.Persona ->
+                    ActionRowCta(
+                        kind =
+                            ActionRowCtaKind.Persona(
+                                followInFlight = followState is PublicProfileActionState.InFlight,
+                                isFollowing = followState is PublicProfileActionState.Succeeded,
+                                onFollow = onFollow,
+                            ),
+                    )
+                PublicProfileKind.Local ->
+                    ActionRowCta(
+                        kind =
+                            ActionRowCtaKind.Local(
+                                messageInFlight = false,
+                                connectInFlight = connectState is PublicProfileActionState.InFlight,
+                                isConnectRequested = connectState is PublicProfileActionState.Succeeded,
+                                onMessage = onMessage,
+                                onConnect = onConnect,
+                            ),
+                    )
+            }
+        },
+        header = {
+            Column(
+                modifier =
+                    Modifier.testTag(
+                        if (content.kind == PublicProfileKind.Persona) {
+                            "publicProfilePersonaHeader"
+                        } else {
+                            "publicProfileLocalHeader"
+                        },
+                    ),
+            ) {
+                PublicProfileBanner(kind = content.kind)
+                ProfileHeader(
+                    displayName = content.header.displayName,
+                    handle = content.header.handle,
+                    locality = content.header.locality,
+                    avatarUrl = content.header.avatarUrl,
+                    isVerified = content.header.isVerified,
+                    identityBadges = content.header.identityBadges,
+                    tierLabel = content.header.tierLabel,
+                    isVerifiedNeighbor = content.header.isVerifiedNeighbor,
+                )
+            }
+        },
+        body = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
+                StatsTabsBody(
+                    content = content.stats,
+                    selectedTab = selectedTab,
+                    onSelectTab = onSelectTab,
+                    showActionRow = false,
+                    onMessage = onMessage,
+                    onConnect = onConnect,
+                    onOverflow = onOverflow,
+                )
+                PublicProfilePostsFeed(
+                    kind = content.kind,
+                    posts = content.posts,
+                    onUnlock = { onUnlock() },
+                )
+            }
+        },
+    )
 }
 
 @Composable
@@ -178,7 +291,7 @@ private fun OverflowSheetRow(
 }
 
 @Composable
-private fun LoadingLayout(onBack: () -> Unit) {
+internal fun LoadingLayout(onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
         ContentDetailTopBar(title = null, onBack = onBack, action = null)
         Column(
@@ -196,7 +309,7 @@ private fun LoadingLayout(onBack: () -> Unit) {
 }
 
 @Composable
-private fun ErrorLayout(
+internal fun ErrorLayout(
     message: String,
     onRetry: () -> Unit,
 ) {

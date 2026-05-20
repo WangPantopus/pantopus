@@ -79,6 +79,7 @@ fun AudienceProfileScreen(
     val selectedTier by viewModel.selectedTierRank.collectAsStateWithLifecycle()
     val followerSearch by viewModel.followerSearchText.collectAsStateWithLifecycle()
     val followerSort by viewModel.followerSort.collectAsStateWithLifecycle()
+    val activeThreadFilter by viewModel.activeThreadFilter.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.load() }
 
     val displayName =
@@ -108,6 +109,8 @@ fun AudienceProfileScreen(
                             followerSearchText = followerSearch,
                             followerSort = followerSort,
                             visibleFollowers = viewModel.visibleFollowers(),
+                            activeThreadFilter = activeThreadFilter,
+                            visibleThreads = viewModel.visibleThreads(),
                         ),
                     actions =
                         AudienceProfileLoadedFrameActions(
@@ -115,6 +118,7 @@ fun AudienceProfileScreen(
                             onSelectTier = viewModel::selectTierFilter,
                             onFollowerSearch = viewModel::onFollowerSearchText,
                             onFollowerSort = viewModel::selectFollowerSort,
+                            onSelectThreadFilter = viewModel::selectThreadFilter,
                             composer =
                                 AudienceProfileComposerActions(
                                     onText = viewModel::onComposerText,
@@ -331,6 +335,10 @@ internal fun LoadedFrame(
             AudienceProfileTab.Threads ->
                 ThreadsTab(
                     threads = state.loaded.threads,
+                    visibleThreads = state.visibleThreads,
+                    chips = state.loaded.threadsFilterChips,
+                    activeFilter = state.activeThreadFilter,
+                    onSelectFilter = actions.onSelectThreadFilter,
                     onOpenThread = actions.navigation.onOpenThread,
                     onOpenCreatorInbox = actions.navigation.onOpenCreatorInbox,
                 )
@@ -343,9 +351,11 @@ internal data class AudienceProfileLoadedFrameState(
     val activeTab: AudienceProfileTab,
     val composer: UpdateComposerState,
     val selectedTier: Int?,
-    val followerSearchText: String,
-    val followerSort: FollowerSort,
-    val visibleFollowers: List<FollowerRowContent>,
+    val followerSearchText: String = "",
+    val followerSort: FollowerSort = FollowerSort.NewestActive,
+    val visibleFollowers: List<FollowerRowContent> = emptyList(),
+    val activeThreadFilter: ThreadsFilter = ThreadsFilter.All,
+    val visibleThreads: List<ThreadRowContent> = emptyList(),
 )
 
 internal data class AudienceProfileLoadedFrameActions(
@@ -353,6 +363,7 @@ internal data class AudienceProfileLoadedFrameActions(
     val onSelectTier: (Int?) -> Unit,
     val onFollowerSearch: (String) -> Unit,
     val onFollowerSort: (FollowerSort) -> Unit,
+    val onSelectThreadFilter: (ThreadsFilter) -> Unit = {},
     val composer: AudienceProfileComposerActions,
     val navigation: AudienceProfileNavigationActions,
 )
@@ -1183,6 +1194,10 @@ private fun EmptyFollowersCard() {
 @Composable
 private fun ThreadsTab(
     threads: List<ThreadRowContent>,
+    visibleThreads: List<ThreadRowContent>,
+    chips: List<ThreadsFilterChipContent>,
+    activeFilter: ThreadsFilter,
+    onSelectFilter: (ThreadsFilter) -> Unit,
     onOpenThread: (ThreadRowContent) -> Unit,
     onOpenCreatorInbox: () -> Unit = {},
 ) {
@@ -1190,18 +1205,132 @@ private fun ThreadsTab(
         modifier =
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
                 .testTag("audienceProfileThreadsList"),
+    ) {
+        ThreadsFilterStrip(chips = chips, activeFilter = activeFilter, onSelect = onSelectFilter)
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (threads.isEmpty()) {
+                EmptyThreadsCard()
+            } else if (visibleThreads.isEmpty()) {
+                FilteredEmptyThreadsCard()
+            } else {
+                ViewAllMessagesCTA(onClick = onOpenCreatorInbox)
+                visibleThreads.forEach { ThreadRow(it, onOpen = { onOpenThread(it) }) }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun ThreadsFilterStrip(
+    chips: List<ThreadsFilterChipContent>,
+    activeFilter: ThreadsFilter,
+    onSelect: (ThreadsFilter) -> Unit,
+) {
+    val scroll = rememberScrollState()
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .testTag("audienceProfileThreadsFilterStrip"),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(scroll)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            chips.forEach { chip ->
+                ThreadsFilterChip(chip = chip, isActive = chip.filter == activeFilter, onSelect = onSelect)
+            }
+        }
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
+    }
+}
+
+@Composable
+private fun ThreadsFilterChip(
+    chip: ThreadsFilterChipContent,
+    isActive: Boolean,
+    onSelect: (ThreadsFilter) -> Unit,
+) {
+    val bg = if (isActive) PantopusColors.primary600 else PantopusColors.appSurface
+    val border = if (isActive) PantopusColors.primary600 else PantopusColors.appBorder
+    val fg = if (isActive) PantopusColors.appTextInverse else PantopusColors.appTextStrong
+    val description = chip.count?.let { "${chip.label}, $it" } ?: chip.label
+    Row(
+        modifier =
+            Modifier
+                .heightIn(min = 28.dp)
+                .clip(RoundedCornerShape(9999.dp))
+                .background(bg)
+                .border(width = 1.dp, color = border, shape = RoundedCornerShape(9999.dp))
+                .clickable { onSelect(chip.filter) }
+                .padding(horizontal = 11.dp, vertical = 5.dp)
+                .testTag("threadsFilterChip_${chip.id}")
+                .semantics { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Text(
+            text = chip.label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = fg,
+        )
+        chip.count?.let { count ->
+            Text(
+                text = "$count",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = fg.copy(alpha = 0.85f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilteredEmptyThreadsCard() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+                .testTag("audienceProfileThreadsFilteredEmpty"),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (threads.isEmpty()) {
-            EmptyThreadsCard()
-        } else {
-            ViewAllMessagesCTA(onClick = onOpenCreatorInbox)
-            threads.forEach { ThreadRow(it, onOpen = { onOpenThread(it) }) }
-        }
-        Spacer(modifier = Modifier.height(24.dp))
+        PantopusIconImage(
+            icon = PantopusIcon.Inbox,
+            contentDescription = null,
+            size = 32.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.appTextMuted,
+        )
+        Text(
+            text = "No threads in this view",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+            modifier = Modifier.semantics { heading() },
+        )
+        Text(
+            text = "Try another filter to see the rest of your inbox.",
+            fontSize = 12.sp,
+            color = PantopusColors.appTextSecondary,
+        )
     }
 }
 

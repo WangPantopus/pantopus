@@ -23,6 +23,7 @@ public final class AudienceProfileViewModel {
     public var selectedTierRank: Int?
     public var followerSearchText: String = ""
     public var followerSort: FollowerSort = .newestActive
+    public var activeThreadFilter: ThreadsFilter = .all
     public var composer: UpdateComposerState = .init()
 
     private let api: APIClient
@@ -91,6 +92,10 @@ public final class AudienceProfileViewModel {
         followerSort = sort
     }
 
+    public func selectThreadFilter(_ filter: ThreadsFilter) {
+        activeThreadFilter = filter
+    }
+
     /// POST the composer's body to the persona's broadcast channel.
     /// On success the composer text clears and `load()` reruns so the
     /// updates feed picks up the new row.
@@ -137,45 +142,18 @@ public final class AudienceProfileViewModel {
         return Self.sortFollowers(rows, by: followerSort)
     }
 
-    static func sortFollowers(
-        _ rows: [FollowerRowContent],
-        by sort: FollowerSort
-    ) -> [FollowerRowContent] {
-        if sort == .newestActive { return rows }
-        let indexed = Array(rows.enumerated())
-        switch sort {
-        case .newestActive:
-            return rows
-        case .highestTier:
-            return indexed
-                .sorted { lhs, rhs in
-                    if lhs.element.tierRank != rhs.element.tierRank {
-                        return lhs.element.tierRank > rhs.element.tierRank
-                    }
-                    return lhs.offset < rhs.offset
-                }
-                .map(\.element)
-        case .recentlyJoined:
-            return indexed
-                .sorted { lhs, rhs in
-                    let lhsKey = lhs.element.tenureMonths ?? Int.max
-                    let rhsKey = rhs.element.tenureMonths ?? Int.max
-                    if lhsKey != rhsKey { return lhsKey < rhsKey }
-                    return lhs.offset < rhs.offset
-                }
-                .map(\.element)
-        case .mostEngaged:
-            return indexed
-                .sorted { lhs, rhs in
-                    if lhs.element.tierRank != rhs.element.tierRank {
-                        return lhs.element.tierRank > rhs.element.tierRank
-                    }
-                    let lhsKey = lhs.element.tenureMonths ?? -1
-                    let rhsKey = rhs.element.tenureMonths ?? -1
-                    if lhsKey != rhsKey { return lhsKey > rhsKey }
-                    return lhs.offset < rhs.offset
-                }
-                .map(\.element)
+    /// Threads filtered by `activeThreadFilter`.
+    public var visibleThreads: [ThreadRowContent] {
+        guard case let .loaded(loaded) = state else { return [] }
+        return loaded.threads.filter { Self.matchesThreadFilter($0, filter: activeThreadFilter) }
+    }
+
+    static func matchesThreadFilter(_ row: ThreadRowContent, filter: ThreadsFilter) -> Bool {
+        switch filter {
+        case .all: true
+        case .unread: row.unreadCount > 0
+        case .bronzePlus: row.tierRank >= 2
+        case .flagged: row.flagged
         }
     }
 
@@ -203,6 +181,7 @@ public final class AudienceProfileViewModel {
         let chips = tierChips(counts: audience.counts, tiers: tiers)
         let followers = audience.items.compactMap(Self.followerRow)
         let threadRows = threads.compactMap(Self.threadRow)
+        let threadsFilterChips = Self.threadsFilterChips(threads: threadRows)
         return AudienceProfileLoaded(
             header: header,
             updates: updates,
@@ -211,8 +190,21 @@ public final class AudienceProfileViewModel {
             tierChips: chips,
             followers: followers,
             threads: threadRows,
+            threadsFilterChips: threadsFilterChips,
             channelId: channelId
         )
+    }
+
+    static func threadsFilterChips(threads: [ThreadRowContent]) -> [ThreadsFilterChipContent] {
+        let total = threads.count
+        let unread = threads.filter { $0.unreadCount > 0 }.count
+        let bronzePlus = threads.filter { $0.tierRank >= 2 }.count
+        return [
+            ThreadsFilterChipContent(filter: .all, count: total),
+            ThreadsFilterChipContent(filter: .unread, count: unread),
+            ThreadsFilterChipContent(filter: .bronzePlus, count: bronzePlus),
+            ThreadsFilterChipContent(filter: .flagged, count: nil)
+        ]
     }
 
     private static func updateCard(_ dto: PersonaPostDTO) -> UpdateCardContent? {
@@ -306,9 +298,11 @@ public final class AudienceProfileViewModel {
             handle: handle.isEmpty ? "" : "@\(handle)",
             avatarUrl: dto.fanAvatarUrl,
             tierName: dto.tier?.name,
+            tierRank: dto.tier?.rank ?? 1,
             preview: dto.lastMessagePreview ?? "",
             timeAgo: timeAgo(from: dto.lastMessageAt),
-            unreadCount: dto.unreadCount ?? 0
+            unreadCount: dto.unreadCount ?? 0,
+            flagged: dto.flagged ?? false
         )
     }
 
@@ -324,5 +318,52 @@ public final class AudienceProfileViewModel {
         if days < 7 { return "\(days)d ago" }
         let weeks = days / 7
         return "\(weeks)w ago"
+    }
+}
+
+extension AudienceProfileViewModel {
+    /// Orders followers per the chosen sort. `.newestActive` preserves the
+    /// backend's natural order; other sorts use a stable tie-break on the
+    /// original index so equal keys keep their relative position.
+    static func sortFollowers(
+        _ rows: [FollowerRowContent],
+        by sort: FollowerSort
+    ) -> [FollowerRowContent] {
+        if sort == .newestActive { return rows }
+        let indexed = Array(rows.enumerated())
+        switch sort {
+        case .newestActive:
+            return rows
+        case .highestTier:
+            return indexed
+                .sorted { lhs, rhs in
+                    if lhs.element.tierRank != rhs.element.tierRank {
+                        return lhs.element.tierRank > rhs.element.tierRank
+                    }
+                    return lhs.offset < rhs.offset
+                }
+                .map(\.element)
+        case .recentlyJoined:
+            return indexed
+                .sorted { lhs, rhs in
+                    let lhsKey = lhs.element.tenureMonths ?? Int.max
+                    let rhsKey = rhs.element.tenureMonths ?? Int.max
+                    if lhsKey != rhsKey { return lhsKey < rhsKey }
+                    return lhs.offset < rhs.offset
+                }
+                .map(\.element)
+        case .mostEngaged:
+            return indexed
+                .sorted { lhs, rhs in
+                    if lhs.element.tierRank != rhs.element.tierRank {
+                        return lhs.element.tierRank > rhs.element.tierRank
+                    }
+                    let lhsKey = lhs.element.tenureMonths ?? -1
+                    let rhsKey = rhs.element.tenureMonths ?? -1
+                    if lhsKey != rhsKey { return lhsKey > rhsKey }
+                    return lhs.offset < rhs.offset
+                }
+                .map(\.element)
+        }
     }
 }

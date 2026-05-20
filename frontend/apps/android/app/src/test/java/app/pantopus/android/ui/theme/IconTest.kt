@@ -191,6 +191,9 @@ class IconTest {
             // P1.3 — Broadcast detail sub-route
             "reply",
             "radio-tower",
+            // P6.5 — Public profile · Persona vs Local
+            "message-square",
+            "globe",
             // P2.10 — Document detail sticky-footer action glyphs.
             "external-link",
             "refresh-cw",

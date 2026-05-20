@@ -5,6 +5,18 @@
 //  Public profile screen wired through `ContentDetailShell` with
 //  `ProfileHeader` + `StatsTabsBody` + `ActionRowCTA`.
 //
+//  P6.5 — Differentiates between Persona (creator) and Local (verified
+//  neighbor) profiles. The view-model picks the kind from the loaded
+//  profile's metadata, then this view swaps:
+//
+//    - banner color (sky vs green) above the header,
+//    - in-header chips ("Persona · Verified" gold tier vs "Verified
+//      neighbor" green shield),
+//    - sticky footer CTAs (single Follow vs Message + Connect),
+//    - post styling beneath the stats/tabs body (broadcasts with a
+//      tier visibility chip + locked-paywall overlay vs Pulse-style
+//      posts with an intent chip).
+//
 
 import SwiftUI
 
@@ -12,20 +24,18 @@ import SwiftUI
 @MainActor
 public struct PublicProfileView: View {
     @State private var viewModel: PublicProfileViewModel
+    @State private var showReportSheet = false
     private let onBack: @MainActor () -> Void
     private let onOpenMessages: @MainActor (PublicProfile) -> Void
-    private let onOpenReport: @MainActor () -> Void
 
     public init(
         userId: String,
         onBack: @escaping @MainActor () -> Void,
-        onOpenMessages: @escaping @MainActor (PublicProfile) -> Void = { _ in },
-        onOpenReport: @escaping @MainActor () -> Void = {}
+        onOpenMessages: @escaping @MainActor (PublicProfile) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: PublicProfileViewModel(userId: userId))
         self.onBack = onBack
         self.onOpenMessages = onOpenMessages
-        self.onOpenReport = onOpenReport
     }
 
     public var body: some View {
@@ -53,11 +63,29 @@ public struct PublicProfileView: View {
             Button("Block this user", role: .destructive) {
                 Task { await viewModel.block() }
             }
-            Button("Report") { onOpenReport() }
+            Button("Report") { showReportSheet = true }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showReportSheet) {
+            reportSheet
         }
         .accessibilityIdentifier("publicProfile")
         .task { await viewModel.load() }
+    }
+
+    @ViewBuilder private var reportSheet: some View {
+        if case let .loaded(payload) = viewModel.state {
+            ReportUserSheet(
+                userId: payload.profile.id,
+                handle: payload.header.handle,
+                displayName: payload.header.displayName,
+                onClose: { showReportSheet = false },
+                onSubmitted: {
+                    showReportSheet = false
+                    viewModel.toastMessage = "Report received"
+                }
+            )
+        }
     }
 
     @ViewBuilder private var content: some View {
@@ -78,29 +106,63 @@ public struct PublicProfileView: View {
             title: nil,
             onBack: onBack,
             header: {
-                ProfileHeader(
-                    displayName: payload.header.displayName,
-                    handle: payload.header.handle,
-                    locality: payload.header.locality,
-                    avatarURL: payload.header.avatarURL,
-                    isVerified: payload.header.isVerified,
-                    identityBadges: payload.header.identityBadges
+                VStack(spacing: 0) {
+                    PublicProfileBanner(kind: payload.kind)
+                    ProfileHeader(
+                        displayName: payload.header.displayName,
+                        handle: payload.header.handle,
+                        locality: payload.header.locality,
+                        avatarURL: payload.header.avatarURL,
+                        isVerified: payload.header.isVerified,
+                        identityBadges: payload.header.identityBadges,
+                        tierLabel: payload.header.tierLabel,
+                        isVerifiedNeighbor: payload.header.isVerifiedNeighbor
+                    )
+                }
+                .accessibilityIdentifier(
+                    payload.kind == .persona
+                        ? "publicProfilePersonaHeader"
+                        : "publicProfileLocalHeader"
                 )
             },
             body: {
-                StatsTabsBody(
-                    content: payload.stats,
-                    selectedTab: Binding(
-                        get: { viewModel.selectedTab },
-                        set: { viewModel.selectedTab = $0 }
-                    ),
-                    onMessage: { onOpenMessages(payload.profile) },
-                    onConnect: { Task { await viewModel.connect() } },
-                    onOverflow: { viewModel.showOverflow = true }
-                )
+                VStack(alignment: .leading, spacing: Spacing.s4) {
+                    StatsTabsBody(
+                        content: payload.stats,
+                        selectedTab: Binding(
+                            get: { viewModel.selectedTab },
+                            set: { viewModel.selectedTab = $0 }
+                        ),
+                        showActionRow: false,
+                        onMessage: { onOpenMessages(payload.profile) },
+                        onConnect: { Task { await viewModel.connect() } },
+                        onOverflow: { viewModel.showOverflow = true }
+                    )
+                    PublicProfilePostsFeed(
+                        kind: payload.kind,
+                        posts: payload.posts
+                    ) { _ in viewModel.toastMessage = "Subscribe flow coming soon" }
+                }
             },
-            cta: { ActionRowCTA() }
+            cta: { stickyFooter(for: payload) }
         )
+    }
+
+    @ViewBuilder
+    private func stickyFooter(for payload: PublicProfileContent) -> some View {
+        switch payload.kind {
+        case .persona:
+            ActionRowCTA(kind: .persona(followState: viewModel.followState) {
+                Task { await viewModel.follow() }
+            })
+        case .local:
+            ActionRowCTA(kind: .local(
+                messageState: .idle,
+                connectState: viewModel.connectState,
+                onMessage: { onOpenMessages(payload.profile) },
+                onConnect: { Task { await viewModel.connect() } }
+            ))
+        }
     }
 }
 

@@ -18,19 +18,17 @@ public struct NearbyMapView: View {
     @State private var viewModel: NearbyMapViewModel
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var dragTranslation: CGFloat = 0
+    @State private var showFilterSheet = false
     private let onOpenEntity: @MainActor (MapEntity) -> Void
-    private let onOpenFilters: @MainActor () -> Void
     private let onBack: (@MainActor () -> Void)?
 
     init(
         viewModel: NearbyMapViewModel = NearbyMapViewModel(),
         onOpenEntity: @escaping @MainActor (MapEntity) -> Void = { _ in },
-        onOpenFilters: @escaping @MainActor () -> Void = {},
         onBack: (@MainActor () -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onOpenEntity = onOpenEntity
-        self.onOpenFilters = onOpenFilters
         self.onBack = onBack
     }
 
@@ -50,6 +48,13 @@ public struct NearbyMapView: View {
             .ignoresSafeArea(edges: .bottom)
         }
         .task { await viewModel.load() }
+        .sheet(isPresented: $showFilterSheet) {
+            MapFilterSheet(
+                criteria: viewModel.filters,
+                onApply: { viewModel.applyFilters($0) },
+                onClose: { showFilterSheet = false }
+            )
+        }
         .accessibilityIdentifier("nearbyMap")
     }
 
@@ -103,6 +108,15 @@ public struct NearbyMapView: View {
         .onChange(of: viewModel.userCoordinate) { _, newCoord in
             recenter(on: newCoord)
         }
+        // MapKit publishes a large, constantly-changing accessibility
+        // subtree (map tiles + internal elements) that prevents XCUITest
+        // from settling an a11y snapshot — surfacing as "Failed to get
+        // matching snapshots: Timed out while evaluating UI query" on
+        // slower simulators (e.g. iPhone 16 Pro). Collapse the map to a
+        // single labeled element; the bottom-sheet list (`nearbySheetList`)
+        // remains the accessible affordance for the same entities.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Nearby map")
     }
 
     private func recenter(on coord: UserCoordinate?) {
@@ -148,12 +162,15 @@ public struct NearbyMapView: View {
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
             Spacer(minLength: 4)
-            Button(action: onOpenFilters) {
+            Button {
+                showFilterSheet = true
+            } label: {
                 Icon(.slidersHorizontal, size: 16, strokeWidth: 2.2, color: Theme.Color.appText)
                     .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Filters")
+            .accessibilityIdentifier("mapFiltersButton")
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
@@ -213,7 +230,7 @@ public struct NearbyMapView: View {
                 recenter(on: viewModel.userCoordinate)
             }
             mapControlButton(icon: .map, label: "Layers") {
-                onOpenFilters()
+                showFilterSheet = true
             }
         }
         .padding(.trailing, 14)

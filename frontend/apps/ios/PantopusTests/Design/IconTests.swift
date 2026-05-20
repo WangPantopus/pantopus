@@ -61,6 +61,8 @@ final class IconTests: XCTestCase {
         "video", "more-vertical", "hand",
         // P1.3 Broadcast detail — sticky footer + analytics.
         "reply", "radio-tower",
+        // P6.5 Public profile · Persona vs Local.
+        "message-square", "globe",
         // P2.10 Document detail — sticky-footer action glyphs.
         "external-link", "refresh-cw"
     ]

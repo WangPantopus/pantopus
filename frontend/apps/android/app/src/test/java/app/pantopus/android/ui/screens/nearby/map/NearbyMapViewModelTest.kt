@@ -12,6 +12,7 @@ import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.listings.ListingsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
+import app.pantopus.android.ui.screens.gigs.GigFilterCriteria
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import io.mockk.coEvery
 import io.mockk.every
@@ -139,6 +140,48 @@ class NearbyMapViewModelTest {
             assertEquals("g1", (vm.state.value as NearbyMapUiState.Loaded).selectedId)
             vm.selectEntity(null)
             assertNull((vm.state.value as NearbyMapUiState.Loaded).selectedId)
+        }
+
+    @Test fun apply_entity_type_gigs_hides_listings() =
+        runTest {
+            coEvery { gigs.inBounds(any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(GigsInBoundsResponse(listOf(gigConfirmed(), gigPending())))
+            coEvery { listings.inBounds(any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(ListingsInBoundsResponse(listOf(listing())))
+            val vm = makeVm()
+            vm.load()
+            assertEquals(3, (vm.state.value as NearbyMapUiState.Loaded).entities.size)
+            vm.applyFilters(MapFilterCriteria(entityType = MapEntityType.Gigs))
+            val loaded = vm.state.value as NearbyMapUiState.Loaded
+            assertEquals(2, loaded.entities.size)
+            assertTrue(loaded.entities.all { it.kind == MapEntityKind.Gig })
+        }
+
+    @Test fun apply_entity_type_listings_hides_gigs() =
+        runTest {
+            coEvery { gigs.inBounds(any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(GigsInBoundsResponse(listOf(gigConfirmed(), gigPending())))
+            coEvery { listings.inBounds(any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(ListingsInBoundsResponse(listOf(listing())))
+            val vm = makeVm()
+            vm.load()
+            vm.applyFilters(MapFilterCriteria(entityType = MapEntityType.Listings))
+            val loaded = vm.state.value as NearbyMapUiState.Loaded
+            assertEquals(listOf("l1"), loaded.entities.map { it.id })
+        }
+
+    @Test fun apply_category_filter_applies_to_gigs_and_listings() =
+        runTest {
+            coEvery { gigs.inBounds(any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(GigsInBoundsResponse(listOf(gigConfirmed(), gigPending())))
+            coEvery { listings.inBounds(any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(ListingsInBoundsResponse(listOf(listing())))
+            val vm = makeVm()
+            vm.load()
+            // g1 is handyman; g2 is cleaning; l1 is moving → only g1 survives.
+            vm.applyFilters(MapFilterCriteria(gig = GigFilterCriteria(categories = setOf(GigsCategory.Handyman))))
+            val loaded = vm.state.value as NearbyMapUiState.Loaded
+            assertEquals(listOf("g1"), loaded.entities.map { it.id })
         }
 
     @Test fun sheet_stop_transitions() {
