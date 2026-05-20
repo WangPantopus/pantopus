@@ -78,10 +78,13 @@ fun BillDetailScreen(
                     splits = current.splits,
                     saving = current.saving,
                     saveError = current.saveError,
-                    onBack = onBack,
-                    onEdit = onEdit,
-                    onMarkPaid = viewModel::markPaid,
-                    onRemove = viewModel::remove,
+                    actions =
+                        BillDetailActions(
+                            onBack = onBack,
+                            onEdit = onEdit,
+                            onMarkPaid = viewModel::markPaid,
+                            onRemove = viewModel::remove,
+                        ),
                 )
         }
     }
@@ -143,17 +146,14 @@ private fun LoadedShell(
     splits: List<BillSplitDto>,
     saving: Boolean,
     saveError: String?,
-    onBack: () -> Unit,
-    onEdit: () -> Unit,
-    onMarkPaid: () -> Unit,
-    onRemove: () -> Unit,
+    actions: BillDetailActions,
 ) {
     val projection = BillsListViewModel.project(bill, Instant.now())
     val isPaid = bill.status == "paid"
     val autoPay = projection.status == BillChipStatus.Scheduled
     ContentDetailShell(
         title = "Bill",
-        onBack = onBack,
+        onBack = actions.onBack,
         header = {
             BillHeader(
                 model =
@@ -191,7 +191,7 @@ private fun LoadedShell(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(Radii.md))
                             .background(PantopusColors.primary50)
-                            .clickable(enabled = !saving, onClick = onEdit)
+                            .clickable(enabled = !saving, onClick = actions.onEdit)
                             .padding(Spacing.s3)
                             .testTag("billDetail_edit"),
                     verticalAlignment = Alignment.CenterVertically,
@@ -213,7 +213,7 @@ private fun LoadedShell(
                 Row(
                     modifier =
                         Modifier
-                            .clickable(enabled = !saving, onClick = onRemove)
+                            .clickable(enabled = !saving, onClick = actions.onRemove)
                             .testTag("billDetail_remove"),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -238,12 +238,19 @@ private fun LoadedShell(
                 title = if (isPaid) "Already paid" else "Mark paid",
                 isLoading = saving,
                 isEnabled = !isPaid && !saving,
-                onClick = onMarkPaid,
+                onClick = actions.onMarkPaid,
                 modifier = Modifier.testTag("billDetail_markPaid"),
             )
         },
     )
 }
+
+private data class BillDetailActions(
+    val onBack: () -> Unit,
+    val onEdit: () -> Unit,
+    val onMarkPaid: () -> Unit,
+    val onRemove: () -> Unit,
+)
 
 private data class BillHeaderModel(
     val payee: String,
