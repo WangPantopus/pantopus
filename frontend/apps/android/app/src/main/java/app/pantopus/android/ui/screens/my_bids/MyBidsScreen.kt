@@ -1,4 +1,5 @@
 @file:Suppress("PackageNaming")
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.my_bids
 
@@ -8,14 +9,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -41,21 +39,23 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /** Test tag on the My bids root container. */
 const val MY_BIDS_TAG = "my-bids"
 
+private const val TOAST_DISMISS_DELAY_MS = 2_500L
+
 /**
  * T5.3.1 — My bids. Thin wrapper around [ListOfRowsScreen]. Four tabs
  * (Active / Accepted / Rejected / Done), 48dp extended-pill FAB
  * labelled "Browse tasks", filter icon in the top-bar trailing slot,
- * and a primary-tinted banner above the Active tab. The
- * `WithdrawBidSheet` is a screen-bespoke addition for the destructive
- * confirmation flow — every other state lives in the shared shell.
+ * and a primary-tinted banner above the Active tab. The screen-bespoke
+ * pieces attached at the bottom are the WithdrawBidSheet plus the
+ * P3.4 Edit Bid + Leave Review sheets.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("LongParameterList")
 fun MyBidsScreen(
@@ -64,8 +64,6 @@ fun MyBidsScreen(
     onOpenFilters: () -> Unit = {},
     onBrowseTasks: () -> Unit = {},
     onMessageClient: (BidDto) -> Unit = {},
-    onEditBid: (BidDto) -> Unit = {},
-    onLeaveReview: (BidDto) -> Unit = {},
     viewModel: MyBidsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -75,6 +73,9 @@ fun MyBidsScreen(
     val tabs by viewModel.tabs.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val withdrawTarget by viewModel.withdrawTarget.collectAsStateWithLifecycle()
+    val editBidTarget by viewModel.editBidTarget.collectAsStateWithLifecycle()
+    val leaveReviewTarget by viewModel.leaveReviewTarget.collectAsStateWithLifecycle()
+    val toast by viewModel.toast.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.bindCallbacks(
@@ -82,10 +83,15 @@ fun MyBidsScreen(
             onOpenFilters = onOpenFilters,
             onBrowseTasks = onBrowseTasks,
             onMessageClient = onMessageClient,
-            onEditBid = onEditBid,
-            onLeaveReview = onLeaveReview,
         )
         viewModel.load()
+    }
+
+    LaunchedEffect(toast) {
+        if (toast != null) {
+            kotlinx.coroutines.delay(TOAST_DISMISS_DELAY_MS)
+            viewModel.dismissToast()
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize().testTag(MY_BIDS_TAG)) {
@@ -102,21 +108,115 @@ fun MyBidsScreen(
             banner = banner,
             onBack = onBack,
         )
+
+        toast?.let { payload -> MyBidsToastOverlay(payload) }
     }
 
-    val target = withdrawTarget
-    if (target != null) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.cancelWithdraw() },
-            sheetState = sheetState,
+    WithdrawBidSheet(
+        target = withdrawTarget,
+        onCancel = { viewModel.cancelWithdraw() },
+        onConfirm = { reason -> viewModel.confirmWithdraw(reason) },
+    )
+
+    EditBidSheet(
+        target = editBidTarget,
+        onCancel = { viewModel.cancelEditBid() },
+        onSubmit = { draft -> viewModel.submitEditBid(draft) },
+    )
+
+    LeaveReviewSheet(
+        target = leaveReviewTarget,
+        onCancel = { viewModel.cancelLeaveReview() },
+        onSubmit = { draft -> viewModel.submitLeaveReview(draft) },
+    )
+}
+
+@Composable
+private fun MyBidsToastOverlay(payload: MyBidsToast) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .padding(bottom = Spacing.s10, start = Spacing.s4, end = Spacing.s4)
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(
+                        if (payload.isError) PantopusColors.error else PantopusColors.success,
+                    )
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                    .testTag("my-bids-toast"),
         ) {
-            WithdrawBidSheetContent(
-                target = target,
-                onCancel = { viewModel.cancelWithdraw() },
-                onConfirm = { reason -> viewModel.confirmWithdraw(reason) },
+            Text(
+                text = payload.text,
+                style = PantopusTextStyle.small,
+                color = PantopusColors.appTextInverse,
             )
         }
+    }
+}
+
+@Composable
+private fun WithdrawBidSheet(
+    target: WithdrawSheetTarget?,
+    onCancel: () -> Unit,
+    onConfirm: (WithdrawBidReason?) -> Unit,
+) {
+    if (target == null) return
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onCancel,
+        sheetState = sheetState,
+    ) {
+        WithdrawBidSheetContent(
+            target = target,
+            onCancel = onCancel,
+            onConfirm = onConfirm,
+        )
+    }
+}
+
+@Composable
+private fun EditBidSheet(
+    target: EditBidSheetTarget?,
+    onCancel: () -> Unit,
+    onSubmit: suspend (EditBidDraft) -> Boolean,
+) {
+    if (target == null) return
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onCancel,
+        sheetState = sheetState,
+    ) {
+        EditBidSheetContent(
+            target = target,
+            onSubmit = onSubmit,
+            onCancel = onCancel,
+        )
+    }
+}
+
+@Composable
+private fun LeaveReviewSheet(
+    target: LeaveReviewSheetTarget?,
+    onCancel: () -> Unit,
+    onSubmit: suspend (LeaveReviewDraft) -> Boolean,
+) {
+    if (target == null) return
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onCancel,
+        sheetState = sheetState,
+    ) {
+        LeaveReviewSheetContent(
+            target = target,
+            onSubmit = onSubmit,
+            onCancel = onCancel,
+        )
     }
 }
 
@@ -265,7 +365,4 @@ private fun DestructiveButton(
             )
         }
     }
-
-    // Padding helper — kept here so the layout matches the iOS withdraw sheet.
-    Spacer(modifier = Modifier.width(0.dp))
 }

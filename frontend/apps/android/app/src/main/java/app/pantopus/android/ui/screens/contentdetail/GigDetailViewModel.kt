@@ -65,13 +65,19 @@ class GigDetailViewModel
         fun placeBid(
             amount: Double,
             message: String?,
+            proposedTime: String? = null,
             onResult: (Boolean) -> Unit = {},
         ) {
             viewModelScope.launch {
                 val result =
                     repo.placeBid(
                         gigId = gigId,
-                        body = PlaceBidBody(bidAmount = amount, message = message),
+                        body =
+                            PlaceBidBody(
+                                bidAmount = amount,
+                                message = message,
+                                proposedTime = proposedTime,
+                            ),
                     )
                 if (result is NetworkResult.Success) {
                     load()
@@ -81,6 +87,9 @@ class GigDetailViewModel
                 }
             }
         }
+
+        /** Returns the gig id wired from `SavedStateHandle`. */
+        fun currentGigId(): String = gigId
 
         object Projection {
             fun project(

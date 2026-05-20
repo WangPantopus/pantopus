@@ -1,0 +1,114 @@
+@file:Suppress("PackageNaming")
+
+package app.pantopus.android.ui.screens.shared.filter_sheet
+
+import androidx.compose.runtime.Immutable
+
+/**
+ * Render models for the shared FilterSheet archetype — every filter
+ * / sort bottom sheet in the app uses this shape. Sections are an
+ * ordered list of headers + controls; the shell owns the working
+ * copy and emits the applied selection back through `onApply`.
+ *
+ * Mirrors the iOS `FilterSection.swift` API.
+ */
+
+/** One selectable option in a chip-group / radio / multi-select. */
+@Immutable
+data class FilterOption(
+    val id: String,
+    val label: String,
+)
+
+/** A bounded numeric range with movable lower / upper handles. */
+@Immutable
+data class FilterRange(
+    /** Domain lower bound. */
+    val min: Float,
+    /** Domain upper bound. */
+    val max: Float,
+    /** Current lower handle position. */
+    val lower: Float,
+    /** Current upper handle position. */
+    val upper: Float,
+    /** Step size — handles snap to multiples of `step` from `min`. */
+    val step: Float = 1f,
+) {
+    /**
+     * Returns a copy with `lower = min` and `upper = max` — the
+     * "no filter" position used when the user taps Reset.
+     */
+    fun cleared(): FilterRange = copy(lower = min, upper = max)
+
+    companion object {
+        /** Order-correcting factory. */
+        fun create(
+            min: Float,
+            max: Float,
+            lower: Float,
+            upper: Float,
+            step: Float = 1f,
+        ): FilterRange {
+            val safeLower = kotlin.math.max(min, kotlin.math.min(lower, upper))
+            val safeUpper = kotlin.math.min(max, kotlin.math.max(upper, lower))
+            return FilterRange(min, max, safeLower, safeUpper, step)
+        }
+    }
+}
+
+/** The right-side / inline control on one section. */
+sealed interface FilterControl {
+    /** Horizontal flow of selectable pill chips. Multi-select. */
+    @Immutable
+    data class ChipGroup(
+        val options: List<FilterOption>,
+        val selectedIds: Set<String>,
+    ) : FilterControl
+
+    /** Stack of rows, single selection only. `null` = "no selection". */
+    @Immutable
+    data class Radio(
+        val options: List<FilterOption>,
+        val selectedId: String?,
+    ) : FilterControl
+
+    /** Stack of rows with checkboxes, multiple selection. */
+    @Immutable
+    data class MultiSelect(
+        val options: List<FilterOption>,
+        val selectedIds: Set<String>,
+    ) : FilterControl
+
+    /** Dual-thumb range slider. */
+    @Immutable
+    data class RangeSlider(
+        val range: FilterRange,
+    ) : FilterControl
+}
+
+/**
+ * The default / "no selection" form per control kind. Drives the
+ * shell's Reset button — every section is mapped to its cleared
+ * equivalent without dismissing the sheet.
+ */
+fun FilterControl.cleared(): FilterControl =
+    when (this) {
+        is FilterControl.ChipGroup -> copy(selectedIds = emptySet())
+        is FilterControl.Radio -> copy(selectedId = null)
+        is FilterControl.MultiSelect -> copy(selectedIds = emptySet())
+        is FilterControl.RangeSlider -> copy(range = range.cleared())
+    }
+
+/** One section in the sheet — a header label + a single control. */
+@Immutable
+data class FilterSection(
+    val id: String,
+    val title: String,
+    val control: FilterControl,
+) {
+    /** Returns a copy with the control reset to its default / empty form. */
+    fun cleared(): FilterSection = copy(control = control.cleared())
+}
+
+/** Map every section to its cleared form. */
+fun List<FilterSection>.cleared(): List<FilterSection> = map { it.cleared() }

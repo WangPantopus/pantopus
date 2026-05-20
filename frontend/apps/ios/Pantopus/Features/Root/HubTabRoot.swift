@@ -99,6 +99,9 @@ public enum HubRoute: Hashable {
     case pulseFeed
     /// Compose post target — placeholder until the compose flow ships.
     case composePost(intent: String)
+    /// P3.5 — Edit an existing Pulse post. Re-uses the compose flow in
+    /// edit mode (prefill + PATCH submit + locked intent picker).
+    case editPost(postId: String)
     /// Gigs feed (T2.3). Reached from Hub → pillar(.gigs).
     case gigsFeed
     /// Gig detail target — placeholder until the Transactional Detail (T2.6) ships.
@@ -862,11 +865,15 @@ public struct HubTabRoot: View {
         case let .pulsePost(postId):
             PulsePostDetailView(
                 postId: postId,
+                currentUserId: currentUserId.isEmpty ? nil : currentUserId,
                 onBack: {
                     if !path.isEmpty { path.removeLast() }
                 },
                 onOpenProfile: { userId in
                     Task { @MainActor in push(.publicProfile(userId: userId)) }
+                },
+                onEdit: { id in
+                    Task { @MainActor in push(.editPost(postId: id)) }
                 }
             )
         case .mailboxDrawers:
@@ -919,6 +926,10 @@ public struct HubTabRoot: View {
             )
         case let .composePost(intent):
             PulseComposeView(intent: PulseComposeIntent.from(rawValue: intent)) { _ in
+                pop()
+            }
+        case let .editPost(postId):
+            PulseComposeView(postId: postId) { _ in
                 pop()
             }
         case .gigsFeed:
@@ -1210,21 +1221,9 @@ public struct HubTabRoot: View {
                                 verified: false
                             )))
                         }
-                    },
-                    onEditBid: { bid in
-                        Task { @MainActor in
-                            if let gigId = bid.gigId {
-                                push(.gigDetail(gigId: gigId))
-                            }
-                        }
-                    },
-                    onLeaveReview: { bid in
-                        Task { @MainActor in
-                            if let gigId = bid.gigId {
-                                push(.gigDetail(gigId: gigId))
-                            }
-                        }
                     }
+                    // Edit-bid + Leave-review are presented as sheets from
+                    // inside the screen (P3.4) — no router wiring needed.
                 )
             )
         case let .chatConversation(dest):

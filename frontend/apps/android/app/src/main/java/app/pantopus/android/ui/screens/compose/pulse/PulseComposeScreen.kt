@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -50,8 +51,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
+import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
 import app.pantopus.android.ui.screens.shared.form.FormShell
@@ -92,12 +95,16 @@ fun PulseComposeScreen(
     val photos by viewModel.photos.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
     val shouldDismiss by viewModel.shouldDismiss.collectAsStateWithLifecycle()
+    val prefillState by viewModel.prefillState.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         Analytics.track(AnalyticsEvent.ScreenPulseComposeViewed(intent = activeIntent.key))
+        if (viewModel.isEditing && prefillState is PulseComposePrefillState.Loading) {
+            viewModel.loadForEdit()
+        }
     }
 
     LaunchedEffect(toast) {
@@ -144,48 +151,58 @@ fun PulseComposeScreen(
                 .testTag("composePulseShell"),
     ) {
         FormShell(
-            title = "New post",
-            rightActionLabel = activeIntent.ctaLabel,
+            title = viewModel.displayTitle,
+            rightActionLabel = viewModel.ctaLabel,
             isValid = viewModel.isValid,
             isDirty = viewModel.isDirty,
             isSaving = viewModel.isSubmitting,
             onClose = onBack,
             onCommit = viewModel::submit,
         ) {
-            PulseComposeBody(
-                state =
-                    PulseComposeContentState(
-                        activeIntent = activeIntent,
-                        identity = identity,
-                        visibility = visibility,
-                        lostFoundKind = lostFoundKind,
-                        announceAudience = announceAudience,
-                        askCategory = askCategory,
-                        recommendRating = recommendRating,
-                        fields = fields,
-                        photos = photos,
-                    ),
-                actions =
-                    PulseComposeActions(
-                        selection =
-                            PulseComposeSelectionActions(
-                                onSelectIntent = viewModel::selectIntent,
-                                onSelectIdentity = viewModel::selectIdentity,
-                                onSelectVisibility = viewModel::selectVisibility,
-                                onSelectLostFoundKind = viewModel::selectLostFoundKind,
-                                onSelectAnnounceAudience = viewModel::selectAnnounceAudience,
-                                onSelectAskCategory = viewModel::selectAskCategory,
-                                onSelectRecommendRating = viewModel::selectRecommendRating,
+            when (val prefill = prefillState) {
+                PulseComposePrefillState.Loading -> PulseComposePrefillSkeleton()
+                is PulseComposePrefillState.Error ->
+                    PulseComposePrefillErrorView(
+                        message = prefill.message,
+                        onRetry = { viewModel.loadForEdit() },
+                    )
+                PulseComposePrefillState.Ready ->
+                    PulseComposeBody(
+                        state =
+                            PulseComposeContentState(
+                                activeIntent = activeIntent,
+                                identity = identity,
+                                visibility = visibility,
+                                lostFoundKind = lostFoundKind,
+                                announceAudience = announceAudience,
+                                askCategory = askCategory,
+                                recommendRating = recommendRating,
+                                fields = fields,
+                                photos = photos,
+                                isIntentLocked = viewModel.isIntentLocked,
                             ),
-                        onUpdateField = viewModel::update,
-                        onPickPhotos = {
-                            photoPicker.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                            )
-                        },
-                        onRemovePhoto = viewModel::removePhoto,
-                    ),
-            )
+                        actions =
+                            PulseComposeActions(
+                                selection =
+                                    PulseComposeSelectionActions(
+                                        onSelectIntent = viewModel::selectIntent,
+                                        onSelectIdentity = viewModel::selectIdentity,
+                                        onSelectVisibility = viewModel::selectVisibility,
+                                        onSelectLostFoundKind = viewModel::selectLostFoundKind,
+                                        onSelectAnnounceAudience = viewModel::selectAnnounceAudience,
+                                        onSelectAskCategory = viewModel::selectAskCategory,
+                                        onSelectRecommendRating = viewModel::selectRecommendRating,
+                                    ),
+                                onUpdateField = viewModel::update,
+                                onPickPhotos = {
+                                    photoPicker.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                    )
+                                },
+                                onRemovePhoto = viewModel::removePhoto,
+                            ),
+                    )
+            }
         }
 
         toast?.let { payload ->
@@ -241,6 +258,8 @@ internal data class PulseComposeContentState(
     val recommendRating: Int = 5,
     val fields: Map<PulseComposeField, FormFieldState> = emptyMap(),
     val photos: List<PulseComposePhoto> = emptyList(),
+    /** True when the intent picker is non-interactive (edit mode). */
+    val isIntentLocked: Boolean = false,
 )
 
 internal data class PulseComposeSelectionActions(
@@ -265,7 +284,11 @@ internal fun PulseComposeBody(
     state: PulseComposeContentState,
     actions: PulseComposeActions,
 ) {
-    IntentPicker(active = state.activeIntent, onSelect = actions.selection.onSelectIntent)
+    IntentPicker(
+        active = state.activeIntent,
+        isLocked = state.isIntentLocked,
+        onSelect = actions.selection.onSelectIntent,
+    )
     IdentitySection(active = state.identity, onSelect = actions.selection.onSelectIdentity)
     IntentSpecificSection(
         state = state,
@@ -282,6 +305,7 @@ internal fun PulseComposeBody(
 @Composable
 private fun IntentPicker(
     active: PulseComposeIntent,
+    isLocked: Boolean,
     onSelect: (PulseComposeIntent) -> Unit,
 ) {
     FormFieldGroup("Post type") {
@@ -294,7 +318,12 @@ private fun IntentPicker(
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             PulseComposeIntent.entries.forEach { intent ->
-                IntentChip(intent = intent, isActive = intent == active, onSelect = onSelect)
+                IntentChip(
+                    intent = intent,
+                    isActive = intent == active,
+                    isLocked = isLocked,
+                    onSelect = onSelect,
+                )
             }
         }
     }
@@ -304,22 +333,24 @@ private fun IntentPicker(
 private fun IntentChip(
     intent: PulseComposeIntent,
     isActive: Boolean,
+    isLocked: Boolean,
     onSelect: (PulseComposeIntent) -> Unit,
 ) {
     val fg = if (isActive) PantopusColors.appTextInverse else PantopusColors.appTextStrong
     val bg = if (isActive) PantopusColors.primary600 else PantopusColors.appSurface
     val border = if (isActive) Color.Transparent else PantopusColors.appBorder
+    val chipModifier =
+        Modifier
+            .heightIn(min = 32.dp)
+            .clip(RoundedCornerShape(Radii.pill))
+            .background(bg)
+            .border(width = 1.dp, color = border, shape = RoundedCornerShape(Radii.pill))
+            .let { base -> if (isLocked) base else base.clickable { onSelect(intent) } }
+            .padding(horizontal = Spacing.s3, vertical = Spacing.s1)
+            .testTag("composePulseIntentChip_${intent.key}")
+            .semantics { contentDescription = "${intent.label} post" }
     Row(
-        modifier =
-            Modifier
-                .heightIn(min = 32.dp)
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(bg)
-                .border(width = 1.dp, color = border, shape = RoundedCornerShape(Radii.pill))
-                .clickable { onSelect(intent) }
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s1)
-                .testTag("composePulseIntentChip_${intent.key}")
-                .semantics { contentDescription = "${intent.label} post" },
+        modifier = chipModifier.alpha(if (isLocked && !isActive) 0.4f else 1f),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
@@ -1085,5 +1116,58 @@ private fun ChipRow(
                 }
             }
         }
+    }
+}
+
+/**
+ * Shimmer skeleton shown while the edit-mode prefill is in flight.
+ * Mirrors the loaded geometry so layout doesn't jump on resolve.
+ */
+@Composable
+private fun PulseComposePrefillSkeleton() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4)
+                .testTag("composePulsePrefillSkeleton"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s5),
+    ) {
+        Shimmer(width = 220.dp, height = 16.dp, cornerRadius = Radii.sm)
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            Shimmer(width = 64.dp, height = 32.dp, cornerRadius = Radii.pill)
+            Shimmer(width = 80.dp, height = 32.dp, cornerRadius = Radii.pill)
+            Shimmer(width = 72.dp, height = 32.dp, cornerRadius = Radii.pill)
+        }
+        Shimmer(width = 160.dp, height = 16.dp, cornerRadius = Radii.sm)
+        Shimmer(width = 320.dp, height = 44.dp, cornerRadius = Radii.md)
+        Shimmer(width = 100.dp, height = 16.dp, cornerRadius = Radii.sm)
+        Shimmer(width = 320.dp, height = 96.dp, cornerRadius = Radii.md)
+    }
+}
+
+/**
+ * Error state shown when the edit-mode prefill fetch fails. Pairs the
+ * message with a retry CTA wired back to `loadForEdit`.
+ */
+@Composable
+private fun PulseComposePrefillErrorView(
+    message: String,
+    onRetry: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4)
+                .testTag("composePulsePrefillError"),
+    ) {
+        EmptyState(
+            icon = PantopusIcon.AlertCircle,
+            headline = "Couldn't load this post",
+            subcopy = message,
+            ctaTitle = "Try again",
+            onCta = onRetry,
+        )
     }
 }
