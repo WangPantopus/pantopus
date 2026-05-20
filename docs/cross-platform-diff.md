@@ -122,6 +122,99 @@ match except where flagged in the sections below.
 
 ---
 
+## P6.8 resolution log
+
+Disposition of every P6.7 delta. **Environment note:** this container has
+**no Swift toolchain, no Xcode, and no Android SDK**, so neither platform can
+be compiled or snapshot-tested here — the authoritative gates are CI
+(`ios-ci.yml`, `android-ci.yml`). Per the agreed approach, genuine localized
+bugs are fixed in place (one commit per screen), native-platform idioms are
+recorded as intentional, and structural / cross-DI / iOS-only changes that
+can't be safely landed blind are tracked with a precise spec.
+
+### Fixed (committed this session)
+
+| Screen | Delta | Fix |
+|---|---|---|
+| Invite owner | Android matched "already active" on body substring only | Android `mapInviteError` now also keys on `NetworkError.code == 409`, mirroring iOS. |
+| Public profile | Android error state had no back chevron (unescapable) | `ErrorLayout` now renders the `ContentDetailTopBar(onBack=)` that `LoadingLayout` already uses, matching iOS. |
+| Me / You | iOS Personal grid missing the "Support trains" tile (design + Android have it) | Added the tile (`.handCoins`, `me.supportTrains`); route was already wired in `YouTabRoot`. |
+
+### Already at parity (P6.7 false positive — corrected)
+
+- **Settings → Help center.** P6.7 reported the Android "Email support" CTA as
+  a no-op. It is in fact wired at `RootTabScreen.kt:2470-2480` to a
+  `mailto:support@pantopus.app?subject=Help` intent (the audit missed the call
+  site). No change needed; section corrected below.
+
+### Intentional native-platform differences (no change — "keep native, document")
+
+iOS HIG and Android Material prescribe different primitives for the same UX
+role; forcing them identical would break platform convention.
+
+- **Confirm / overflow menus** — iOS `.confirmationDialog`/`.alert` vs Android
+  `ModalBottomSheet`/`AlertDialog` (Public profile & Business profile overflow,
+  My posts & Pulse-post kebab, Maintenance delete). Same items + copy.
+- **Date entry** — iOS inline wheel `DatePicker` vs Android `DatePickerDialog`
+  (Maintenance, Gig compose, Start poll, Edit-profile DOB, Bills due-date).
+- **Wizard / form presentation** — iOS `.sheet` vs Android full-screen `Dialog`
+  (Invite member, Add pet); Owners invite `.sheet` vs route. Both modal.
+- **My bids** — iOS partial sheet detents vs Android full-height sheet (both
+  `ModalBottomSheet`-class). Sheet sizing only.
+- **Token Accept** — iOS `.fullScreenCover` vs Android pushed route; the Android
+  terminal Done/Close buttons exist because a pushed route needs an explicit
+  dismiss where iOS dismisses the cover via callback. Tied to the nav model.
+- **Map + motion** — Nearby uses MapKit (iOS) vs Google Maps (Android); release
+  velocity (600 vs 1200) and active-pin pulse (animated iOS / static Android for
+  Paparazzi determinism) differ by gesture/snapshot system. Detent heights match.
+- **Household-tasks due-date (Android)** — a plain `yyyy-MM-dd` text field rather
+  than a calendar dialog: an intentional Compose-DatePicker / Paparazzi
+  compatibility choice noted in-code.
+- **Nearby & Content-detail loading** — a plain spinner on *both* platforms (a
+  shared house-rule gap, not a cross-platform delta).
+
+### Tracked follow-ups (genuine; need a toolchain to land + verify)
+
+Real cross-platform gaps whose fix is structural, crosses DI, or is iOS-only —
+not safe to land blind in a no-compiler container. Spec'd for a toolchain env.
+
+1. **Systemic error-copy fallback (~30 fetchable screens).** Android list/detail
+   VMs surface raw `NetworkError.message`; iOS shows a feature fallback when the
+   error has no description. Align by wrapping Android's string:
+   `…Error(result.error.message.ifBlank { "Couldn't load X." })` per screen (or
+   have iOS prefer the server message). Mechanical but broad — one dedicated
+   sweep so it compiles + snapshot-checks together.
+2. **Verify email (Android).** Add the resend-countdown label (render
+   `cooldownRemaining()` as "Resend in Ns") + the "change email" sheet with its
+   "New email" field and `AuthValidation.email` gate, matching iOS.
+3. **Edit profile (iOS).** Replace the screen-level `ProgressView("Loading
+   profile…")` with a shimmer skeleton (house-rule; Android already has
+   `EditProfileSkeleton`).
+4. **Content detail — gig bids (Android).** Gate the bids fetch + module on
+   viewer-is-owner like iOS; requires injecting a current-user-id source into
+   `GigDetailViewModel`. (Confirm whether the backend already restricts
+   `/:gigId/bids` to the owner — if so this is defense-in-depth.)
+5. **Chat conversation (Android).** Wire the attach button to an attach menu —
+   after confirming the iOS attach actions are live flows vs stubs, mirror the
+   live ones.
+6. **Chat search (Android).** Add diacritic-insensitive matching to
+   `ChatSearchText` (NFD-fold) preserving original-string offsets so highlight
+   spans stay aligned.
+7. **Claim ownership.** Reconcile picker types (iOS image-only + 10 MB guard;
+   Android image+PDF, no guard) and accept-hint copy against backend support.
+8. **Gig / Pulse compose.** Align validation + placeholders: Pulse body
+   min-length message, event-date validator, Gig-compose description placeholder.
+9. **Mail detail.** (a) Elevate `legal`/`tax` generic fallthrough to `.verified`
+   on Android to match iOS. (b) Align community last-reply preview ("Author:
+   preview" vs bold-author "Author preview").
+10. **Start a train.** Pick canonical launch-error wording (iOS one generic vs
+    Android phase-specific) and make both match.
+
+Tracked as `P6.8-followup-*`; each lands as a scoped commit once a build/test
+toolchain is available.
+
+---
+
 <!-- cluster:tier0-auth -->
 
 ## Login
@@ -449,7 +542,7 @@ match except where flagged in the sections below.
 - **Field set:** Match — Email + Phone (optional). Minor: phone placeholder differs — iOS "+1 555 555 0123" vs Android "+15555550123".
 - **Validation rules:** Match — email = `[.email, .emailNotMatching(currentUserEmail)]`, phone = E.164; `isValid` requires non-empty email both.
 - **Empty-state copy:** N/A
-- **Error-state copy:** **DELTA** — the 409/"already active" mapping differs: iOS keys off `status == 409 || raw.contains("already active")` (`InviteOwnerFormViewModel.swift:120,168-170`) → friendly inline "An ownership claim is already active for this home."; Android keys only off `raw.contains("already active")` (`InviteOwnerFormViewModel.kt:189-192`), so a 409 whose body lacks that substring falls through to raw `error.message` with no inline field error. Shared strings ("Already an owner of this home.", "We couldn't find a Pantopus account with that email.", "Fix the highlighted field.", "Invite sent.") match.
+- **Error-state copy:** **Resolved (P6.8)** — Android `mapInviteError` now keys on `NetworkError.code == 409 || raw.contains("already active")`, matching iOS, so any 409 maps to the friendly "An ownership claim is already active for this home." inline error. Shared strings ("Already an owner of this home.", "We couldn't find a Pantopus account with that email.", "Fix the highlighted field.", "Invite sent.") match.
 - **Animation / transition:** Match — bottom toast with fade/slide both.
 
 ## Bills
@@ -800,7 +893,7 @@ match except where flagged in the sections below.
 
 ## Public profile
 - **iOS:** `Profile/PublicProfileView.swift` (+ VM, `PublicProfileChrome.swift`) · **Android:** `profile/PublicProfileScreen.kt` (+ VM, `PublicProfileChrome.kt`)
-- **State coverage:** **DELTA** — both loading/loaded/error (no empty by design), but iOS error layout includes a `ContentDetailTopBar` with back chevron (`PublicProfileView.swift:197-208`); Android `ErrorLayout` is a bare `EmptyState` with no top bar / back affordance (`PublicProfileScreen.kt:311-323`) — Android error screen is unescapable via in-screen chrome.
+- **State coverage:** **Resolved (P6.8)** — Android `ErrorLayout` now renders a `ContentDetailTopBar(onBack=)` above the `EmptyState` (mirroring `LoadingLayout`), matching iOS's escapable error screen. Both: loading/loaded/error (no empty by design).
 - **Action affordances:** Match — back, overflow (Block/Report), Persona Follow CTA, Local Message+Connect CTAs, stats tabs, locked-broadcast "Subscribe to unlock", error "Try again".
 - **Field set:** N/A
 - **Validation rules:** N/A
@@ -831,7 +924,7 @@ match except where flagged in the sections below.
 ## Me / You
 - **iOS:** `Me/MeView.swift` (+ VM, `MeIdentity.swift`) · **Android:** `you/me/MeView.kt` (+ VM, `MeIdentity.kt`); sign-out/debug chrome in `you/YouScreen.kt`
 - **State coverage:** Match — loading(skeleton)/loaded(3 identity bundles)/error. (iOS `toastMessage` overlay is dormant — VM never sets it; Android omits.)
-- **Action affordances:** **DELTA** — Personal identity action grid: iOS has 6 tiles ending at "Connections" (`MeViewModel.swift:162-169`); Android adds a 7th tile **"Support trains"** (`me.supportTrains`, `MeViewModel.kt:131-136`) absent on iOS. Identity pills/stats/section rows/destructive card/sign-out match.
+- **Action affordances:** **Resolved (P6.8)** — iOS now includes the 7th "Support trains" tile (`me.supportTrains`, `.handCoins`) in the Personal grid, matching Android + the design (`me-frames.jsx:352`); the route was already wired in `YouTabRoot`. Identity pills/stats/section rows/destructive card/sign-out match.
 - **Field set:** N/A
 - **Validation rules:** N/A
 - **Empty-state copy:** Match (per-identity unbound) — Home "Claim a home" / "Add a home from the Hub to unlock household tools."; Business "Add a business" / "Business identity is set up in the web app today; mobile read APIs land later."
@@ -1057,7 +1150,7 @@ match except where flagged in the sections below.
 ## Settings — Help center
 - **iOS:** `Settings/Help/HelpCenterView.swift` · **Android:** `settings/help/HelpCenterScreen.kt`
 - **State coverage:** Match — static FAQ, no fetch states.
-- **Action affordances:** **DELTA (wiring)** — both render an "Email support" CTA (`helpCenterContactCTA`). iOS opens `mailto:support@pantopus.app?subject=Help` inside the view (`HelpCenterView.swift:82-87`); Android exposes `onEmailSupport: () -> Unit` but the call site leaves it the default no-op (`RootTabScreen.kt` passes only `onBack`). Net: emails on iOS, no-op on Android.
+- **Action affordances:** **Match (P6.7 false positive corrected)** — both render an "Email support" CTA (`helpCenterContactCTA`) wired to a `mailto:support@pantopus.app?subject=Help` intent: iOS in-view (`HelpCenterView.swift:82-87`), Android at the call site (`RootTabScreen.kt:2470-2480`). P6.7 flagged Android as a no-op — that was wrong (the call site was missed).
 - **Field set:** N/A
 - **Validation rules:** N/A
 - **Empty-state copy:** N/A
