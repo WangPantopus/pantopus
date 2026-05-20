@@ -8,12 +8,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -41,6 +39,7 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
@@ -51,9 +50,9 @@ const val MY_BIDS_TAG = "my-bids"
  * T5.3.1 — My bids. Thin wrapper around [ListOfRowsScreen]. Four tabs
  * (Active / Accepted / Rejected / Done), 48dp extended-pill FAB
  * labelled "Browse tasks", filter icon in the top-bar trailing slot,
- * and a primary-tinted banner above the Active tab. The
- * `WithdrawBidSheet` is a screen-bespoke addition for the destructive
- * confirmation flow — every other state lives in the shared shell.
+ * and a primary-tinted banner above the Active tab. The screen-bespoke
+ * pieces attached at the bottom are the WithdrawBidSheet plus the
+ * P3.4 Edit Bid + Leave Review sheets.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,8 +63,6 @@ fun MyBidsScreen(
     onOpenFilters: () -> Unit = {},
     onBrowseTasks: () -> Unit = {},
     onMessageClient: (BidDto) -> Unit = {},
-    onEditBid: (BidDto) -> Unit = {},
-    onLeaveReview: (BidDto) -> Unit = {},
     viewModel: MyBidsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -75,6 +72,9 @@ fun MyBidsScreen(
     val tabs by viewModel.tabs.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val withdrawTarget by viewModel.withdrawTarget.collectAsStateWithLifecycle()
+    val editBidTarget by viewModel.editBidTarget.collectAsStateWithLifecycle()
+    val leaveReviewTarget by viewModel.leaveReviewTarget.collectAsStateWithLifecycle()
+    val toast by viewModel.toast.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.bindCallbacks(
@@ -82,10 +82,15 @@ fun MyBidsScreen(
             onOpenFilters = onOpenFilters,
             onBrowseTasks = onBrowseTasks,
             onMessageClient = onMessageClient,
-            onEditBid = onEditBid,
-            onLeaveReview = onLeaveReview,
         )
         viewModel.load()
+    }
+
+    LaunchedEffect(toast) {
+        if (toast != null) {
+            kotlinx.coroutines.delay(2_500)
+            viewModel.dismissToast()
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize().testTag(MY_BIDS_TAG)) {
@@ -102,6 +107,31 @@ fun MyBidsScreen(
             banner = banner,
             onBack = onBack,
         )
+
+        toast?.let { payload ->
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .padding(bottom = Spacing.s10, start = Spacing.s4, end = Spacing.s4)
+                            .clip(RoundedCornerShape(Radii.pill))
+                            .background(
+                                if (payload.isError) PantopusColors.error else PantopusColors.success,
+                            )
+                            .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                            .testTag("my-bids-toast"),
+                ) {
+                    Text(
+                        text = payload.text,
+                        style = PantopusTextStyle.small,
+                        color = PantopusColors.appTextInverse,
+                    )
+                }
+            }
+        }
     }
 
     val target = withdrawTarget
@@ -115,6 +145,36 @@ fun MyBidsScreen(
                 target = target,
                 onCancel = { viewModel.cancelWithdraw() },
                 onConfirm = { reason -> viewModel.confirmWithdraw(reason) },
+            )
+        }
+    }
+
+    val edit = editBidTarget
+    if (edit != null) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.cancelEditBid() },
+            sheetState = sheetState,
+        ) {
+            EditBidSheetContent(
+                target = edit,
+                onSubmit = { draft -> viewModel.submitEditBid(draft) },
+                onCancel = { viewModel.cancelEditBid() },
+            )
+        }
+    }
+
+    val review = leaveReviewTarget
+    if (review != null) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.cancelLeaveReview() },
+            sheetState = sheetState,
+        ) {
+            LeaveReviewSheetContent(
+                target = review,
+                onSubmit = { draft -> viewModel.submitLeaveReview(draft) },
+                onCancel = { viewModel.cancelLeaveReview() },
             )
         }
     }
@@ -265,7 +325,4 @@ private fun DestructiveButton(
             )
         }
     }
-
-    // Padding helper — kept here so the layout matches the iOS withdraw sheet.
-    Spacer(modifier = Modifier.width(0.dp))
 }

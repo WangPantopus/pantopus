@@ -551,6 +551,265 @@ final class MyBidsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.tabs[2].count, 0)
     }
 
+    // MARK: - Edit bid sheet
+
+    func testRequestEditBid_SetsTargetWithPrefilledValues() {
+        let bid = makeBid(
+            id: "e1",
+            status: "pending",
+            bidAmount: 95,
+            category: "handyman"
+        )
+        let bidWithMessage = BidDTO(
+            id: bid.id,
+            gigId: bid.gigId,
+            userId: bid.userId,
+            bidAmount: bid.bidAmount,
+            message: "Old message",
+            proposedTime: "Saturday afternoon",
+            status: bid.status,
+            createdAt: bid.createdAt,
+            updatedAt: nil,
+            expiresAt: nil,
+            counterAmount: nil,
+            counterStatus: nil,
+            counteredAt: nil,
+            withdrawnAt: nil,
+            withdrawalReason: nil,
+            gig: bid.gig,
+            bidder: nil,
+            shortlisted: nil,
+            yourRank: nil,
+            topPrice: nil
+        )
+        let vm = makeVM()
+        vm.requestEditBid(bidWithMessage)
+        XCTAssertNotNil(vm.editBidTarget)
+        XCTAssertEqual(vm.editBidTarget?.gigId, bidWithMessage.gigId)
+        XCTAssertEqual(vm.editBidTarget?.bidId, bidWithMessage.id)
+        XCTAssertEqual(vm.editBidTarget?.initialAmount, 95)
+        XCTAssertEqual(vm.editBidTarget?.initialMessage, "Old message")
+        XCTAssertEqual(vm.editBidTarget?.initialProposedTime, "Saturday afternoon")
+        XCTAssertNil(vm.editBidTarget?.initialTerms)
+    }
+
+    func testCancelEditBid_ClearsTarget() {
+        let bid = makeBid(id: "e2")
+        let vm = makeVM()
+        vm.requestEditBid(bid)
+        XCTAssertNotNil(vm.editBidTarget)
+        vm.cancelEditBid()
+        XCTAssertNil(vm.editBidTarget)
+    }
+
+    func testSubmitEditBid_HitsUpdateEndpointAndUpdatesRow() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: """
+            {"bids":[{"id":"e3","gig_id":"g","user_id":"u","bid_amount":50,
+                     "status":"pending","created_at":"2026-05-14T09:00:00Z",
+                     "gig":{"id":"g","title":"t","price":80,"category":"handyman",
+                            "status":"open","user_id":"u_owner"}}],"total":1}
+            """),
+            .status(200, body: """
+            {"id":"e3","gig_id":"g","user_id":"u","bid_amount":75,
+             "status":"pending","created_at":"2026-05-14T09:00:00Z"}
+            """)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        let bid = BidDTO(
+            id: "e3",
+            gigId: "g",
+            userId: "u",
+            bidAmount: 50,
+            status: "pending",
+            gig: BidGigDTO(
+                id: "g",
+                title: "t",
+                description: nil,
+                price: 80,
+                category: "handyman",
+                status: "open",
+                userId: "u_owner"
+            )
+        )
+        vm.requestEditBid(bid)
+        let ok = await vm.submitEditBid(EditBidDraft(amount: 75, message: "Updated", proposedTime: nil))
+        XCTAssertTrue(ok)
+        XCTAssertNil(vm.editBidTarget)
+        XCTAssertEqual(vm.toast?.kind, .success)
+        // Row reflects the new amount.
+        if case let .loaded(sections, _) = vm.state,
+           case let .priceStack(amount, _) = sections.first?.rows.first?.trailing {
+            XCTAssertEqual(amount, "$75")
+        } else {
+            XCTFail("Expected loaded state with updated row amount")
+        }
+    }
+
+    func testSubmitEditBid_ReportsErrorOnFailure() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: """
+            {"bids":[{"id":"e4","gig_id":"g","user_id":"u","bid_amount":50,
+                     "status":"pending","created_at":"2026-05-14T09:00:00Z",
+                     "gig":{"id":"g","title":"t","price":80,"category":"handyman",
+                            "status":"open","user_id":"u_owner"}}],"total":1}
+            """),
+            .status(500, body: "{}")
+        ]
+        let vm = makeVM()
+        await vm.load()
+        let bid = BidDTO(id: "e4", gigId: "g", status: "pending")
+        vm.requestEditBid(bid)
+        let ok = await vm.submitEditBid(EditBidDraft(amount: 75, message: nil, proposedTime: nil))
+        XCTAssertFalse(ok)
+        // Sheet target stays so the user can retry.
+        XCTAssertNotNil(vm.editBidTarget)
+        XCTAssertEqual(vm.toast?.kind, .error)
+    }
+
+    func testRequestEditBid_PrefillsTermsWhenSeparated() {
+        let bid = BidDTO(
+            id: "et",
+            gigId: "g",
+            userId: "u",
+            bidAmount: 50,
+            message: "Hi there\n\nTerms: 50% deposit upfront",
+            proposedTime: nil,
+            status: "pending",
+            gig: BidGigDTO(
+                id: "g",
+                title: "t",
+                description: nil,
+                price: 80,
+                category: "handyman",
+                status: "open",
+                userId: "u_owner"
+            )
+        )
+        let vm = makeVM()
+        vm.requestEditBid(bid)
+        XCTAssertEqual(vm.editBidTarget?.initialMessage, "Hi there")
+        XCTAssertEqual(vm.editBidTarget?.initialTerms, "50% deposit upfront")
+    }
+
+    // MARK: - Leave review sheet
+
+    func testRequestLeaveReview_SetsTargetWithGigPosterAsReviewee() {
+        let bid = makeBid(id: "r1", status: "accepted", gigStatus: "completed")
+        let vm = makeVM()
+        vm.requestLeaveReview(bid)
+        XCTAssertNotNil(vm.leaveReviewTarget)
+        XCTAssertEqual(vm.leaveReviewTarget?.gigId, bid.gigId)
+        XCTAssertEqual(vm.leaveReviewTarget?.revieweeId, "u_owner")
+    }
+
+    func testRequestLeaveReview_DoesNothingWhenGigPosterMissing() {
+        let bid = BidDTO(
+            id: "r2",
+            gigId: "g_r2",
+            userId: "u",
+            bidAmount: 50,
+            status: "accepted",
+            gig: BidGigDTO(
+                id: "g_r2",
+                title: "t",
+                description: nil,
+                price: 80,
+                category: "handyman",
+                status: "completed",
+                userId: nil
+            )
+        )
+        let vm = makeVM()
+        vm.requestLeaveReview(bid)
+        XCTAssertNil(vm.leaveReviewTarget)
+    }
+
+    func testCancelLeaveReview_ClearsTarget() {
+        let bid = makeBid(id: "r3", status: "accepted", gigStatus: "completed")
+        let vm = makeVM()
+        vm.requestLeaveReview(bid)
+        XCTAssertNotNil(vm.leaveReviewTarget)
+        vm.cancelLeaveReview()
+        XCTAssertNil(vm.leaveReviewTarget)
+    }
+
+    func testSubmitLeaveReview_HitsCreateEndpointAndFlashesSuccess() async {
+        SequencedURLProtocol.sequence = [
+            .status(201, body: "{\"id\":\"rv1\"}")
+        ]
+        let vm = makeVM()
+        let bid = makeBid(id: "r4", status: "accepted", gigStatus: "completed")
+        vm.requestLeaveReview(bid)
+        let ok = await vm.submitLeaveReview(LeaveReviewDraft(rating: 5, comment: "Great!"))
+        XCTAssertTrue(ok)
+        XCTAssertNil(vm.leaveReviewTarget)
+        XCTAssertEqual(vm.toast?.kind, .success)
+    }
+
+    func testSubmitLeaveReview_ReportsErrorOnFailure() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
+        let vm = makeVM()
+        let bid = makeBid(id: "r5", status: "accepted", gigStatus: "completed")
+        vm.requestLeaveReview(bid)
+        let ok = await vm.submitLeaveReview(LeaveReviewDraft(rating: 4, comment: nil))
+        XCTAssertFalse(ok)
+        XCTAssertNotNil(vm.leaveReviewTarget)
+        XCTAssertEqual(vm.toast?.kind, .error)
+    }
+
+    // MARK: - Message / terms composition
+
+    func testComposeMessage_BothEmptyReturnsNil() {
+        XCTAssertNil(EditBidSheetView.composeMessage(message: "", terms: ""))
+    }
+
+    func testComposeMessage_OnlyMessageReturnsMessage() {
+        XCTAssertEqual(
+            EditBidSheetView.composeMessage(message: "Hello", terms: ""),
+            "Hello"
+        )
+    }
+
+    func testComposeMessage_OnlyTermsReturnsPrefixedString() {
+        XCTAssertEqual(
+            EditBidSheetView.composeMessage(message: "", terms: "Deposit upfront"),
+            "Terms: Deposit upfront"
+        )
+    }
+
+    func testComposeMessage_BothJoinsWithSeparator() {
+        XCTAssertEqual(
+            EditBidSheetView.composeMessage(message: "Hello", terms: "Deposit upfront"),
+            "Hello\n\nTerms: Deposit upfront"
+        )
+    }
+
+    func testSplitMessageAndTerms_NoMarkerReturnsMessageOnly() {
+        let parts = MyBidsViewModel.splitMessageAndTerms("Just a message")
+        XCTAssertEqual(parts.message, "Just a message")
+        XCTAssertNil(parts.terms)
+    }
+
+    func testSplitMessageAndTerms_TermsOnlyReturnsTermsOnly() {
+        let parts = MyBidsViewModel.splitMessageAndTerms("Terms: Deposit upfront")
+        XCTAssertNil(parts.message)
+        XCTAssertEqual(parts.terms, "Deposit upfront")
+    }
+
+    func testSplitMessageAndTerms_BothSplitsCorrectly() {
+        let parts = MyBidsViewModel.splitMessageAndTerms("Hello\n\nTerms: Deposit upfront")
+        XCTAssertEqual(parts.message, "Hello")
+        XCTAssertEqual(parts.terms, "Deposit upfront")
+    }
+
+    func testSplitMessageAndTerms_NilReturnsAllNil() {
+        let parts = MyBidsViewModel.splitMessageAndTerms(nil)
+        XCTAssertNil(parts.message)
+        XCTAssertNil(parts.terms)
+    }
+
     // MARK: - Test fixtures
 
     private static let iso8601: ISO8601DateFormatter = {

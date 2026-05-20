@@ -12,12 +12,16 @@ import app.pantopus.android.data.api.models.gigs.MarkCompletedResponse
 import app.pantopus.android.data.api.models.offers.BidDto
 import app.pantopus.android.data.api.models.offers.BidGigDto
 import app.pantopus.android.data.api.models.offers.MyBidsResponse
+import app.pantopus.android.data.api.models.offers.UpdateBidBody
 import app.pantopus.android.data.api.models.offers.WithdrawBidReason
 import app.pantopus.android.data.api.models.offers.WithdrawBidResponse
+import app.pantopus.android.data.api.models.reviews.CreateReviewResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.services.UpdateBidResponseEnvelope
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.offers.OffersRepository
+import app.pantopus.android.data.reviews.ReviewsRepository
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowHighlight
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
@@ -44,6 +48,7 @@ import java.time.Instant
 class MyBidsViewModelTest {
     private val offersRepo: OffersRepository = mockk()
     private val gigsRepo: GigsRepository = mockk()
+    private val reviewsRepo: ReviewsRepository = mockk()
 
     @Before
     fun setUp() {
@@ -104,7 +109,7 @@ class MyBidsViewModelTest {
     )
 
     private fun vm(): MyBidsViewModel =
-        MyBidsViewModel(offersRepo, gigsRepo).apply {
+        MyBidsViewModel(offersRepo, gigsRepo, reviewsRepo).apply {
             overrideNow { fixedNow }
         }
 
@@ -588,5 +593,254 @@ class MyBidsViewModelTest {
             viewModel.load()
             assertTrue(viewModel.state.value === firstState || viewModel.state.value is ListOfRowsUiState.Loaded)
             assertFalse(viewModel.state.value is ListOfRowsUiState.Loading)
+        }
+
+    // MARK: - Edit bid sheet
+
+    @Test
+    fun request_edit_bid_sets_target_with_prefilled_values() {
+        val viewModel = vm()
+        val bid =
+            BidDto(
+                id = "e1",
+                gigId = "g_e1",
+                userId = "u",
+                bidAmount = 95.0,
+                message = "Old message",
+                proposedTime = "Saturday afternoon",
+                status = "pending",
+                gig =
+                    BidGigDto(
+                        id = "g_e1",
+                        title = "Mount a TV",
+                        status = "open",
+                        userId = "u_owner",
+                    ),
+            )
+        viewModel.requestEditBid(bid)
+        val target = viewModel.editBidTarget.value
+        assertNotNull(target)
+        assertEquals("g_e1", target!!.gigId)
+        assertEquals("e1", target.bidId)
+        assertEquals(95.0, target.initialAmount!!, 0.0001)
+        assertEquals("Old message", target.initialMessage)
+        assertEquals("Saturday afternoon", target.initialProposedTime)
+        assertNull(target.initialTerms)
+    }
+
+    @Test
+    fun request_edit_bid_splits_message_and_terms_when_present() {
+        val viewModel = vm()
+        val bid =
+            BidDto(
+                id = "et",
+                gigId = "g",
+                userId = "u",
+                bidAmount = 50.0,
+                message = "Hi there\n\nTerms: 50% deposit upfront",
+                status = "pending",
+                gig =
+                    BidGigDto(
+                        id = "g",
+                        title = "t",
+                        status = "open",
+                        userId = "u_owner",
+                    ),
+            )
+        viewModel.requestEditBid(bid)
+        val target = viewModel.editBidTarget.value!!
+        assertEquals("Hi there", target.initialMessage)
+        assertEquals("50% deposit upfront", target.initialTerms)
+    }
+
+    @Test
+    fun cancel_edit_bid_clears_target() {
+        val viewModel = vm()
+        val bid = dto("e2")
+        viewModel.requestEditBid(bid)
+        assertNotNull(viewModel.editBidTarget.value)
+        viewModel.cancelEditBid()
+        assertNull(viewModel.editBidTarget.value)
+    }
+
+    @Test
+    fun submit_edit_bid_hits_update_endpoint_and_updates_row() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Success(
+                    MyBidsResponse(
+                        bids = listOf(dto("e3", status = "pending", createdAt = "2026-05-14T09:00:00Z")),
+                    ),
+                )
+            coEvery {
+                offersRepo.updateBid("g_e3", "e3", any())
+            } returns NetworkResult.Success(UpdateBidResponseEnvelope(bid = null))
+
+            val viewModel = vm()
+            viewModel.load()
+            val bid =
+                BidDto(
+                    id = "e3",
+                    gigId = "g_e3",
+                    userId = "u",
+                    bidAmount = 100.0,
+                    status = "pending",
+                    gig = BidGigDto(id = "g_e3", title = "t", status = "open", userId = "u_owner"),
+                )
+            viewModel.requestEditBid(bid)
+            val ok =
+                viewModel.submitEditBid(
+                    EditBidDraft(amount = 75.0, message = "Updated", proposedTime = null),
+                )
+            assertTrue(ok)
+            assertNull(viewModel.editBidTarget.value)
+            assertEquals("Bid updated.", viewModel.toast.value?.text)
+            assertFalse(viewModel.toast.value?.isError ?: true)
+            val state = viewModel.state.value as ListOfRowsUiState.Loaded
+            val trailing = state.sections.first().rows.first().trailing as RowTrailing.PriceStack
+            assertEquals("$75", trailing.amount)
+        }
+
+    @Test
+    fun submit_edit_bid_reports_error_on_failure() =
+        runTest {
+            coEvery { offersRepo.myBids(any()) } returns
+                NetworkResult.Success(
+                    MyBidsResponse(
+                        bids = listOf(dto("e4", status = "pending", createdAt = "2026-05-14T09:00:00Z")),
+                    ),
+                )
+            coEvery {
+                offersRepo.updateBid("g_e4", "e4", any())
+            } returns NetworkResult.Failure(NetworkError.Server(500, "nope"))
+
+            val viewModel = vm()
+            viewModel.load()
+            val bid =
+                BidDto(
+                    id = "e4",
+                    gigId = "g_e4",
+                    userId = "u",
+                    bidAmount = 50.0,
+                    status = "pending",
+                    gig = BidGigDto(id = "g_e4", title = "t", status = "open", userId = "u_owner"),
+                )
+            viewModel.requestEditBid(bid)
+            val ok =
+                viewModel.submitEditBid(
+                    EditBidDraft(amount = 60.0, message = null, proposedTime = null),
+                )
+            assertFalse(ok)
+            assertNotNull(viewModel.editBidTarget.value)
+            assertTrue(viewModel.toast.value?.isError ?: false)
+        }
+
+    // MARK: - Leave review sheet
+
+    @Test
+    fun request_leave_review_sets_target_with_gig_poster_as_reviewee() {
+        val viewModel = vm()
+        val bid = dto("r1", status = "accepted", gigStatus = "completed")
+        viewModel.requestLeaveReview(bid)
+        val target = viewModel.leaveReviewTarget.value
+        assertNotNull(target)
+        assertEquals("g_r1", target!!.gigId)
+        assertEquals("u_owner", target.revieweeId)
+    }
+
+    @Test
+    fun request_leave_review_noops_when_gig_poster_missing() {
+        val viewModel = vm()
+        val bid =
+            BidDto(
+                id = "r2",
+                gigId = "g_r2",
+                userId = "u",
+                bidAmount = 50.0,
+                status = "accepted",
+                gig =
+                    BidGigDto(
+                        id = "g_r2",
+                        title = "t",
+                        status = "completed",
+                        userId = null,
+                    ),
+            )
+        viewModel.requestLeaveReview(bid)
+        assertNull(viewModel.leaveReviewTarget.value)
+    }
+
+    @Test
+    fun cancel_leave_review_clears_target() {
+        val viewModel = vm()
+        viewModel.requestLeaveReview(dto("r3", status = "accepted", gigStatus = "completed"))
+        assertNotNull(viewModel.leaveReviewTarget.value)
+        viewModel.cancelLeaveReview()
+        assertNull(viewModel.leaveReviewTarget.value)
+    }
+
+    @Test
+    fun submit_leave_review_hits_create_endpoint_and_flashes_success() =
+        runTest {
+            coEvery { reviewsRepo.create(any()) } returns
+                NetworkResult.Success(CreateReviewResponse(id = "rv1"))
+            val viewModel = vm()
+            viewModel.requestLeaveReview(dto("r4", status = "accepted", gigStatus = "completed"))
+            val ok = viewModel.submitLeaveReview(LeaveReviewDraft(rating = 5, comment = "Great!"))
+            assertTrue(ok)
+            assertNull(viewModel.leaveReviewTarget.value)
+            assertEquals("Review submitted. Thanks!", viewModel.toast.value?.text)
+            assertFalse(viewModel.toast.value?.isError ?: true)
+        }
+
+    @Test
+    fun submit_leave_review_reports_error_on_failure() =
+        runTest {
+            coEvery { reviewsRepo.create(any()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, "nope"))
+            val viewModel = vm()
+            viewModel.requestLeaveReview(dto("r5", status = "accepted", gigStatus = "completed"))
+            val ok = viewModel.submitLeaveReview(LeaveReviewDraft(rating = 4, comment = null))
+            assertFalse(ok)
+            assertNotNull(viewModel.leaveReviewTarget.value)
+            assertTrue(viewModel.toast.value?.isError ?: false)
+        }
+
+    // MARK: - Message / terms composition
+
+    @Test
+    fun compose_message_combines_message_and_terms() {
+        assertNull(composeMessage("", ""))
+        assertEquals("Hello", composeMessage("Hello", ""))
+        assertEquals("Terms: Deposit", composeMessage("", "Deposit"))
+        assertEquals("Hello\n\nTerms: Deposit", composeMessage("Hello", "Deposit"))
+    }
+
+    @Test
+    fun split_message_and_terms_handles_every_shape() {
+        val (msg1, t1) = splitMessageAndTerms(null)
+        assertNull(msg1); assertNull(t1)
+
+        val (msg2, t2) = splitMessageAndTerms("Just a message")
+        assertEquals("Just a message", msg2); assertNull(t2)
+
+        val (msg3, t3) = splitMessageAndTerms("Terms: Deposit upfront")
+        assertNull(msg3); assertEquals("Deposit upfront", t3)
+
+        val (msg4, t4) = splitMessageAndTerms("Hi\n\nTerms: Deposit upfront")
+        assertEquals("Hi", msg4); assertEquals("Deposit upfront", t4)
+    }
+
+    @Test
+    fun dismiss_toast_clears_state() =
+        runTest {
+            coEvery { reviewsRepo.create(any()) } returns
+                NetworkResult.Success(CreateReviewResponse(id = "rv"))
+            val viewModel = vm()
+            viewModel.requestLeaveReview(dto("rt", status = "accepted", gigStatus = "completed"))
+            viewModel.submitLeaveReview(LeaveReviewDraft(rating = 5, comment = null))
+            assertNotNull(viewModel.toast.value)
+            viewModel.dismissToast()
+            assertNull(viewModel.toast.value)
         }
 }

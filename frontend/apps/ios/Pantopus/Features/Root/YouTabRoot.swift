@@ -743,21 +743,9 @@ public struct YouTabRoot: View {
                                 path.append(.gigDetail(gigId: gigId))
                             }
                         }
-                    },
-                    onEditBid: { dto in
-                        Task { @MainActor in
-                            if let gigId = dto.gigId {
-                                path.append(.gigDetail(gigId: gigId))
-                            }
-                        }
-                    },
-                    onLeaveReview: { dto in
-                        Task { @MainActor in
-                            if let gigId = dto.gigId {
-                                path.append(.gigDetail(gigId: gigId))
-                            }
-                        }
                     }
+                    // Edit-bid + Leave-review are presented as sheets from
+                    // inside the screen (P3.4) — no router wiring needed.
                 )
             )
         case .myTasks:

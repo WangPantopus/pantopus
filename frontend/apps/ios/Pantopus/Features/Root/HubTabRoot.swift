@@ -1134,21 +1134,9 @@ public struct HubTabRoot: View {
                                 verified: false
                             )))
                         }
-                    },
-                    onEditBid: { bid in
-                        Task { @MainActor in
-                            if let gigId = bid.gigId {
-                                push(.gigDetail(gigId: gigId))
-                            }
-                        }
-                    },
-                    onLeaveReview: { bid in
-                        Task { @MainActor in
-                            if let gigId = bid.gigId {
-                                push(.gigDetail(gigId: gigId))
-                            }
-                        }
                     }
+                    // Edit-bid + Leave-review are presented as sheets from
+                    // inside the screen (P3.4) — no router wiring needed.
                 )
             )
         case let .chatConversation(dest):
