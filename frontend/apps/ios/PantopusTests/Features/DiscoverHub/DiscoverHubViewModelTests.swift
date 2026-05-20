@@ -18,6 +18,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable file_length type_body_length
+
 private enum Fixture {
     static let peopleJSON = """
     {"filter":"people","items":[
@@ -474,5 +476,91 @@ final class DiscoverHubViewModelTests: XCTestCase {
     func testNoTabs() {
         let vm = makeVM()
         XCTAssertTrue(vm.tabs.isEmpty)
+    }
+
+    // MARK: - Filters (P5.2)
+
+    func testDefaultTopBarActionHasNoBadge() {
+        let vm = makeVM()
+        XCTAssertNil(vm.topBarAction?.badgeCount)
+        XCTAssertEqual(vm.filters.activeCount, 0)
+    }
+
+    func testApplyFiltersContentTypeShowsOnlySelectedSections() async {
+        SequencedURLProtocol.routeResponses = [
+            discoveryRoute(filter: "people", chip: DiscoverHubChip.nearby):
+                [.status(200, body: Fixture.peopleJSON), .status(200, body: Fixture.peopleJSON)],
+            discoveryRoute(filter: "businesses", chip: DiscoverHubChip.nearby):
+                [.status(200, body: Fixture.businessesJSON), .status(200, body: Fixture.businessesJSON)],
+            discoveryRoute(filter: "gigs", chip: DiscoverHubChip.nearby):
+                [.status(200, body: Fixture.gigsJSON), .status(200, body: Fixture.gigsJSON)],
+            discoveryRoute(filter: "listings", chip: DiscoverHubChip.nearby):
+                [.status(200, body: Fixture.listingsJSON), .status(200, body: Fixture.listingsJSON)]
+        ]
+        let vm = makeVM()
+        await vm.load()
+        vm.applyFilters(DiscoverHubFilters(
+            contentTypes: [DiscoverHubSection.people, DiscoverHubSection.gigs]
+        ))
+        try? await Task.sleep(nanoseconds: 150_000_000)
+
+        guard case let .loaded(sections, _) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(sections.map(\.id), [DiscoverHubSection.people, DiscoverHubSection.gigs])
+        XCTAssertEqual(vm.filters.activeCount, 1)
+        XCTAssertEqual(vm.topBarAction?.badgeCount, 1)
+    }
+
+    func testApplyFiltersVerifiedOnlyUsesVerifiedQuery() async {
+        SequencedURLProtocol.routeResponses = [
+            discoveryRoute(filter: "people", chip: DiscoverHubChip.nearby): [.status(200, body: Fixture.emptyJSON)],
+            discoveryRoute(filter: "businesses", chip: DiscoverHubChip.nearby): [.status(200, body: Fixture.emptyJSON)],
+            discoveryRoute(filter: "gigs", chip: DiscoverHubChip.nearby): [.status(200, body: Fixture.emptyJSON)],
+            discoveryRoute(filter: "listings", chip: DiscoverHubChip.nearby): [.status(200, body: Fixture.emptyJSON)],
+            discoveryRoute(filter: "people", chip: DiscoverHubChip.verified): [.status(200, body: Fixture.peopleJSON)],
+            discoveryRoute(filter: "businesses", chip: DiscoverHubChip.verified): [.status(200, body: Fixture.emptyJSON)],
+            discoveryRoute(filter: "gigs", chip: DiscoverHubChip.verified): [.status(200, body: Fixture.emptyJSON)],
+            discoveryRoute(filter: "listings", chip: DiscoverHubChip.verified): [.status(200, body: Fixture.emptyJSON)]
+        ]
+        let vm = makeVM()
+        await vm.load()
+        vm.applyFilters(DiscoverHubFilters(verifiedOnly: true))
+        try? await Task.sleep(nanoseconds: 150_000_000)
+
+        guard case let .loaded(sections, _) = vm.state else {
+            XCTFail("Expected .loaded after verified filter, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(sections.map(\.id), [DiscoverHubSection.people])
+        XCTAssertEqual(vm.filters.activeCount, 1)
+        XCTAssertEqual(vm.topBarAction?.badgeCount, 1)
+    }
+
+    func testApplyFiltersNewestFirstReordersByCreatedAt() async {
+        SequencedURLProtocol.routeResponses = [
+            discoveryRoute(filter: "people", chip: DiscoverHubChip.nearby):
+                [.status(200, body: Fixture.emptyJSON), .status(200, body: Fixture.emptyJSON)],
+            discoveryRoute(filter: "businesses", chip: DiscoverHubChip.nearby):
+                [.status(200, body: Fixture.emptyJSON), .status(200, body: Fixture.emptyJSON)],
+            discoveryRoute(filter: "gigs", chip: DiscoverHubChip.nearby):
+                [.status(200, body: Fixture.gigsJSON), .status(200, body: Fixture.gigsJSON)],
+            discoveryRoute(filter: "listings", chip: DiscoverHubChip.nearby):
+                [.status(200, body: Fixture.emptyJSON), .status(200, body: Fixture.emptyJSON)]
+        ]
+        let vm = makeVM()
+        await vm.load()
+        // g1 (08:00) then g2 (09:00) in fixture order.
+        vm.applyFilters(DiscoverHubFilters(newestFirst: true))
+        try? await Task.sleep(nanoseconds: 150_000_000)
+
+        guard case let .loaded(sections, _) = vm.state,
+              let gigs = sections.first(where: { $0.id == DiscoverHubSection.gigs }) else {
+            XCTFail("Expected a gigs section, got \(vm.state)")
+            return
+        }
+        // Newest-first: g2 (09:00) ahead of g1 (08:00).
+        XCTAssertEqual(gigs.rows.map(\.id), ["gig-g2", "gig-g1"])
     }
 }

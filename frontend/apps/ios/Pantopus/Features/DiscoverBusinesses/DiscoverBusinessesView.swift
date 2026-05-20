@@ -20,6 +20,18 @@ public struct DiscoverBusinessesView: View {
     public var body: some View {
         ListOfRowsView(dataSource: viewModel)
             .accessibilityIdentifier("discoverBusinesses")
+            .sheet(
+                isPresented: Binding(
+                    get: { viewModel.isFilterSheetPresented },
+                    set: { viewModel.setFilterSheetPresented($0) }
+                )
+            ) {
+                BusinessFilterSheet(
+                    initialFilters: viewModel.filters,
+                    onApply: { viewModel.applyFilters($0) },
+                    onClose: { viewModel.setFilterSheetPresented(false) }
+                )
+            }
     }
 }
 

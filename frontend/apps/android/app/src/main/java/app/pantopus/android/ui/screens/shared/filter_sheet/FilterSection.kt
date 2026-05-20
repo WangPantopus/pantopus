@@ -90,6 +90,30 @@ sealed interface FilterControl {
         val selectedIds: Set<String>,
     ) : FilterControl
 
+    /**
+     * Stack of rows, each a labeled switch. `selectedIds` are the "on"
+     * switches — same selection shape as [MultiSelect] but renders as
+     * toggles. Used for boolean filter dimensions (verified-only,
+     * newest-first, open-now).
+     */
+    @Immutable
+    data class Toggle(
+        val options: List<FilterOption>,
+        val selectedIds: Set<String>,
+    ) : FilterControl
+
+    /**
+     * Single-thumb slider that snaps to a fixed set of labelled [stops].
+     * [selectedIndex] indexes into [stops]; [defaultIndex] is the stop
+     * Reset returns to. Used for the distance-radius dimension.
+     */
+    @Immutable
+    data class StepSlider(
+        val stops: List<FilterOption>,
+        val selectedIndex: Int,
+        val defaultIndex: Int,
+    ) : FilterControl
+
     /** Dual-thumb range slider. */
     @Immutable
     data class RangeSlider(
@@ -108,6 +132,8 @@ fun FilterControl.cleared(): FilterControl =
         is FilterControl.SingleChip -> copy(selectedId = null)
         is FilterControl.Radio -> copy(selectedId = null)
         is FilterControl.MultiSelect -> copy(selectedIds = emptySet())
+        is FilterControl.Toggle -> copy(selectedIds = emptySet())
+        is FilterControl.StepSlider -> copy(selectedIndex = defaultIndex)
         is FilterControl.RangeSlider -> copy(range = range.cleared())
     }
 

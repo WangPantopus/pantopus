@@ -32,7 +32,7 @@
 //  "All".
 //
 
-// swiftlint:disable type_body_length
+// swiftlint:disable file_length type_body_length
 
 import Foundation
 import Observation
@@ -69,7 +69,6 @@ public enum DiscoverBusinessesSection {
 /// The host (`HubTabRoot`) maps these onto the appropriate push.
 public enum DiscoverBusinessesTarget: Sendable, Hashable {
     case business(businessId: String, name: String)
-    case openFilters
     case widenRadius
     case inviteBusiness
 }
@@ -101,9 +100,12 @@ public final class DiscoverBusinessesViewModel: ListOfRowsDataSource {
     public var topBarAction: TopBarAction? {
         TopBarAction(
             icon: .slidersHorizontal,
-            accessibilityLabel: "Filter discovery"
+            accessibilityLabel: filters.activeCount > 0
+                ? "Filter discovery, \(filters.activeCount) active"
+                : "Filter discovery",
+            badgeCount: filters.activeCount > 0 ? filters.activeCount : nil
         ) { [weak self] in
-            MainActor.assumeIsolated { self?.onSelect(.openFilters) }
+            MainActor.assumeIsolated { self?.presentFilters() }
         }
     }
 
@@ -150,6 +152,14 @@ public final class DiscoverBusinessesViewModel: ListOfRowsDataSource {
     /// section grouping).
     public private(set) var selectedChip: String = DiscoverBusinessesChip.all
     public private(set) var searchText: String = ""
+
+    /// Persisted filter-sheet selection (category / distance / open-now /
+    /// rating). Default = no filters.
+    public private(set) var filters: DiscoverBusinessFilters = .default
+
+    /// Whether the filter sheet is presented. The view binds `.sheet` to
+    /// this via `setFilterSheetPresented`.
+    public private(set) var isFilterSheetPresented = false
 
     // MARK: - Dependencies
 
@@ -209,19 +219,43 @@ public final class DiscoverBusinessesViewModel: ListOfRowsDataSource {
         Task { @MainActor in await fetch() }
     }
 
+    // MARK: - Filters
+
+    /// Open the filter sheet (top-bar action handler).
+    public func presentFilters() {
+        isFilterSheetPresented = true
+    }
+
+    /// Sheet-presentation binding setter (called on dismiss).
+    public func setFilterSheetPresented(_ presented: Bool) {
+        isFilterSheetPresented = presented
+    }
+
+    /// Apply a new filter selection and re-fetch. Category / distance /
+    /// open-now / rating all map to `GET /api/businesses/search` params.
+    public func applyFilters(_ newFilters: DiscoverBusinessFilters) {
+        filters = newFilters
+        Task { @MainActor in await fetch() }
+    }
+
     // MARK: - Fetching
 
     private func fetch() async {
         // Preserve "loading" only on first fetch; chip + search updates
         // keep the previous list visible while the new one arrives.
         if !loadedOnce { state = .loading }
-        let categories: [String]? =
-            selectedChip == DiscoverBusinessesChip.all ? nil : [selectedChip]
+        let radiusParam =
+            filters.radiusMiles == DiscoverBusinessFilters.defaultRadiusMiles
+                ? nil
+                : filters.radiusMiles
         let endpoint = BusinessDiscoveryEndpoints.search(
             q: searchText.isEmpty ? nil : searchText,
-            categories: categories,
+            categories: combinedCategories(),
             page: 1,
-            pageSize: 50
+            pageSize: 50,
+            radiusMiles: radiusParam,
+            openNow: filters.openNow ? true : nil,
+            ratingMin: filters.ratingFloor
         )
         do {
             let response: BusinessDiscoverySearchResponse = try await api.request(endpoint)
@@ -237,6 +271,18 @@ public final class DiscoverBusinessesViewModel: ListOfRowsDataSource {
         } catch {
             state = .error(message: "Couldn't load businesses. Try again.")
         }
+    }
+
+    /// Union of the chip-strip category (when not "All") and the filter
+    /// sheet's coarse category multi-select, sent as `categories=` (the
+    /// backend matches via array overlap). `nil` when empty. Sorted for a
+    /// stable request shape.
+    private func combinedCategories() -> [String]? {
+        var set = filters.categories
+        if selectedChip != DiscoverBusinessesChip.all {
+            set.insert(selectedChip)
+        }
+        return set.isEmpty ? nil : set.sorted()
     }
 
     // MARK: - State projection

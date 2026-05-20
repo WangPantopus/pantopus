@@ -5,8 +5,10 @@
 //  T5.4.1 — Discover hub. Drives the typed discovery list (People ·
 //  Businesses · Gigs · Listings) on the shared `ListOfRows` archetype:
 //
-//    - Top bar trailing `sliders-horizontal` icon (filter — wired to
-//      `onOpenFilters`).
+//    - Top bar trailing `sliders-horizontal` icon presents the
+//      `DiscoveryFilterSheet` (P5.2) and shows an active-filter count
+//      badge. Filters (content type / verified-only / newest-first) are
+//      persisted in `filters` and applied via `applyFilters`.
 //    - Chip-strip filter row (Nearby / New today / Verified / Free /
 //      wanted). Selection re-fetches all four types with the matching
 //      query params; `Trending` is omitted (no engagement signal in
@@ -32,6 +34,8 @@
 //      `/api/discover/hub` endpoint exists today; consider one as a
 //      follow-up if list latency becomes a concern.
 //
+
+// swiftlint:disable type_body_length
 
 import Foundation
 import Observation
@@ -67,7 +71,6 @@ public enum DiscoverHubTarget: Sendable, Hashable {
     case seeAllBusinesses
     case seeAllGigs
     case seeAllListings
-    case openFilters
 }
 
 /// Tone palette for category-icon backgrounds + thumbnail gradients.
@@ -104,9 +107,12 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
     public var topBarAction: TopBarAction? {
         TopBarAction(
             icon: .slidersHorizontal,
-            accessibilityLabel: "Filter discovery"
+            accessibilityLabel: filters.activeCount > 0
+                ? "Filter discovery, \(filters.activeCount) active"
+                : "Filter discovery",
+            badgeCount: filters.activeCount > 0 ? filters.activeCount : nil
         ) { [weak self] in
-            MainActor.assumeIsolated { self?.onSelect(.openFilters) }
+            MainActor.assumeIsolated { self?.presentFilters() }
         }
     }
 
@@ -144,6 +150,14 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
 
     /// Currently-selected chip (drives backend query params).
     public private(set) var selectedChip: String = DiscoverHubChip.nearby
+
+    /// Persisted filter-sheet selection (content type / verified-only /
+    /// newest-first). Default = no filters.
+    public private(set) var filters: DiscoverHubFilters = .default
+
+    /// Whether the filter sheet is presented. The view binds `.sheet` to
+    /// this via `setFilterSheetPresented`.
+    public private(set) var isFilterSheetPresented = false
 
     // MARK: - Dependencies
 
@@ -195,6 +209,26 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
         Task { @MainActor in await fetchAll() }
     }
 
+    // MARK: - Filters
+
+    /// Open the filter sheet (top-bar action handler).
+    public func presentFilters() {
+        isFilterSheetPresented = true
+    }
+
+    /// Sheet-presentation binding setter (called on dismiss).
+    public func setFilterSheetPresented(_ presented: Bool) {
+        isFilterSheetPresented = presented
+    }
+
+    /// Apply a new filter selection: re-fetch (the verified-only
+    /// dimension is a server param) then re-project (content-type +
+    /// newest-first are client-side).
+    public func applyFilters(_ newFilters: DiscoverHubFilters) {
+        filters = newFilters
+        Task { @MainActor in await fetchAll() }
+    }
+
     // MARK: - Fetching
 
     private func fetchAll() async {
@@ -223,11 +257,13 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
     /// Fetch one type. Returns `nil` on failure so the caller can tell
     /// "empty section" (returned `[]`) from "transport error" (`nil`).
     private func fetch(filter: String) async -> [HubDiscoveryResponse.Item]? {
+        let verifiedParam =
+            selectedChip == DiscoverHubChip.verified || filters.verifiedOnly ? true : nil
         let endpoint = HubEndpoints.discovery(
             filter: filter,
             limit: perTypeLimit,
             since: selectedChip == DiscoverHubChip.newToday ? "today" : nil,
-            verified: selectedChip == DiscoverHubChip.verified ? true : nil,
+            verified: verifiedParam,
             freeOrWanted: selectedChip == DiscoverHubChip.freeOrWanted ? true : nil
         )
         do {
@@ -245,48 +281,53 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
     /// empty state when all four are empty.
     func rebuild() {
         var sections: [RowSection] = []
-        if !people.isEmpty {
+        let peopleItems = recencySorted(people)
+        let businessItems = recencySorted(businesses)
+        let gigItems = recencySorted(gigs)
+        let listingItems = recencySorted(listings)
+
+        if includes(DiscoverHubSection.people), !peopleItems.isEmpty {
             sections.append(RowSection(
                 id: DiscoverHubSection.people,
                 header: "People",
-                rows: people.map { rowForPerson($0) },
-                count: people.count,
+                rows: peopleItems.map { rowForPerson($0) },
+                count: peopleItems.count,
                 onSeeAll: { [weak self] in
                     MainActor.assumeIsolated { self?.onSelect(.seeAllPeople) }
                 },
                 style: .card
             ))
         }
-        if !businesses.isEmpty {
+        if includes(DiscoverHubSection.businesses), !businessItems.isEmpty {
             sections.append(RowSection(
                 id: DiscoverHubSection.businesses,
                 header: "Businesses",
-                rows: businesses.map { rowForBusiness($0) },
-                count: businesses.count,
+                rows: businessItems.map { rowForBusiness($0) },
+                count: businessItems.count,
                 onSeeAll: { [weak self] in
                     MainActor.assumeIsolated { self?.onSelect(.seeAllBusinesses) }
                 },
                 style: .card
             ))
         }
-        if !gigs.isEmpty {
+        if includes(DiscoverHubSection.gigs), !gigItems.isEmpty {
             sections.append(RowSection(
                 id: DiscoverHubSection.gigs,
                 header: "Gigs",
-                rows: gigs.map { rowForGig($0) },
-                count: gigs.count,
+                rows: gigItems.map { rowForGig($0) },
+                count: gigItems.count,
                 onSeeAll: { [weak self] in
                     MainActor.assumeIsolated { self?.onSelect(.seeAllGigs) }
                 },
                 style: .card
             ))
         }
-        if !listings.isEmpty {
+        if includes(DiscoverHubSection.listings), !listingItems.isEmpty {
             sections.append(RowSection(
                 id: DiscoverHubSection.listings,
                 header: "Listings",
-                rows: listings.map { rowForListing($0) },
-                count: listings.count,
+                rows: listingItems.map { rowForListing($0) },
+                count: listingItems.count,
                 onSeeAll: { [weak self] in
                     MainActor.assumeIsolated { self?.onSelect(.seeAllListings) }
                 },
@@ -298,6 +339,22 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
             return
         }
         state = .loaded(sections: sections, hasMore: false)
+    }
+
+    /// Whether a content type passes the active content-type filter. An
+    /// empty selection means "all types".
+    private func includes(_ type: String) -> Bool {
+        filters.contentTypes.isEmpty || filters.contentTypes.contains(type)
+    }
+
+    /// Sort items newest-first when the filter is on. ISO-8601
+    /// `createdAt` strings sort lexicographically by recency; items with
+    /// no timestamp sink to the end.
+    private func recencySorted(
+        _ items: [HubDiscoveryResponse.Item]
+    ) -> [HubDiscoveryResponse.Item] {
+        guard filters.newestFirst else { return items }
+        return items.sorted { ($0.createdAt ?? "") > ($1.createdAt ?? "") }
     }
 
     private func emptyContent() -> ListOfRowsState.EmptyContent {

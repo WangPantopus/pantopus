@@ -48,6 +48,33 @@ class FilterSheetShellContractTest {
         assertTrue(cleared.selectedIds.isEmpty())
     }
 
+    // ─── Toggle ─────────────────────────────────────────
+
+    @Test
+    fun toggle_cleared_drops_selection() {
+        val control = FilterControl.Toggle(options = opts, selectedIds = setOf("a", "b"))
+        val cleared = control.cleared() as FilterControl.Toggle
+        assertTrue(cleared.selectedIds.isEmpty())
+        assertEquals(opts, cleared.options)
+    }
+
+    // ─── StepSlider ─────────────────────────────────────
+
+    @Test
+    fun stepSlider_cleared_resets_to_default_index() {
+        val stops =
+            listOf(
+                FilterOption("0.5", "0.5 mi"),
+                FilterOption("1", "1 mi"),
+                FilterOption("3", "3 mi"),
+            )
+        val control = FilterControl.StepSlider(stops = stops, selectedIndex = 0, defaultIndex = 2)
+        val cleared = control.cleared() as FilterControl.StepSlider
+        assertEquals(2, cleared.selectedIndex)
+        assertEquals(2, cleared.defaultIndex)
+        assertEquals(stops, cleared.stops)
+    }
+
     // ─── Range ──────────────────────────────────────────
 
     @Test

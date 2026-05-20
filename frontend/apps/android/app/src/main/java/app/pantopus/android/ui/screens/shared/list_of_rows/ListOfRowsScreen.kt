@@ -2016,16 +2016,47 @@ private fun TopBarActionButton(action: TopBarAction) {
             )
         }
     } else {
-        IconButton(
-            onClick = action.onClick,
-            enabled = action.isEnabled,
-            modifier = Modifier.testTag("listOfRowsTopBarAction"),
-        ) {
-            PantopusIconImage(
-                icon = action.icon,
-                contentDescription = action.contentDescription,
-                tint = iconTint,
-            )
+        val badge = action.badgeCount
+        val iconButton: @Composable () -> Unit = {
+            IconButton(
+                onClick = action.onClick,
+                enabled = action.isEnabled,
+                modifier = Modifier.testTag("listOfRowsTopBarAction"),
+            ) {
+                PantopusIconImage(
+                    icon = action.icon,
+                    contentDescription = action.contentDescription,
+                    tint = iconTint,
+                )
+            }
+        }
+        if (badge != null && badge > 0) {
+            // Badge variant only — the no-badge path stays byte-identical
+            // to the historical render so existing snapshots are unaffected.
+            Box {
+                iconButton()
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = (-6).dp, y = 6.dp)
+                            .sizeIn(minWidth = 16.dp, minHeight = 16.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.primary600)
+                            .padding(horizontal = 4.dp)
+                            .testTag("listOfRowsTopBarActionBadge"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = badge.toString(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appTextInverse,
+                    )
+                }
+            }
+        } else {
+            iconButton()
         }
     }
 }

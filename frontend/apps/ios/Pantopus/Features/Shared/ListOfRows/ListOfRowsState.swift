@@ -375,17 +375,23 @@ public struct TopBarAction: Sendable {
     public let label: String?
     public let accessibilityLabel: String
     public let isEnabled: Bool
+    /// Optional count badge rendered over the icon's top-trailing corner
+    /// (e.g. number of active filters). `nil` or `0` hides the badge.
+    /// Only honoured by the icon variant.
+    public let badgeCount: Int?
     public let handler: @Sendable () -> Void
 
     public init(
         icon: PantopusIcon,
         accessibilityLabel: String,
+        badgeCount: Int? = nil,
         handler: @escaping @Sendable () -> Void
     ) {
         self.icon = icon
         label = nil
         self.accessibilityLabel = accessibilityLabel
         isEnabled = true
+        self.badgeCount = badgeCount
         self.handler = handler
     }
 
@@ -402,6 +408,7 @@ public struct TopBarAction: Sendable {
         self.label = label
         self.accessibilityLabel = accessibilityLabel
         self.isEnabled = isEnabled
+        badgeCount = nil
         self.handler = handler
     }
 }

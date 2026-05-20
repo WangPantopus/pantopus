@@ -50,6 +50,33 @@ final class FilterSheetShellTests: XCTestCase {
         }
     }
 
+    func testToggleClearedDropsSelection() {
+        let opts = [FilterOption(id: "a", label: "A"), FilterOption(id: "b", label: "B")]
+        let control: FilterControl = .toggle(options: opts, selectedIds: ["a", "b"])
+        let cleared = control.cleared()
+        if case let .toggle(_, ids) = cleared {
+            XCTAssertTrue(ids.isEmpty)
+        } else {
+            XCTFail("Expected toggle after clearing")
+        }
+    }
+
+    func testStepSliderClearedResetsToDefaultIndex() {
+        let stops = [
+            FilterOption(id: "0.5", label: "0.5 mi"),
+            FilterOption(id: "1", label: "1 mi"),
+            FilterOption(id: "3", label: "3 mi")
+        ]
+        let control: FilterControl = .stepSlider(stops: stops, selectedIndex: 0, defaultIndex: 2)
+        let cleared = control.cleared()
+        if case let .stepSlider(_, selectedIndex, defaultIndex) = cleared {
+            XCTAssertEqual(selectedIndex, 2)
+            XCTAssertEqual(defaultIndex, 2)
+        } else {
+            XCTFail("Expected stepSlider after clearing")
+        }
+    }
+
     func testRangeSliderClearedResetsToBounds() {
         let range = FilterRange(min: 0, max: 100, lower: 25, upper: 75, step: 5)
         let cleared = range.cleared()
@@ -115,6 +142,27 @@ final class FilterSheetShellTests: XCTestCase {
                 control: .multiSelect(
                     options: [FilterOption(id: "verified", label: "Verified")],
                     selectedIds: []
+                )
+            ),
+            FilterSection(
+                id: "options",
+                title: "Options",
+                control: .toggle(
+                    options: [FilterOption(id: "open-now", label: "Open now")],
+                    selectedIds: ["open-now"]
+                )
+            ),
+            FilterSection(
+                id: "distance",
+                title: "Distance",
+                control: .stepSlider(
+                    stops: [
+                        FilterOption(id: "1", label: "1 mi"),
+                        FilterOption(id: "5", label: "5 mi"),
+                        FilterOption(id: "10", label: "10 mi")
+                    ],
+                    selectedIndex: 1,
+                    defaultIndex: 1
                 )
             ),
             FilterSection(
