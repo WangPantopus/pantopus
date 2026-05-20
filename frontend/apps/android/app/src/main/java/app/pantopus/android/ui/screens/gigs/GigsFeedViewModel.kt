@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
+import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -145,7 +146,7 @@ class GigsFeedViewModel
                     if (price % 1.0 == 0.0) {
                         "$${price.toInt()}"
                     } else {
-                        String.format("$%.2f", price)
+                        String.format(Locale.US, "$%.2f", price)
                     }
                 return when (payType) {
                     "hourly" -> "$base / hr"
@@ -160,7 +161,7 @@ class GigsFeedViewModel
                 if (miles == null) return null
                 return when {
                     miles < 0.1 -> "< 0.1mi"
-                    miles < 10 -> String.format("%.1fmi", miles)
+                    miles < 10 -> String.format(Locale.US, "%.1fmi", miles)
                     else -> "${miles.toInt()}mi"
                 }
             }

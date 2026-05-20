@@ -28,6 +28,7 @@ class GigsRepository
     constructor(
         private val api: GigsApi,
     ) {
+        @Suppress("LongParameterList")
         suspend fun list(
             category: String? = null,
             sort: String? = null,
