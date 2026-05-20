@@ -732,7 +732,7 @@ private struct ListOfRowsErrorBanner: View {
 
 /// Whether a row is rendered inside a grouped section card (Discover hub
 /// style) or as a free-standing card.
-private enum RowCardContext {
+enum RowCardContext {
     case standalone
     case grouped(isLast: Bool)
 
@@ -744,7 +744,10 @@ private enum RowCardContext {
     }
 }
 
-private struct RowView: View {
+/// Single row card. `internal` (not `private`) so reuse surfaces like the
+/// Document Search results list can render an identical row outside the
+/// `ListOfRowsView` `List` body. Mirrors Android's `internal fun RowView`.
+struct RowView: View {
     let row: RowModel
     var cardContext: RowCardContext = .standalone
 
