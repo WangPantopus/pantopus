@@ -14,6 +14,13 @@ import XCTest
 
 @MainActor
 final class DocumentSearchViewModelTests: XCTestCase {
+    private struct DocumentFixture {
+        let id: String
+        let docType: String
+        let title: String
+        let tags: String?
+    }
+
     override func setUp() {
         super.setUp()
         SequencedURLProtocol.reset()
@@ -35,7 +42,7 @@ final class DocumentSearchViewModelTests: XCTestCase {
 
     private func makeVM() -> DocumentSearchViewModel {
         let frozen = Self.fixedNow
-        return DocumentSearchViewModel(homeId: "home-1", api: makeAPI(), now: { frozen })
+        return DocumentSearchViewModel(homeId: "home-1", api: makeAPI()) { frozen }
     }
 
     private func dto(
@@ -59,16 +66,32 @@ final class DocumentSearchViewModelTests: XCTestCase {
 
     /// Build a `{ "documents": [...] }` response body.
     private static func body(
-        _ docs: [(id: String, docType: String, title: String, tags: String?)]
+        _ docs: [DocumentFixture]
     ) -> String {
-        let items = docs.map { d -> String in
-            let details = d.tags.map { "{\"tags\":\"\($0)\"}" } ?? "{}"
-            return "{\"id\":\"\(d.id)\",\"home_id\":\"home-1\",\"doc_type\":\"\(d.docType)\","
-                + "\"title\":\"\(d.title)\",\"mime_type\":\"application/pdf\",\"size_bytes\":1024,"
-                + "\"visibility\":\"members\",\"details\":\(details),"
-                + "\"created_at\":\"2026-05-10T00:00:00Z\"}"
-        }.joined(separator: ",")
+        let items = docs
+            .map { d -> String in
+                let details = d.tags.map { "{\"tags\":\"\($0)\"}" } ?? "{}"
+                return "{\"id\":\"\(d.id)\",\"home_id\":\"home-1\",\"doc_type\":\"\(d.docType)\","
+                    + "\"title\":\"\(d.title)\",\"mime_type\":\"application/pdf\",\"size_bytes\":1024,"
+                    + "\"visibility\":\"members\",\"details\":\(details),"
+                    + "\"created_at\":\"2026-05-10T00:00:00Z\"}"
+            }
+            .joined(separator: ",")
         return "{\"documents\":[\(items)]}"
+    }
+
+    private static func fixture(
+        _ id: String,
+        _ docType: String,
+        _ title: String,
+        _ tags: String? = nil
+    ) -> DocumentFixture {
+        DocumentFixture(
+            id: id,
+            docType: docType,
+            title: title,
+            tags: tags
+        )
     }
 
     // MARK: - Pure matching
@@ -127,9 +150,16 @@ final class DocumentSearchViewModelTests: XCTestCase {
     }
 
     func testLoadClearsLoadingAndKeepsResultsEmptyForBlankQuery() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.body([
-            ("d1", "lease", "Lease.pdf", nil),
-        ]))]
+        SequencedURLProtocol.sequence = [
+            .status(
+                200,
+                body: Self.body(
+                    [
+                        Self.fixture("d1", "lease", "Lease.pdf"),
+                    ]
+                )
+            ),
+        ]
         let vm = makeVM()
         await vm.load()
         XCTAssertFalse(vm.isLoading)
@@ -137,10 +167,17 @@ final class DocumentSearchViewModelTests: XCTestCase {
     }
 
     func testQueryFiltersLoadedCorpus() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.body([
-            ("d1", "lease", "Lease.pdf", "signed"),
-            ("d2", "insurance", "Renters Policy.pdf", "renters,policy"),
-        ]))]
+        SequencedURLProtocol.sequence = [
+            .status(
+                200,
+                body: Self.body(
+                    [
+                        Self.fixture("d1", "lease", "Lease.pdf", "signed"),
+                        Self.fixture("d2", "insurance", "Renters Policy.pdf", "renters,policy"),
+                    ]
+                )
+            ),
+        ]
         let vm = makeVM()
         await vm.load()
         vm.query = "renters"
@@ -159,9 +196,16 @@ final class DocumentSearchViewModelTests: XCTestCase {
     }
 
     func testRowModelReusesDocumentRowWithTagChips() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.body([
-            ("d1", "insurance", "Renters Policy.pdf", "renters,policy"),
-        ]))]
+        SequencedURLProtocol.sequence = [
+            .status(
+                200,
+                body: Self.body(
+                    [
+                        Self.fixture("d1", "insurance", "Renters Policy.pdf", "renters,policy"),
+                    ]
+                )
+            ),
+        ]
         let vm = makeVM()
         await vm.load()
         vm.query = "renters"
