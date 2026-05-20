@@ -335,23 +335,29 @@ class PulseComposeViewModelTest {
         return PulseComposeViewModel(repo, networkMonitor, savedState)
     }
 
-    private fun samplePost(
-        postType: String,
-        content: String,
-        title: String? = null,
-        visibility: String = "neighborhood",
-        eventDate: String? = null,
-        eventVenue: String? = null,
-        lostFoundType: String? = null,
-        serviceCategory: String? = null,
-        dealBusinessName: String? = null,
-    ): PostDetailDto =
+    private data class SamplePost(
+        val postType: String,
+        val content: String,
+        val title: String? = null,
+        val visibility: String = "neighborhood",
+        val metadata: SamplePostMetadata = SamplePostMetadata(),
+    )
+
+    private data class SamplePostMetadata(
+        val eventDate: String? = null,
+        val eventVenue: String? = null,
+        val lostFoundType: String? = null,
+        val serviceCategory: String? = null,
+        val dealBusinessName: String? = null,
+    )
+
+    private fun samplePost(sample: SamplePost): PostDetailDto =
         PostDetailDto(
             id = "p_42",
             userId = "u_1",
-            title = title,
-            content = content,
-            postType = postType,
+            title = sample.title,
+            content = sample.content,
+            postType = sample.postType,
             postFormat = null,
             purpose = null,
             mediaUrls = emptyList(),
@@ -370,12 +376,12 @@ class PulseComposeViewModelTest {
             userHasSaved = false,
             userHasReposted = false,
             comments = emptyList(),
-            visibility = visibility,
-            eventDate = eventDate,
-            eventVenue = eventVenue,
-            lostFoundType = lostFoundType,
-            serviceCategory = serviceCategory,
-            dealBusinessName = dealBusinessName,
+            visibility = sample.visibility,
+            eventDate = sample.metadata.eventDate,
+            eventVenue = sample.metadata.eventVenue,
+            lostFoundType = sample.metadata.lostFoundType,
+            serviceCategory = sample.metadata.serviceCategory,
+            dealBusinessName = sample.metadata.dealBusinessName,
         )
 
     @Test fun isEditingTrueWhenPostIdProvided() {
@@ -409,10 +415,12 @@ class PulseComposeViewModelTest {
                     PostDetailResponse(
                         post =
                             samplePost(
-                                postType = "ask_local",
-                                content = "Pipe is leaking.",
-                                title = "Need a plumber",
-                                serviceCategory = "cleaning",
+                                SamplePost(
+                                    postType = "ask_local",
+                                    content = "Pipe is leaking.",
+                                    title = "Need a plumber",
+                                    metadata = SamplePostMetadata(serviceCategory = "cleaning"),
+                                ),
                             ),
                     ),
                 )
@@ -435,9 +443,11 @@ class PulseComposeViewModelTest {
                     PostDetailResponse(
                         post =
                             samplePost(
-                                postType = "recommendation",
-                                content = "★★★★☆\n\nGreat lattes.",
-                                dealBusinessName = "Joe's Coffee",
+                                SamplePost(
+                                    postType = "recommendation",
+                                    content = "★★★★☆\n\nGreat lattes.",
+                                    metadata = SamplePostMetadata(dealBusinessName = "Joe's Coffee"),
+                                ),
                             ),
                     ),
                 )
@@ -457,9 +467,11 @@ class PulseComposeViewModelTest {
                     PostDetailResponse(
                         post =
                             samplePost(
-                                postType = "lost_found",
-                                content = "Last seen: 5th & Elm\n\nMochi the cat.",
-                                lostFoundType = "lost",
+                                SamplePost(
+                                    postType = "lost_found",
+                                    content = "Last seen: 5th & Elm\n\nMochi the cat.",
+                                    metadata = SamplePostMetadata(lostFoundType = "lost"),
+                                ),
                             ),
                     ),
                 )
@@ -479,11 +491,16 @@ class PulseComposeViewModelTest {
                     PostDetailResponse(
                         post =
                             samplePost(
-                                postType = "event",
-                                content = "Bring chairs.",
-                                title = "Block party",
-                                eventDate = "2030-08-15T17:00:00Z",
-                                eventVenue = "Elm Park",
+                                SamplePost(
+                                    postType = "event",
+                                    content = "Bring chairs.",
+                                    title = "Block party",
+                                    metadata =
+                                        SamplePostMetadata(
+                                            eventDate = "2030-08-15T17:00:00Z",
+                                            eventVenue = "Elm Park",
+                                        ),
+                                ),
                             ),
                     ),
                 )
@@ -524,9 +541,11 @@ class PulseComposeViewModelTest {
                     PostDetailResponse(
                         post =
                             samplePost(
-                                postType = "ask_local",
-                                content = "Pipe is leaking.",
-                                title = "Need a plumber",
+                                SamplePost(
+                                    postType = "ask_local",
+                                    content = "Pipe is leaking.",
+                                    title = "Need a plumber",
+                                ),
                             ),
                     ),
                 )
