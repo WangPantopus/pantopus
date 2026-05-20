@@ -156,6 +156,9 @@ import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationHost
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
 import app.pantopus.android.ui.screens.inbox.conversation.ChatThreadMode
 import app.pantopus.android.ui.screens.inbox.newmessage.NewMessageScreen
+import app.pantopus.android.ui.screens.inbox.search.ChatSearchResult
+import app.pantopus.android.ui.screens.inbox.search.ChatSearchResultKind
+import app.pantopus.android.ui.screens.inbox.search.ChatSearchScreen
 import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
 import app.pantopus.android.ui.screens.listings.MyListingsScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
@@ -737,6 +740,10 @@ private object ChildRoutes {
     const val CHAT_IDENTITY_KEY = "identity"
     const val CHAT_LOCALITY_KEY = "locality"
     const val CHAT_ONLINE_KEY = "online"
+
+    /** P4.3 — message id to scroll to on open (Chat Search deep-link).
+     *  Empty for normal opens, which land on the latest message. */
+    const val CHAT_SCROLL_TO_KEY = "scrollTo"
     const val CHAT_CONVERSATION =
         "chat/{$CHAT_KIND_KEY}/{$CHAT_ID_KEY}?" +
             "$CHAT_NAME_KEY={$CHAT_NAME_KEY}" +
@@ -744,11 +751,15 @@ private object ChildRoutes {
             "&$CHAT_VERIFIED_KEY={$CHAT_VERIFIED_KEY}" +
             "&$CHAT_IDENTITY_KEY={$CHAT_IDENTITY_KEY}" +
             "&$CHAT_LOCALITY_KEY={$CHAT_LOCALITY_KEY}" +
-            "&$CHAT_ONLINE_KEY={$CHAT_ONLINE_KEY}"
+            "&$CHAT_ONLINE_KEY={$CHAT_ONLINE_KEY}" +
+            "&$CHAT_SCROLL_TO_KEY={$CHAT_SCROLL_TO_KEY}"
 
     /** New message contact picker (T6.6b P25). Reached from Chat list
      *  compose button + empty-state CTA. */
     const val NEW_MESSAGE = "chat/new"
+
+    /** P4.3 — Chat Search. Reached from the Chat list search bar. */
+    const val CHAT_SEARCH = "chat/search"
 
     /** Compose post target — placeholder until the compose flow ships. */
     const val COMPOSE_INTENT_KEY = "intent"
@@ -853,7 +864,8 @@ private object ChildRoutes {
             "&$CHAT_VERIFIED_KEY=${row.verified}" +
             "&$CHAT_IDENTITY_KEY=${enc(identity)}" +
             "&$CHAT_LOCALITY_KEY=" +
-            "&$CHAT_ONLINE_KEY=false"
+            "&$CHAT_ONLINE_KEY=false" +
+            "&$CHAT_SCROLL_TO_KEY="
     }
 
     /** Build the chat-conversation path for a New Message picker
@@ -874,7 +886,35 @@ private object ChildRoutes {
             "&$CHAT_VERIFIED_KEY=$verified" +
             "&$CHAT_IDENTITY_KEY=" +
             "&$CHAT_LOCALITY_KEY=${enc(locality ?: "")}" +
-            "&$CHAT_ONLINE_KEY=false"
+            "&$CHAT_ONLINE_KEY=false" +
+            "&$CHAT_SCROLL_TO_KEY="
+    }
+
+    /** Build the chat-conversation path for a Chat Search result. Carries
+     *  the matched message id so the conversation opens scrolled to it
+     *  (empty for name-only matches → opens at the latest message). */
+    fun chatSearchConversation(result: ChatSearchResult): String {
+        val kind =
+            when (result.kind) {
+                ChatSearchResultKind.Group -> "room"
+                ChatSearchResultKind.Dm -> "person"
+            }
+        val identity =
+            when (result.identityChip) {
+                ConversationIdentityChip.Business -> "business"
+                ConversationIdentityChip.Home -> "home"
+                null -> ""
+            }
+
+        fun enc(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
+        return "chat/$kind/${enc(result.conversationId)}?" +
+            "$CHAT_NAME_KEY=${enc(result.displayName)}" +
+            "&$CHAT_INITIALS_KEY=${enc(result.initials)}" +
+            "&$CHAT_VERIFIED_KEY=${result.verified}" +
+            "&$CHAT_IDENTITY_KEY=${enc(identity)}" +
+            "&$CHAT_LOCALITY_KEY=" +
+            "&$CHAT_ONLINE_KEY=false" +
+            "&$CHAT_SCROLL_TO_KEY=${enc(result.matchedMessageId ?: "")}"
     }
 }
 
@@ -1063,7 +1103,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.chatConversation(row))
                     },
                     onCompose = { navController.navigate(ChildRoutes.NEW_MESSAGE) },
-                    onOpenSearch = { navController.navigate(ChildRoutes.placeholder("Chat search")) },
+                    onOpenSearch = { navController.navigate(ChildRoutes.CHAT_SEARCH) },
                 )
             }
             composable(PantopusRoute.You.path) {
@@ -1868,6 +1908,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             type = NavType.StringType
                             defaultValue = "false"
                         },
+                        navArgument(ChildRoutes.CHAT_SCROLL_TO_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
                     ),
             ) { entry ->
                 val args = entry.arguments ?: return@composable
@@ -1878,6 +1922,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 val verified = args.getString(ChildRoutes.CHAT_VERIFIED_KEY) == "true"
                 val locality = args.getString(ChildRoutes.CHAT_LOCALITY_KEY).orEmpty().takeIf { it.isNotEmpty() }
                 val online = args.getString(ChildRoutes.CHAT_ONLINE_KEY) == "true"
+                val scrollTo = args.getString(ChildRoutes.CHAT_SCROLL_TO_KEY).orEmpty().takeIf { it.isNotEmpty() }
                 val mode: ChatThreadMode =
                     when (kind) {
                         "ai" -> ChatThreadMode.Ai
@@ -1901,6 +1946,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     mode = mode,
                     counterparty = counterparty,
                     onBack = { navController.popBackStack() },
+                    scrollToMessageId = scrollTo,
+                )
+            }
+            composable(ChildRoutes.CHAT_SEARCH) {
+                ChatSearchScreen(
+                    onOpenResult = { result ->
+                        navController.navigate(ChildRoutes.chatSearchConversation(result))
+                    },
+                    onCancel = { navController.popBackStack() },
                 )
             }
             composable(ChildRoutes.NEW_MESSAGE) {

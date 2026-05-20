@@ -49,6 +49,12 @@ class ChatConversationViewModel
         private val _isCounterpartyTyping = MutableStateFlow(false)
         val isCounterpartyTyping: StateFlow<Boolean> = _isCounterpartyTyping.asStateFlow()
 
+        // Timeline row id ("bubble_<messageId>") the screen should scroll
+        // to — set once when opened from Chat Search with a matched message
+        // present in the loaded page. Cleared via [consumePendingScroll].
+        private val _pendingScrollTarget = MutableStateFlow<String?>(null)
+        val pendingScrollTarget: StateFlow<String?> = _pendingScrollTarget.asStateFlow()
+
         val aiPrompts: List<ChatPromptChip> =
             listOf(
                 ChatPromptChip("mail", "Summarize my inbox", PantopusIcon.Mailbox),
@@ -65,6 +71,8 @@ class ChatConversationViewModel
 
         private var mode: ChatThreadMode = ChatThreadMode.Ai
         private var currentUserId: String = ""
+        private var scrollToMessageId: String? = null
+        private var didResolveScrollTarget = false
         private var messages: MutableList<ChatMessageDto> = mutableListOf()
         private val pendingByClientId = LinkedHashMap<String, ChatMessageDto>()
         private val failedClientIds = mutableSetOf<String>()
@@ -80,10 +88,17 @@ class ChatConversationViewModel
             mode: ChatThreadMode,
             counterparty: ChatCounterparty,
             currentUserId: String,
+            scrollToMessageId: String? = null,
         ) {
             this.mode = mode
             this.currentUserId = currentUserId
             this._counterparty.value = counterparty
+            this.scrollToMessageId = scrollToMessageId
+        }
+
+        /** Clear the scroll target after the screen has scrolled to it. */
+        fun consumePendingScroll() {
+            _pendingScrollTarget.value = null
         }
 
         fun load() {
@@ -375,6 +390,22 @@ class ChatConversationViewModel
                 )
             }
             _state.value = ChatConversationUiState.Loaded(rows)
+            resolveScrollTarget(rows)
+        }
+
+        /**
+         * Resolve the Chat Search scroll target once: if the deep-linked
+         * message is in the loaded page, publish its row id for the screen
+         * to scroll to. The match is guaranteed present because search
+         * indexes the same most-recent page the conversation loads.
+         */
+        private fun resolveScrollTarget(rows: List<ChatTimelineRow>) {
+            if (didResolveScrollTarget) return
+            val target = scrollToMessageId ?: return
+            val rowId = "bubble_$target"
+            if (rows.none { it.rowId == rowId }) return
+            didResolveScrollTarget = true
+            _pendingScrollTarget.value = rowId
         }
 
         private fun bodyOf(message: ChatMessageDto): ChatBubbleBody =
