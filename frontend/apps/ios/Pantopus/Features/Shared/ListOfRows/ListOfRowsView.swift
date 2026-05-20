@@ -744,6 +744,24 @@ private enum RowCardContext {
     }
 }
 
+/// Public free-standing renderer for a single `RowModel`, so surfaces
+/// that compose their own list container — notably the `SearchListShell`
+/// row builders — reuse the exact list-row visual (leading tile, content
+/// column, trailing slot, highlight chrome) without re-implementing it.
+/// Renders the standalone-card variant; group the rows yourself when you
+/// need the Discover-hub card-stack look.
+public struct ListRowCard: View {
+    private let row: RowModel
+
+    public init(row: RowModel) {
+        self.row = row
+    }
+
+    public var body: some View {
+        RowView(row: row)
+    }
+}
+
 private struct RowView: View {
     let row: RowModel
     var cardContext: RowCardContext = .standalone

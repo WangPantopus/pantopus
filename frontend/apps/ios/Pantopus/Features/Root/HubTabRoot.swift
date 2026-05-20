@@ -140,6 +140,9 @@ public enum HubRoute: Hashable {
     /// Review-signups (T6.6c / P26.5) — organizer-only review queue
     /// for one Support Train. Pushed from a Support Trains row tap.
     case reviewSignups(supportTrainId: String)
+    /// P4.6 — Support Trains search. Pushed from the Support Trains list
+    /// top-bar search action; reuses the shared `SearchListShell`.
+    case searchSupportTrains
     /// Admin home-ownership-claims review queue. Gated by
     /// `auth.user.isAdmin` and reached from the Settings menu's Admin
     /// group. Mirrors the web `/app/admin/review-claims` page.
@@ -1067,8 +1070,17 @@ public struct HubTabRoot: View {
                         Task { @MainActor in push(.reviewSignups(supportTrainId: trainId)) }
                     },
                     onSearch: {
-                        Task { @MainActor in push(.placeholder(label: "Search support trains")) }
+                        Task { @MainActor in push(.searchSupportTrains) }
                     }
+                )
+            )
+        case .searchSupportTrains:
+            SupportTrainsSearchView(
+                viewModel: SupportTrainsSearchViewModel(
+                    onOpenTrain: { trainId in
+                        Task { @MainActor in push(.reviewSignups(supportTrainId: trainId)) }
+                    },
+                    onCancel: { pop() }
                 )
             )
         case .startSupportTrain:

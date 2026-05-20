@@ -62,6 +62,7 @@ import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
+import app.pantopus.android.ui.screens.homes.accesscodes.search.AccessCodesSearchScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_CATEGORY_KEY
 import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_SECRET_ID_KEY
@@ -197,6 +198,7 @@ import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
+import app.pantopus.android.ui.screens.support_trains.search.SupportTrainsSearchScreen
 import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
 import app.pantopus.android.ui.screens.you.YouScreen
@@ -424,6 +426,14 @@ private object ChildRoutes {
             "&$EDIT_ACCESS_CODE_CATEGORY_KEY=$encodedCategory"
     }
 
+    /** P4.6 — Access codes search. Reuses the shared SearchListShell.
+     *  `homeId` scopes the corpus to one home and matches
+     *  `AccessCodesSearchViewModel.HOME_ID_KEY`. */
+    const val ACCESS_CODES_SEARCH = "homes/{$ACCESS_CODES_HOME_ID_KEY}/access/search"
+
+    /** Build the concrete path for the Access codes search screen. */
+    fun accessCodesSearch(homeId: String): String = "homes/$homeId/access/search"
+
     /** Household tasks list per home (T6.3c / P11). */
     const val HOME_TASKS = "homes/{$HOUSEHOLD_TASKS_HOME_ID_KEY}/tasks"
 
@@ -628,6 +638,10 @@ private object ChildRoutes {
     /** P2.6 — Start-a-Support-Train wizard. Pushed by the Support
      *  Trains FAB / empty-state CTA. */
     const val START_SUPPORT_TRAIN = "support-trains/start"
+
+    /** P4.6 — Support Trains search. Pushed from the Support Trains list
+     *  top-bar search action; reuses the shared SearchListShell. */
+    const val SUPPORT_TRAINS_SEARCH = "support-trains/search"
 
     /** T6.6c (P26.5) Review signups (organizer-only). `:id` is the
      *  Support Train UUID. Keep in sync with
@@ -1551,9 +1565,30 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         )
                     },
                     onSearch = {
-                        navController.navigate(ChildRoutes.placeholder("Search access codes"))
+                        navController.navigate(ChildRoutes.accessCodesSearch(homeIdArg))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.ACCESS_CODES_SEARCH,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.ACCESS_CODES_HOME_ID_KEY) { type = NavType.StringType },
+                    ),
+            ) { backStackEntry ->
+                val homeIdArg = backStackEntry.arguments?.getString(ChildRoutes.ACCESS_CODES_HOME_ID_KEY).orEmpty()
+                AccessCodesSearchScreen(
+                    onOpenCode = { secretId ->
+                        navController.navigate(
+                            ChildRoutes.editAccessCode(
+                                homeId = homeIdArg,
+                                secretId = secretId,
+                                category = null,
+                            ),
+                        )
+                    },
+                    onCancel = { navController.popBackStack() },
                 )
             }
             composable(
@@ -2502,8 +2537,16 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.START_SUPPORT_TRAIN)
                     },
                     onSearch = {
-                        navController.navigate(ChildRoutes.placeholder("Search support trains"))
+                        navController.navigate(ChildRoutes.SUPPORT_TRAINS_SEARCH)
                     },
+                )
+            }
+            composable(ChildRoutes.SUPPORT_TRAINS_SEARCH) {
+                SupportTrainsSearchScreen(
+                    onOpenTrain = { trainId ->
+                        navController.navigate(ChildRoutes.reviewSignups(trainId))
+                    },
+                    onCancel = { navController.popBackStack() },
                 )
             }
             composable(ChildRoutes.START_SUPPORT_TRAIN) {

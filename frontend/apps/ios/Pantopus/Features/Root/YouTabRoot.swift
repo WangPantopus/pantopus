@@ -44,6 +44,9 @@ public enum YouRoute: Hashable {
     /// T6.6c (P26.5) — Review signups (organizer-only) for one Support
     /// Train. Pushed from a Support Trains row tap.
     case reviewSignups(supportTrainId: String)
+    /// P4.6 — Support Trains search. Pushed from the Support Trains list
+    /// top-bar search action; reuses the shared `SearchListShell`.
+    case searchSupportTrains
     /// T6.3f / P14 — My homes (avatar-first roster). The "me.homes"
     /// Activity-section row pushes here; tapping a row drills into the
     /// home dashboard via `homeDashboard(homeId:)`.
@@ -130,6 +133,9 @@ public enum YouRoute: Hashable {
     /// `category` is set when the user lands here from the empty-state
     /// quick-start chips so the form pre-selects the matching tile.
     case editAccessCode(homeId: String, secretId: String?, categoryRaw: String?)
+    /// P4.6 — Access codes search. Pushed from the Access codes list
+    /// top-bar search action; `homeId` scopes the corpus to one home.
+    case searchAccessCodes(homeId: String)
     /// T6.3c / P11 — Household tasks (per-home chore list). The
     /// "me.tasks" Activity-section row pushes here with the primary
     /// home id resolved by the Me VM. Distinct from `.myTasks` which is
@@ -839,8 +845,17 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.reviewSignups(supportTrainId: trainId)) }
                     },
                     onSearch: {
-                        Task { @MainActor in path.append(.placeholder(label: "Search support trains")) }
+                        Task { @MainActor in path.append(.searchSupportTrains) }
                     }
+                )
+            )
+        case .searchSupportTrains:
+            SupportTrainsSearchView(
+                viewModel: SupportTrainsSearchViewModel(
+                    onOpenTrain: { trainId in
+                        Task { @MainActor in path.append(.reviewSignups(supportTrainId: trainId)) }
+                    },
+                    onCancel: { if !path.isEmpty { path.removeLast() } }
                 )
             )
         case .startSupportTrain:
@@ -1220,11 +1235,27 @@ public struct YouTabRoot: View {
                                 secretId: secretId,
                                 categoryRaw: nil
                             ))
-                        case .search:
-                            path.append(.placeholder(label: "Search access codes"))
+                        case let .search(homeId: targetHomeId):
+                            path.append(.searchAccessCodes(homeId: targetHomeId))
                         }
                     }
                 }
+            )
+        case let .searchAccessCodes(homeId):
+            AccessCodesSearchView(
+                viewModel: AccessCodesSearchViewModel(
+                    homeId: homeId,
+                    onOpenCode: { secretId in
+                        Task { @MainActor in
+                            path.append(.editAccessCode(
+                                homeId: homeId,
+                                secretId: secretId,
+                                categoryRaw: nil
+                            ))
+                        }
+                    },
+                    onCancel: { if !path.isEmpty { path.removeLast() } }
+                )
             )
         case let .editAccessCode(homeId, secretId, categoryRaw):
             EditAccessCodeFormView(
