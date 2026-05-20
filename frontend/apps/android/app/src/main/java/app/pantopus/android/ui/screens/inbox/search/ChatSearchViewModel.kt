@@ -179,8 +179,7 @@ class ChatSearchViewModel
             dto: UnifiedConversationDto,
             isRoom: Boolean,
             name: String,
-        ): String =
-            if (isRoom) (dto.id ?: dto.gigId ?: dto.homeId ?: name) else (dto.otherParticipantId ?: name)
+        ): String = if (isRoom) (dto.id ?: dto.gigId ?: dto.homeId ?: name) else (dto.otherParticipantId ?: name)
 
         private fun identityChip(
             dto: UnifiedConversationDto,
