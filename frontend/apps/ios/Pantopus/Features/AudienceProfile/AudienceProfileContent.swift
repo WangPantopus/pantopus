@@ -232,9 +232,14 @@ public struct ThreadRowContent: Sendable, Hashable, Identifiable {
     public let handle: String
     public let avatarUrl: String?
     public let tierName: String?
+    /// Tier rank (1=Free / Follower, 2=Bronze, 3=Silver, 4=Gold). Drives
+    /// the "Bronze+" filter chip (matches when `tierRank >= 2`).
+    public let tierRank: Int
     public let preview: String
     public let timeAgo: String
     public let unreadCount: Int
+    /// Creator-flagged thread — drives the Flagged filter chip.
+    public let flagged: Bool
 
     public init(
         id: String,
@@ -242,18 +247,59 @@ public struct ThreadRowContent: Sendable, Hashable, Identifiable {
         handle: String,
         avatarUrl: String?,
         tierName: String?,
+        tierRank: Int,
         preview: String,
         timeAgo: String,
-        unreadCount: Int
+        unreadCount: Int,
+        flagged: Bool
     ) {
         self.id = id
         self.displayName = displayName
         self.handle = handle
         self.avatarUrl = avatarUrl
         self.tierName = tierName
+        self.tierRank = tierRank
         self.preview = preview
         self.timeAgo = timeAgo
         self.unreadCount = unreadCount
+        self.flagged = flagged
+    }
+}
+
+/// Filter chip selection on the Threads tab. Mirrors the design's four
+/// chips (All threads · Unread · Bronze+ · Flagged) and the matching set
+/// already used by the standalone Creator Inbox.
+public enum ThreadsFilter: String, Sendable, Hashable, CaseIterable {
+    case all
+    case unread
+    /// Bronze tier and above. Projection treats this as `tierRank >= 2`
+    /// (rank 1 is Free / Follower).
+    case bronzePlus
+    case flagged
+
+    public var title: String {
+        switch self {
+        case .all: "All threads"
+        case .unread: "Unread"
+        case .bronzePlus: "Bronze+"
+        case .flagged: "Flagged"
+        }
+    }
+}
+
+/// Render model for a single threads-filter chip.
+/// `count` is `nil` for the Flagged chip — the design omits a count there.
+public struct ThreadsFilterChipContent: Sendable, Hashable, Identifiable {
+    public let id: String
+    public let filter: ThreadsFilter
+    public let label: String
+    public let count: Int?
+
+    public init(filter: ThreadsFilter, count: Int?) {
+        id = filter.rawValue
+        self.filter = filter
+        label = filter.title
+        self.count = count
     }
 }
 
@@ -267,6 +313,7 @@ public struct AudienceProfileLoaded: Sendable, Hashable {
     public let tierChips: [TierChipContent]
     public let followers: [FollowerRowContent]
     public let threads: [ThreadRowContent]
+    public let threadsFilterChips: [ThreadsFilterChipContent]
     public let channelId: String?
 
     public init(
@@ -277,6 +324,7 @@ public struct AudienceProfileLoaded: Sendable, Hashable {
         tierChips: [TierChipContent],
         followers: [FollowerRowContent],
         threads: [ThreadRowContent],
+        threadsFilterChips: [ThreadsFilterChipContent],
         channelId: String?
     ) {
         self.header = header
@@ -286,6 +334,7 @@ public struct AudienceProfileLoaded: Sendable, Hashable {
         self.tierChips = tierChips
         self.followers = followers
         self.threads = threads
+        self.threadsFilterChips = threadsFilterChips
         self.channelId = channelId
     }
 }

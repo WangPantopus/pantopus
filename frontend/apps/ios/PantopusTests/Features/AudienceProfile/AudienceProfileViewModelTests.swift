@@ -84,7 +84,15 @@ final class AudienceProfileViewModelTests: XCTestCase {
       {"id":"th1","membershipId":"m1","fanHandle":"alex","fanDisplayName":"Alex",
        "tier":{"rank":2,"name":"Members"},
        "lastMessagePreview":"Loved the workshop","lastMessageAt":"2026-05-15T10:00:00Z",
-       "unreadCount":2}
+       "unreadCount":2,"flagged":false},
+      {"id":"th2","membershipId":"m2","fanHandle":"billie","fanDisplayName":"Billie B.",
+       "tier":{"rank":3,"name":"Insiders"},
+       "lastMessagePreview":"Question on step 4","lastMessageAt":"2026-05-15T08:00:00Z",
+       "unreadCount":1,"flagged":true},
+      {"id":"th3","membershipId":"m3","fanHandle":"junie","fanDisplayName":"Junie L.",
+       "tier":{"rank":1,"name":"Followers"},
+       "lastMessagePreview":"Following from the market!","lastMessageAt":"2026-05-12T08:00:00Z",
+       "unreadCount":0,"flagged":false}
     ]}
     """
 
@@ -117,8 +125,10 @@ final class AudienceProfileViewModelTests: XCTestCase {
         XCTAssertEqual(loaded.updates.last?.targetTierRank, 2)
         XCTAssertEqual(loaded.followers.count, 2)
         XCTAssertEqual(loaded.followers.first?.tierName, "Followers")
-        XCTAssertEqual(loaded.threads.count, 1)
+        XCTAssertEqual(loaded.threads.count, 3)
         XCTAssertEqual(loaded.threads.first?.unreadCount, 2)
+        XCTAssertEqual(loaded.threads.first?.tierRank, 2)
+        XCTAssertEqual(loaded.threads.first { $0.id == "th2" }?.flagged, true)
         XCTAssertEqual(loaded.channelId, "ch_demo")
     }
 
@@ -267,5 +277,57 @@ final class AudienceProfileViewModelTests: XCTestCase {
         }
         let chip = loaded.tierChips.first { $0.id == "tier_1" }
         XCTAssertEqual(chip?.count, 8)
+    }
+
+    func testThreadsFilterChipsSurfaceCorrectCounts() async {
+        SequencedURLProtocol.sequence = loadedSequence()
+        let vm = AudienceProfileViewModel(api: makeAPI())
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        XCTAssertEqual(
+            loaded.threadsFilterChips.map(\.filter),
+            [.all, .unread, .bronzePlus, .flagged]
+        )
+        XCTAssertEqual(loaded.threadsFilterChips.first { $0.filter == .all }?.count, 3)
+        XCTAssertEqual(loaded.threadsFilterChips.first { $0.filter == .unread }?.count, 2)
+        XCTAssertEqual(loaded.threadsFilterChips.first { $0.filter == .bronzePlus }?.count, 2)
+        // The Flagged chip carries no count in the design.
+        XCTAssertNil(loaded.threadsFilterChips.first { $0.filter == .flagged }?.count)
+    }
+
+    func testThreadFilterAllShowsEveryThread() async {
+        SequencedURLProtocol.sequence = loadedSequence()
+        let vm = AudienceProfileViewModel(api: makeAPI())
+        await vm.load()
+        XCTAssertEqual(vm.activeThreadFilter, .all)
+        XCTAssertEqual(vm.visibleThreads.count, 3)
+    }
+
+    func testThreadFilterUnreadDropsReadThreads() async {
+        SequencedURLProtocol.sequence = loadedSequence()
+        let vm = AudienceProfileViewModel(api: makeAPI())
+        await vm.load()
+        vm.selectThreadFilter(.unread)
+        XCTAssertEqual(vm.activeThreadFilter, .unread)
+        XCTAssertEqual(vm.visibleThreads.map(\.id), ["th1", "th2"])
+    }
+
+    func testThreadFilterBronzePlusDropsTier1Threads() async {
+        SequencedURLProtocol.sequence = loadedSequence()
+        let vm = AudienceProfileViewModel(api: makeAPI())
+        await vm.load()
+        vm.selectThreadFilter(.bronzePlus)
+        XCTAssertEqual(vm.visibleThreads.map(\.id), ["th1", "th2"])
+    }
+
+    func testThreadFilterFlaggedKeepsOnlyFlaggedThreads() async {
+        SequencedURLProtocol.sequence = loadedSequence()
+        let vm = AudienceProfileViewModel(api: makeAPI())
+        await vm.load()
+        vm.selectThreadFilter(.flagged)
+        XCTAssertEqual(vm.visibleThreads.map(\.id), ["th2"])
     }
 }
