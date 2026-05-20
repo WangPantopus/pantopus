@@ -231,5 +231,4 @@ class SearchListShellContractTest {
                 store.recentQueries.first(),
             )
         }
-
 }

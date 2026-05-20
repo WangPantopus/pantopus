@@ -207,11 +207,13 @@ fun resolvePhase(
     hasResults: Boolean,
 ): SearchListPhase {
     val trimmed = query.trim()
-    if (trimmed.isEmpty()) return SearchListPhase.Recent
-    if (isLoading) return SearchListPhase.Typing
-    if (hasResults) return SearchListPhase.Results
-    if (debouncedQuery == query) return SearchListPhase.Empty
-    return SearchListPhase.Typing
+    return when {
+        trimmed.isEmpty() -> SearchListPhase.Recent
+        isLoading -> SearchListPhase.Typing
+        hasResults -> SearchListPhase.Results
+        debouncedQuery == query -> SearchListPhase.Empty
+        else -> SearchListPhase.Typing
+    }
 }
 
 // ─── Header ────────────────────────────────────────────────────
@@ -445,4 +447,3 @@ private fun EmptySection(emptyState: EmptyStateContent) {
         )
     }
 }
-

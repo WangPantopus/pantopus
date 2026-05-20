@@ -128,7 +128,10 @@ final class SearchListShellTests: XCTestCase {
 final class RecentQueriesStoreTests: XCTestCase {
     private func makeDefaults() -> UserDefaults {
         let suite = "tests.pantopus.recents.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            XCTFail("Unable to create isolated UserDefaults suite")
+            return .standard
+        }
         defaults.removePersistentDomain(forName: suite)
         return defaults
     }

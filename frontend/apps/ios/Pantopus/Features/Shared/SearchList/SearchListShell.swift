@@ -131,7 +131,7 @@ public struct SearchListShell<Result: Hashable & Sendable, Row: View>: View {
     // MARK: - Body phase
 
     /// What is the shell rendering right now?
-    private enum BodyPhase: Sendable {
+    private enum BodyPhase {
         case recent
         case typing
         case results

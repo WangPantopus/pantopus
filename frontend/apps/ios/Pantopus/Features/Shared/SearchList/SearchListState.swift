@@ -49,7 +49,7 @@ public final class RecentQueriesStore: @unchecked Sendable {
         limit: Int = 6,
         defaults: UserDefaults = .standard
     ) {
-        self.key = userDefaultsKey
+        key = userDefaultsKey
         self.limit = limit
         self.defaults = defaults
     }
