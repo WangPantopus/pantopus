@@ -287,8 +287,10 @@ final class AudienceProfileViewModelTests: XCTestCase {
             XCTFail("Expected .loaded")
             return
         }
-        XCTAssertEqual(loaded.threadsFilterChips.map(\.filter),
-                       [.all, .unread, .bronzePlus, .flagged])
+        XCTAssertEqual(
+            loaded.threadsFilterChips.map(\.filter),
+            [.all, .unread, .bronzePlus, .flagged]
+        )
         XCTAssertEqual(loaded.threadsFilterChips.first { $0.filter == .all }?.count, 3)
         XCTAssertEqual(loaded.threadsFilterChips.first { $0.filter == .unread }?.count, 2)
         XCTAssertEqual(loaded.threadsFilterChips.first { $0.filter == .bronzePlus }?.count, 2)

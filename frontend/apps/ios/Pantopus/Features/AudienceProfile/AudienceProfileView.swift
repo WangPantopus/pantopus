@@ -706,7 +706,6 @@ public struct AudienceProfileView: View {
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }
 
-    @ViewBuilder
     private func threadsListBody(loaded: AudienceProfileLoaded) -> some View {
         ScrollView {
             VStack(spacing: 8) {
