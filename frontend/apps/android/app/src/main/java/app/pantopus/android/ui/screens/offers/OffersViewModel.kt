@@ -18,6 +18,9 @@ import app.pantopus.android.data.api.models.offers.BidderUserDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.offers.OffersRepository
 import app.pantopus.android.ui.components.StatusChipVariant
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivityFilter
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivitySortOrder
+import app.pantopus.android.ui.screens.shared.filter_sheet.FilterOption
 import app.pantopus.android.ui.screens.shared.list_of_rows.GradientPair
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsTab
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
@@ -197,7 +200,6 @@ class OffersViewModel
         private var sent: List<BidDto> = emptyList()
         private var loadedAtLeastOnce: Boolean = false
         private var rowTapHandler: (BidDto) -> Unit = {}
-        private var filterHandler: () -> Unit = {}
         private var browseHandler: () -> Unit = {}
         private var postTaskHandler: () -> Unit = {}
 
@@ -223,34 +225,58 @@ class OffersViewModel
                     contentDescription = "Filter offers",
                     label = null,
                     isEnabled = true,
-                    onClick = { filterHandler() },
+                    onClick = { openFilterSheet() },
                 ),
             )
         val topBarAction: StateFlow<TopBarAction?> = _topBarAction.asStateFlow()
 
+        // Activity filter (P5.4)
+        private val _showFilterSheet = MutableStateFlow(false)
+        val showFilterSheet: StateFlow<Boolean> = _showFilterSheet.asStateFlow()
+
+        private val _activityFilter = MutableStateFlow(ActivityFilter())
+        val activityFilter: StateFlow<ActivityFilter> = _activityFilter.asStateFlow()
+
+        /** Section header for the status chips in the sheet. */
+        val statusFilterTitle = "Offer status"
+
+        /** Per-surface status chips (the three offer lifecycle buckets). */
+        val statusFilterOptions =
+            listOf(
+                FilterOption("pending", "Pending"),
+                FilterOption("accepted", "Accepted"),
+                FilterOption("declined", "Declined"),
+            )
+
+        /** Offers carry an amount, so the full sort set applies. */
+        val sortFilterOptions = ActivitySortOrder.ALL
+
+        fun openFilterSheet() {
+            _showFilterSheet.value = true
+        }
+
+        fun dismissFilterSheet() {
+            _showFilterSheet.value = false
+        }
+
+        fun applyFilter(filter: ActivityFilter) {
+            _activityFilter.value = filter
+            applyState()
+        }
+
         /**
          * Inject the screen-level callbacks (row tap → detail push,
-         * empty-state CTAs, filter chip handler). Called from the Screen
-         * composable's [androidx.compose.runtime.LaunchedEffect].
+         * empty-state CTAs). Called from the Screen composable's
+         * [androidx.compose.runtime.LaunchedEffect].
          */
         fun bindCallbacks(
             onOpenOfferDetail: (BidDto) -> Unit,
-            onOpenFilters: () -> Unit,
             onBrowseListings: () -> Unit,
             onPostTask: () -> Unit,
         ) {
             rowTapHandler = onOpenOfferDetail
-            filterHandler = onOpenFilters
             browseHandler = onBrowseListings
             postTaskHandler = onPostTask
-            _topBarAction.value =
-                TopBarAction(
-                    icon = PantopusIcon.Filter,
-                    contentDescription = "Filter offers",
-                    label = null,
-                    isEnabled = true,
-                    onClick = { filterHandler() },
-                )
         }
 
         fun load() {
@@ -312,15 +338,28 @@ class OffersViewModel
                     ),
                 )
             val items = if (_selectedTab.value == OffersTab.SENT) sent else received
-            if (items.isEmpty()) {
-                _state.value = emptyState()
-                return
-            }
             val perspective =
                 if (_selectedTab.value == OffersTab.SENT) OfferPerspective.Sent else OfferPerspective.Received
             val now = Instant.now()
+            val visible =
+                _activityFilter.value.apply(
+                    items = items,
+                    now = now,
+                    statusId = { statusFilterId(derivedStatus(it, now)) },
+                    date = { parseInstant(it.createdAt) },
+                    value = { it.bidAmount },
+                )
+            if (visible.isEmpty()) {
+                _state.value =
+                    if (_activityFilter.value.isActive && items.isNotEmpty()) {
+                        filteredEmptyState()
+                    } else {
+                        emptyState()
+                    }
+                return
+            }
             val rows =
-                items.map { dto ->
+                visible.map { dto ->
                     row(
                         dto = dto,
                         perspective = perspective,
@@ -333,6 +372,17 @@ class OffersViewModel
                     hasMore = false,
                 )
         }
+
+        private fun filteredEmptyState(): ListOfRowsUiState.Empty =
+            ListOfRowsUiState.Empty(
+                icon = PantopusIcon.Filter,
+                headline = "No offers match your filters",
+                subcopy =
+                    "Try a different status, date range, or sort — or clear " +
+                        "your filters to see everything in this tab.",
+                ctaTitle = "Clear filters",
+                onCta = { applyFilter(ActivityFilter()) },
+            )
 
         private fun emptyState(): ListOfRowsUiState.Empty =
             when (_selectedTab.value) {
@@ -474,6 +524,14 @@ class OffersViewModel
                     OfferPerspective.Sent -> "counter ${formatPrice(counter)}"
                 }
             }
+
+            /** Map a derived offer status onto one of the three filter chip ids. */
+            fun statusFilterId(status: OfferStatus): String =
+                when (status) {
+                    OfferStatus.New, OfferStatus.Expiring, OfferStatus.Countered, OfferStatus.Pending -> "pending"
+                    OfferStatus.Accepted -> "accepted"
+                    OfferStatus.Declined, OfferStatus.Withdrawn, OfferStatus.Expired -> "declined"
+                }
 
             fun isPending(raw: String?): Boolean = (raw ?: "").lowercase(Locale.ROOT) == "pending"
 

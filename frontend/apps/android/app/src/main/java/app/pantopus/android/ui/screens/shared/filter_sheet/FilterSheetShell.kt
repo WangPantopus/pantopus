@@ -275,6 +275,14 @@ private fun FilterSectionRow(
                 ) { newIds ->
                     onUpdate(section.copy(control = control.copy(selectedIds = newIds)))
                 }
+            is FilterControl.SingleChip ->
+                SingleChipControl(
+                    sectionId = section.id,
+                    options = control.options,
+                    selectedId = control.selectedId,
+                ) { newId ->
+                    onUpdate(section.copy(control = control.copy(selectedId = newId)))
+                }
             is FilterControl.Radio ->
                 RadioControl(
                     sectionId = section.id,
@@ -338,6 +346,55 @@ private fun ChipGroupControl(
                         .semantics {
                             contentDescription = option.label
                             role = Role.Checkbox
+                            selected = isOn
+                        },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = option.label,
+                    fontSize = 14.sp,
+                    fontWeight = if (isOn) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (isOn) PantopusColors.primary600 else PantopusColors.appText,
+                )
+            }
+        }
+    }
+}
+
+// ─── Single-select chip group ──────────────────────
+
+@Composable
+private fun SingleChipControl(
+    sectionId: String,
+    options: List<FilterOption>,
+    selectedId: String?,
+    onChange: (String?) -> Unit,
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        options.forEach { option ->
+            val isOn = selectedId == option.id
+            Box(
+                modifier =
+                    Modifier
+                        .heightIn(min = 44.dp)
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(
+                            if (isOn) PantopusColors.primary50 else PantopusColors.appSurface,
+                        ).border(
+                            width = if (isOn) 1.5.dp else 1.dp,
+                            color = if (isOn) PantopusColors.primary600 else PantopusColors.appBorder,
+                            shape = RoundedCornerShape(Radii.pill),
+                        ).clickable {
+                            onChange(if (isOn) null else option.id)
+                        }.padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                        .testTag("filterSingleChip_${sectionId}_${option.id}")
+                        .semantics {
+                            contentDescription = option.label
+                            role = Role.RadioButton
                             selected = isOn
                         },
                 contentAlignment = Alignment.Center,

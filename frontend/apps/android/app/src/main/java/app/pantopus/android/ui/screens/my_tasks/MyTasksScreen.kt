@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.gigs.MyGigDto
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivityFilterSheet
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 
 /** Test tag on the My tasks V2 root container. */
@@ -29,7 +30,6 @@ const val MY_TASKS_TAG = "my-tasks"
 fun MyTasksScreen(
     onBack: () -> Unit,
     onOpenTask: (MyGigDto) -> Unit,
-    onOpenFilters: () -> Unit = {},
     onOpenBids: (MyGigDto) -> Unit = {},
     onEditTask: (MyGigDto) -> Unit = {},
     onMessageWorker: (MyGigDto) -> Unit = {},
@@ -44,11 +44,12 @@ fun MyTasksScreen(
     val banner by viewModel.banner.collectAsStateWithLifecycle()
     val tabs by viewModel.tabs.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
+    val showFilterSheet by viewModel.showFilterSheet.collectAsStateWithLifecycle()
+    val activityFilter by viewModel.activityFilter.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.bindCallbacks(
             onOpenTask = onOpenTask,
-            onOpenFilters = onOpenFilters,
             onOpenBids = onOpenBids,
             onEditTask = onEditTask,
             onMessageWorker = onMessageWorker,
@@ -72,6 +73,17 @@ fun MyTasksScreen(
             fab = fab,
             banner = banner,
             onBack = onBack,
+        )
+    }
+
+    if (showFilterSheet) {
+        ActivityFilterSheet(
+            statusTitle = viewModel.statusFilterTitle,
+            statusOptions = viewModel.statusFilterOptions,
+            sortOptions = viewModel.sortFilterOptions,
+            filter = activityFilter,
+            onApply = { viewModel.applyFilter(it) },
+            onDismiss = { viewModel.dismissFilterSheet() },
         )
     }
 }

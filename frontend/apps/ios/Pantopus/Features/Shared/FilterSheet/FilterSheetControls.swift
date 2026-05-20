@@ -48,6 +48,48 @@ struct FilterChipGroupControl: View {
     }
 }
 
+// MARK: - Single-select chip group
+
+@MainActor
+struct FilterSingleChipControl: View {
+    let sectionId: String
+    let options: [FilterOption]
+    let selectedId: String?
+    let onChange: @MainActor (String?) -> Void
+
+    var body: some View {
+        FilterSheetFlowLayout(spacing: Spacing.s2) {
+            ForEach(options) { option in
+                let isOn = selectedId == option.id
+                Button {
+                    onChange(isOn ? nil : option.id)
+                } label: {
+                    Text(option.label)
+                        .font(.system(size: 14, weight: isOn ? .semibold : .regular))
+                        .foregroundStyle(isOn ? Theme.Color.primary600 : Theme.Color.appText)
+                        .padding(.horizontal, Spacing.s3)
+                        .frame(minHeight: 36)
+                        .background(isOn ? Theme.Color.primary50 : Theme.Color.appSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                                .stroke(
+                                    isOn ? Theme.Color.primary600 : Theme.Color.appBorder,
+                                    lineWidth: isOn ? 1.5 : 1
+                                )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+                .accessibilityLabel(option.label)
+                .accessibilityValue(isOn ? "Selected" : "Not selected")
+                .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
+                .accessibilityIdentifier("filterSingleChip_\(sectionId)_\(option.id)")
+            }
+        }
+    }
+}
+
 // MARK: - Radio
 
 @MainActor

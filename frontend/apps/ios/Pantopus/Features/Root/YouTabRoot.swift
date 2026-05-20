@@ -732,9 +732,6 @@ public struct YouTabRoot: View {
                         guard let gigId = dto.gigId ?? dto.gig?.id else { return }
                         Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
                     },
-                    onOpenFilters: {
-                        Task { @MainActor in path.append(.placeholder(label: "Offer filters")) }
-                    },
                     onBrowseListings: {
                         Task { @MainActor in path.append(.placeholder(label: "Browse listings")) }
                     },
@@ -827,9 +824,6 @@ public struct YouTabRoot: View {
                     onOpenPost: { _ in
                         Task { @MainActor in path.append(.placeholder(label: "Post detail")) }
                     },
-                    onOpenFilters: {
-                        Task { @MainActor in path.append(.placeholder(label: "Filter posts")) }
-                    },
                     onCompose: {
                         Task { @MainActor in path.append(.placeholder(label: "Write a post")) }
                     },
@@ -851,9 +845,6 @@ public struct YouTabRoot: View {
                                 path.append(.gigDetail(gigId: gigId))
                             }
                         }
-                    },
-                    onOpenFilters: {
-                        Task { @MainActor in path.append(.placeholder(label: "Filter bids")) }
                     },
                     onBrowseTasks: {
                         Task { @MainActor in path.append(.placeholder(label: "Browse tasks")) }
@@ -880,9 +871,6 @@ public struct YouTabRoot: View {
                 viewModel: MyTasksViewModel(
                     onOpenTask: { dto in
                         Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) }
-                    },
-                    onOpenFilters: {
-                        Task { @MainActor in path.append(.placeholder(label: "Filter tasks")) }
                     },
                     onOpenBids: { dto in
                         // Gig detail's "Manage bids" sheet renders the

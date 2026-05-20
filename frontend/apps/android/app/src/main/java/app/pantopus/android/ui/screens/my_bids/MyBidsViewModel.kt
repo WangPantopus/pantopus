@@ -25,6 +25,9 @@ import app.pantopus.android.data.offers.OffersRepository
 import app.pantopus.android.data.reviews.ReviewsRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.offers.OffersCategory
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivityFilter
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivitySortOrder
+import app.pantopus.android.ui.screens.shared.filter_sheet.FilterOption
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
 import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
@@ -192,7 +195,6 @@ class MyBidsViewModel
         private var nowProvider: () -> Instant = { Instant.now() }
 
         private var openBidHandler: (BidDto) -> Unit = {}
-        private var openFiltersHandler: () -> Unit = {}
         private var browseTasksHandler: () -> Unit = {}
         private var messageClientHandler: (BidDto) -> Unit = {}
 
@@ -210,10 +212,45 @@ class MyBidsViewModel
                 TopBarAction(
                     icon = PantopusIcon.Filter,
                     contentDescription = "Filter bids",
-                    onClick = { openFiltersHandler() },
+                    onClick = { openFilterSheet() },
                 ),
             )
         val topBarAction: StateFlow<TopBarAction?> = _topBarAction.asStateFlow()
+
+        // Activity filter (P5.4)
+        private val _showFilterSheet = MutableStateFlow(false)
+        val showFilterSheet: StateFlow<Boolean> = _showFilterSheet.asStateFlow()
+
+        private val _activityFilter = MutableStateFlow(ActivityFilter())
+        val activityFilter: StateFlow<ActivityFilter> = _activityFilter.asStateFlow()
+
+        /** Section header for the status chips in the sheet. */
+        val statusFilterTitle = "Bid status"
+
+        /** Per-surface status chips (coarse bid lifecycle buckets). */
+        val statusFilterOptions =
+            listOf(
+                FilterOption("pending", "Pending"),
+                FilterOption("accepted", "Accepted"),
+                FilterOption("declined", "Declined"),
+                FilterOption("completed", "Completed"),
+            )
+
+        /** Bids carry an amount, so the full sort set applies. */
+        val sortFilterOptions = ActivitySortOrder.ALL
+
+        fun openFilterSheet() {
+            _showFilterSheet.value = true
+        }
+
+        fun dismissFilterSheet() {
+            _showFilterSheet.value = false
+        }
+
+        fun applyFilter(filter: ActivityFilter) {
+            _activityFilter.value = filter
+            applyState()
+        }
 
         private val _fab =
             MutableStateFlow<FabAction?>(
@@ -250,20 +287,12 @@ class MyBidsViewModel
          */
         fun bindCallbacks(
             onOpenBid: (BidDto) -> Unit,
-            onOpenFilters: () -> Unit,
             onBrowseTasks: () -> Unit,
             onMessageClient: (BidDto) -> Unit,
         ) {
             openBidHandler = onOpenBid
-            openFiltersHandler = onOpenFilters
             browseTasksHandler = onBrowseTasks
             messageClientHandler = onMessageClient
-            _topBarAction.value =
-                TopBarAction(
-                    icon = PantopusIcon.Filter,
-                    contentDescription = "Filter bids",
-                    onClick = { openFiltersHandler() },
-                )
             _fab.value =
                 FabAction(
                     icon = PantopusIcon.Compass,
@@ -334,18 +363,42 @@ class MyBidsViewModel
                 )
             _banner.value = bannerFor(_selectedTab.value, counts)
 
-            val filtered = projections.filter { it.tab == _selectedTab.value }
-            if (filtered.isEmpty()) {
-                _state.value = emptyStateFor(_selectedTab.value)
+            val tabItems = projections.filter { it.tab == _selectedTab.value }
+            val visible =
+                _activityFilter.value.apply(
+                    items = tabItems,
+                    now = now,
+                    statusId = { statusFilterId(it.status) },
+                    date = { parseInstant(it.dto.createdAt) },
+                    value = { it.dto.bidAmount },
+                )
+            if (visible.isEmpty()) {
+                _state.value =
+                    if (_activityFilter.value.isActive && tabItems.isNotEmpty()) {
+                        filteredEmptyState()
+                    } else {
+                        emptyStateFor(_selectedTab.value)
+                    }
                 return
             }
-            val rows = filtered.map { row(it, now) }
+            val rows = visible.map { row(it, now) }
             _state.value =
                 ListOfRowsUiState.Loaded(
                     sections = listOf(RowSection(id = _selectedTab.value, rows = rows)),
                     hasMore = false,
                 )
         }
+
+        private fun filteredEmptyState(): ListOfRowsUiState.Empty =
+            ListOfRowsUiState.Empty(
+                icon = PantopusIcon.Filter,
+                headline = "No bids match your filters",
+                subcopy =
+                    "Try a different status, date range, or sort — or clear " +
+                        "your filters to see everything in this tab.",
+                ctaTitle = "Clear filters",
+                onCta = { applyFilter(ActivityFilter()) },
+            )
 
         private fun emptyStateFor(tab: String): ListOfRowsUiState.Empty =
             when (tab) {
@@ -852,6 +905,17 @@ class MyBidsViewModel
                 when (projection.status) {
                     is MyBidsStatus.NotSelected, is MyBidsStatus.TaskCancelled -> RowHighlight.Muted
                     else -> null
+                }
+
+            /** Map a derived bid status onto one of the four filter chip ids. */
+            fun statusFilterId(status: MyBidsStatus): String =
+                when (status) {
+                    is MyBidsStatus.TopBid, is MyBidsStatus.Shortlisted, is MyBidsStatus.Pending,
+                    is MyBidsStatus.Outbid, is MyBidsStatus.Expiring,
+                    -> "pending"
+                    is MyBidsStatus.Accepted, is MyBidsStatus.Scheduled -> "accepted"
+                    is MyBidsStatus.NotSelected, is MyBidsStatus.TaskCancelled -> "declined"
+                    is MyBidsStatus.Paid, is MyBidsStatus.LeaveReview -> "completed"
                 }
 
             fun metaTail(

@@ -54,6 +54,11 @@ public struct FilterRange: Sendable, Hashable {
 public enum FilterControl: Sendable, Hashable {
     /// Horizontal flow of selectable pill chips. Multi-select.
     case chipGroup(options: [FilterOption], selectedIds: Set<String>)
+    /// Horizontal flow of selectable pill chips. Single-select —
+    /// `selectedId == nil` means "no selection". Used for preset-style
+    /// dimensions that read as chips but only allow one value (e.g. a
+    /// date-range preset).
+    case singleChip(options: [FilterOption], selectedId: String?)
     /// Stack of rows, single selection only. `selectedId == nil` means
     /// "no selection" — typically only valid for filter dimensions
     /// that allow an unset state.
@@ -70,6 +75,8 @@ public enum FilterControl: Sendable, Hashable {
         switch self {
         case let .chipGroup(options, _):
             .chipGroup(options: options, selectedIds: [])
+        case let .singleChip(options, _):
+            .singleChip(options: options, selectedId: nil)
         case let .radio(options, _):
             .radio(options: options, selectedId: nil)
         case let .multiSelect(options, _):

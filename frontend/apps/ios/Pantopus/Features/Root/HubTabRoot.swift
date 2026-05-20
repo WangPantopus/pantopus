@@ -1251,9 +1251,6 @@ public struct HubTabRoot: View {
                             }
                         }
                     },
-                    onOpenFilters: {
-                        Task { @MainActor in push(.placeholder(label: "Filter bids")) }
-                    },
                     onBrowseTasks: {
                         Task { @MainActor in push(.gigsFeed) }
                     },
