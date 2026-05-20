@@ -881,8 +881,7 @@ public struct HubTabRoot: View {
                             verified: profile.verified ?? false
                         )))
                     }
-                },
-                onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report")) } }
+                }
             )
         case let .businessProfile(businessId):
             BusinessProfileDestination(

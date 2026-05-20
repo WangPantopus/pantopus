@@ -121,6 +121,11 @@ class PublicProfileViewModel
             _toastMessage.value = null
         }
 
+        /** Surface a transient toast — used by the Report sheet success path. */
+        fun showToast(message: String) {
+            _toastMessage.value = message
+        }
+
         fun setShowOverflow(show: Boolean) {
             _showOverflow.value = show
         }

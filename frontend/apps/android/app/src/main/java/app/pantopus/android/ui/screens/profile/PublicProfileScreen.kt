@@ -19,6 +19,9 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,15 +48,14 @@ import kotlinx.coroutines.delay
  *
  * `onOpenMessages` is invoked with the loaded `PublicProfileDto` so the
  * host nav stack can construct a chat-conversation destination with the
- * profile's user as counterparty. `onOpenReport` lands on the
- * `NotYetAvailableView` placeholder until the Report flow ships.
+ * profile's user as counterparty. The Report flow is presented as a
+ * [ReportUserSheet] hosted locally here, not via the nav graph (per P6.2).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublicProfileScreen(
     onBack: () -> Unit,
     onOpenMessages: (app.pantopus.android.data.api.models.profile.PublicProfileDto) -> Unit = {},
-    onOpenReport: () -> Unit = {},
     viewModel: PublicProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -61,6 +63,8 @@ fun PublicProfileScreen(
     val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
     val showOverflow by viewModel.showOverflow.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState()
+    val reportSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showReportSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -129,9 +133,25 @@ fun PublicProfileScreen(
                     },
                     onReport = {
                         viewModel.setShowOverflow(false)
-                        onOpenReport()
+                        showReportSheet = true
                     },
                     onCancel = { viewModel.setShowOverflow(false) },
+                )
+            }
+        }
+        if (showReportSheet) {
+            val loaded = state as? PublicProfileUiState.Loaded
+            if (loaded != null) {
+                ReportUserSheet(
+                    userId = loaded.content.profile.id,
+                    handle = loaded.content.header.handle,
+                    displayName = loaded.content.header.displayName,
+                    sheetState = reportSheetState,
+                    onDismiss = { showReportSheet = false },
+                    onSubmitted = {
+                        showReportSheet = false
+                        viewModel.showToast("Report received")
+                    },
                 )
             }
         }

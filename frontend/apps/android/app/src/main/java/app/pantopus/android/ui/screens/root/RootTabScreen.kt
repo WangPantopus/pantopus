@@ -1875,7 +1875,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             ),
                         )
                     },
-                    onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report")) },
                 )
             }
             composable(
