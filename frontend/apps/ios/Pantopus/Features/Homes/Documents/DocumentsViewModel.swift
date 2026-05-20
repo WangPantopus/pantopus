@@ -288,9 +288,33 @@ final class DocumentsViewModel: ListOfRowsDataSource {
     // MARK: - Projection
 
     func row(for dto: HomeDocumentDTO, now: Date) -> RowModel {
-        let projection = Self.project(dto: dto, now: now)
-        let fileType = projection.fileType
         let dtoCopy = dto
+        return Self.makeRow(
+            dto: dto,
+            now: now,
+            onOpen: { [onOpenDocument] in onOpenDocument(dtoCopy) },
+            onSecondary: { [onDocumentAction] in
+                // Tapping the kebab opens View by default. A real menu
+                // sheet renders in a follow-up; today we route the
+                // tap to View so the row stays interactive.
+                onDocumentAction(dtoCopy, .view)
+            }
+        )
+    }
+
+    /// Shared row builder so the Documents list and the Document Search
+    /// surface (`DocumentSearchView`) render byte-identical rows. Search
+    /// passes `extraChips` to append matched-tag pills after the
+    /// category / expiry chips.
+    static func makeRow(
+        dto: HomeDocumentDTO,
+        now: Date,
+        extraChips: [RowChip] = [],
+        onOpen: @escaping @Sendable () -> Void,
+        onSecondary: @escaping @Sendable () -> Void
+    ) -> RowModel {
+        let projection = project(dto: dto, now: now)
+        let fileType = projection.fileType
         return RowModel(
             id: projection.id,
             title: projection.filename,
@@ -301,16 +325,11 @@ final class DocumentsViewModel: ListOfRowsDataSource {
                 foreground: fileType.foreground
             ),
             trailing: .kebab,
-            onTap: { [onOpenDocument] in onOpenDocument(dtoCopy) },
-            onSecondary: { [onDocumentAction] in
-                // Tapping the kebab opens View by default. A real menu
-                // sheet renders in a follow-up; today we route the
-                // tap to View so the row stays interactive.
-                onDocumentAction(dtoCopy, .view)
-            },
+            onTap: onOpen,
+            onSecondary: onSecondary,
             body: bodyLine(for: projection),
             bodyIcon: .uploadCloud,
-            chips: chips(for: projection),
+            chips: chips(for: projection) + extraChips,
             metaTail: projection.sharedWithCount > 0
                 ? "Shared \(projection.sharedWithCount)"
                 : projection.sizeLabel
@@ -320,7 +339,7 @@ final class DocumentsViewModel: ListOfRowsDataSource {
     /// Compose the "Uploaded ✕ · by ◯ · v3" body line. Each fragment is
     /// optional; the line drops the leading separator when the first
     /// fragment is missing.
-    private func bodyLine(for projection: DocumentRowProjection) -> String {
+    private static func bodyLine(for projection: DocumentRowProjection) -> String {
         var fragments: [String] = []
         if let uploaded = projection.uploadedLabel {
             fragments.append(uploaded)
@@ -331,7 +350,7 @@ final class DocumentsViewModel: ListOfRowsDataSource {
         return fragments.joined(separator: " · ")
     }
 
-    private func chips(for projection: DocumentRowProjection) -> [RowChip] {
+    private static func chips(for projection: DocumentRowProjection) -> [RowChip] {
         var chips: [RowChip] = [
             RowChip(
                 text: projection.category.label,

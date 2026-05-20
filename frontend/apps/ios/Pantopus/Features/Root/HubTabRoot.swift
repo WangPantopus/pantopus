@@ -37,6 +37,9 @@ public enum HubRoute: Hashable {
     case uploadDocument(homeId: String)
     /// P2.10 — Document detail (preview + metadata + footer actions).
     case documentDetail(homeId: String, documentId: String)
+    /// P4.5 — Document Search surface (search across title / tags /
+    /// category) for a home's vault.
+    case documentSearch(homeId: String)
     /// Packages list for a home (T6.3d / P14).
     case homePackages(homeId: String)
     /// Package detail (read-mostly summary with mark-picked-up).
@@ -702,7 +705,7 @@ public struct HubTabRoot: View {
                     },
                     onSearch: {
                         Task { @MainActor in
-                            push(.placeholder(label: "Search documents"))
+                            push(.documentSearch(homeId: homeId))
                         }
                     },
                     onExport: {
@@ -745,6 +748,22 @@ public struct HubTabRoot: View {
                         push(.uploadDocument(homeId: homeId))
                     }
                 }
+            )
+        case let .documentSearch(homeId):
+            DocumentSearchView(
+                viewModel: DocumentSearchViewModel(
+                    homeId: homeId,
+                    onOpenDocument: { dto in
+                        Task { @MainActor in
+                            push(.documentDetail(homeId: homeId, documentId: dto.id))
+                        }
+                    },
+                    onCancel: {
+                        Task { @MainActor in
+                            if !path.isEmpty { path.removeLast() }
+                        }
+                    }
+                )
             )
         case let .homePackages(homeId):
             PackagesListView(

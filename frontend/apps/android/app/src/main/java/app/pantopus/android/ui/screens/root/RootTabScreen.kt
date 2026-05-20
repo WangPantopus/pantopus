@@ -93,6 +93,7 @@ import app.pantopus.android.ui.screens.homes.documents.DOCUMENTS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENT_DETAIL_DOC_ID_KEY
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENT_DETAIL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.documents.DocumentDetailScreen
+import app.pantopus.android.ui.screens.homes.documents.DocumentSearchScreen
 import app.pantopus.android.ui.screens.homes.documents.DocumentsScreen
 import app.pantopus.android.ui.screens.homes.documents.UPLOAD_DOCUMENT_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.documents.UploadDocumentFormScreen
@@ -343,6 +344,12 @@ private object ChildRoutes {
         homeId: String,
         documentId: String,
     ): String = "homes/$homeId/docs/$documentId"
+
+    /** P4.5 — Document Search surface (title / tags / category). */
+    const val DOCUMENT_SEARCH = "homes/{$DOCUMENTS_HOME_ID_KEY}/docs/search"
+
+    /** Build the concrete path for the document search screen. */
+    fun documentSearch(homeId: String): String = "homes/$homeId/docs/search"
 
     /** Packages list per home (T6.3d / P14). */
     const val HOME_PACKAGES = "homes/{$PACKAGES_HOME_ID_KEY}/packages"
@@ -1499,12 +1506,23 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onUpload = {
                         navController.navigate(ChildRoutes.uploadDocument(docsHomeId))
                     },
-                    onSearch = { navController.navigate(ChildRoutes.placeholder("Search documents")) },
+                    onSearch = { navController.navigate(ChildRoutes.documentSearch(docsHomeId)) },
                     onExport = { navController.navigate(ChildRoutes.placeholder("Export documents")) },
                     onDocumentAction = { dto, _ ->
                         navController.navigate(ChildRoutes.documentDetail(dto.homeId, dto.id))
                     },
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = ChildRoutes.DOCUMENT_SEARCH,
+                arguments = listOf(navArgument(DOCUMENTS_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                DocumentSearchScreen(
+                    onOpenDocument = { dto ->
+                        navController.navigate(ChildRoutes.documentDetail(dto.homeId, dto.id))
+                    },
+                    onCancel = { navController.popBackStack() },
                 )
             }
             composable(
