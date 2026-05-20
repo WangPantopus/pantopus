@@ -10,8 +10,6 @@
 //
 //  Mirrors the Android `EditAccessCodeFormScreen` Composable.
 //
-// swiftlint:disable file_length
-
 import SwiftUI
 
 /// Stable a11y identifiers (mirror naming with Android testTags).
@@ -34,7 +32,7 @@ public struct EditAccessCodeFormView: View {
     @State private var viewModel: EditAccessCodeFormViewModel
     private let onClose: @MainActor () -> Void
 
-    public init(
+    init(
         homeId: String,
         secretId: String? = nil,
         initialCategory: AccessCategory? = nil,
@@ -58,13 +56,14 @@ public struct EditAccessCodeFormView: View {
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: onClose,
-            onCommit: { Task { await viewModel.submit() } }
-        ) {
-            categorySection
-            detailsSection
-            notesSection
-            sharedWithSection
-        }
+            onCommit: { Task { await viewModel.submit() } },
+            content: {
+                categorySection
+                detailsSection
+                notesSection
+                sharedWithSection
+            }
+        )
         .accessibilityIdentifier(EditAccessCodeA11y.screen)
         .formShakeOnChange(of: viewModel.shakeTrigger)
         .overlay(alignment: .bottom) { toastOverlay }
@@ -81,10 +80,9 @@ public struct EditAccessCodeFormView: View {
 
     private var categorySection: some View {
         FormFieldGroup("Category") {
-            CategoryGrid(
-                selected: viewModel.category,
-                onSelect: { viewModel.selectCategory($0) }
-            )
+            CategoryGrid(selected: viewModel.category) {
+                viewModel.selectCategory($0)
+            }
         }
     }
 
@@ -123,9 +121,10 @@ public struct EditAccessCodeFormView: View {
                     VisibilityRow(
                         scope: scope,
                         isSelected: viewModel.visibility == scope,
-                        rosterSummary: viewModel.rosterSummary(for: scope),
-                        onSelect: { viewModel.selectVisibility(scope) }
-                    )
+                        rosterSummary: viewModel.rosterSummary(for: scope)
+                    ) {
+                        viewModel.selectVisibility(scope)
+                    }
                 }
                 if !viewModel.sharedWithNames().isEmpty {
                     MemberPreviewStrip(names: viewModel.sharedWithNames())
@@ -195,9 +194,10 @@ private struct CategoryGrid: View {
             ForEach(AccessCategory.displayOrder, id: \.self) { category in
                 CategoryTile(
                     category: category,
-                    isSelected: category == selected,
-                    onSelect: { onSelect(category) }
-                )
+                    isSelected: category == selected
+                ) {
+                    onSelect(category)
+                }
             }
         }
         .accessibilityIdentifier(EditAccessCodeA11y.categoryGrid)
@@ -458,5 +458,3 @@ private struct MemberPreviewStrip: View {
         secretId: "secret_1"
     ) {}
 }
-
-// swiftlint:enable file_length

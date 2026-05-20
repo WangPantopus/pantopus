@@ -430,8 +430,11 @@ class EditAccessCodeFormViewModel
             val valueEmpty =
                 current.fields[EditAccessCodeField.Value]?.value?.trim().isNullOrEmpty()
             if (firstInvalid == null) {
-                if (labelEmpty) firstInvalid = EditAccessCodeField.Label
-                else if (valueEmpty) firstInvalid = EditAccessCodeField.Value
+                if (labelEmpty) {
+                    firstInvalid = EditAccessCodeField.Label
+                } else if (valueEmpty) {
+                    firstInvalid = EditAccessCodeField.Value
+                }
             }
             return firstInvalid
         }
