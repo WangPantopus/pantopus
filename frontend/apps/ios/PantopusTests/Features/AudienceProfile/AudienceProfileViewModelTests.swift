@@ -305,16 +305,8 @@ final class AudienceProfileViewModelTests: XCTestCase {
 
     func testSortMostEngagedTieBreaksOnLongerTenure() {
         let rows = [
-            FollowerRowContent(
-                id: "a", displayName: "A", handle: "@a", avatarUrl: nil,
-                tierName: "Members", tierRank: 2, tenureLabel: "1 mo.",
-                tenureMonths: 1, joinedMonth: nil, verifiedLocal: false
-            ),
-            FollowerRowContent(
-                id: "b", displayName: "B", handle: "@b", avatarUrl: nil,
-                tierName: "Members", tierRank: 2, tenureLabel: "9 mo.",
-                tenureMonths: 9, joinedMonth: nil, verifiedLocal: false
-            )
+            follower(id: "a", tierRank: 2, tenureMonths: 1),
+            follower(id: "b", tierRank: 2, tenureMonths: 9)
         ]
         let sorted = AudienceProfileViewModel.sortFollowers(rows, by: .mostEngaged)
         XCTAssertEqual(sorted.map(\.id), ["b", "a"])
@@ -360,5 +352,29 @@ final class AudienceProfileViewModelTests: XCTestCase {
         }
         let chip = loaded.tierChips.first { $0.id == "tier_1" }
         XCTAssertEqual(chip?.count, 8)
+    }
+}
+
+private extension AudienceProfileViewModelTests {
+    /// Builds a `FollowerRowContent` fixture, defaulting the fields a test
+    /// doesn't care about so call sites stay on one line.
+    func follower(
+        id: String,
+        tierRank: Int,
+        tenureMonths: Int,
+        tierName: String = "Members"
+    ) -> FollowerRowContent {
+        FollowerRowContent(
+            id: id,
+            displayName: id.uppercased(),
+            handle: "@\(id)",
+            avatarUrl: nil,
+            tierName: tierName,
+            tierRank: tierRank,
+            tenureLabel: "\(tenureMonths) mo.",
+            tenureMonths: tenureMonths,
+            joinedMonth: nil,
+            verifiedLocal: false
+        )
     }
 }
