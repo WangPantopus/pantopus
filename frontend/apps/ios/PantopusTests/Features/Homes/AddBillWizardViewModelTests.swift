@@ -25,7 +25,7 @@ private enum AddBillFixtures {
         dueDate: String = "2026-06-01",
         scheduleKey: String? = "monthly"
     ) -> String {
-        let scheduleField: String =
+        let scheduleField =
             if let scheduleKey { "\"schedule\":\"\(scheduleKey)\",\"frequency\":\"\(scheduleKey)\"" } else { "" }
         return """
         {

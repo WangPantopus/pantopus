@@ -259,9 +259,9 @@ private struct SuccessStep: View {
                     ? "Your changes are saved. The detail will reflect them now."
                     : "You can mark it paid or review the schedule from the Bills list."
             )
-                .pantopusTextStyle(.body)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center)
+            .pantopusTextStyle(.body)
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.top, Spacing.s6)

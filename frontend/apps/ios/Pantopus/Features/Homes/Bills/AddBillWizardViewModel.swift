@@ -187,7 +187,7 @@ final class AddBillWizardViewModel: WizardModel {
         let creating = !isEditing
         switch currentStep {
         case .details:
-            WizardChrome(
+            return WizardChrome(
                 title: isEditing ? "Edit bill" : "Add a bill",
                 progressLabel: .stepOf(current: 1, total: 3),
                 progressFraction: 1.0 / 3.0,
@@ -199,7 +199,7 @@ final class AddBillWizardViewModel: WizardModel {
                 showsProgressBar: true
             )
         case .schedule:
-            WizardChrome(
+            return WizardChrome(
                 title: "Schedule",
                 progressLabel: .stepOf(current: 2, total: 3),
                 progressFraction: 2.0 / 3.0,
@@ -211,7 +211,7 @@ final class AddBillWizardViewModel: WizardModel {
                 showsProgressBar: true
             )
         case .review:
-            WizardChrome(
+            return WizardChrome(
                 title: "Review",
                 progressLabel: .stepOf(current: 3, total: 3),
                 progressFraction: 3.0 / 3.0,
@@ -223,7 +223,7 @@ final class AddBillWizardViewModel: WizardModel {
                 showsProgressBar: true
             )
         case .success:
-            WizardChrome(
+            return WizardChrome(
                 title: creating ? "Bill added" : "Bill updated",
                 progressLabel: .hidden,
                 progressFraction: nil,

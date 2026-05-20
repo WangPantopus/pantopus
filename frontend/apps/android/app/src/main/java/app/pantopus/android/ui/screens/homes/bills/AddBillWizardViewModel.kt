@@ -167,12 +167,13 @@ class AddBillWizardViewModel
             // on create. Older rows may have only `details.frequency`.
             val scheduleKey = bill.details?.get("schedule") ?: bill.details?.get("frequency")
             schedule = AddBillSchedule.fromDetailsKey(scheduleKey)
-            hydratedSnapshot = Snapshot(
-                payee = payee,
-                amount = amount,
-                dueDate = dueDate,
-                schedule = schedule,
-            )
+            hydratedSnapshot =
+                Snapshot(
+                    payee = payee,
+                    amount = amount,
+                    dueDate = dueDate,
+                    schedule = schedule,
+                )
         }
 
         override val chrome: WizardChrome
