@@ -573,6 +573,24 @@ private struct ListingContextHeader: View {
                         Text(config.askPrice)
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(Theme.Color.appText)
+                        if let onEditPrice = config.onEditPrice {
+                            Button {
+                                onEditPrice()
+                            } label: {
+                                Icon(
+                                    .pencil,
+                                    size: 14,
+                                    strokeWidth: 2.0,
+                                    color: Theme.Color.primary600
+                                )
+                                .frame(width: 28, height: 28)
+                                .background(Theme.Color.primary50)
+                                .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Edit price")
+                            .accessibilityIdentifier("listingContextEditPrice")
+                        }
                     }
                     if !config.meta.isEmpty {
                         metaRow
@@ -663,7 +681,9 @@ private struct ListingContextHeader: View {
             }
             Spacer()
             if let sortLabel = config.sortLabel {
-                if let onSort = config.onSort {
+                if !config.sortOptions.isEmpty {
+                    sortMenu(label: sortLabel)
+                } else if let onSort = config.onSort {
                     Button(action: onSort) {
                         sortLabelView(sortLabel)
                     }
@@ -674,6 +694,27 @@ private struct ListingContextHeader: View {
                 }
             }
         }
+    }
+
+    private func sortMenu(label: String) -> some View {
+        Menu {
+            ForEach(config.sortOptions) { option in
+                Button {
+                    option.select()
+                } label: {
+                    if option.isSelected {
+                        Label(option.label, systemImage: "checkmark")
+                    } else {
+                        Text(option.label)
+                    }
+                }
+                .accessibilityIdentifier("listingContextSortOption-\(option.id)")
+            }
+        } label: {
+            sortLabelView(label)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("listingContextSort")
     }
 
     private func sortLabelView(_ label: String) -> some View {
@@ -714,7 +755,7 @@ private struct ListOfRowsErrorBanner: View {
 
 /// Whether a row is rendered inside a grouped section card (Discover hub
 /// style) or as a free-standing card.
-private enum RowCardContext {
+enum RowCardContext {
     case standalone
     case grouped(isLast: Bool)
 
@@ -726,7 +767,28 @@ private enum RowCardContext {
     }
 }
 
-private struct RowView: View {
+/// Public free-standing renderer for a single `RowModel`, so surfaces
+/// that compose their own list container — notably the `SearchListShell`
+/// row builders — reuse the exact list-row visual (leading tile, content
+/// column, trailing slot, highlight chrome) without re-implementing it.
+/// Renders the standalone-card variant; group the rows yourself when you
+/// need the Discover-hub card-stack look.
+public struct ListRowCard: View {
+    private let row: RowModel
+
+    public init(row: RowModel) {
+        self.row = row
+    }
+
+    public var body: some View {
+        RowView(row: row)
+    }
+}
+
+/// Single row card. `internal` (not `private`) so reuse surfaces like the
+/// Document Search results list can render an identical row outside the
+/// `ListOfRowsView` `List` body. Mirrors Android's `internal fun RowView`.
+struct RowView: View {
     let row: RowModel
     var cardContext: RowCardContext = .standalone
 

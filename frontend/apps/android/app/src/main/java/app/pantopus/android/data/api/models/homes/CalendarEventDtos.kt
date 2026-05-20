@@ -52,6 +52,26 @@ data class CreateHomeEventRequest(
     @Json(name = "alerts_enabled") val alertsEnabled: Boolean? = null,
 )
 
+/**
+ * Body for `PUT /api/homes/:id/events/:eventId` — route
+ * `backend/routes/home.js:5082`. All keys optional; the server's
+ * allow-list at line 5090 picks up only present fields. Empty strings
+ * are accepted (and the server stores them verbatim) so the form can
+ * clear location / notes / recurrence on edit.
+ */
+@JsonClass(generateAdapter = true)
+data class UpdateHomeEventRequest(
+    @Json(name = "event_type") val eventType: String? = null,
+    val title: String? = null,
+    val description: String? = null,
+    @Json(name = "start_at") val startAt: String? = null,
+    @Json(name = "end_at") val endAt: String? = null,
+    @Json(name = "location_notes") val locationNotes: String? = null,
+    @Json(name = "recurrence_rule") val recurrenceRule: String? = null,
+    @Json(name = "assigned_to") val assignedTo: List<String>? = null,
+    @Json(name = "alerts_enabled") val alertsEnabled: Boolean? = null,
+)
+
 /** Envelope for `POST /api/homes/:id/events` and `PUT …/:eventId`. */
 @JsonClass(generateAdapter = true)
 data class HomeEventResponse(

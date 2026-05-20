@@ -41,6 +41,14 @@ final class PulseComposeSnapshotTests: XCTestCase {
         assertRenders(intent: .announce, fixture: PulseComposeFixture.announceFilled)
     }
 
+    /// Edit-mode prefill — the form opens with every field already
+    /// seeded from the saved post and the intent picker locked. The
+    /// fixture mirrors what the view-model emits after `loadForEdit`
+    /// resolves successfully.
+    func test_pulse_compose_edit_prefilled_renders() {
+        assertRenders(intent: .ask, fixture: PulseComposeFixture.editPrefilledAsk)
+    }
+
     // MARK: - Rendering helper
 
     /// Wraps `PulseComposeContent` in a hosting controller so layout
@@ -137,6 +145,22 @@ enum PulseComposeFixture {
                 title: "Street closure Saturday",
                 body: "Elm between 4th and 6th will be closed 10-2 for the spring parade."
             )
+        )
+    }
+
+    /// Edit-mode fixture for the Ask intent. The intent picker is
+    /// locked (`isIntentLocked: true`) and every field arrives with a
+    /// non-empty `originalValue` so dirty tracking starts at false.
+    static var editPrefilledAsk: PulseComposeContentState {
+        PulseComposeContentState(
+            activeIntent: .ask,
+            identity: .personal,
+            askCategory: .handyman,
+            fields: fields(
+                title: "Need a plumber",
+                body: "Pipe leaking under the kitchen sink. Anyone know someone reliable?"
+            ),
+            isIntentLocked: true
         )
     }
 

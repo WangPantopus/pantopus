@@ -17,6 +17,30 @@
 
 import SwiftUI
 
+/// One row in the top-bar overflow menu. Used by owner-mode listing
+/// detail to surface "Edit listing" without crowding the dock.
+public struct ContentDetailOverflowItem: Sendable {
+    public let label: String
+    public let icon: PantopusIcon?
+    public let identifier: String
+    public let action: @MainActor () -> Void
+    public let role: ButtonRole?
+
+    public init(
+        label: String,
+        icon: PantopusIcon? = nil,
+        identifier: String,
+        role: ButtonRole? = nil,
+        action: @escaping @MainActor () -> Void
+    ) {
+        self.label = label
+        self.icon = icon
+        self.identifier = identifier
+        self.role = role
+        self.action = action
+    }
+}
+
 /// Sticky-dock transactional-detail shell.
 public struct TransactionalDetailShell: View {
     private let state: ContentDetailState
@@ -25,6 +49,7 @@ public struct TransactionalDetailShell: View {
     private let onSecondaryAction: (@MainActor () -> Void)?
     private let onRetry: @MainActor () -> Void
     private let onMessageCounterparty: (@MainActor () -> Void)?
+    private let overflowItems: [ContentDetailOverflowItem]
 
     public init(
         state: ContentDetailState,
@@ -32,7 +57,8 @@ public struct TransactionalDetailShell: View {
         onPrimaryAction: @escaping @MainActor () -> Void = {},
         onSecondaryAction: (@MainActor () -> Void)? = nil,
         onRetry: @escaping @MainActor () -> Void = {},
-        onMessageCounterparty: (@MainActor () -> Void)? = nil
+        onMessageCounterparty: (@MainActor () -> Void)? = nil,
+        overflowItems: [ContentDetailOverflowItem] = []
     ) {
         self.state = state
         self.onBack = onBack
@@ -40,6 +66,7 @@ public struct TransactionalDetailShell: View {
         self.onSecondaryAction = onSecondaryAction
         self.onRetry = onRetry
         self.onMessageCounterparty = onMessageCounterparty
+        self.overflowItems = overflowItems
     }
 
     public var body: some View {
@@ -59,7 +86,7 @@ public struct TransactionalDetailShell: View {
 
     private var loadingFrame: some View {
         VStack(spacing: 0) {
-            topNav(trailing: nil, transparent: false)
+            topNav(trailing: trailingOverflow(transparent: false), transparent: false)
             Spacer()
             ProgressView()
             Spacer()
@@ -69,7 +96,7 @@ public struct TransactionalDetailShell: View {
 
     private func errorFrame(message: String) -> some View {
         VStack(spacing: Spacing.s3) {
-            topNav(trailing: nil, transparent: false)
+            topNav(trailing: trailingOverflow(transparent: false), transparent: false)
             Spacer()
             Icon(.alertCircle, size: 40, color: Theme.Color.error)
             Text("Couldn't load detail")
@@ -104,7 +131,7 @@ public struct TransactionalDetailShell: View {
                         coverView(cover)
                     }
                     if content.cover == nil {
-                        topNav(trailing: nil, transparent: false)
+                        topNav(trailing: trailingOverflow(transparent: false), transparent: false)
                     }
                     contentBody(content)
                     Spacer(minLength: 110)
@@ -112,11 +139,22 @@ public struct TransactionalDetailShell: View {
             }
             .scrollIndicators(.hidden)
             if content.cover != nil {
-                topNav(trailing: nil, transparent: true)
+                topNav(trailing: trailingOverflow(transparent: true), transparent: true)
                     .frame(maxHeight: .infinity, alignment: .top)
             }
             stickyDock(content.dock)
         }
+    }
+
+    /// Build the trailing-nav overflow control. Returns `nil` when no
+    /// items are wired, which short-circuits to the bare back-only top
+    /// bar used by gigs / invoices today.
+    @MainActor
+    private func trailingOverflow(transparent: Bool) -> AnyView? {
+        guard !overflowItems.isEmpty else { return nil }
+        return AnyView(
+            OverflowMenuButton(items: overflowItems, transparent: transparent)
+        )
     }
 
     private func contentBody(_ content: ContentDetailContent) -> some View {
@@ -818,5 +856,36 @@ private struct FlowLayoutCompat: Layout {
             x += size.width + spacing
             lineHeight = max(lineHeight, size.height)
         }
+    }
+}
+
+// MARK: - Overflow menu
+
+/// Trailing top-bar overflow ("...") menu. Renders nothing when the
+/// items list is empty so the bare back-only top bar still hits the
+/// same layout. The transparent variant matches the cover-overlay
+/// chrome — same white-fill chip used for the back button.
+private struct OverflowMenuButton: View {
+    let items: [ContentDetailOverflowItem]
+    let transparent: Bool
+
+    var body: some View {
+        Menu {
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                Button(role: item.role) {
+                    item.action()
+                } label: {
+                    Text(item.label)
+                }
+                .accessibilityIdentifier(item.identifier)
+            }
+        } label: {
+            Icon(.moreVertical, size: 20, strokeWidth: 2.2, color: Theme.Color.appText)
+                .frame(width: 36, height: 36)
+                .background(transparent ? Color.white.opacity(0.85) : Color.clear)
+                .clipShape(Circle())
+        }
+        .accessibilityLabel("More actions")
+        .accessibilityIdentifier("contentDetailOverflowMenu")
     }
 }

@@ -9,6 +9,26 @@
 
 import Foundation
 
+/// Whether the wizard is creating a new listing or editing an existing
+/// one. `.edit` carries the listing id (POST → PATCH switch) and an
+/// optional `jumpToStep` that lets entry points like "Edit price" land
+/// on the price step instead of step one.
+public enum ListingComposeMode: Sendable, Hashable {
+    case create
+    case edit(listingId: String, jumpToStep: ListingComposeStep?)
+
+    /// Convenience: the listing id when editing, else nil.
+    public var editingListingId: String? {
+        if case let .edit(listingId, _) = self { return listingId }
+        return nil
+    }
+
+    public var isEdit: Bool {
+        if case .edit = self { return true }
+        return false
+    }
+}
+
 /// The six pre-success steps of the Snap & Sell wizard, in order.
 public enum ListingComposeStep: Int, CaseIterable, Sendable {
     case photos = 0

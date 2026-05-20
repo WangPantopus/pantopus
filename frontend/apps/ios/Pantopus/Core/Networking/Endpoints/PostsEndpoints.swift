@@ -43,6 +43,13 @@ public enum PostsEndpoints {
         Endpoint(method: .post, path: "/api/posts", body: body)
     }
 
+    /// `PATCH /api/posts/:id` — author-only edit. Body keys are validated
+    /// by `updatePostSchema` at `backend/routes/posts.js:298-328`. Route
+    /// `backend/routes/posts.js:2428`.
+    public static func updatePost(id: String, body: PostUpdateRequest) -> Endpoint {
+        Endpoint(method: .patch, path: "/api/posts/\(id)", body: body)
+    }
+
     /// `GET /api/posts/:id` — route `backend/routes/posts.js:2354`.
     public static func detail(id: String) -> Endpoint {
         Endpoint(method: .get, path: "/api/posts/\(id)")

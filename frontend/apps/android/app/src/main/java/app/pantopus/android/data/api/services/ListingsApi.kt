@@ -11,9 +11,12 @@ import app.pantopus.android.data.api.models.listings.ListingsNearbyResponse
 import app.pantopus.android.data.api.models.listings.MessageListingBody
 import app.pantopus.android.data.api.models.listings.MessageListingResponse
 import app.pantopus.android.data.api.models.listings.MyListingsResponse
+import app.pantopus.android.data.api.models.listings.UpdateListingRequest
+import app.pantopus.android.data.api.models.listings.UpdateListingResponse
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -23,7 +26,8 @@ import retrofit2.http.Query
  * in-bounds for the Nearby map; T2.5 adds browse / nearby / categories
  * / save for the Marketplace tab.
  */
-interface ListingsApi {
+@Suppress("LongParameterList")
+interface ListingsReadApi {
     /** `GET /api/listings/browse` — paginated browse with bbox filter. */
     @GET("api/listings/browse")
     suspend fun browse(
@@ -93,11 +97,26 @@ interface ListingsApi {
     @GET("api/listings/categories")
     suspend fun categories(): ListingsCategoriesResponse
 
+    /** `GET /api/listings/:id` — single-listing detail wrapper. */
+    @GET("api/listings/{id}")
+    suspend fun detail(
+        @Path("id") id: String,
+    ): ListingDetailResponse
+}
+
+interface ListingsMutationApi {
     /** `POST /api/listings` — create a new listing. Route `backend/routes/listings.js:426`. */
     @POST("api/listings")
     suspend fun create(
         @Body body: CreateListingRequest,
     ): CreateListingResponse
+
+    /** `PATCH /api/listings/:id` — owner-only update. Route `backend/routes/listings.js:1479`. */
+    @PATCH("api/listings/{id}")
+    suspend fun update(
+        @Path("id") id: String,
+        @Body body: UpdateListingRequest,
+    ): UpdateListingResponse
 
     /** `POST /api/listings/:id/save` — bookmark. */
     @POST("api/listings/{id}/save")
@@ -110,12 +129,6 @@ interface ListingsApi {
     suspend fun unsave(
         @Path("id") id: String,
     ): ListingSaveResponse
-
-    /** `GET /api/listings/:id` — single-listing detail wrapper. */
-    @GET("api/listings/{id}")
-    suspend fun detail(
-        @Path("id") id: String,
-    ): ListingDetailResponse
 
     /** `POST /api/listings/:id/message` — buyer → seller message / offer. */
     @POST("api/listings/{id}/message")

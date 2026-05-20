@@ -5,6 +5,11 @@ package app.pantopus.android.ui.screens.compose.pulse
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.posts.PostCreateRequest
 import app.pantopus.android.data.api.models.posts.PostCreateResponse
+import app.pantopus.android.data.api.models.posts.PostDetailDto
+import app.pantopus.android.data.api.models.posts.PostDetailResponse
+import app.pantopus.android.data.api.models.posts.PostUpdateRequest
+import app.pantopus.android.data.api.models.posts.PostUpdateResponse
+import app.pantopus.android.data.api.models.posts.PostUpdateResponsePost
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.network.NetworkMonitor
@@ -319,4 +324,247 @@ class PulseComposeViewModelTest {
         assertEquals("Need help with this.", vm.fields.value[PulseComposeField.Body]?.value)
         assertEquals(PulseComposeIntent.Announce, vm.activeIntent.value)
     }
+
+    // MARK: - Edit mode (P3.5)
+
+    private fun editViewModel(postId: String = "p_42"): PulseComposeViewModel {
+        val savedState =
+            SavedStateHandle().apply {
+                set(PulseComposeViewModel.POST_ID_KEY, postId)
+            }
+        return PulseComposeViewModel(repo, networkMonitor, savedState)
+    }
+
+    private data class SamplePost(
+        val postType: String,
+        val content: String,
+        val title: String? = null,
+        val visibility: String = "neighborhood",
+        val metadata: SamplePostMetadata = SamplePostMetadata(),
+    )
+
+    private data class SamplePostMetadata(
+        val eventDate: String? = null,
+        val eventVenue: String? = null,
+        val lostFoundType: String? = null,
+        val serviceCategory: String? = null,
+        val dealBusinessName: String? = null,
+    )
+
+    private fun samplePost(sample: SamplePost): PostDetailDto =
+        PostDetailDto(
+            id = "p_42",
+            userId = "u_1",
+            title = sample.title,
+            content = sample.content,
+            postType = sample.postType,
+            postFormat = null,
+            purpose = null,
+            mediaUrls = emptyList(),
+            mediaTypes = null,
+            mediaLiveUrls = emptyList(),
+            createdAt = "2026-05-19T00:00:00Z",
+            updatedAt = null,
+            isEdited = null,
+            likeCount = 0,
+            commentCount = 0,
+            shareCount = null,
+            viewCount = null,
+            creator = null,
+            home = null,
+            userHasLiked = false,
+            userHasSaved = false,
+            userHasReposted = false,
+            comments = emptyList(),
+            visibility = sample.visibility,
+            eventDate = sample.metadata.eventDate,
+            eventVenue = sample.metadata.eventVenue,
+            lostFoundType = sample.metadata.lostFoundType,
+            serviceCategory = sample.metadata.serviceCategory,
+            dealBusinessName = sample.metadata.dealBusinessName,
+        )
+
+    @Test fun isEditingTrueWhenPostIdProvided() {
+        val vm = editViewModel()
+        assertTrue(vm.isEditing)
+        assertEquals("p_42", vm.editingPostId)
+        assertEquals("Edit post", vm.displayTitle)
+        assertEquals("Save", vm.ctaLabel)
+        assertTrue(vm.isIntentLocked)
+    }
+
+    @Test fun isEditingFalseInCreateMode() {
+        val vm = viewModel(PulseComposeIntent.Ask)
+        assertFalse(vm.isEditing)
+        assertNull(vm.editingPostId)
+        assertEquals("New post", vm.displayTitle)
+        assertEquals("Post", vm.ctaLabel)
+        assertFalse(vm.isIntentLocked)
+    }
+
+    @Test fun selectIntentLockedInEditMode() {
+        val vm = editViewModel()
+        vm.selectIntent(PulseComposeIntent.Announce)
+        assertEquals(PulseComposeIntent.Ask, vm.activeIntent.value)
+    }
+
+    @Test fun loadForEditAskPrefillSeedsFields() =
+        runTest {
+            coEvery { repo.detail("p_42") } returns
+                NetworkResult.Success(
+                    PostDetailResponse(
+                        post =
+                            samplePost(
+                                SamplePost(
+                                    postType = "ask_local",
+                                    content = "Pipe is leaking.",
+                                    title = "Need a plumber",
+                                    metadata = SamplePostMetadata(serviceCategory = "cleaning"),
+                                ),
+                            ),
+                    ),
+                )
+            val vm = editViewModel()
+            assertTrue(vm.prefillState.value is PulseComposePrefillState.Loading)
+            vm.loadForEdit()
+            assertTrue(vm.prefillState.value is PulseComposePrefillState.Ready)
+            assertEquals(PulseComposeIntent.Ask, vm.activeIntent.value)
+            assertEquals("Need a plumber", vm.fields.value[PulseComposeField.Title]?.value)
+            assertEquals("Pipe is leaking.", vm.fields.value[PulseComposeField.Body]?.value)
+            assertEquals(PulseAskCategory.Cleaning, vm.askCategory.value)
+            // Re-baselined — every field starts non-dirty.
+            assertFalse(vm.isDirty)
+        }
+
+    @Test fun loadForEditRecommendUnwrapsStarsAndBody() =
+        runTest {
+            coEvery { repo.detail("p_42") } returns
+                NetworkResult.Success(
+                    PostDetailResponse(
+                        post =
+                            samplePost(
+                                SamplePost(
+                                    postType = "recommendation",
+                                    content = "★★★★☆\n\nGreat lattes.",
+                                    metadata = SamplePostMetadata(dealBusinessName = "Joe's Coffee"),
+                                ),
+                            ),
+                    ),
+                )
+            val vm = editViewModel()
+            vm.loadForEdit()
+            assertEquals(PulseComposeIntent.Recommend, vm.activeIntent.value)
+            assertEquals(4, vm.recommendRating.value)
+            assertEquals("Great lattes.", vm.fields.value[PulseComposeField.Body]?.value)
+            assertEquals("Joe's Coffee", vm.fields.value[PulseComposeField.RecommendBusiness]?.value)
+            assertFalse(vm.isDirty)
+        }
+
+    @Test fun loadForEditLostUnwrapsLastSeenPrefix() =
+        runTest {
+            coEvery { repo.detail("p_42") } returns
+                NetworkResult.Success(
+                    PostDetailResponse(
+                        post =
+                            samplePost(
+                                SamplePost(
+                                    postType = "lost_found",
+                                    content = "Last seen: 5th & Elm\n\nMochi the cat.",
+                                    metadata = SamplePostMetadata(lostFoundType = "lost"),
+                                ),
+                            ),
+                    ),
+                )
+            val vm = editViewModel()
+            vm.loadForEdit()
+            assertEquals(PulseComposeIntent.Lost, vm.activeIntent.value)
+            assertEquals("5th & Elm", vm.fields.value[PulseComposeField.LostLastSeenLocation]?.value)
+            assertEquals("Mochi the cat.", vm.fields.value[PulseComposeField.Body]?.value)
+            assertEquals(PulseLostFoundKind.Lost, vm.lostFoundKind.value)
+            assertFalse(vm.isDirty)
+        }
+
+    @Test fun loadForEditEventNormalizesISODate() =
+        runTest {
+            coEvery { repo.detail("p_42") } returns
+                NetworkResult.Success(
+                    PostDetailResponse(
+                        post =
+                            samplePost(
+                                SamplePost(
+                                    postType = "event",
+                                    content = "Bring chairs.",
+                                    title = "Block party",
+                                    metadata =
+                                        SamplePostMetadata(
+                                            eventDate = "2030-08-15T17:00:00Z",
+                                            eventVenue = "Elm Park",
+                                        ),
+                                ),
+                            ),
+                    ),
+                )
+            val vm = editViewModel()
+            vm.loadForEdit()
+            assertEquals(PulseComposeIntent.Event, vm.activeIntent.value)
+            assertEquals("Block party", vm.fields.value[PulseComposeField.Title]?.value)
+            assertEquals("Elm Park", vm.fields.value[PulseComposeField.EventLocation]?.value)
+            assertEquals("2030-08-15 17:00", vm.fields.value[PulseComposeField.EventDate]?.value)
+            assertFalse(vm.isDirty)
+        }
+
+    @Test fun loadForEditFailureSurfacesPrefillError() =
+        runTest {
+            coEvery { repo.detail("p_42") } returns
+                NetworkResult.Failure(NetworkError.Server(500, "down"))
+            val vm = editViewModel()
+            vm.loadForEdit()
+            assertTrue(vm.prefillState.value is PulseComposePrefillState.Error)
+        }
+
+    @Test fun buildUpdateRequestForAskCarriesEditableFields() {
+        val vm = editViewModel()
+        vm.update(PulseComposeField.Title, "New title")
+        vm.update(PulseComposeField.Body, "Updated body.")
+        vm.selectAskCategory(PulseAskCategory.Advice)
+        val request = vm.buildUpdateRequest()
+        assertEquals("New title", request.title)
+        assertEquals("Updated body.", request.content)
+        assertEquals("advice", request.serviceCategory)
+        assertEquals("neighborhood", request.visibility)
+    }
+
+    @Test fun editSubmitSendsPATCH() =
+        runTest {
+            coEvery { repo.detail("p_42") } returns
+                NetworkResult.Success(
+                    PostDetailResponse(
+                        post =
+                            samplePost(
+                                SamplePost(
+                                    postType = "ask_local",
+                                    content = "Pipe is leaking.",
+                                    title = "Need a plumber",
+                                ),
+                            ),
+                    ),
+                )
+            val updateSlot = slot<PostUpdateRequest>()
+            coEvery { repo.updatePost("p_42", capture(updateSlot)) } returns
+                NetworkResult.Success(
+                    PostUpdateResponse(
+                        message = "Post updated successfully",
+                        post = PostUpdateResponsePost(id = "p_42"),
+                    ),
+                )
+            val vm = editViewModel()
+            vm.loadForEdit()
+            vm.update(PulseComposeField.Body, "Pipe still leaking.")
+            vm.submit()
+            assertTrue(vm.state.value is PulseComposeUiState.Success)
+            assertEquals("p_42", (vm.state.value as PulseComposeUiState.Success).postId)
+            assertTrue(vm.shouldDismiss.value)
+            assertEquals("Saved", vm.toast.value?.text)
+            assertEquals("Pipe still leaking.", updateSlot.captured.content)
+        }
 }

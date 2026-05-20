@@ -14,19 +14,27 @@ public struct PulsePostDetailView: View {
     @State private var viewModel: PulsePostDetailViewModel
     private let onBack: @MainActor () -> Void
     private let onOpenProfile: @MainActor (String) -> Void
+    private let onEdit: @MainActor (String) -> Void
 
     public init(
         postId: String,
+        currentUserId: String? = nil,
         onBack: @escaping @MainActor () -> Void,
-        onOpenProfile: @escaping @MainActor (String) -> Void = { _ in }
+        onOpenProfile: @escaping @MainActor (String) -> Void = { _ in },
+        onEdit: @escaping @MainActor (String) -> Void = { _ in }
     ) {
-        _viewModel = State(initialValue: PulsePostDetailViewModel(postId: postId))
+        _viewModel = State(initialValue: PulsePostDetailViewModel(
+            postId: postId,
+            currentUserId: currentUserId
+        ))
         self.onBack = onBack
         self.onOpenProfile = onOpenProfile
+        self.onEdit = onEdit
     }
 
     public var body: some View {
-        ZStack(alignment: .bottom) {
+        @Bindable var bindable = viewModel
+        return ZStack(alignment: .bottom) {
             content
             if let toast = viewModel.toastMessage {
                 ToastView(message: ToastMessage(text: toast, kind: .error))
@@ -41,6 +49,17 @@ public struct PulsePostDetailView: View {
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("pulsePostDetail")
         .task { await viewModel.load() }
+        .confirmationDialog(
+            "Post options",
+            isPresented: $bindable.showsOverflowMenu,
+            titleVisibility: .hidden
+        ) {
+            if case let .loaded(detail) = viewModel.state {
+                Button("Edit post") { onEdit(detail.post.id) }
+                    .accessibilityIdentifier("pulsePostDetail-edit")
+            }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 
     @ViewBuilder private var content: some View {
@@ -60,6 +79,7 @@ public struct PulsePostDetailView: View {
         ContentDetailShell(
             title: nil,
             onBack: onBack,
+            topBarAction: viewModel.isOwner ? overflowAction : nil,
             header: {
                 PostAuthorHeader(
                     displayName: detail.authorDisplayName,
@@ -92,6 +112,13 @@ public struct PulsePostDetailView: View {
             },
             cta: { InlineReplyCTA() }
         )
+    }
+
+    private var overflowAction: ContentDetailTopBarAction {
+        ContentDetailTopBarAction(
+            icon: .moreHorizontal,
+            accessibilityLabel: "Post options"
+        ) { Task { @MainActor in viewModel.showsOverflowMenu = true } }
     }
 }
 

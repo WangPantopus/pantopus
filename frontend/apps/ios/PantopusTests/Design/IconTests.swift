@@ -60,7 +60,9 @@ final class IconTests: XCTestCase {
         // T6.6b Chat conversation refresh — header + composer.
         "video", "more-vertical", "hand",
         // P1.3 Broadcast detail — sticky footer + analytics.
-        "reply", "radio-tower"
+        "reply", "radio-tower",
+        // P2.10 Document detail — sticky-footer action glyphs.
+        "external-link", "refresh-cw"
     ]
 
     func testInventoryMatches() {

@@ -17,6 +17,8 @@ public enum YouRoute: Hashable {
     case signOutConfirm
     case mailbox
     case mailItemDetail(mailId: String)
+    /// P4.2 — Mailbox search. Client-side filter over the user's mailbox.
+    case mailboxSearch
     case settings
     case placeholder(label: String)
     /// T5.2.4 — cross-listing Offers (incoming + outgoing).
@@ -30,14 +32,28 @@ public enum YouRoute: Hashable {
     case composeTask
     /// T5.3.3 — My posts. The "me.posts" Activity-section row pushes here.
     case myPosts
+    /// P3.5 — Edit an existing Pulse post. Pushed from the per-row Edit
+    /// CTA on My posts; re-uses the compose flow in edit mode.
+    case editPost(postId: String)
     /// T5.2.3 — Connections. The "me.connections" Personal action tile pushes here.
     case connections
     /// T6.6c (P26.5) — Support Trains. The "me.supportTrains" Personal
     /// action tile pushes here. Personal pillar (mutual-aid surface).
     case supportTrains
+    /// P2.6 — Start-a-Support-Train wizard (organizer compose flow).
+    /// Pushed when the Support Trains FAB / empty-state CTA fires.
+    case startSupportTrain
     /// T6.6c (P26.5) — Review signups (organizer-only) for one Support
     /// Train. Pushed from a Support Trains row tap.
     case reviewSignups(supportTrainId: String)
+    /// P4.6 — Support Trains search. Pushed from the Support Trains list
+    /// top-bar search action; reuses the shared `SearchListShell`.
+    case searchSupportTrains
+    /// P3.7 — Edit Signup form (organizer-side mutation of a helper
+    /// reservation). Pushed from the Review-signups per-row Edit
+    /// action with the seed DTO baked in so the form can prefill
+    /// without a re-fetch.
+    case editSignup(reservation: SupportTrainReservationDTO)
     /// T6.3f / P14 — My homes (avatar-first roster). The "me.homes"
     /// Activity-section row pushes here; tapping a row drills into the
     /// home dashboard via `homeDashboard(homeId:)`.
@@ -79,12 +95,27 @@ public enum YouRoute: Hashable {
     /// action tile + Home Dashboard "calendar" quick-action push here
     /// with the primary home id resolved by the VM.
     case homeCalendar(homeId: String)
+    /// P2.7 — Add / edit calendar event. `eventId` non-nil = edit.
+    case addCalendarEvent(homeId: String, eventId: String?, prefilledCategory: String?)
+    /// P2.7 — Calendar event detail with Edit + Delete actions.
+    case calendarEventDetail(homeId: String, eventId: String)
     /// T6.4b — Emergency info. The home-context "me.emergency" Activity
     /// row pushes here with the primary home id resolved by the VM.
     case homeEmergency(homeId: String)
+    /// P2.8 — Add Emergency Info form.
+    case addEmergencyInfo(homeId: String)
+    /// P2.8 — Emergency item detail.
+    case emergencyItem(homeId: String, emergencyId: String)
     /// T6.4b — Documents. The home-context "me.docs" action tile pushes
     /// here with the primary home id resolved by the VM.
     case homeDocs(homeId: String)
+    /// P2.10 — Upload document form for a home.
+    case uploadDocument(homeId: String)
+    /// P2.10 — Document detail (preview + metadata + footer actions).
+    case documentDetail(homeId: String, documentId: String)
+    /// P4.5 — Document Search surface (search across title / tags /
+    /// category) for a home's vault.
+    case documentSearch(homeId: String)
     /// T6.3d — Packages. The home-context "me.packages" Activity row +
     /// the Home Dashboard "view_packages" quick action push here.
     case homePackages(homeId: String)
@@ -97,6 +128,9 @@ public enum YouRoute: Hashable {
     case homePolls(homeId: String)
     /// T6.3e — Poll detail. Pushed from a Polls list row.
     case pollDetail(homeId: String, pollId: String)
+    /// P2.5 — Start-a-poll composer. Pushed from the Polls list FAB +
+    /// empty-state CTA.
+    case startPoll(homeId: String)
     /// T6.4a — Access codes. Per-home roster of Wi-Fi / Alarm / Gate /
     /// Lockbox / Garage / Smart lock codes. The "me.access" Household-
     /// section row pushes here with the primary home id resolved by
@@ -105,14 +139,37 @@ public enum YouRoute: Hashable {
     /// rendered under the title while the underlying home payload is
     /// in flight or unavailable.
     case accessCodes(homeId: String, homeName: String?)
+    /// P3.1 — Add (no secretId) / Edit (with secretId) access code.
+    /// `category` is set when the user lands here from the empty-state
+    /// quick-start chips so the form pre-selects the matching tile.
+    case editAccessCode(homeId: String, secretId: String?, categoryRaw: String?)
+    /// P4.6 — Access codes search. Pushed from the Access codes list
+    /// top-bar search action; `homeId` scopes the corpus to one home.
+    case searchAccessCodes(homeId: String)
     /// T6.3c / P11 — Household tasks (per-home chore list). The
     /// "me.tasks" Activity-section row pushes here with the primary
     /// home id resolved by the Me VM. Distinct from `.myTasks` which is
     /// the posted-to-neighbours gig list.
     case homeTasks(homeId: String)
+    /// P2.4 — Add a new household task. Reached from the household
+    /// tasks list FAB.
+    case addHouseholdTask(homeId: String)
+    /// P2.4 / P3.6 — Edit an existing household task. Reached from the
+    /// "Edit recurring" overflow action on a Recurring row. Re-uses the
+    /// `AddHouseholdTaskFormView` shell in Edit mode.
+    case editHouseholdTask(homeId: String, taskId: String)
     /// T6.3b / P10 — Maintenance. The home-context "me.maintenance"
     /// action tile pushes here.
     case homeMaintenance(homeId: String)
+    /// P2.9 — Log a maintenance entry. Pushed from the Maintenance list
+    /// FAB; on success the host pops back and refreshes the list.
+    case logMaintenance(homeId: String)
+    /// P2.9 — Maintenance detail for a specific task. Pushed from a
+    /// per-row tap on the Maintenance list.
+    case maintenanceDetail(homeId: String, taskId: String)
+    /// P2.9 — Edit an existing maintenance entry. Re-uses the
+    /// `LogMaintenanceFormView` shell in edit mode.
+    case editMaintenance(homeId: String, taskId: String)
     /// P15 / T6.3g — Owners (legal-title roster). The "me.owners"
     /// Household-section row pushes here with the primary home id
     /// resolved by `MeViewModel.homeSections(...)`.
@@ -131,6 +188,14 @@ public enum YouRoute: Hashable {
     /// Listing detail destination reached from the listing-offers buyer
     /// row tap so the seller can drill back into the canonical view.
     case listingDetail(listingId: String)
+    /// Push the chat conversation for a given counterparty. Payload
+    /// mirrors the Inbox tab's `InboxConversationDestination` so the same
+    /// `ChatConversationView` can host the thread inside the You stack.
+    case chatConversation(InboxConversationDestination)
+    /// P3.3 — Edit an existing listing. Reached from the listing-detail
+    /// overflow ("Edit listing") for the owner, or from the listing-
+    /// offers panel's "Edit price" affordance.
+    case editListing(listingId: String, jumpToStep: ListingComposeStep?)
     #if DEBUG
     case publicProfile(userId: String)
     /// P1.6 — Typed Business Profile screen. Reached today only via
@@ -557,11 +622,59 @@ public struct YouTabRoot: View {
         path.append(.placeholder(label: row.label))
     }
 
+    private func popAfterListingUpdate(_: String) {
+        Task { @MainActor in
+            if !path.isEmpty { path.removeLast() }
+        }
+    }
+
     /// No-op overlay slot — we previously routed debug affordances via
     /// a 5-tap gesture, but the designed DEBUG section in `MeView` now
     /// surfaces them directly.
     private var debugTapTarget: some View {
         EmptyView()
+    }
+
+    /// Two-letter initials derived from a display name. Falls back to
+    /// `··` when the input has no alphanumeric content so the chat header's
+    /// avatar still renders.
+    fileprivate static func initials(from name: String) -> String {
+        let parts = name.split(separator: " ").prefix(2)
+        let joined = parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
+        return joined.isEmpty ? "··" : joined
+    }
+
+    /// Project an `InboxConversationDestination.Mode` onto the
+    /// `ChatThreadMode` consumed by `ChatConversationViewModel`.
+    private static func chatMode(
+        for mode: InboxConversationDestination.Mode
+    ) -> ChatThreadMode {
+        switch mode {
+        case .ai: .ai
+        case let .room(id): .room(id: id)
+        case let .person(otherUserId): .person(otherUserId: otherUserId)
+        }
+    }
+
+    /// Project an `InboxConversationDestination` onto the
+    /// `ChatCounterparty` consumed by `ChatConversationViewModel`.
+    private static func chatCounterparty(
+        for dest: InboxConversationDestination
+    ) -> ChatCounterparty {
+        switch dest.mode {
+        case .ai:
+            .ai(name: dest.displayName)
+        case .room:
+            .group(name: dest.displayName, memberCount: nil)
+        case .person:
+            .person(
+                name: dest.displayName,
+                initials: dest.initials,
+                locality: nil,
+                verified: dest.verified,
+                online: false
+            )
+        }
     }
 
     @ViewBuilder
@@ -575,7 +688,20 @@ public struct YouTabRoot: View {
                     onOpenMail: { mailId in
                         Task { @MainActor in path.append(.mailItemDetail(mailId: mailId)) }
                     },
-                    onOpenSearch: { path.append(.placeholder(label: "Mail search")) }
+                    onOpenSearch: { path.append(.mailboxSearch) }
+                )
+            )
+        case .mailboxSearch:
+            MailboxSearchView(
+                viewModel: MailboxSearchViewModel(
+                    onOpenMail: { mailId in
+                        Task { @MainActor in path.append(.mailItemDetail(mailId: mailId)) }
+                    },
+                    onCancel: {
+                        Task { @MainActor in
+                            if !path.isEmpty { path.removeLast() }
+                        }
+                    }
                 )
             )
         case let .mailItemDetail(mailId):
@@ -606,9 +732,6 @@ public struct YouTabRoot: View {
                         guard let gigId = dto.gigId ?? dto.gig?.id else { return }
                         Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
                     },
-                    onOpenFilters: {
-                        Task { @MainActor in path.append(.placeholder(label: "Offer filters")) }
-                    },
                     onBrowseListings: {
                         Task { @MainActor in path.append(.placeholder(label: "Browse listings")) }
                     },
@@ -621,17 +744,45 @@ public struct YouTabRoot: View {
             GigDetailView(
                 viewModel: GigDetailViewModel(gigId: gigId),
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onMessage: { _ in
-                    Task { @MainActor in path.append(.placeholder(label: "Messages")) }
+                onMessage: { gig in
+                    Task { @MainActor in
+                        guard let posterId = gig.userId else { return }
+                        let name = gig.creator?.name ?? gig.creator?.username ?? gig.title
+                        path.append(.chatConversation(InboxConversationDestination(
+                            mode: .person(otherUserId: posterId),
+                            displayName: name,
+                            initials: Self.initials(from: name),
+                            identityKind: nil,
+                            verified: gig.creator?.verified ?? false
+                        )))
+                    }
                 }
             )
         case let .listingDetail(listingId):
             ListingDetailView(
                 viewModel: ListingDetailViewModel(listingId: listingId),
                 onBack: { if !path.isEmpty { path.removeLast() } },
+                onMessage: { listing in
+                    Task { @MainActor in
+                        guard let sellerId = listing.userId else { return }
+                        let name = listing.title ?? "Seller"
+                        path.append(.chatConversation(InboxConversationDestination(
+                            mode: .person(otherUserId: sellerId),
+                            displayName: name,
+                            initials: Self.initials(from: name),
+                            identityKind: nil,
+                            verified: false
+                        )))
+                    }
+                },
                 onViewOffers: { dto in
                     Task { @MainActor in
                         path.append(.listingOffers(listingId: dto.id, title: dto.title))
+                    }
+                },
+                onEditListing: { dto in
+                    Task { @MainActor in
+                        path.append(.editListing(listingId: dto.id, jumpToStep: nil))
                     }
                 }
             )
@@ -657,15 +808,15 @@ public struct YouTabRoot: View {
                     },
                     onEditPrice: {
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Edit listing"))
-                        }
-                    },
-                    onSort: {
-                        Task { @MainActor in
-                            path.append(.placeholder(label: "Sort offers"))
+                            path.append(.editListing(listingId: listingId, jumpToStep: .price))
                         }
                     }
                 )
+            )
+        case let .editListing(listingId, jumpToStep):
+            ListingComposeWizardView(
+                mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
+                onListingUpdated: popAfterListingUpdate
             )
         case .myPosts:
             MyPostsView(
@@ -673,17 +824,18 @@ public struct YouTabRoot: View {
                     onOpenPost: { _ in
                         Task { @MainActor in path.append(.placeholder(label: "Post detail")) }
                     },
-                    onOpenFilters: {
-                        Task { @MainActor in path.append(.placeholder(label: "Filter posts")) }
-                    },
                     onCompose: {
                         Task { @MainActor in path.append(.placeholder(label: "Write a post")) }
                     },
-                    onEditPost: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Edit post")) }
+                    onEditPost: { dto in
+                        Task { @MainActor in path.append(.editPost(postId: dto.id)) }
                     }
                 )
             )
+        case let .editPost(postId):
+            PulseComposeView(postId: postId) { _ in
+                if !path.isEmpty { path.removeLast() }
+            }
         case .myBids:
             MyBidsView(
                 viewModel: MyBidsViewModel(
@@ -694,36 +846,24 @@ public struct YouTabRoot: View {
                             }
                         }
                     },
-                    onOpenFilters: {
-                        Task { @MainActor in path.append(.placeholder(label: "Filter bids")) }
-                    },
                     onBrowseTasks: {
                         Task { @MainActor in path.append(.placeholder(label: "Browse tasks")) }
                     },
                     onMessageClient: { dto in
-                        // The chat conversation surface lives on HubTabRoot
-                        // today; from You we push to gig detail where the
-                        // "Message poster" CTA opens the same thread.
                         Task { @MainActor in
-                            if let gigId = dto.gigId {
-                                path.append(.gigDetail(gigId: gigId))
-                            }
-                        }
-                    },
-                    onEditBid: { dto in
-                        Task { @MainActor in
-                            if let gigId = dto.gigId {
-                                path.append(.gigDetail(gigId: gigId))
-                            }
-                        }
-                    },
-                    onLeaveReview: { dto in
-                        Task { @MainActor in
-                            if let gigId = dto.gigId {
-                                path.append(.gigDetail(gigId: gigId))
-                            }
+                            guard let posterId = dto.gig?.userId else { return }
+                            let name = dto.gig?.title ?? "Conversation"
+                            path.append(.chatConversation(InboxConversationDestination(
+                                mode: .person(otherUserId: posterId),
+                                displayName: name,
+                                initials: Self.initials(from: name),
+                                identityKind: nil,
+                                verified: false
+                            )))
                         }
                     }
+                    // Edit-bid + Leave-review are presented as sheets from
+                    // inside the screen (P3.4) — no router wiring needed.
                 )
             )
         case .myTasks:
@@ -731,9 +871,6 @@ public struct YouTabRoot: View {
                 viewModel: MyTasksViewModel(
                     onOpenTask: { dto in
                         Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) }
-                    },
-                    onOpenFilters: {
-                        Task { @MainActor in path.append(.placeholder(label: "Filter tasks")) }
                     },
                     onOpenBids: { dto in
                         // Gig detail's "Manage bids" sheet renders the
@@ -768,8 +905,16 @@ public struct YouTabRoot: View {
         case .connections:
             ConnectionsView(
                 viewModel: ConnectionsViewModel(
-                    onMessage: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Messages")) }
+                    onMessage: { target in
+                        Task { @MainActor in
+                            path.append(.chatConversation(InboxConversationDestination(
+                                mode: .person(otherUserId: target.userId),
+                                displayName: target.displayName,
+                                initials: target.initials,
+                                identityKind: nil,
+                                verified: target.verified
+                            )))
+                        }
                     },
                     onFindPeople: {
                         Task { @MainActor in path.append(.placeholder(label: "Find people")) }
@@ -780,15 +925,38 @@ public struct YouTabRoot: View {
             SupportTrainsView(
                 viewModel: SupportTrainsViewModel(
                     onStartTrain: {
-                        Task { @MainActor in path.append(.placeholder(label: "Start a support train")) }
+                        Task { @MainActor in path.append(.startSupportTrain) }
                     },
                     onOpenTrain: { trainId in
                         Task { @MainActor in path.append(.reviewSignups(supportTrainId: trainId)) }
                     },
                     onSearch: {
-                        Task { @MainActor in path.append(.placeholder(label: "Search support trains")) }
+                        Task { @MainActor in path.append(.searchSupportTrains) }
                     }
                 )
+            )
+        case .searchSupportTrains:
+            SupportTrainsSearchView(
+                viewModel: SupportTrainsSearchViewModel(
+                    onOpenTrain: { trainId in
+                        Task { @MainActor in path.append(.reviewSignups(supportTrainId: trainId)) }
+                    },
+                    onCancel: { if !path.isEmpty { path.removeLast() } }
+                )
+            )
+        case .startSupportTrain:
+            StartSupportTrainWizardView(
+                onDismiss: {
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                },
+                onOpenTrain: { trainId in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        path.append(.reviewSignups(supportTrainId: trainId))
+                    }
+                }
             )
         case let .reviewSignups(supportTrainId):
             ReviewSignupsView(
@@ -805,13 +973,17 @@ public struct YouTabRoot: View {
                     onMessage: { _ in
                         Task { @MainActor in path.append(.placeholder(label: "Message helper")) }
                     },
-                    onEdit: { reservationId in
+                    onEdit: { reservation in
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Edit signup · \(reservationId)"))
+                            path.append(.editSignup(reservation: reservation))
                         }
                     }
                 )
             )
+        case let .editSignup(reservation):
+            EditSignupFormView(reservation: reservation) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case .identityCenter:
             IdentityCenterView(
                 onBack: { if !path.isEmpty { path.removeLast() } },
@@ -900,6 +1072,14 @@ public struct YouTabRoot: View {
                     currentUserId: currentUserId ?? ""
                 )
             ) { if !path.isEmpty { path.removeLast() } }
+        case let .chatConversation(dest):
+            ChatConversationView(
+                viewModel: ChatConversationViewModel(
+                    mode: Self.chatMode(for: dest.mode),
+                    counterparty: Self.chatCounterparty(for: dest),
+                    currentUserId: currentUserId ?? ""
+                )
+            ) { if !path.isEmpty { path.removeLast() } }
         case let .homeBills(homeId):
             BillsListView(
                 viewModel: BillsListViewModel(
@@ -920,28 +1100,73 @@ public struct YouTabRoot: View {
                     homeId: homeId,
                     onAddEvent: {
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Add event"))
+                            path.append(.addCalendarEvent(
+                                homeId: homeId,
+                                eventId: nil,
+                                prefilledCategory: nil
+                            ))
                         }
                     },
-                    onOpenEvent: { _ in
+                    onOpenEvent: { eventId in
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Event detail"))
+                            path.append(.calendarEventDetail(homeId: homeId, eventId: eventId))
                         }
                     }
                 )
+            )
+        case let .addCalendarEvent(homeId, eventId, prefilledCategory):
+            CalendarEventFormRoute(
+                homeId: homeId,
+                eventId: eventId,
+                prefilledCategory: prefilledCategory,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCommitted: { event in
+                    switch event {
+                    case let .created(newId):
+                        path.removeAll { route in
+                            if case .addCalendarEvent = route { return true }
+                            return false
+                        }
+                        path.append(.calendarEventDetail(homeId: homeId, eventId: newId))
+                    case let .updated(updatedId):
+                        // Pop both the form AND the stale detail, then
+                        // push the detail again so it re-fetches.
+                        path.removeAll { route in
+                            if case .addCalendarEvent = route { return true }
+                            if case .calendarEventDetail = route { return true }
+                            return false
+                        }
+                        path.append(.calendarEventDetail(homeId: homeId, eventId: updatedId))
+                    }
+                }
+            )
+        case let .calendarEventDetail(homeId, eventId):
+            EventDetailView(
+                homeId: homeId,
+                eventId: eventId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onEdit: { event in
+                    Task { @MainActor in
+                        path.append(.addCalendarEvent(
+                            homeId: homeId,
+                            eventId: event.id,
+                            prefilledCategory: event.eventType
+                        ))
+                    }
+                }
             )
         case let .homeEmergency(homeId):
             EmergencyInfoView(
                 viewModel: EmergencyInfoViewModel(
                     homeId: homeId,
-                    onAction: { _ in
+                    onAction: { dto in
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Emergency item"))
+                            path.append(.emergencyItem(homeId: homeId, emergencyId: dto.id))
                         }
                     },
                     onAdd: {
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Add emergency info"))
+                            path.append(.addEmergencyInfo(homeId: homeId))
                         }
                     },
                     onShare: {
@@ -956,23 +1181,40 @@ public struct YouTabRoot: View {
                     }
                 )
             )
+        case let .addEmergencyInfo(homeId):
+            AddEmergencyInfoFormView(
+                viewModel: AddEmergencyInfoFormViewModel(homeId: homeId) { _ in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
+            )
+        case let .emergencyItem(homeId, emergencyId):
+            EmergencyInfoDetailView(
+                homeId: homeId,
+                emergencyId: emergencyId
+            ) {
+                Task { @MainActor in
+                    if !path.isEmpty { path.removeLast() }
+                }
+            }
         case let .homeDocs(homeId):
             DocumentsView(
                 viewModel: DocumentsViewModel(
                     homeId: homeId,
-                    onOpenDocument: { _ in
+                    onOpenDocument: { dto in
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Document detail"))
+                            path.append(.documentDetail(homeId: homeId, documentId: dto.id))
                         }
                     },
                     onUpload: {
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Upload document"))
+                            path.append(.uploadDocument(homeId: homeId))
                         }
                     },
                     onSearch: {
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Search documents"))
+                            path.append(.documentSearch(homeId: homeId))
                         }
                     },
                     onExport: {
@@ -980,9 +1222,49 @@ public struct YouTabRoot: View {
                             path.append(.placeholder(label: "Export documents"))
                         }
                     },
-                    onDocumentAction: { _, _ in
+                    onDocumentAction: { dto, _ in
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Document action"))
+                            path.append(.documentDetail(homeId: homeId, documentId: dto.id))
+                        }
+                    }
+                )
+            )
+        case let .uploadDocument(homeId):
+            UploadDocumentFormView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onUploaded: { _ in
+                    Task { @MainActor in
+                        path.removeAll { route in
+                            if case .uploadDocument = route { return true }
+                            return false
+                        }
+                    }
+                }
+            )
+        case let .documentDetail(homeId, documentId):
+            DocumentDetailView(
+                homeId: homeId,
+                documentId: documentId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onReplace: {
+                    Task { @MainActor in
+                        path.append(.uploadDocument(homeId: homeId))
+                    }
+                }
+            )
+        case let .documentSearch(homeId):
+            DocumentSearchView(
+                viewModel: DocumentSearchViewModel(
+                    homeId: homeId,
+                    onOpenDocument: { dto in
+                        Task { @MainActor in
+                            path.append(.documentDetail(homeId: homeId, documentId: dto.id))
+                        }
+                    },
+                    onCancel: {
+                        Task { @MainActor in
+                            if !path.isEmpty { path.removeLast() }
                         }
                     }
                 )
@@ -1032,7 +1314,7 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.pollDetail(homeId: homeId, pollId: pollId)) }
                     },
                     onStartPoll: {
-                        Task { @MainActor in path.append(.placeholder(label: "Start a poll")) }
+                        Task { @MainActor in path.append(.startPoll(homeId: homeId)) }
                     }
                 )
             )
@@ -1043,6 +1325,10 @@ public struct YouTabRoot: View {
             ) {
                 if !path.isEmpty { path.removeLast() }
             }
+        case let .startPoll(homeId):
+            StartPollFormView(homeId: homeId) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case let .accessCodes(homeId, homeName):
             AccessCodesView(
                 viewModel: AccessCodesViewModel(
@@ -1051,17 +1337,48 @@ public struct YouTabRoot: View {
                 ) { target in
                     Task { @MainActor in
                         switch target {
-                        case let .addCode(homeId: _, category: category):
-                            let label = category.map { "Add \($0.label) code" } ?? "Add access code"
-                            path.append(.placeholder(label: label))
-                        case .editCode:
-                            path.append(.placeholder(label: "Edit access code"))
-                        case .search:
-                            path.append(.placeholder(label: "Search access codes"))
+                        case let .addCode(homeId: targetHomeId, category: category):
+                            path.append(.editAccessCode(
+                                homeId: targetHomeId,
+                                secretId: nil,
+                                categoryRaw: category?.rawValue
+                            ))
+                        case let .editCode(homeId: targetHomeId, secretId: secretId):
+                            path.append(.editAccessCode(
+                                homeId: targetHomeId,
+                                secretId: secretId,
+                                categoryRaw: nil
+                            ))
+                        case let .search(homeId: targetHomeId):
+                            path.append(.searchAccessCodes(homeId: targetHomeId))
                         }
                     }
                 }
             )
+        case let .searchAccessCodes(homeId):
+            AccessCodesSearchView(
+                viewModel: AccessCodesSearchViewModel(
+                    homeId: homeId,
+                    onOpenCode: { secretId in
+                        Task { @MainActor in
+                            path.append(.editAccessCode(
+                                homeId: homeId,
+                                secretId: secretId,
+                                categoryRaw: nil
+                            ))
+                        }
+                    },
+                    onCancel: { if !path.isEmpty { path.removeLast() } }
+                )
+            )
+        case let .editAccessCode(homeId, secretId, categoryRaw):
+            EditAccessCodeFormView(
+                homeId: homeId,
+                secretId: secretId,
+                initialCategory: categoryRaw.flatMap { AccessCategory(rawValue: $0) }
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case .myHomes:
             MyHomesListView(
                 viewModel: MyHomesListViewModel(
@@ -1144,24 +1461,78 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.placeholder(label: "Task detail")) }
                     },
                     onAddTask: {
-                        Task { @MainActor in path.append(.placeholder(label: "Add a task")) }
+                        Task { @MainActor in path.append(.addHouseholdTask(homeId: homeId)) }
                     },
-                    onEditRecurring: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Edit recurring task")) }
+                    onEditRecurring: { taskId in
+                        Task { @MainActor in
+                            path.append(.editHouseholdTask(homeId: homeId, taskId: taskId))
+                        }
                     }
                 )
             )
+        case let .addHouseholdTask(homeId):
+            AddHouseholdTaskFormView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCreated: { _ in
+                    if !path.isEmpty { path.removeLast() }
+                }
+            )
+        case let .editHouseholdTask(homeId, taskId):
+            AddHouseholdTaskFormView(
+                homeId: homeId,
+                taskId: taskId
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case let .homeMaintenance(homeId):
             MaintenanceListView(
                 viewModel: MaintenanceListViewModel(
                     homeId: homeId,
-                    onOpenTask: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Maintenance detail")) }
+                    onOpenTask: { taskId in
+                        Task { @MainActor in
+                            path.append(.maintenanceDetail(homeId: homeId, taskId: taskId))
+                        }
                     },
                     onAddTask: {
-                        Task { @MainActor in path.append(.placeholder(label: "Log maintenance")) }
+                        Task { @MainActor in path.append(.logMaintenance(homeId: homeId)) }
                     }
                 )
+            )
+        case let .logMaintenance(homeId):
+            LogMaintenanceFormView(
+                viewModel: LogMaintenanceFormViewModel(homeId: homeId),
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onSubmitted: { taskId in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        path.append(.maintenanceDetail(homeId: homeId, taskId: taskId))
+                    }
+                }
+            )
+        case let .maintenanceDetail(homeId, taskId):
+            MaintenanceDetailView(
+                homeId: homeId,
+                taskId: taskId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onEdit: {
+                    Task { @MainActor in
+                        path.append(.editMaintenance(homeId: homeId, taskId: taskId))
+                    }
+                }
+            )
+        case let .editMaintenance(homeId, taskId):
+            LogMaintenanceFormView(
+                viewModel: LogMaintenanceFormViewModel(
+                    homeId: homeId,
+                    mode: .edit(taskId: taskId)
+                ),
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onSubmitted: { _ in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
             )
         case let .homeOwners(homeId):
             let currentUserId: String? = {

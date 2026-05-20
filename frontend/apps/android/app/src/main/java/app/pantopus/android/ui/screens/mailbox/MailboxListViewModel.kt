@@ -95,10 +95,7 @@ class MailboxListViewModel
             reload()
         }
 
-        /**
-         * Top-bar search action. Routes to the search placeholder until
-         * `/api/mailbox` supports a query parameter.
-         */
+        /** Top-bar search action — routes to Mailbox Search (P4.2). */
         fun onSearchTapped() {
             onOpenSearch()
         }
@@ -163,53 +160,66 @@ class MailboxListViewModel
         }
 
         /**
-         * T6.5b (P20) — Map one mail DTO to the design's row anatomy:
-         *  - leading: 40dp category typeIcon (per `mailbox.jsx:4-16`
-         *    accent palette),
-         *  - sender as subtitle,
-         *  - title (display_title || subject),
-         *  - body (preview_text),
-         *  - chips: category + trust,
-         *  - `timeMeta`: relative time,
-         *  - `unread` highlight when `!viewed`.
+         * Maps one mail DTO to the list row, routing taps to this VM's
+         * `onOpenMail`. Delegates to the shared [makeRow] factory so the
+         * mailbox list and Mailbox Search (P4.2) render rows identically.
          */
-        internal fun rowFor(mail: MailItem): RowModel {
-            val category = MailItemCategory.fromRaw(mail.mailType ?: mail.type)
-            val trust = MailTrust.fromRaw(null) // V1 list doesn't surface sender_trust
-            val chips =
-                listOf(
-                    RowChip(
-                        text = category.label,
-                        icon = category.icon,
-                        tint = RowChip.Tint.Custom(category.rowBackground, category.accent),
-                    ),
-                    RowChip(
-                        text = trust.label,
-                        icon = trust.icon,
-                        tint = RowChip.Tint.Custom(trust.background, trust.foreground),
-                    ),
-                )
-            return RowModel(
-                id = mail.id,
-                title = mail.displayTitle ?: mail.subject ?: mail.senderBusinessName ?: "Mail",
-                subtitle = mail.senderBusinessName ?: mail.senderAddress,
-                template = RowTemplate.StatusChip,
-                leading =
-                    RowLeading.TypeIcon(
-                        icon = category.icon,
-                        background = category.rowBackground,
-                        foreground = category.accent,
-                    ),
-                trailing = RowTrailing.None,
-                onTap = { onOpenMail(mail.id) },
-                body = mail.previewText,
-                chips = chips,
-                timeMeta = formatRelativeTime(mail.createdAt),
-                highlight = if (!mail.viewed) RowHighlight.Unread else null,
-            )
-        }
+        internal fun rowFor(mail: MailItem): RowModel = makeRow(mail, onOpenMail)
 
         companion object {
+            /**
+             * T6.5b (P20) — Builds the canonical mailbox row anatomy from a
+             * single mail DTO. Extracted so other surfaces — e.g. Mailbox
+             * Search (P4.2) — reuse the exact projection without
+             * duplicating it (single source of truth, no drift):
+             *  - leading: 40dp category typeIcon (per `mailbox.jsx:4-16`
+             *    accent palette),
+             *  - sender as subtitle,
+             *  - title (display_title || subject),
+             *  - body (preview_text),
+             *  - chips: category + trust,
+             *  - `timeMeta`: relative time,
+             *  - `unread` highlight when `!viewed`.
+             */
+            fun makeRow(
+                mail: MailItem,
+                onOpenMail: (String) -> Unit,
+            ): RowModel {
+                val category = MailItemCategory.fromRaw(mail.mailType ?: mail.type)
+                val trust = MailTrust.fromRaw(null) // V1 list doesn't surface sender_trust
+                val chips =
+                    listOf(
+                        RowChip(
+                            text = category.label,
+                            icon = category.icon,
+                            tint = RowChip.Tint.Custom(category.rowBackground, category.accent),
+                        ),
+                        RowChip(
+                            text = trust.label,
+                            icon = trust.icon,
+                            tint = RowChip.Tint.Custom(trust.background, trust.foreground),
+                        ),
+                    )
+                return RowModel(
+                    id = mail.id,
+                    title = mail.displayTitle ?: mail.subject ?: mail.senderBusinessName ?: "Mail",
+                    subtitle = mail.senderBusinessName ?: mail.senderAddress,
+                    template = RowTemplate.StatusChip,
+                    leading =
+                        RowLeading.TypeIcon(
+                            icon = category.icon,
+                            background = category.rowBackground,
+                            foreground = category.accent,
+                        ),
+                    trailing = RowTrailing.None,
+                    onTap = { onOpenMail(mail.id) },
+                    body = mail.previewText,
+                    chips = chips,
+                    timeMeta = formatRelativeTime(mail.createdAt),
+                    highlight = if (!mail.viewed) RowHighlight.Unread else null,
+                )
+            }
+
             /**
              * Mirrors iOS `MailboxListViewModel.formatRelativeTime`:
              *   < 1m  → "now"

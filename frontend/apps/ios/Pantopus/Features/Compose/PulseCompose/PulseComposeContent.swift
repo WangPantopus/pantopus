@@ -25,6 +25,9 @@ public struct PulseComposeContentState: Equatable {
     public var recommendRating: Int
     public var fields: [PulseComposeField: FormFieldState]
     public var photos: [PulseComposePhoto]
+    /// True when the intent picker should render as a non-interactive
+    /// chip row (edit mode — `post_type` is fixed at create time).
+    public var isIntentLocked: Bool
 
     public init(
         activeIntent: PulseComposeIntent,
@@ -35,7 +38,8 @@ public struct PulseComposeContentState: Equatable {
         askCategory: PulseAskCategory = .handyman,
         recommendRating: Int = 5,
         fields: [PulseComposeField: FormFieldState] = [:],
-        photos: [PulseComposePhoto] = []
+        photos: [PulseComposePhoto] = [],
+        isIntentLocked: Bool = false
     ) {
         self.activeIntent = activeIntent
         self.identity = identity
@@ -46,6 +50,7 @@ public struct PulseComposeContentState: Equatable {
         self.recommendRating = recommendRating
         self.fields = fields
         self.photos = photos
+        self.isIntentLocked = isIntentLocked
     }
 }
 
@@ -125,17 +130,19 @@ public struct PulseComposeContent: View {
 
     private func intentChip(_ intent: PulseComposeIntent) -> some View {
         let active = state.activeIntent == intent
+        let locked = state.isIntentLocked
+        let textColor = active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong
         return Button { actions.onSelectIntent(intent) } label: {
             HStack(spacing: Spacing.s1) {
                 Icon(
                     intent.icon,
                     size: 14,
                     strokeWidth: 2,
-                    color: active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong
+                    color: textColor
                 )
                 Text(intent.label)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
+                    .foregroundStyle(textColor)
             }
             .padding(.horizontal, Spacing.s3)
             .frame(minHeight: 32)
@@ -147,6 +154,8 @@ public struct PulseComposeContent: View {
             .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
         }
         .buttonStyle(.plain)
+        .disabled(locked)
+        .opacity(locked && !active ? 0.4 : 1)
         .accessibilityLabel("\(intent.label) post")
         .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
         .accessibilityIdentifier("composePulseIntentChip_\(intent.rawValue)")

@@ -14,12 +14,12 @@ public struct PublicProfileView: View {
     @State private var viewModel: PublicProfileViewModel
     @State private var showReportSheet = false
     private let onBack: @MainActor () -> Void
-    private let onOpenMessages: @MainActor () -> Void
+    private let onOpenMessages: @MainActor (PublicProfile) -> Void
 
     public init(
         userId: String,
         onBack: @escaping @MainActor () -> Void,
-        onOpenMessages: @escaping @MainActor () -> Void = {}
+        onOpenMessages: @escaping @MainActor (PublicProfile) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: PublicProfileViewModel(userId: userId))
         self.onBack = onBack
@@ -110,7 +110,7 @@ public struct PublicProfileView: View {
                         get: { viewModel.selectedTab },
                         set: { viewModel.selectedTab = $0 }
                     ),
-                    onMessage: { onOpenMessages() },
+                    onMessage: { onOpenMessages(payload.profile) },
                     onConnect: { Task { await viewModel.connect() } },
                     onOverflow: { viewModel.showOverflow = true }
                 )

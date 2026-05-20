@@ -35,6 +35,7 @@ fun ChatConversationHost(
     mode: ChatThreadMode,
     counterparty: ChatCounterparty,
     onBack: () -> Unit,
+    scrollToMessageId: String? = null,
     authViewModel: ChatConversationHostViewModel = hiltViewModel(),
 ) {
     val state by authViewModel.authState.collectAsStateWithLifecycle()
@@ -43,6 +44,7 @@ fun ChatConversationHost(
         mode = mode,
         counterparty = counterparty,
         currentUserId = currentUserId,
+        scrollToMessageId = scrollToMessageId,
         onBack = onBack,
     )
 }

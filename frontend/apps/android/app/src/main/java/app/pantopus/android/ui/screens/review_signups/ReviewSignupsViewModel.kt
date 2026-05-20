@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.support_trains.SupportTrainReservationDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.support_trains.SupportTrainReservationsStore
 import app.pantopus.android.data.support_trains.SupportTrainsRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBackground
@@ -63,6 +64,7 @@ class ReviewSignupsViewModel
     @Inject
     constructor(
         private val repo: SupportTrainsRepository,
+        private val reservationsStore: SupportTrainReservationsStore,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val supportTrainId: String =
@@ -82,6 +84,14 @@ class ReviewSignupsViewModel
 
         private val _chipStrip = MutableStateFlow(makeChipStrip(ReviewSignupsFilter.ALL))
         val chipStrip: StateFlow<ChipStripConfig> = _chipStrip.asStateFlow()
+
+        /**
+         * Bumps every time `EditSignupFormScreen` writes a patch into
+         * the shared store. The screen watches this in a
+         * `LaunchedEffect` and re-applies pending edits — keeps the
+         * row in sync without a re-fetch.
+         */
+        val pendingEditsRevision: StateFlow<Int> = reservationsStore.revision
 
         var onShareTrain: () -> Unit = {}
             set(value) {
@@ -112,6 +122,39 @@ class ReviewSignupsViewModel
             _selectedFilter.value = id
             _chipStrip.value = makeChipStrip(id)
             applyState()
+        }
+
+        /**
+         * Stage the row's reservation in the shared store and fire
+         * [onEditSignup] so the host can navigate. The Edit Signup
+         * form reads the seed from the store on init — keeps the
+         * navigation URL clean (just a reservation id) without
+         * round-tripping the row through the backend.
+         */
+        fun handleEdit(reservation: SupportTrainReservationDto) {
+            reservationsStore.stage(reservation)
+            onEditSignup(reservation.id)
+        }
+
+        /**
+         * Drain pending optimistic patches from the shared store and
+         * replay them into the in-memory cache. Called by the screen
+         * on resume so an Edit committed in `EditSignupFormScreen` is
+         * reflected the moment the user lands back on this screen.
+         */
+        fun applyPendingEdits() {
+            var changed = false
+            reservations =
+                reservations.map { current ->
+                    val patch = reservationsStore.consumePatch(current.id)
+                    if (patch != null) {
+                        changed = true
+                        patch
+                    } else {
+                        current
+                    }
+                }
+            if (changed) applyState()
         }
 
         /**
@@ -202,7 +245,7 @@ class ReviewSignupsViewModel
                         verified = false,
                     ),
                 trailing = RowTrailing.Status(text = chip.first, variant = chip.second),
-                onTap = { onEditSignup(r.id) },
+                onTap = { handleEdit(r) },
                 body = r.noteToRecipient?.let { "“$it”" },
                 timeMeta = shortDateLabel(r),
                 metaTail = metaParts.joinToString(" · ").ifBlank { null },
@@ -263,7 +306,7 @@ class ReviewSignupsViewModel
                                     title = "Edit",
                                     icon = PantopusIcon.Pencil,
                                     variant = CompactButtonVariant.Ghost,
-                                ) { onEditSignup(r.id) },
+                                ) { handleEdit(r) },
                             ),
                     )
                 "confirmed" ->

@@ -32,6 +32,12 @@ public final class ChatConversationViewModel {
     /// Current render state.
     public private(set) var state: ChatConversationState = .loading
 
+    /// Timeline row id (`bubble_<messageId>`) the view should scroll to.
+    /// Set once when the screen is opened from Chat Search with a matched
+    /// message that is present in the loaded page; the view clears it via
+    /// `consumePendingScroll()` after scrolling.
+    public private(set) var pendingScrollTargetId: String?
+
     /// Header counterparty data (drives the top-bar variant).
     public private(set) var counterparty: ChatCounterparty
 
@@ -60,6 +66,10 @@ public final class ChatConversationViewModel {
     private let socket: SocketClient
     private let mode: ChatThreadMode
     private let currentUserId: String
+    /// Message to scroll to on first load (Chat Search deep-link). `nil`
+    /// for normal opens, which land on the latest message.
+    private let scrollToMessageId: String?
+    private var didResolveScrollTarget = false
     private let logger = Logger(label: "app.pantopus.ios.ChatConversation")
 
     private var messages: [ChatMessageDTO] = []
@@ -74,12 +84,14 @@ public final class ChatConversationViewModel {
         mode: ChatThreadMode,
         counterparty: ChatCounterparty,
         currentUserId: String,
+        scrollToMessageId: String? = nil,
         api: APIClient = .shared,
         socket: SocketClient = .shared
     ) {
         self.mode = mode
         self.counterparty = counterparty
         self.currentUserId = currentUserId
+        self.scrollToMessageId = scrollToMessageId
         self.api = api
         self.socket = socket
         aiPrompts = [
@@ -426,6 +438,30 @@ public final class ChatConversationViewModel {
             )))
         }
         state = .loaded(rows: rows)
+        resolveScrollTargetIfNeeded(rows: rows)
+    }
+
+    /// Resolve the Chat Search scroll target once: if the deep-linked
+    /// message is present in the loaded page, publish its row id for the
+    /// view to scroll to. The matched message is guaranteed to be in the
+    /// first page because search indexes the same most-recent page.
+    private func resolveScrollTargetIfNeeded(rows: [ChatTimelineRow]) {
+        guard !didResolveScrollTarget, let target = scrollToMessageId else { return }
+        let rowId = "bubble_\(target)"
+        guard rows.contains(where: { $0.id == rowId }) else { return }
+        didResolveScrollTarget = true
+        // Publish on the next beat so the populated frame is mounted and
+        // laid out before the view reacts — it scrolls in `.onChange`,
+        // which only fires for a value that changes while it is on screen.
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            self?.pendingScrollTargetId = rowId
+        }
+    }
+
+    /// Clear the scroll target after the view has scrolled to it.
+    public func consumePendingScroll() {
+        pendingScrollTargetId = nil
     }
 
     /// Merge persisted messages with optimistic pending rows. Failed

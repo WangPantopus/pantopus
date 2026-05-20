@@ -16,6 +16,7 @@ import SwiftUI
 public struct ChatConversationView: View {
     @State private var viewModel: ChatConversationViewModel
     @State private var attachmentsPresented = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let onBack: @MainActor () -> Void
 
     public init(
@@ -178,9 +179,11 @@ public struct ChatConversationView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
     }
+}
 
-    // MARK: - AI welcome
+// MARK: - AI welcome
 
+extension ChatConversationView {
     private var aiWelcomeFrame: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -261,23 +264,36 @@ public struct ChatConversationView: View {
     // MARK: - Populated + error
 
     private func populatedFrame(_ rows: [ChatTimelineRow]) -> some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                if viewModel.canLoadOlder {
-                    Color.clear
-                        .frame(height: 1)
-                        .onAppear { Task { await viewModel.loadOlder() } }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    if viewModel.canLoadOlder {
+                        Color.clear
+                            .frame(height: 1)
+                            .onAppear { Task { await viewModel.loadOlder() } }
+                    }
+                    ForEach(rows) { row in
+                        timelineRowView(row)
+                    }
+                    Color.clear.frame(height: 4)
                 }
-                ForEach(rows) { row in
-                    timelineRowView(row)
-                }
-                Color.clear.frame(height: 4)
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
+            .refreshable { await viewModel.refresh() }
+            .accessibilityIdentifier("chatConversationContent")
+            .onChange(of: viewModel.pendingScrollTargetId) { _, target in
+                guard let target else { return }
+                if reduceMotion {
+                    proxy.scrollTo(target, anchor: .center)
+                } else {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(target, anchor: .center)
+                    }
+                }
+                viewModel.consumePendingScroll()
+            }
         }
-        .refreshable { await viewModel.refresh() }
-        .accessibilityIdentifier("chatConversationContent")
     }
 
     @ViewBuilder

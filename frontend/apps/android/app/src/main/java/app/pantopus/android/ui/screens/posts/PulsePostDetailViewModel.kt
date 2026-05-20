@@ -11,6 +11,7 @@ import app.pantopus.android.data.api.models.posts.PostDetailDto
 import app.pantopus.android.data.api.models.posts.PostReactionKind
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.PostCommentRow
@@ -60,6 +61,7 @@ class PulsePostDetailViewModel
     @Inject
     constructor(
         private val repo: PostsRepository,
+        private val authRepo: AuthRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val postId: String =
@@ -79,9 +81,36 @@ class PulsePostDetailViewModel
         private val _toastMessage = MutableStateFlow<String?>(null)
         val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
 
+        private val _showsOverflowMenu = MutableStateFlow(false)
+
+        /**
+         * Bound to the screen's overflow modal so the Edit action sheet
+         * pops when the owner taps the top-bar's more-horizontal icon.
+         */
+        val showsOverflowMenu: StateFlow<Boolean> = _showsOverflowMenu.asStateFlow()
+
         private val showingAllReplies = MutableStateFlow(false)
 
         private val maxInitialReplies = 3
+
+        /**
+         * True when the signed-in user authored the post on screen. The
+         * screen uses this to gate the Edit overflow action.
+         */
+        val isOwner: Boolean
+            get() {
+                val loaded = _state.value as? PulsePostDetailUiState.Loaded ?: return false
+                val signedIn = authRepo.state.value as? AuthRepository.State.SignedIn ?: return false
+                return loaded.content.post.userId == signedIn.user.id
+            }
+
+        fun openOverflowMenu() {
+            _showsOverflowMenu.value = true
+        }
+
+        fun dismissOverflowMenu() {
+            _showsOverflowMenu.value = false
+        }
 
         /** First-load entry. */
         fun load() {

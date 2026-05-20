@@ -91,6 +91,24 @@ enum class AccessCategory(
                 SmartLock -> Color(0xFF0F766E)
             }
 
+    /**
+     * Wire string sent to the backend on POST / PUT. The database
+     * CHECK constraint at `HomeAccessSecret_type_chk` only accepts
+     * `('wifi','door_code','gate_code','lockbox','garage','alarm','other')`
+     * so the two extra UI-side categories (`Gate`, `SmartLock`) round-
+     * trip through the closest allowed strings (`gate_code`, `other`).
+     */
+    val backendAccessType: String
+        get() =
+            when (this) {
+                Wifi -> "wifi"
+                Alarm -> "alarm"
+                Gate -> "gate_code"
+                Lockbox -> "lockbox"
+                Garage -> "garage"
+                SmartLock -> "other"
+            }
+
     companion object {
         /** Display order on the screen — same order the chip strip uses. */
         val displayOrder: List<AccessCategory> =

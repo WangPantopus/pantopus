@@ -9,6 +9,8 @@ import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.data.analytics.AnalyticsResult
 import app.pantopus.android.data.api.models.posts.PostCreateRequest
+import app.pantopus.android.data.api.models.posts.PostDetailDto
+import app.pantopus.android.data.api.models.posts.PostUpdateRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.posts.PostsRepository
@@ -151,6 +153,21 @@ sealed interface PulseComposeUiState {
     data class Error(val message: String) : PulseComposeUiState
 }
 
+/**
+ * Edit-mode prefill state. Surfaces a shimmer in the view while the
+ * post is being fetched and a retry CTA when the fetch fails.
+ */
+sealed interface PulseComposePrefillState {
+    /** Create mode (no prefill needed) or prefill already resolved. */
+    data object Ready : PulseComposePrefillState
+
+    /** Fetch in flight — view shows shimmer. */
+    data object Loading : PulseComposePrefillState
+
+    /** Fetch failed — view shows error with retry. */
+    data class Error(val message: String) : PulseComposePrefillState
+}
+
 /** Tone-tagged transient message surfaced by the form. */
 data class PulseComposeToast(
     val text: String,
@@ -174,11 +191,20 @@ class PulseComposeViewModel
         private val _state = MutableStateFlow<PulseComposeUiState>(PulseComposeUiState.Idle)
         val state: StateFlow<PulseComposeUiState> = _state.asStateFlow()
 
+        /** Post id when editing an existing post; `null` in create mode. */
+        val editingPostId: String? = savedStateHandle.get<String>(POST_ID_KEY)
+
         private val initialIntent: PulseComposeIntent =
             PulseComposeIntent.fromKey(savedStateHandle.get<String>(INTENT_KEY) ?: PulseComposeIntent.Ask.key)
 
         private val _activeIntent = MutableStateFlow(initialIntent)
         val activeIntent: StateFlow<PulseComposeIntent> = _activeIntent.asStateFlow()
+
+        private val _prefillState =
+            MutableStateFlow<PulseComposePrefillState>(
+                if (editingPostId == null) PulseComposePrefillState.Ready else PulseComposePrefillState.Loading,
+            )
+        val prefillState: StateFlow<PulseComposePrefillState> = _prefillState.asStateFlow()
 
         private val _identity = MutableStateFlow(PulseComposeIdentity.Personal)
         val identity: StateFlow<PulseComposeIdentity> = _identity.asStateFlow()
@@ -218,9 +244,34 @@ class PulseComposeViewModel
         private val _shouldDismiss = MutableStateFlow(false)
         val shouldDismiss: StateFlow<Boolean> = _shouldDismiss.asStateFlow()
 
+        /**
+         * Selector + identity baselines. Updated to the prefilled values
+         * after a successful edit-mode fetch so `isDirty` compares against
+         * the post's saved pose, not the create-mode defaults.
+         */
+        private var baselineIdentity: PulseComposeIdentity = PulseComposeIdentity.Personal
+        private var baselineVisibility: PulseComposeVisibility = PulseComposeVisibility.Neighbors
+        private var baselineLostFoundKind: PulseLostFoundKind = PulseLostFoundKind.Lost
+        private var baselineAnnounceAudience: PulseAnnounceAudience = PulseAnnounceAudience.Neighbors
+        private var baselineAskCategory: PulseAskCategory = PulseAskCategory.Handyman
+        private var baselineRecommendRating: Int = DEFAULT_RECOMMEND_RATING
+
+        /** True iff this view-model is wired to edit an existing post. */
+        val isEditing: Boolean get() = editingPostId != null
+
+        /** Top-bar title — "Edit post" in edit mode, "New post" otherwise. */
+        val displayTitle: String get() = if (isEditing) "Edit post" else "New post"
+
+        /** Right-action label — "Save" in edit mode, intent-driven otherwise. */
+        val ctaLabel: String get() = if (isEditing) "Save" else _activeIntent.value.ctaLabel
+
+        /** True iff the intent picker is locked (post_type is fixed on edit). */
+        val isIntentLocked: Boolean get() = isEditing
+
         // MARK: - Selector updates
 
         fun selectIntent(intent: PulseComposeIntent) {
+            if (isIntentLocked) return
             if (_activeIntent.value == intent) return
             _activeIntent.value = intent
         }
@@ -290,14 +341,14 @@ class PulseComposeViewModel
         val isDirty: Boolean
             get() {
                 if (_photos.value.isNotEmpty()) return true
-                if (_identity.value != PulseComposeIdentity.Personal) return true
-                if (_visibility.value != PulseComposeVisibility.Neighbors) return true
+                if (_identity.value != baselineIdentity) return true
+                if (_visibility.value != baselineVisibility) return true
                 if (activeIntentFields().any { (_fields.value[it]?.isDirty == true) }) return true
                 return when (_activeIntent.value) {
-                    PulseComposeIntent.Ask -> _askCategory.value != PulseAskCategory.Handyman
-                    PulseComposeIntent.Recommend -> _recommendRating.value != DEFAULT_RECOMMEND_RATING
-                    PulseComposeIntent.Lost -> _lostFoundKind.value != PulseLostFoundKind.Lost
-                    PulseComposeIntent.Announce -> _announceAudience.value != PulseAnnounceAudience.Neighbors
+                    PulseComposeIntent.Ask -> _askCategory.value != baselineAskCategory
+                    PulseComposeIntent.Recommend -> _recommendRating.value != baselineRecommendRating
+                    PulseComposeIntent.Lost -> _lostFoundKind.value != baselineLostFoundKind
+                    PulseComposeIntent.Announce -> _announceAudience.value != baselineAnnounceAudience
                     PulseComposeIntent.Event -> false
                 }
             }
@@ -426,30 +477,266 @@ class PulseComposeViewModel
             }
             _state.value = PulseComposeUiState.Submitting
             viewModelScope.launch {
-                when (val result = repo.createPost(buildRequest())) {
+                val editingId = editingPostId
+                if (editingId != null) {
+                    handleUpdate(editingId)
+                } else {
+                    handleCreate()
+                }
+            }
+        }
+
+        private suspend fun handleCreate() {
+            when (val result = repo.createPost(buildRequest())) {
+                is NetworkResult.Success -> {
+                    _state.value = PulseComposeUiState.Success(postId = result.data.postId)
+                    _toast.value = PulseComposeToast("Posted", isError = false)
+                    _shouldDismiss.value = true
+                    Analytics.track(
+                        AnalyticsEvent.FormPulseComposeSubmit(
+                            intent = _activeIntent.value.key,
+                            result = AnalyticsResult.SUCCESS,
+                        ),
+                    )
+                }
+                is NetworkResult.Failure -> {
+                    val message = result.error.message.ifBlank { "Couldn't post. Try again." }
+                    _state.value = PulseComposeUiState.Error(message)
+                    _toast.value = PulseComposeToast(message, isError = true)
+                    Analytics.track(
+                        AnalyticsEvent.FormPulseComposeSubmit(
+                            intent = _activeIntent.value.key,
+                            result = AnalyticsResult.ERROR,
+                        ),
+                    )
+                }
+            }
+        }
+
+        private suspend fun handleUpdate(postId: String) {
+            when (val result = repo.updatePost(postId, buildUpdateRequest())) {
+                is NetworkResult.Success -> {
+                    _state.value =
+                        PulseComposeUiState.Success(postId = result.data.postId ?: postId)
+                    _toast.value = PulseComposeToast("Saved", isError = false)
+                    _shouldDismiss.value = true
+                    Analytics.track(
+                        AnalyticsEvent.FormPulseComposeSubmit(
+                            intent = _activeIntent.value.key,
+                            result = AnalyticsResult.SUCCESS,
+                        ),
+                    )
+                }
+                is NetworkResult.Failure -> {
+                    val message = result.error.message.ifBlank { "Couldn't save. Try again." }
+                    _state.value = PulseComposeUiState.Error(message)
+                    _toast.value = PulseComposeToast(message, isError = true)
+                    Analytics.track(
+                        AnalyticsEvent.FormPulseComposeSubmit(
+                            intent = _activeIntent.value.key,
+                            result = AnalyticsResult.ERROR,
+                        ),
+                    )
+                }
+            }
+        }
+
+        // MARK: - Edit-mode prefill
+
+        /**
+         * Fetch the post being edited and seed every field + selector from
+         * the wire payload. Idempotent — safe to call again from the retry
+         * CTA when the first attempt failed.
+         */
+        fun loadForEdit() {
+            val editingId = editingPostId ?: return
+            _prefillState.value = PulseComposePrefillState.Loading
+            viewModelScope.launch {
+                when (val result = repo.detail(editingId)) {
                     is NetworkResult.Success -> {
-                        _state.value = PulseComposeUiState.Success(postId = result.data.postId)
-                        _toast.value = PulseComposeToast("Posted", isError = false)
-                        _shouldDismiss.value = true
-                        Analytics.track(
-                            AnalyticsEvent.FormPulseComposeSubmit(
-                                intent = _activeIntent.value.key,
-                                result = AnalyticsResult.SUCCESS,
-                            ),
-                        )
+                        applyPrefill(result.data.post)
+                        _prefillState.value = PulseComposePrefillState.Ready
                     }
                     is NetworkResult.Failure -> {
-                        val message = result.error.message.ifBlank { "Couldn't post. Try again." }
-                        _state.value = PulseComposeUiState.Error(message)
-                        _toast.value = PulseComposeToast(message, isError = true)
-                        Analytics.track(
-                            AnalyticsEvent.FormPulseComposeSubmit(
-                                intent = _activeIntent.value.key,
-                                result = AnalyticsResult.ERROR,
-                            ),
-                        )
+                        val message = result.error.message.ifBlank { "Couldn't load this post. Try again." }
+                        _prefillState.value = PulseComposePrefillState.Error(message)
                     }
                 }
+            }
+        }
+
+        /** Seed every field + selector from the saved post + rebaseline. */
+        @Suppress("CyclomaticComplexMethod", "LongMethod")
+        private fun applyPrefill(post: PostDetailDto) {
+            val intent = PulseComposeIntent.fromFeedIntent(PulseIntent.fromPostType(post.postType))
+            _activeIntent.value = intent
+
+            // Visibility — fall back to the current selection when the
+            // wire value isn't one of the form's three options.
+            post.visibility
+                ?.let { raw -> PulseComposeVisibility.entries.firstOrNull { it.key == raw } }
+                ?.let { _visibility.value = it }
+            baselineVisibility = _visibility.value
+
+            // Identity is fixed at create time (updatePostSchema has no
+            // `postAs`). The signed-in user is still the post's creator,
+            // so we keep the form's selection as-is.
+            baselineIdentity = _identity.value
+
+            when (intent) {
+                PulseComposeIntent.Ask -> {
+                    seedField(PulseComposeField.Title, post.title.orEmpty())
+                    seedField(PulseComposeField.Body, post.content)
+                    post.serviceCategory
+                        ?.let { raw -> PulseAskCategory.entries.firstOrNull { it.key == raw } }
+                        ?.let { _askCategory.value = it }
+                    baselineAskCategory = _askCategory.value
+                }
+                PulseComposeIntent.Recommend -> {
+                    val (stars, body) = unwrapRecommendBody(post.content)
+                    _recommendRating.value = stars ?: DEFAULT_RECOMMEND_RATING
+                    seedField(PulseComposeField.Body, body)
+                    seedField(PulseComposeField.RecommendBusiness, post.dealBusinessName.orEmpty())
+                    baselineRecommendRating = _recommendRating.value
+                }
+                PulseComposeIntent.Event -> {
+                    seedField(PulseComposeField.Title, post.title.orEmpty())
+                    seedField(PulseComposeField.Body, post.content)
+                    seedField(PulseComposeField.EventDate, formatEventDateForPicker(post.eventDate))
+                    seedField(PulseComposeField.EventLocation, post.eventVenue.orEmpty())
+                }
+                PulseComposeIntent.Lost -> {
+                    val (location, body) = unwrapLostBody(post.content)
+                    seedField(PulseComposeField.Body, body)
+                    seedField(PulseComposeField.LostLastSeenLocation, location.orEmpty())
+                    post.lostFoundType
+                        ?.let { raw -> PulseLostFoundKind.entries.firstOrNull { it.key == raw } }
+                        ?.let { _lostFoundKind.value = it }
+                    baselineLostFoundKind = _lostFoundKind.value
+                }
+                PulseComposeIntent.Announce -> {
+                    seedField(PulseComposeField.Title, post.title.orEmpty())
+                    seedField(PulseComposeField.Body, post.content)
+                    post.visibility
+                        ?.let { raw -> PulseAnnounceAudience.entries.firstOrNull { it.key == raw } }
+                        ?.let { _announceAudience.value = it }
+                    baselineAnnounceAudience = _announceAudience.value
+                }
+            }
+        }
+
+        private fun seedField(
+            field: PulseComposeField,
+            value: String,
+        ) {
+            val map = _fields.value.toMutableMap()
+            map[field] = FormFieldState(id = field.key, value = value, originalValue = value)
+            _fields.value = map
+        }
+
+        /**
+         * Reverse of `composeRecommendBody`: splits "★★★☆☆\n\n<body>"
+         * back into a star count + body. Returns (null, raw) when the
+         * row is missing so the saved text is preserved verbatim.
+         */
+        private fun unwrapRecommendBody(raw: String): Pair<Int?, String> {
+            val firstLine = raw.lineSequence().firstOrNull() ?: raw
+            val filled = firstLine.count { it == '★' }
+            val empty = firstLine.count { it == '☆' }
+            if (filled + empty == 5 && firstLine.isNotEmpty()) {
+                val remainder = raw.removePrefix(firstLine).trimStart('\n')
+                return filled to remainder
+            }
+            return null to raw
+        }
+
+        /**
+         * Reverse of `prefixLastSeen`: splits "Last seen: <loc>\n\n<body>"
+         * back into (location, body). Returns (null, raw) when the prefix
+         * is missing.
+         */
+        private fun unwrapLostBody(raw: String): Pair<String?, String> {
+            val prefix = "Last seen: "
+            if (!raw.startsWith(prefix)) return null to raw
+            val afterPrefix = raw.removePrefix(prefix)
+            val newlineIdx = afterPrefix.indexOf('\n')
+            if (newlineIdx < 0) return afterPrefix to ""
+            val location = afterPrefix.substring(0, newlineIdx)
+            val body = afterPrefix.substring(newlineIdx).trimStart('\n')
+            return location to body
+        }
+
+        /**
+         * Convert an ISO-8601 wire date into the `yyyy-MM-dd HH:mm` shape
+         * the Event date picker emits. Returns "" when the wire value is
+         * missing or unparsable.
+         */
+        private fun formatEventDateForPicker(raw: String?): String {
+            if (raw.isNullOrEmpty()) return ""
+            val instant =
+                runCatching {
+                    java.time.Instant.parse(raw)
+                }.getOrNull() ?: return raw
+            val dt = instant.atZone(java.time.ZoneOffset.UTC).toLocalDateTime()
+            return "%04d-%02d-%02d %02d:%02d".format(
+                dt.year,
+                dt.monthValue,
+                dt.dayOfMonth,
+                dt.hour,
+                dt.minute,
+            )
+        }
+
+        /**
+         * Build the `PATCH /api/posts/:id` body from the active intent's
+         * field values + selectors. Only the keys `updatePostSchema`
+         * accepts make it onto the wire.
+         */
+        fun buildUpdateRequest(): PostUpdateRequest {
+            val bodyValue = trimmedValue(PulseComposeField.Body)
+            val titleValue = trimmedValue(PulseComposeField.Title)
+            val intent = _activeIntent.value
+            return when (intent) {
+                PulseComposeIntent.Ask ->
+                    PostUpdateRequest(
+                        content = bodyValue,
+                        title = titleValue,
+                        visibility = _visibility.value.key,
+                        serviceCategory = _askCategory.value.key,
+                    )
+                PulseComposeIntent.Recommend -> {
+                    val business = trimmedValue(PulseComposeField.RecommendBusiness)
+                    PostUpdateRequest(
+                        content = composeRecommendBody(_recommendRating.value, bodyValue),
+                        visibility = _visibility.value.key,
+                        dealBusinessName = business.ifEmpty { null },
+                    )
+                }
+                PulseComposeIntent.Event -> {
+                    val venue = trimmedValue(PulseComposeField.EventLocation)
+                    val dateRaw = trimmedValue(PulseComposeField.EventDate)
+                    PostUpdateRequest(
+                        content = bodyValue,
+                        title = titleValue,
+                        visibility = _visibility.value.key,
+                        eventDate = dateRaw.ifEmpty { null }?.let { isoDateTime(it) },
+                        eventVenue = venue.ifEmpty { null },
+                    )
+                }
+                PulseComposeIntent.Lost -> {
+                    val lastSeen = trimmedValue(PulseComposeField.LostLastSeenLocation)
+                    PostUpdateRequest(
+                        content = prefixLastSeen(bodyValue, lastSeen),
+                        visibility = _visibility.value.key,
+                        lostFoundType = _lostFoundKind.value.key,
+                    )
+                }
+                PulseComposeIntent.Announce ->
+                    PostUpdateRequest(
+                        content = bodyValue,
+                        title = titleValue,
+                        visibility = _announceAudience.value.backendVisibility,
+                    )
             }
         }
 
@@ -548,6 +835,7 @@ class PulseComposeViewModel
 
         companion object {
             const val INTENT_KEY = "intent"
+            const val POST_ID_KEY = "postId"
             private const val TITLE_MAX = 255
             private const val BODY_MAX = 5000
             private const val LOCATION_MAX = 255

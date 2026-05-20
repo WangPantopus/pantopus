@@ -34,6 +34,11 @@ public struct BillDTO: Decodable, Sendable, Hashable, Identifiable {
     public let paidBy: String?
     public let createdAt: String?
     public let updatedAt: String?
+    /// Backend-stored JSONB bag. Used today only by the Add Bill
+    /// wizard to round-trip the recurrence selection through
+    /// `details.schedule` / `details.frequency`. Stays string-only
+    /// because every value the wizard writes is a plain string key.
+    public let details: [String: String]?
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -51,6 +56,7 @@ public struct BillDTO: Decodable, Sendable, Hashable, Identifiable {
         case paidBy = "paid_by"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case details
     }
 
     public init(from decoder: Decoder) throws {
@@ -70,6 +76,7 @@ public struct BillDTO: Decodable, Sendable, Hashable, Identifiable {
         paidBy = try container.decodeIfPresent(String.self, forKey: .paidBy)
         createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+        details = try container.decodeIfPresent([String: String].self, forKey: .details)
     }
 
     public init(
@@ -87,7 +94,8 @@ public struct BillDTO: Decodable, Sendable, Hashable, Identifiable {
         paidAt: String? = nil,
         paidBy: String? = nil,
         createdAt: String? = nil,
-        updatedAt: String? = nil
+        updatedAt: String? = nil,
+        details: [String: String]? = nil
     ) {
         self.id = id
         self.homeId = homeId
@@ -104,6 +112,7 @@ public struct BillDTO: Decodable, Sendable, Hashable, Identifiable {
         self.paidBy = paidBy
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.details = details
     }
 
     /// Best-effort cents-or-decimal → `Decimal` extraction. Treats
@@ -190,13 +199,15 @@ public struct CreateBillRequest: Encodable, Sendable {
 }
 
 /// Body for `PUT /api/homes/:id/bills/:billId`. All fields optional —
-/// the server picks up whichever are sent.
+/// the server picks up whichever are sent (whitelist mirrored from
+/// `backend/routes/home.js:4593`).
 public struct UpdateBillRequest: Encodable, Sendable {
     public let status: String?
     public let paidAt: String?
     public let amount: Decimal?
     public let providerName: String?
     public let dueDate: String?
+    public let details: [String: String]?
 
     private enum CodingKeys: String, CodingKey {
         case status
@@ -204,6 +215,7 @@ public struct UpdateBillRequest: Encodable, Sendable {
         case amount
         case providerName = "provider_name"
         case dueDate = "due_date"
+        case details
     }
 
     public init(
@@ -211,13 +223,15 @@ public struct UpdateBillRequest: Encodable, Sendable {
         paidAt: String? = nil,
         amount: Decimal? = nil,
         providerName: String? = nil,
-        dueDate: String? = nil
+        dueDate: String? = nil,
+        details: [String: String]? = nil
     ) {
         self.status = status
         self.paidAt = paidAt
         self.amount = amount
         self.providerName = providerName
         self.dueDate = dueDate
+        self.details = details
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -229,6 +243,7 @@ public struct UpdateBillRequest: Encodable, Sendable {
         }
         if let providerName { try c.encode(providerName, forKey: .providerName) }
         if let dueDate { try c.encode(dueDate, forKey: .dueDate) }
+        if let details { try c.encode(details, forKey: .details) }
     }
 }
 

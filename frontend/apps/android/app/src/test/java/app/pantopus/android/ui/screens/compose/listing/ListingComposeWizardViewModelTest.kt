@@ -2,93 +2,26 @@
 
 package app.pantopus.android.ui.screens.compose.listing
 
-import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.listings.CreateListingRequest
-import app.pantopus.android.data.api.models.listings.CreateListingResponse
-import app.pantopus.android.data.api.models.listings.ListingDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
-import app.pantopus.android.data.listings.ListingsRepository
-import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
 import app.pantopus.android.ui.screens.shared.wizard.WizardProgressLabel
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.every
-import io.mockk.mockk
 import io.mockk.slot
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ListingComposeWizardViewModelTest {
-    private val repo: ListingsRepository = mockk(relaxed = true)
-    private val isOnlineFlow = MutableStateFlow(true)
-    private val networkMonitor: NetworkMonitor =
-        mockk<NetworkMonitor>(relaxed = true).also {
-            every { it.isOnline } returns isOnlineFlow
-        }
-
-    @Before
-    fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
-        isOnlineFlow.value = true
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
-    }
-
-    private fun makeVm(savedStateHandle: SavedStateHandle = SavedStateHandle()) =
-        ListingComposeWizardViewModel(repo, savedStateHandle, networkMonitor)
-
-    private val createResponse =
-        CreateListingResponse(
-            message = "Listing created successfully",
-            listing =
-                ListingDto(
-                    id = "listing_42",
-                    title = "Moving boxes — bundle of 18",
-                    category = "goods",
-                    layer = "goods",
-                    listingType = "sell_item",
-                    isFree = false,
-                    price = 25.0,
-                    status = "active",
-                ),
-        )
-
-    /** Move the wizard to the final review state with a valid form. */
-    private fun seedReadyToSubmit(vm: ListingComposeWizardViewModel) {
-        vm.addPhoto("photo_1")
-        vm.addPhoto("photo_2")
-        vm.setTitle("Moving boxes — bundle of 18")
-        vm.setCategory(ListingComposeCategory.Goods)
-        vm.setCondition(ListingComposeCondition.LikeNew)
-        vm.setBody("Lightly used, perfect for a one-bedroom move across town.")
-        vm.setPriceKind(ListingComposePriceKind.Fixed)
-        vm.setPriceAmount("25")
-        vm.setFulfillment(ListingComposeFulfillment.Pickup)
-        vm.setLocationKind(ListingComposeLocationKind.SavedAddress)
-        // Walk through 5 steps to land on Review.
-        repeat(5) { vm.onPrimary() }
-    }
-
+class ListingComposeWizardViewModelTest : ListingComposeWizardViewModelTestCase() {
     // MARK: - Chrome shape
 
     @Test

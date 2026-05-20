@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.posts.MyPostDto
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivityFilterSheet
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -54,7 +55,6 @@ const val MY_POSTS_TAG = "my-posts"
 fun MyPostsScreen(
     onBack: () -> Unit,
     onOpenPost: (MyPostDto) -> Unit,
-    onOpenFilters: () -> Unit = {},
     onCompose: () -> Unit = {},
     onEditPost: (MyPostDto) -> Unit = {},
     viewModel: MyPostsViewModel = hiltViewModel(),
@@ -66,11 +66,12 @@ fun MyPostsScreen(
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val kebabTarget by viewModel.kebabTarget.collectAsStateWithLifecycle()
     val deleteTarget by viewModel.deleteTarget.collectAsStateWithLifecycle()
+    val showFilterSheet by viewModel.showFilterSheet.collectAsStateWithLifecycle()
+    val activityFilter by viewModel.activityFilter.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.bindCallbacks(
             onOpenPost = onOpenPost,
-            onOpenFilters = onOpenFilters,
             onCompose = onCompose,
             onEditPost = onEditPost,
         )
@@ -141,6 +142,17 @@ fun MyPostsScreen(
                     Text("Cancel", color = PantopusColors.appText)
                 }
             },
+        )
+    }
+
+    if (showFilterSheet) {
+        ActivityFilterSheet(
+            statusTitle = viewModel.statusFilterTitle,
+            statusOptions = viewModel.statusFilterOptions,
+            sortOptions = viewModel.sortFilterOptions,
+            filter = activityFilter,
+            onApply = { viewModel.applyFilter(it) },
+            onDismiss = { viewModel.dismissFilterSheet() },
         )
     }
 }
