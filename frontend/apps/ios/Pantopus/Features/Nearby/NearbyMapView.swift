@@ -103,6 +103,15 @@ public struct NearbyMapView: View {
         .onChange(of: viewModel.userCoordinate) { _, newCoord in
             recenter(on: newCoord)
         }
+        // MapKit publishes a large, constantly-changing accessibility
+        // subtree (map tiles + internal elements) that prevents XCUITest
+        // from settling an a11y snapshot — surfacing as "Failed to get
+        // matching snapshots: Timed out while evaluating UI query" on
+        // slower simulators (e.g. iPhone 16 Pro). Collapse the map to a
+        // single labeled element; the bottom-sheet list (`nearbySheetList`)
+        // remains the accessible affordance for the same entities.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Nearby map")
     }
 
     private func recenter(on coord: UserCoordinate?) {
