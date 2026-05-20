@@ -445,4 +445,98 @@ class DiscoverHubViewModelTest {
         )
         assertEquals(DiscoverHubChip.NEARBY, chip.selectedId)
     }
+
+    // MARK: - Filters (P5.2)
+
+    @Test
+    fun default_top_bar_action_has_no_badge() {
+        val vm = DiscoverHubViewModel(repo)
+        assertNull(vm.topBarAction.value?.badgeCount)
+        assertEquals(0, vm.filters.value.activeCount)
+    }
+
+    @Test
+    fun present_and_dismiss_toggles_sheet_flag() {
+        val vm = DiscoverHubViewModel(repo)
+        assertEquals(false, vm.showFilterSheet.value)
+        vm.presentFilters()
+        assertEquals(true, vm.showFilterSheet.value)
+        vm.dismissFilters()
+        assertEquals(false, vm.showFilterSheet.value)
+    }
+
+    @Test
+    fun apply_filters_content_type_shows_only_selected_sections() =
+        runTest {
+            stubAll(peopleResp, businessesResp, gigsResp, listingsResp)
+            val vm = DiscoverHubViewModel(repo)
+            vm.load()
+            vm.applyFilters(
+                DiscoverHubFilters(
+                    contentTypes = setOf(DiscoverHubSection.PEOPLE, DiscoverHubSection.GIGS),
+                ),
+            )
+            val state = vm.state.value
+            assertTrue("Expected Loaded, got $state", state is ListOfRowsUiState.Loaded)
+            val loaded = state as ListOfRowsUiState.Loaded
+            assertEquals(
+                listOf(DiscoverHubSection.PEOPLE, DiscoverHubSection.GIGS),
+                loaded.sections.map { it.id },
+            )
+            assertEquals(1, vm.filters.value.activeCount)
+            assertEquals(1, vm.topBarAction.value?.badgeCount)
+        }
+
+    @Test
+    fun apply_filters_verified_only_passes_verified_true() =
+        runTest {
+            stubAll(peopleResp, emptyResp, emptyResp, emptyResp)
+            val vm = DiscoverHubViewModel(repo)
+            vm.load()
+            vm.applyFilters(DiscoverHubFilters(verifiedOnly = true))
+            coVerify {
+                repo.discovery(
+                    filter = "people",
+                    limit = any(),
+                    since = any(),
+                    verified = true,
+                    freeOrWanted = any(),
+                )
+            }
+            assertEquals(1, vm.topBarAction.value?.badgeCount)
+        }
+
+    @Test
+    fun apply_filters_newest_first_reorders_by_created_at() =
+        runTest {
+            val gigsWithDates =
+                NetworkResult.Success(
+                    HubDiscoveryResponse(
+                        items =
+                            listOf(
+                                DiscoveryItem(
+                                    id = "g1", type = "gig", title = "Earlier", meta = "",
+                                    category = "Handyman", avatarUrl = null, route = "/gig/g1",
+                                    subtitle = null, price = "$10", rating = null, verified = null,
+                                    isFree = null, isWanted = null, createdAt = "2026-05-14T08:00:00Z",
+                                ),
+                                DiscoveryItem(
+                                    id = "g2", type = "gig", title = "Later", meta = "",
+                                    category = "Handyman", avatarUrl = null, route = "/gig/g2",
+                                    subtitle = null, price = "$20", rating = null, verified = null,
+                                    isFree = null, isWanted = null, createdAt = "2026-05-14T09:00:00Z",
+                                ),
+                            ),
+                    ),
+                )
+            stubAll(emptyResp, emptyResp, gigsWithDates, emptyResp)
+            val vm = DiscoverHubViewModel(repo)
+            vm.load()
+            vm.applyFilters(DiscoverHubFilters(newestFirst = true))
+
+            val loaded = vm.state.value as ListOfRowsUiState.Loaded
+            val gigs = loaded.sections.first { it.id == DiscoverHubSection.GIGS }
+            // Newest-first: g2 (09:00) ahead of g1 (08:00).
+            assertEquals(listOf("gig-g2", "gig-g1"), gigs.rows.map { it.id })
+        }
 }

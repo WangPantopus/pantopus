@@ -216,8 +216,38 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             accessibilityLabel: "Filter bids"
         ) { [weak self] in
             guard let self else { return }
-            Task { @MainActor in self.onOpenFilters() }
+            Task { @MainActor in self.isFilterPresented = true }
         }
+    }
+
+    // MARK: - Activity filter (P5.4)
+
+    /// Bound to the view's `.sheet(isPresented:)` so the shared
+    /// `ActivityFilterSheet` presents over the list.
+    public var isFilterPresented = false
+
+    /// The applied status / sort / date-range selection. Default is the
+    /// "no filter" position, so `rebuild()` keeps the unfiltered order.
+    public private(set) var activityFilter = ActivityFilter()
+
+    /// Section header for the status chips in the sheet.
+    public let statusFilterTitle = "Bid status"
+
+    /// Per-surface status chips (coarse bid lifecycle buckets).
+    public let statusFilterOptions: [FilterOption] = [
+        FilterOption(id: "pending", label: "Pending"),
+        FilterOption(id: "accepted", label: "Accepted"),
+        FilterOption(id: "declined", label: "Declined"),
+        FilterOption(id: "completed", label: "Completed")
+    ]
+
+    /// Bids carry an amount, so the full sort set (incl. value) applies.
+    public let sortFilterOptions = ActivitySortOrder.all
+
+    /// Store the applied filter and re-project the visible rows.
+    public func applyFilter(_ filter: ActivityFilter) {
+        activityFilter = filter
+        rebuild()
     }
 
     public var banner: BannerConfig? {
@@ -245,15 +275,24 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
     /// confirmation flow without owning any business logic.
     public var withdrawTarget: WithdrawSheetTarget?
 
+    /// Bound to the Edit Bid sheet — populated when the user taps the
+    /// "Edit bid" footer action on an Active row.
+    public var editBidTarget: EditBidSheetTarget?
+
+    /// Bound to the Leave Review sheet — populated when the user taps
+    /// "Leave a review" on a Done row.
+    public var leaveReviewTarget: LeaveReviewSheetTarget?
+
+    /// Transient confirmation banner. Set after a successful edit /
+    /// review submission so the view can flash a toast.
+    public var toast: ToastMessage?
+
     // MARK: - Dependencies
 
     private let api: APIClient
     private let onOpenBid: @MainActor (BidDTO) -> Void
-    private let onOpenFilters: @MainActor () -> Void
     private let onBrowseTasks: @MainActor () -> Void
     private let onMessageClient: @MainActor (BidDTO) -> Void
-    private let onEditBid: @MainActor (BidDTO) -> Void
-    private let onLeaveReview: @MainActor (BidDTO) -> Void
     private let now: @Sendable () -> Date
 
     // MARK: - Local data
@@ -274,20 +313,14 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
     init(
         api: APIClient = .shared,
         onOpenBid: @escaping @MainActor (BidDTO) -> Void = { _ in },
-        onOpenFilters: @escaping @MainActor () -> Void = {},
         onBrowseTasks: @escaping @MainActor () -> Void = {},
         onMessageClient: @escaping @MainActor (BidDTO) -> Void = { _ in },
-        onEditBid: @escaping @MainActor (BidDTO) -> Void = { _ in },
-        onLeaveReview: @escaping @MainActor (BidDTO) -> Void = { _ in },
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.api = api
         self.onOpenBid = onOpenBid
-        self.onOpenFilters = onOpenFilters
         self.onBrowseTasks = onBrowseTasks
         self.onMessageClient = onMessageClient
-        self.onEditBid = onEditBid
-        self.onLeaveReview = onLeaveReview
         self.now = now
     }
 
@@ -338,12 +371,20 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
 
         counts = Self.tabCounts(for: projections, now: nowSnapshot)
 
-        let filtered = projections.filter { $0.tab == selectedTab }
-        if filtered.isEmpty {
-            state = .empty(emptyContent(for: selectedTab))
+        let tabItems = projections.filter { $0.tab == selectedTab }
+        let visible = activityFilter.apply(
+            to: tabItems,
+            now: nowSnapshot,
+            statusId: { Self.statusFilterId(for: $0.status) },
+            date: { Self.parseDate($0.dto.createdAt) },
+            value: { $0.dto.bidAmount }
+        )
+        if visible.isEmpty {
+            let isFiltered = activityFilter.isActive && !tabItems.isEmpty
+            state = .empty(isFiltered ? filteredEmptyContent() : emptyContent(for: selectedTab))
             return
         }
-        let rows = filtered.map { proj in
+        let rows = visible.map { proj in
             Self.row(
                 projection: proj,
                 now: nowSnapshot,
@@ -351,6 +392,29 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             )
         }
         state = .loaded(sections: [RowSection(id: selectedTab, rows: rows)], hasMore: false)
+    }
+
+    /// Map a derived bid status onto one of the four filter chip ids.
+    public static func statusFilterId(for status: MyBidsStatus) -> String {
+        switch status {
+        case .topBid, .shortlisted, .pending, .outbid, .expiring: "pending"
+        case .accepted, .scheduled: "accepted"
+        case .notSelected, .taskCancelled: "declined"
+        case .paid, .leaveReview: "completed"
+        }
+    }
+
+    /// Empty state shown when an active filter hides every row in the tab.
+    private func filteredEmptyContent() -> ListOfRowsState.EmptyContent {
+        ListOfRowsState.EmptyContent(
+            icon: .filter,
+            headline: "No bids match your filters",
+            subcopy: "Try a different status, date range, or sort — or clear "
+                + "your filters to see everything in this tab.",
+            ctaTitle: "Clear filters"
+        ) { [weak self] in
+            Task { @MainActor in self?.applyFilter(ActivityFilter()) }
+        }
     }
 
     /// Build the bundled [RowCallbacks] for a given bid — each handler
@@ -368,7 +432,7 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             },
             onEditBid: { [weak self] in
                 guard let self else { return }
-                Task { @MainActor in self.onEditBid(dto) }
+                Task { @MainActor in self.requestEditBid(dto) }
             },
             onMessage: { [weak self] in
                 guard let self else { return }
@@ -380,7 +444,7 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             },
             onLeaveReview: { [weak self] in
                 guard let self else { return }
-                Task { @MainActor in self.onLeaveReview(dto) }
+                Task { @MainActor in self.requestLeaveReview(dto) }
             },
             onRebid: { [weak self] in
                 guard let self else { return }
@@ -479,6 +543,115 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             // Roll back so the user can retry.
             bids = previous
             rebuild()
+        }
+    }
+
+    // MARK: - Edit bid sheet
+
+    /// Open the Edit Bid sheet pre-filled with the bid's current values.
+    /// The view binds `editBidTarget` and renders the sheet on demand.
+    public func requestEditBid(_ dto: BidDTO) {
+        guard let gigId = dto.gigId else { return }
+        let messageParts = Self.splitMessageAndTerms(dto.message)
+        editBidTarget = EditBidSheetTarget(
+            id: dto.id,
+            gigId: gigId,
+            gigTitle: dto.gig?.title ?? "this task",
+            bidId: dto.id,
+            initialAmount: dto.bidAmount,
+            initialMessage: messageParts.message,
+            initialProposedTime: dto.proposedTime,
+            initialTerms: messageParts.terms
+        )
+    }
+
+    /// Tear down the Edit Bid sheet without committing.
+    public func cancelEditBid() {
+        editBidTarget = nil
+    }
+
+    /// Submit the Edit Bid draft. Returns `true` on success so the sheet
+    /// can self-dismiss; on failure the sheet renders its inline error.
+    /// Mutates the cached bid optimistically when the PUT succeeds so
+    /// the row reflects the new amount + message without a full refetch.
+    @discardableResult
+    public func submitEditBid(_ draft: EditBidDraft) async -> Bool {
+        guard let target = editBidTarget,
+              let bidId = target.bidId
+        else { return false }
+        let body = PlaceBidBody(
+            bidAmount: draft.amount,
+            message: draft.message,
+            proposedTime: draft.proposedTime
+        )
+        do {
+            _ = try await api.request(
+                GigsEndpoints.updateBid(gigId: target.gigId, bidId: bidId, body: body),
+                as: PlaceBidResponse.self
+            )
+            if let index = bids.firstIndex(where: { $0.id == bidId }) {
+                bids[index] = Self.updatedCopy(of: bids[index], draft: draft)
+                rebuild()
+            }
+            editBidTarget = nil
+            toast = ToastMessage(text: "Bid updated.", kind: .success)
+            return true
+        } catch {
+            toast = ToastMessage(
+                text: (error as? APIError)?.errorDescription ?? "Couldn't update bid.",
+                kind: .error
+            )
+            return false
+        }
+    }
+
+    // MARK: - Leave review sheet
+
+    /// Open the Leave Review sheet for the bid's gig. The reviewee is
+    /// the gig poster (the worker reviews the client they did the work
+    /// for after the gig is marked completed).
+    public func requestLeaveReview(_ dto: BidDTO) {
+        guard let gigId = dto.gigId,
+              let revieweeId = dto.gig?.userId
+        else { return }
+        leaveReviewTarget = LeaveReviewSheetTarget(
+            id: dto.id,
+            gigId: gigId,
+            revieweeId: revieweeId,
+            gigTitle: dto.gig?.title ?? "this task",
+            revieweeName: nil
+        )
+    }
+
+    /// Tear down the Leave Review sheet without committing.
+    public func cancelLeaveReview() {
+        leaveReviewTarget = nil
+    }
+
+    /// Submit the review draft. Returns `true` on success.
+    @discardableResult
+    public func submitLeaveReview(_ draft: LeaveReviewDraft) async -> Bool {
+        guard let target = leaveReviewTarget else { return false }
+        let body = CreateReviewBody(
+            gigId: target.gigId,
+            revieweeId: target.revieweeId,
+            rating: draft.rating,
+            comment: draft.comment
+        )
+        do {
+            _ = try await api.request(
+                ReviewsEndpoints.create(body: body),
+                as: EmptyResponse.self
+            )
+            leaveReviewTarget = nil
+            toast = ToastMessage(text: "Review submitted. Thanks!", kind: .success)
+            return true
+        } catch {
+            toast = ToastMessage(
+                text: (error as? APIError)?.errorDescription ?? "Couldn't submit review.",
+                kind: .error
+            )
+            return false
         }
     }
 
@@ -888,6 +1061,54 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
         if hours >= 1 { return "\(hours)h left" }
         let minutes = max(1, Int(seconds / 60))
         return "\(minutes)m left"
+    }
+
+    /// Build an optimistic copy of a bid that's just been edited.
+    /// Replaces amount + message + proposed_time; leaves everything
+    /// else (status, rank, etc.) untouched.
+    public static func updatedCopy(of dto: BidDTO, draft: EditBidDraft) -> BidDTO {
+        BidDTO(
+            id: dto.id,
+            gigId: dto.gigId,
+            userId: dto.userId,
+            bidAmount: draft.amount,
+            message: draft.message,
+            proposedTime: draft.proposedTime,
+            status: dto.status,
+            createdAt: dto.createdAt,
+            updatedAt: ISO8601DateFormatter().string(from: Date()),
+            expiresAt: dto.expiresAt,
+            counterAmount: dto.counterAmount,
+            counterStatus: dto.counterStatus,
+            counteredAt: dto.counteredAt,
+            withdrawnAt: dto.withdrawnAt,
+            withdrawalReason: dto.withdrawalReason,
+            gig: dto.gig,
+            bidder: dto.bidder,
+            shortlisted: dto.shortlisted,
+            yourRank: dto.yourRank,
+            topPrice: dto.topPrice
+        )
+    }
+
+    /// Reverse of `EditBidSheetView.composeMessage(…)` — split a stored
+    /// bid `message` back into its `(message, terms)` halves so the
+    /// edit sheet can pre-fill both fields.
+    public static func splitMessageAndTerms(_ raw: String?) -> (message: String?, terms: String?) {
+        guard let raw, !raw.isEmpty else { return (nil, nil) }
+        guard let range = raw.range(of: "\n\nTerms: ") else {
+            if raw.hasPrefix("Terms: ") {
+                let terms = String(raw.dropFirst("Terms: ".count))
+                return (nil, terms.isEmpty ? nil : terms)
+            }
+            return (raw, nil)
+        }
+        let message = String(raw[..<range.lowerBound])
+        let terms = String(raw[range.upperBound...])
+        return (
+            message.isEmpty ? nil : message,
+            terms.isEmpty ? nil : terms
+        )
     }
 
     /// Build an optimistic copy of a bid that's just been withdrawn.

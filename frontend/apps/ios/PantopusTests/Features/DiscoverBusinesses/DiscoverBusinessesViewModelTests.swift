@@ -16,6 +16,8 @@
 import XCTest
 @testable import Pantopus
 
+// swiftlint:disable file_length
+
 private enum Fixture {
     /// Two handyman businesses + one cleaning business + one with
     /// an unrecognised category — exercises grouping + the "other"
@@ -424,5 +426,79 @@ final class DiscoverBusinessesViewModelTests: XCTestCase {
         let vm = makeVM()
         XCTAssertNotNil(vm.searchBar)
         XCTAssertEqual(vm.searchBar?.placeholder, "Search businesses or services")
+    }
+
+    // MARK: - Filters (P5.2)
+
+    func testDefaultTopBarActionHasNoBadge() {
+        let vm = makeVM()
+        XCTAssertNil(vm.topBarAction?.badgeCount)
+        XCTAssertEqual(vm.filters.activeCount, 0)
+    }
+
+    func testApplyFiltersPassesServerParams() async {
+        stub([
+            .status(200, body: Fixture.mixedJSON),
+            .status(200, body: Fixture.mixedJSON)
+        ])
+        let vm = makeVM()
+        await vm.load()
+        let before = SequencedURLProtocol.capturedRequests.count
+
+        vm.applyFilters(DiscoverBusinessFilters(
+            categories: ["home-services"],
+            radiusMiles: 1,
+            openNow: true,
+            ratingFloor: 4
+        ))
+        try? await Task.sleep(nanoseconds: 150_000_000)
+
+        XCTAssertGreaterThan(SequencedURLProtocol.capturedRequests.count, before)
+        let query = SequencedURLProtocol.capturedRequests.last?.url?.query ?? ""
+        XCTAssertTrue(query.contains("radius_miles=1.0"), query)
+        XCTAssertTrue(query.contains("open_now=true"), query)
+        XCTAssertTrue(query.contains("rating_min=4.0"), query)
+        XCTAssertTrue(query.contains("categories=home-services"), query)
+        XCTAssertEqual(vm.filters.activeCount, 4)
+        XCTAssertEqual(vm.topBarAction?.badgeCount, 4)
+    }
+
+    func testApplyDefaultFiltersOmitsServerParams() async {
+        stub([
+            .status(200, body: Fixture.mixedJSON),
+            .status(200, body: Fixture.mixedJSON)
+        ])
+        let vm = makeVM()
+        await vm.load()
+
+        vm.applyFilters(.default)
+        try? await Task.sleep(nanoseconds: 150_000_000)
+
+        let query = SequencedURLProtocol.capturedRequests.last?.url?.query ?? ""
+        XCTAssertFalse(query.contains("radius_miles="), query)
+        XCTAssertFalse(query.contains("open_now="), query)
+        XCTAssertFalse(query.contains("rating_min="), query)
+        XCTAssertNil(vm.topBarAction?.badgeCount)
+    }
+
+    func testCategoryFilterUnionsWithChipSelection() async {
+        stub([
+            .status(200, body: Fixture.mixedJSON),
+            .status(200, body: Fixture.mixedJSON),
+            .status(200, body: Fixture.mixedJSON)
+        ])
+        let vm = makeVM()
+        await vm.load()
+        vm.selectChip(DiscoverBusinessesChip.handyman)
+        try? await Task.sleep(nanoseconds: 120_000_000)
+
+        vm.applyFilters(DiscoverBusinessFilters(categories: ["home-services"]))
+        try? await Task.sleep(nanoseconds: 150_000_000)
+
+        let query = SequencedURLProtocol.capturedRequests.last?.url?.query ?? ""
+        // The fine chip (handyman) and the coarse sheet category
+        // (home-services) both flow into `categories=`.
+        XCTAssertTrue(query.contains("handyman"), query)
+        XCTAssertTrue(query.contains("home-services"), query)
     }
 }

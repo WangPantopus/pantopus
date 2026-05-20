@@ -200,4 +200,29 @@ sealed interface ListingComposeOutboundEvent {
     data class OpenListingDetail(
         val listingId: String,
     ) : ListingComposeOutboundEvent
+
+    /** Pop the wizard after an edit save — the host pops back to the
+     *  detail underneath so it refreshes from its own .task block. */
+    data class ListingUpdated(
+        val listingId: String,
+    ) : ListingComposeOutboundEvent
+}
+
+/**
+ * Whether the wizard is creating a new listing or editing an existing
+ * one. Edit mode carries the listing id (POST → PATCH switch) and an
+ * optional `jumpToStep` so entry points like "Edit price" can land
+ * directly on the price step instead of step one.
+ */
+sealed interface ListingComposeMode {
+    data object Create : ListingComposeMode
+
+    data class Edit(
+        val listingId: String,
+        val jumpToStep: ListingComposeStep? = null,
+    ) : ListingComposeMode
+
+    val isEdit: Boolean get() = this is Edit
+
+    val editingListingId: String? get() = (this as? Edit)?.listingId
 }

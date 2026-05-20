@@ -48,6 +48,26 @@ sealed class AnalyticsEvent(
     /** T6.3b / P10 — Maintenance list view. */
     data object ScreenHomeMaintenanceViewed : AnalyticsEvent("screen.home_maintenance.viewed")
 
+    /** P2.9 — Log maintenance form view. */
+    data object ScreenLogMaintenanceViewed : AnalyticsEvent("screen.log_maintenance.viewed")
+
+    /** P2.9 — Maintenance detail screen view. */
+    data object ScreenMaintenanceDetailViewed : AnalyticsEvent("screen.maintenance_detail.viewed")
+
+    /** P2.9 — Log maintenance form submit. */
+    data class CtaLogMaintenanceSubmit(
+        val result: AnalyticsResult,
+    ) : AnalyticsEvent("cta.log_maintenance.submit") {
+        override val properties = mapOf("result" to result.value)
+    }
+
+    /** P2.9 — Maintenance delete CTA. */
+    data class CtaMaintenanceDelete(
+        val result: AnalyticsResult,
+    ) : AnalyticsEvent("cta.maintenance.delete") {
+        override val properties = mapOf("result" to result.value)
+    }
+
     data object ScreenNotificationsViewed : AnalyticsEvent("screen.notifications.viewed")
 
     data object ScreenHomeCalendarViewed : AnalyticsEvent("screen.home_calendar.viewed")

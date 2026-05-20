@@ -18,8 +18,19 @@ public struct OffersView: View {
     }
 
     public var body: some View {
-        ListOfRowsView(dataSource: viewModel)
+        @Bindable var bindable = viewModel
+        return ListOfRowsView(dataSource: viewModel)
             .accessibilityIdentifier("offers")
+            .sheet(isPresented: $bindable.isFilterPresented) {
+                ActivityFilterSheet(
+                    statusTitle: viewModel.statusFilterTitle,
+                    statusOptions: viewModel.statusFilterOptions,
+                    sortOptions: viewModel.sortFilterOptions,
+                    filter: viewModel.activityFilter,
+                    onApply: { viewModel.applyFilter($0) },
+                    onClose: { viewModel.isFilterPresented = false }
+                )
+            }
     }
 }
 

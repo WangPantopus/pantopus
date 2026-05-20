@@ -275,73 +275,13 @@ class DocumentsViewModel
         private fun rowFor(
             dto: HomeDocumentDto,
             now: Instant,
-        ): RowModel {
-            val projection = project(dto, now)
-            val fileType = projection.fileType
-            val chips = chipsFor(projection)
-            return RowModel(
-                id = projection.id,
-                title = projection.filename,
-                template = RowTemplate.StatusChip,
-                leading =
-                    RowLeading.TypeIcon(
-                        icon = fileType.icon,
-                        background = fileType.background,
-                        foreground = fileType.foreground,
-                    ),
-                trailing = RowTrailing.Kebab,
+        ): RowModel =
+            makeRow(
+                dto = dto,
+                now = now,
                 onTap = { onOpenDocument(dto) },
                 onSecondary = { onDocumentAction(dto, DocumentAction.View) },
-                body = bodyLine(projection)?.ifEmpty { null },
-                bodyIcon = PantopusIcon.UploadCloud,
-                chips = chips,
-                metaTail =
-                    if (projection.sharedWithCount > 0) {
-                        "Shared ${projection.sharedWithCount}"
-                    } else {
-                        projection.sizeLabel
-                    },
             )
-        }
-
-        private fun bodyLine(projection: DocumentRowProjection): String? {
-            val fragments = mutableListOf<String>()
-            projection.uploadedLabel?.let { fragments.add(it) }
-            projection.version?.let { fragments.add(it) }
-            return if (fragments.isEmpty()) null else fragments.joinToString(" · ")
-        }
-
-        private fun chipsFor(projection: DocumentRowProjection): List<RowChip> {
-            val chips =
-                mutableListOf(
-                    RowChip(
-                        text = projection.category.label,
-                        icon = projection.category.icon,
-                        tint =
-                            RowChip.Tint.Custom(
-                                background = projection.category.background,
-                                foreground = projection.category.foreground,
-                            ),
-                    ),
-                )
-            projection.expiresLabel?.let { label ->
-                chips.add(
-                    RowChip(
-                        text = label,
-                        icon = PantopusIcon.CalendarClock,
-                        tint =
-                            RowChip.Tint.Status(
-                                if (projection.expiresUrgent) {
-                                    StatusChipVariant.Warning
-                                } else {
-                                    StatusChipVariant.Neutral
-                                },
-                            ),
-                    ),
-                )
-            }
-            return chips
-        }
 
         private fun passes(
             dto: HomeDocumentDto,
@@ -421,6 +361,85 @@ class DocumentsViewModel
             )
 
         companion object {
+            /**
+             * Shared row builder so the Documents list and the Document
+             * Search surface (`DocumentSearchScreen`) render identical
+             * rows. Search passes `extraChips` to append matched-tag pills
+             * after the category / expiry chips.
+             */
+            fun makeRow(
+                dto: HomeDocumentDto,
+                now: Instant,
+                extraChips: List<RowChip> = emptyList(),
+                onTap: () -> Unit,
+                onSecondary: () -> Unit,
+            ): RowModel {
+                val projection = project(dto, now)
+                val fileType = projection.fileType
+                return RowModel(
+                    id = projection.id,
+                    title = projection.filename,
+                    template = RowTemplate.StatusChip,
+                    leading =
+                        RowLeading.TypeIcon(
+                            icon = fileType.icon,
+                            background = fileType.background,
+                            foreground = fileType.foreground,
+                        ),
+                    trailing = RowTrailing.Kebab,
+                    onTap = onTap,
+                    onSecondary = onSecondary,
+                    body = bodyLine(projection)?.ifEmpty { null },
+                    bodyIcon = PantopusIcon.UploadCloud,
+                    chips = chipsFor(projection) + extraChips,
+                    metaTail =
+                        if (projection.sharedWithCount > 0) {
+                            "Shared ${projection.sharedWithCount}"
+                        } else {
+                            projection.sizeLabel
+                        },
+                )
+            }
+
+            private fun bodyLine(projection: DocumentRowProjection): String? {
+                val fragments = mutableListOf<String>()
+                projection.uploadedLabel?.let { fragments.add(it) }
+                projection.version?.let { fragments.add(it) }
+                return if (fragments.isEmpty()) null else fragments.joinToString(" · ")
+            }
+
+            private fun chipsFor(projection: DocumentRowProjection): List<RowChip> {
+                val chips =
+                    mutableListOf(
+                        RowChip(
+                            text = projection.category.label,
+                            icon = projection.category.icon,
+                            tint =
+                                RowChip.Tint.Custom(
+                                    background = projection.category.background,
+                                    foreground = projection.category.foreground,
+                                ),
+                        ),
+                    )
+                projection.expiresLabel?.let { label ->
+                    chips.add(
+                        RowChip(
+                            text = label,
+                            icon = PantopusIcon.CalendarClock,
+                            tint =
+                                RowChip.Tint.Status(
+                                    if (projection.expiresUrgent) {
+                                        StatusChipVariant.Warning
+                                    } else {
+                                        StatusChipVariant.Neutral
+                                    },
+                                ),
+                        ),
+                    )
+                }
+                return chips
+            }
+
             /** Pure mapping from a DTO to display strings. */
             @JvmStatic
             fun project(

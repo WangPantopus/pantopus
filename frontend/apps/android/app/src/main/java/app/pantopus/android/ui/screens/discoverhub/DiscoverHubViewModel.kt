@@ -72,8 +72,6 @@ sealed interface DiscoverHubTarget {
     data object SeeAllGigs : DiscoverHubTarget
 
     data object SeeAllListings : DiscoverHubTarget
-
-    data object OpenFilters : DiscoverHubTarget
 }
 
 /**
@@ -116,8 +114,9 @@ enum class DiscoverHubTone {
  * Businesses · Gigs · Listings) on the shared `ListOfRows` archetype.
  *
  * Mirrors iOS `DiscoverHubViewModel` exactly:
- *  - Top-bar trailing `sliders-horizontal` icon (filter; wired via
- *    [onSelect] = [DiscoverHubTarget.OpenFilters]).
+ *  - Top-bar trailing `sliders-horizontal` icon presents the
+ *    `DiscoveryFilterSheet` (P5.2) with an active-filter count badge.
+ *    Filters are persisted in [filters] and applied via [applyFilters].
  *  - Chip-strip filter row (Nearby / New today / Verified / Free /
  *    wanted). Selection re-fetches all four types with the matching
  *    query params; `Trending` is omitted (no engagement signal in the
@@ -154,6 +153,14 @@ class DiscoverHubViewModel
         private val _selectedChip = MutableStateFlow(DiscoverHubChip.NEARBY)
         val selectedChip: StateFlow<String> = _selectedChip.asStateFlow()
 
+        /** Persisted filter-sheet selection. Default = no filters. */
+        private val _filters = MutableStateFlow(DiscoverHubFilters.Default)
+        val filters: StateFlow<DiscoverHubFilters> = _filters.asStateFlow()
+
+        /** Whether the filter sheet is shown. */
+        private val _showFilterSheet = MutableStateFlow(false)
+        val showFilterSheet: StateFlow<Boolean> = _showFilterSheet.asStateFlow()
+
         private val _chipStrip = MutableStateFlow(makeChipStrip(DiscoverHubChip.NEARBY))
         val chipStrip: StateFlow<ChipStripConfig> = _chipStrip.asStateFlow()
 
@@ -189,6 +196,29 @@ class DiscoverHubViewModel
             reload()
         }
 
+        // MARK: - Filters
+
+        /** Open the filter sheet (top-bar action handler). */
+        fun presentFilters() {
+            _showFilterSheet.value = true
+        }
+
+        /** Dismiss the filter sheet. */
+        fun dismissFilters() {
+            _showFilterSheet.value = false
+        }
+
+        /**
+         * Apply a new filter selection: re-fetch (verified-only is a
+         * server param) then re-project (content-type + newest-first are
+         * client-side).
+         */
+        fun applyFilters(newFilters: DiscoverHubFilters) {
+            _filters.value = newFilters
+            _topBarAction.value = makeTopBarAction()
+            reload()
+        }
+
         // MARK: - Fetching
 
         private fun reload() {
@@ -196,7 +226,11 @@ class DiscoverHubViewModel
             viewModelScope.launch {
                 val sinceParam = if (_selectedChip.value == DiscoverHubChip.NEW_TODAY) "today" else null
                 val verifiedParam =
-                    if (_selectedChip.value == DiscoverHubChip.VERIFIED) true else null
+                    if (_selectedChip.value == DiscoverHubChip.VERIFIED || _filters.value.verifiedOnly) {
+                        true
+                    } else {
+                        null
+                    }
                 val freeOrWantedParam =
                     if (_selectedChip.value == DiscoverHubChip.FREE_OR_WANTED) true else null
 
@@ -272,49 +306,53 @@ class DiscoverHubViewModel
          */
         internal fun applyState() {
             val sections = mutableListOf<RowSection>()
-            if (people.isNotEmpty()) {
+            val peopleItems = recencySorted(people)
+            val businessItems = recencySorted(businesses)
+            val gigItems = recencySorted(gigs)
+            val listingItems = recencySorted(listings)
+            if (includes(DiscoverHubSection.PEOPLE) && peopleItems.isNotEmpty()) {
                 sections.add(
                     RowSection(
                         id = DiscoverHubSection.PEOPLE,
                         header = "People",
-                        rows = people.map { rowForPerson(it) },
-                        count = people.size,
+                        rows = peopleItems.map { rowForPerson(it) },
+                        count = peopleItems.size,
                         onSeeAll = { onSelect(DiscoverHubTarget.SeeAllPeople) },
                         style = SectionStyle.Card,
                     ),
                 )
             }
-            if (businesses.isNotEmpty()) {
+            if (includes(DiscoverHubSection.BUSINESSES) && businessItems.isNotEmpty()) {
                 sections.add(
                     RowSection(
                         id = DiscoverHubSection.BUSINESSES,
                         header = "Businesses",
-                        rows = businesses.map { rowForBusiness(it) },
-                        count = businesses.size,
+                        rows = businessItems.map { rowForBusiness(it) },
+                        count = businessItems.size,
                         onSeeAll = { onSelect(DiscoverHubTarget.SeeAllBusinesses) },
                         style = SectionStyle.Card,
                     ),
                 )
             }
-            if (gigs.isNotEmpty()) {
+            if (includes(DiscoverHubSection.GIGS) && gigItems.isNotEmpty()) {
                 sections.add(
                     RowSection(
                         id = DiscoverHubSection.GIGS,
                         header = "Gigs",
-                        rows = gigs.map { rowForGig(it) },
-                        count = gigs.size,
+                        rows = gigItems.map { rowForGig(it) },
+                        count = gigItems.size,
                         onSeeAll = { onSelect(DiscoverHubTarget.SeeAllGigs) },
                         style = SectionStyle.Card,
                     ),
                 )
             }
-            if (listings.isNotEmpty()) {
+            if (includes(DiscoverHubSection.LISTINGS) && listingItems.isNotEmpty()) {
                 sections.add(
                     RowSection(
                         id = DiscoverHubSection.LISTINGS,
                         header = "Listings",
-                        rows = listings.map { rowForListing(it) },
-                        count = listings.size,
+                        rows = listingItems.map { rowForListing(it) },
+                        count = listingItems.size,
                         onSeeAll = { onSelect(DiscoverHubTarget.SeeAllListings) },
                         style = SectionStyle.Card,
                     ),
@@ -439,12 +477,28 @@ class DiscoverHubViewModel
                 onSelect = { selectChip(it) },
             )
 
-        private fun makeTopBarAction(): TopBarAction =
-            TopBarAction(
+        private fun makeTopBarAction(): TopBarAction {
+            val count = _filters.value.activeCount
+            return TopBarAction(
                 icon = PantopusIcon.SlidersHorizontal,
-                contentDescription = "Filter discovery",
-                onClick = { onSelect(DiscoverHubTarget.OpenFilters) },
+                contentDescription =
+                    if (count > 0) "Filter discovery, $count active" else "Filter discovery",
+                badgeCount = if (count > 0) count else null,
+                onClick = { presentFilters() },
             )
+        }
+
+        /** Whether a content type passes the active content-type filter. */
+        private fun includes(type: String): Boolean {
+            val types = _filters.value.contentTypes
+            return types.isEmpty() || types.contains(type)
+        }
+
+        /** Sort items newest-first when the filter is on (by `createdAt`). */
+        private fun recencySorted(items: List<DiscoveryItem>): List<DiscoveryItem> {
+            if (!_filters.value.newestFirst) return items
+            return items.sortedByDescending { it.createdAt ?: "" }
+        }
 
         // MARK: - Helpers (pure)
 

@@ -138,6 +138,70 @@ public struct CreateHomeEventRequest: Encodable, Sendable {
     }
 }
 
+/// Request body for `PUT /api/homes/:id/events/:eventId` — route
+/// `backend/routes/home.js:5082`. All fields optional; the route picks
+/// up only keys present in the body via an allow-list.
+public struct UpdateHomeEventRequest: Encodable, Sendable {
+    public let eventType: String?
+    public let title: String?
+    public let description: String?
+    public let startAt: String?
+    public let endAt: String?
+    public let locationNotes: String?
+    public let recurrenceRule: String?
+    public let assignedTo: [String]?
+    public let alertsEnabled: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case eventType = "event_type"
+        case title
+        case description
+        case startAt = "start_at"
+        case endAt = "end_at"
+        case locationNotes = "location_notes"
+        case recurrenceRule = "recurrence_rule"
+        case assignedTo = "assigned_to"
+        case alertsEnabled = "alerts_enabled"
+    }
+
+    public init(
+        eventType: String? = nil,
+        title: String? = nil,
+        description: String? = nil,
+        startAt: String? = nil,
+        endAt: String? = nil,
+        locationNotes: String? = nil,
+        recurrenceRule: String? = nil,
+        assignedTo: [String]? = nil,
+        alertsEnabled: Bool? = nil
+    ) {
+        self.eventType = eventType
+        self.title = title
+        self.description = description
+        self.startAt = startAt
+        self.endAt = endAt
+        self.locationNotes = locationNotes
+        self.recurrenceRule = recurrenceRule
+        self.assignedTo = assignedTo
+        self.alertsEnabled = alertsEnabled
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        if let eventType { try c.encode(eventType, forKey: .eventType) }
+        if let title { try c.encode(title, forKey: .title) }
+        if let description { try c.encode(description, forKey: .description) }
+        if let startAt { try c.encode(startAt, forKey: .startAt) }
+        // endAt + locationNotes + recurrenceRule + assignedTo are all
+        // explicit-nullable to support clearing values on edit.
+        if let endAt { try c.encode(endAt, forKey: .endAt) }
+        if let locationNotes { try c.encode(locationNotes, forKey: .locationNotes) }
+        if let recurrenceRule { try c.encode(recurrenceRule, forKey: .recurrenceRule) }
+        if let assignedTo { try c.encode(assignedTo, forKey: .assignedTo) }
+        if let alertsEnabled { try c.encode(alertsEnabled, forKey: .alertsEnabled) }
+    }
+}
+
 /// Envelope for `POST /api/homes/:id/events` and `PUT …/:eventId`.
 public struct HomeEventResponse: Decodable, Sendable {
     public let event: CalendarEventDTO

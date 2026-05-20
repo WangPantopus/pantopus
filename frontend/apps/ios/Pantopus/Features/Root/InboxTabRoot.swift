@@ -32,13 +32,25 @@ public struct InboxConversationDestination: Hashable, Sendable {
     public let initials: String
     public let identityKind: String?
     public let verified: Bool
+    /// Message to scroll to on open (set when arriving from Chat Search
+    /// with a body match). `nil` opens the conversation at the latest
+    /// message.
+    public let scrollToMessageId: String?
 
-    public init(mode: Mode, displayName: String, initials: String, identityKind: String?, verified: Bool) {
+    public init(
+        mode: Mode,
+        displayName: String,
+        initials: String,
+        identityKind: String?,
+        verified: Bool,
+        scrollToMessageId: String? = nil
+    ) {
         self.mode = mode
         self.displayName = displayName
         self.initials = initials
         self.identityKind = identityKind
         self.verified = verified
+        self.scrollToMessageId = scrollToMessageId
     }
 }
 
@@ -86,6 +98,21 @@ public struct InboxTabRoot: View {
         )
     }
 
+    private func destination(from result: ChatSearchResult) -> InboxConversationDestination {
+        let mode: InboxConversationDestination.Mode = switch result.kind {
+        case .group: .room(id: result.conversationId)
+        case .dm: .person(otherUserId: result.conversationId)
+        }
+        return InboxConversationDestination(
+            mode: mode,
+            displayName: result.displayName,
+            initials: result.initials,
+            identityKind: result.identityChip.map { $0 == .business ? "business" : "home" },
+            verified: result.verified,
+            scrollToMessageId: result.matchedMessageId
+        )
+    }
+
     @ViewBuilder
     private func destination(for route: InboxRoute) -> some View {
         switch route {
@@ -94,7 +121,8 @@ public struct InboxTabRoot: View {
                 viewModel: ChatConversationViewModel(
                     mode: Self.viewModelMode(for: dest.mode),
                     counterparty: Self.counterparty(for: dest),
-                    currentUserId: currentUserId
+                    currentUserId: currentUserId,
+                    scrollToMessageId: dest.scrollToMessageId
                 )
             ) { if !path.isEmpty { path.removeLast() } }
         case .compose:
@@ -121,7 +149,16 @@ public struct InboxTabRoot: View {
         case .invite:
             NotYetAvailableView(tabName: "Invite to Pantopus", icon: .userPlus)
         case .search:
-            NotYetAvailableView(tabName: "Chat search", icon: .search)
+            ChatSearchView(
+                viewModel: ChatSearchViewModel(
+                    onOpenResult: { result in
+                        Task { @MainActor in path.append(.conversation(destination(from: result))) }
+                    },
+                    onCancel: {
+                        Task { @MainActor in if !path.isEmpty { path.removeLast() } }
+                    }
+                )
+            )
         }
     }
 

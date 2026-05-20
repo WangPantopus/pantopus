@@ -23,6 +23,7 @@ final class RootTabUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment["UI_TESTS_SIGNED_IN"] = "1"
         app.launchEnvironment["UI_TESTS_STUB_API"] = "1"
+        app.launchEnvironment["UI_TESTS_DISABLE_NOTIFICATIONS"] = "1"
         app.launch()
         // If the app doesn't honour the flag (older builds), skip rather than fail.
         let hubTab = app.buttons["tab.hub"].firstMatch
@@ -35,12 +36,6 @@ final class RootTabUITests: XCTestCase {
 
     private func tabButton(_ tab: String, in app: XCUIApplication) -> XCUIElement {
         app.buttons["tab.\(tab)"].firstMatch
-    }
-
-    private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any)
-            .matching(identifier: identifier)
-            .firstMatch
     }
 
     func testLaunchLandsOnHubTab() throws {
@@ -71,13 +66,7 @@ final class RootTabUITests: XCTestCase {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
         tabButton("nearby", in: app).tap()
-        // The Nearby tab renders a MapKit canvas. A deep `descendants(matching: .any)`
-        // query times out serialising the map's accessibility snapshot, so assert on
-        // the map container and the always-present category chips with type-specific
-        // queries (which short-circuit before walking the expensive map subtree).
-        let mapShown = app.otherElements["nearbyMap"].waitForExistence(timeout: 10)
-            || app.buttons["nearbyCategoryChip_all"].waitForExistence(timeout: 5)
-        XCTAssertTrue(mapShown, "Expected the Nearby map canvas to appear")
+        XCTAssertTrue(app.buttons["nearbyCategoryChip_all"].waitForExistence(timeout: 5))
     }
 
     func testTapInboxShowsChatListEmptyState() throws {
@@ -93,7 +82,7 @@ final class RootTabUITests: XCTestCase {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
         tabButton("you", in: app).tap()
-        XCTAssertTrue(element("meScreen", in: app).waitForExistence(timeout: 5))
+        XCTAssertTrue(app.scrollViews["meScreen"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["meDestructiveCard_personal"].waitForExistence(timeout: 2))
     }
 }

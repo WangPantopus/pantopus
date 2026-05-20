@@ -25,6 +25,8 @@ public enum BusinessDiscoveryEndpoints {
         page: Int = 1,
         pageSize: Int = 20,
         radiusMiles: Double? = nil,
+        openNow: Bool? = nil,
+        ratingMin: Double? = nil,
         lat: Double? = nil,
         lng: Double? = nil
     ) -> Endpoint {
@@ -38,6 +40,8 @@ public enum BusinessDiscoveryEndpoints {
         }
         if let sort { query["sort"] = sort }
         if let radiusMiles { query["radius_miles"] = String(radiusMiles) }
+        if let openNow, openNow { query["open_now"] = "true" }
+        if let ratingMin { query["rating_min"] = String(ratingMin) }
         if let lat { query["lat"] = String(lat) }
         if let lng { query["lon"] = String(lng) }
         return Endpoint(method: .get, path: "/api/businesses/search", query: query)

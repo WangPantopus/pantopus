@@ -142,6 +142,19 @@ public struct PostDetailDTO: Decodable, Sendable, Hashable, Identifiable {
     public let userHasSaved: Bool
     public let userHasReposted: Bool
     public let comments: [PostCommentDTO]
+    /// Visibility scope — needed by the edit-mode prefill so the compose
+    /// form can show the saved audience.
+    public let visibility: String?
+    /// Event date in ISO-8601 — populated for `event` posts.
+    public let eventDate: String?
+    /// Event venue — populated for `event` posts.
+    public let eventVenue: String?
+    /// `lost` / `found` — populated for `lost_found` posts.
+    public let lostFoundType: String?
+    /// Service category — populated for `ask_local` posts.
+    public let serviceCategory: String?
+    /// Recommended business name — populated for `recommendation` posts.
+    public let dealBusinessName: String?
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -163,6 +176,12 @@ public struct PostDetailDTO: Decodable, Sendable, Hashable, Identifiable {
         case creator, home
         case userHasLiked, userHasSaved, userHasReposted
         case comments
+        case visibility
+        case eventDate = "event_date"
+        case eventVenue = "event_venue"
+        case lostFoundType = "lost_found_type"
+        case serviceCategory = "service_category"
+        case dealBusinessName = "deal_business_name"
     }
 
     public init(from decoder: any Decoder) throws {
@@ -190,5 +209,11 @@ public struct PostDetailDTO: Decodable, Sendable, Hashable, Identifiable {
         userHasSaved = try c.decodeIfPresent(Bool.self, forKey: .userHasSaved) ?? false
         userHasReposted = try c.decodeIfPresent(Bool.self, forKey: .userHasReposted) ?? false
         comments = try (c.decodeIfPresent([PostCommentDTO].self, forKey: .comments)) ?? []
+        visibility = try c.decodeIfPresent(String.self, forKey: .visibility)
+        eventDate = try c.decodeIfPresent(String.self, forKey: .eventDate)
+        eventVenue = try c.decodeIfPresent(String.self, forKey: .eventVenue)
+        lostFoundType = try c.decodeIfPresent(String.self, forKey: .lostFoundType)
+        serviceCategory = try c.decodeIfPresent(String.self, forKey: .serviceCategory)
+        dealBusinessName = try c.decodeIfPresent(String.self, forKey: .dealBusinessName)
     }
 }

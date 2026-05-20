@@ -1,9 +1,15 @@
 package app.pantopus.android.data.api.services
 
+import app.pantopus.android.data.api.models.support_trains.AddSupportTrainSlotBody
+import app.pantopus.android.data.api.models.support_trains.CreateSupportTrainBody
+import app.pantopus.android.data.api.models.support_trains.CreateSupportTrainResponse
 import app.pantopus.android.data.api.models.support_trains.SupportTrainReservationsResponse
 import app.pantopus.android.data.api.models.support_trains.SupportTrainsListResponse
 import app.pantopus.android.data.api.models.support_trains.SupportTrainsNearbyResponse
+import okhttp3.ResponseBody
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -52,4 +58,37 @@ interface SupportTrainsApi {
     suspend fun reservations(
         @Path("id") supportTrainId: String,
     ): SupportTrainReservationsResponse
+
+    /**
+     * `POST /api/support-trains/` — create a new Support Train
+     * (status `draft`). P2.6 — the Start-a-Support-Train wizard fires
+     * this on launch, then [addSlot] for each generated slot, then
+     * [publish]. Route `backend/routes/supportTrains.js:639`.
+     */
+    @POST("api/support-trains")
+    suspend fun create(
+        @Body body: CreateSupportTrainBody,
+    ): CreateSupportTrainResponse
+
+    /**
+     * `POST /api/support-trains/:id/slots` — append one custom slot.
+     * The wizard calls this once per generated slot. Route
+     * `backend/routes/supportTrains.js:921`.
+     */
+    @POST("api/support-trains/{id}/slots")
+    suspend fun addSlot(
+        @Path("id") supportTrainId: String,
+        @Body body: AddSupportTrainSlotBody,
+    ): ResponseBody
+
+    /**
+     * `POST /api/support-trains/:id/publish` — flip the draft to
+     * `published` so neighbors / connections can sign up. Fires last
+     * in the wizard's launch sequence. Route
+     * `backend/routes/supportTrains.js:1236`.
+     */
+    @POST("api/support-trains/{id}/publish")
+    suspend fun publish(
+        @Path("id") supportTrainId: String,
+    ): ResponseBody
 }

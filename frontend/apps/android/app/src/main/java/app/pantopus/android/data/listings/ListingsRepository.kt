@@ -11,9 +11,12 @@ import app.pantopus.android.data.api.models.listings.ListingsNearbyResponse
 import app.pantopus.android.data.api.models.listings.MessageListingBody
 import app.pantopus.android.data.api.models.listings.MessageListingResponse
 import app.pantopus.android.data.api.models.listings.MyListingsResponse
+import app.pantopus.android.data.api.models.listings.UpdateListingRequest
+import app.pantopus.android.data.api.models.listings.UpdateListingResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
-import app.pantopus.android.data.api.services.ListingsApi
+import app.pantopus.android.data.api.services.ListingsMutationApi
+import app.pantopus.android.data.api.services.ListingsReadApi
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,7 +25,8 @@ import javax.inject.Singleton
 class ListingsRepository
     @Inject
     constructor(
-        private val api: ListingsApi,
+        private val readApi: ListingsReadApi,
+        private val mutationApi: ListingsMutationApi,
     ) {
         suspend fun nearby(
             latitude: Double,
@@ -36,7 +40,7 @@ class ListingsRepository
             offset: Int = 0,
         ): NetworkResult<ListingsNearbyResponse> =
             safeApiCall {
-                api.nearby(
+                readApi.nearby(
                     latitude = latitude,
                     longitude = longitude,
                     radiusMiles = radiusMiles,
@@ -62,7 +66,7 @@ class ListingsRepository
             limit: Int = 30,
         ): NetworkResult<ListingsBrowseResponse> =
             safeApiCall {
-                api.browse(
+                readApi.browse(
                     south = south,
                     west = west,
                     north = north,
@@ -82,23 +86,31 @@ class ListingsRepository
             north: Double,
             east: Double,
             category: String? = null,
-        ): NetworkResult<ListingsInBoundsResponse> = safeApiCall { api.inBounds(south, west, north, east, category) }
+        ): NetworkResult<ListingsInBoundsResponse> = safeApiCall { readApi.inBounds(south, west, north, east, category) }
 
-        suspend fun categories(): NetworkResult<ListingsCategoriesResponse> = safeApiCall { api.categories() }
+        suspend fun categories(): NetworkResult<ListingsCategoriesResponse> = safeApiCall { readApi.categories() }
 
         /** Wraps `POST /api/listings`. Used by the Snap & Sell wizard. */
-        suspend fun create(request: CreateListingRequest): NetworkResult<CreateListingResponse> = safeApiCall { api.create(request) }
+        suspend fun create(request: CreateListingRequest): NetworkResult<CreateListingResponse> =
+            safeApiCall { mutationApi.create(request) }
 
-        suspend fun save(id: String): NetworkResult<ListingSaveResponse> = safeApiCall { api.save(id) }
+        /** Wraps `PATCH /api/listings/:id`. Used by the Edit-listing
+         *  flow (P3.3). Owner-only on the backend. */
+        suspend fun update(
+            id: String,
+            request: UpdateListingRequest,
+        ): NetworkResult<UpdateListingResponse> = safeApiCall { mutationApi.update(id, request) }
 
-        suspend fun unsave(id: String): NetworkResult<ListingSaveResponse> = safeApiCall { api.unsave(id) }
+        suspend fun save(id: String): NetworkResult<ListingSaveResponse> = safeApiCall { mutationApi.save(id) }
 
-        suspend fun detail(id: String): NetworkResult<ListingDetailResponse> = safeApiCall { api.detail(id) }
+        suspend fun unsave(id: String): NetworkResult<ListingSaveResponse> = safeApiCall { mutationApi.unsave(id) }
+
+        suspend fun detail(id: String): NetworkResult<ListingDetailResponse> = safeApiCall { readApi.detail(id) }
 
         suspend fun messageListing(
             id: String,
             body: MessageListingBody,
-        ): NetworkResult<MessageListingResponse> = safeApiCall { api.messageListing(id, body) }
+        ): NetworkResult<MessageListingResponse> = safeApiCall { mutationApi.messageListing(id, body) }
 
         /**
          * T6.3f / P14 — backs the My listings screen. Optional `status`
@@ -109,5 +121,5 @@ class ListingsRepository
             status: String? = null,
             limit: Int = 100,
             offset: Int = 0,
-        ): NetworkResult<MyListingsResponse> = safeApiCall { api.myListings(status, limit, offset) }
+        ): NetworkResult<MyListingsResponse> = safeApiCall { readApi.myListings(status, limit, offset) }
     }

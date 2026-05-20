@@ -140,16 +140,31 @@ final class MailboxListViewModel: ListOfRowsDataSource {
         }
     }
 
-    /// Map one mail DTO to the design's row anatomy (T6.5b / P20 re-skin):
+    /// Maps one mail DTO to the list row, routing taps to this VM's
+    /// `onOpenMail`. Delegates to the shared `makeRow` factory so the
+    /// mailbox list and Mailbox Search (P4.2) render rows identically.
+    func row(for mail: MailItem) -> RowModel {
+        Self.makeRow(for: mail) { [weak self] mailId in
+            Task { @MainActor in self?.onOpenMail(mailId) }
+        }
+    }
+
+    /// Builds the canonical mailbox row anatomy (T6.5b / P20 re-skin) from
+    /// a single mail DTO. Extracted as a `static` so other surfaces — e.g.
+    /// Mailbox Search (P4.2) — reuse the exact projection without
+    /// duplicating it (single source of truth, no drift):
     ///   - leading: 40pt category typeIcon (per `mailbox.jsx:4-16` accent
     ///     palette),
-    ///   - sender as uppercase overline-style subtitle,
+    ///   - sender as subtitle,
     ///   - title (display_title || subject),
     ///   - body (preview_text, 2 lines),
-    ///   - chips: trust + category,
+    ///   - chips: category + trust,
     ///   - `timeMeta`: relative time,
     ///   - `unread` highlight when `!viewed`.
-    func row(for mail: MailItem) -> RowModel {
+    static func makeRow(
+        for mail: MailItem,
+        onOpenMail: @escaping @Sendable (String) -> Void
+    ) -> RowModel {
         let category = MailItemCategory.fromRaw(mail.mailType ?? mail.type)
         let trust = MailTrust.fromRaw(nil) // V1 list endpoint doesn't surface sender_trust.
         let chips: [RowChip] = [
@@ -176,10 +191,10 @@ final class MailboxListViewModel: ListOfRowsDataSource {
                 foreground: category.accent
             ),
             trailing: .none,
-            onTap: { @Sendable in Task { @MainActor in self.onOpenMail(mailId) } },
+            onTap: { onOpenMail(mailId) },
             body: mail.previewText,
             chips: chips,
-            timeMeta: Self.formatRelativeTime(mail.createdAt),
+            timeMeta: formatRelativeTime(mail.createdAt),
             highlight: mail.viewed ? nil : .unread
         )
     }

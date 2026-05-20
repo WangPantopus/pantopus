@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.offers.BidDto
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivityFilterSheet
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 
 /** Test tag on the offers root container. */
@@ -27,7 +28,6 @@ const val OFFERS_TAG = "offers"
 fun OffersScreen(
     onBack: () -> Unit,
     onOpenOfferDetail: (BidDto) -> Unit,
-    onOpenFilters: () -> Unit = {},
     onBrowseListings: () -> Unit = {},
     onPostTask: () -> Unit = {},
     viewModel: OffersViewModel = hiltViewModel(),
@@ -36,11 +36,12 @@ fun OffersScreen(
     val topBarAction by viewModel.topBarAction.collectAsStateWithLifecycle()
     val tabs by viewModel.tabs.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
+    val showFilterSheet by viewModel.showFilterSheet.collectAsStateWithLifecycle()
+    val activityFilter by viewModel.activityFilter.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.bindCallbacks(
             onOpenOfferDetail = onOpenOfferDetail,
-            onOpenFilters = onOpenFilters,
             onBrowseListings = onBrowseListings,
             onPostTask = onPostTask,
         )
@@ -58,6 +59,17 @@ fun OffersScreen(
             onSelectTab = { viewModel.selectTab(it) },
             topBarAction = topBarAction,
             onBack = onBack,
+        )
+    }
+
+    if (showFilterSheet) {
+        ActivityFilterSheet(
+            statusTitle = viewModel.statusFilterTitle,
+            statusOptions = viewModel.statusFilterOptions,
+            sortOptions = viewModel.sortFilterOptions,
+            filter = activityFilter,
+            onApply = { viewModel.applyFilter(it) },
+            onDismiss = { viewModel.dismissFilterSheet() },
         )
     }
 }

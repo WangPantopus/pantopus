@@ -102,4 +102,11 @@ data class PostDetailDto(
     val userHasSaved: Boolean = false,
     val userHasReposted: Boolean = false,
     val comments: List<PostCommentDto> = emptyList(),
+    // Edit-mode prefill fields — see iOS PostDetailDTO parity.
+    val visibility: String? = null,
+    @Json(name = "event_date") val eventDate: String? = null,
+    @Json(name = "event_venue") val eventVenue: String? = null,
+    @Json(name = "lost_found_type") val lostFoundType: String? = null,
+    @Json(name = "service_category") val serviceCategory: String? = null,
+    @Json(name = "deal_business_name") val dealBusinessName: String? = null,
 )

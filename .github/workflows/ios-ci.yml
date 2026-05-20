@@ -112,12 +112,19 @@ jobs:
         # CI runners have no Apple Developer signing identity. Disable
         # signing so the simulator-only test/build works without a
         # provisioning profile.
+        #
+        # OS is pinned to 18.5 (the SDK Xcode 16.4 builds against) rather
+        # than `OS=latest`. The runner image now also carries iOS 26.x
+        # runtimes, so `latest` resolved to 26.2 — running an 18.5-SDK app
+        # there made the XCUITest runner injection flaky ("Application …
+        # xctrunner is unknown to FrontBoard"). Matching the runtime to the
+        # SDK keeps the runner install deterministic across simulators.
         run: |
           set -o pipefail
           xcodebuild \
             -project Pantopus.xcodeproj \
             -scheme Pantopus \
-            -destination "platform=iOS Simulator,name=${{ matrix.simulator }},OS=latest" \
+            -destination "platform=iOS Simulator,name=${{ matrix.simulator }},OS=18.5" \
             -configuration Debug \
             -enableCodeCoverage YES \
             -resultBundlePath "TestResults-${{ steps.sim.outputs.slug }}.xcresult" \
@@ -179,7 +186,7 @@ jobs:
           xcodebuild \
             -project Pantopus.xcodeproj \
             -scheme Pantopus \
-            -destination "platform=iOS Simulator,name=iPhone 16,OS=latest" \
+            -destination "platform=iOS Simulator,name=iPhone 16,OS=18.5" \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \

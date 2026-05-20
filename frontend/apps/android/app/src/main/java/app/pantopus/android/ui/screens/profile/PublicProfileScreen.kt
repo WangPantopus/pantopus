@@ -43,15 +43,16 @@ import kotlinx.coroutines.delay
  * Public profile detail screen. ViewModel reads the user id via the
  * nav-backstack [androidx.lifecycle.SavedStateHandle].
  *
- * `onOpenMessages` and `onOpenReport` are nav-host callbacks; their
- * destinations currently land on `NotYetAvailableView` placeholders
- * until the Chat and Report flows ship.
+ * `onOpenMessages` is invoked with the loaded `PublicProfileDto` so the
+ * host nav stack can construct a chat-conversation destination with the
+ * profile's user as counterparty. `onOpenReport` lands on the
+ * `NotYetAvailableView` placeholder until the Report flow ships.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublicProfileScreen(
     onBack: () -> Unit,
-    onOpenMessages: () -> Unit = {},
+    onOpenMessages: (app.pantopus.android.data.api.models.profile.PublicProfileDto) -> Unit = {},
     onOpenReport: () -> Unit = {},
     viewModel: PublicProfileViewModel = hiltViewModel(),
 ) {
@@ -95,7 +96,7 @@ fun PublicProfileScreen(
                             content = content.stats,
                             selectedTab = selectedTab,
                             onSelectTab = { viewModel.selectTab(it) },
-                            onMessage = onOpenMessages,
+                            onMessage = { onOpenMessages(content.profile) },
                             onConnect = { viewModel.connect() },
                             onOverflow = { viewModel.setShowOverflow(true) },
                         )

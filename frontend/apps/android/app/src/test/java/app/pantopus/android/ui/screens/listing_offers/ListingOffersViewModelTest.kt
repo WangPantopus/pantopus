@@ -65,7 +65,6 @@ class ListingOffersViewModelTest {
             onShareListing = {},
             onOpenBuyer = {},
             onOpenTransaction = {},
-            onSort = {},
             now = { fixedNow },
         )
         return vm
@@ -141,6 +140,33 @@ class ListingOffersViewModelTest {
                 buyerUsername = "dan_k",
             ),
         )
+
+    /**
+     * Three pending offers with amount and recency deliberately crossed
+     * so every sort yields a distinct order:
+     *   - o-low-new : $100, newest (05-15)
+     *   - o-mid-old : $200, oldest (05-10)
+     *   - o-high-mid: $300, middle (05-13) — top offer, wins LEADING
+     */
+    private val sortFixture: List<ListingOfferDto> =
+        listOf(
+            offer(id = "o-low-new", amount = 100.0, status = "pending", createdAt = "2026-05-15T10:00:00Z"),
+            offer(id = "o-mid-old", amount = 200.0, status = "pending", createdAt = "2026-05-10T10:00:00Z"),
+            offer(id = "o-high-mid", amount = 300.0, status = "pending", createdAt = "2026-05-13T10:00:00Z"),
+        )
+
+    private fun loadedVm(offers: List<ListingOfferDto>): ListingOffersViewModel {
+        coEvery { listingsRepo.detail(any()) } returns NetworkResult.Success(ListingDetailResponse(listing))
+        coEvery { offersRepo.listOffers(any()) } returns NetworkResult.Success(ListingOffersResponse(offers))
+        val vm = makeVm()
+        vm.load()
+        return vm
+    }
+
+    private fun loadedRowIds(vm: ListingOffersViewModel): List<String> {
+        val state = vm.state.value
+        return if (state is ListOfRowsUiState.Loaded) state.sections.first().rows.map { it.id } else emptyList()
+    }
 
     // MARK: - Lifecycle
 
@@ -218,7 +244,7 @@ class ListingOffersViewModelTest {
             assertEquals("Mid-century walnut credenza", context!!.title)
             assertEquals("$250", context.askPrice)
             assertEquals(3, context.offerCount)
-            assertEquals("Highest first", context.sortLabel)
+            assertEquals("Highest offer", context.sortLabel)
             assertEquals("Active", context.statusChip.label)
         }
 
@@ -421,5 +447,77 @@ class ListingOffersViewModelTest {
             val row = state.sections.first().rows.first { it.id == "o-anika" }
             assertEquals("Countered", row.chips!![0].text)
             assertEquals("Your counter $230", row.chips!![1].text)
+        }
+
+    // MARK: - Sort menu
+
+    @Test
+    fun default_sort_is_highest_offer() =
+        runTest {
+            val vm = loadedVm(sortFixture)
+            assertEquals(listOf("o-high-mid", "o-mid-old", "o-low-new"), loadedRowIds(vm))
+            assertEquals("Highest offer", vm.listingContext.value?.sortLabel)
+        }
+
+    @Test
+    fun select_sort_lowest_offer() =
+        runTest {
+            val vm = loadedVm(sortFixture)
+            vm.selectSort(ListingOffersSort.LowestOffer)
+            assertEquals(listOf("o-low-new", "o-mid-old", "o-high-mid"), loadedRowIds(vm))
+            assertEquals("Lowest offer", vm.listingContext.value?.sortLabel)
+        }
+
+    @Test
+    fun select_sort_newest_first() =
+        runTest {
+            val vm = loadedVm(sortFixture)
+            vm.selectSort(ListingOffersSort.NewestFirst)
+            assertEquals(listOf("o-low-new", "o-high-mid", "o-mid-old"), loadedRowIds(vm))
+            assertEquals("Newest first", vm.listingContext.value?.sortLabel)
+        }
+
+    @Test
+    fun select_sort_oldest_first() =
+        runTest {
+            val vm = loadedVm(sortFixture)
+            vm.selectSort(ListingOffersSort.OldestFirst)
+            assertEquals(listOf("o-mid-old", "o-high-mid", "o-low-new"), loadedRowIds(vm))
+            assertEquals("Oldest first", vm.listingContext.value?.sortLabel)
+        }
+
+    @Test
+    fun leading_highlight_tracks_top_offer_regardless_of_sort() =
+        runTest {
+            val vm = loadedVm(sortFixture)
+            vm.selectSort(ListingOffersSort.OldestFirst)
+            val rows = (vm.state.value as ListOfRowsUiState.Loaded).sections.first().rows
+            val leading = rows.firstOrNull { it.highlight == RowHighlight.Leading }
+            assertEquals("o-high-mid", leading?.id)
+        }
+
+    @Test
+    fun sort_persists_across_refresh() =
+        runTest {
+            val vm = loadedVm(sortFixture)
+            vm.selectSort(ListingOffersSort.LowestOffer)
+            vm.refresh()
+            assertEquals(listOf("o-low-new", "o-mid-old", "o-high-mid"), loadedRowIds(vm))
+            assertEquals("Lowest offer", vm.listingContext.value?.sortLabel)
+        }
+
+    @Test
+    fun sort_menu_options_expose_four_entries_with_selection() =
+        runTest {
+            val vm = loadedVm(sortFixture)
+            val options = vm.listingContext.value?.sortOptions ?: emptyList()
+            assertEquals(
+                listOf("Highest offer", "Lowest offer", "Newest first", "Oldest first"),
+                options.map { it.label },
+            )
+            assertEquals(listOf("highestOffer"), options.filter { it.isSelected }.map { it.id })
+            vm.selectSort(ListingOffersSort.NewestFirst)
+            val after = vm.listingContext.value?.sortOptions ?: emptyList()
+            assertEquals(listOf("newestFirst"), after.filter { it.isSelected }.map { it.id })
         }
 }

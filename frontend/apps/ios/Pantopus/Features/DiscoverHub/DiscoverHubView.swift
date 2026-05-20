@@ -20,6 +20,18 @@ public struct DiscoverHubView: View {
     public var body: some View {
         ListOfRowsView(dataSource: viewModel)
             .accessibilityIdentifier("discoverHub")
+            .sheet(
+                isPresented: Binding(
+                    get: { viewModel.isFilterSheetPresented },
+                    set: { viewModel.setFilterSheetPresented($0) }
+                )
+            ) {
+                DiscoveryFilterSheet(
+                    initialFilters: viewModel.filters,
+                    onApply: { viewModel.applyFilters($0) },
+                    onClose: { viewModel.setFilterSheetPresented(false) }
+                )
+            }
     }
 }
 

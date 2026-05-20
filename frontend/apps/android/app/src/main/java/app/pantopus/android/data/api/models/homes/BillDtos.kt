@@ -34,6 +34,10 @@ data class BillDto(
     @Json(name = "paid_by") val paidBy: String? = null,
     @Json(name = "created_at") val createdAt: String? = null,
     @Json(name = "updated_at") val updatedAt: String? = null,
+    /** Backend-stored JSONB bag. Used today only by the Add Bill
+     *  wizard to round-trip the recurrence selection through
+     *  `details.schedule` / `details.frequency`. */
+    val details: Map<String, String>? = null,
 ) {
     /** Best-effort cents-or-decimal → BigDecimal extraction. Treats
      *  `amount_cents` as authoritative when set, then falls back to
@@ -67,7 +71,8 @@ data class CreateBillRequest(
     val details: Map<String, String>? = null,
 )
 
-/** Body for `PUT /api/homes/:id/bills/:billId`. All fields optional. */
+/** Body for `PUT /api/homes/:id/bills/:billId`. All fields optional —
+ *  the whitelist mirrors `backend/routes/home.js:4593`. */
 @JsonClass(generateAdapter = true)
 data class UpdateBillRequest(
     val status: String? = null,
@@ -75,6 +80,7 @@ data class UpdateBillRequest(
     val amount: BigDecimal? = null,
     @Json(name = "provider_name") val providerName: String? = null,
     @Json(name = "due_date") val dueDate: String? = null,
+    val details: Map<String, String>? = null,
 )
 
 /** One row from `GET /api/homes/:id/bills/:billId/splits` —

@@ -141,8 +141,39 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
             accessibilityLabel: "Filter posts"
         ) { [weak self] in
             guard let self else { return }
-            Task { @MainActor in self.onOpenFilters() }
+            Task { @MainActor in self.isFilterPresented = true }
         }
+    }
+
+    // MARK: - Activity filter (P5.4)
+
+    /// Bound to the view's `.sheet(isPresented:)` so the shared
+    /// `ActivityFilterSheet` presents over the list.
+    public var isFilterPresented = false
+
+    /// The applied type / sort / date-range selection. Default is the
+    /// "no filter" position.
+    public private(set) var activityFilter = ActivityFilter()
+
+    /// Section header for the status chips. Posts filter by intent, so
+    /// the chips read as a post "Type".
+    public let statusFilterTitle = "Type"
+
+    /// Per-surface status chips — the post intents (ask / recommend /
+    /// event / lost & found / announce).
+    public var statusFilterOptions: [FilterOption] {
+        [PulseIntent.ask, .recommend, .event, .lost, .announce].map {
+            FilterOption(id: Self.intentFilterId($0), label: Self.intentLabel($0))
+        }
+    }
+
+    /// Posts have no per-row value — only date ordering applies.
+    public let sortFilterOptions = ActivitySortOrder.timeOnly
+
+    /// Store the applied filter and re-project the visible rows.
+    public func applyFilter(_ filter: ActivityFilter) {
+        activityFilter = filter
+        rebuild()
     }
 
     public private(set) var state: ListOfRowsState = .loading
@@ -162,7 +193,6 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
     private let api: APIClient
     private let currentUserId: @MainActor () -> String?
     private let onOpenPost: @MainActor (MyPostDTO) -> Void
-    private let onOpenFilters: @MainActor () -> Void
     private let onCompose: @MainActor () -> Void
     private let onEditPost: @MainActor (MyPostDTO) -> Void
     private let now: @Sendable () -> Date
@@ -194,7 +224,6 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
         api: APIClient = .shared,
         currentUserId: @escaping @MainActor () -> String? = { MyPostsViewModel.defaultCurrentUserId() },
         onOpenPost: @escaping @MainActor (MyPostDTO) -> Void = { _ in },
-        onOpenFilters: @escaping @MainActor () -> Void = {},
         onCompose: @escaping @MainActor () -> Void = {},
         onEditPost: @escaping @MainActor (MyPostDTO) -> Void = { _ in },
         now: @escaping @Sendable () -> Date = { Date() }
@@ -202,7 +231,6 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
         self.api = api
         self.currentUserId = currentUserId
         self.onOpenPost = onOpenPost
-        self.onOpenFilters = onOpenFilters
         self.onCompose = onCompose
         self.onEditPost = onEditPost
         self.now = now
@@ -270,6 +298,7 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
     /// Recompute the tab counts + visible section list from the cached
     /// `posts` array, applying any `localArchiveOverrides`.
     private func rebuild() {
+        let nowSnapshot = now()
         let projections = posts.map { dto -> PostProjection in
             let archived = isArchived(dto)
             let tab = archived ? MyPostsTab.archived : MyPostsTab.active
@@ -279,19 +308,53 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
         let publicCounts = Self.tabCounts(for: projections)
         counts = TabCounts(active: publicCounts.active, archived: publicCounts.archived)
 
-        let filtered = projections.filter { $0.tab == selectedTab }
-        if filtered.isEmpty {
-            state = .empty(emptyContent(for: selectedTab))
+        let tabItems = projections.filter { $0.tab == selectedTab }
+        let visible = activityFilter.apply(
+            to: tabItems,
+            now: nowSnapshot,
+            statusId: { Self.intentFilterId(PulseIntent.from(postType: $0.dto.postType)) },
+            date: { Self.parseDate($0.dto.createdAt) },
+            value: { _ in nil }
+        )
+        if visible.isEmpty {
+            let isFiltered = activityFilter.isActive && !tabItems.isEmpty
+            state = .empty(isFiltered ? filteredEmptyContent() : emptyContent(for: selectedTab))
             return
         }
-        let rows = filtered.map { proj in
+        let rows = visible.map { proj in
             Self.row(
                 projection: proj,
-                now: now(),
+                now: nowSnapshot,
                 callbacks: callbacks(for: proj.dto)
             )
         }
         state = .loaded(sections: [RowSection(id: selectedTab, rows: rows)], hasMore: false)
+    }
+
+    /// Map a post intent onto its filter chip id. `.all` is the Pulse
+    /// "all" sentinel and never appears as a real post intent.
+    public static func intentFilterId(_ intent: PulseIntent) -> String {
+        switch intent {
+        case .all: "all"
+        case .ask: "ask"
+        case .recommend: "recommend"
+        case .event: "event"
+        case .lost: "lost"
+        case .announce: "announce"
+        }
+    }
+
+    /// Empty state shown when an active filter hides every row in the tab.
+    private func filteredEmptyContent() -> ListOfRowsState.EmptyContent {
+        ListOfRowsState.EmptyContent(
+            icon: .filter,
+            headline: "No posts match your filters",
+            subcopy: "Try a different type, date range, or sort — or clear "
+                + "your filters to see everything in this tab.",
+            ctaTitle: "Clear filters"
+        ) { [weak self] in
+            Task { @MainActor in self?.applyFilter(ActivityFilter()) }
+        }
     }
 
     /// Per-row callbacks bundle. Same pattern as MyBids — keeps the
