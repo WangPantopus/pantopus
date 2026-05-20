@@ -48,6 +48,12 @@ class AudienceProfileViewModel
         private val _selectedTierRank = MutableStateFlow<Int?>(null)
         val selectedTierRank: StateFlow<Int?> = _selectedTierRank.asStateFlow()
 
+        private val _followerSearchText = MutableStateFlow("")
+        val followerSearchText: StateFlow<String> = _followerSearchText.asStateFlow()
+
+        private val _followerSort = MutableStateFlow(FollowerSort.NewestActive)
+        val followerSort: StateFlow<FollowerSort> = _followerSort.asStateFlow()
+
         private val _activeThreadFilter = MutableStateFlow(ThreadsFilter.All)
         val activeThreadFilter: StateFlow<ThreadsFilter> = _activeThreadFilter.asStateFlow()
 
@@ -144,6 +150,14 @@ class AudienceProfileViewModel
             _selectedTierRank.value = rank
         }
 
+        fun onFollowerSearchText(text: String) {
+            _followerSearchText.value = text
+        }
+
+        fun selectFollowerSort(sort: FollowerSort) {
+            _followerSort.value = sort
+        }
+
         fun selectThreadFilter(filter: ThreadsFilter) {
             _activeThreadFilter.value = filter
         }
@@ -195,15 +209,27 @@ class AudienceProfileViewModel
             }
         }
 
-        /** Followers filtered by `selectedTierRank`. */
+        /**
+         * Followers narrowed by [selectedTierRank], then by
+         * [followerSearchText] (display name + handle, case-insensitive),
+         * then ordered by [followerSort]. The default sort
+         * [FollowerSort.NewestActive] preserves the natural API order —
+         * the backend already serves most-recently-active first.
+         */
         fun visibleFollowers(): List<FollowerRowContent> {
             val current = _state.value as? AudienceProfileUiState.Loaded ?: return emptyList()
             val rank = _selectedTierRank.value
-            return if (rank != null) {
-                current.content.followers.filter { it.tierRank == rank }
-            } else {
-                current.content.followers
+            var rows = current.content.followers
+            if (rank != null) rows = rows.filter { it.tierRank == rank }
+            val query = _followerSearchText.value.trim().lowercase()
+            if (query.isNotEmpty()) {
+                rows =
+                    rows.filter {
+                        it.displayName.lowercase().contains(query) ||
+                            it.handle.lowercase().contains(query)
+                    }
             }
+            return sortFollowers(rows, _followerSort.value)
         }
 
         /** Threads filtered by `activeThreadFilter`. */
@@ -214,6 +240,35 @@ class AudienceProfileViewModel
         }
 
         companion object {
+            /**
+             * Pure sort over the supplied [rows]. Stable across equal keys
+             * because we tag each row with its original index and use it as
+             * the final tie-break.
+             */
+            internal fun sortFollowers(
+                rows: List<FollowerRowContent>,
+                sort: FollowerSort,
+            ): List<FollowerRowContent> {
+                if (sort == FollowerSort.NewestActive) return rows
+                val indexed = rows.withIndex().toList()
+                val comparator: Comparator<IndexedValue<FollowerRowContent>> =
+                    when (sort) {
+                        FollowerSort.NewestActive ->
+                            compareBy<IndexedValue<FollowerRowContent>> { it.index }
+                        FollowerSort.HighestTier ->
+                            compareByDescending<IndexedValue<FollowerRowContent>> { it.value.tierRank }
+                                .thenBy { it.index }
+                        FollowerSort.RecentlyJoined ->
+                            compareBy<IndexedValue<FollowerRowContent>> { it.value.tenureMonths ?: Int.MAX_VALUE }
+                                .thenBy { it.index }
+                        FollowerSort.MostEngaged ->
+                            compareByDescending<IndexedValue<FollowerRowContent>> { it.value.tierRank }
+                                .thenByDescending { it.value.tenureMonths ?: -1 }
+                                .thenBy { it.index }
+                    }
+                return indexed.sortedWith(comparator).map { it.value }
+            }
+
             internal fun project(
                 persona: PersonaSummaryDto,
                 audience: AudienceListResponse,
@@ -371,6 +426,8 @@ class AudienceProfileViewModel
                     tierName = tierName,
                     tierRank = rank,
                     tenureLabel = tenure,
+                    tenureMonths = dto.tenureMonths,
+                    joinedMonth = dto.joinedMonth,
                     verifiedLocal = dto.verifiedLocal == true,
                 )
             }

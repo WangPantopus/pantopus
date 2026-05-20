@@ -24,6 +24,9 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -41,11 +44,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -55,6 +61,7 @@ import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
 
 @Composable
 fun AudienceProfileScreen(
@@ -70,6 +77,8 @@ fun AudienceProfileScreen(
     val activeTab by viewModel.activeTab.collectAsStateWithLifecycle()
     val composer by viewModel.composer.collectAsStateWithLifecycle()
     val selectedTier by viewModel.selectedTierRank.collectAsStateWithLifecycle()
+    val followerSearch by viewModel.followerSearchText.collectAsStateWithLifecycle()
+    val followerSort by viewModel.followerSort.collectAsStateWithLifecycle()
     val activeThreadFilter by viewModel.activeThreadFilter.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -97,6 +106,8 @@ fun AudienceProfileScreen(
                             activeTab = activeTab,
                             composer = composer,
                             selectedTier = selectedTier,
+                            followerSearchText = followerSearch,
+                            followerSort = followerSort,
                             visibleFollowers = viewModel.visibleFollowers(),
                             activeThreadFilter = activeThreadFilter,
                             visibleThreads = viewModel.visibleThreads(),
@@ -105,6 +116,8 @@ fun AudienceProfileScreen(
                         AudienceProfileLoadedFrameActions(
                             onSelectTab = viewModel::selectTab,
                             onSelectTier = viewModel::selectTierFilter,
+                            onFollowerSearch = viewModel::onFollowerSearchText,
+                            onFollowerSort = viewModel::selectFollowerSort,
                             onSelectThreadFilter = viewModel::selectThreadFilter,
                             composer =
                                 AudienceProfileComposerActions(
@@ -301,13 +314,23 @@ internal fun LoadedFrame(
                 )
             AudienceProfileTab.Followers ->
                 FollowersTab(
-                    cells = state.loaded.analyticsCells,
-                    breakdown = state.loaded.tierBreakdown,
-                    chips = state.loaded.tierChips,
-                    selectedTier = state.selectedTier,
-                    followers = state.visibleFollowers,
-                    onSelectTier = actions.onSelectTier,
-                    onOpenFollower = actions.navigation.onOpenFollower,
+                    state =
+                        FollowersTabState(
+                            cells = state.loaded.analyticsCells,
+                            breakdown = state.loaded.tierBreakdown,
+                            chips = state.loaded.tierChips,
+                            selectedTier = state.selectedTier,
+                            searchText = state.followerSearchText,
+                            activeSort = state.followerSort,
+                            followers = state.visibleFollowers,
+                        ),
+                    actions =
+                        FollowersTabActions(
+                            onSelectTier = actions.onSelectTier,
+                            onFollowerSearch = actions.onFollowerSearch,
+                            onFollowerSort = actions.onFollowerSort,
+                            onOpenFollower = actions.navigation.onOpenFollower,
+                        ),
                 )
             AudienceProfileTab.Threads ->
                 ThreadsTab(
@@ -328,7 +351,9 @@ internal data class AudienceProfileLoadedFrameState(
     val activeTab: AudienceProfileTab,
     val composer: UpdateComposerState,
     val selectedTier: Int?,
-    val visibleFollowers: List<FollowerRowContent>,
+    val followerSearchText: String = "",
+    val followerSort: FollowerSort = FollowerSort.NewestActive,
+    val visibleFollowers: List<FollowerRowContent> = emptyList(),
     val activeThreadFilter: ThreadsFilter = ThreadsFilter.All,
     val visibleThreads: List<ThreadRowContent> = emptyList(),
 )
@@ -336,6 +361,8 @@ internal data class AudienceProfileLoadedFrameState(
 internal data class AudienceProfileLoadedFrameActions(
     val onSelectTab: (AudienceProfileTab) -> Unit,
     val onSelectTier: (Int?) -> Unit,
+    val onFollowerSearch: (String) -> Unit,
+    val onFollowerSort: (FollowerSort) -> Unit,
     val onSelectThreadFilter: (ThreadsFilter) -> Unit = {},
     val composer: AudienceProfileComposerActions,
     val navigation: AudienceProfileNavigationActions,
@@ -717,15 +744,27 @@ private fun UpdateCard(
 
 // MARK: - Followers tab
 
+private data class FollowersTabState(
+    val cells: List<AnalyticsCellContent>,
+    val breakdown: TierBreakdownContent,
+    val chips: List<TierChipContent>,
+    val selectedTier: Int?,
+    val searchText: String,
+    val activeSort: FollowerSort,
+    val followers: List<FollowerRowContent>,
+)
+
+private data class FollowersTabActions(
+    val onSelectTier: (Int?) -> Unit,
+    val onFollowerSearch: (String) -> Unit,
+    val onFollowerSort: (FollowerSort) -> Unit,
+    val onOpenFollower: (FollowerRowContent) -> Unit,
+)
+
 @Composable
 private fun FollowersTab(
-    cells: List<AnalyticsCellContent>,
-    breakdown: TierBreakdownContent,
-    chips: List<TierChipContent>,
-    selectedTier: Int?,
-    followers: List<FollowerRowContent>,
-    onSelectTier: (Int?) -> Unit,
-    onOpenFollower: (FollowerRowContent) -> Unit,
+    state: FollowersTabState,
+    actions: FollowersTabActions,
 ) {
     Column(
         modifier =
@@ -736,17 +775,189 @@ private fun FollowersTab(
                 .testTag("audienceProfileFollowersList"),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        AnalyticsRow(cells)
-        TierStackedBar(breakdown)
-        TierChipRow(chips = chips, selectedTier = selectedTier, onSelect = onSelectTier)
-        if (followers.isEmpty()) {
-            EmptyFollowersCard()
+        AnalyticsRow(state.cells)
+        TierStackedBar(state.breakdown)
+        TierChipRow(chips = state.chips, selectedTier = state.selectedTier, onSelect = actions.onSelectTier)
+        FollowerSearchField(text = state.searchText, onChange = actions.onFollowerSearch)
+        FollowerSortChipRow(active = state.activeSort, onSelect = actions.onFollowerSort)
+        if (state.followers.isEmpty()) {
+            if (state.searchText.trim().isNotEmpty()) {
+                EmptyFollowerSearchCard()
+            } else {
+                EmptyFollowersCard()
+            }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                followers.forEach { FollowerRow(it, onOpen = { onOpenFollower(it) }) }
+                state.followers.forEach { follower -> FollowerRow(follower, onOpen = { actions.onOpenFollower(follower) }) }
             }
         }
         Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun FollowerSearchField(
+    text: String,
+    onChange: (String) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                .padding(horizontal = 12.dp)
+                .height(40.dp)
+                .testTag("followerSearchField"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Search,
+            contentDescription = null,
+            size = 15.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.appTextMuted,
+        )
+        Box(modifier = Modifier.weight(1f)) {
+            if (text.isEmpty()) {
+                Text(
+                    text = "Search followers by name or handle",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = PantopusColors.appTextMuted,
+                )
+            }
+            BasicTextField(
+                value = text,
+                onValueChange = onChange,
+                textStyle =
+                    TextStyle(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = PantopusColors.appText,
+                    ),
+                cursorBrush = SolidColor(PantopusColors.primary600),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(),
+                singleLine = true,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = "Search followers by name or handle" }
+                        .testTag("followerSearchInput"),
+            )
+        }
+        if (text.isNotEmpty()) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .clickable { onChange("") }
+                        .testTag("followerSearchClear"),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.X,
+                    contentDescription = "Clear search",
+                    size = 14.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.appTextSecondary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FollowerSortChipRow(
+    active: FollowerSort,
+    onSelect: (FollowerSort) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .testTag("followerSortChipRow")
+                .semantics { contentDescription = "Sort followers" },
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FollowerSort.entries.forEach { sort ->
+            val isActive = sort == active
+            Row(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(
+                            if (isActive) PantopusColors.primary600 else PantopusColors.appSurface,
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = if (isActive) PantopusColors.primary600 else PantopusColors.appBorder,
+                            shape = RoundedCornerShape(Radii.pill),
+                        )
+                        .clickable { onSelect(sort) }
+                        .padding(horizontal = 12.dp)
+                        .heightIn(min = 28.dp)
+                        .wrapContentSize(Alignment.Center)
+                        .testTag("followerSortChip_${sort.key}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (isActive) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.Check,
+                        contentDescription = null,
+                        size = 11.dp,
+                        strokeWidth = 2.6f,
+                        tint = PantopusColors.appTextInverse,
+                    )
+                }
+                Text(
+                    text = sort.title,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color =
+                        if (isActive) PantopusColors.appTextInverse else PantopusColors.appTextStrong,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyFollowerSearchCard() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+                .testTag("followerSearchEmpty"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Search,
+            contentDescription = null,
+            size = 32.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.appTextMuted,
+        )
+        Text(
+            text = "No followers match that search",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+        )
+        Text(
+            text = "Try a different name or handle.",
+            fontSize = 12.sp,
+            color = PantopusColors.appTextSecondary,
+        )
     }
 }
 

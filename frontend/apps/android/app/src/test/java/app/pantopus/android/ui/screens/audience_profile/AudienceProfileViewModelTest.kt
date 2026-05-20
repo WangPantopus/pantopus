@@ -95,6 +95,7 @@ class AudienceProfileViewModelTest {
                                 tier = FanTierBadgeDto(rank = 1, name = "Followers"),
                                 verifiedLocal = true,
                                 tenureMonths = 3,
+                                joinedMonth = "2026-02",
                             ),
                             FanDto(
                                 membershipId = "m2",
@@ -103,6 +104,16 @@ class AudienceProfileViewModelTest {
                                 status = "active",
                                 tier = FanTierBadgeDto(rank = 2, name = "Members"),
                                 tenureMonths = 12,
+                                joinedMonth = "2025-05",
+                            ),
+                            FanDto(
+                                membershipId = "m3",
+                                fanHandle = "cory",
+                                fanDisplayName = "Cory K.",
+                                status = "active",
+                                tier = FanTierBadgeDto(rank = 3, name = "Insiders"),
+                                tenureMonths = 1,
+                                joinedMonth = "2026-04",
                             ),
                         ),
                     counts =
@@ -212,7 +223,9 @@ class AudienceProfileViewModelTest {
             assertEquals(UpdateVisibility.Followers, loaded.content.updates[0].visibility)
             assertEquals(UpdateVisibility.TierOrAbove, loaded.content.updates[1].visibility)
             assertEquals(2, loaded.content.updates[1].targetTierRank)
-            assertEquals(2, loaded.content.followers.size)
+            assertEquals(3, loaded.content.followers.size)
+            assertEquals(3, loaded.content.followers[0].tenureMonths)
+            assertEquals("2026-02", loaded.content.followers[0].joinedMonth)
             assertEquals(3, loaded.content.threads.size)
             assertEquals(2, loaded.content.threads[0].unreadCount)
             assertEquals(2, loaded.content.threads[0].tierRank)
@@ -336,12 +349,119 @@ class AudienceProfileViewModelTest {
             stubLoaded()
             val vm = makeVm()
             vm.load()
-            assertEquals(2, vm.visibleFollowers().size)
+            assertEquals(3, vm.visibleFollowers().size)
             vm.selectTierFilter(2)
             assertEquals(1, vm.visibleFollowers().size)
             assertEquals(2, vm.visibleFollowers().first().tierRank)
             vm.selectTierFilter(null)
-            assertEquals(2, vm.visibleFollowers().size)
+            assertEquals(3, vm.visibleFollowers().size)
+        }
+
+    @Test fun search_filters_followers_by_display_name_and_handle() =
+        runTest {
+            stubLoaded()
+            val vm = makeVm()
+            vm.load()
+            vm.onFollowerSearchText("billie")
+            assertEquals(1, vm.visibleFollowers().size)
+            assertEquals("@billie", vm.visibleFollowers().first().handle)
+            // Display name match (case-insensitive).
+            vm.onFollowerSearchText("CoRy")
+            assertEquals(1, vm.visibleFollowers().size)
+            assertEquals("@cory", vm.visibleFollowers().first().handle)
+            // Handle prefix match (no @).
+            vm.onFollowerSearchText("ale")
+            assertEquals(1, vm.visibleFollowers().size)
+            assertEquals("@alex", vm.visibleFollowers().first().handle)
+            // Whitespace-only query returns all.
+            vm.onFollowerSearchText("  ")
+            assertEquals(3, vm.visibleFollowers().size)
+            // No match yields empty.
+            vm.onFollowerSearchText("zzz")
+            assertEquals(0, vm.visibleFollowers().size)
+        }
+
+    @Test fun sort_defaults_to_newest_active_preserving_api_order() =
+        runTest {
+            stubLoaded()
+            val vm = makeVm()
+            vm.load()
+            assertEquals(FollowerSort.NewestActive, vm.followerSort.value)
+            assertEquals(listOf("@alex", "@billie", "@cory"), vm.visibleFollowers().map { it.handle })
+        }
+
+    @Test fun sort_highest_tier_orders_by_tier_rank_descending() =
+        runTest {
+            stubLoaded()
+            val vm = makeVm()
+            vm.load()
+            vm.selectFollowerSort(FollowerSort.HighestTier)
+            assertEquals(listOf("@cory", "@billie", "@alex"), vm.visibleFollowers().map { it.handle })
+        }
+
+    @Test fun sort_recently_joined_orders_by_tenure_ascending() =
+        runTest {
+            stubLoaded()
+            val vm = makeVm()
+            vm.load()
+            vm.selectFollowerSort(FollowerSort.RecentlyJoined)
+            // tenureMonths: alex=3, billie=12, cory=1 → cory, alex, billie.
+            assertEquals(listOf("@cory", "@alex", "@billie"), vm.visibleFollowers().map { it.handle })
+        }
+
+    @Test fun sort_most_engaged_favours_higher_tier_then_longer_tenure() =
+        runTest {
+            stubLoaded()
+            val vm = makeVm()
+            vm.load()
+            vm.selectFollowerSort(FollowerSort.MostEngaged)
+            // No tie on tier rank here, so order matches highest-tier.
+            assertEquals(listOf("@cory", "@billie", "@alex"), vm.visibleFollowers().map { it.handle })
+        }
+
+    @Test fun sort_most_engaged_tie_breaks_on_longer_tenure() {
+        val rows =
+            listOf(
+                FollowerRowContent(
+                    id = "a",
+                    displayName = "A",
+                    handle = "@a",
+                    avatarUrl = null,
+                    tierName = "Members",
+                    tierRank = 2,
+                    tenureLabel = "1 mo.",
+                    tenureMonths = 1,
+                    joinedMonth = null,
+                    verifiedLocal = false,
+                ),
+                FollowerRowContent(
+                    id = "b",
+                    displayName = "B",
+                    handle = "@b",
+                    avatarUrl = null,
+                    tierName = "Members",
+                    tierRank = 2,
+                    tenureLabel = "9 mo.",
+                    tenureMonths = 9,
+                    joinedMonth = null,
+                    verifiedLocal = false,
+                ),
+            )
+        val sorted =
+            AudienceProfileViewModel.sortFollowers(rows, FollowerSort.MostEngaged)
+        assertEquals(listOf("b", "a"), sorted.map { it.id })
+    }
+
+    @Test fun search_and_sort_combine_with_tier_filter() =
+        runTest {
+            stubLoaded()
+            val vm = makeVm()
+            vm.load()
+            vm.selectTierFilter(2)
+            vm.onFollowerSearchText("billie")
+            vm.selectFollowerSort(FollowerSort.HighestTier)
+            assertEquals(1, vm.visibleFollowers().size)
+            assertEquals("@billie", vm.visibleFollowers().first().handle)
         }
 
     @Test fun active_tab_defaults_to_updates() =
