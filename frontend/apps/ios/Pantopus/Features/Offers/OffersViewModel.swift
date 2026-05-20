@@ -502,13 +502,15 @@ public final class OffersViewModel: ListOfRowsDataSource {
         }
     }
 
-    // MARK: - Helpers
-
     public enum OfferPerspective: Sendable {
         case received
         case sent
     }
+}
 
+// MARK: - Helpers
+
+extension OffersViewModel {
     static func isPending(_ raw: String?) -> Bool {
         (raw ?? "").lowercased() == "pending"
     }

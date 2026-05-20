@@ -87,12 +87,13 @@ final class ActivityFilterSheetTests: XCTestCase {
     }
 
     func testClearedSectionsParseToInactiveFilter() {
-        let sections = ActivityFilterSheet.sections(
+        let built = ActivityFilterSheet.sections(
             statusTitle: "Status",
             statusOptions: statusOptions,
             sortOptions: ActivitySortOrder.all,
             filter: ActivityFilter(statusIds: ["pending"], sort: .oldest, dateRange: .today)
-        ).cleared()
+        )
+        let sections = built.cleared()
         let parsed = ActivityFilterSheet.filter(from: sections)
         XCTAssertFalse(parsed.isActive)
         XCTAssertEqual(parsed, ActivityFilter())
@@ -112,8 +113,11 @@ final class ActivityFilterSheetTests: XCTestCase {
     func testApplyInactiveReturnsItemsUnchanged() {
         let items = [item("a", ageDays: 1), item("b", ageDays: 5), item("c", ageDays: 10)]
         let result = ActivityFilter().apply(
-            to: items, now: now,
-            statusId: { $0.status }, date: { $0.date }, value: { $0.value }
+            to: items,
+            now: now,
+            statusId: { $0.status },
+            date: { $0.date },
+            value: { $0.value }
         )
         XCTAssertEqual(result, items)
     }
@@ -127,8 +131,11 @@ final class ActivityFilterSheetTests: XCTestCase {
             item("c", status: "declined")
         ]
         let result = ActivityFilter(statusIds: ["pending", "declined"]).apply(
-            to: items, now: now,
-            statusId: { $0.status }, date: { $0.date }, value: { $0.value }
+            to: items,
+            now: now,
+            statusId: { $0.status },
+            date: { $0.date },
+            value: { $0.value }
         )
         XCTAssertEqual(result.map(\.id), ["a", "c"])
     }
@@ -136,8 +143,11 @@ final class ActivityFilterSheetTests: XCTestCase {
     func testApplyStatusDropsItemsWithNoChipId() {
         let items = [item("a", status: "pending"), item("b", status: nil)]
         let result = ActivityFilter(statusIds: ["pending"]).apply(
-            to: items, now: now,
-            statusId: { $0.status }, date: { $0.date }, value: { $0.value }
+            to: items,
+            now: now,
+            statusId: { $0.status },
+            date: { $0.date },
+            value: { $0.value }
         )
         XCTAssertEqual(result.map(\.id), ["a"])
     }
@@ -147,8 +157,11 @@ final class ActivityFilterSheetTests: XCTestCase {
     func testApplyDateRangeToday() {
         let items = [item("today", ageDays: 0), item("yesterday", ageDays: 1)]
         let result = ActivityFilter(dateRange: .today).apply(
-            to: items, now: now,
-            statusId: { $0.status }, date: { $0.date }, value: { $0.value }
+            to: items,
+            now: now,
+            statusId: { $0.status },
+            date: { $0.date },
+            value: { $0.value }
         )
         XCTAssertEqual(result.map(\.id), ["today"])
     }
@@ -156,13 +169,19 @@ final class ActivityFilterSheetTests: XCTestCase {
     func testApplyDateRangeWeekAndMonth() {
         let items = [item("d2", ageDays: 2), item("d10", ageDays: 10), item("d40", ageDays: 40)]
         let week = ActivityFilter(dateRange: .week).apply(
-            to: items, now: now,
-            statusId: { $0.status }, date: { $0.date }, value: { $0.value }
+            to: items,
+            now: now,
+            statusId: { $0.status },
+            date: { $0.date },
+            value: { $0.value }
         )
         XCTAssertEqual(week.map(\.id), ["d2"])
         let month = ActivityFilter(dateRange: .month).apply(
-            to: items, now: now,
-            statusId: { $0.status }, date: { $0.date }, value: { $0.value }
+            to: items,
+            now: now,
+            statusId: { $0.status },
+            date: { $0.date },
+            value: { $0.value }
         )
         XCTAssertEqual(month.map(\.id), ["d2", "d10"])
     }
@@ -172,13 +191,19 @@ final class ActivityFilterSheetTests: XCTestCase {
     func testApplySortNewestThenOldest() {
         let items = [item("old", ageDays: 10), item("mid", ageDays: 5), item("new", ageDays: 1)]
         let newest = ActivityFilter(sort: .newest).apply(
-            to: items, now: now,
-            statusId: { $0.status }, date: { $0.date }, value: { $0.value }
+            to: items,
+            now: now,
+            statusId: { $0.status },
+            date: { $0.date },
+            value: { $0.value }
         )
         XCTAssertEqual(newest.map(\.id), ["new", "mid", "old"])
         let oldest = ActivityFilter(sort: .oldest).apply(
-            to: items, now: now,
-            statusId: { $0.status }, date: { $0.date }, value: { $0.value }
+            to: items,
+            now: now,
+            statusId: { $0.status },
+            date: { $0.date },
+            value: { $0.value }
         )
         XCTAssertEqual(oldest.map(\.id), ["old", "mid", "new"])
     }
@@ -186,13 +211,19 @@ final class ActivityFilterSheetTests: XCTestCase {
     func testApplySortByValue() {
         let items = [item("lo", value: 10), item("hi", value: 99), item("mid", value: 50)]
         let highLow = ActivityFilter(sort: .valueHighToLow).apply(
-            to: items, now: now,
-            statusId: { $0.status }, date: { $0.date }, value: { $0.value }
+            to: items,
+            now: now,
+            statusId: { $0.status },
+            date: { $0.date },
+            value: { $0.value }
         )
         XCTAssertEqual(highLow.map(\.id), ["hi", "mid", "lo"])
         let lowHigh = ActivityFilter(sort: .valueLowToHigh).apply(
-            to: items, now: now,
-            statusId: { $0.status }, date: { $0.date }, value: { $0.value }
+            to: items,
+            now: now,
+            statusId: { $0.status },
+            date: { $0.date },
+            value: { $0.value }
         )
         XCTAssertEqual(lowHigh.map(\.id), ["lo", "mid", "hi"])
     }
