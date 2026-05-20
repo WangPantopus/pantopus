@@ -234,14 +234,31 @@ data class ListingContextConfig(
     val statusChip: ListingContextStatus,
     /** Count rendered in the sort strip below the header (e.g. "5 offers"). */
     val offerCount: Int? = null,
-    /** Sort selector label (e.g. "Highest first"). */
+    /** Sort selector label (e.g. "Highest offer"). */
     val sortLabel: String? = null,
-    /** Triggered when the user taps the sort selector — opens a sort sheet, etc. */
+    /** Options for the sort menu rendered on the sort strip. When
+     *  non-empty the strip renders a `DropdownMenu`; when empty it falls
+     *  back to [onSort] or a static label. */
+    val sortOptions: List<ListingContextSortOption> = emptyList(),
+    /** Triggered when the user taps the sort selector — opens a sort sheet, etc.
+     *  Ignored when [sortOptions] is non-empty (the menu drives sorting). */
     val onSort: (() -> Unit)? = null,
     /** P3.3 — Triggered when the seller taps the pencil chip next to
      *  the asking price. Owner-only — the projection sets it to `null`
      *  for buyers so the chip stays hidden. */
     val onEditPrice: (() -> Unit)? = null,
+)
+
+/**
+ * One option in the listing-context sort menu (e.g. "Highest offer").
+ * The owning view-model supplies the label, the current selection, and
+ * the [select] handler that re-sorts the list in place.
+ */
+data class ListingContextSortOption(
+    val id: String,
+    val label: String,
+    val isSelected: Boolean,
+    val select: () -> Unit,
 )
 
 /** One meta item in the listing-context header (e.g. "2.4k views"). */

@@ -2071,7 +2071,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             ),
                         )
                     },
-                    onSort = { navController.navigate(ChildRoutes.placeholder("Sort offers")) },
                 )
             }
             composable(

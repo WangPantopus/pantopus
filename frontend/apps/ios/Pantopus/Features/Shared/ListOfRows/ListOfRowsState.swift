@@ -211,10 +211,15 @@ public struct ListingContextConfig: Sendable {
     /// Count rendered in the sort strip below the header
     /// (e.g. "5 offers"). `nil` hides the strip.
     public let offerCount: Int?
-    /// Sort selector label (e.g. "Highest first").
+    /// Sort selector label (e.g. "Highest offer").
     public let sortLabel: String?
+    /// Options for the sort menu rendered on the sort strip. When
+    /// non-empty the strip renders a `Menu`; when empty it falls back to
+    /// `onSort` (a plain button) or a static label.
+    public let sortOptions: [ListingContextSortOption]
     /// Triggered when the user taps the sort selector — opens a sort
     /// sheet, etc. `nil` makes the selector a non-interactive label.
+    /// Ignored when `sortOptions` is non-empty (the menu drives sorting).
     public let onSort: (@Sendable () -> Void)?
     /// P3.3 — Triggered when the seller taps the pencil chip next to
     /// the asking price. Owner-only — the projection sets it to `nil`
@@ -229,6 +234,7 @@ public struct ListingContextConfig: Sendable {
         statusChip: ListingContextStatus,
         offerCount: Int? = nil,
         sortLabel: String? = nil,
+        sortOptions: [ListingContextSortOption] = [],
         onSort: (@Sendable () -> Void)? = nil,
         onEditPrice: (@Sendable () -> Void)? = nil
     ) {
@@ -239,8 +245,31 @@ public struct ListingContextConfig: Sendable {
         self.statusChip = statusChip
         self.offerCount = offerCount
         self.sortLabel = sortLabel
+        self.sortOptions = sortOptions
         self.onSort = onSort
         self.onEditPrice = onEditPrice
+    }
+}
+
+/// One option in the listing-context sort menu (e.g. "Highest offer").
+/// The owning view-model supplies the label, the current selection, and
+/// the `select` handler that re-sorts the list in place.
+public struct ListingContextSortOption: Identifiable, Sendable {
+    public let id: String
+    public let label: String
+    public let isSelected: Bool
+    public let select: @Sendable () -> Void
+
+    public init(
+        id: String,
+        label: String,
+        isSelected: Bool,
+        select: @escaping @Sendable () -> Void
+    ) {
+        self.id = id
+        self.label = label
+        self.isSelected = isSelected
+        self.select = select
     }
 }
 
