@@ -25,8 +25,18 @@ public enum HubRoute: Hashable {
     case homePets(homeId: String)
     /// Emergency info sub-screen for a specific home (T6.4b / P17).
     case homeEmergency(homeId: String)
+    /// Add Emergency Info form (P2.8) — single-page editor backed by
+    /// `AddEmergencyInfoFormView`.
+    case addEmergencyInfo(homeId: String)
+    /// Emergency item detail (P2.8) — read-only summary backed by
+    /// `EmergencyInfoDetailView`.
+    case emergencyItem(homeId: String, emergencyId: String)
     /// Documents sub-screen for a specific home (T6.4b / P17).
     case homeDocs(homeId: String)
+    /// P2.10 — Upload document form for a home.
+    case uploadDocument(homeId: String)
+    /// P2.10 — Document detail (preview + metadata + footer actions).
+    case documentDetail(homeId: String, documentId: String)
     /// Packages list for a home (T6.3d / P14).
     case homePackages(homeId: String)
     /// Package detail (read-mostly summary with mark-picked-up).
@@ -37,24 +47,54 @@ public enum HubRoute: Hashable {
     /// (T6.3c / P11). Distinct from `.myBids` / `.myTasks` (the gig
     /// surfaces in the You tab).
     case homeTasks(homeId: String)
+    /// P2.4 — Add a new household task. Reached from the household
+    /// tasks list FAB.
+    case addHouseholdTask(homeId: String)
+    /// P2.4 — Edit an existing household task. Reached from the
+    /// "Edit recurring" overflow action on a Recurring row.
+    case editHouseholdTask(homeId: String, taskId: String)
     /// Maintenance sub-screen for a specific home (T6.3b / P10).
     case homeMaintenance(homeId: String)
+    /// P2.9 — Log a maintenance entry. Pushed from the Maintenance list
+    /// FAB; on success the host pops back and refreshes the list.
+    case logMaintenance(homeId: String)
+    /// P2.9 — Maintenance detail for a specific task. Pushed from a
+    /// per-row tap on the Maintenance list.
+    case maintenanceDetail(homeId: String, taskId: String)
+    /// P2.9 — Edit an existing maintenance entry. Re-uses the
+    /// `LogMaintenanceFormView` shell in edit mode.
+    case editMaintenance(homeId: String, taskId: String)
     /// Members sub-screen for a specific home (T6.3a / P9).
     case homeMembers(homeId: String)
     case publicProfile(userId: String)
+    /// P1.6 — Typed Business Profile screen. Pushed from DiscoverHub
+    /// business cards, DiscoverBusinesses row taps, and any other
+    /// surface that previously routed to a `Business: <name>`
+    /// placeholder.
+    case businessProfile(businessId: String)
     case pulsePost(postId: String)
     /// Bills list for a home (T5.2.2 / P13).
     case homeBills(homeId: String)
     /// Home calendar list (T6.4c / P18).
     case homeCalendar(homeId: String)
+    /// Add / edit calendar event form (P2.7). `eventId` non-nil = edit;
+    /// `prefilledCategory` seeds the chip selector when arriving from
+    /// the empty-state quick-start tiles.
+    case addCalendarEvent(homeId: String, eventId: String?, prefilledCategory: String?)
+    /// Read-only event detail (P2.7). Edit + Delete actions live here.
+    case calendarEventDetail(homeId: String, eventId: String)
     /// Bill detail (read-mostly summary with mark-paid / remove).
     case billDetail(homeId: String, billId: String)
-    /// Add Bill wizard.
-    case addBill(homeId: String)
+    /// Add / Edit Bill wizard. When `billId` is non-nil the wizard
+    /// loads the existing bill, seeds every step, and PUTs on submit.
+    case addBill(homeId: String, billId: String? = nil)
     /// Polls list for a home (T6.3e / P13).
     case homePolls(homeId: String)
     /// Poll detail — read + cast vote (T6.3e / P13).
     case pollDetail(homeId: String, pollId: String)
+    /// Start-a-poll composer (P2.5). Pushed from the Polls list FAB +
+    /// empty-state CTA.
+    case startPoll(homeId: String)
     /// Pulse tab (T1.2). Reached from Hub → pillar(.pulse).
     case pulseFeed
     /// Compose post target — placeholder until the compose flow ships.
@@ -74,6 +114,11 @@ public enum HubRoute: Hashable {
     case listingDetail(listingId: String)
     /// Snap & sell — placeholder until the marketplace compose flow ships.
     case composeListing
+    /// P3.3 — Edit an existing listing. Reached from the listing-detail
+    /// overflow ("Edit listing") for the owner, or from the listing-
+    /// offers panel's "Edit price" affordance (which seeds
+    /// `jumpToStep == .price`).
+    case editListing(listingId: String, jumpToStep: ListingComposeStep?)
     /// Invoice detail (T2.6 TransactionalDetailShell · invoice variant).
     /// Reached from wallet / payments surfaces when those land.
     case invoiceDetail(invoiceId: String)
@@ -86,6 +131,9 @@ public enum HubRoute: Hashable {
     /// Personal pillar. Reached from the You tab action grid or via
     /// the `pantopus://support-trains` deep link.
     case supportTrains
+    /// P2.6 — Start-a-Support-Train wizard (organizer compose flow).
+    /// Pushed when the Support Trains FAB / empty-state CTA fires.
+    case startSupportTrain
     /// Review-signups (T6.6c / P26.5) — organizer-only review queue
     /// for one Support Train. Pushed from a Support Trains row tap.
     case reviewSignups(supportTrainId: String)
@@ -115,6 +163,9 @@ public enum HubRoute: Hashable {
     /// `InboxConversationDestination` so the same `ChatConversationView`
     /// can host the thread inside the Hub stack.
     case chatConversation(InboxConversationDestination)
+    /// P1.5 — Recent activity log. Pushed when the Hub's
+    /// `HubRecentActivity` "See all" CTA fires.
+    case recentActivity
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
     case menu
     /// Edit profile form — pushed by Settings → "Edit profile". P1.4.
@@ -145,6 +196,30 @@ public struct HubTabRoot: View {
     private var currentUserId: String {
         if case let .signedIn(user) = auth.state { return user.id }
         return ""
+    }
+
+    @MainActor
+    private func pop() {
+        if !path.isEmpty { path.removeLast() }
+    }
+
+    private func handleListingCreated(_ listingId: String, push: @escaping (HubRoute) -> Void) {
+        Task { @MainActor in
+            pop()
+            push(.listingDetail(listingId: listingId))
+        }
+    }
+
+    private func listingCreatedHandler(push: @escaping (HubRoute) -> Void) -> (String) -> Void {
+        { listingId in
+            handleListingCreated(listingId, push: push)
+        }
+    }
+
+    private func handleListingUpdated(_: String) {
+        // Pop the wizard — the listing-detail (or offers) screen
+        // underneath refreshes on next `.task`.
+        Task { @MainActor in pop() }
     }
 
     public var body: some View {
@@ -219,6 +294,7 @@ public struct HubTabRoot: View {
             // then this is a no-op so the chevron-right feels live but
             // doesn't push to a stub.
             case .openToday: break
+            case .openRecentActivity: path.append(.recentActivity)
             }
         }
         .overlay(alignment: .topLeading) { debugTapTarget }
@@ -265,7 +341,7 @@ public struct HubTabRoot: View {
         case .post: .pulsePost(postId: item.id)
         case .person: .publicProfile(userId: item.id)
         case .gig: .placeholder(label: "Gig detail")
-        case .business: .placeholder(label: "Business")
+        case .business: .businessProfile(businessId: item.id)
         case .unknown: .placeholder(label: item.title)
         }
     }
@@ -382,13 +458,53 @@ public struct HubTabRoot: View {
             MaintenanceListView(
                 viewModel: MaintenanceListViewModel(
                     homeId: homeId,
-                    onOpenTask: { _ in
-                        Task { @MainActor in push(.placeholder(label: "Maintenance detail")) }
+                    onOpenTask: { taskId in
+                        Task { @MainActor in
+                            push(.maintenanceDetail(homeId: homeId, taskId: taskId))
+                        }
                     },
                     onAddTask: {
-                        Task { @MainActor in push(.placeholder(label: "Log maintenance")) }
+                        Task { @MainActor in push(.logMaintenance(homeId: homeId)) }
                     }
                 )
+            )
+        case let .logMaintenance(homeId):
+            LogMaintenanceFormView(
+                viewModel: LogMaintenanceFormViewModel(homeId: homeId),
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onSubmitted: { taskId in
+                    Task { @MainActor in
+                        path.removeAll { route in
+                            if case .logMaintenance = route { return true }
+                            return false
+                        }
+                        path.append(.maintenanceDetail(homeId: homeId, taskId: taskId))
+                    }
+                }
+            )
+        case let .maintenanceDetail(homeId, taskId):
+            MaintenanceDetailView(
+                homeId: homeId,
+                taskId: taskId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onEdit: {
+                    Task { @MainActor in
+                        push(.editMaintenance(homeId: homeId, taskId: taskId))
+                    }
+                }
+            )
+        case let .editMaintenance(homeId, taskId):
+            LogMaintenanceFormView(
+                viewModel: LogMaintenanceFormViewModel(
+                    homeId: homeId,
+                    mode: .edit(taskId: taskId)
+                ),
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onSubmitted: { _ in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
             )
         case let .homeBills(homeId):
             BillsListView(
@@ -397,15 +513,20 @@ public struct HubTabRoot: View {
         case let .billDetail(homeId, billId):
             BillDetailView(
                 homeId: homeId,
-                billId: billId
-            ) {
-                if !path.isEmpty { path.removeLast() }
-            }
-        case let .addBill(homeId):
+                billId: billId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onEdit: {
+                    Task { @MainActor in
+                        push(.addBill(homeId: homeId, billId: billId))
+                    }
+                }
+            )
+        case let .addBill(homeId, billId):
             AddBillWizardView(
                 homeId: homeId,
+                billId: billId,
                 onClose: { if !path.isEmpty { path.removeLast() } },
-                onCreated: { billId in
+                onCreated: { newBillId in
                     // Replace the wizard with the new bill's detail so
                     // Back returns to the Bills list, not the success
                     // step.
@@ -413,7 +534,13 @@ public struct HubTabRoot: View {
                         if case .addBill = route { return true }
                         return false
                     }
-                    path.append(.billDetail(homeId: homeId, billId: billId))
+                    path.append(.billDetail(homeId: homeId, billId: newBillId))
+                },
+                onUpdated: {
+                    // Edit mode pops back to the bill detail in place
+                    // — no new detail to push since the same bill is
+                    // already on the stack underneath the wizard.
+                    if !path.isEmpty { path.removeLast() }
                 }
             )
         case let .homePolls(homeId):
@@ -427,6 +554,10 @@ public struct HubTabRoot: View {
             ) {
                 if !path.isEmpty { path.removeLast() }
             }
+        case let .startPoll(homeId):
+            StartPollFormView(homeId: homeId) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
         case let .homeCalendar(homeId):
@@ -434,25 +565,76 @@ public struct HubTabRoot: View {
                 viewModel: HomeCalendarViewModel(
                     homeId: homeId,
                     onAddEvent: {
-                        Task { @MainActor in push(.placeholder(label: "Add event")) }
+                        Task { @MainActor in
+                            push(.addCalendarEvent(
+                                homeId: homeId,
+                                eventId: nil,
+                                prefilledCategory: nil
+                            ))
+                        }
                     },
-                    onOpenEvent: { _ in
-                        Task { @MainActor in push(.placeholder(label: "Event detail")) }
+                    onOpenEvent: { eventId in
+                        Task { @MainActor in
+                            push(.calendarEventDetail(homeId: homeId, eventId: eventId))
+                        }
                     }
                 )
+            )
+        case let .addCalendarEvent(homeId, eventId, prefilledCategory):
+            CalendarEventFormRoute(
+                homeId: homeId,
+                eventId: eventId,
+                prefilledCategory: prefilledCategory,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCommitted: { event in
+                    switch event {
+                    case let .created(newId):
+                        // Replace the form with the new event's detail so
+                        // Back returns to the calendar list.
+                        path.removeAll { route in
+                            if case .addCalendarEvent = route { return true }
+                            return false
+                        }
+                        path.append(.calendarEventDetail(homeId: homeId, eventId: newId))
+                    case let .updated(updatedId):
+                        // Pop both the form AND the stale detail, then
+                        // push the detail again so it re-fetches.
+                        path.removeAll { route in
+                            if case .addCalendarEvent = route { return true }
+                            if case .calendarEventDetail = route { return true }
+                            return false
+                        }
+                        path.append(.calendarEventDetail(homeId: homeId, eventId: updatedId))
+                    }
+                }
+            )
+        case let .calendarEventDetail(homeId, eventId):
+            EventDetailView(
+                homeId: homeId,
+                eventId: eventId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onEdit: { event in
+                    Task { @MainActor in
+                        push(.addCalendarEvent(
+                            homeId: homeId,
+                            eventId: event.id,
+                            prefilledCategory: event.eventType
+                        ))
+                    }
+                }
             )
         case let .homeEmergency(homeId):
             EmergencyInfoView(
                 viewModel: EmergencyInfoViewModel(
                     homeId: homeId,
-                    onAction: { _ in
+                    onAction: { dto in
                         Task { @MainActor in
-                            push(.placeholder(label: "Emergency item"))
+                            push(.emergencyItem(homeId: homeId, emergencyId: dto.id))
                         }
                     },
                     onAdd: {
                         Task { @MainActor in
-                            push(.placeholder(label: "Add emergency info"))
+                            push(.addEmergencyInfo(homeId: homeId))
                         }
                     },
                     onShare: {
@@ -467,18 +649,35 @@ public struct HubTabRoot: View {
                     }
                 )
             )
+        case let .addEmergencyInfo(homeId):
+            AddEmergencyInfoFormView(
+                viewModel: AddEmergencyInfoFormViewModel(homeId: homeId) { _ in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                }
+            )
+        case let .emergencyItem(homeId, emergencyId):
+            EmergencyInfoDetailView(
+                homeId: homeId,
+                emergencyId: emergencyId
+            ) {
+                Task { @MainActor in
+                    if !path.isEmpty { path.removeLast() }
+                }
+            }
         case let .homeDocs(homeId):
             DocumentsView(
                 viewModel: DocumentsViewModel(
                     homeId: homeId,
-                    onOpenDocument: { _ in
+                    onOpenDocument: { dto in
                         Task { @MainActor in
-                            push(.placeholder(label: "Document detail"))
+                            push(.documentDetail(homeId: homeId, documentId: dto.id))
                         }
                     },
                     onUpload: {
                         Task { @MainActor in
-                            push(.placeholder(label: "Upload document"))
+                            push(.uploadDocument(homeId: homeId))
                         }
                     },
                     onSearch: {
@@ -491,12 +690,41 @@ public struct HubTabRoot: View {
                             push(.placeholder(label: "Export documents"))
                         }
                     },
-                    onDocumentAction: { _, _ in
+                    onDocumentAction: { dto, action in
                         Task { @MainActor in
-                            push(.placeholder(label: "Document action"))
+                            switch action {
+                            case .view:
+                                push(.documentDetail(homeId: homeId, documentId: dto.id))
+                            case .share, .download, .delete:
+                                push(.documentDetail(homeId: homeId, documentId: dto.id))
+                            }
                         }
                     }
                 )
+            )
+        case let .uploadDocument(homeId):
+            UploadDocumentFormView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onUploaded: { _ in
+                    Task { @MainActor in
+                        path.removeAll { route in
+                            if case .uploadDocument = route { return true }
+                            return false
+                        }
+                    }
+                }
+            )
+        case let .documentDetail(homeId, documentId):
+            DocumentDetailView(
+                homeId: homeId,
+                documentId: documentId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onReplace: {
+                    Task { @MainActor in
+                        push(.uploadDocument(homeId: homeId))
+                    }
+                }
             )
         case let .homePackages(homeId):
             PackagesListView(
@@ -533,13 +761,32 @@ public struct HubTabRoot: View {
                         Task { @MainActor in push(.placeholder(label: "Task detail")) }
                     },
                     onAddTask: {
-                        Task { @MainActor in push(.placeholder(label: "Add a task")) }
+                        Task { @MainActor in push(.addHouseholdTask(homeId: homeId)) }
                     },
-                    onEditRecurring: { _ in
-                        Task { @MainActor in push(.placeholder(label: "Edit recurring task")) }
+                    onEditRecurring: { taskId in
+                        Task { @MainActor in
+                            push(.editHouseholdTask(homeId: homeId, taskId: taskId))
+                        }
                     }
                 )
             )
+        case let .addHouseholdTask(homeId):
+            AddHouseholdTaskFormView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCreated: { _ in
+                    // Pop back to the tasks list; the list refreshes
+                    // on `.refreshable` / next visit.
+                    if !path.isEmpty { path.removeLast() }
+                }
+            )
+        case let .editHouseholdTask(homeId, taskId):
+            AddHouseholdTaskFormView(
+                homeId: homeId,
+                taskId: taskId
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId)
         case let .claimOwnership(homeId):
@@ -584,6 +831,14 @@ public struct HubTabRoot: View {
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
                 onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report")) } }
+            )
+        case let .businessProfile(businessId):
+            BusinessProfileDestination(
+                businessId: businessId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
+                onShare: { Task { @MainActor in push(.placeholder(label: "Share business")) } },
+                onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } }
             )
         case let .pulsePost(postId):
             PulsePostDetailView(
@@ -644,7 +899,9 @@ public struct HubTabRoot: View {
                 onBack: { if !path.isEmpty { path.removeLast() } }
             )
         case let .composePost(intent):
-            NotYetAvailableView(tabName: "Compose · \(intent.capitalized)", icon: .pencil)
+            PulseComposeView(intent: PulseComposeIntent.from(rawValue: intent)) { _ in
+                pop()
+            }
         case .gigsFeed:
             GigsFeedView(
                 onOpenGig: { gigId in
@@ -658,7 +915,7 @@ public struct HubTabRoot: View {
                 },
                 onOpenSearch: { Task { @MainActor in push(.placeholder(label: "Gig search")) } },
                 onOpenFilters: { Task { @MainActor in push(.placeholder(label: "Gig filters")) } },
-                onBack: { if !path.isEmpty { path.removeLast() } }
+                onBack: pop
             )
         case let .gigDetail(gigId):
             GigDetailView(
@@ -667,7 +924,15 @@ public struct HubTabRoot: View {
                 onMessage: { _ in Task { @MainActor in push(.placeholder(label: "Messages")) } }
             )
         case let .composeGig(category):
-            NotYetAvailableView(tabName: "Post a task · \(category.capitalized)", icon: .pencil)
+            GigComposeWizardView(preselectedCategoryKey: category) { gigId in
+                // Replace the wizard with the gig's detail so Back goes
+                // to the Gigs feed, not the success screen.
+                path.removeAll { route in
+                    if case .composeGig = route { return true }
+                    return false
+                }
+                path.append(.gigDetail(gigId: gigId))
+            }
         case let .nearbyMapForGigs(categoryKey):
             NearbyMapView(
                 viewModel: NearbyMapViewModel(
@@ -701,6 +966,11 @@ public struct HubTabRoot: View {
                     Task { @MainActor in
                         push(.listingOffers(listingId: dto.id, title: dto.title))
                     }
+                },
+                onEditListing: { dto in
+                    Task { @MainActor in
+                        push(.editListing(listingId: dto.id, jumpToStep: nil))
+                    }
                 }
             )
         case let .listingOffers(listingId, titleHint):
@@ -718,7 +988,9 @@ public struct HubTabRoot: View {
                         Task { @MainActor in push(.placeholder(label: "Transaction detail")) }
                     },
                     onEditPrice: {
-                        Task { @MainActor in push(.placeholder(label: "Edit listing")) }
+                        Task { @MainActor in
+                            push(.editListing(listingId: listingId, jumpToStep: .price))
+                        }
                     },
                     onSort: {
                         Task { @MainActor in push(.placeholder(label: "Sort offers")) }
@@ -726,11 +998,31 @@ public struct HubTabRoot: View {
                 )
             )
         case .composeListing:
-            NotYetAvailableView(tabName: "Snap & sell", icon: .camera)
+            ListingComposeWizardView(
+                onOpenListingDetail: listingCreatedHandler(push: push)
+            )
+        case let .editListing(listingId, jumpToStep):
+            ListingComposeWizardView(
+                mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
+                onListingUpdated: handleListingUpdated
+            )
         case let .invoiceDetail(invoiceId):
             InvoiceDetailView(
                 viewModel: InvoiceDetailViewModel(invoiceId: invoiceId)
             ) { if !path.isEmpty { path.removeLast() } }
+        case .recentActivity:
+            RecentActivityView(
+                viewModel: RecentActivityViewModel { destination in
+                    switch destination {
+                    case let .gigDetail(id): push(.gigDetail(gigId: id))
+                    case let .listingDetail(id): push(.listingDetail(listingId: id))
+                    case let .mailItemDetail(id): push(.mailItemDetail(mailId: id))
+                    case let .pulsePost(id): push(.pulsePost(postId: id))
+                    case let .homeDashboard(id): push(.homeDashboard(homeId: id))
+                    case let .placeholder(label): push(.placeholder(label: label))
+                    }
+                }
+            )
         case .notifications:
             NotificationsView(
                 viewModel: NotificationsViewModel()
@@ -758,7 +1050,7 @@ public struct HubTabRoot: View {
             SupportTrainsView(
                 viewModel: SupportTrainsViewModel(
                     onStartTrain: {
-                        Task { @MainActor in push(.placeholder(label: "Start a support train")) }
+                        Task { @MainActor in push(.startSupportTrain) }
                     },
                     onOpenTrain: { trainId in
                         Task { @MainActor in push(.reviewSignups(supportTrainId: trainId)) }
@@ -767,6 +1059,20 @@ public struct HubTabRoot: View {
                         Task { @MainActor in push(.placeholder(label: "Search support trains")) }
                     }
                 )
+            )
+        case .startSupportTrain:
+            StartSupportTrainWizardView(
+                onDismiss: {
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                },
+                onOpenTrain: { trainId in
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        path.append(.reviewSignups(supportTrainId: trainId))
+                    }
+                }
             )
         case let .reviewSignups(supportTrainId):
             ReviewSignupsView(
@@ -797,11 +1103,8 @@ public struct HubTabRoot: View {
                         switch target {
                         case let .person(userId, _):
                             push(.publicProfile(userId: userId))
-                        case .business:
-                            // Per buildout plan F6, the typed business
-                            // profile screen lands later — push the
-                            // discover-businesses placeholder for now.
-                            push(.discoverBusinesses)
+                        case let .business(businessId, _):
+                            push(.businessProfile(businessId: businessId))
                         case let .gig(gigId):
                             push(.gigDetail(gigId: gigId))
                         case let .listing(listingId):
@@ -825,11 +1128,8 @@ public struct HubTabRoot: View {
                 viewModel: DiscoverBusinessesViewModel { target in
                     Task { @MainActor in
                         switch target {
-                        case let .business(businessId, name):
-                            // The dedicated business-profile screen is
-                            // still pending. Use the placeholder until
-                            // it lands.
-                            push(.placeholder(label: "Business: \(name) (\(businessId))"))
+                        case let .business(businessId, _):
+                            push(.businessProfile(businessId: businessId))
                         case .openFilters:
                             push(.placeholder(label: "Business filters"))
                         case .widenRadius:
@@ -979,9 +1279,8 @@ public struct HubTabRoot: View {
     }
 
     /// Construct the Polls list VM with navigation callbacks wired to
-    /// `push(.pollDetail(…))` for row taps. The FAB currently routes to
-    /// the not-yet-built composer placeholder — that screen lands in a
-    /// follow-up PR.
+    /// `push(.pollDetail(…))` for row taps and `push(.startPoll(…))` for
+    /// the FAB + empty-state CTA (P2.5 composer).
     private static func pollsListViewModel(
         homeId: String,
         push: @escaping (HubRoute) -> Void
@@ -990,7 +1289,7 @@ public struct HubTabRoot: View {
             Task { @MainActor in push(.pollDetail(homeId: homeId, pollId: pollId)) }
         }
         let startPoll: @Sendable () -> Void = {
-            Task { @MainActor in push(.placeholder(label: "Start a poll")) }
+            Task { @MainActor in push(.startPoll(homeId: homeId)) }
         }
         return PollsListViewModel(
             homeId: homeId,
@@ -1007,6 +1306,32 @@ extension HubRoute: Identifiable {
     }
 }
 #endif
+
+/// Small wrapper that injects the `openURL` environment action into the
+/// Business Profile screen so the "Visit" button can punch out to Safari
+/// without the navigation host having to depend on `UIApplication`.
+@MainActor
+private struct BusinessProfileDestination: View {
+    let businessId: String
+    let onBack: @MainActor () -> Void
+    let onOpenMessages: @MainActor () -> Void
+    let onShare: @MainActor () -> Void
+    let onOpenReport: @MainActor () -> Void
+
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        BusinessProfileView(
+            businessId: businessId,
+            onBack: onBack,
+            onOpenMessages: onOpenMessages,
+            onShare: onShare,
+            onOpenReport: onOpenReport
+        ) { url in
+            openURL(url)
+        }
+    }
+}
 
 #Preview {
     HubTabRoot()

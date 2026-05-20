@@ -120,6 +120,70 @@ data class ListingDetailResponse(
     val listing: ListingDto,
 )
 
+/**
+ * Body for `POST /api/listings`. Mirrors the destructure at
+ * `backend/routes/listings.js:430`. The wizard sends the commonly-used
+ * subset; backend defaults take care of the rest (visibility scope,
+ * radius, expirations, geocode provenance, …).
+ */
+@JsonClass(generateAdapter = true)
+data class CreateListingRequest(
+    val title: String,
+    val description: String? = null,
+    val price: Double? = null,
+    val isFree: Boolean,
+    val category: String,
+    val condition: String? = null,
+    val mediaUrls: List<String> = emptyList(),
+    val layer: String,
+    val listingType: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val locationName: String? = null,
+    val locationAddress: String? = null,
+    val meetupPreference: String? = null,
+    val deliveryAvailable: Boolean = false,
+    val isWanted: Boolean = false,
+)
+
+/** Envelope from `POST /api/listings` (status 201). */
+@JsonClass(generateAdapter = true)
+data class CreateListingResponse(
+    val message: String? = null,
+    val listing: ListingDto,
+)
+
+/**
+ * Body for `PATCH /api/listings/:id`. Owner-only update. Mirrors the
+ * fields the Snap & Sell wizard collects so the same form can drive
+ * create + edit. All fields are nullable — Moshi omits `null` from the
+ * encoded JSON, matching the backend Joi schema's `min(1)` requirement
+ * that at least one updatable field be present.
+ */
+@JsonClass(generateAdapter = true)
+data class UpdateListingRequest(
+    val title: String? = null,
+    val description: String? = null,
+    val price: Double? = null,
+    val isFree: Boolean? = null,
+    val category: String? = null,
+    val condition: String? = null,
+    val mediaUrls: List<String>? = null,
+    val layer: String? = null,
+    val listingType: String? = null,
+    val locationName: String? = null,
+    val meetupPreference: String? = null,
+    val deliveryAvailable: Boolean? = null,
+    val isWanted: Boolean? = null,
+)
+
+/** Envelope from `PATCH /api/listings/:id`. */
+@JsonClass(generateAdapter = true)
+data class UpdateListingResponse(
+    val message: String? = null,
+    val listing: ListingDto,
+)
+
 /** `POST /api/listings/:id/message` body. */
 @JsonClass(generateAdapter = true)
 data class MessageListingBody(

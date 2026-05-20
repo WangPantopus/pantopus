@@ -73,11 +73,9 @@ struct HubView: View {
                     HubJumpBackIn(items: content.jumpBackIn) { onNavigate(.jumpBackIn($0)) }
                 }
                 if !content.activity.isEmpty {
-                    // `See all` on Recent activity is documented as a P-future
-                    // wire-up (MeRoute.recentActivity not implemented yet — see
-                    // PR description "Wiring gaps"). Render without the link
-                    // until the destination lands.
-                    HubRecentActivity(entries: content.activity)
+                    HubRecentActivity(entries: content.activity) {
+                        onNavigate(.openRecentActivity)
+                    }
                 }
                 Spacer(minLength: Spacing.s10)
             }
@@ -138,6 +136,9 @@ enum HubNavigationIntent {
     /// destination is "home calendar" but P11 hasn't shipped the native
     /// route yet). Wired in P11.
     case openToday
+    /// "See all" on the Recent activity section — pushes the standalone
+    /// Recent activity list (`HubRoute.recentActivity`).
+    case openRecentActivity
 }
 
 private struct ErrorView: View {

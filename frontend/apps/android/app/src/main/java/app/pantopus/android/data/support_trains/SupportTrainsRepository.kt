@@ -2,6 +2,9 @@
 
 package app.pantopus.android.data.support_trains
 
+import app.pantopus.android.data.api.models.support_trains.AddSupportTrainSlotBody
+import app.pantopus.android.data.api.models.support_trains.CreateSupportTrainBody
+import app.pantopus.android.data.api.models.support_trains.CreateSupportTrainResponse
 import app.pantopus.android.data.api.models.support_trains.SupportTrainReservationsResponse
 import app.pantopus.android.data.api.models.support_trains.SupportTrainsListResponse
 import app.pantopus.android.data.api.models.support_trains.SupportTrainsNearbyResponse
@@ -54,4 +57,31 @@ class SupportTrainsRepository
          */
         suspend fun reservations(supportTrainId: String): NetworkResult<SupportTrainReservationsResponse> =
             safeApiCall { api.reservations(supportTrainId) }
+
+        /**
+         * `POST /api/support-trains/` — create draft. Route
+         * `backend/routes/supportTrains.js:639`. P2.6.
+         */
+        suspend fun create(body: CreateSupportTrainBody): NetworkResult<CreateSupportTrainResponse> = safeApiCall { api.create(body) }
+
+        /**
+         * `POST /api/support-trains/:id/slots` — append one custom slot.
+         * Route `backend/routes/supportTrains.js:921`. P2.6.
+         */
+        suspend fun addSlot(
+            supportTrainId: String,
+            body: AddSupportTrainSlotBody,
+        ): NetworkResult<Unit> =
+            safeApiCall {
+                api.addSlot(supportTrainId, body).close()
+            }
+
+        /**
+         * `POST /api/support-trains/:id/publish` — publish a draft.
+         * Route `backend/routes/supportTrains.js:1236`. P2.6.
+         */
+        suspend fun publish(supportTrainId: String): NetworkResult<Unit> =
+            safeApiCall {
+                api.publish(supportTrainId).close()
+            }
     }

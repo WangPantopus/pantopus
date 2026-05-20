@@ -32,6 +32,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenAddBillWizardStepViewed(stepNumber: Int, stepName: String)
     case ctaAddBillSubmit(result: AnalyticsResult)
     case screenHomeMaintenanceViewed
+    case screenLogMaintenanceViewed
+    case screenMaintenanceDetailViewed
+    case ctaLogMaintenanceSubmit(result: AnalyticsResult)
+    case ctaMaintenanceDelete(result: AnalyticsResult)
     case screenPetsListViewed
     case screenPetsWizardStepViewed(stepNumber: Int, stepName: String)
     case screenHomeCalendarViewed
@@ -56,9 +60,25 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case ctaHubPillarTapped(pillar: String)
     case ctaMailboxItemLogReceived
     case ctaAddHomeSubmit
+    /// P2.3 — Snap & Sell wizard step view event.
+    case screenListingComposeWizardStepViewed(stepNumber: Int, stepName: String)
+    /// P2.3 — submit the listing-compose wizard (final POST).
+    case ctaListingComposeSubmit
     case ctaClaimOwnershipSubmit(result: AnalyticsResult)
     case formEditProfileSubmit(result: AnalyticsResult)
     case formEditProfileValidationError(field: String)
+    /// P2.1 — Pulse compose form submitted. `intent` is one of
+    /// `ask / recommend / event / lost / announce`.
+    case formPulseComposeSubmit(intent: String, result: AnalyticsResult)
+    /// P2.1 — Pulse compose validation failure. `intent` matches the
+    /// form's active variant; `field` is the failing field's id.
+    case formPulseComposeValidationError(intent: String, field: String)
+    /// P2.1 — Pulse compose screen viewed.
+    case screenPulseComposeViewed(intent: String)
+    /// P2.2 — Post-a-Task wizard step view.
+    case screenComposeGigWizardStepViewed(stepNumber: Int, stepName: String)
+    /// P2.2 — Post-a-Task wizard submit tap (fires before the POST).
+    case ctaComposeGigSubmit
 
     /// Wire-format event name. Stable across versions — vendor / dashboard
     /// owners depend on these strings.
@@ -79,6 +99,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenAddBillWizardStepViewed: "screen.add_bill_wizard.step_viewed"
         case .ctaAddBillSubmit: "cta.add_bill.submit"
         case .screenHomeMaintenanceViewed: "screen.home_maintenance.viewed"
+        case .screenLogMaintenanceViewed: "screen.log_maintenance.viewed"
+        case .screenMaintenanceDetailViewed: "screen.maintenance_detail.viewed"
+        case .ctaLogMaintenanceSubmit: "cta.log_maintenance.submit"
+        case .ctaMaintenanceDelete: "cta.maintenance.delete"
         case .screenPetsListViewed: "screen.pets_list.viewed"
         case .screenPetsWizardStepViewed: "screen.pets_wizard.step_viewed"
         case .screenHomeCalendarViewed: "screen.home_calendar.viewed"
@@ -101,9 +125,16 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .ctaHubPillarTapped: "cta.hub.pillar_tapped"
         case .ctaMailboxItemLogReceived: "cta.mailbox_item.log_received"
         case .ctaAddHomeSubmit: "cta.add_home.submit"
+        case .screenListingComposeWizardStepViewed: "screen.listing_compose_wizard.step_viewed"
+        case .ctaListingComposeSubmit: "cta.listing_compose.submit"
         case .ctaClaimOwnershipSubmit: "cta.claim_ownership.submit"
         case .formEditProfileSubmit: "form.edit_profile.submit"
         case .formEditProfileValidationError: "form.edit_profile.validation_error"
+        case .formPulseComposeSubmit: "form.pulse_compose.submit"
+        case .formPulseComposeValidationError: "form.pulse_compose.validation_error"
+        case .screenPulseComposeViewed: "screen.pulse_compose.viewed"
+        case .screenComposeGigWizardStepViewed: "screen.compose_gig_wizard.step_viewed"
+        case .ctaComposeGigSubmit: "cta.compose_gig.submit"
         }
     }
 
@@ -114,6 +145,10 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case let .screenMailboxItemDetailViewed(category, trustLevel):
             ["category": category, "trust_level": trustLevel]
         case let .screenAddHomeWizardStepViewed(stepNumber, stepName):
+            ["step_number": "\(stepNumber)", "step_name": stepName]
+        case let .screenComposeGigWizardStepViewed(stepNumber, stepName):
+            ["step_number": "\(stepNumber)", "step_name": stepName]
+        case let .screenListingComposeWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .screenPetsWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
@@ -133,11 +168,21 @@ public enum AnalyticsEvent: Sendable, Equatable {
             ["result": result.rawValue]
         case let .formEditProfileValidationError(field):
             ["field": field]
+        case let .formPulseComposeSubmit(intent, result):
+            ["intent": intent, "result": result.rawValue]
+        case let .formPulseComposeValidationError(intent, field):
+            ["intent": intent, "field": field]
+        case let .screenPulseComposeViewed(intent):
+            ["intent": intent]
         case let .screenAddBillWizardStepViewed(stepNumber, stepName):
             ["step_number": "\(stepNumber)", "step_name": stepName]
         case let .ctaAddBillSubmit(result):
             ["result": result.rawValue]
         case let .ctaLogPackageSubmit(result):
+            ["result": result.rawValue]
+        case let .ctaLogMaintenanceSubmit(result):
+            ["result": result.rawValue]
+        case let .ctaMaintenanceDelete(result):
             ["result": result.rawValue]
         case let .ctaPollVoteSubmit(result):
             ["result": result.rawValue]
@@ -150,6 +195,8 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenBillsViewed,
              .screenBillDetailViewed,
              .screenHomeMaintenanceViewed,
+             .screenLogMaintenanceViewed,
+             .screenMaintenanceDetailViewed,
              .screenPetsListViewed,
              .screenHomeCalendarViewed,
              .screenPackagesViewed,
@@ -165,7 +212,9 @@ public enum AnalyticsEvent: Sendable, Equatable {
              .screenDocumentsViewed,
              .screenEditProfileViewed,
              .ctaMailboxItemLogReceived,
-             .ctaAddHomeSubmit:
+             .ctaAddHomeSubmit,
+             .ctaComposeGigSubmit,
+             .ctaListingComposeSubmit:
             [:]
         }
     }

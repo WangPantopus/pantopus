@@ -299,11 +299,16 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         return Self.context(
             for: listing,
             offerCount: offers.count,
-            sortLabel: sort.label
-        ) { [weak self] in
-            guard let self else { return }
-            Task { @MainActor in self.onSort() }
-        }
+            sortLabel: sort.label,
+            onSort: { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in self.onSort() }
+            },
+            onEditPrice: { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in self.onEditPrice() }
+            }
+        )
     }
 
     /// Bound to the view's `.sheet(item:)` to drive the counter
@@ -796,7 +801,8 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
         for listing: ListingDTO,
         offerCount: Int,
         sortLabel: String?,
-        onSort: (@Sendable () -> Void)?
+        onSort: (@Sendable () -> Void)?,
+        onEditPrice: (@Sendable () -> Void)? = nil
     ) -> ListingContextConfig {
         let category = ListingOffersCategory.from(
             rawCategory: listing.category,
@@ -820,7 +826,8 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
             statusChip: status,
             offerCount: offerCount,
             sortLabel: sortLabel,
-            onSort: onSort
+            onSort: onSort,
+            onEditPrice: onEditPrice
         )
     }
 

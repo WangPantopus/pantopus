@@ -71,3 +71,14 @@ public struct HomeAccessSecretsResponse: Decodable, Sendable, Hashable {
         self.secrets = secrets
     }
 }
+
+/// Envelope for the single-secret POST / PUT endpoints. Backend returns
+/// `{ "secret": HomeAccessSecret }` at `backend/routes/home.js:5773` and
+/// `backend/routes/home.js:5824`.
+public struct HomeAccessSecretResponse: Decodable, Sendable, Hashable {
+    public let secret: HomeAccessSecretDTO
+
+    public init(secret: HomeAccessSecretDTO) {
+        self.secret = secret
+    }
+}

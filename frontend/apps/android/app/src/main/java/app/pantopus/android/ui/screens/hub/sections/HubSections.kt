@@ -837,7 +837,7 @@ private fun JumpBackCard(
 @Composable
 fun HubRecentActivity(
     entries: List<ActivityEntry>,
-    onSeeAll: (() -> Unit)? = null,
+    onSeeAll: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -849,28 +849,26 @@ fun HubRecentActivity(
         ) {
             SectionHeader("Recent activity")
             Spacer(Modifier.weight(1f))
-            if (onSeeAll != null) {
-                Row(
-                    modifier =
-                        Modifier
-                            .clickable { onSeeAll() }
-                            .testTag("hubRecentActivity.seeAll")
-                            .semantics { contentDescription = "See all activity" },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        "See all",
-                        style = PantopusTextStyle.caption.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
-                        color = PantopusColors.primary600,
-                    )
-                    PantopusIconImage(
-                        icon = PantopusIcon.ChevronRight,
-                        contentDescription = null,
-                        size = 13.dp,
-                        tint = PantopusColors.primary600,
-                    )
-                }
+            Row(
+                modifier =
+                    Modifier
+                        .clickable { onSeeAll() }
+                        .testTag("hubRecentActivity.seeAll")
+                        .semantics { contentDescription = "See all activity" },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    "See all",
+                    style = PantopusTextStyle.caption.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+                    color = PantopusColors.primary600,
+                )
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronRight,
+                    contentDescription = null,
+                    size = 13.dp,
+                    tint = PantopusColors.primary600,
+                )
             }
         }
         Column(
