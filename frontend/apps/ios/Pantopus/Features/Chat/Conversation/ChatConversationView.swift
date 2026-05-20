@@ -179,9 +179,11 @@ public struct ChatConversationView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
     }
+}
 
-    // MARK: - AI welcome
+// MARK: - AI welcome
 
+extension ChatConversationView {
     private var aiWelcomeFrame: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
