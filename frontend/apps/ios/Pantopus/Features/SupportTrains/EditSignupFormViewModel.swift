@@ -256,7 +256,7 @@ public final class EditSignupFormViewModel {
               let minute = Int(parts[1]) else { return reservation.estimatedArrivalAt }
         let calendar = Calendar(identifier: .gregorian)
         let baseDate: Date = if let original = reservation.estimatedArrivalAt,
-                                let parsed = Self.isoFormatter.date(from: original) {
+                                let parsed = Self.parseISO(original) {
             parsed
         } else {
             Date()
@@ -288,7 +288,7 @@ public final class EditSignupFormViewModel {
             return reservation.dishTitle ?? ""
         case .dropoffTime:
             guard let iso = reservation.estimatedArrivalAt,
-                  let date = isoFormatter.date(from: iso) else { return "" }
+                  let date = parseISO(iso) else { return "" }
             return timeFormatter.string(from: date)
         case .dietaryNotes:
             return reservation.privateNoteToOrganizer ?? ""
@@ -297,9 +297,24 @@ public final class EditSignupFormViewModel {
 
     // MARK: - Formatters
 
+    /// Parse an ISO-8601 instant tolerating both the fractional-second
+    /// (`…00.000Z`) and whole-second (`…00Z`) forms. Postgres emits
+    /// either depending on the column's stored precision, and
+    /// `ISO8601DateFormatter` is strict: `.withFractionalSeconds`
+    /// rejects whole-second strings, so try both spellings.
+    private static func parseISO(_ iso: String) -> Date? {
+        isoFormatter.date(from: iso) ?? isoFormatterNoFraction.date(from: iso)
+    }
+
     private nonisolated(unsafe) static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private nonisolated(unsafe) static let isoFormatterNoFraction: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
         return f
     }()
 
