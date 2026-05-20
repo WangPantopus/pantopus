@@ -8,6 +8,7 @@ import app.pantopus.android.data.api.models.support_trains.SupportTrainReservati
 import app.pantopus.android.data.api.models.support_trains.SupportTrainReservationsResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.support_trains.SupportTrainReservationsStore
 import app.pantopus.android.data.support_trains.SupportTrainsRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
@@ -29,16 +30,21 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReviewSignupsViewModelTest {
     private val repo: SupportTrainsRepository = mockk()
+    private lateinit var store: SupportTrainReservationsStore
 
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        store = SupportTrainReservationsStore()
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    private fun makeVM(savedState: SavedStateHandle = savedState()): ReviewSignupsViewModel =
+        ReviewSignupsViewModel(repo, store, savedState)
 
     private fun savedState(trainId: String = "st1"): SavedStateHandle =
         SavedStateHandle(mapOf(ReviewSignupsViewModel.SUPPORT_TRAIN_ID_KEY to trainId))
@@ -97,7 +103,7 @@ class ReviewSignupsViewModelTest {
                             ),
                     ),
                 )
-            val vm = ReviewSignupsViewModel(repo, savedState())
+            val vm = makeVM()
             vm.load()
             val state = vm.state.value as ListOfRowsUiState.Loaded
             assertEquals(listOf("r1", "r2"), state.sections.first().rows.map { it.id })
@@ -108,7 +114,7 @@ class ReviewSignupsViewModelTest {
         runTest {
             coEvery { repo.reservations("st1") } returns
                 NetworkResult.Success(SupportTrainReservationsResponse(reservations = emptyList()))
-            val vm = ReviewSignupsViewModel(repo, savedState())
+            val vm = makeVM()
             vm.load()
             val state = vm.state.value as ListOfRowsUiState.Empty
             assertEquals("No signups yet", state.headline)
@@ -120,7 +126,7 @@ class ReviewSignupsViewModelTest {
         runTest {
             coEvery { repo.reservations(any()) } returns
                 NetworkResult.Failure(NetworkError.Server(500, null))
-            val vm = ReviewSignupsViewModel(repo, savedState())
+            val vm = makeVM()
             vm.load()
             assertTrue(vm.state.value is ListOfRowsUiState.Error)
         }
@@ -128,7 +134,7 @@ class ReviewSignupsViewModelTest {
     @Test
     fun missing_support_train_id_surfaces_error_without_fetch() =
         runTest {
-            val vm = ReviewSignupsViewModel(repo, savedState(trainId = ""))
+            val vm = makeVM(savedState(trainId = ""))
             vm.load()
             assertTrue(vm.state.value is ListOfRowsUiState.Error)
         }
@@ -144,7 +150,7 @@ class ReviewSignupsViewModelTest {
                         reservations = listOf(reservation("r1", "pending"), reservation("r2", "confirmed")),
                     ),
                 )
-            val vm = ReviewSignupsViewModel(repo, savedState())
+            val vm = makeVM()
             vm.load()
             vm.selectFilter(ReviewSignupsFilter.PENDING)
             val state = vm.state.value as ListOfRowsUiState.Loaded
@@ -170,7 +176,7 @@ class ReviewSignupsViewModelTest {
                             ),
                     ),
                 )
-            val vm = ReviewSignupsViewModel(repo, savedState())
+            val vm = makeVM()
             vm.load()
             vm.selectFilter(ReviewSignupsFilter.EDITED)
             val state = vm.state.value as ListOfRowsUiState.Loaded
@@ -186,7 +192,7 @@ class ReviewSignupsViewModelTest {
                         reservations = listOf(reservation("r1", "pending"), reservation("r3", "canceled")),
                     ),
                 )
-            val vm = ReviewSignupsViewModel(repo, savedState())
+            val vm = makeVM()
             vm.load()
             vm.selectFilter(ReviewSignupsFilter.CANCELED)
             val state = vm.state.value as ListOfRowsUiState.Loaded
@@ -214,7 +220,7 @@ class ReviewSignupsViewModelTest {
                             ),
                     ),
                 )
-            val vm = ReviewSignupsViewModel(repo, savedState())
+            val vm = makeVM()
             vm.load()
             val state = vm.state.value as ListOfRowsUiState.Loaded
             assertEquals("Block Neighbor", state.sections.first().rows.first().title)
@@ -228,7 +234,7 @@ class ReviewSignupsViewModelTest {
                 NetworkResult.Success(
                     SupportTrainReservationsResponse(reservations = listOf(reservation("r1"))),
                 )
-            val vm = ReviewSignupsViewModel(repo, savedState())
+            val vm = makeVM()
             vm.load()
             val state = vm.state.value as ListOfRowsUiState.Loaded
             assertEquals("“I'll knock when I'm there”", state.sections.first().rows.first().body)
@@ -251,7 +257,7 @@ class ReviewSignupsViewModelTest {
                             ),
                     ),
                 )
-            val vm = ReviewSignupsViewModel(repo, savedState())
+            val vm = makeVM()
             vm.load()
             val state = vm.state.value as ListOfRowsUiState.Loaded
             val trailing = state.sections.first().rows.first().trailing as RowTrailing.Status
@@ -268,7 +274,7 @@ class ReviewSignupsViewModelTest {
                 NetworkResult.Success(
                     SupportTrainReservationsResponse(reservations = listOf(reservation("r1", "pending"))),
                 )
-            val vm = ReviewSignupsViewModel(repo, savedState())
+            val vm = makeVM()
             var captured: String? = null
             vm.onConfirmReservation = { captured = it }
             vm.load()
