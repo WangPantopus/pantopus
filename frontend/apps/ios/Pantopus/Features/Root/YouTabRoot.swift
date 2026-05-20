@@ -17,6 +17,8 @@ public enum YouRoute: Hashable {
     case signOutConfirm
     case mailbox
     case mailItemDetail(mailId: String)
+    /// P4.2 — Mailbox search. Client-side filter over the user's mailbox.
+    case mailboxSearch
     case settings
     case placeholder(label: String)
     /// T5.2.4 — cross-listing Offers (incoming + outgoing).
@@ -626,7 +628,16 @@ public struct YouTabRoot: View {
                     onOpenMail: { mailId in
                         Task { @MainActor in path.append(.mailItemDetail(mailId: mailId)) }
                     },
-                    onOpenSearch: { path.append(.placeholder(label: "Mail search")) }
+                    onOpenSearch: { path.append(.mailboxSearch) }
+                )
+            )
+        case .mailboxSearch:
+            MailboxSearchView(
+                viewModel: MailboxSearchViewModel(
+                    onOpenMail: { mailId in
+                        Task { @MainActor in path.append(.mailItemDetail(mailId: mailId)) }
+                    },
+                    onCancel: { if !path.isEmpty { path.removeLast() } }
                 )
             )
         case let .mailItemDetail(mailId):

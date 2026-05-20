@@ -160,6 +160,7 @@ import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
 import app.pantopus.android.ui.screens.listings.MyListingsScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
+import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
@@ -2490,7 +2491,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.MAILBOX_SEARCH) {
-                NotYetAvailableView(tabName = "Mail search", icon = PantopusIcon.Search)
+                MailboxSearchScreen(
+                    onOpenMail = { mailId ->
+                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(ChildRoutes.SUPPORT_TRAINS) {
                 SupportTrainsScreen(

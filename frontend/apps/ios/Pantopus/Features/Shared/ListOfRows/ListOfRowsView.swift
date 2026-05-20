@@ -732,7 +732,7 @@ private struct ListOfRowsErrorBanner: View {
 
 /// Whether a row is rendered inside a grouped section card (Discover hub
 /// style) or as a free-standing card.
-private enum RowCardContext {
+enum RowCardContext {
     case standalone
     case grouped(isLast: Bool)
 
@@ -744,7 +744,11 @@ private enum RowCardContext {
     }
 }
 
-private struct RowView: View {
+/// Renders a single `RowModel` using the shared list-row template
+/// (leading visual, title/subtitle/body, chips, trailing, highlight).
+/// Exposed (alongside the list itself) so non-archetype surfaces — e.g.
+/// the Mailbox Search results (P4.2) — reuse the exact row chrome.
+struct RowView: View {
     let row: RowModel
     var cardContext: RowCardContext = .standalone
 
