@@ -103,6 +103,9 @@ public enum YouRoute: Hashable {
     case uploadDocument(homeId: String)
     /// P2.10 — Document detail (preview + metadata + footer actions).
     case documentDetail(homeId: String, documentId: String)
+    /// P4.5 — Document Search surface (search across title / tags /
+    /// category) for a home's vault.
+    case documentSearch(homeId: String)
     /// T6.3d — Packages. The home-context "me.packages" Activity row +
     /// the Home Dashboard "view_packages" quick action push here.
     case homePackages(homeId: String)
@@ -1101,7 +1104,7 @@ public struct YouTabRoot: View {
                     },
                     onSearch: {
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Search documents"))
+                            path.append(.documentSearch(homeId: homeId))
                         }
                     },
                     onExport: {
@@ -1139,6 +1142,22 @@ public struct YouTabRoot: View {
                         path.append(.uploadDocument(homeId: homeId))
                     }
                 }
+            )
+        case let .documentSearch(homeId):
+            DocumentSearchView(
+                viewModel: DocumentSearchViewModel(
+                    homeId: homeId,
+                    onOpenDocument: { dto in
+                        Task { @MainActor in
+                            path.append(.documentDetail(homeId: homeId, documentId: dto.id))
+                        }
+                    },
+                    onCancel: {
+                        Task { @MainActor in
+                            if !path.isEmpty { path.removeLast() }
+                        }
+                    }
+                )
             )
         case let .homePackages(homeId):
             PackagesListView(
