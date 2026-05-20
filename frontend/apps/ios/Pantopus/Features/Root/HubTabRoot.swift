@@ -1211,8 +1211,6 @@ public struct HubTabRoot: View {
                             push(.gigsFeed)
                         case .seeAllListings:
                             push(.marketplace)
-                        case .openFilters:
-                            push(.placeholder(label: "Discovery filters"))
                         }
                     }
                 }
@@ -1224,8 +1222,6 @@ public struct HubTabRoot: View {
                         switch target {
                         case let .business(businessId, _):
                             push(.businessProfile(businessId: businessId))
-                        case .openFilters:
-                            push(.placeholder(label: "Business filters"))
                         case .widenRadius:
                             push(.placeholder(label: "Set home address"))
                         case .inviteBusiness:

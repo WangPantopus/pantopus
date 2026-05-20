@@ -2277,8 +2277,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 navController.navigate(ChildRoutes.GIGS_FEED)
                             DiscoverHubTarget.SeeAllListings ->
                                 navController.navigate(ChildRoutes.MARKETPLACE)
-                            DiscoverHubTarget.OpenFilters ->
-                                navController.navigate(ChildRoutes.placeholder("Discovery filters"))
                         }
                     },
                 )
@@ -2290,8 +2288,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         when (target) {
                             is DiscoverBusinessesTarget.Business ->
                                 navController.navigate(ChildRoutes.businessProfile(target.businessId))
-                            DiscoverBusinessesTarget.OpenFilters ->
-                                navController.navigate(ChildRoutes.placeholder("Business filters"))
                             DiscoverBusinessesTarget.WidenRadius ->
                                 navController.navigate(ChildRoutes.placeholder("Set home address"))
                             DiscoverBusinessesTarget.InviteBusiness ->

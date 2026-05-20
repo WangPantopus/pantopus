@@ -29,6 +29,8 @@ fun DiscoverHubScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val chipStrip by viewModel.chipStrip.collectAsStateWithLifecycle()
     val topBarAction by viewModel.topBarAction.collectAsStateWithLifecycle()
+    val showFilterSheet by viewModel.showFilterSheet.collectAsStateWithLifecycle()
+    val filters by viewModel.filters.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.onSelect = onSelect
@@ -44,6 +46,14 @@ fun DiscoverHubScreen(
             topBarAction = topBarAction,
             onBack = onBack,
             chipStrip = chipStrip,
+        )
+    }
+
+    if (showFilterSheet) {
+        DiscoveryFilterSheet(
+            initialFilters = filters,
+            onApply = { viewModel.applyFilters(it) },
+            onDismiss = { viewModel.dismissFilters() },
         )
     }
 }

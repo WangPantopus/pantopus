@@ -390,4 +390,101 @@ class DiscoverBusinessesViewModelTest {
         val searchBar = vm.searchBar.value
         assertEquals("Search businesses or services", searchBar.placeholder)
     }
+
+    // ───────── Filters (P5.2) ─────────
+
+    @Test
+    fun defaultTopBarActionHasNoBadge() {
+        val vm = DiscoverBusinessesViewModel(repo)
+        assertEquals(null, vm.topBarAction.value?.badgeCount)
+        assertEquals(0, vm.filters.value.activeCount)
+    }
+
+    @Test
+    fun presentAndDismissTogglesSheetFlag() {
+        val vm = DiscoverBusinessesViewModel(repo)
+        assertEquals(false, vm.showFilterSheet.value)
+        vm.presentFilters()
+        assertEquals(true, vm.showFilterSheet.value)
+        vm.dismissFilters()
+        assertEquals(false, vm.showFilterSheet.value)
+    }
+
+    @Test
+    fun applyFiltersPassesServerParams() =
+        runTest {
+            coEvery {
+                repo.search(
+                    q = any(), categories = any(), sort = any(), page = any(),
+                    pageSize = any(), radiusMiles = any(), openNow = any(), ratingMin = any(),
+                )
+            } returns NetworkResult.Success(response(mixed))
+
+            val vm = DiscoverBusinessesViewModel(repo)
+            vm.load()
+            vm.applyFilters(
+                DiscoverBusinessFilters(
+                    categories = setOf("home-services"),
+                    radiusMiles = 1.0,
+                    openNow = true,
+                    ratingFloor = 4.0,
+                ),
+            )
+
+            coVerify {
+                repo.search(
+                    q = null, categories = listOf("home-services"), sort = null, page = 1,
+                    pageSize = 50, radiusMiles = 1.0, openNow = true, ratingMin = 4.0,
+                )
+            }
+            assertEquals(4, vm.filters.value.activeCount)
+            assertEquals(4, vm.topBarAction.value?.badgeCount)
+        }
+
+    @Test
+    fun applyDefaultFiltersOmitsServerParams() =
+        runTest {
+            coEvery {
+                repo.search(
+                    q = any(), categories = any(), sort = any(), page = any(),
+                    pageSize = any(), radiusMiles = any(), openNow = any(), ratingMin = any(),
+                )
+            } returns NetworkResult.Success(response(mixed))
+
+            val vm = DiscoverBusinessesViewModel(repo)
+            vm.load()
+            vm.applyFilters(DiscoverBusinessFilters.Default)
+
+            coVerify {
+                repo.search(
+                    q = null, categories = null, sort = null, page = 1,
+                    pageSize = 50, radiusMiles = null, openNow = null, ratingMin = null,
+                )
+            }
+            assertEquals(null, vm.topBarAction.value?.badgeCount)
+        }
+
+    @Test
+    fun categoryFilterUnionsWithChipSelection() =
+        runTest {
+            coEvery {
+                repo.search(
+                    q = any(), categories = any(), sort = any(), page = any(),
+                    pageSize = any(), radiusMiles = any(), openNow = any(), ratingMin = any(),
+                )
+            } returns NetworkResult.Success(response(mixed))
+
+            val vm = DiscoverBusinessesViewModel(repo)
+            vm.load()
+            vm.selectChip(DiscoverBusinessesChip.HANDYMAN)
+            vm.applyFilters(DiscoverBusinessFilters(categories = setOf("home-services")))
+
+            // Sorted union of the chip (handyman) + sheet (home-services).
+            coVerify {
+                repo.search(
+                    q = null, categories = listOf("handyman", "home-services"), sort = null,
+                    page = 1, pageSize = 50, radiusMiles = null, openNow = null, ratingMin = null,
+                )
+            }
+        }
 }

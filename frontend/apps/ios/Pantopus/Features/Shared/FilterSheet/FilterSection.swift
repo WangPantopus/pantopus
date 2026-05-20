@@ -60,6 +60,16 @@ public enum FilterControl: Sendable, Hashable {
     case radio(options: [FilterOption], selectedId: String?)
     /// Stack of rows with checkboxes, multiple selection.
     case multiSelect(options: [FilterOption], selectedIds: Set<String>)
+    /// Stack of rows, each a labeled switch. `selectedIds` are the "on"
+    /// switches. Same selection shape as `multiSelect` but renders as
+    /// toggles — used for boolean filter dimensions (verified-only,
+    /// newest-first, open-now).
+    case toggle(options: [FilterOption], selectedIds: Set<String>)
+    /// Single-thumb slider that snaps to a fixed set of labelled
+    /// `stops`. `selectedIndex` indexes into `stops`; `defaultIndex` is
+    /// the position Reset returns to (the "no filter" stop). Used for
+    /// the distance-radius dimension (0.5 / 1 / 3 / 5 / 10 mi).
+    case stepSlider(stops: [FilterOption], selectedIndex: Int, defaultIndex: Int)
     /// Dual-thumb range slider.
     case rangeSlider(FilterRange)
 
@@ -74,6 +84,10 @@ public enum FilterControl: Sendable, Hashable {
             .radio(options: options, selectedId: nil)
         case let .multiSelect(options, _):
             .multiSelect(options: options, selectedIds: [])
+        case let .toggle(options, _):
+            .toggle(options: options, selectedIds: [])
+        case let .stepSlider(stops, _, defaultIndex):
+            .stepSlider(stops: stops, selectedIndex: defaultIndex, defaultIndex: defaultIndex)
         case let .rangeSlider(range):
             .rangeSlider(range.cleared())
         }

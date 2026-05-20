@@ -53,6 +53,12 @@ data class TopBarAction(
     val onClick: () -> Unit,
     val label: String? = null,
     val isEnabled: Boolean = true,
+    /**
+     * Optional count badge rendered over the icon's top-trailing corner
+     * (e.g. number of active filters). `null` or `0` hides the badge.
+     * Only honoured by the icon variant.
+     */
+    val badgeCount: Int? = null,
 )
 
 /**

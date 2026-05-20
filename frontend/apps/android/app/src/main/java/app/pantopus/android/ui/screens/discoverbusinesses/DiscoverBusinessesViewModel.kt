@@ -74,8 +74,6 @@ object DiscoverBusinessesSection {
 sealed interface DiscoverBusinessesTarget {
     data class Business(val businessId: String, val name: String) : DiscoverBusinessesTarget
 
-    data object OpenFilters : DiscoverBusinessesTarget
-
     data object WidenRadius : DiscoverBusinessesTarget
 
     data object InviteBusiness : DiscoverBusinessesTarget
@@ -133,6 +131,14 @@ class DiscoverBusinessesViewModel
         private val _searchText = MutableStateFlow("")
         val searchText: StateFlow<String> = _searchText.asStateFlow()
 
+        /** Persisted filter-sheet selection. Default = no filters. */
+        private val _filters = MutableStateFlow(DiscoverBusinessFilters.Default)
+        val filters: StateFlow<DiscoverBusinessFilters> = _filters.asStateFlow()
+
+        /** Whether the filter sheet is shown. */
+        private val _showFilterSheet = MutableStateFlow(false)
+        val showFilterSheet: StateFlow<Boolean> = _showFilterSheet.asStateFlow()
+
         private val _chipStrip = MutableStateFlow(makeChipStrip(DiscoverBusinessesChip.ALL))
         val chipStrip: StateFlow<ChipStripConfig> = _chipStrip.asStateFlow()
 
@@ -183,17 +189,59 @@ class DiscoverBusinessesViewModel
             reload()
         }
 
+        // MARK: - Filters
+
+        /** Open the filter sheet (top-bar action handler). */
+        fun presentFilters() {
+            _showFilterSheet.value = true
+        }
+
+        /** Dismiss the filter sheet. */
+        fun dismissFilters() {
+            _showFilterSheet.value = false
+        }
+
+        /**
+         * Apply a new filter selection and re-fetch. Category / distance /
+         * open-now / rating all map to `GET /api/businesses/search` params.
+         */
+        fun applyFilters(newFilters: DiscoverBusinessFilters) {
+            _filters.value = newFilters
+            _topBarAction.value = makeTopBarAction()
+            reload()
+        }
+
+        /**
+         * Union of the chip-strip category (when not "All") and the
+         * filter sheet's coarse category multi-select. Sent as
+         * `categories=` (backend matches via array overlap). `null` when
+         * empty; sorted for a stable request shape.
+         */
+        private fun combinedCategories(): List<String>? {
+            val set = _filters.value.categories.toMutableSet()
+            if (_selectedChip.value != DiscoverBusinessesChip.ALL) {
+                set.add(_selectedChip.value)
+            }
+            return set.takeIf { it.isNotEmpty() }?.sorted()
+        }
+
         private fun reload() {
             if (!loadedOnce) _state.value = ListOfRowsUiState.Loading
             viewModelScope.launch {
-                val categories: List<String>? =
-                    if (_selectedChip.value == DiscoverBusinessesChip.ALL) {
-                        null
-                    } else {
-                        listOf(_selectedChip.value)
-                    }
                 val q = _searchText.value.takeIf { it.isNotEmpty() }
-                when (val result = repo.search(q = q, categories = categories, pageSize = pageSize)) {
+                val filters = _filters.value
+                val radiusParam =
+                    filters.radiusMiles.takeIf { it != DiscoverBusinessFilters.DEFAULT_RADIUS_MILES }
+                val result =
+                    repo.search(
+                        q = q,
+                        categories = combinedCategories(),
+                        pageSize = pageSize,
+                        radiusMiles = radiusParam,
+                        openNow = if (filters.openNow) true else null,
+                        ratingMin = filters.ratingFloor,
+                    )
+                when (result) {
                     is NetworkResult.Success -> {
                         results = result.data.results
                         loadedOnce = true
@@ -340,12 +388,16 @@ class DiscoverBusinessesViewModel
                 onSubmit = { submitSearch() },
             )
 
-        private fun makeTopBarAction(): TopBarAction =
-            TopBarAction(
+        private fun makeTopBarAction(): TopBarAction {
+            val count = _filters.value.activeCount
+            return TopBarAction(
                 icon = PantopusIcon.SlidersHorizontal,
-                contentDescription = "Filter discovery",
-                onClick = { onSelect(DiscoverBusinessesTarget.OpenFilters) },
+                contentDescription =
+                    if (count > 0) "Filter discovery, $count active" else "Filter discovery",
+                badgeCount = if (count > 0) count else null,
+                onClick = { presentFilters() },
             )
+        }
 
         // MARK: - Helpers (pure)
 

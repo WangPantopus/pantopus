@@ -30,6 +30,8 @@ fun DiscoverBusinessesScreen(
     val chipStrip by viewModel.chipStrip.collectAsStateWithLifecycle()
     val searchBar by viewModel.searchBar.collectAsStateWithLifecycle()
     val topBarAction by viewModel.topBarAction.collectAsStateWithLifecycle()
+    val showFilterSheet by viewModel.showFilterSheet.collectAsStateWithLifecycle()
+    val filters by viewModel.filters.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.onSelect = onSelect
@@ -46,6 +48,14 @@ fun DiscoverBusinessesScreen(
             onBack = onBack,
             searchBar = searchBar,
             chipStrip = chipStrip,
+        )
+    }
+
+    if (showFilterSheet) {
+        BusinessFilterSheet(
+            initialFilters = filters,
+            onApply = { viewModel.applyFilters(it) },
+            onDismiss = { viewModel.dismissFilters() },
         )
     }
 }

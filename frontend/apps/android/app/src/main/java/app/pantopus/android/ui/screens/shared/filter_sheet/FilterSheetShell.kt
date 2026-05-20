@@ -24,7 +24,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.SheetState
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -35,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -52,6 +56,7 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import kotlin.math.roundToInt
 
 /** Test tag on the filter-sheet root. */
 const val FILTER_SHEET_TAG = "filterSheet"
@@ -291,6 +296,22 @@ private fun FilterSectionRow(
                 ) { newIds ->
                     onUpdate(section.copy(control = control.copy(selectedIds = newIds)))
                 }
+            is FilterControl.Toggle ->
+                ToggleControl(
+                    sectionId = section.id,
+                    options = control.options,
+                    selectedIds = control.selectedIds,
+                ) { newIds ->
+                    onUpdate(section.copy(control = control.copy(selectedIds = newIds)))
+                }
+            is FilterControl.StepSlider ->
+                StepSliderControl(
+                    sectionId = section.id,
+                    stops = control.stops,
+                    selectedIndex = control.selectedIndex,
+                ) { newIndex ->
+                    onUpdate(section.copy(control = control.copy(selectedIndex = newIndex)))
+                }
             is FilterControl.RangeSlider ->
                 RangeSliderControl(
                     sectionId = section.id,
@@ -498,6 +519,114 @@ private fun CheckboxGlyph(isOn: Boolean) {
                 contentDescription = null,
                 size = 12.dp,
                 tint = PantopusColors.appTextInverse,
+            )
+        }
+    }
+}
+
+// ─── Toggle list ───────────────────────────────────
+
+@Composable
+private fun ToggleControl(
+    sectionId: String,
+    options: List<FilterOption>,
+    selectedIds: Set<String>,
+    onChange: (Set<String>) -> Unit,
+) {
+    Column {
+        options.forEachIndexed { index, option ->
+            val isOn = selectedIds.contains(option.id)
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 44.dp)
+                        .padding(vertical = Spacing.s3),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+            ) {
+                Text(
+                    text = option.label,
+                    fontSize = 15.sp,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = isOn,
+                    onCheckedChange = { newValue ->
+                        val next =
+                            if (newValue) selectedIds + option.id else selectedIds - option.id
+                        onChange(next)
+                    },
+                    colors =
+                        SwitchDefaults.colors(
+                            checkedTrackColor = PantopusColors.primary600,
+                            checkedThumbColor = Color.White,
+                        ),
+                    modifier =
+                        Modifier
+                            .testTag("filterToggle_${sectionId}_${option.id}")
+                            .semantics { contentDescription = option.label },
+                )
+            }
+            if (index < options.lastIndex) {
+                HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
+            }
+        }
+    }
+}
+
+// ─── Step slider (discrete stops) ──────────────────
+
+@Composable
+private fun StepSliderControl(
+    sectionId: String,
+    stops: List<FilterOption>,
+    selectedIndex: Int,
+    onChange: (Int) -> Unit,
+) {
+    val maxIndex = (stops.size - 1).coerceAtLeast(0)
+    val clamped = selectedIndex.coerceIn(0, maxIndex)
+    val current = stops.getOrNull(clamped)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+        Slider(
+            value = clamped.toFloat(),
+            onValueChange = { onChange(it.roundToInt().coerceIn(0, maxIndex)) },
+            valueRange = 0f..maxIndex.toFloat(),
+            steps = (maxIndex - 1).coerceAtLeast(0),
+            colors =
+                SliderDefaults.colors(
+                    thumbColor = PantopusColors.primary600,
+                    activeTrackColor = PantopusColors.primary600,
+                    inactiveTrackColor = PantopusColors.appBorder,
+                ),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .testTag("filterStepSlider_$sectionId")
+                    .semantics { contentDescription = "Distance radius" },
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stops.firstOrNull()?.label ?: "",
+                fontSize = 12.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = current?.label ?: "",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.primary600,
+                modifier = Modifier.testTag("filterStepSliderValue_$sectionId"),
+            )
+            Text(
+                text = stops.lastOrNull()?.label ?: "",
+                fontSize = 12.sp,
+                color = PantopusColors.appTextSecondary,
             )
         }
     }

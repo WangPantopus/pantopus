@@ -107,6 +107,12 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource, Header: View>: Vi
                                     ? Theme.Color.appText
                                     : Theme.Color.appTextMuted
                             )
+                            .overlay(alignment: .topTrailing) {
+                                if let count = action.badgeCount, count > 0 {
+                                    TopBarActionBadge(count: count)
+                                        .offset(x: 7, y: -7)
+                                }
+                            }
                         }
                     }
                     .disabled(!action.isEnabled)
@@ -156,6 +162,27 @@ public extension ListOfRowsView where Header == EmptyView {
         self.init(dataSource: dataSource) {
             EmptyView()
         }
+    }
+}
+
+// MARK: - Top-bar action badge
+
+/// Small count badge rendered over a top-bar icon action (e.g. the
+/// active-filter count on the Discover surfaces' `sliders-horizontal`
+/// button). Hidden by the call site when the count is `nil` / `0`.
+private struct TopBarActionBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text("\(count)")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Theme.Color.appTextInverse)
+            .padding(.horizontal, 4)
+            .frame(minWidth: 16, minHeight: 16)
+            .background(Theme.Color.primary600)
+            .clipShape(Capsule())
+            .accessibilityHidden(true)
+            .accessibilityIdentifier("listOfRowsTopBarActionBadge")
     }
 }
 

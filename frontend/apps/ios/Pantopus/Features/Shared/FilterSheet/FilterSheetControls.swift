@@ -170,6 +170,94 @@ struct FilterMultiSelectControl: View {
     }
 }
 
+// MARK: - Toggle list
+
+@MainActor
+struct FilterToggleControl: View {
+    let sectionId: String
+    let options: [FilterOption]
+    let selectedIds: Set<String>
+    let onChange: @MainActor (Set<String>) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(options) { option in
+                let isOn = selectedIds.contains(option.id)
+                Toggle(
+                    isOn: Binding(
+                        get: { isOn },
+                        set: { newValue in
+                            var next = selectedIds
+                            if newValue { next.insert(option.id) } else { next.remove(option.id) }
+                            onChange(next)
+                        }
+                    )
+                ) {
+                    Text(option.label)
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(Theme.Color.appText)
+                }
+                .toggleStyle(SwitchToggleStyle(tint: Theme.Color.primary600))
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("filterToggle_\(sectionId)_\(option.id)")
+                if option.id != options.last?.id {
+                    Rectangle()
+                        .fill(Theme.Color.appBorderSubtle)
+                        .frame(height: 1)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Step slider (discrete stops)
+
+@MainActor
+struct FilterStepSliderControl: View {
+    let sectionId: String
+    let stops: [FilterOption]
+    let selectedIndex: Int
+    let onChange: @MainActor (Int) -> Void
+
+    private var maxIndex: Int { max(stops.count - 1, 0) }
+    private var clampedIndex: Int { min(max(selectedIndex, 0), maxIndex) }
+    private var currentStop: FilterOption? {
+        stops.indices.contains(clampedIndex) ? stops[clampedIndex] : nil
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            Slider(
+                value: Binding(
+                    get: { Double(clampedIndex) },
+                    set: { onChange(Int($0.rounded())) }
+                ),
+                in: 0 ... Double(maxIndex),
+                step: 1
+            )
+            .tint(Theme.Color.primary600)
+            .accessibilityIdentifier("filterStepSlider_\(sectionId)")
+            .accessibilityLabel("Distance radius")
+            .accessibilityValue(currentStop?.label ?? "")
+            HStack {
+                Text(stops.first?.label ?? "")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                Spacer()
+                Text(currentStop?.label ?? "")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.Color.primary600)
+                    .accessibilityIdentifier("filterStepSliderValue_\(sectionId)")
+                Spacer()
+                Text(stops.last?.label ?? "")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
 // MARK: - Range slider
 
 @MainActor

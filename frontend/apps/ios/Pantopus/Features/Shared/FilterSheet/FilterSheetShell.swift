@@ -207,6 +207,34 @@ struct FilterSectionRow: View {
                     control: .multiSelect(options: options, selectedIds: ids)
                 ))
             }
+        case let .toggle(options, selectedIds):
+            FilterToggleControl(
+                sectionId: section.id,
+                options: options,
+                selectedIds: selectedIds
+            ) { ids in
+                onUpdate(FilterSection(
+                    id: section.id,
+                    title: section.title,
+                    control: .toggle(options: options, selectedIds: ids)
+                ))
+            }
+        case let .stepSlider(stops, selectedIndex, defaultIndex):
+            FilterStepSliderControl(
+                sectionId: section.id,
+                stops: stops,
+                selectedIndex: selectedIndex
+            ) { newIndex in
+                onUpdate(FilterSection(
+                    id: section.id,
+                    title: section.title,
+                    control: .stepSlider(
+                        stops: stops,
+                        selectedIndex: newIndex,
+                        defaultIndex: defaultIndex
+                    )
+                ))
+            }
         case let .rangeSlider(range):
             FilterRangeSliderControl(sectionId: section.id, range: range) { newRange in
                 onUpdate(FilterSection(

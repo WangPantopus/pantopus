@@ -24,6 +24,9 @@ class BusinessDiscoveryRepository
             sort: String? = null,
             page: Int = 1,
             pageSize: Int = 20,
+            radiusMiles: Double? = null,
+            openNow: Boolean? = null,
+            ratingMin: Double? = null,
         ): NetworkResult<BusinessDiscoverySearchResponse> =
             safeApiCall {
                 val query =
@@ -33,6 +36,9 @@ class BusinessDiscoveryRepository
                         sort?.takeIf { it.isNotBlank() }?.let { put("sort", it) }
                         put("page", page.toString())
                         put("page_size", pageSize.toString())
+                        radiusMiles?.let { put("radius_miles", it.toString()) }
+                        if (openNow == true) put("open_now", "true")
+                        ratingMin?.let { put("rating_min", it.toString()) }
                     }
                 api.search(query)
             }
