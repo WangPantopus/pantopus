@@ -378,6 +378,15 @@ public struct HubTabRoot: View {
         return .placeholder(label: item.title)
     }
 
+    /// Two-letter initials derived from a display name. Falls back to
+    /// `··` when the input has no alphanumeric content so the chat header's
+    /// avatar still renders.
+    fileprivate static func initials(from name: String) -> String {
+        let parts = name.split(separator: " ").prefix(2)
+        let joined = parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
+        return joined.isEmpty ? "··" : joined
+    }
+
     /// Extracts `<id>` from `/app/homes/<id>/dashboard`. Returns `nil`
     /// when the prefix doesn't match.
     private static func homeId(in route: String) -> String? {
@@ -837,7 +846,17 @@ public struct HubTabRoot: View {
             PublicProfileView(
                 userId: userId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
+                onOpenMessages: { profile in
+                    Task { @MainActor in
+                        push(.chatConversation(InboxConversationDestination(
+                            mode: .person(otherUserId: profile.id),
+                            displayName: profile.displayName,
+                            initials: Self.initials(from: profile.displayName),
+                            identityKind: nil,
+                            verified: profile.verified ?? false
+                        )))
+                    }
+                },
                 onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report")) } }
             )
         case let .businessProfile(businessId):
@@ -937,7 +956,19 @@ public struct HubTabRoot: View {
             GigDetailView(
                 viewModel: GigDetailViewModel(gigId: gigId),
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onMessage: { _ in Task { @MainActor in push(.placeholder(label: "Messages")) } }
+                onMessage: { gig in
+                    Task { @MainActor in
+                        guard let posterId = gig.userId else { return }
+                        let name = gig.creator?.name ?? gig.creator?.username ?? gig.title
+                        push(.chatConversation(InboxConversationDestination(
+                            mode: .person(otherUserId: posterId),
+                            displayName: name,
+                            initials: Self.initials(from: name),
+                            identityKind: nil,
+                            verified: gig.creator?.verified ?? false
+                        )))
+                    }
+                }
             )
         case let .composeGig(category):
             GigComposeWizardView(preselectedCategoryKey: category) { gigId in
@@ -977,7 +1008,19 @@ public struct HubTabRoot: View {
             ListingDetailView(
                 viewModel: ListingDetailViewModel(listingId: listingId),
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onMessage: { _ in Task { @MainActor in push(.placeholder(label: "Messages")) } },
+                onMessage: { listing in
+                    Task { @MainActor in
+                        guard let sellerId = listing.userId else { return }
+                        let name = listing.title ?? "Seller"
+                        push(.chatConversation(InboxConversationDestination(
+                            mode: .person(otherUserId: sellerId),
+                            displayName: name,
+                            initials: Self.initials(from: name),
+                            identityKind: nil,
+                            verified: false
+                        )))
+                    }
+                },
                 onViewOffers: { dto in
                     Task { @MainActor in
                         push(.listingOffers(listingId: dto.id, title: dto.title))

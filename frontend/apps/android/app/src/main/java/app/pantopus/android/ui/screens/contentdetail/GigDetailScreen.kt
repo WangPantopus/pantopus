@@ -35,7 +35,7 @@ import kotlin.coroutines.resume
 @Composable
 fun GigDetailScreen(
     onBack: () -> Unit = {},
-    onOpenMessages: () -> Unit = {},
+    onOpenMessages: (app.pantopus.android.data.api.models.gigs.GigDto) -> Unit = {},
     viewModel: GigDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -44,6 +44,10 @@ fun GigDetailScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(Unit) { viewModel.load() }
+
+    val openMessages: () -> Unit = {
+        viewModel.gigSnapshot()?.let { onOpenMessages(it) }
+    }
 
     LaunchedEffect(toastText) {
         if (toastText != null) {
@@ -69,9 +73,9 @@ fun GigDetailScreen(
                     bidId = null,
                 )
         },
-        onSecondaryAction = { onOpenMessages() },
+        onSecondaryAction = openMessages,
         onRetry = { viewModel.load() },
-        onMessageCounterparty = { onOpenMessages() },
+        onMessageCounterparty = openMessages,
     )
 
     val target = sheetTarget
