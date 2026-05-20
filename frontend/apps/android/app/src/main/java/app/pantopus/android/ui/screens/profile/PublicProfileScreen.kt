@@ -94,7 +94,7 @@ fun PublicProfileScreen(
     ) {
         when (val s = state) {
             PublicProfileUiState.Loading -> LoadingLayout(onBack = onBack)
-            is PublicProfileUiState.Error -> ErrorLayout(message = s.message, onRetry = { viewModel.refresh() })
+            is PublicProfileUiState.Error -> ErrorLayout(message = s.message, onRetry = { viewModel.refresh() }, onBack = onBack)
             is PublicProfileUiState.Loaded ->
                 PublicProfileLoadedFrame(
                     content = s.content,
@@ -312,12 +312,18 @@ internal fun LoadingLayout(onBack: () -> Unit) {
 internal fun ErrorLayout(
     message: String,
     onRetry: () -> Unit,
+    onBack: () -> Unit,
 ) {
-    EmptyState(
-        icon = PantopusIcon.AlertCircle,
-        headline = "Couldn't load this profile",
-        subcopy = message,
-        ctaTitle = "Try again",
-        onCta = onRetry,
-    )
+    // Mirror iOS: the error layout keeps a back chevron so a load failure
+    // is escapable from in-screen chrome (LoadingLayout already does this).
+    Column(modifier = Modifier.fillMaxSize()) {
+        ContentDetailTopBar(title = null, onBack = onBack, action = null)
+        EmptyState(
+            icon = PantopusIcon.AlertCircle,
+            headline = "Couldn't load this profile",
+            subcopy = message,
+            ctaTitle = "Try again",
+            onCta = onRetry,
+        )
+    }
 }
