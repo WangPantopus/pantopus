@@ -68,6 +68,7 @@ fun ChatConversationScreen(
     counterparty: ChatCounterparty,
     currentUserId: String,
     onBack: () -> Unit = {},
+    scrollToMessageId: String? = null,
     viewModel: ChatConversationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -75,9 +76,10 @@ fun ChatConversationScreen(
     val composerText by viewModel.composerText.collectAsStateWithLifecycle()
     val isSending by viewModel.isSending.collectAsStateWithLifecycle()
     val isCounterpartyTyping by viewModel.isCounterpartyTyping.collectAsStateWithLifecycle()
+    val pendingScroll by viewModel.pendingScrollTarget.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
-        viewModel.configure(mode, counterparty, currentUserId)
+        viewModel.configure(mode, counterparty, currentUserId, scrollToMessageId)
         viewModel.load()
     }
     DisposableEffect(Unit) {
@@ -107,6 +109,8 @@ fun ChatConversationScreen(
                         rows = s.rows,
                         onRetry = viewModel::retry,
                         onLoadOlder = viewModel::loadOlder,
+                        scrollToRowId = pendingScroll,
+                        onScrollConsumed = viewModel::consumePendingScroll,
                     )
                 is ChatConversationUiState.Error -> ErrorFrame(message = s.message, onRetry = viewModel::refresh)
             }
@@ -570,11 +574,25 @@ internal fun PopulatedFrame(
     rows: List<ChatTimelineRow>,
     onRetry: (String) -> Unit,
     onLoadOlder: () -> Unit,
+    scrollToRowId: String? = null,
+    onScrollConsumed: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(rows.size) {
         if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 100) {
             // No-op: keep position when new rows append at bottom.
+        }
+    }
+    // Chat Search deep-link: animate to the matched row once it lands in
+    // the list, then clear the target. The +1 offset skips the leading
+    // pagination spacer item. Compose honors the system "remove
+    // animations" setting, so this is instant under reduced motion.
+    LaunchedEffect(scrollToRowId, rows) {
+        val target = scrollToRowId ?: return@LaunchedEffect
+        val index = rows.indexOfFirst { it.rowId == target }
+        if (index >= 0) {
+            listState.animateScrollToItem(index + 1)
+            onScrollConsumed()
         }
     }
     LazyColumn(
