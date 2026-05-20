@@ -2309,7 +2309,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.navigate(ChildRoutes.gigDetail(gigId))
                         }
                     },
-                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Offer filters")) },
                     onBrowseListings = { navController.navigate(ChildRoutes.placeholder("Browse listings")) },
                     onPostTask = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
                 )
@@ -2323,7 +2322,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.navigate(ChildRoutes.gigDetail(gigId))
                         }
                     },
-                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Filter bids")) },
                     onBrowseTasks = { navController.navigate(ChildRoutes.GIGS_FEED) },
                     onMessageClient = { dto ->
                         // Push to gig detail; "Message poster" is wired there.
@@ -2340,7 +2338,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 MyTasksScreen(
                     onBack = { navController.popBackStack() },
                     onOpenTask = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
-                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Filter tasks")) },
                     onOpenBids = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
                     onEditTask = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
                     onMessageWorker = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
@@ -2363,7 +2360,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 MyPostsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenPost = { navController.navigate(ChildRoutes.placeholder("Post detail")) },
-                    onOpenFilters = { navController.navigate(ChildRoutes.placeholder("Filter posts")) },
                     onCompose = { navController.navigate(ChildRoutes.placeholder("Write a post")) },
                     onEditPost = { dto -> navController.navigate(ChildRoutes.editPost(dto.id)) },
                 )

@@ -65,6 +65,17 @@ sealed interface FilterControl {
         val selectedIds: Set<String>,
     ) : FilterControl
 
+    /**
+     * Horizontal flow of selectable pill chips. Single-select —
+     * `null` = "no selection". Reads as chips but only allows one value
+     * (e.g. a date-range preset).
+     */
+    @Immutable
+    data class SingleChip(
+        val options: List<FilterOption>,
+        val selectedId: String?,
+    ) : FilterControl
+
     /** Stack of rows, single selection only. `null` = "no selection". */
     @Immutable
     data class Radio(
@@ -94,6 +105,7 @@ sealed interface FilterControl {
 fun FilterControl.cleared(): FilterControl =
     when (this) {
         is FilterControl.ChipGroup -> copy(selectedIds = emptySet())
+        is FilterControl.SingleChip -> copy(selectedId = null)
         is FilterControl.Radio -> copy(selectedId = null)
         is FilterControl.MultiSelect -> copy(selectedIds = emptySet())
         is FilterControl.RangeSlider -> copy(range = range.cleared())

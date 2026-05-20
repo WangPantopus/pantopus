@@ -58,6 +58,16 @@ public struct MyBidsView: View {
                 )
                 .presentationDetents([.medium, .large])
             }
+            .sheet(isPresented: $bindable.isFilterPresented) {
+                ActivityFilterSheet(
+                    statusTitle: viewModel.statusFilterTitle,
+                    statusOptions: viewModel.statusFilterOptions,
+                    sortOptions: viewModel.sortFilterOptions,
+                    filter: viewModel.activityFilter,
+                    onApply: { viewModel.applyFilter($0) },
+                    onClose: { viewModel.isFilterPresented = false }
+                )
+            }
             .overlay(alignment: .bottom) { toastOverlay }
     }
 

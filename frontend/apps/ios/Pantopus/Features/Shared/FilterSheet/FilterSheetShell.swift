@@ -183,6 +183,18 @@ struct FilterSectionRow: View {
                     control: .chipGroup(options: options, selectedIds: ids)
                 ))
             }
+        case let .singleChip(options, selectedId):
+            FilterSingleChipControl(
+                sectionId: section.id,
+                options: options,
+                selectedId: selectedId
+            ) { id in
+                onUpdate(FilterSection(
+                    id: section.id,
+                    title: section.title,
+                    control: .singleChip(options: options, selectedId: id)
+                ))
+            }
         case let .radio(options, selectedId):
             FilterRadioControl(
                 sectionId: section.id,

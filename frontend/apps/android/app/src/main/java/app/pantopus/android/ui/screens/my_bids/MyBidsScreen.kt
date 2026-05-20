@@ -35,6 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.offers.BidDto
 import app.pantopus.android.data.api.models.offers.WithdrawBidReason
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivityFilterSheet
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -61,7 +62,6 @@ private const val TOAST_DISMISS_DELAY_MS = 2_500L
 fun MyBidsScreen(
     onBack: () -> Unit,
     onOpenBid: (BidDto) -> Unit,
-    onOpenFilters: () -> Unit = {},
     onBrowseTasks: () -> Unit = {},
     onMessageClient: (BidDto) -> Unit = {},
     viewModel: MyBidsViewModel = hiltViewModel(),
@@ -76,11 +76,12 @@ fun MyBidsScreen(
     val editBidTarget by viewModel.editBidTarget.collectAsStateWithLifecycle()
     val leaveReviewTarget by viewModel.leaveReviewTarget.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
+    val showFilterSheet by viewModel.showFilterSheet.collectAsStateWithLifecycle()
+    val activityFilter by viewModel.activityFilter.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.bindCallbacks(
             onOpenBid = onOpenBid,
-            onOpenFilters = onOpenFilters,
             onBrowseTasks = onBrowseTasks,
             onMessageClient = onMessageClient,
         )
@@ -129,6 +130,17 @@ fun MyBidsScreen(
         onCancel = { viewModel.cancelLeaveReview() },
         onSubmit = { draft -> viewModel.submitLeaveReview(draft) },
     )
+
+    if (showFilterSheet) {
+        ActivityFilterSheet(
+            statusTitle = viewModel.statusFilterTitle,
+            statusOptions = viewModel.statusFilterOptions,
+            sortOptions = viewModel.sortFilterOptions,
+            filter = activityFilter,
+            onApply = { viewModel.applyFilter(it) },
+            onDismiss = { viewModel.dismissFilterSheet() },
+        )
+    }
 }
 
 @Composable

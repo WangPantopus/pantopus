@@ -194,8 +194,37 @@ public final class OffersViewModel: ListOfRowsDataSource {
             icon: .filter,
             accessibilityLabel: "Filter offers"
         ) { [weak self] in
-            Task { @MainActor in self?.onOpenFilters() }
+            Task { @MainActor in self?.isFilterPresented = true }
         }
+    }
+
+    // MARK: - Activity filter (P5.4)
+
+    /// Bound to the view's `.sheet(isPresented:)` so the shared
+    /// `ActivityFilterSheet` presents over the list.
+    public var isFilterPresented = false
+
+    /// The applied status / sort / date-range selection. Default is the
+    /// "no filter" position.
+    public private(set) var activityFilter = ActivityFilter()
+
+    /// Section header for the status chips in the sheet.
+    public let statusFilterTitle = "Offer status"
+
+    /// Per-surface status chips (the three offer lifecycle buckets).
+    public let statusFilterOptions: [FilterOption] = [
+        FilterOption(id: "pending", label: "Pending"),
+        FilterOption(id: "accepted", label: "Accepted"),
+        FilterOption(id: "declined", label: "Declined")
+    ]
+
+    /// Offers carry an amount, so the full sort set (incl. value) applies.
+    public let sortFilterOptions = ActivitySortOrder.all
+
+    /// Store the applied filter and re-project the visible rows.
+    public func applyFilter(_ filter: ActivityFilter) {
+        activityFilter = filter
+        rebuild()
     }
 
     public private(set) var state: ListOfRowsState = .loading
@@ -204,7 +233,6 @@ public final class OffersViewModel: ListOfRowsDataSource {
 
     private let api: APIClient
     private let onOpenOfferDetail: @MainActor (BidDTO) -> Void
-    private let onOpenFilters: @MainActor () -> Void
     private let onBrowseListings: @MainActor () -> Void
     private let onPostTask: @MainActor () -> Void
     private let now: @Sendable () -> Date
@@ -218,14 +246,12 @@ public final class OffersViewModel: ListOfRowsDataSource {
     init(
         api: APIClient = .shared,
         onOpenOfferDetail: @escaping @MainActor (BidDTO) -> Void = { _ in },
-        onOpenFilters: @escaping @MainActor () -> Void = {},
         onBrowseListings: @escaping @MainActor () -> Void = {},
         onPostTask: @escaping @MainActor () -> Void = {},
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.api = api
         self.onOpenOfferDetail = onOpenOfferDetail
-        self.onOpenFilters = onOpenFilters
         self.onBrowseListings = onBrowseListings
         self.onPostTask = onPostTask
         self.now = now
@@ -297,13 +323,21 @@ public final class OffersViewModel: ListOfRowsDataSource {
 
     private func rebuild() {
         let items = selectedTab == OffersTab.sent ? sent : received
-        if items.isEmpty {
-            state = .empty(emptyContent(for: selectedTab))
-            return
-        }
         let perspective: OfferPerspective = selectedTab == OffersTab.sent ? .sent : .received
         let nowSnapshot = now()
-        let rows = items.map { dto in
+        let visible = activityFilter.apply(
+            to: items,
+            now: nowSnapshot,
+            statusId: { Self.statusFilterId(for: Self.derivedStatus(for: $0, now: nowSnapshot)) },
+            date: { Self.parseDate($0.createdAt) },
+            value: { $0.bidAmount }
+        )
+        if visible.isEmpty {
+            let isFiltered = activityFilter.isActive && !items.isEmpty
+            state = .empty(isFiltered ? filteredEmptyContent() : emptyContent(for: selectedTab))
+            return
+        }
+        let rows = visible.map { dto in
             Self.row(dto: dto, perspective: perspective, now: nowSnapshot) { [weak self] in
                 guard let self else { return }
                 Task { @MainActor in self.onOpenOfferDetail(dto) }
@@ -311,6 +345,28 @@ public final class OffersViewModel: ListOfRowsDataSource {
         }
         let section = RowSection(id: selectedTab, rows: rows)
         state = .loaded(sections: [section], hasMore: false)
+    }
+
+    /// Map a derived offer status onto one of the three filter chip ids.
+    public static func statusFilterId(for status: OfferStatus) -> String {
+        switch status {
+        case .new, .expiring, .countered, .pending: "pending"
+        case .accepted: "accepted"
+        case .declined, .withdrawn, .expired: "declined"
+        }
+    }
+
+    /// Empty state shown when an active filter hides every row in the tab.
+    private func filteredEmptyContent() -> ListOfRowsState.EmptyContent {
+        ListOfRowsState.EmptyContent(
+            icon: .filter,
+            headline: "No offers match your filters",
+            subcopy: "Try a different status, date range, or sort — or clear "
+                + "your filters to see everything in this tab.",
+            ctaTitle: "Clear filters"
+        ) { [weak self] in
+            Task { @MainActor in self?.applyFilter(ActivityFilter()) }
+        }
     }
 
     private func emptyContent(for tab: String) -> ListOfRowsState.EmptyContent {

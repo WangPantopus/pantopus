@@ -18,6 +18,9 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivityFilter
+import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivitySortOrder
+import app.pantopus.android.ui.screens.shared.filter_sheet.FilterOption
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsTab
@@ -93,7 +96,6 @@ class MyPostsViewModel
         private var nowProvider: () -> Instant = { Instant.now() }
 
         private var openPostHandler: (MyPostDto) -> Unit = {}
-        private var openFiltersHandler: () -> Unit = {}
         private var composeHandler: () -> Unit = {}
         private var editPostHandler: (MyPostDto) -> Unit = {}
 
@@ -111,10 +113,46 @@ class MyPostsViewModel
                 TopBarAction(
                     icon = PantopusIcon.Filter,
                     contentDescription = "Filter posts",
-                    onClick = { openFiltersHandler() },
+                    onClick = { openFilterSheet() },
                 ),
             )
         val topBarAction: StateFlow<TopBarAction?> = _topBarAction.asStateFlow()
+
+        // Activity filter (P5.4)
+        private val _showFilterSheet = MutableStateFlow(false)
+        val showFilterSheet: StateFlow<Boolean> = _showFilterSheet.asStateFlow()
+
+        private val _activityFilter = MutableStateFlow(ActivityFilter())
+        val activityFilter: StateFlow<ActivityFilter> = _activityFilter.asStateFlow()
+
+        /** Posts filter by intent, so the chips read as a post "Type". */
+        val statusFilterTitle = "Type"
+
+        /** Per-surface status chips — the post intents. */
+        val statusFilterOptions =
+            listOf(
+                PulseIntent.Ask,
+                PulseIntent.Recommend,
+                PulseIntent.Event,
+                PulseIntent.Lost,
+                PulseIntent.Announce,
+            ).map { FilterOption(id = intentFilterId(it), label = intentLabel(it)) }
+
+        /** Posts have no per-row value — only date ordering applies. */
+        val sortFilterOptions = ActivitySortOrder.TIME_ONLY
+
+        fun openFilterSheet() {
+            _showFilterSheet.value = true
+        }
+
+        fun dismissFilterSheet() {
+            _showFilterSheet.value = false
+        }
+
+        fun applyFilter(filter: ActivityFilter) {
+            _activityFilter.value = filter
+            applyState()
+        }
 
         private val _fab =
             MutableStateFlow<FabAction?>(
@@ -136,20 +174,12 @@ class MyPostsViewModel
         /** Wire navigation callbacks before [load]. Same shape as MyBids. */
         fun bindCallbacks(
             onOpenPost: (MyPostDto) -> Unit,
-            onOpenFilters: () -> Unit,
             onCompose: () -> Unit,
             onEditPost: (MyPostDto) -> Unit,
         ) {
             openPostHandler = onOpenPost
-            openFiltersHandler = onOpenFilters
             composeHandler = onCompose
             editPostHandler = onEditPost
-            _topBarAction.value =
-                TopBarAction(
-                    icon = PantopusIcon.Filter,
-                    contentDescription = "Filter posts",
-                    onClick = { openFiltersHandler() },
-                )
             _fab.value =
                 FabAction(
                     icon = PantopusIcon.Pencil,
@@ -226,18 +256,42 @@ class MyPostsViewModel
                     ListOfRowsTab(id = MyPostsTab.ARCHIVED, label = "Archived", count = counts.archived),
                 )
 
-            val filtered = projections.filter { it.tab == _selectedTab.value }
-            if (filtered.isEmpty()) {
-                _state.value = emptyStateFor(_selectedTab.value)
+            val tabItems = projections.filter { it.tab == _selectedTab.value }
+            val visible =
+                _activityFilter.value.apply(
+                    items = tabItems,
+                    now = now,
+                    statusId = { intentFilterId(PulseIntent.fromPostType(it.dto.postType)) },
+                    date = { parseInstant(it.dto.createdAt) },
+                    value = { null },
+                )
+            if (visible.isEmpty()) {
+                _state.value =
+                    if (_activityFilter.value.isActive && tabItems.isNotEmpty()) {
+                        filteredEmptyState()
+                    } else {
+                        emptyStateFor(_selectedTab.value)
+                    }
                 return
             }
-            val rows = filtered.map { row(it, now) }
+            val rows = visible.map { row(it, now) }
             _state.value =
                 ListOfRowsUiState.Loaded(
                     sections = listOf(RowSection(id = _selectedTab.value, rows = rows)),
                     hasMore = false,
                 )
         }
+
+        private fun filteredEmptyState(): ListOfRowsUiState.Empty =
+            ListOfRowsUiState.Empty(
+                icon = PantopusIcon.Filter,
+                headline = "No posts match your filters",
+                subcopy =
+                    "Try a different type, date range, or sort — or clear " +
+                        "your filters to see everything in this tab.",
+                ctaTitle = "Clear filters",
+                onCta = { applyFilter(ActivityFilter()) },
+            )
 
         private fun emptyStateFor(tab: String): ListOfRowsUiState.Empty =
             when (tab) {
@@ -454,6 +508,17 @@ class MyPostsViewModel
                             foreground = PantopusColors.appTextSecondary,
                         ),
                 )
+
+            /** Map a post intent onto its filter chip id. */
+            fun intentFilterId(intent: PulseIntent): String =
+                when (intent) {
+                    PulseIntent.All -> "all"
+                    PulseIntent.Ask -> "ask"
+                    PulseIntent.Recommend -> "recommend"
+                    PulseIntent.Event -> "event"
+                    PulseIntent.Lost -> "lost"
+                    PulseIntent.Announce -> "announce"
+                }
 
             /** Intent → display label per design (`Lost & Found` not `Lost`). */
             fun intentLabel(intent: PulseIntent): String =

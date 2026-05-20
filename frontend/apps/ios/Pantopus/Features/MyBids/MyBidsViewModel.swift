@@ -216,8 +216,38 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             accessibilityLabel: "Filter bids"
         ) { [weak self] in
             guard let self else { return }
-            Task { @MainActor in self.onOpenFilters() }
+            Task { @MainActor in self.isFilterPresented = true }
         }
+    }
+
+    // MARK: - Activity filter (P5.4)
+
+    /// Bound to the view's `.sheet(isPresented:)` so the shared
+    /// `ActivityFilterSheet` presents over the list.
+    public var isFilterPresented = false
+
+    /// The applied status / sort / date-range selection. Default is the
+    /// "no filter" position, so `rebuild()` keeps the unfiltered order.
+    public private(set) var activityFilter = ActivityFilter()
+
+    /// Section header for the status chips in the sheet.
+    public let statusFilterTitle = "Bid status"
+
+    /// Per-surface status chips (coarse bid lifecycle buckets).
+    public let statusFilterOptions: [FilterOption] = [
+        FilterOption(id: "pending", label: "Pending"),
+        FilterOption(id: "accepted", label: "Accepted"),
+        FilterOption(id: "declined", label: "Declined"),
+        FilterOption(id: "completed", label: "Completed")
+    ]
+
+    /// Bids carry an amount, so the full sort set (incl. value) applies.
+    public let sortFilterOptions = ActivitySortOrder.all
+
+    /// Store the applied filter and re-project the visible rows.
+    public func applyFilter(_ filter: ActivityFilter) {
+        activityFilter = filter
+        rebuild()
     }
 
     public var banner: BannerConfig? {
@@ -261,7 +291,6 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
 
     private let api: APIClient
     private let onOpenBid: @MainActor (BidDTO) -> Void
-    private let onOpenFilters: @MainActor () -> Void
     private let onBrowseTasks: @MainActor () -> Void
     private let onMessageClient: @MainActor (BidDTO) -> Void
     private let now: @Sendable () -> Date
@@ -284,14 +313,12 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
     init(
         api: APIClient = .shared,
         onOpenBid: @escaping @MainActor (BidDTO) -> Void = { _ in },
-        onOpenFilters: @escaping @MainActor () -> Void = {},
         onBrowseTasks: @escaping @MainActor () -> Void = {},
         onMessageClient: @escaping @MainActor (BidDTO) -> Void = { _ in },
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.api = api
         self.onOpenBid = onOpenBid
-        self.onOpenFilters = onOpenFilters
         self.onBrowseTasks = onBrowseTasks
         self.onMessageClient = onMessageClient
         self.now = now
@@ -344,12 +371,20 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
 
         counts = Self.tabCounts(for: projections, now: nowSnapshot)
 
-        let filtered = projections.filter { $0.tab == selectedTab }
-        if filtered.isEmpty {
-            state = .empty(emptyContent(for: selectedTab))
+        let tabItems = projections.filter { $0.tab == selectedTab }
+        let visible = activityFilter.apply(
+            to: tabItems,
+            now: nowSnapshot,
+            statusId: { Self.statusFilterId(for: $0.status) },
+            date: { Self.parseDate($0.dto.createdAt) },
+            value: { $0.dto.bidAmount }
+        )
+        if visible.isEmpty {
+            let isFiltered = activityFilter.isActive && !tabItems.isEmpty
+            state = .empty(isFiltered ? filteredEmptyContent() : emptyContent(for: selectedTab))
             return
         }
-        let rows = filtered.map { proj in
+        let rows = visible.map { proj in
             Self.row(
                 projection: proj,
                 now: nowSnapshot,
@@ -357,6 +392,29 @@ public final class MyBidsViewModel: ListOfRowsDataSource {
             )
         }
         state = .loaded(sections: [RowSection(id: selectedTab, rows: rows)], hasMore: false)
+    }
+
+    /// Map a derived bid status onto one of the four filter chip ids.
+    public static func statusFilterId(for status: MyBidsStatus) -> String {
+        switch status {
+        case .topBid, .shortlisted, .pending, .outbid, .expiring: "pending"
+        case .accepted, .scheduled: "accepted"
+        case .notSelected, .taskCancelled: "declined"
+        case .paid, .leaveReview: "completed"
+        }
+    }
+
+    /// Empty state shown when an active filter hides every row in the tab.
+    private func filteredEmptyContent() -> ListOfRowsState.EmptyContent {
+        ListOfRowsState.EmptyContent(
+            icon: .filter,
+            headline: "No bids match your filters",
+            subcopy: "Try a different status, date range, or sort — or clear "
+                + "your filters to see everything in this tab.",
+            ctaTitle: "Clear filters"
+        ) { [weak self] in
+            Task { @MainActor in self?.applyFilter(ActivityFilter()) }
+        }
     }
 
     /// Build the bundled [RowCallbacks] for a given bid — each handler
