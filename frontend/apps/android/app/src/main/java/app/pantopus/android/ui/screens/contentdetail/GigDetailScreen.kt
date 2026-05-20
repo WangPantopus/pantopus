@@ -4,18 +4,11 @@
 package app.pantopus.android.ui.screens.contentdetail
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -27,15 +20,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.screens.my_bids.EditBidSheetContent
+import app.pantopus.android.ui.screens.my_bids.EditBidSheetTarget
 import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusTextStyle
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 @Composable
 fun GigDetailScreen(
@@ -44,94 +39,89 @@ fun GigDetailScreen(
     viewModel: GigDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var sheetVisible by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
+    var sheetTarget by remember { mutableStateOf<EditBidSheetTarget?>(null) }
+    var toastText by remember { mutableStateOf<String?>(null) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(Unit) { viewModel.load() }
+
+    LaunchedEffect(toastText) {
+        if (toastText != null) {
+            kotlinx.coroutines.delay(2_500)
+            toastText = null
+        }
+    }
 
     ContentDetailShell(
         state = state,
         onBack = onBack,
-        onPrimaryAction = { sheetVisible = true },
+        onPrimaryAction = {
+            val gig = (state as? ContentDetailUiState.Loaded)?.content?.hero
+            // Pull the gig identifiers off the loaded state. The VM keeps
+            // the gig id internally; we look it up here for the sheet
+            // header copy. When the state isn't loaded yet, the dock CTA
+            // is hidden so we never reach this branch in practice.
+            sheetTarget =
+                EditBidSheetTarget(
+                    id = "new-bid",
+                    gigId = viewModel.currentGigId(),
+                    gigTitle = gig?.title ?: "this task",
+                    bidId = null,
+                )
+        },
         onSecondaryAction = { onOpenMessages() },
         onRetry = { viewModel.load() },
         onMessageCounterparty = { onOpenMessages() },
     )
 
-    if (sheetVisible) {
+    val target = sheetTarget
+    if (target != null) {
         ModalBottomSheet(
-            onDismissRequest = { sheetVisible = false },
+            onDismissRequest = { sheetTarget = null },
             sheetState = sheetState,
         ) {
-            BidSheetContent(
-                onSubmit = { amount, message ->
-                    viewModel.placeBid(amount, message) { ok ->
-                        if (ok) sheetVisible = false
+            EditBidSheetContent(
+                target = target,
+                onSubmit = { draft ->
+                    val ok =
+                        suspendCancellableCoroutine<Boolean> { cont ->
+                            viewModel.placeBid(
+                                amount = draft.amount,
+                                message = draft.message,
+                                proposedTime = draft.proposedTime,
+                            ) { result -> cont.resume(result) }
+                        }
+                    if (ok) {
+                        sheetTarget = null
+                        toastText = "Bid submitted."
                     }
+                    ok
                 },
+                onCancel = { sheetTarget = null },
             )
         }
     }
-}
 
-@Composable
-private fun BidSheetContent(onSubmit: (Double, String?) -> Unit) {
-    var amountField by remember { mutableStateOf(TextFieldValue("")) }
-    var messageField by remember { mutableStateOf(TextFieldValue("")) }
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = "Place a bid",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = PantopusColors.appText,
-        )
-        Text(
-            text = "Tell the poster what you'd charge and add a short message about your approach.",
-            fontSize = 13.sp,
-            color = PantopusColors.appTextSecondary,
-        )
-        OutlinedTextField(
-            value = amountField,
-            onValueChange = { amountField = it },
-            label = { Text("Amount") },
-            singleLine = true,
-            visualTransformation = VisualTransformation.None,
-            keyboardOptions =
-                androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = messageField,
-            onValueChange = { messageField = it },
-            label = { Text("Message (optional)") },
-            minLines = 2,
-            maxLines = 4,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        val amount = amountField.text.toDoubleOrNull()
+    toastText?.let { text ->
         Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (amount != null && amount > 0) PantopusColors.primary600 else PantopusColors.appBorder)
-                    .clickable(enabled = amount != null && amount > 0) {
-                        amount?.let { onSubmit(it, messageField.text.takeIf { msg -> msg.isNotEmpty() }) }
-                    }
-                    .heightIn(min = 48.dp),
-            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.BottomCenter,
         ) {
-            Text(
-                text = "Submit bid",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appTextInverse,
-            )
+            Box(
+                modifier =
+                    Modifier
+                        .padding(Spacing.s4)
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(PantopusColors.success)
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                        .testTag("gig-detail-toast"),
+            ) {
+                Text(
+                    text = text,
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.appTextInverse,
+                )
+            }
         }
-        Spacer(modifier = Modifier.height(20.dp))
     }
 }

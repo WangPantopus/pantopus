@@ -2231,18 +2231,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.navigate(ChildRoutes.gigDetail(gigId))
                         }
                     },
-                    onEditBid = { dto ->
-                        val gigId = dto.gigId ?: dto.gig?.id
-                        if (!gigId.isNullOrBlank()) {
-                            navController.navigate(ChildRoutes.gigDetail(gigId))
-                        }
-                    },
-                    onLeaveReview = { dto ->
-                        val gigId = dto.gigId ?: dto.gig?.id
-                        if (!gigId.isNullOrBlank()) {
-                            navController.navigate(ChildRoutes.gigDetail(gigId))
-                        }
-                    },
+                    // Edit-bid + Leave-review are presented as sheets from
+                    // inside the screen (P3.4) — no router wiring needed.
                 )
             }
             composable(ChildRoutes.MY_TASKS) {

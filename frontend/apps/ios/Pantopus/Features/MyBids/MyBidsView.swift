@@ -5,10 +5,10 @@
 //  T5.3.1 — My bids. Thin wrapper around the shared `ListOfRowsView`.
 //  The shell renders the back chevron, centered title, trailing
 //  "filter" action, four tabs, banner, row cards (with footers), and
-//  the extended-pill "Browse tasks" FAB. The only screen-bespoke piece
-//  is the withdraw confirmation sheet attached at the bottom — the
-//  ViewModel hands it a target via `withdrawTarget` and the sheet
-//  picks a reason before calling back into the VM.
+//  the extended-pill "Browse tasks" FAB. The screen-bespoke pieces
+//  attached at the bottom — the withdraw confirmation sheet, the
+//  P3.4 Edit Bid sheet, and the P3.4 Leave Review sheet — are driven
+//  by the VM's `…Target` bindings.
 //
 
 import SwiftUI
@@ -21,9 +21,10 @@ public struct MyBidsView: View {
     }
 
     public var body: some View {
-        // Local @Bindable wrapper so we can hand a `Binding<WithdrawSheetTarget?>`
-        // to `.sheet(item:)`. `@State` + `@Observable` doesn't expose a `$`-binding
-        // for nested properties directly — this is the canonical SwiftUI 5 pattern.
+        // Local @Bindable wrapper so we can hand `Binding<…Target?>`
+        // values to `.sheet(item:)`. `@State` + `@Observable` doesn't
+        // expose a `$`-binding for nested properties directly — this
+        // is the canonical SwiftUI 5 pattern.
         @Bindable var bindable = viewModel
         return ListOfRowsView(dataSource: viewModel)
             .accessibilityIdentifier("my-bids")
@@ -37,6 +38,40 @@ public struct MyBidsView: View {
                 )
                 .presentationDetents([.medium])
             }
+            .sheet(item: $bindable.editBidTarget) { target in
+                EditBidSheetView(
+                    target: target,
+                    onSubmit: { draft in
+                        await viewModel.submitEditBid(draft)
+                    },
+                    onCancel: { viewModel.cancelEditBid() }
+                )
+                .presentationDetents([.large])
+            }
+            .sheet(item: $bindable.leaveReviewTarget) { target in
+                LeaveReviewSheetView(
+                    target: target,
+                    onSubmit: { draft in
+                        await viewModel.submitLeaveReview(draft)
+                    },
+                    onCancel: { viewModel.cancelLeaveReview() }
+                )
+                .presentationDetents([.medium, .large])
+            }
+            .overlay(alignment: .bottom) { toastOverlay }
+    }
+
+    @ViewBuilder private var toastOverlay: some View {
+        if let toast = viewModel.toast {
+            ToastView(message: toast)
+                .padding(.bottom, Spacing.s8)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .task(id: toast) {
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    viewModel.toast = nil
+                }
+                .accessibilityIdentifier("my-bids-toast")
+        }
     }
 }
 
