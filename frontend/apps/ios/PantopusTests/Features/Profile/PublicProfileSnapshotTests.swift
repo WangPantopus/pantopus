@@ -113,8 +113,8 @@ final class PublicProfileSnapshotTests: XCTestCase {
 
     // MARK: - Render helper
 
-    private func assertRenders<V: View>(
-        _ view: V,
+    private func assertRenders(
+        _ view: some View,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
@@ -165,15 +165,14 @@ private struct LoadedFixtureView: View {
                     )
                     PublicProfilePostsFeed(
                         kind: content.kind,
-                        posts: content.posts,
-                        onUnlock: { _ in }
-                    )
+                        posts: content.posts
+                    ) { _ in }
                 }
             },
             cta: {
                 switch content.kind {
                 case .persona:
-                    ActionRowCTA(kind: .persona(followState: followState, onFollow: {}))
+                    ActionRowCTA(kind: .persona(followState: followState) {})
                 case .local:
                     ActionRowCTA(kind: .local(
                         messageState: .idle,

@@ -124,9 +124,8 @@ public struct PublicProfileView: View {
                     )
                     PublicProfilePostsFeed(
                         kind: payload.kind,
-                        posts: payload.posts,
-                        onUnlock: { _ in viewModel.toastMessage = "Subscribe flow coming soon" }
-                    )
+                        posts: payload.posts
+                    ) { _ in viewModel.toastMessage = "Subscribe flow coming soon" }
                 }
             },
             cta: { stickyFooter(for: payload) }
@@ -137,10 +136,9 @@ public struct PublicProfileView: View {
     private func stickyFooter(for payload: PublicProfileContent) -> some View {
         switch payload.kind {
         case .persona:
-            ActionRowCTA(kind: .persona(
-                followState: viewModel.followState,
-                onFollow: { Task { await viewModel.follow() } }
-            ))
+            ActionRowCTA(kind: .persona(followState: viewModel.followState) {
+                Task { await viewModel.follow() }
+            })
         case .local:
             ActionRowCTA(kind: .local(
                 messageState: .idle,

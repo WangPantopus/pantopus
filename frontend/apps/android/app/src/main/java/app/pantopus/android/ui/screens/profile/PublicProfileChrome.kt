@@ -209,7 +209,7 @@ private fun unlockTierLabel(visibility: PublicProfilePost.Visibility?): String =
 
 @Composable
 private fun VisibilityChip(visibility: PublicProfilePost.Visibility) {
-    val (label, icon, fg, bg) =
+    val spec =
         when (visibility) {
             PublicProfilePost.Visibility.Free ->
                 VisibilityChipSpec("FREE", PantopusIcon.Globe, PantopusColors.success, PantopusColors.successBg)
@@ -224,13 +224,13 @@ private fun VisibilityChip(visibility: PublicProfilePost.Visibility) {
         modifier =
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
-                .background(bg)
+                .background(spec.bg)
                 .padding(horizontal = Spacing.s2, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 10.dp, tint = fg)
-        Text(text = label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = fg)
+        PantopusIconImage(icon = spec.icon, contentDescription = null, size = 10.dp, tint = spec.fg)
+        Text(text = spec.label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = spec.fg)
     }
 }
 
@@ -295,7 +295,7 @@ private fun LocalMetaRow(post: PublicProfilePost) {
 
 @Composable
 private fun IntentChip(intent: PublicProfilePost.Intent) {
-    val (label, icon, fg, bg) =
+    val spec =
         when (intent) {
             PublicProfilePost.Intent.Offer ->
                 IntentChipSpec("OFFER", PantopusIcon.Hand, PantopusColors.home, PantopusColors.homeBg)
@@ -310,13 +310,13 @@ private fun IntentChip(intent: PublicProfilePost.Intent) {
         modifier =
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
-                .background(bg)
+                .background(spec.bg)
                 .padding(horizontal = Spacing.s2, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 10.dp, tint = fg)
-        Text(text = label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = fg)
+        PantopusIconImage(icon = spec.icon, contentDescription = null, size = 10.dp, tint = spec.fg)
+        Text(text = spec.label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = spec.fg)
     }
 }
 
