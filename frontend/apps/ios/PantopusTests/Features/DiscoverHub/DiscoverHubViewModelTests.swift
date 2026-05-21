@@ -180,9 +180,16 @@ final class DiscoverHubViewModelTests: XCTestCase {
 
     private func makeVM(
         onSelect: @escaping @MainActor (DiscoverHubTarget) -> Void = { _ in },
-        api: APIClient? = nil
+        api: APIClient? = nil,
+        onOpenMap: @escaping @MainActor () -> Void = {}
     ) -> DiscoverHubViewModel {
-        DiscoverHubViewModel(api: api ?? makeAPI(), onSelect: onSelect)
+        DiscoverHubViewModel(api: api ?? makeAPI(), onSelect: onSelect, onOpenMap: onOpenMap)
+    }
+
+    private func makeOpenMapVM(
+        onOpenMap: @escaping @MainActor () -> Void
+    ) -> DiscoverHubViewModel {
+        DiscoverHubViewModel(api: makeAPI(), onOpenMap: onOpenMap)
     }
 
     private func stubAll(
@@ -468,9 +475,24 @@ final class DiscoverHubViewModelTests: XCTestCase {
         XCTAssertEqual(chip.selectedId, DiscoverHubChip.nearby)
     }
 
-    func testNoFAB() {
-        let vm = makeVM()
-        XCTAssertNil(vm.fab)
+    @MainActor
+    func testOpenMapFABNavigatesToExploreMap() {
+        var didOpenMap = false
+        let vm = makeOpenMapVM {
+            didOpenMap = true
+        }
+
+        let fab = vm.fab
+        XCTAssertEqual(fab?.icon, .map)
+        XCTAssertEqual(fab?.accessibilityLabel, "Open map")
+        if case let .extendedNav(label) = fab?.variant {
+            XCTAssertEqual(label, "Open map")
+        } else {
+            XCTFail("DiscoverHub FAB should use the extended navigation variant.")
+        }
+
+        fab?.handler()
+        XCTAssertTrue(didOpenMap)
     }
 
     func testNoTabs() {

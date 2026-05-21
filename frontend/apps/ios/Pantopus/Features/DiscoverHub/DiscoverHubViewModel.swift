@@ -35,7 +35,7 @@
 //      follow-up if list latency becomes a concern.
 //
 
-// swiftlint:disable type_body_length
+// swiftlint:disable type_body_length file_length
 
 import Foundation
 import Observation
@@ -125,7 +125,16 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
     }
 
     public var fab: FABAction? {
-        nil
+        // A11.2 — "Open map" entry point into the Explore map. Uses the
+        // navigation FAB variant ("go elsewhere", not "create").
+        FABAction(
+            icon: .map,
+            accessibilityLabel: "Open map",
+            variant: .extendedNav(label: "Open map"),
+            tint: .sky
+        ) { [weak self] in
+            MainActor.assumeIsolated { self?.onOpenMap() }
+        }
     }
 
     public private(set) var state: ListOfRowsState = .loading
@@ -163,6 +172,8 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
 
     private let api: APIClient
     private let onSelect: @MainActor (DiscoverHubTarget) -> Void
+    /// A11.2 — invoked by the "Open map" FAB to push the Explore map.
+    private let onOpenMap: @MainActor () -> Void
     private let perTypeLimit: Int
 
     private var people: [HubDiscoveryResponse.Item] = []
@@ -174,11 +185,13 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
     init(
         api: APIClient = .shared,
         perTypeLimit: Int = 5,
-        onSelect: @escaping @MainActor (DiscoverHubTarget) -> Void = { _ in }
+        onSelect: @escaping @MainActor (DiscoverHubTarget) -> Void = { _ in },
+        onOpenMap: @escaping @MainActor () -> Void = {}
     ) {
         self.api = api
         self.perTypeLimit = perTypeLimit
         self.onSelect = onSelect
+        self.onOpenMap = onOpenMap
     }
 
     // MARK: - ListOfRowsDataSource
