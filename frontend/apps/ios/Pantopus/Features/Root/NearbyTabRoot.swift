@@ -25,6 +25,8 @@ public enum NearbyRoute: Hashable {
 /// NavigationStack wrapper for the Nearby tab.
 public struct NearbyTabRoot: View {
     @State private var path: [NearbyRoute] = []
+    /// P6.6 — share system sheet driven by "Share listing".
+    @State private var systemSheet: SystemSheetRequest?
 
     public init() {}
 
@@ -48,6 +50,7 @@ public struct NearbyTabRoot: View {
                     .toolbar(.hidden, for: .navigationBar)
             }
         }
+        .sheet(item: $systemSheet) { request in request.makeView() }
     }
 
     @ViewBuilder
@@ -83,7 +86,10 @@ public struct NearbyTabRoot: View {
                     listingId: listingId,
                     listingTitleHint: titleHint,
                     onShareListing: {
-                        Task { @MainActor in path.append(.placeholder(label: "Share listing")) }
+                        let name = titleHint ?? "this listing"
+                        systemSheet = .share(
+                            items: ["Check out \(name) on Pantopus — \(InviteLinks.downloadURLString)"]
+                        )
                     },
                     onOpenBuyer: { _ in
                         Task { @MainActor in path.append(.placeholder(label: "Buyer profile")) }

@@ -150,7 +150,7 @@ extension AddEventFormViewModel {
 
     /// Same heuristic as the agenda row: midnight + nil end → all-day.
     static func isAllDayHeuristic(start: Date, end: Date?, endIso: String?) -> Bool {
-        let cal = Calendar.current
+        let cal = utcCalendar()
         let parts = cal.dateComponents([.hour, .minute, .second], from: start)
         let startIsMidnight = (parts.hour ?? 0) == 0 && (parts.minute ?? 0) == 0 && (parts.second ?? 0) == 0
         return startIsMidnight && end == nil && endIso == nil
@@ -162,11 +162,19 @@ extension AddEventFormViewModel {
         let fmt = ISO8601DateFormatter()
         fmt.formatOptions = [.withInternetDateTime]
         let stamp: Date = if allDay {
-            Calendar.current.startOfDay(for: date)
+            utcCalendar().startOfDay(for: date)
         } else {
             date
         }
         return fmt.string(from: stamp)
+    }
+
+    private static func utcCalendar() -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        if let utc = TimeZone(secondsFromGMT: 0) {
+            calendar.timeZone = utc
+        }
+        return calendar
     }
 
     static func parseIsoInstant(_ iso: String) -> Date? {

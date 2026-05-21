@@ -64,6 +64,9 @@ public enum YouRoute: Hashable {
     /// T6.3f / P14 — My businesses (avatar-first roster). The
     /// "me.businesses" Activity-section row pushes here.
     case myBusinesses
+    /// P6.6 — "Register a business · coming soon" waitlist surface. The
+    /// full registration wizard is a future Phase 9 item.
+    case businessWaitlist
     /// T6.3f / P14 — Home dashboard for a specific home, reached from
     /// the My homes row tap inside the You stack.
     case homeDashboard(homeId: String)
@@ -227,6 +230,10 @@ public struct YouTabRoot: View {
     @State private var path: [YouRoute] = []
     @State private var showsSignOutConfirm = false
     @State private var showsEditProfile = false
+    /// P6.6 — share system sheet driven by "Share train".
+    @State private var systemSheet: SystemSheetRequest?
+    /// P6.6 — "Find people" → contacts picker → invite share.
+    @State private var showFindPeople = false
     #if DEBUG
     @State private var debugProfileSheet = false
     @State private var debugPostSheet = false
@@ -249,6 +256,13 @@ public struct YouTabRoot: View {
     private var currentUserId: String? {
         if case let .signedIn(user) = auth.state { return user.id }
         return nil
+    }
+
+    /// Current user's handle — used to open the public-profile setup
+    /// (privacy handshake) for "Set up Public Profile".
+    private var currentUserHandle: String {
+        if case let .signedIn(user) = auth.state { return user.username }
+        return ""
     }
 
     public init() {}
@@ -279,6 +293,8 @@ public struct YouTabRoot: View {
             .sheet(isPresented: $showsEditProfile) {
                 EditProfileView()
             }
+            .sheet(item: $systemSheet) { request in request.makeView() }
+            .findPeopleSheet(isPresented: $showFindPeople)
             .overlay(alignment: .topLeading) { debugTapTarget }
             #if DEBUG
                 .alert("Open profile", isPresented: $debugProfileSheet) {
@@ -792,9 +808,10 @@ public struct YouTabRoot: View {
                     listingId: listingId,
                     listingTitleHint: titleHint,
                     onShareListing: {
-                        Task { @MainActor in
-                            path.append(.placeholder(label: "Share listing"))
-                        }
+                        let name = titleHint ?? "this listing"
+                        systemSheet = .share(
+                            items: ["Check out \(name) on Pantopus — \(InviteLinks.downloadURLString)"]
+                        )
                     },
                     onOpenBuyer: { _ in
                         Task { @MainActor in
@@ -916,9 +933,7 @@ public struct YouTabRoot: View {
                             )))
                         }
                     },
-                    onFindPeople: {
-                        Task { @MainActor in path.append(.placeholder(label: "Find people")) }
-                    }
+                    onFindPeople: { showFindPeople = true }
                 )
             )
         case .supportTrains:
@@ -963,7 +978,9 @@ public struct YouTabRoot: View {
                 viewModel: ReviewSignupsViewModel(
                     supportTrainId: supportTrainId,
                     onShareTrain: {
-                        Task { @MainActor in path.append(.placeholder(label: "Share train")) }
+                        systemSheet = .share(
+                            items: ["Join my support train on Pantopus — \(InviteLinks.downloadURLString)"]
+                        )
                     },
                     onConfirm: { _ in
                         // POST `/api/support-trains/:id/reservations/:id/confirm`
@@ -1010,7 +1027,7 @@ public struct YouTabRoot: View {
                     }
                 },
                 onOpenSetup: {
-                    Task { @MainActor in path.append(.placeholder(label: "Audience setup")) }
+                    Task { @MainActor in path.append(.privacyHandshake(personaHandle: currentUserHandle)) }
                 },
                 onOpenCreatorInbox: {
                     Task { @MainActor in path.append(.creatorInbox) }
@@ -1167,16 +1184,6 @@ public struct YouTabRoot: View {
                     onAdd: {
                         Task { @MainActor in
                             path.append(.addEmergencyInfo(homeId: homeId))
-                        }
-                    },
-                    onShare: {
-                        Task { @MainActor in
-                            path.append(.placeholder(label: "Share emergency info"))
-                        }
-                    },
-                    onPrintCard: {
-                        Task { @MainActor in
-                            path.append(.placeholder(label: "Print emergency card"))
                         }
                     }
                 )
@@ -1408,10 +1415,12 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.placeholder(label: "Business dashboard")) }
                     },
                     onRegister: {
-                        Task { @MainActor in path.append(.placeholder(label: "Register a business")) }
+                        Task { @MainActor in path.append(.businessWaitlist) }
                     }
                 )
             )
+        case .businessWaitlist:
+            BusinessWaitlistView { if !path.isEmpty { path.removeLast() } }
         case let .homeDashboard(homeId):
             HomeDashboardView(
                 homeId: homeId,

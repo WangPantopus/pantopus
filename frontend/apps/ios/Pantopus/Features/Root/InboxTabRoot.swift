@@ -13,7 +13,6 @@ import SwiftUI
 public enum InboxRoute: Hashable {
     case conversation(InboxConversationDestination)
     case compose
-    case invite
     case search
 }
 
@@ -58,6 +57,9 @@ public struct InboxConversationDestination: Hashable, Sendable {
 public struct InboxTabRoot: View {
     @Environment(AuthManager.self) private var auth
     @State private var path: [InboxRoute] = []
+    /// P6.6 — "Invite to Pantopus" opens the system share sheet with the
+    /// store link prefilled.
+    @State private var systemSheet: SystemSheetRequest?
 
     public init() {}
 
@@ -76,6 +78,7 @@ public struct InboxTabRoot: View {
                     .toolbar(.hidden, for: .navigationBar)
             }
         }
+        .sheet(item: $systemSheet) { request in request.makeView() }
     }
 
     private var currentUserId: String {
@@ -143,11 +146,9 @@ public struct InboxTabRoot: View {
                         )))
                     },
                     onCancel: { if !path.isEmpty { path.removeLast() } },
-                    onInvite: { path.append(.invite) }
+                    onInvite: { systemSheet = .share(items: InviteLinks.shareItems) }
                 )
             )
-        case .invite:
-            NotYetAvailableView(tabName: "Invite to Pantopus", icon: .userPlus)
         case .search:
             ChatSearchView(
                 viewModel: ChatSearchViewModel(
