@@ -215,6 +215,8 @@ class IconTest {
             "door-open",
             "car",
             "warehouse",
+            // A15.3 — AI Assistant avatar/reply glyph.
+            "bot",
         )
 
     @Test

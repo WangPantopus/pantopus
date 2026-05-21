@@ -10,6 +10,7 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.chats.ChatRepository
 import app.pantopus.android.data.realtime.SocketManager
+import app.pantopus.android.ui.theme.PantopusIcon
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -113,6 +114,28 @@ class ChatConversationViewModelTest {
             )
             vm.load()
             assertTrue(vm.state.value is ChatConversationUiState.Empty)
+        }
+
+    @Test fun send_capability_prompt_starts_ai_thread_with_user_bubble() =
+        runTest {
+            val vm = ChatConversationViewModel(repo, socket)
+            vm.configure(
+                mode = ChatThreadMode.Ai,
+                counterparty = counterpartyAi,
+                currentUserId = "u_me",
+            )
+            vm.load()
+            assertTrue(vm.state.value is ChatConversationUiState.Empty)
+            vm.sendCapabilityPrompt(ChatPromptChip("price", "Price a task", PantopusIcon.Hammer))
+            val loaded = vm.state.value as ChatConversationUiState.Loaded
+            val outgoing =
+                loaded.rows
+                    .filterIsInstance<ChatTimelineRow.Bubble>()
+                    .firstOrNull { it.content.side == ChatMessageSide.Outgoing }
+            assertNotNull(outgoing)
+            val body = outgoing!!.content.body
+            assertTrue(body is ChatBubbleBody.Text)
+            assertEquals("Price a task", (body as ChatBubbleBody.Text).text)
         }
 
     @Test fun send_failure_marks_optimistic_bubble_as_failed() =

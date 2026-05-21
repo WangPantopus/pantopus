@@ -27,6 +27,9 @@ public struct InboxConversationDestination: Hashable, Sendable {
     }
 
     public let mode: Mode
+    /// Presentation mode for the conversation chrome. `.aiAssistant` for
+    /// the Ask Pantopus thread; `.dm` for human DMs/groups.
+    public let kind: ChatConversationMode
     public let displayName: String
     public let initials: String
     public let identityKind: String?
@@ -38,6 +41,7 @@ public struct InboxConversationDestination: Hashable, Sendable {
 
     public init(
         mode: Mode,
+        kind: ChatConversationMode = .dm,
         displayName: String,
         initials: String,
         identityKind: String?,
@@ -45,6 +49,7 @@ public struct InboxConversationDestination: Hashable, Sendable {
         scrollToMessageId: String? = nil
     ) {
         self.mode = mode
+        self.kind = kind
         self.displayName = displayName
         self.initials = initials
         self.identityKind = identityKind
@@ -92,8 +97,10 @@ public struct InboxTabRoot: View {
         case .group: .room(id: row.id)
         case .dm: .person(otherUserId: row.id)
         }
+        let kind: ChatConversationMode = row.variant == .aiAssistant ? .aiAssistant : .dm
         return InboxConversationDestination(
             mode: mode,
+            kind: kind,
             displayName: row.displayName,
             initials: row.initials,
             identityKind: row.identityChip.map { $0 == .business ? "business" : "home" },
@@ -126,7 +133,8 @@ public struct InboxTabRoot: View {
                     counterparty: Self.counterparty(for: dest),
                     currentUserId: currentUserId,
                     scrollToMessageId: dest.scrollToMessageId
-                )
+                ),
+                mode: dest.kind
             ) { if !path.isEmpty { path.removeLast() } }
         case .compose:
             NewMessageView(

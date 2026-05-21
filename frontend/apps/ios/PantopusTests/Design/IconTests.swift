@@ -70,7 +70,9 @@ final class IconTests: XCTestCase {
         // A10.3 Today detail — weather and signal glyphs from today-frames.jsx.
         "sun-dim", "flower", "snowflake", "wind", "bus", "droplets",
         // A13.1 Add Guest — allowed-area chips.
-        "door-open", "car", "warehouse"
+        "door-open", "car", "warehouse",
+        // A15.3 AI Assistant — avatar/reply glyph.
+        "bot"
     ]
 
     func testInventoryMatches() {

@@ -35,6 +35,7 @@ fun ChatConversationHost(
     mode: ChatThreadMode,
     counterparty: ChatCounterparty,
     onBack: () -> Unit,
+    conversationMode: ChatConversationMode = ChatConversationMode.Dm,
     scrollToMessageId: String? = null,
     authViewModel: ChatConversationHostViewModel = hiltViewModel(),
 ) {
@@ -44,6 +45,7 @@ fun ChatConversationHost(
         mode = mode,
         counterparty = counterparty,
         currentUserId = currentUserId,
+        conversationMode = conversationMode,
         scrollToMessageId = scrollToMessageId,
         onBack = onBack,
     )

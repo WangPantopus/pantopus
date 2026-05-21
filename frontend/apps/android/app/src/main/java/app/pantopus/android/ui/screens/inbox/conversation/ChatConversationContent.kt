@@ -5,6 +5,15 @@ package app.pantopus.android.ui.screens.inbox.conversation
 import androidx.compose.runtime.Immutable
 import app.pantopus.android.ui.theme.PantopusIcon
 
+/**
+ * Presentation mode for the conversation surface. Orthogonal to
+ * [ChatCounterparty] (who you're talking to) — `mode` drives the chrome
+ * (avatar treatment, empty/welcome state, bubble shapes). [Dm] is the
+ * default human DM/group thread; [AiAssistant] is the Pantopus AI thread;
+ * [CreatorThread] / [FanThread] land in Wave D.
+ */
+enum class ChatConversationMode { Dm, AiAssistant, CreatorThread, FanThread }
+
 /** Counterparty type — drives the header swap + empty-state copy. */
 sealed interface ChatCounterparty {
     val displayName: String
@@ -42,6 +51,17 @@ enum class ChatDeliveryState { Sending, Failed, Delivered, Read }
 
 enum class ChatSystemLinkAccent { Primary, Success, Warning, Error }
 
+/**
+ * Inline "this would cost about $X" estimate rendered inside an AI reply
+ * bubble (`AiEstimateCard`).
+ */
+@Immutable
+data class ChatEstimate(
+    val amount: String,
+    val basis: String,
+    val confidence: String,
+)
+
 /** Body of a single bubble. */
 sealed interface ChatBubbleBody {
     data class Text(val text: String) : ChatBubbleBody
@@ -57,6 +77,16 @@ sealed interface ChatBubbleBody {
         val label: String,
         val sub: String,
         val accent: ChatSystemLinkAccent,
+    ) : ChatBubbleBody
+
+    /**
+     * Structured AI reply: prose plus an optional inline estimate card.
+     * Renders wider than a plain bubble with a "Pantopus AI" tag
+     * (`AiAssistant` mode only).
+     */
+    data class AiReply(
+        val text: String,
+        val estimate: ChatEstimate?,
     ) : ChatBubbleBody
 }
 

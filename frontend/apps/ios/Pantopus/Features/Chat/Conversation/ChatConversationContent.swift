@@ -11,6 +11,18 @@
 
 import Foundation
 
+/// Presentation mode for the conversation surface. Orthogonal to
+/// `ChatCounterparty` (who you're talking to) — `mode` drives the chrome
+/// (avatar treatment, empty/welcome state, bubble shapes). `.dm` is the
+/// default human DM/group thread; `.aiAssistant` is the Pantopus AI
+/// thread; `.creatorThread` / `.fanThread` land in Wave D.
+public enum ChatConversationMode: String, Sendable, Hashable {
+    case dm
+    case aiAssistant
+    case creatorThread
+    case fanThread
+}
+
 /// Counterparty type. Drives the header swap, empty-state copy, and
 /// composer placeholder.
 public enum ChatCounterparty: Sendable, Hashable {
@@ -41,6 +53,23 @@ public enum ChatDeliveryState: Sendable, Hashable {
     case read
 }
 
+/// Inline "this would cost about $X" estimate rendered inside an AI
+/// reply bubble (`AIEstimateCard`).
+public struct ChatEstimate: Sendable, Hashable {
+    /// Headline figure, e.g. "$55–70".
+    public let amount: String
+    /// Supporting basis, e.g. "based on 8 nearby jobs".
+    public let basis: String
+    /// Confidence label, e.g. "Medium–High".
+    public let confidence: String
+
+    public init(amount: String, basis: String, confidence: String) {
+        self.amount = amount
+        self.basis = basis
+        self.confidence = confidence
+    }
+}
+
 /// Per-bubble render model.
 public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
     public enum Body: Sendable, Hashable {
@@ -48,6 +77,10 @@ public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
         case image(url: URL?)
         case attachment(filename: String, sizeLabel: String?)
         case systemLink(label: String, sub: String, accent: SystemLinkAccent)
+        /// Structured AI reply: prose plus an optional inline estimate
+        /// card. Renders wider than a plain bubble with a "Pantopus AI"
+        /// tag (`.aiAssistant` mode only).
+        case aiReply(text: String, estimate: ChatEstimate?)
     }
 
     public enum SystemLinkAccent: String, Sendable, Hashable {

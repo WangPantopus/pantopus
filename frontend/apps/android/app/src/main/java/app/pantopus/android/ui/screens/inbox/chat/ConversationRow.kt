@@ -23,7 +23,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -32,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.screens.inbox.conversation.ai.ChatAiAvatar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -90,7 +90,7 @@ fun ConversationRow(
 @Composable
 private fun Avatar(content: ConversationRowContent) {
     when (val variant = content.variant) {
-        ConversationRowVariant.AiAssistant -> AiAvatar()
+        ConversationRowVariant.AiAssistant -> ChatAiAvatar(size = 44.dp)
         ConversationRowVariant.Dm -> DmAvatar(initials = content.initials, verified = content.verified)
         is ConversationRowVariant.Group -> GroupAvatar(content.initials, variant)
     }
@@ -141,30 +141,6 @@ private fun GroupAvatar(
         Box(modifier = Modifier.align(Alignment.BottomEnd).offset(x = 3.dp, y = 3.dp)) {
             InitialsCircle(size = 32.dp, color = PantopusColors.success, initials = front)
         }
-    }
-}
-
-@Composable
-private fun AiAvatar() {
-    Box(
-        modifier =
-            Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(PantopusColors.primary500, PantopusColors.primary700),
-                    ),
-                )
-                .semantics { contentDescription = "AI assistant" },
-        contentAlignment = Alignment.Center,
-    ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Info,
-            contentDescription = null,
-            size = 20.dp,
-            tint = PantopusColors.appTextInverse,
-        )
     }
 }
 

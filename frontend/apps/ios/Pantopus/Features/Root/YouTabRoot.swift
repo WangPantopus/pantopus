@@ -1148,7 +1148,8 @@ public struct YouTabRoot: View {
                     mode: Self.chatMode(for: dest.mode),
                     counterparty: Self.chatCounterparty(for: dest),
                     currentUserId: currentUserId ?? ""
-                )
+                ),
+                mode: dest.kind
             ) { if !path.isEmpty { path.removeLast() } }
         case let .homeBills(homeId):
             BillsListView(
