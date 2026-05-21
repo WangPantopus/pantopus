@@ -200,8 +200,10 @@ public enum HubRoute: Hashable {
     case propertyDetails(homeId: String)
     /// A.3 — Add a guest to a home.
     case addGuest(homeId: String)
-    /// A.x — Tasks map (full-bleed map of household / neighbourhood tasks).
-    case tasksMap
+    /// A11.1 — Tasks map. Gigs-only mode of the MapListHybrid archetype,
+    /// opened from the Gigs feed's list/map toggle. Carries the active
+    /// category so the map renders the same filtered window.
+    case tasksMap(categoryKey: String)
     /// A.x — Explore (neighbourhood discovery surface).
     case explore
     /// B.1 prerequisite — Mailbox root archetype.
@@ -992,7 +994,7 @@ public struct HubTabRoot: View {
                     Task { @MainActor in push(.composeGig(category: category.rawValue)) }
                 },
                 onOpenMap: { category in
-                    Task { @MainActor in push(.nearbyMapForGigs(categoryKey: category.rawValue)) }
+                    Task { @MainActor in push(.tasksMap(categoryKey: category.rawValue)) }
                 },
                 onOpenSearch: { Task { @MainActor in push(.gigSearch) } },
                 onBack: pop
@@ -1370,8 +1372,19 @@ public struct HubTabRoot: View {
             AddGuestFormView(
                 viewModel: AddGuestFormViewModel(homeId: homeId)
             )
-        case .tasksMap:
-            NotYetAvailableView(tabName: "Tasks map", icon: .map)
+        case let .tasksMap(categoryKey):
+            TasksMapView(
+                viewModel: TasksMapViewModel(
+                    initialCategory: GigsCategory(rawValue: categoryKey) ?? .all
+                ),
+                onOpenTask: { taskId in
+                    Task { @MainActor in push(.gigDetail(gigId: taskId)) }
+                },
+                onCompose: { category in
+                    Task { @MainActor in push(.composeGig(category: category.rawValue)) }
+                },
+                onBack: pop
+            )
         case .explore:
             NotYetAvailableView(tabName: "Explore", icon: .compass)
         case .mailboxRoot:

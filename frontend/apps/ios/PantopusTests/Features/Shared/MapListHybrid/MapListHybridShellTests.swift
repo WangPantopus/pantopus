@@ -5,7 +5,8 @@
 //  T6.6a (P24) — pure detent-resolver tests. The shell's drag-release
 //  math is extracted into `MapListHybridDetentResolver.resolve(...)` so
 //  these tests verify snap-to-nearest, velocity-nudge, and edge clamps
-//  without spinning up SwiftUI.
+//  without spinning up SwiftUI. Detents are screen-relative fractions
+//  (0.20 / 0.40 / 0.90) per the A11.1 revision of the Q9 contract.
 //
 
 import CoreLocation
@@ -19,7 +20,7 @@ final class MapListHybridShellTests: XCTestCase {
         let target = MapListHybridDetentResolver.resolve(
             from: .standard,
             velocity: 0,
-            displacedHeight: 170 // near 160
+            displacedFraction: 0.22 // near 0.20
         )
         XCTAssertEqual(target, .collapsed)
     }
@@ -28,7 +29,7 @@ final class MapListHybridShellTests: XCTestCase {
         let target = MapListHybridDetentResolver.resolve(
             from: .collapsed,
             velocity: 0,
-            displacedHeight: 290 // near 296
+            displacedFraction: 0.38 // near 0.40
         )
         XCTAssertEqual(target, .standard)
     }
@@ -37,17 +38,18 @@ final class MapListHybridShellTests: XCTestCase {
         let target = MapListHybridDetentResolver.resolve(
             from: .standard,
             velocity: 0,
-            displacedHeight: 500 // near 518
+            displacedFraction: 0.85 // near 0.90
         )
         XCTAssertEqual(target, .expanded)
     }
 
     func testResolveSnapsToMidpointPreferringStandard() {
-        // 228 = midpoint between 160 and 296; snap to whichever is closer.
+        // 0.33 sits between collapsed (0.20) and standard (0.40); snap to
+        // whichever is closer.
         let target = MapListHybridDetentResolver.resolve(
             from: .collapsed,
             velocity: 0,
-            displacedHeight: 250
+            displacedFraction: 0.33
         )
         XCTAssertEqual(target, .standard)
     }
@@ -63,7 +65,7 @@ final class MapListHybridShellTests: XCTestCase {
         let target = MapListHybridDetentResolver.resolve(
             from: .collapsed,
             velocity: -800, // upward → grow
-            displacedHeight: 170
+            displacedFraction: 0.22
         )
         XCTAssertEqual(target, .standard)
     }
@@ -72,7 +74,7 @@ final class MapListHybridShellTests: XCTestCase {
         let target = MapListHybridDetentResolver.resolve(
             from: .standard,
             velocity: -1000,
-            displacedHeight: 320
+            displacedFraction: 0.43
         )
         XCTAssertEqual(target, .expanded)
     }
@@ -81,7 +83,7 @@ final class MapListHybridShellTests: XCTestCase {
         let target = MapListHybridDetentResolver.resolve(
             from: .expanded,
             velocity: -1200,
-            displacedHeight: 520
+            displacedFraction: 0.88
         )
         XCTAssertEqual(target, .expanded)
     }
@@ -90,7 +92,7 @@ final class MapListHybridShellTests: XCTestCase {
         let target = MapListHybridDetentResolver.resolve(
             from: .expanded,
             velocity: 800, // downward → shrink
-            displacedHeight: 500
+            displacedFraction: 0.85
         )
         XCTAssertEqual(target, .standard)
     }
@@ -99,7 +101,7 @@ final class MapListHybridShellTests: XCTestCase {
         let target = MapListHybridDetentResolver.resolve(
             from: .standard,
             velocity: 1000,
-            displacedHeight: 280
+            displacedFraction: 0.38
         )
         XCTAssertEqual(target, .collapsed)
     }
@@ -108,7 +110,7 @@ final class MapListHybridShellTests: XCTestCase {
         let target = MapListHybridDetentResolver.resolve(
             from: .collapsed,
             velocity: 1200,
-            displacedHeight: 150
+            displacedFraction: 0.19
         )
         XCTAssertEqual(target, .collapsed)
     }
@@ -121,17 +123,23 @@ final class MapListHybridShellTests: XCTestCase {
         let target = MapListHybridDetentResolver.resolve(
             from: .collapsed,
             velocity: MapListHybridDetentResolver.velocityThreshold,
-            displacedHeight: 165
+            displacedFraction: 0.22
         )
         XCTAssertEqual(target, .collapsed)
     }
 
-    // MARK: - Detent heights
+    // MARK: - Detent fractions
 
-    func testDetentHeightsMatchQ9Contract() {
-        XCTAssertEqual(MapListHybridDetent.collapsed.height, 160)
-        XCTAssertEqual(MapListHybridDetent.standard.height, 296)
-        XCTAssertEqual(MapListHybridDetent.expanded.height, 518)
+    func testDetentFractionsMatchContract() {
+        XCTAssertEqual(MapListHybridDetent.collapsed.heightFraction, 0.20, accuracy: 0.0001)
+        XCTAssertEqual(MapListHybridDetent.standard.heightFraction, 0.40, accuracy: 0.0001)
+        XCTAssertEqual(MapListHybridDetent.expanded.heightFraction, 0.90, accuracy: 0.0001)
+    }
+
+    func testDetentResolvesAbsoluteHeightFromContainer() {
+        XCTAssertEqual(MapListHybridDetent.collapsed.height(in: 800), 160, accuracy: 0.0001)
+        XCTAssertEqual(MapListHybridDetent.standard.height(in: 800), 320, accuracy: 0.0001)
+        XCTAssertEqual(MapListHybridDetent.expanded.height(in: 800), 720, accuracy: 0.0001)
     }
 
     func testDetentAllCasesOrdered() {
