@@ -7,6 +7,8 @@
 //  Coupon / Booklet / Certified.
 //
 
+// swiftlint:disable type_body_length
+
 import XCTest
 @testable import Pantopus
 
@@ -166,6 +168,47 @@ final class MailboxItemDetailCategoryDispatchTests: XCTestCase {
         }
     }
 
+    // MARK: - Gig (A17.6)
+
+    private static let gigJSON = """
+    {"mail":{
+      "id":"m-gig","type":"gig","mail_type":"gig",
+      "created_at":"2026-05-21T10:00:00Z",
+      "sender_display":"Marcus T.","sender_trust":"verified_business",
+      "display_title":"New bid · $65 to move your sofa Saturday","tags":[],
+      "object_payload":{
+        "is_accepted":false,
+        "bidder":{
+          "initials":"MT","name":"Marcus T.","handle":"@marcus_t",
+          "blurb":"Lives on Maple St · 0.8 mi from you",
+          "rating":4.9,"jobs":47,"response_time":"~12 min",
+          "identity":"Personal","verified":true,
+          "badges":["Moving · 24 jobs","Has truck"]
+        },
+        "bid":{
+          "amount":65,"unit":"flat","eta":"Saturday · 9–10 AM",
+          "expires":"Expires in 22h",
+          "message":["Hi! I can do this Saturday morning.","$65 covers the whole job."]
+        },
+        "post":{
+          "title":"Sofa move — garage → living room","category":"Moving",
+          "posted":"2 days ago · by you","expires":"Bids close in 4 days",
+          "budget":"$40–80 · flexible","schedule":"This Saturday, May 24 · morning",
+          "where":"1428 Elm St","details":"One 3-seater sofa, about 7 ft.","bid_count":3
+        },
+        "other_bids":[
+          {"id":"devon","who":"Devon R.","initials":"DR","amount":55,"rating":4.7,"jobs":18,"when":"40m ago","flag":"cheapest"},
+          {"id":"sasha","who":"Sasha P.","initials":"SP","amount":80,"rating":5.0,"jobs":112,"when":"1h ago","flag":"top-rated"}
+        ],
+        "next_steps":[
+          {"id":"accepted","label":"Bid accepted","when":"Just now","state":"active"},
+          {"id":"confirm","label":"Marcus confirms","when":"Pending","state":"pending"},
+          {"id":"review","label":"Review each other","when":"Within 7 days","state":"upcoming"}
+        ]
+      }
+    }}
+    """
+
     // MARK: - Memory
 
     private static let memoryJSON = """
@@ -215,6 +258,62 @@ final class MailboxItemDetailCategoryDispatchTests: XCTestCase {
       }
     }}
     """
+
+    func testGigDispatchProjectsGigPayload() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.gigJSON)]
+        let vm = MailboxItemDetailViewModel(mailId: "m-gig", api: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(content.category, .gig)
+        XCTAssertEqual(content.trust, .verified)
+        // The rich gig surface lives in the body, so the shell stays bare.
+        XCTAssertNil(content.aiElf)
+        XCTAssertTrue(content.keyFacts.isEmpty)
+        XCTAssertTrue(content.timeline.isEmpty)
+        XCTAssertEqual(content.sender.displayName, "Marcus T.")
+        guard case let .gig(gig) = content.payload else {
+            XCTFail("Expected .gig payload, got \(content.payload)")
+            return
+        }
+        XCTAssertFalse(gig.isAccepted)
+        XCTAssertEqual(gig.bid.amount, 65)
+        XCTAssertEqual(gig.bidder.rating, 4.9, accuracy: 0.001)
+        XCTAssertEqual(gig.bidder.jobs, 47)
+        XCTAssertEqual(gig.post.title, "Sofa move — garage → living room")
+        XCTAssertEqual(gig.otherBids.count, 2)
+        XCTAssertEqual(gig.otherBids.first?.flag, "cheapest")
+        XCTAssertEqual(gig.nextSteps.count, 3)
+    }
+
+    func testGigAcceptFlipsToAcceptedState() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.gigJSON)]
+        let vm = MailboxItemDetailViewModel(mailId: "m-gig", api: makeAPI())
+        await vm.load()
+
+        await vm.acceptGigBid()
+
+        guard case let .loaded(content) = vm.state, case let .gig(gig) = content.payload else {
+            XCTFail("Expected loaded gig, got \(vm.state)")
+            return
+        }
+        XCTAssertTrue(gig.isAccepted, "Accepting the bid should flip the gig into its accepted state.")
+        XCTAssertFalse(content.ctaEnabled)
+        // Accepted state preserves the surrounding data for the timeline.
+        XCTAssertEqual(gig.nextSteps.count, 3)
+        XCTAssertEqual(gig.bid.amount, 65)
+    }
+
+    func testGigDecodeReturnsNilWhenRequiredFieldsMissing() {
+        // Missing post.title → decode bails, body falls back to placeholder.
+        let json = """
+        {"bidder":{"name":"Marcus T."},"bid":{"amount":65},"post":{}}
+        """
+        let value = try? JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))
+        XCTAssertNil(GigDetailDTO.decode(from: value))
+    }
 
     func testMemoryDispatchProjectsMemoryPayload() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.memoryJSON)]

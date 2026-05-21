@@ -125,6 +125,10 @@ struct MailboxItemDetailView: View {
                     termsSheet = TermsSheetItem(url: url)
                 }
             }
+        case let (.gig, .gig(gig)):
+            GigBody(gig: gig) {
+                Task { await viewModel.acceptGigBid() }
+            }
         case let (.memory, .memory(memory)):
             MemoryBody(memory: memory, isSaved: memory.isSaved)
         default:

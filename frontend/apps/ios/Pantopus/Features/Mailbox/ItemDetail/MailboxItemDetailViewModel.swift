@@ -336,7 +336,7 @@ final class MailboxItemDetailViewModel {
             switch category {
             case .package:
                 await fetchPackageDetails(for: response.mail, category: category)
-            case .coupon, .booklet, .certified, .memory:
+            case .coupon, .booklet, .certified, .gig, .memory:
                 applyCategoryBody(response.mail, category: category)
             default:
                 applyItem(response.mail, category: category)
@@ -372,6 +372,8 @@ final class MailboxItemDetailViewModel {
             applyBooklet(item: item, category: category, booklet: booklet, baseTrust: baseTrust)
         case let .certified(certified):
             applyCertified(item: item, category: category, certified: certified)
+        case let .gig(gig):
+            applyGig(item: item, category: category, gig: gig, baseTrust: baseTrust)
         case let .memory(memory):
             applyMemory(item: item, category: category, memory: memory)
         case .other:
@@ -528,6 +530,59 @@ final class MailboxItemDetailViewModel {
                 packageInfo: nil,
                 ctaEnabled: !certified.isAcknowledged,
                 payload: .certified(certified)
+            )
+        )
+    }
+
+    /// Gig (A17.6) — the bidder becomes the sender; the rich gig surface
+    /// (bidder/post/bid cards + action row or accepted timeline) lives in
+    /// `GigBody`, so the shell carries no AI elf / KeyFacts / timeline and
+    /// no sticky CTA shelf (the three-way action row is in the body).
+    private func applyGig(
+        item: MailboxV2ItemResponse.Item,
+        category: MailItemCategory,
+        gig: GigDetailDTO,
+        baseTrust: MailTrust
+    ) {
+        state = .loaded(
+            MailboxItemDetailContent(
+                category: category,
+                trust: baseTrust,
+                sender: SenderBlockContent(
+                    displayName: gig.bidder.name,
+                    meta: item.base.createdAt,
+                    initials: Self.initials(from: gig.bidder.name),
+                    senderUserId: item.base.senderUserId
+                ),
+                aiElf: nil,
+                keyFacts: [],
+                timeline: [],
+                packageInfo: nil,
+                ctaEnabled: true,
+                payload: .gig(gig)
+            )
+        )
+    }
+
+    /// Accept the incoming bid. Optimistically flips the gig payload into
+    /// its accepted state (the body swaps the action row for the next-steps
+    /// timeline). No network — the gig action endpoint was removed with the
+    /// backend; re-point this at the real endpoint when it lands.
+    func acceptGigBid() async {
+        guard case let .loaded(content) = state,
+              case let .gig(gig) = content.payload,
+              !gig.isAccepted else { return }
+        state = .loaded(
+            MailboxItemDetailContent(
+                category: content.category,
+                trust: content.trust,
+                sender: content.sender,
+                aiElf: content.aiElf,
+                keyFacts: content.keyFacts,
+                timeline: content.timeline,
+                packageInfo: content.packageInfo,
+                ctaEnabled: false,
+                payload: .gig(gig.accepted())
             )
         )
     }

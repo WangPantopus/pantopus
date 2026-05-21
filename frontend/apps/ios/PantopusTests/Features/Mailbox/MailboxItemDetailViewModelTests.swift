@@ -141,7 +141,7 @@ final class MailboxItemDetailViewModelTests: XCTestCase {
     }
 
     func testAccentColorsCoverAllCategories() {
-        XCTAssertEqual(MailItemCategory.allCases.count, 18)
+        XCTAssertEqual(MailItemCategory.allCases.count, 19)
         // Each accent must resolve (doesn't trap) — smoke coverage.
         for category in MailItemCategory.allCases {
             _ = category.accent

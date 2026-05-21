@@ -17,6 +17,8 @@ sealed interface MailboxCategoryPayload {
 
     data class Certified(val detail: CertifiedDetailDto) : MailboxCategoryPayload
 
+    data class Gig(val detail: GigDetailDto) : MailboxCategoryPayload
+
     data class Memory(val detail: MemoryDetailDto) : MailboxCategoryPayload
 
     /**
@@ -45,6 +47,9 @@ sealed interface MailboxCategoryPayload {
                 MailItemCategory.Certified ->
                     CertifiedDetailDto.decodeFromObjectPayload(objectPayload)
                         ?.let(::Certified) ?: Other
+                MailItemCategory.Gig ->
+                    GigDetailDto.decodeFromObjectPayload(objectPayload)
+                        ?.let(::Gig) ?: Other
                 MailItemCategory.Memory ->
                     MemoryDetailDto.decodeFromObjectPayload(objectPayload)
                         ?.let(::Memory) ?: Other

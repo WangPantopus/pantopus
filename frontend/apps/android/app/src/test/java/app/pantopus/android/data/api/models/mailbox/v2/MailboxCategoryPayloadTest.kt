@@ -86,6 +86,79 @@ class MailboxCategoryPayloadTest {
         assertNull(cert.chain[2].occurredAt)
     }
 
+    @Test fun gig_decodes_bidder_bid_post_and_other_bids() {
+        val payload =
+            mapOf(
+                "is_accepted" to false,
+                "bidder" to
+                    mapOf(
+                        "initials" to "MT",
+                        "name" to "Marcus T.",
+                        "rating" to 4.9,
+                        "jobs" to 47,
+                        "verified" to true,
+                        "badges" to listOf("Moving · 24 jobs", "Has truck"),
+                    ),
+                "bid" to
+                    mapOf(
+                        "amount" to 65,
+                        "unit" to "flat",
+                        "eta" to "Saturday · 9–10 AM",
+                        "message" to listOf("Hi!", "Thanks."),
+                    ),
+                "post" to mapOf("title" to "Sofa move", "category" to "Moving", "bid_count" to 3),
+                "other_bids" to
+                    listOf(
+                        mapOf("who" to "Devon R.", "amount" to 55, "rating" to 4.7, "flag" to "cheapest"),
+                        mapOf("who" to "Sasha P.", "amount" to 80, "rating" to 5.0, "flag" to "top-rated"),
+                    ),
+                "next_steps" to
+                    listOf(
+                        mapOf("label" to "Bid accepted", "when" to "Just now", "state" to "active"),
+                        mapOf("label" to "Marcus confirms", "when" to "Pending", "state" to "pending"),
+                    ),
+            )
+        val resolved = MailboxCategoryPayload.resolve(MailItemCategory.Gig, payload)
+        assertTrue(resolved is MailboxCategoryPayload.Gig)
+        val gig = (resolved as MailboxCategoryPayload.Gig).detail
+        assertFalse(gig.isAccepted)
+        assertEquals(65, gig.bid.amount)
+        assertEquals(4.9, gig.bidder.rating, 0.001)
+        assertEquals(47, gig.bidder.jobs)
+        assertEquals("Sofa move", gig.post.title)
+        assertEquals(2, gig.otherBids.size)
+        assertEquals("cheapest", gig.otherBids[0].flag)
+        assertEquals(2, gig.nextSteps.size)
+        assertEquals(GigDetailDto.StepState.Active, gig.nextSteps[0].state)
+        assertEquals(GigDetailDto.StepState.Pending, gig.nextSteps[1].state)
+    }
+
+    @Test fun gig_missing_post_title_falls_back_to_other() {
+        val payload =
+            mapOf(
+                "bidder" to mapOf("name" to "Marcus T."),
+                "bid" to mapOf("amount" to 65),
+                "post" to mapOf<String, Any?>(),
+            )
+        assertEquals(
+            MailboxCategoryPayload.Other,
+            MailboxCategoryPayload.resolve(MailItemCategory.Gig, payload),
+        )
+    }
+
+    @Test fun gig_accepted_flag_round_trips() {
+        val payload =
+            mapOf(
+                "is_accepted" to true,
+                "bidder" to mapOf("name" to "Marcus T."),
+                "bid" to mapOf("amount" to 65),
+                "post" to mapOf("title" to "Sofa move"),
+            )
+        val resolved = MailboxCategoryPayload.resolve(MailItemCategory.Gig, payload)
+        assertTrue(resolved is MailboxCategoryPayload.Gig)
+        assertTrue((resolved as MailboxCategoryPayload.Gig).detail.isAccepted)
+    }
+
     @Test fun non_p18_category_returns_other() {
         val payload = mapOf("anything" to "goes")
         assertEquals(
