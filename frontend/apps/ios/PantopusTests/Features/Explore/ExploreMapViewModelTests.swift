@@ -31,7 +31,7 @@ final class ExploreMapViewModelTests: XCTestCase {
         let vm = ExploreMapViewModel(scenario: .populated)
         await vm.load()
         let markers = loaded(vm)?.markers ?? []
-        let hasCluster = markers.contains { if case .cluster = $0 { return true } else { return false } }
+        let hasCluster = markers.contains { if case .cluster = $0 { true } else { false } }
         XCTAssertTrue(hasCluster, "Dense sample should collapse into at least one cluster pin")
     }
 
@@ -122,10 +122,18 @@ final class ExploreMapViewModelTests: XCTestCase {
 
     func test_filterCriteria_matches_honoursEveryDimension() {
         let entity = ExploreEntity(
-            id: "x", kind: .task, state: .confirmed,
-            latitude: 0, longitude: 0, title: "t",
-            metaLead: "$1", distanceLabel: "0.2 mi", distanceMiles: 0.2,
-            badge: nil, verified: false, openNow: true
+            id: "x",
+            kind: .task,
+            state: .confirmed,
+            latitude: 0,
+            longitude: 0,
+            title: "t",
+            metaLead: "$1",
+            distanceLabel: "0.2 mi",
+            distanceMiles: 0.2,
+            badge: nil,
+            verified: false,
+            openNow: true
         )
         XCTAssertTrue(ExploreFilterCriteria().matches(entity))
         XCTAssertFalse(ExploreFilterCriteria(kinds: [.spot]).matches(entity))

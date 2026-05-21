@@ -9,7 +9,7 @@
 //
 //  Tabular fixture builders intentionally use wide positional signatures
 //  + grouped rows so the data reads like a table.
-// swiftlint:disable function_parameter_count multiline_arguments
+// swiftlint:disable function_parameter_count function_body_length type_body_length
 
 import Foundation
 
@@ -56,30 +56,138 @@ public enum ExploreMapSampleData {
     /// every one of them.
     private static func populatedEntities() -> [ExploreEntity] {
         var out: [ExploreEntity] = [
-            entity("t1", .task, .confirmed, 0.0010, 0.0009, "Hang 3 floating shelves",
-                   "$60", 0.2, badge("4 bids", .bids)),
-            entity("i1", .item, .confirmed, -0.0006, 0.0030, "Mid-century walnut sideboard",
-                   "$420", 0.4, badge("New", .new)),
-            entity("p1", .post, .confirmed, 0.0024, -0.0008, "Anyone know a good cardiologist nearby?",
-                   "Asked 2h ago", 0.3, badge("8 replies", .replies)),
-            entity("s1", .spot, .confirmed, 0.0038, 0.0020, "Sunrise Bakery — fresh pastries",
-                   "Open", 0.5, badge("4.8★", .rating)),
-            entity("t2", .task, .pending, -0.0030, -0.0024, "Mount a 55\" TV on drywall",
-                   "$80", 0.6, badge("2 bids", .bids)),
-            entity("i2", .item, .confirmed, 0.0044, -0.0030, "Road bike, barely used",
-                   "$250", 0.7, badge("New", .new)),
-            entity("p2", .post, .confirmed, -0.0040, 0.0012, "Lost gray cat near Oak St",
-                   "Asked 5h ago", 0.4, badge("3 replies", .replies)),
-            entity("s2", .spot, .confirmed, 0.0008, 0.0042, "Verde Coffee — espresso bar",
-                   "Open", 0.2, badge("4.6★", .rating)),
-            entity("t3", .task, .confirmed, -0.0014, 0.0048, "Assemble flat-pack wardrobe",
-                   "$45", 0.8, badge("1 bid", .bids)),
-            entity("i3", .item, .pending, 0.0052, 0.0006, "Toddler stroller, like new",
-                   "$90", 0.5, badge("New", .new)),
-            entity("p3", .post, .confirmed, -0.0050, -0.0040, "Recommendations for a plumber?",
-                   "Asked 1d ago", 0.9, badge("12 replies", .replies)),
-            entity("s3", .spot, .confirmed, 0.0030, 0.0054, "Hudson Hardware — tools & paint",
-                   "Open", 0.6, badge("4.7★", .rating))
+            entity(
+                "t1",
+                .task,
+                .confirmed,
+                0.0010,
+                0.0009,
+                "Hang 3 floating shelves",
+                "$60",
+                0.2,
+                badge("4 bids", .bids)
+            ),
+            entity(
+                "i1",
+                .item,
+                .confirmed,
+                -0.0006,
+                0.0030,
+                "Mid-century walnut sideboard",
+                "$420",
+                0.4,
+                badge("New", .new)
+            ),
+            entity(
+                "p1",
+                .post,
+                .confirmed,
+                0.0024,
+                -0.0008,
+                "Anyone know a good cardiologist nearby?",
+                "Asked 2h ago",
+                0.3,
+                badge("8 replies", .replies)
+            ),
+            entity(
+                "s1",
+                .spot,
+                .confirmed,
+                0.0038,
+                0.0020,
+                "Sunrise Bakery — fresh pastries",
+                "Open",
+                0.5,
+                badge("4.8★", .rating)
+            ),
+            entity(
+                "t2",
+                .task,
+                .pending,
+                -0.0030,
+                -0.0024,
+                "Mount a 55\" TV on drywall",
+                "$80",
+                0.6,
+                badge("2 bids", .bids)
+            ),
+            entity(
+                "i2",
+                .item,
+                .confirmed,
+                0.0044,
+                -0.0030,
+                "Road bike, barely used",
+                "$250",
+                0.7,
+                badge("New", .new)
+            ),
+            entity(
+                "p2",
+                .post,
+                .confirmed,
+                -0.0040,
+                0.0012,
+                "Lost gray cat near Oak St",
+                "Asked 5h ago",
+                0.4,
+                badge("3 replies", .replies)
+            ),
+            entity(
+                "s2",
+                .spot,
+                .confirmed,
+                0.0008,
+                0.0042,
+                "Verde Coffee — espresso bar",
+                "Open",
+                0.2,
+                badge("4.6★", .rating)
+            ),
+            entity(
+                "t3",
+                .task,
+                .confirmed,
+                -0.0014,
+                0.0048,
+                "Assemble flat-pack wardrobe",
+                "$45",
+                0.8,
+                badge("1 bid", .bids)
+            ),
+            entity(
+                "i3",
+                .item,
+                .pending,
+                0.0052,
+                0.0006,
+                "Toddler stroller, like new",
+                "$90",
+                0.5,
+                badge("New", .new)
+            ),
+            entity(
+                "p3",
+                .post,
+                .confirmed,
+                -0.0050,
+                -0.0040,
+                "Recommendations for a plumber?",
+                "Asked 1d ago",
+                0.9,
+                badge("12 replies", .replies)
+            ),
+            entity(
+                "s3",
+                .spot,
+                .confirmed,
+                0.0030,
+                0.0054,
+                "Hudson Hardware — tools & paint",
+                "Open",
+                0.6,
+                badge("4.7★", .rating)
+            )
         ]
         // Dense cluster of 12 just south-east of the anchor.
         out += filler(prefix: "ca", count: 12, latBase: -0.0065, lonBase: 0.0060, spread: 0.0006, startIndex: 0)
@@ -99,19 +207,85 @@ public enum ExploreMapSampleData {
     private static func emptyEntities() -> [ExploreEntity] {
         [
             // Close, but excluded by verified/open.
-            entity("e1", .task, .confirmed, 0.0008, 0.0006, "Fix a leaky kitchen faucet",
-                   "$50", 0.2, badge("2 bids", .bids), verified: false, openNow: true),
-            entity("e2", .spot, .confirmed, -0.0010, 0.0009, "Late Night Diner",
-                   "Closed", 0.3, badge("4.2★", .rating), verified: true, openNow: false),
-            entity("e3", .item, .pending, 0.0004, -0.0007, "Bookshelf, solid oak",
-                   "$120", 0.1, badge("New", .new), verified: false, openNow: true),
+            entity(
+                "e1",
+                .task,
+                .confirmed,
+                0.0008,
+                0.0006,
+                "Fix a leaky kitchen faucet",
+                "$50",
+                0.2,
+                badge("2 bids", .bids),
+                verified: false,
+                openNow: true
+            ),
+            entity(
+                "e2",
+                .spot,
+                .confirmed,
+                -0.0010,
+                0.0009,
+                "Late Night Diner",
+                "Closed",
+                0.3,
+                badge("4.2★", .rating),
+                verified: true,
+                openNow: false
+            ),
+            entity(
+                "e3",
+                .item,
+                .pending,
+                0.0004,
+                -0.0007,
+                "Bookshelf, solid oak",
+                "$120",
+                0.1,
+                badge("New", .new),
+                verified: false,
+                openNow: true
+            ),
             // Verified + open, but beyond the 0.5 mi radius (revealed by Widen area).
-            entity("e4", .post, .confirmed, 0.0090, 0.0070, "Block party this weekend — who's in?",
-                   "Asked 3h ago", 0.8, badge("9 replies", .replies), verified: true, openNow: true),
-            entity("e5", .task, .confirmed, -0.0150, 0.0120, "Deep clean a 2-bed apartment",
-                   "$140", 1.4, badge("5 bids", .bids), verified: true, openNow: true),
-            entity("e6", .spot, .confirmed, 0.0180, -0.0140, "Greenmarket — open Saturdays",
-                   "Open", 1.8, badge("4.9★", .rating), verified: true, openNow: true)
+            entity(
+                "e4",
+                .post,
+                .confirmed,
+                0.0090,
+                0.0070,
+                "Block party this weekend — who's in?",
+                "Asked 3h ago",
+                0.8,
+                badge("9 replies", .replies),
+                verified: true,
+                openNow: true
+            ),
+            entity(
+                "e5",
+                .task,
+                .confirmed,
+                -0.0150,
+                0.0120,
+                "Deep clean a 2-bed apartment",
+                "$140",
+                1.4,
+                badge("5 bids", .bids),
+                verified: true,
+                openNow: true
+            ),
+            entity(
+                "e6",
+                .spot,
+                .confirmed,
+                0.0180,
+                -0.0140,
+                "Greenmarket — open Saturdays",
+                "Open",
+                1.8,
+                badge("4.9★", .rating),
+                verified: true,
+                openNow: true
+            )
         ]
     }
 

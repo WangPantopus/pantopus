@@ -22,7 +22,9 @@ public enum ExploreKind: String, CaseIterable, Sendable, Hashable, Identifiable 
     case post
     case spot
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Plural label for the type toggle + the filter sheet chips.
     public var pluralLabel: String {
@@ -162,7 +164,9 @@ public enum ExploreSort: String, CaseIterable, Sendable, Hashable, Identifiable 
     case closest
     case newest
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -283,7 +287,9 @@ public struct ExploreMapLoaded: Sendable, Hashable {
 
     /// Designed empty state — a successful load that the active filters
     /// narrowed to zero results.
-    public var isEmpty: Bool { entities.isEmpty }
+    public var isEmpty: Bool {
+        entities.isEmpty
+    }
 }
 
 /// Render state for the Explore map screen.
