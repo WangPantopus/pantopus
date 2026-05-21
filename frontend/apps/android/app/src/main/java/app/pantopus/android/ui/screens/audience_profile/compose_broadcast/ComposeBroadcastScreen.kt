@@ -109,6 +109,7 @@ fun ComposeBroadcastScreen(
     )
 }
 
+@Suppress("LongParameterList")
 @Composable
 internal fun ComposeBroadcastScaffold(
     uiState: ComposeBroadcastUiState,
@@ -1183,7 +1184,6 @@ private fun ScheduleSheet(
 // MARK: - Helpers
 
 /** All-beacons follows the primary accent; tier-locked options borrow the tier ladder. */
-internal fun audienceColor(audience: BroadcastAudience) =
-    audience.tierRank?.let { tierColor(it) } ?: PantopusColors.primary600
+internal fun audienceColor(audience: BroadcastAudience) = audience.tierRank?.let { tierColor(it) } ?: PantopusColors.primary600
 
 private fun formatCount(count: Int): String = String.format(Locale.US, "%,d", count)

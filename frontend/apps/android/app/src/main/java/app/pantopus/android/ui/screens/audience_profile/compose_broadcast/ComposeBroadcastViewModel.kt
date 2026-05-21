@@ -89,6 +89,7 @@ class ComposeBroadcastViewModel
             }
         }
 
+        @Suppress("TooGenericExceptionCaught")
         fun send(onSent: () -> Unit = {}) {
             val current = _state.value
             if (!current.canSend) return
@@ -133,6 +134,5 @@ class ComposeBroadcastViewModel
             }
         }
 
-        private fun formatSchedule(millis: Long): String =
-            SimpleDateFormat("MMM d, h:mm a", Locale.US).format(Date(millis))
+        private fun formatSchedule(millis: Long): String = SimpleDateFormat("MMM d, h:mm a", Locale.US).format(Date(millis))
     }

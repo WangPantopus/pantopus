@@ -139,7 +139,7 @@ class ComposeBroadcastViewModelTest {
     fun `send failure surfaces error and preserves draft`() =
         runTest(dispatcher) {
             val vm = buildVm()
-            vm.performSend = { _, _ -> throw RuntimeException("Network down") }
+            vm.performSend = { _, _ -> throw SendFailure("Network down") }
             vm.updateBody("keep me")
             vm.send()
             advanceUntilIdle()
@@ -156,7 +156,7 @@ class ComposeBroadcastViewModelTest {
     fun `editing clears prior send error`() =
         runTest(dispatcher) {
             val vm = buildVm()
-            vm.performSend = { _, _ -> throw RuntimeException("Oops") }
+            vm.performSend = { _, _ -> throw SendFailure("Oops") }
             vm.updateBody("first")
             vm.send()
             advanceUntilIdle()
@@ -185,3 +185,5 @@ class ComposeBroadcastViewModelTest {
         }
     }
 }
+
+private class SendFailure(message: String) : RuntimeException(message)

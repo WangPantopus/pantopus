@@ -782,12 +782,12 @@ public struct YouTabRoot: View {
             NotYetAvailableView(tabName: "Edit persona", icon: .userRound)
         case let .composeBroadcast(personaId):
             ComposeBroadcastView(
-                viewModel: .live(
-                    personaId: personaId,
-                    onSent: { if !path.isEmpty { path.removeLast() } }
-                ),
-                onClose: { if !path.isEmpty { path.removeLast() } }
-            )
+                viewModel: .live(personaId: personaId) {
+                    if !path.isEmpty { path.removeLast() }
+                }
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case .offers:
             OffersView(
                 viewModel: OffersViewModel(

@@ -85,10 +85,21 @@ public final class ComposeBroadcastViewModel {
         }
     }
 
-    public var characterCount: Int { draft.body.count }
-    public var isOverLimit: Bool { characterCount > maxCharacterCount }
-    public var hasRecentBroadcasts: Bool { !recentBroadcasts.isEmpty }
-    public var isSending: Bool { phase == .sending }
+    public var characterCount: Int {
+        draft.body.count
+    }
+
+    public var isOverLimit: Bool {
+        characterCount > maxCharacterCount
+    }
+
+    public var hasRecentBroadcasts: Bool {
+        !recentBroadcasts.isEmpty
+    }
+
+    public var isSending: Bool {
+        phase == .sending
+    }
 
     /// Send is allowed once there's content, we're under the character
     /// limit, and a send isn't already in flight.

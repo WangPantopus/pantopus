@@ -105,7 +105,7 @@ final class ComposeBroadcastViewModelTests: XCTestCase {
 
     func testSendSuccessResetsComposerAndKeepsAudience() async {
         var sentCalled = false
-        let vm = makeVM(onSent: { sentCalled = true })
+        let vm = makeVM { sentCalled = true }
         vm.setAudience(.silverPlus)
         vm.updateBody("Q&A recording is up")
         await vm.send()
@@ -116,7 +116,11 @@ final class ComposeBroadcastViewModelTests: XCTestCase {
     }
 
     func testSendFailureSurfacesErrorAndPreservesDraft() async {
-        struct SendError: LocalizedError { var errorDescription: String? { "Network down" } }
+        struct SendError: LocalizedError {
+            var errorDescription: String? {
+                "Network down"
+            }
+        }
         let vm = makeVM()
         vm.performSend = { _, _ in throw SendError() }
         vm.updateBody("keep me")
@@ -128,7 +132,11 @@ final class ComposeBroadcastViewModelTests: XCTestCase {
     }
 
     func testEditingClearsPriorSendError() async {
-        struct SendError: LocalizedError { var errorDescription: String? { "Oops" } }
+        struct SendError: LocalizedError {
+            var errorDescription: String? {
+                "Oops"
+            }
+        }
         let vm = makeVM()
         vm.performSend = { _, _ in throw SendError() }
         vm.updateBody("first")

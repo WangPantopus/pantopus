@@ -79,13 +79,16 @@ public struct ComposeBroadcastView: View {
 
             Spacer(minLength: 0)
 
-            Button(action: { viewModel.saveDraft() }) {
-                Text("Save")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(viewModel.isDirty ? Theme.Color.primary600 : Theme.Color.appTextMuted)
-                    .padding(.horizontal, Spacing.s2)
-                    .frame(minWidth: 44, minHeight: 44)
-            }
+            Button(
+                action: { viewModel.saveDraft() },
+                label: {
+                    Text("Save")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(viewModel.isDirty ? Theme.Color.primary600 : Theme.Color.appTextMuted)
+                        .padding(.horizontal, Spacing.s2)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+            )
             .buttonStyle(.plain)
             .disabled(!viewModel.isDirty)
             .accessibilityLabel("Save draft")
@@ -387,39 +390,45 @@ public struct ComposeBroadcastView: View {
 
     private var stickyActions: some View {
         HStack(spacing: Spacing.s2) {
-            Button(action: { viewModel.saveDraft() }) {
-                Text("Save draft")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(viewModel.isDirty ? Theme.Color.appTextStrong : Theme.Color.appTextMuted)
-                    .padding(.horizontal, Spacing.s3)
-                    .frame(minWidth: 96, minHeight: 44)
-                    .background(Theme.Color.appSurface)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                            .stroke(Theme.Color.appBorder, lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            }
+            Button(
+                action: { viewModel.saveDraft() },
+                label: {
+                    Text("Save draft")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(viewModel.isDirty ? Theme.Color.appTextStrong : Theme.Color.appTextMuted)
+                        .padding(.horizontal, Spacing.s3)
+                        .frame(minWidth: 96, minHeight: 44)
+                        .background(Theme.Color.appSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                                .stroke(Theme.Color.appBorder, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                }
+            )
             .buttonStyle(.plain)
             .disabled(!viewModel.isDirty)
             .accessibilityIdentifier("composeBroadcastSaveDraft")
 
-            Button(action: { Task { await viewModel.send() } }) {
-                HStack(spacing: Spacing.s1) {
-                    if viewModel.isSending {
-                        ProgressView().tint(Theme.Color.appTextInverse)
-                    } else {
-                        Icon(.send, size: 14, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
+            Button(
+                action: { Task { await viewModel.send() } },
+                label: {
+                    HStack(spacing: Spacing.s1) {
+                        if viewModel.isSending {
+                            ProgressView().tint(Theme.Color.appTextInverse)
+                        } else {
+                            Icon(.send, size: 14, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
+                        }
+                        Text(viewModel.primaryActionTitle)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Theme.Color.appTextInverse)
                     }
-                    Text(viewModel.primaryActionTitle)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Theme.Color.appTextInverse)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(viewModel.canSend ? Theme.Color.primary600 : Theme.Color.appBorderStrong)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(viewModel.canSend ? Theme.Color.primary600 : Theme.Color.appBorderStrong)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            }
+            )
             .buttonStyle(.plain)
             .disabled(!viewModel.canSend)
             .accessibilityLabel(viewModel.primaryActionTitle)
@@ -491,7 +500,9 @@ public struct ComposeBroadcastView: View {
             ForEach(BroadcastAudience.allCases) { audience in
                 audienceRow(audience)
                 if audience != BroadcastAudience.allCases.last {
-                    Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+                    Rectangle()
+                        .fill(Theme.Color.appBorderSubtle)
+                        .frame(height: 1)
                         .padding(.leading, Spacing.s4)
                 }
             }

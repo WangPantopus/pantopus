@@ -100,11 +100,10 @@ public extension ComposeBroadcastViewModel {
             persona: ComposeBroadcastSampleData.persona,
             recentBroadcasts: ComposeBroadcastSampleData.recentBroadcasts,
             audienceReach: ComposeBroadcastSampleData.audienceReach,
-            onSent: onSent,
-            performSend: { _, _ in
-                try await Task.sleep(nanoseconds: 600_000_000)
-            }
-        )
+            onSent: onSent
+        ) { _, _ in
+            try await Task.sleep(nanoseconds: 600_000_000)
+        }
     }
 
     /// FRAME 1 — drafted broadcast with body + attached media + recents.

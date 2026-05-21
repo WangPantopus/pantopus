@@ -24,7 +24,9 @@ public enum BroadcastAudience: String, Sendable, Hashable, CaseIterable, Identif
     case silverPlus
     case goldOnly
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var title: String {
         switch self {
@@ -59,7 +61,9 @@ public enum BroadcastAudience: String, Sendable, Hashable, CaseIterable, Identif
     }
 
     /// True for every targeting option that isn't the public broadcast.
-    public var isRestricted: Bool { self != .allBeacons }
+    public var isRestricted: Bool {
+        self != .allBeacons
+    }
 }
 
 /// One attached media item in the composer. `imageData` carries the
