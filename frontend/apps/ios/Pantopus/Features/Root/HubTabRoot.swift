@@ -196,6 +196,23 @@ public enum HubRoute: Hashable {
     /// Generic placeholder for any intent whose destination hasn't been
     /// built yet. The label is shown by `NotYetAvailableView`.
     case placeholder(label: String)
+    // MARK: Wave A — pre-staged routes (placeholder destinations until A.x ships)
+    /// A.x — Full "Today" detail expansion. Distinct from `today` (the
+    /// existing weather / AQI / commute card); reconcile when the Wave A
+    /// "Today detail" screen lands.
+    case todayDetail
+    /// A.4 — Property details for a home.
+    case propertyDetails(homeId: String)
+    /// A.3 — Add a guest to a home.
+    case addGuest(homeId: String)
+    /// A.x — Tasks map (full-bleed map of household / neighbourhood tasks).
+    case tasksMap
+    /// A.x — Explore (neighbourhood discovery surface).
+    case explore
+    /// B.1 prerequisite — Mailbox root archetype.
+    case mailboxRoot
+    /// A.x — Mailbox map.
+    case mailboxMap
     #if DEBUG
     case tokenGallery
     case iconGallery
@@ -1330,6 +1347,22 @@ public struct HubTabRoot: View {
             )
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
+        // MARK: Wave A — pre-staged placeholder destinations. When an A.x
+        // screen ships, swap its single line below for the real view.
+        case .todayDetail:
+            NotYetAvailableView(tabName: "Today detail", icon: .sun)
+        case .propertyDetails:
+            NotYetAvailableView(tabName: "Property details", icon: .home)
+        case .addGuest:
+            NotYetAvailableView(tabName: "Add guest", icon: .userPlus)
+        case .tasksMap:
+            NotYetAvailableView(tabName: "Tasks map", icon: .map)
+        case .explore:
+            NotYetAvailableView(tabName: "Explore", icon: .compass)
+        case .mailboxRoot:
+            NotYetAvailableView(tabName: "Mailbox", icon: .mailbox)
+        case .mailboxMap:
+            NotYetAvailableView(tabName: "Mailbox map", icon: .map)
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to

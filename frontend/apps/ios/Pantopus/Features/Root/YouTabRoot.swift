@@ -199,6 +199,15 @@ public enum YouRoute: Hashable {
     /// overflow ("Edit listing") for the owner, or from the listing-
     /// offers panel's "Edit price" affordance.
     case editListing(listingId: String, jumpToStep: ListingComposeStep?)
+    // MARK: Wave A — pre-staged routes (placeholder destinations until A.x ships)
+    /// A.x — Membership detail for a persona.
+    case membershipDetail(personaId: String)
+    /// A.5 — Professional profile.
+    case professionalProfile
+    /// A.6 — Edit persona.
+    case editPersona(personaId: String)
+    /// A.7 — Compose broadcast from a persona.
+    case composeBroadcast(personaId: String)
     #if DEBUG
     case publicProfile(userId: String)
     /// P1.6 — Typed Business Profile screen. Reached today only via
@@ -741,6 +750,16 @@ public struct YouTabRoot: View {
             )
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
+        // MARK: Wave A — pre-staged placeholder destinations. When an A.x
+        // screen ships, swap its single line below for the real view.
+        case .membershipDetail:
+            NotYetAvailableView(tabName: "Membership", icon: .crown)
+        case .professionalProfile:
+            NotYetAvailableView(tabName: "Professional profile", icon: .briefcase)
+        case .editPersona:
+            NotYetAvailableView(tabName: "Edit persona", icon: .userRound)
+        case .composeBroadcast:
+            NotYetAvailableView(tabName: "Compose broadcast", icon: .megaphone)
         case .offers:
             OffersView(
                 viewModel: OffersViewModel(
