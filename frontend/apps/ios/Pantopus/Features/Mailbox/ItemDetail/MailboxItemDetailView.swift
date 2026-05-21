@@ -180,11 +180,10 @@ struct MailboxItemDetailView: View {
     /// Memory CTA shelf — "Save to Vault" flips to a disabled "Saved to
     /// Vault" once kept; "Share" stays available in both states.
     private func memoryCTA(_ content: MailboxItemDetailContent) -> MailboxCTAShelfContent {
-        let saved: Bool
-        if case let .memory(memory) = content.payload {
-            saved = memory.isSaved
+        let saved: Bool = if case let .memory(memory) = content.payload {
+            memory.isSaved
         } else {
-            saved = false
+            false
         }
         return MailboxCTAShelfContent(
             primaryTitle: saved ? "Saved to Vault" : "Save to Vault",

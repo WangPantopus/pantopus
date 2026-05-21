@@ -31,7 +31,9 @@ public struct MemoryFact: Sendable, Hashable, Identifiable {
     /// row is rendered as a tappable button.
     public let linkHint: String?
 
-    public var id: String { kind.rawValue }
+    public var id: String {
+        kind.rawValue
+    }
 
     public init(kind: Kind, label: String, value: String, linkHint: String? = nil) {
         self.kind = kind
@@ -71,7 +73,9 @@ public struct MemoryElfBullet: Sendable, Hashable, Identifiable {
     public let label: String
     public let text: String
 
-    public var id: String { label }
+    public var id: String {
+        label
+    }
 
     public init(glyph: Glyph, label: String, text: String) {
         self.glyph = glyph
@@ -126,7 +130,9 @@ public struct MemoryVaultCrumb: Sendable, Hashable, Identifiable {
     public let label: String
     public let isCurrent: Bool
 
-    public var id: String { label }
+    public var id: String {
+        label
+    }
 
     public init(glyph: Glyph, label: String, isCurrent: Bool) {
         self.glyph = glyph
@@ -153,7 +159,9 @@ public struct MemoryVaultStat: Sendable, Hashable, Identifiable {
     public let value: String
     public let label: String
 
-    public var id: String { label }
+    public var id: String {
+        label
+    }
 
     public init(value: String, label: String) {
         self.value = value

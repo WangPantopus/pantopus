@@ -2,7 +2,7 @@
 //  MailItemCategory.swift
 //  Pantopus
 //
-//  14-category enum for mailbox items. Each case carries its accent
+//  18-category enum for mailbox items. Each case carries its accent
 //  color for the 4pt top strip.
 //
 
