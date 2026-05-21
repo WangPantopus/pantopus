@@ -31,7 +31,8 @@ public enum MailboxMapSampleData {
             lastPickupLabel: "Last pickup 5 PM",
             services: [.stamps, .shipping, .poBoxes, .passport],
             weekHours: weekHours(["9–6", "9–6", "9–6", "9–6", "9–6", "10–4", "—"]),
-            mapX: 0.19, mapY: 0.20
+            mapX: 0.19,
+            mapY: 0.20
         ),
         MailboxSpot(
             id: "usps-drop-hayes-buchanan",
@@ -45,7 +46,8 @@ public enum MailboxMapSampleData {
             lastPickupLabel: "Last pickup 5 PM",
             services: [.dropOff],
             weekHours: weekHours(["24h", "24h", "24h", "24h", "24h", "24h", "24h"]),
-            mapX: 0.43, mapY: 0.13
+            mapX: 0.43,
+            mapY: 0.13
         ),
         MailboxSpot(
             id: "amazon-hub-whole-foods",
@@ -59,7 +61,8 @@ public enum MailboxMapSampleData {
             lastPickupLabel: nil,
             services: [.pickup, .dropOff],
             weekHours: weekHours(["7–10", "7–10", "7–10", "7–10", "7–10", "8–10", "8–9"]),
-            mapX: 0.61, mapY: 0.24
+            mapX: 0.61,
+            mapY: 0.24
         ),
         MailboxSpot(
             id: "fedex-office-market",
@@ -73,7 +76,8 @@ public enum MailboxMapSampleData {
             lastPickupLabel: "Last pickup 6 PM",
             services: [.shipping, .printing, .pickup],
             weekHours: weekHours(["8–8", "8–8", "8–8", "8–8", "8–8", "9–6", "12–5"]),
-            mapX: 0.80, mapY: 0.16
+            mapX: 0.80,
+            mapY: 0.16
         ),
         MailboxSpot(
             id: "usps-drop-octavia",
@@ -87,7 +91,8 @@ public enum MailboxMapSampleData {
             lastPickupLabel: "Last pickup 4 PM",
             services: [.dropOff],
             weekHours: weekHours(["24h", "24h", "24h", "24h", "24h", "24h", "24h"]),
-            mapX: 0.33, mapY: 0.34
+            mapX: 0.33,
+            mapY: 0.34
         ),
         MailboxSpot(
             id: "civic-center-station",
@@ -101,7 +106,8 @@ public enum MailboxMapSampleData {
             lastPickupLabel: nil,
             services: [.poBoxes, .passport, .dropOff],
             weekHours: weekHours(["8–5", "8–5", "8–5", "8–5", "8–5", "—", "—"]),
-            mapX: 0.67, mapY: 0.37
+            mapX: 0.67,
+            mapY: 0.37
         ),
         MailboxSpot(
             id: "ups-locker-safeway",
@@ -115,7 +121,8 @@ public enum MailboxMapSampleData {
             lastPickupLabel: nil,
             services: [.pickup, .dropOff],
             weekHours: weekHours(["6–9", "6–9", "6–9", "6–9", "6–9", "7–9", "8–8"]),
-            mapX: 0.86, mapY: 0.31
+            mapX: 0.86,
+            mapY: 0.31
         ),
         MailboxSpot(
             id: "usps-drop-duboce",
@@ -129,7 +136,8 @@ public enum MailboxMapSampleData {
             lastPickupLabel: "Last pickup 3 PM",
             services: [.dropOff],
             weekHours: weekHours(["24h", "24h", "24h", "24h", "24h", "24h", "24h"]),
-            mapX: 0.15, mapY: 0.45
+            mapX: 0.15,
+            mapY: 0.45
         ),
         MailboxSpot(
             id: "ups-store-divisadero",
@@ -143,7 +151,8 @@ public enum MailboxMapSampleData {
             lastPickupLabel: "Last pickup 5 PM",
             services: [.shipping, .printing, .pickup, .poBoxes],
             weekHours: weekHours(["8–7", "8–7", "8–7", "8–7", "8–7", "9–5", "—"]),
-            mapX: 0.54, mapY: 0.47
+            mapX: 0.54,
+            mapY: 0.47
         ),
         MailboxSpot(
             id: "noe-valley-po",
@@ -157,7 +166,8 @@ public enum MailboxMapSampleData {
             lastPickupLabel: "Last pickup 4 PM",
             services: [.stamps, .shipping, .poBoxes],
             weekHours: weekHours(["8:30–5", "8:30–5", "8:30–5", "8:30–5", "8:30–5", "9–2", "—"]),
-            mapX: 0.30, mapY: 0.27
+            mapX: 0.30,
+            mapY: 0.27
         ),
         MailboxSpot(
             id: "city-hall-mailroom",
@@ -171,7 +181,8 @@ public enum MailboxMapSampleData {
             lastPickupLabel: nil,
             services: [.dropOff, .poBoxes],
             weekHours: weekHours(["8–5", "8–5", "8–5", "8–5", "8–5", "—", "—"]),
-            mapX: 0.47, mapY: 0.22
+            mapX: 0.47,
+            mapY: 0.22
         ),
         MailboxSpot(
             id: "amazon-locker-castro",
@@ -185,8 +196,9 @@ public enum MailboxMapSampleData {
             lastPickupLabel: nil,
             services: [.pickup, .dropOff],
             weekHours: weekHours(["6–11", "6–11", "6–11", "6–11", "6–11", "7–11", "8–10"]),
-            mapX: 0.72, mapY: 0.45
-        ),
+            mapX: 0.72,
+            mapY: 0.45
+        )
     ]
 
     /// Build a Monday-first week-hour strip. `hours` is seven entries

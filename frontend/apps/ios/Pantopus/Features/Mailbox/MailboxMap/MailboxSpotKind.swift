@@ -21,7 +21,9 @@ public enum MailboxSpotKind: String, CaseIterable, Sendable, Hashable, Identifia
     case carrier
     case civic
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Plural chip / legend label.
     public var label: String {

@@ -28,7 +28,9 @@ public enum MailboxServiceType: String, CaseIterable, Sendable, Hashable, Identi
     case atm
     case dropOff
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -40,6 +42,19 @@ public enum MailboxServiceType: String, CaseIterable, Sendable, Hashable, Identi
         case .printing: "Print & copy"
         case .atm: "ATM"
         case .dropOff: "Mail drop-off"
+        }
+    }
+
+    public var chipLabel: String {
+        switch self {
+        case .stamps: "Stamps"
+        case .shipping: "Shipping"
+        case .poBoxes: "PO box"
+        case .passport: "Passport"
+        case .pickup: "Pickup"
+        case .printing: "Print"
+        case .atm: "ATM"
+        case .dropOff: "Drop-off"
         }
     }
 
@@ -68,7 +83,9 @@ public struct MailboxDayHours: Sendable, Hashable, Identifiable {
     public let label: String
     public let hours: String
 
-    public var id: Int { weekday }
+    public var id: Int {
+        weekday
+    }
 
     public init(weekday: Int, label: String, hours: String) {
         self.weekday = weekday

@@ -57,8 +57,8 @@ public struct MailboxMapView: View {
 
     // MARK: - Derived
 
-    private var sheetHeight: CGFloat {
-        max(120, viewModel.detent.height + dragTranslation)
+    private func sheetHeight(containerHeight: CGFloat) -> CGFloat {
+        Swift.max(120, viewModel.detent.height(in: containerHeight) + dragTranslation)
     }
 
     /// Chip to render active. In the detail panel the selected spot's
@@ -80,6 +80,13 @@ public struct MailboxMapView: View {
         case .selected:
             ""
         }
+    }
+
+    private var headerDirectionsSpot: MailboxSpot? {
+        if case let .populated(spots) = viewModel.state {
+            return spots.first
+        }
+        return nil
     }
 
     // MARK: - Map layer
@@ -104,10 +111,10 @@ public struct MailboxMapView: View {
         }
     }
 
-    private func mapCanvas<Content: View>(
+    private func mapCanvas(
         width: CGFloat,
         height: CGFloat,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: () -> some View
     ) -> some View {
         ZStack {
             Theme.Color.appSurfaceSunken
@@ -119,7 +126,6 @@ public struct MailboxMapView: View {
         .accessibilityIdentifier("mailboxMapCanvas")
     }
 
-    @ViewBuilder
     private func populatedMapContent(spots: [MailboxSpot], width: CGFloat, height: CGFloat) -> some View {
         ZStack {
             ForEach(spots) { spot in
@@ -150,7 +156,7 @@ public struct MailboxMapView: View {
                 MailboxMapPin(kind: other.kind, dimmed: true)
                     .position(
                         x: other.mapX * width,
-                        y: min(max(other.mapY, 0.16), 0.62) * height
+                        y: Swift.min(Swift.max(other.mapY, 0.16), 0.62) * height
                     )
                     .accessibilityHidden(true)
             }
@@ -193,9 +199,12 @@ public struct MailboxMapView: View {
             .opacity(onBack == nil ? 0 : 1)
             .disabled(onBack == nil)
             Spacer(minLength: 4)
-            Text("Mailbox map")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
+            HStack(spacing: 2) {
+                Text("Mailbox map")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Icon(.chevronDown, size: 14, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
+            }
             Spacer(minLength: 4)
             Color.clear.frame(width: 32, height: 32)
         }
@@ -261,15 +270,15 @@ public struct MailboxMapView: View {
         case let .selected(spot, _):
             detailPanel(spot: spot, geo: geo)
         case let .populated(spots):
-            bottomSheet { populatedSheetBody(spots) }
+            bottomSheet(geo: geo) { populatedSheetBody(spots) }
         case .loading:
-            bottomSheet { loadingSheetBody }
+            bottomSheet(geo: geo) { loadingSheetBody }
         case let .error(message):
-            bottomSheet { errorSheetBody(message) }
+            bottomSheet(geo: geo) { errorSheetBody(message) }
         }
     }
 
-    private func bottomSheet<Body: View>(@ViewBuilder body: () -> Body) -> some View {
+    private func bottomSheet(geo: GeometryProxy, @ViewBuilder body: () -> some View) -> some View {
         VStack(spacing: 0) {
             Spacer(minLength: 0)
             VStack(spacing: 0) {
@@ -279,27 +288,27 @@ public struct MailboxMapView: View {
                     .frame(maxHeight: .infinity, alignment: .top)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: sheetHeight)
+            .frame(height: sheetHeight(containerHeight: geo.size.height))
             .background(Theme.Color.appSurface)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: -10)
-            .gesture(sheetDrag)
+            .gesture(sheetDrag(containerHeight: geo.size.height))
         }
         .accessibilityIdentifier("mailboxMapSheet")
     }
 
-    private var sheetDrag: some Gesture {
+    private func sheetDrag(containerHeight: CGFloat) -> some Gesture {
         DragGesture()
             .onChanged { gesture in
                 dragTranslation = -gesture.translation.height
             }
             .onEnded { gesture in
                 let velocity = gesture.predictedEndTranslation.height
-                let displaced = viewModel.detent.height + dragTranslation
+                let displaced = viewModel.detent.height(in: containerHeight) + dragTranslation
                 let target = MapListHybridDetentResolver.resolve(
                     from: viewModel.detent,
                     velocity: velocity,
-                    displacedHeight: displaced
+                    displacedFraction: displaced / containerHeight
                 )
                 withAnimation(.interpolatingSpring(stiffness: 320, damping: 30)) {
                     viewModel.setDetent(target)
@@ -314,6 +323,21 @@ public struct MailboxMapView: View {
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
             Spacer()
+            if let spot = headerDirectionsSpot {
+                Button { openDirections(to: spot) } label: {
+                    HStack(spacing: 4) {
+                        Icon(.navigation, size: 14, strokeWidth: 2.2, color: Theme.Color.primary700)
+                        Text("Directions")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Theme.Color.primary700)
+                    }
+                    .frame(minHeight: 32)
+                    .padding(.horizontal, 8)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("mailboxMapHeaderDirections")
+                .accessibilityLabel("Directions to nearest mailbox spot")
+            }
         }
         .padding(.horizontal, 18)
         .padding(.top, 4)
@@ -859,13 +883,7 @@ private struct MailboxKindTile: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [kind.color, kind.color.opacity(0.8)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(kind.color)
             Icon(kind.glyph, size: iconSize, strokeWidth: 2, color: .white)
         }
         .frame(width: size, height: size)
@@ -874,7 +892,6 @@ private struct MailboxKindTile: View {
 
 // MARK: - Status badge
 
-@ViewBuilder
 private func mailboxStatusBadge(isOpen: Bool) -> some View {
     Text(isOpen ? "OPEN" : "CLOSED")
         .font(.system(size: 9, weight: .bold))
@@ -884,6 +901,30 @@ private func mailboxStatusBadge(isOpen: Bool) -> some View {
         .padding(.vertical, 1)
         .background(isOpen ? Theme.Color.successBg : Theme.Color.errorBg)
         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+}
+
+private struct MailboxServiceChipRow: View {
+    let services: [MailboxServiceType]
+    let maxCount: Int
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(Array(services.prefix(maxCount)), id: \.self) { service in
+                Text(service.chipLabel)
+                    .font(.system(size: 9.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .lineLimit(1)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Theme.Color.appSurfaceMuted)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            }
+        }
+    }
 }
 
 // MARK: - Rail card
@@ -910,6 +951,7 @@ private struct MailboxSpotCard: View {
                             .foregroundStyle(Theme.Color.appTextSecondary)
                             .lineLimit(1)
                     }
+                    MailboxServiceChipRow(services: spot.services, maxCount: 2)
                     HStack(spacing: 3) {
                         Icon(.mapPin, size: 11, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
                         Text(spot.walkLabel)
@@ -942,7 +984,9 @@ private struct MailboxSpotCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .shadow(
                 color: active ? Theme.Color.primary600.opacity(0.18) : .black.opacity(0.04),
-                radius: active ? 6 : 2, x: 0, y: 2
+                radius: active ? 6 : 2,
+                x: 0,
+                y: 2
             )
         }
         .buttonStyle(.plain)
@@ -972,6 +1016,7 @@ private struct MailboxSpotRow: View {
                             .font(.system(size: 10.5, weight: .medium))
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
+                    MailboxServiceChipRow(services: spot.services, maxCount: 3)
                     HStack(spacing: 3) {
                         Icon(.mapPin, size: 11, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
                         Text(spot.walkLabel)

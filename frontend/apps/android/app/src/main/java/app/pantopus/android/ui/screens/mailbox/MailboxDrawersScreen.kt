@@ -8,6 +8,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
+import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
+import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
  * `GET /api/mailbox/v2/drawers` wrapped in the List-of-Rows archetype.
@@ -16,6 +18,7 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 fun MailboxDrawersScreen(
     onOpenDrawer: (String) -> Unit,
     onOpenVault: () -> Unit = {},
+    onOpenMap: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     viewModel: MailboxDrawersViewModel = hiltViewModel(),
 ) {
@@ -31,5 +34,11 @@ fun MailboxDrawersScreen(
         onRefresh = { viewModel.refresh() },
         onEndReached = {},
         onBack = onBack,
+        topBarAction =
+            TopBarAction(
+                icon = PantopusIcon.Map,
+                contentDescription = "Map view",
+                onClick = onOpenMap,
+            ),
     )
 }
