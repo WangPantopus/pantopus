@@ -9,7 +9,7 @@
 import SwiftUI
 
 /// Identity pillar, used for the ring tint.
-public enum IdentityPillar: Sendable {
+public enum IdentityPillar: Sendable, Hashable {
     case personal, home, business
 
     var color: Color {

@@ -175,6 +175,7 @@ import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
 import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
+import app.pantopus.android.ui.screens.membership.MembershipDetailScreen
 import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
 import app.pantopus.android.ui.screens.my_posts.MyPostsScreen
 import app.pantopus.android.ui.screens.my_tasks.MyTasksScreen
@@ -2661,6 +2662,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenCreatorInbox = {
                         navController.navigate(ChildRoutes.CREATOR_INBOX)
                     },
+                    onOpenMembership = { personaId ->
+                        navController.navigate(ChildRoutes.membershipDetail(personaId))
+                    },
                     viewModel = audienceViewModel,
                 )
             }
@@ -2877,7 +2881,27 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments =
                     listOf(navArgument(ChildRoutes.MEMBERSHIP_DETAIL_PERSONA_ID_KEY) { type = NavType.StringType }),
             ) {
-                NotYetAvailableView(tabName = "Membership", icon = PantopusIcon.Crown)
+                MembershipDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onShare = {
+                        navController.navigate(ChildRoutes.placeholder("Share membership"))
+                    },
+                    onOpenPersona = {
+                        navController.navigate(ChildRoutes.AUDIENCE_PROFILE)
+                    },
+                    onChangeTier = {
+                        navController.navigate(ChildRoutes.placeholder("Change tier"))
+                    },
+                    onUpdatePayment = {
+                        navController.navigate(ChildRoutes.placeholder("Update payment"))
+                    },
+                    onCancel = {
+                        navController.navigate(ChildRoutes.placeholder("Membership cancelled"))
+                    },
+                    onRequestRefund = {
+                        navController.navigate(ChildRoutes.placeholder("Request refund"))
+                    },
+                )
             }
             composable(ChildRoutes.PROFESSIONAL_PROFILE) {
                 NotYetAvailableView(tabName = "Professional profile", icon = PantopusIcon.Briefcase)
