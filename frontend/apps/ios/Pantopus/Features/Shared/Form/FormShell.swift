@@ -8,17 +8,34 @@
 
 import SwiftUI
 
+/// Leading top-bar control style. Sheet-style forms dismiss with an `X`
+/// (`.close`); pushed forms that own a `NavigationStack` entry use a back
+/// chevron (`.back`).
+public enum FormShellLeading: Sendable {
+    case close
+    case back
+}
+
 /// Scaffold for every Form screen.
 ///
 /// Per the P10 Form archetype: a 44pt top bar with leading X, centered
 /// title, and a right-aligned text action button (`Save` / `Send` / `Post`
 /// / `Done`). The action button renders in `primary600` when enabled and
 /// `fg4` (`appTextMuted`) when disabled.
+///
+/// Two bottom-slot options exist for create / verification flows where a
+/// top-right action would scroll out of view: pass `bottomActionLabel` for
+/// the standard full-width primary CTA, or `stickyBottom` to inject a
+/// bespoke sticky bar (e.g. the verification-aware Professional-profile
+/// `Save & submit` bar). When `stickyBottom` is supplied it takes
+/// precedence and the top-right action is hidden.
 @MainActor
 public struct FormShell<Content: View>: View {
     private let title: String
+    private let leading: FormShellLeading
     private let rightActionLabel: String?
     private let bottomActionLabel: String?
+    private let stickyBottom: (() -> AnyView)?
     private let isValid: Bool
     private let isDirty: Bool
     private let isSaving: Bool
@@ -50,10 +67,16 @@ public struct FormShell<Content: View>: View {
     ///     confirms discard on a dirty one.
     ///   - onCommit: Invoked when the user taps the top-right action or
     ///     the bottom CTA.
+    ///   - leading: Leading top-bar control — `.close` (X, default) for
+    ///     sheet-style forms or `.back` (chevron) for pushed forms.
+    ///   - stickyBottom: Optional bespoke sticky bar pinned below the
+    ///     scroll area. Takes precedence over `bottomActionLabel` and hides
+    ///     the top-right action when supplied.
     ///   - content: Body view builder — typically a stack of
     ///     `FormFieldGroup`s.
     public init(
         title: String,
+        leading: FormShellLeading = .close,
         rightActionLabel: String? = "Save",
         bottomActionLabel: String? = nil,
         isValid: Bool,
@@ -61,11 +84,14 @@ public struct FormShell<Content: View>: View {
         isSaving: Bool = false,
         onClose: @escaping () -> Void,
         onCommit: @escaping () -> Void,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: () -> Content,
+        stickyBottom: (() -> AnyView)? = nil
     ) {
         self.title = title
+        self.leading = leading
         self.rightActionLabel = rightActionLabel
         self.bottomActionLabel = bottomActionLabel
+        self.stickyBottom = stickyBottom
         self.isValid = isValid
         self.isDirty = isDirty
         self.isSaving = isSaving
@@ -78,9 +104,10 @@ public struct FormShell<Content: View>: View {
         VStack(spacing: 0) {
             FormTopBar(
                 title: title,
+                leading: leading,
                 rightActionLabel: showsTopRightAction ? rightActionLabel : nil,
                 rightActionEnabled: isValid && isDirty && !isSaving,
-                isSaving: isSaving && bottomActionLabel == nil,
+                isSaving: isSaving && bottomActionLabel == nil && stickyBottom == nil,
                 onClose: handleClose,
                 onCommit: onCommit
             )
@@ -91,7 +118,9 @@ public struct FormShell<Content: View>: View {
                 .padding(.vertical, Spacing.s4)
             }
             .background(Theme.Color.appBg)
-            if let bottomActionLabel {
+            if let stickyBottom {
+                stickyBottom()
+            } else if let bottomActionLabel {
                 FormBottomCTA(
                     label: bottomActionLabel,
                     isEnabled: isValid && !isSaving,
@@ -115,7 +144,7 @@ public struct FormShell<Content: View>: View {
     }
 
     private var showsTopRightAction: Bool {
-        bottomActionLabel == nil && rightActionLabel != nil
+        bottomActionLabel == nil && stickyBottom == nil && rightActionLabel != nil
     }
 
     private func handleClose() {
@@ -130,6 +159,7 @@ public struct FormShell<Content: View>: View {
 /// 44pt top bar: leading X, centered title, optional trailing action label.
 private struct FormTopBar: View {
     let title: String
+    let leading: FormShellLeading
     let rightActionLabel: String?
     let rightActionEnabled: Bool
     let isSaving: Bool
@@ -144,11 +174,11 @@ private struct FormTopBar: View {
                 .accessibilityAddTraits(.isHeader)
             HStack {
                 Button(action: onClose) {
-                    Icon(.x, size: 22, color: Theme.Color.appText)
+                    Icon(leading == .back ? .chevronLeft : .x, size: 22, color: Theme.Color.appText)
                         .frame(width: 44, height: 44)
                 }
-                .accessibilityLabel("Close")
-                .accessibilityIdentifier("formCloseButton")
+                .accessibilityLabel(leading == .back ? "Back" : "Close")
+                .accessibilityIdentifier(leading == .back ? "formBackButton" : "formCloseButton")
                 Spacer()
                 if let rightActionLabel {
                     Button(action: onCommit) {

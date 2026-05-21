@@ -189,6 +189,7 @@ import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.EditProfileScreen
 import app.pantopus.android.ui.screens.profile.PUBLIC_PROFILE_USER_ID_KEY
 import app.pantopus.android.ui.screens.profile.PublicProfileScreen
+import app.pantopus.android.ui.screens.profile.professional.ProfessionalProfileScreen
 import app.pantopus.android.ui.screens.recent_activity.RecentActivityDestination
 import app.pantopus.android.ui.screens.recent_activity.RecentActivityScreen
 import app.pantopus.android.ui.screens.review_claims.ReviewClaimDetailScreen
@@ -2716,7 +2717,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             IdentityKind.Personal ->
                                 navController.navigate(ChildRoutes.placeholder("Personal"))
                             IdentityKind.Professional ->
-                                navController.navigate(ChildRoutes.placeholder("Professional"))
+                                navController.navigate(ChildRoutes.PROFESSIONAL_PROFILE)
                         }
                     },
                     onOpenPlaceholder = { label ->
@@ -2901,7 +2902,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.PROFESSIONAL_PROFILE) {
-                NotYetAvailableView(tabName = "Professional profile", icon = PantopusIcon.Briefcase)
+                ProfessionalProfileScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.EDIT_PERSONA,

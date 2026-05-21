@@ -777,7 +777,7 @@ public struct YouTabRoot: View {
                 }
             )
         case .professionalProfile:
-            NotYetAvailableView(tabName: "Professional profile", icon: .briefcase)
+            ProfessionalProfileView { if !path.isEmpty { path.removeLast() } }
         case .editPersona:
             NotYetAvailableView(tabName: "Edit persona", icon: .userRound)
         case .composeBroadcast:
@@ -1045,8 +1045,17 @@ public struct YouTabRoot: View {
         case .identityCenter:
             IdentityCenterView(
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onOpenIdentity: { _ in
-                    Task { @MainActor in path.append(.placeholder(label: "Identity")) }
+                onOpenIdentity: { card in
+                    Task { @MainActor in
+                        switch card.kind {
+                        case .professional:
+                            // A.5 — "Edit professional profile" from the
+                            // Professional identity card.
+                            path.append(.professionalProfile)
+                        case .local, .personal, .publicProfile:
+                            path.append(.placeholder(label: "Identity"))
+                        }
+                    }
                 }
             )
         case .audienceProfile:

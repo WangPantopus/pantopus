@@ -48,6 +48,9 @@ const val FORM_SHELL_TAG = "formShell"
 /** Test tag on the close (X) button. */
 const val FORM_CLOSE_BUTTON_TAG = "formCloseButton"
 
+/** Test tag on the back-chevron button. */
+const val FORM_BACK_BUTTON_TAG = "formBackButton"
+
 /** Test tag on the right-action commit button. */
 const val FORM_COMMIT_BUTTON_TAG = "formCommitButton"
 
@@ -57,7 +60,8 @@ const val FORM_BOTTOM_COMMIT_BUTTON_TAG = "formBottomCommitButton"
 /**
  * Scaffold for every Form screen — mirrors the iOS `FormShell`.
  *
- * 44dp top bar with a leading X, centered title, and a right-aligned
+ * 44dp top bar with a leading X (or back chevron for pushed forms),
+ * centered title, and a right-aligned
  * text action (`Save` / `Send` / `Done`). The action button renders in
  * `primary600` when enabled and `appTextMuted` when disabled. The
  * shell owns the dirty-close confirm dialog so feature screens don't
@@ -73,9 +77,16 @@ const val FORM_BOTTOM_COMMIT_BUTTON_TAG = "formBottomCommitButton"
  * @param onClose Invoked when the user taps X on a clean form, or
  *     confirms discard on a dirty one.
  * @param onCommit Invoked when the user taps the right action.
+ * @param leading Leading top-bar control — [FormShellLeading.Close] for
+ *     sheet-style forms or [FormShellLeading.Back] for pushed forms.
+ * @param stickyBottom Optional bespoke sticky bar pinned below the scroll
+ *     area. Takes precedence over [bottomActionLabel] and hides the
+ *     top-right action when supplied.
  * @param body Content slot — typically a vertical stack of
  *     [FormFieldGroup]s.
  */
+enum class FormShellLeading { Close, Back }
+
 @Composable
 fun FormShell(
     title: String,
@@ -86,6 +97,8 @@ fun FormShell(
     rightActionLabel: String? = "Save",
     bottomActionLabel: String? = null,
     isSaving: Boolean = false,
+    leading: FormShellLeading = FormShellLeading.Close,
+    stickyBottom: (@Composable () -> Unit)? = null,
     body: @Composable () -> Unit,
 ) {
     var showDiscardConfirm by remember { mutableStateOf(false) }
@@ -94,7 +107,7 @@ fun FormShell(
         if (isDirty) showDiscardConfirm = true else onClose()
     }
 
-    val showsTopRightAction = bottomActionLabel == null && rightActionLabel != null
+    val showsTopRightAction = bottomActionLabel == null && stickyBottom == null && rightActionLabel != null
 
     Column(
         modifier =
@@ -107,7 +120,8 @@ fun FormShell(
             title = title,
             rightActionLabel = if (showsTopRightAction) rightActionLabel else null,
             rightActionEnabled = isValid && isDirty && !isSaving,
-            isSaving = isSaving && bottomActionLabel == null,
+            isSaving = isSaving && bottomActionLabel == null && stickyBottom == null,
+            leading = leading,
             onClose = handleClose,
             onCommit = onCommit,
         )
@@ -122,7 +136,9 @@ fun FormShell(
         ) {
             body()
         }
-        if (bottomActionLabel != null) {
+        if (stickyBottom != null) {
+            stickyBottom()
+        } else if (bottomActionLabel != null) {
             FormBottomCTA(
                 label = bottomActionLabel,
                 isEnabled = isValid && !isSaving,
@@ -158,6 +174,7 @@ private fun FormTopBar(
     rightActionLabel: String?,
     rightActionEnabled: Boolean,
     isSaving: Boolean,
+    leading: FormShellLeading,
     onClose: () -> Unit,
     onCommit: () -> Unit,
 ) {
@@ -187,12 +204,12 @@ private fun FormTopBar(
                         Modifier
                             .size(44.dp)
                             .clickable(onClick = onClose)
-                            .testTag(FORM_CLOSE_BUTTON_TAG)
-                            .semantics { contentDescription = "Close" },
+                            .testTag(if (leading == FormShellLeading.Back) FORM_BACK_BUTTON_TAG else FORM_CLOSE_BUTTON_TAG)
+                            .semantics { contentDescription = if (leading == FormShellLeading.Back) "Back" else "Close" },
                     contentAlignment = Alignment.Center,
                 ) {
                     PantopusIconImage(
-                        icon = PantopusIcon.X,
+                        icon = if (leading == FormShellLeading.Back) PantopusIcon.ChevronLeft else PantopusIcon.X,
                         contentDescription = null,
                         size = 22.dp,
                         tint = PantopusColors.appText,

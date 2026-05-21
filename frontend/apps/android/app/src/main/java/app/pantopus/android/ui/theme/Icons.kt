@@ -53,6 +53,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.CropSquare
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -61,6 +63,7 @@ import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.Email
@@ -111,6 +114,7 @@ import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Pause
@@ -124,6 +128,7 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Print
@@ -252,6 +257,12 @@ enum class PantopusIcon(
     Clock("clock"),
     Users("users"),
     DollarSign("dollar-sign"),
+    Ribbon("ribbon"),
+    Palette("palette"),
+    PlayCircle("play-circle"),
+    GripVertical("grip-vertical"),
+    Grid3x3("grid-3x3"),
+    Square("square"),
 
     // T5.2.1 — Pets species iconography. Material doesn't ship dog / cat /
     // bird / fish / turtle vectors, so every species falls back to
@@ -537,6 +548,12 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Clock -> IconSource.Material(Icons.Filled.Schedule)
         PantopusIcon.Users -> IconSource.Material(Icons.Filled.Group)
         PantopusIcon.DollarSign -> IconSource.Material(Icons.Filled.AttachMoney)
+        PantopusIcon.Ribbon -> IconSource.Material(Icons.Filled.WorkspacePremium)
+        PantopusIcon.Palette -> IconSource.Material(Icons.Filled.Palette)
+        PantopusIcon.PlayCircle -> IconSource.Material(Icons.Filled.PlayCircle)
+        PantopusIcon.GripVertical -> IconSource.Material(Icons.Filled.DragIndicator)
+        PantopusIcon.Grid3x3 -> IconSource.Material(Icons.Filled.Dashboard)
+        PantopusIcon.Square -> IconSource.Material(Icons.Filled.CropSquare)
         PantopusIcon.Dog -> IconSource.Material(Icons.Filled.Pets)
         PantopusIcon.Cat -> IconSource.Material(Icons.Filled.Pets)
         PantopusIcon.Bird -> IconSource.Material(Icons.Filled.Pets)
