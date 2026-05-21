@@ -965,6 +965,60 @@ private object ChildRoutes {
             "&$CHAT_ONLINE_KEY=false" +
             "&$CHAT_SCROLL_TO_KEY=${enc(result.matchedMessageId ?: "")}"
     }
+
+    // ---- Wave A bootstrap placeholders ------------------------------------
+    // Routes pre-staged so every Wave A screen lands its navigation in one PR
+    // without colliding on this file. Each is wired to NotYetAvailableView in
+    // the NavHost below; when an A.x screen ships, swap that one composable
+    // body for the real screen (the route + builder here are already correct).
+
+    /** A.x — Full "Today" detail expansion. Distinct from [TODAY]. */
+    const val TODAY_DETAIL = "hub/today/detail"
+
+    /** A.4 — Property details for a home. */
+    const val PROPERTY_DETAILS_HOME_ID_KEY = "homeId"
+    const val PROPERTY_DETAILS = "homes/{$PROPERTY_DETAILS_HOME_ID_KEY}/property"
+
+    fun propertyDetails(homeId: String): String = "homes/$homeId/property"
+
+    /** A.3 — Add a guest to a home. */
+    const val ADD_GUEST_HOME_ID_KEY = "homeId"
+    const val ADD_GUEST = "homes/{$ADD_GUEST_HOME_ID_KEY}/guests/new"
+
+    fun addGuest(homeId: String): String = "homes/$homeId/guests/new"
+
+    /** A.x — Tasks map (full-bleed map of household / neighbourhood tasks). */
+    const val TASKS_MAP = "tasks/map"
+
+    /** A.x — Explore (neighbourhood discovery surface). */
+    const val EXPLORE = "explore"
+
+    /** B.1 prerequisite — Mailbox root archetype. */
+    const val MAILBOX_ROOT = "mailbox/root"
+
+    /** A.x — Mailbox map. */
+    const val MAILBOX_MAP = "mailbox/map"
+
+    /** A.x — Membership detail for a persona. */
+    const val MEMBERSHIP_DETAIL_PERSONA_ID_KEY = "personaId"
+    const val MEMBERSHIP_DETAIL = "personas/{$MEMBERSHIP_DETAIL_PERSONA_ID_KEY}/membership"
+
+    fun membershipDetail(personaId: String): String = "personas/$personaId/membership"
+
+    /** A.5 — Professional profile. */
+    const val PROFESSIONAL_PROFILE = "professional-profile"
+
+    /** A.6 — Edit persona. */
+    const val EDIT_PERSONA_PERSONA_ID_KEY = "personaId"
+    const val EDIT_PERSONA = "personas/{$EDIT_PERSONA_PERSONA_ID_KEY}/edit"
+
+    fun editPersona(personaId: String): String = "personas/$personaId/edit"
+
+    /** A.7 — Compose broadcast from a persona. */
+    const val COMPOSE_BROADCAST_PERSONA_ID_KEY = "personaId"
+    const val COMPOSE_BROADCAST = "personas/{$COMPOSE_BROADCAST_PERSONA_ID_KEY}/broadcast/new"
+
+    fun composeBroadcast(personaId: String): String = "personas/$personaId/broadcast/new"
 }
 
 /**
@@ -2786,6 +2840,61 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             ) { entry ->
                 val label = entry.arguments?.getString(ChildRoutes.PLACEHOLDER_LABEL_KEY) ?: "This"
                 NotYetAvailableView(tabName = label, icon = PantopusIcon.Info)
+            }
+            // ---- Wave A bootstrap placeholders. Swap each body for the real
+            // screen when the matching A.x screen ships. ----
+            composable(ChildRoutes.TODAY_DETAIL) {
+                NotYetAvailableView(tabName = "Today detail", icon = PantopusIcon.Sun)
+            }
+            composable(
+                route = ChildRoutes.PROPERTY_DETAILS,
+                arguments =
+                    listOf(navArgument(ChildRoutes.PROPERTY_DETAILS_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                NotYetAvailableView(tabName = "Property details", icon = PantopusIcon.Home)
+            }
+            composable(
+                route = ChildRoutes.ADD_GUEST,
+                arguments =
+                    listOf(navArgument(ChildRoutes.ADD_GUEST_HOME_ID_KEY) { type = NavType.StringType }),
+            ) {
+                NotYetAvailableView(tabName = "Add guest", icon = PantopusIcon.UserPlus)
+            }
+            composable(ChildRoutes.TASKS_MAP) {
+                NotYetAvailableView(tabName = "Tasks map", icon = PantopusIcon.Map)
+            }
+            composable(ChildRoutes.EXPLORE) {
+                NotYetAvailableView(tabName = "Explore", icon = PantopusIcon.Compass)
+            }
+            composable(ChildRoutes.MAILBOX_ROOT) {
+                NotYetAvailableView(tabName = "Mailbox", icon = PantopusIcon.Mailbox)
+            }
+            composable(ChildRoutes.MAILBOX_MAP) {
+                NotYetAvailableView(tabName = "Mailbox map", icon = PantopusIcon.Map)
+            }
+            composable(
+                route = ChildRoutes.MEMBERSHIP_DETAIL,
+                arguments =
+                    listOf(navArgument(ChildRoutes.MEMBERSHIP_DETAIL_PERSONA_ID_KEY) { type = NavType.StringType }),
+            ) {
+                NotYetAvailableView(tabName = "Membership", icon = PantopusIcon.Crown)
+            }
+            composable(ChildRoutes.PROFESSIONAL_PROFILE) {
+                NotYetAvailableView(tabName = "Professional profile", icon = PantopusIcon.Briefcase)
+            }
+            composable(
+                route = ChildRoutes.EDIT_PERSONA,
+                arguments =
+                    listOf(navArgument(ChildRoutes.EDIT_PERSONA_PERSONA_ID_KEY) { type = NavType.StringType }),
+            ) {
+                NotYetAvailableView(tabName = "Edit persona", icon = PantopusIcon.UserRound)
+            }
+            composable(
+                route = ChildRoutes.COMPOSE_BROADCAST,
+                arguments =
+                    listOf(navArgument(ChildRoutes.COMPOSE_BROADCAST_PERSONA_ID_KEY) { type = NavType.StringType }),
+            ) {
+                NotYetAvailableView(tabName = "Compose broadcast", icon = PantopusIcon.Megaphone)
             }
             composable(ChildRoutes.ADD_HOME) {
                 AddHomeWizardScreen(
