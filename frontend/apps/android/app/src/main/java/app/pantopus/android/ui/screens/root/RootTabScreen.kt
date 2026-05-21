@@ -140,6 +140,7 @@ import app.pantopus.android.ui.screens.homes.polls.PollDetailScreen
 import app.pantopus.android.ui.screens.homes.polls.PollsListScreen
 import app.pantopus.android.ui.screens.homes.polls.START_POLL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.polls.StartPollFormScreen
+import app.pantopus.android.ui.screens.homes.property_details.PropertyDetailsScreen
 import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_TASK_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.AddHouseholdTaskFormScreen
@@ -1354,6 +1355,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onOpenMembers = { homeId ->
                         navController.navigate(ChildRoutes.homeMembers(homeId))
+                    },
+                    onOpenPropertyDetails = { homeId ->
+                        navController.navigate(ChildRoutes.propertyDetails(homeId))
                     },
                 )
             }
@@ -2858,7 +2862,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments =
                     listOf(navArgument(ChildRoutes.PROPERTY_DETAILS_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
-                NotYetAvailableView(tabName = "Property details", icon = PantopusIcon.Home)
+                PropertyDetailsScreen(
+                    onBack = { navController.popBackStack() },
+                    onRequestCorrection = {
+                        navController.navigate(ChildRoutes.placeholder("Request correction"))
+                    },
+                )
             }
             composable(
                 route = ChildRoutes.ADD_GUEST,

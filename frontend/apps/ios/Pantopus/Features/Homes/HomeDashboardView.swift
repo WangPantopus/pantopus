@@ -67,6 +67,10 @@ struct HomeDashboardView: View {
     /// quick-action tile or "Add member" CTA (T6.3a / P9). Receives
     /// this home's id so the destination can pre-fetch the roster.
     private let onOpenMembers: ((String) -> Void)?
+    /// A.4 / A13.5 — Push onto the host stack when the user taps the
+    /// "Property details" affordance in the Overview section. Receives
+    /// this home's id so the destination can resolve the property.
+    private let onOpenPropertyDetails: ((String) -> Void)?
 
     init(
         homeId: String,
@@ -83,7 +87,8 @@ struct HomeDashboardView: View {
         onOpenPackages: ((String) -> Void)? = nil,
         onOpenTasks: ((String) -> Void)? = nil,
         onOpenMaintenance: ((String) -> Void)? = nil,
-        onOpenMembers: ((String) -> Void)? = nil
+        onOpenMembers: ((String) -> Void)? = nil,
+        onOpenPropertyDetails: ((String) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
         self.homeId = homeId
@@ -101,6 +106,7 @@ struct HomeDashboardView: View {
         self.onOpenTasks = onOpenTasks
         self.onOpenMaintenance = onOpenMaintenance
         self.onOpenMembers = onOpenMembers
+        self.onOpenPropertyDetails = onOpenPropertyDetails
     }
 
     /// Current signed-in user's email — used by the Invite Owner form
@@ -156,7 +162,9 @@ struct HomeDashboardView: View {
                         ),
                         onQuickAction: { handleQuickAction($0) },
                         overview: {
-                            HomeOverviewSection(content: content)
+                            HomeOverviewSection(content: content) {
+                                onOpenPropertyDetails?(homeId)
+                            }
                         }
                     )
                 }
@@ -294,20 +302,64 @@ private struct ClaimOwnershipBanner: View {
 
 private struct HomeOverviewSection: View {
     let content: HomeDashboardContent
+    let onOpenPropertyDetails: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            SectionHeader("Summary")
-            KeyFactsPanel(rows: [
-                KeyFactRow(id: "address", label: "Address", value: content.address),
-                KeyFactRow(id: "status", label: "Status", value: content.verified ? "Verified" : "Unverified"),
-                KeyFactRow(
-                    id: "members",
-                    label: "Members",
-                    value: content.stats.first { $0.id == "members" }?.value ?? "—"
-                )
-            ])
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            VStack(alignment: .leading, spacing: Spacing.s3) {
+                SectionHeader("Summary")
+                KeyFactsPanel(rows: [
+                    KeyFactRow(id: "address", label: "Address", value: content.address),
+                    KeyFactRow(id: "status", label: "Status", value: content.verified ? "Verified" : "Unverified"),
+                    KeyFactRow(
+                        id: "members",
+                        label: "Members",
+                        value: content.stats.first { $0.id == "members" }?.value ?? "—"
+                    )
+                ])
+            }
+            VStack(alignment: .leading, spacing: Spacing.s3) {
+                SectionHeader("About this home")
+                PropertyDetailsRow(onTap: onOpenPropertyDetails)
+            }
         }
+    }
+}
+
+/// Tappable affordance into A.4 — Property details (county records, beds,
+/// baths, and verification sources).
+private struct PropertyDetailsRow: View {
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Spacing.s3) {
+                Icon(.home, size: 20, color: Theme.Color.home)
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    Text("Property details")
+                        .pantopusTextStyle(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("County records, beds, baths & verification")
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                Spacer(minLength: Spacing.s2)
+                Icon(.chevronRight, size: 18, color: Theme.Color.appTextMuted)
+            }
+            .padding(Spacing.s4)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: 44)
+        .accessibilityIdentifier("homeDashboard_propertyDetailsRow")
+        .accessibilityHint("Opens property details")
     }
 }
 

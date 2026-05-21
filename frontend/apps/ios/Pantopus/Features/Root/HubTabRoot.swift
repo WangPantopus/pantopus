@@ -505,6 +505,9 @@ public struct HubTabRoot: View {
                 },
                 onOpenMembers: { id in
                     Task { @MainActor in push(.homeMembers(homeId: id)) }
+                },
+                onOpenPropertyDetails: { id in
+                    Task { @MainActor in push(.propertyDetails(homeId: id)) }
                 }
             )
         case let .homeMaintenance(homeId):
@@ -1352,8 +1355,14 @@ public struct HubTabRoot: View {
         // ships, swap its single line below for the real view.
         case .todayDetail:
             TodayDetailView { pop() }
-        case .propertyDetails:
-            NotYetAvailableView(tabName: "Property details", icon: .home)
+        case let .propertyDetails(homeId):
+            PropertyDetailsView(
+                homeId: homeId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onRequestCorrection: {
+                    Task { @MainActor in push(.placeholder(label: "Request correction")) }
+                }
+            )
         case let .addGuest(homeId):
             // A13.1 — Add Guest form. Normally presented via
             // `fullScreenCover` from the Members screen's Guests tab; this
