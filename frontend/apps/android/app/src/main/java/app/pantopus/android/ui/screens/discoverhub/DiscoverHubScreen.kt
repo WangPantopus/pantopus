@@ -9,7 +9,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
+import app.pantopus.android.ui.screens.shared.list_of_rows.FabTint
+import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
+import app.pantopus.android.ui.theme.PantopusIcon
 
 /** Test tag on the Discover hub screen root container. */
 const val DISCOVER_HUB_TAG = "discoverHub"
@@ -24,6 +28,7 @@ const val DISCOVER_HUB_TAG = "discoverHub"
 fun DiscoverHubScreen(
     onBack: () -> Unit,
     onSelect: (DiscoverHubTarget) -> Unit,
+    onOpenMap: () -> Unit,
     viewModel: DiscoverHubViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -44,6 +49,14 @@ fun DiscoverHubScreen(
             onRefresh = { viewModel.refresh() },
             onEndReached = {},
             topBarAction = topBarAction,
+            fab =
+                FabAction(
+                    icon = PantopusIcon.Map,
+                    contentDescription = "Open map",
+                    variant = FabVariant.ExtendedNav(label = "Open map"),
+                    tint = FabTint.Sky,
+                    onClick = onOpenMap,
+                ),
             onBack = onBack,
             chipStrip = chipStrip,
         )

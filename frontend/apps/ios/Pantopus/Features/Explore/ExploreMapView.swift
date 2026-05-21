@@ -381,6 +381,10 @@ public struct ExploreMapView: View {
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityIdentifier("exploreSheetCount")
+            if viewModel.filters.activeCount > 0 {
+                ExploreActiveFilterChip(count: viewModel.filters.activeCount)
+                    .padding(.leading, 4)
+            }
             Spacer()
             Menu {
                 ForEach(ExploreSort.allCases) { sort in
@@ -706,6 +710,22 @@ private struct ExploreBadgeChip: View {
             .padding(.vertical, 1)
             .background(colors.0)
             .clipShape(Capsule())
+    }
+}
+
+private struct ExploreActiveFilterChip: View {
+    let count: Int
+
+    var body: some View {
+        Text("\(count)")
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(Theme.Color.appTextInverse)
+            .frame(minWidth: 16, minHeight: 16)
+            .padding(.horizontal, 5)
+            .background(Theme.Color.primary600)
+            .clipShape(Capsule())
+            .accessibilityLabel("\(count) active filters")
+            .accessibilityIdentifier("exploreSheetFilterCount")
     }
 }
 

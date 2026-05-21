@@ -45,11 +45,15 @@ public struct ExploreFilterCriteria: Sendable, Hashable {
 
     /// Index of the active distance stop (falls back to the default stop).
     public var distanceIndex: Int {
-        Self.distanceStops.firstIndex(of: distanceUpper) ?? Self.distanceDefaultIndex
+        Self.distanceStops.firstIndex(of: distanceUpper)
+            ?? Self.distanceStops.indices.min {
+                abs(Self.distanceStops[$0] - distanceUpper) < abs(Self.distanceStops[$1] - distanceUpper)
+            }
+            ?? Self.distanceDefaultIndex
     }
 
     public var isDistanceActive: Bool {
-        distanceIndex != Self.distanceDefaultIndex
+        distanceUpper < Self.distanceStops[Self.distanceDefaultIndex]
     }
 
     public var isKindActive: Bool {

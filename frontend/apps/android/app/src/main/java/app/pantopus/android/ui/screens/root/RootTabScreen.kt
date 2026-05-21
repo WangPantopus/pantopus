@@ -57,6 +57,9 @@ import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesScre
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesTarget
 import app.pantopus.android.ui.screens.discoverhub.DiscoverHubScreen
 import app.pantopus.android.ui.screens.discoverhub.DiscoverHubTarget
+import app.pantopus.android.ui.screens.explore.ExploreEntity
+import app.pantopus.android.ui.screens.explore.ExploreKind
+import app.pantopus.android.ui.screens.explore.ExploreMapScreen
 import app.pantopus.android.ui.screens.feed.FeedScreen
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.gigs.GigSearchScreen
@@ -2434,6 +2437,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 navController.navigate(ChildRoutes.MARKETPLACE)
                         }
                     },
+                    onOpenMap = { navController.navigate(ChildRoutes.EXPLORE) },
                 )
             }
             composable(ChildRoutes.DISCOVER_BUSINESSES) {
@@ -2912,7 +2916,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.EXPLORE) {
-                NotYetAvailableView(tabName = "Explore", icon = PantopusIcon.Compass)
+                ExploreMapScreen(
+                    onOpenEntity = { entity: ExploreEntity ->
+                        when (entity.kind) {
+                            ExploreKind.Task -> navController.navigate(ChildRoutes.gigDetail(entity.id))
+                            ExploreKind.Item -> navController.navigate(ChildRoutes.listingDetail(entity.id))
+                            ExploreKind.Post -> navController.navigate(ChildRoutes.pulsePost(entity.id))
+                            ExploreKind.Spot -> navController.navigate(ChildRoutes.businessProfile(entity.id))
+                        }
+                    },
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(ChildRoutes.MAILBOX_ROOT) {
                 NotYetAvailableView(tabName = "Mailbox", icon = PantopusIcon.Mailbox)

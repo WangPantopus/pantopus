@@ -10,6 +10,7 @@ import app.pantopus.android.ui.screens.shared.filter_sheet.FilterOption
 import app.pantopus.android.ui.screens.shared.filter_sheet.FilterSection
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
+import kotlin.math.abs
 
 /**
  * A11.2 Explore — content models for the cross-type discovery map.
@@ -171,9 +172,11 @@ data class ExploreFilterCriteria(
     val openNow: Boolean = false,
 ) {
     val distanceIndex: Int
-        get() = DISTANCE_STOPS.indexOf(distanceUpper).takeIf { it >= 0 } ?: DISTANCE_DEFAULT_INDEX
+        get() =
+            DISTANCE_STOPS.indexOf(distanceUpper).takeIf { it >= 0 }
+                ?: DISTANCE_STOPS.indices.minBy { abs(DISTANCE_STOPS[it] - distanceUpper) }
 
-    val isDistanceActive: Boolean get() = distanceIndex != DISTANCE_DEFAULT_INDEX
+    val isDistanceActive: Boolean get() = distanceUpper < DISTANCE_STOPS[DISTANCE_DEFAULT_INDEX]
 
     val isKindActive: Boolean get() = kinds.isNotEmpty() && kinds.size < ExploreKind.entries.size
 

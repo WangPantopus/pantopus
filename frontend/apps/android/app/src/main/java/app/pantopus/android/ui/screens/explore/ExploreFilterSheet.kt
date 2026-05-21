@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.explore
 
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import app.pantopus.android.ui.screens.shared.filter_sheet.FilterSheetShell
 
@@ -11,6 +12,7 @@ import app.pantopus.android.ui.screens.shared.filter_sheet.FilterSheetShell
  * slider), and verified-only / open-now toggles. Mirrors the iOS
  * `ExploreFilterSheet.swift`.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreFilterSheet(
     criteria: ExploreFilterCriteria,
