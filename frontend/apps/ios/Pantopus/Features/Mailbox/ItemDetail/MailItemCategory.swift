@@ -27,6 +27,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
     case membership
     case delivery
     case social
+    case gig
     case general
 
     /// 4pt accent strip color sitting at the top of the detail shell.
@@ -48,6 +49,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .membership: Theme.Color.personal
         case .delivery: Theme.Color.handyman
         case .social: Theme.Color.cleaning
+        case .gig: Theme.Color.handyman // "cat-gigs" orange per A17.6 gig accent
         case .general: Theme.Color.appTextSecondary
         }
     }
@@ -73,6 +75,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .membership: .badgeCheck
         case .delivery: .package
         case .social: .users
+        case .gig: .handCoins
         case .general: .mailbox
         }
     }
@@ -96,6 +99,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .membership: Theme.Color.personalBg
         case .delivery: Theme.Color.appSurfaceSunken
         case .social: Theme.Color.homeBg
+        case .gig: Theme.Color.warningBg
         case .general: Theme.Color.appSurfaceSunken
         }
     }
@@ -120,6 +124,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .membership: "Membership"
         case .delivery: "Delivery"
         case .social: "Social"
+        case .gig: "Gig"
         case .general: "Mail"
         }
     }

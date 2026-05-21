@@ -151,6 +151,14 @@ enum class MailItemCategory(
         label = "Social",
         detailTrust = MailDetailTrust.Neutral,
     ),
+    Gig(
+        raw = "gig",
+        accent = PantopusColors.handyman, // "cat-gigs" orange per A17.6 gig accent
+        icon = PantopusIcon.HandCoins,
+        rowBackground = PantopusColors.warningBg,
+        label = "Gig",
+        detailTrust = MailDetailTrust.Neutral,
+    ),
     General(
         raw = "general",
         accent = PantopusColors.appTextSecondary,

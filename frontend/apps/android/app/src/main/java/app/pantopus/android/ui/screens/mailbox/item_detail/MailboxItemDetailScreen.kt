@@ -30,6 +30,7 @@ import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.BookletBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CertifiedBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CouponBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.GigBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.MailItemPlaceholderBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.PackageBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedTermsSheet
@@ -116,6 +117,7 @@ fun MailboxItemDetailScreen(
                         ackChecked = ackChecked,
                         onAckChange = { viewModel.setCertifiedAckChecked(it) },
                         onViewTerms = showTerms,
+                        onAcceptGig = { viewModel.acceptGigBid() },
                     )
                 }
             }
@@ -193,6 +195,7 @@ private fun CategoryBody(
     ackChecked: Boolean,
     onAckChange: (Boolean) -> Unit,
     onViewTerms: () -> Unit,
+    onAcceptGig: () -> Unit,
 ) {
     when {
         content.category == MailItemCategory.Package && content.packageInfo != null ->
@@ -210,6 +213,11 @@ private fun CategoryBody(
                 isAcknowledged = ackChecked,
                 onAcknowledgedChange = onAckChange,
                 onViewTerms = onViewTerms,
+            )
+        content.payload is MailboxCategoryPayload.Gig ->
+            GigBody(
+                gig = content.payload.detail,
+                onAccept = onAcceptGig,
             )
         content.category != MailItemCategory.Package ->
             MailItemPlaceholderBody(category = content.category)

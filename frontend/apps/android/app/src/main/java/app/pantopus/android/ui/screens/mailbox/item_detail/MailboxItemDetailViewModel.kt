@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.mailbox.v2.BookletDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxCategoryPayload
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxV2Item
 import app.pantopus.android.data.api.models.mailbox.v2.PackageDetailResponse
@@ -324,6 +325,7 @@ class MailboxItemDetailViewModel
                         MailItemCategory.Coupon,
                         MailItemCategory.Booklet,
                         MailItemCategory.Certified,
+                        MailItemCategory.Gig,
                         ->
                             _state.value =
                                 MailboxItemDetailUiState.Loaded(projectCategoryBody(item, category))
@@ -354,8 +356,58 @@ class MailboxItemDetailViewModel
                 is MailboxCategoryPayload.Coupon -> projectCoupon(item, category, payload.detail, baseTrust)
                 is MailboxCategoryPayload.Booklet -> projectBooklet(item, category, payload.detail, baseTrust)
                 is MailboxCategoryPayload.Certified -> projectCertified(item, category, payload.detail)
+                is MailboxCategoryPayload.Gig -> projectGig(item, category, payload.detail, baseTrust)
                 MailboxCategoryPayload.Other -> projectBase(item, category)
             }
+        }
+
+        /**
+         * Gig (A17.6) — the bidder becomes the sender; the rich gig surface
+         * (bidder/post/bid cards + action row or accepted timeline) lives in
+         * `GigBody`, so the shell carries no AI elf / KeyFacts / timeline and
+         * no sticky CTA shelf (the three-way action row is in the body).
+         */
+        private fun projectGig(
+            item: MailboxV2Item,
+            category: MailItemCategory,
+            gig: GigDetailDto,
+            baseTrust: MailTrust,
+        ): MailboxItemDetailContent =
+            MailboxItemDetailContent(
+                category = category,
+                trust = baseTrust,
+                sender =
+                    SenderBlockContent(
+                        displayName = gig.bidder.name,
+                        meta = item.createdAt,
+                        initials = initials(gig.bidder.name),
+                        senderUserId = item.senderUserId,
+                    ),
+                aiElf = null,
+                keyFacts = emptyList(),
+                timeline = emptyList(),
+                packageInfo = null,
+                ctaEnabled = true,
+                payload = MailboxCategoryPayload.Gig(gig),
+            )
+
+        /**
+         * Accept the incoming bid. Optimistically flips the gig payload into
+         * its accepted state (the body swaps the action row for the next-steps
+         * timeline). No network — the gig action endpoint was removed with the
+         * backend; re-point this at the real endpoint when it lands.
+         */
+        fun acceptGigBid() {
+            val current = _state.value as? MailboxItemDetailUiState.Loaded ?: return
+            val payload = current.content.payload as? MailboxCategoryPayload.Gig ?: return
+            if (payload.detail.isAccepted) return
+            _state.value =
+                MailboxItemDetailUiState.Loaded(
+                    current.content.copy(
+                        ctaEnabled = false,
+                        payload = MailboxCategoryPayload.Gig(payload.detail.accepted()),
+                    ),
+                )
         }
 
         private fun projectCoupon(

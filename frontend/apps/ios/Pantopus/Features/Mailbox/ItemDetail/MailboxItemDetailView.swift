@@ -125,6 +125,11 @@ struct MailboxItemDetailView: View {
                     termsSheet = TermsSheetItem(url: url)
                 }
             }
+        case let (.gig, .gig(gig)):
+            GigBody(
+                gig: gig,
+                onAccept: { Task { await viewModel.acceptGigBid() } }
+            )
         default:
             MailItemPlaceholderBody(category: content.category)
         }

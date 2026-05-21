@@ -17,6 +17,8 @@ sealed interface MailboxCategoryPayload {
 
     data class Certified(val detail: CertifiedDetailDto) : MailboxCategoryPayload
 
+    data class Gig(val detail: GigDetailDto) : MailboxCategoryPayload
+
     /**
      * No category-specific decoder applies (Package, Bill, Notice, …).
      * Bodies fall back to the generic placeholder layout.
@@ -43,6 +45,9 @@ sealed interface MailboxCategoryPayload {
                 MailItemCategory.Certified ->
                     CertifiedDetailDto.decodeFromObjectPayload(objectPayload)
                         ?.let(::Certified) ?: Other
+                MailItemCategory.Gig ->
+                    GigDetailDto.decodeFromObjectPayload(objectPayload)
+                        ?.let(::Gig) ?: Other
                 else -> Other
             }
     }
