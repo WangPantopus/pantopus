@@ -116,11 +116,11 @@ final class MeViewModelTests: XCTestCase {
         XCTAssertEqual(personal.stats.count, 3)
         XCTAssertEqual(personal.stats.first { $0.id == "trust" }?.value, "Verified")
         XCTAssertEqual(personal.stats.first { $0.id == "reputation" }?.value, "4.9")
-        XCTAssertEqual(personal.actionTiles.count, 6)
-        // T6.2b action grid is { posts, bids, gigs, offers, listings, connections }.
+        XCTAssertEqual(personal.actionTiles.count, 7)
+        // T6.2b action grid is { posts, bids, gigs, offers, listings, connections, support trains }.
         XCTAssertEqual(
             personal.actionTiles.map(\.routeKey),
-            ["me.posts", "me.bids", "me.gigs", "me.offers", "me.listings", "me.connections"]
+            ["me.posts", "me.bids", "me.gigs", "me.offers", "me.listings", "me.connections", "me.supportTrains"]
         )
         // T6.2b — sections grouped as Profile & Privacy, Activity, Help & Legal
         // (+ Debug appended in DEBUG builds; assert by header prefix).

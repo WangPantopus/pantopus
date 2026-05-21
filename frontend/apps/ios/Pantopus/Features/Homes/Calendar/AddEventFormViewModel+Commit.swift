@@ -148,7 +148,7 @@ extension AddEventFormViewModel {
         return cal.date(from: comps) ?? now
     }
 
-    /// Same heuristic as the agenda row: midnight + nil end → all-day.
+    /// Backend stores all-day events as midnight UTC + nil end.
     static func isAllDayHeuristic(start: Date, end: Date?, endIso: String?) -> Bool {
         let cal = utcCalendar()
         let parts = cal.dateComponents([.hour, .minute, .second], from: start)

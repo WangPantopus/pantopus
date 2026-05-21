@@ -165,7 +165,8 @@ public final class MeViewModel {
                 MeActionTile(id: "gigs", icon: .clipboardList, label: "My tasks", routeKey: "me.gigs"),
                 MeActionTile(id: "offers", icon: .handCoins, label: "Offers", routeKey: "me.offers"),
                 MeActionTile(id: "listings", icon: .shoppingBag, label: "Listings", routeKey: "me.listings"),
-                MeActionTile(id: "connections", icon: .userPlus, label: "Connections", routeKey: "me.connections")
+                MeActionTile(id: "connections", icon: .userPlus, label: "Connections", routeKey: "me.connections"),
+                MeActionTile(id: "supportTrains", icon: .handCoins, label: "Support trains", routeKey: "me.supportTrains")
             ],
             sections: withDebug([
                 MeSection(id: "profile_privacy", header: "Profile & Privacy", rows: [

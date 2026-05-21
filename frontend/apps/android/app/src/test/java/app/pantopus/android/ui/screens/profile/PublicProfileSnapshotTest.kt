@@ -60,7 +60,7 @@ class PublicProfileSnapshotTest {
     @Test
     fun public_profile_error() {
         paparazzi.snapshot {
-            Frame { ErrorLayout(message = "Check your connection and try again.", onRetry = {}) }
+            Frame { ErrorLayout(message = "Check your connection and try again.", onRetry = {}, onBack = {}) }
         }
     }
 
