@@ -64,7 +64,9 @@ final class IconTests: XCTestCase {
         // P6.5 Public profile · Persona vs Local.
         "message-square", "globe",
         // P2.10 Document detail — sticky-footer action glyphs.
-        "external-link", "refresh-cw"
+        "external-link", "refresh-cw",
+        // A13.1 Add Guest — allowed-area chips.
+        "door-open", "car", "warehouse"
     ]
 
     func testInventoryMatches() {

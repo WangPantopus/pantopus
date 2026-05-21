@@ -227,6 +227,9 @@ public struct HubTabRoot: View {
     /// P6.6 — share / mail system sheet driven by "Share listing",
     /// "Share train", and "Invite a business".
     @State private var systemSheet: SystemSheetRequest?
+    /// Full-screen modal routes. A13.1 Add Guest uses this so the tab
+    /// bar is not visible while the access-grant form is open.
+    @State private var modalRoute: HubModalRoute?
     /// P6.6 — "Find people" → contacts picker → invite share.
     @State private var showFindPeople = false
     #if DEBUG
@@ -283,6 +286,9 @@ public struct HubTabRoot: View {
         }
         .task {
             consumeDeepLinkIfNeeded(pending: router.pending)
+        }
+        .fullScreenCover(item: $modalRoute) { item in
+            destination(for: item.route) { path.append($0) }
         }
         .sheet(item: $systemSheet) { request in request.makeView() }
         .findPeopleSheet(isPresented: $showFindPeople)
@@ -845,7 +851,9 @@ public struct HubTabRoot: View {
                 if !path.isEmpty { path.removeLast() }
             }
         case let .homeMembers(homeId):
-            MembersListView(homeId: homeId)
+            MembersListView(homeId: homeId) {
+                modalRoute = HubModalRoute(route: .addGuest(homeId: homeId))
+            }
         case let .claimOwnership(homeId):
             ClaimOwnershipWizardView(
                 homeId: homeId,
@@ -1352,8 +1360,13 @@ public struct HubTabRoot: View {
             NotYetAvailableView(tabName: "Today detail", icon: .sun)
         case .propertyDetails:
             NotYetAvailableView(tabName: "Property details", icon: .home)
-        case .addGuest:
-            NotYetAvailableView(tabName: "Add guest", icon: .userPlus)
+        case let .addGuest(homeId):
+            // A13.1 — Add Guest form. Normally presented via
+            // `fullScreenCover` from the Members screen's Guests tab; this
+            // route case remains concrete for debug/deep-link parity.
+            AddGuestFormView(
+                viewModel: AddGuestFormViewModel(homeId: homeId)
+            )
         case .tasksMap:
             NotYetAvailableView(tabName: "Tasks map", icon: .map)
         case .explore:
@@ -1431,6 +1444,14 @@ public struct HubTabRoot: View {
             onOpenPoll: openPoll,
             onStartPoll: startPoll
         )
+    }
+}
+
+private struct HubModalRoute: Identifiable, Equatable {
+    let route: HubRoute
+
+    var id: HubRoute {
+        route
     }
 }
 

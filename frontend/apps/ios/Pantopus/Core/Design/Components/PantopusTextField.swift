@@ -23,6 +23,7 @@ public struct PantopusTextField: View {
     private let label: String
     private let placeholder: String
     private let state: PantopusFieldState
+    private let isRequired: Bool
     private let isSecure: Bool
     private let keyboardType: UIKeyboardType
     private let contentType: UITextContentType?
@@ -35,6 +36,7 @@ public struct PantopusTextField: View {
         text: Binding<String>,
         placeholder: String = "",
         state: PantopusFieldState = .default,
+        isRequired: Bool = false,
         isSecure: Bool = false,
         keyboardType: UIKeyboardType = .default,
         contentType: UITextContentType? = nil,
@@ -44,6 +46,7 @@ public struct PantopusTextField: View {
         _text = text
         self.placeholder = placeholder
         self.state = state
+        self.isRequired = isRequired
         self.isSecure = isSecure
         self.keyboardType = keyboardType
         self.contentType = contentType
@@ -52,9 +55,17 @@ public struct PantopusTextField: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
-            Text(label)
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
+            HStack(spacing: 2) {
+                Text(label)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                if isRequired {
+                    Text("*")
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.error)
+                        .accessibilityHidden(true)
+                }
+            }
 
             HStack(spacing: Spacing.s2) {
                 input
@@ -111,11 +122,13 @@ public struct PantopusTextField: View {
     }
 
     private var a11yLabel: String {
-        switch state {
-        case let .error(msg): "\(label), error: \(msg)"
-        case .valid: "\(label), valid"
-        case .default: label
-        }
+        let base: String =
+            switch state {
+            case let .error(msg): "\(label), error: \(msg)"
+            case .valid: "\(label), valid"
+            case .default: label
+            }
+        return isRequired ? "\(base), required" : base
     }
 }
 

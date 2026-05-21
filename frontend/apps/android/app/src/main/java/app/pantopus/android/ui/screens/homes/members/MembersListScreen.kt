@@ -33,6 +33,7 @@ const val MEMBERS_LIST_TAG = "membersList"
 @Composable
 fun MembersListScreen(
     onBack: () -> Unit,
+    onAddGuest: () -> Unit = {},
     viewModel: MembersListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -53,6 +54,10 @@ fun MembersListScreen(
             null -> Unit
             MembersListEvent.OpenInvite -> {
                 inviting = true
+                viewModel.acknowledgeEvent()
+            }
+            MembersListEvent.OpenAddGuest -> {
+                onAddGuest()
                 viewModel.acknowledgeEvent()
             }
             is MembersListEvent.ConfirmRemove -> {

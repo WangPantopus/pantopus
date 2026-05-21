@@ -19,9 +19,11 @@ public struct MembersListView: View {
     @State private var removeConfirm: RemoveTarget?
 
     private let homeId: String
+    private let onAddGuest: () -> Void
 
-    public init(homeId: String) {
+    public init(homeId: String, onAddGuest: @escaping () -> Void = {}) {
         self.homeId = homeId
+        self.onAddGuest = onAddGuest
         _viewModel = State(initialValue: MembersListViewModel(homeId: homeId))
     }
 
@@ -65,6 +67,8 @@ public struct MembersListView: View {
         switch event {
         case .openInvite:
             showingInvite = true
+        case .openAddGuest:
+            onAddGuest()
         case let .confirmRemove(userId, name):
             removeConfirm = RemoveTarget(userId: userId, name: name)
         }
