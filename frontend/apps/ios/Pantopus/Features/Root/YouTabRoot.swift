@@ -780,8 +780,14 @@ public struct YouTabRoot: View {
             ProfessionalProfileView { if !path.isEmpty { path.removeLast() } }
         case .editPersona:
             NotYetAvailableView(tabName: "Edit persona", icon: .userRound)
-        case .composeBroadcast:
-            NotYetAvailableView(tabName: "Compose broadcast", icon: .megaphone)
+        case let .composeBroadcast(personaId):
+            ComposeBroadcastView(
+                viewModel: .live(
+                    personaId: personaId,
+                    onSent: { if !path.isEmpty { path.removeLast() } }
+                ),
+                onClose: { if !path.isEmpty { path.removeLast() } }
+            )
         case .offers:
             OffersView(
                 viewModel: OffersViewModel(
@@ -1084,6 +1090,9 @@ public struct YouTabRoot: View {
                 },
                 onOpenMembership: { personaId in
                     Task { @MainActor in path.append(.membershipDetail(personaId: personaId)) }
+                },
+                onComposeBroadcast: { personaId in
+                    Task { @MainActor in path.append(.composeBroadcast(personaId: personaId)) }
                 }
             )
         case let .broadcastDetail(broadcastId, card, tierSegments):

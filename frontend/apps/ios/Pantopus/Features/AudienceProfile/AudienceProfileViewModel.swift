@@ -27,7 +27,9 @@ public final class AudienceProfileViewModel {
     public var composer: UpdateComposerState = .init()
 
     private let api: APIClient
-    private var personaId: String?
+    /// Exposed so the host can route the full Compose Broadcast surface
+    /// (`YouRoute.composeBroadcast(personaId:)`) with the persona id.
+    public private(set) var personaId: String?
     private var personaHandle: String?
     private var channelId: String?
 

@@ -181,6 +181,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     // archive / scan) + category section icons (lease / insurance /
     // warranty / tax / permit / hoa / id) + banner / row chip glyphs.
     case image
+    case imagePlus = "image-plus"
     case fileType = "file-type"
     case fileSpreadsheet = "file-spreadsheet"
     case fileSignature = "file-signature"
@@ -417,6 +418,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .alertTriangle: "exclamationmark.triangle"
         // T6.4b Documents
         case .image: "photo"
+        case .imagePlus: "photo.badge.plus"
         case .fileType: "doc.fill"
         case .fileSpreadsheet: "tablecells"
         case .fileSignature: "doc.text.fill"

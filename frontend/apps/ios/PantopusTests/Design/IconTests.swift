@@ -51,7 +51,7 @@ final class IconTests: XCTestCase {
         "siren", "stethoscope", "cross", "flag", "user-round", "flask-conical",
         "flame-kindling", "printer", "alert-triangle",
         // T6.4b Documents — file-type tiles, category rows, and document actions.
-        "image", "file-type", "file-spreadsheet", "file-signature", "landmark",
+        "image", "image-plus", "file-type", "file-spreadsheet", "file-signature", "landmark",
         "stamp", "id-card", "folder-lock", "upload-cloud", "calendar-clock", "download",
         // T6.3c Household tasks — chore-category iconography + banner glyph.
         "leaf", "list-checks", "utensils", "baby",

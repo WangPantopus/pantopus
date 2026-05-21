@@ -34,6 +34,8 @@ import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileViewModel
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BROADCAST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BroadcastDetailScreen
+import app.pantopus.android.ui.screens.audience_profile.compose_broadcast.COMPOSE_BROADCAST_PERSONA_ID_KEY
+import app.pantopus.android.ui.screens.audience_profile.compose_broadcast.ComposeBroadcastScreen
 import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_BUSINESS_ID_KEY
 import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
@@ -2673,6 +2675,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenMembership = { personaId ->
                         navController.navigate(ChildRoutes.membershipDetail(personaId))
                     },
+                    onComposeBroadcast = { personaId ->
+                        navController.navigate(ChildRoutes.composeBroadcast(personaId))
+                    },
                     viewModel = audienceViewModel,
                 )
             }
@@ -2694,6 +2699,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onPin = {
                         navController.navigate(ChildRoutes.placeholder("Pin broadcast"))
                     },
+                )
+            }
+            composable(
+                ChildRoutes.COMPOSE_BROADCAST,
+                arguments = listOf(navArgument(COMPOSE_BROADCAST_PERSONA_ID_KEY) { type = NavType.StringType }),
+            ) {
+                ComposeBroadcastScreen(
+                    onClose = { navController.popBackStack() },
+                    onSent = { navController.popBackStack() },
                 )
             }
             composable(ChildRoutes.CREATOR_INBOX) {
