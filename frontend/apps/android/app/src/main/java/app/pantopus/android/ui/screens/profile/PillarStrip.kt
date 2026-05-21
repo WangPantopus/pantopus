@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "MatchingDeclarationName", "LongParameterList")
+@file:Suppress("MagicNumber", "MatchingDeclarationName", "LongParameterList", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.profile
 
