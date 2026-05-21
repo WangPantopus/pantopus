@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod")
+@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod", "LongParameterList", "TooManyFunctions")
 @file:OptIn(com.google.maps.android.compose.MapsComposeExperimentalApi::class)
 
 package app.pantopus.android.ui.screens.explore

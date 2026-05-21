@@ -191,13 +191,11 @@ data class ExploreFilterCriteria(
             return count
         }
 
-    fun matches(entity: ExploreEntity): Boolean {
-        if (isKindActive && !kinds.contains(entity.kind)) return false
-        if (isDistanceActive && entity.distanceMiles > distanceUpper) return false
-        if (verifiedOnly && !entity.verified) return false
-        if (openNow && !entity.openNow) return false
-        return true
-    }
+    fun matches(entity: ExploreEntity): Boolean =
+        (!isKindActive || kinds.contains(entity.kind)) &&
+            (!isDistanceActive || entity.distanceMiles <= distanceUpper) &&
+            (!verifiedOnly || entity.verified) &&
+            (!openNow || entity.openNow)
 
     fun toSections(): List<FilterSection> =
         listOf(

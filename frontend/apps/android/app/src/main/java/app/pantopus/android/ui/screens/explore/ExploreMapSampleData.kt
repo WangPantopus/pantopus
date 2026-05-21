@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.explore
 
 import app.pantopus.android.data.location.UserCoordinate
+import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
@@ -375,7 +376,7 @@ object ExploreMapSampleData {
     private fun distanceLabel(miles: Double): String =
         when {
             miles < 0.1 -> "< 0.1 mi"
-            miles < 10 -> String.format("%.1f mi", miles)
+            miles < 10 -> String.format(Locale.US, "%.1f mi", miles)
             else -> "${miles.toInt()} mi"
         }
 }
