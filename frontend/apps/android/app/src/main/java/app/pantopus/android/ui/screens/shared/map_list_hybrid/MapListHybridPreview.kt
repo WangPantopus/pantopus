@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -59,13 +60,19 @@ fun MapListHybridShellStaticPreview(
     sheetBody: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    BoxWithConstraints(
         modifier =
             modifier
                 .fillMaxSize()
                 .background(PantopusColors.appBg)
                 .testTag("mapListHybridShellPreview"),
     ) {
+        val sheetHeight = detent.height(maxHeight)
+        val controlsBottom =
+            minOf(
+                sheetHeight + 14.dp,
+                (maxHeight - CONTROLS_TOP_RESERVE).coerceAtLeast(14.dp),
+            )
         // Flat pale-blue stand-in for the live map canvas. Holds a
         // testTag so snapshot tests can target it deterministically.
         Box(
@@ -102,7 +109,7 @@ fun MapListHybridShellStaticPreview(
             modifier =
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 14.dp, bottom = detent.height + 14.dp)
+                    .padding(end = 14.dp, bottom = controlsBottom)
                     .testTag("mapListHybridMapControls"),
         ) {
             mapControls()
@@ -113,7 +120,7 @@ fun MapListHybridShellStaticPreview(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .height(detent.height)
+                    .height(sheetHeight)
                     .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(PantopusColors.appSurface)
                     .shadow(elevation = 10.dp, shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))

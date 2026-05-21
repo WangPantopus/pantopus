@@ -48,6 +48,7 @@ public struct MapListHybridShell<
     private let pins: [MapPin]
     private let anchor: MapAnchor?
     private let selectedPinId: String?
+    private let recenterTrigger: Int
     private let onPinTap: (String) -> Void
     @Binding private var detent: MapListHybridDetent
 
@@ -61,10 +62,19 @@ public struct MapListHybridShell<
     @State private var cameraPosition: MapCameraPosition = .automatic
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Vertical room reserved below the safe-area top for the floating
+    /// map-control stack, so a near-full sheet can't push it off-screen
+    /// (≈ a 48pt FAB + two 38pt control buttons + gaps). Computed (not
+    /// stored) — generic types can't hold static stored properties.
+    private static var controlsTopReserve: CGFloat {
+        168
+    }
+
     public init(
         pins: [MapPin],
         anchor: MapAnchor? = nil,
         selectedPinId: String? = nil,
+        recenterTrigger: Int = 0,
         detent: Binding<MapListHybridDetent>,
         onPinTap: @escaping (String) -> Void = { _ in },
         @ViewBuilder topPill: @escaping () -> TopPill = { EmptyView() },
@@ -76,6 +86,7 @@ public struct MapListHybridShell<
         self.pins = pins
         self.anchor = anchor
         self.selectedPinId = selectedPinId
+        self.recenterTrigger = recenterTrigger
         _detent = detent
         self.onPinTap = onPinTap
         self.topPill = topPill
@@ -87,7 +98,15 @@ public struct MapListHybridShell<
 
     public var body: some View {
         GeometryReader { geo in
-            let sheetHeight = max(120, detent.height + dragTranslation)
+            let sheetHeight = max(120, detent.height(in: geo.size.height) + dragTranslation)
+            // Map controls follow the sheet edge, but clamp so a tall
+            // detent (the 90% expanded stop) can't push the stack off the
+            // top of the screen — the topmost control (e.g. a Post-task
+            // FAB) stays pinned in the visible map strip.
+            let controlsInset = min(
+                sheetHeight + 14,
+                max(14, geo.size.height - geo.safeAreaInsets.top - Self.controlsTopReserve)
+            )
             ZStack(alignment: .top) {
                 mapLayer
                 topPill()
@@ -97,8 +116,8 @@ public struct MapListHybridShell<
                 categoryChips()
                     .padding(.top, geo.safeAreaInsets.top + 50)
                     .accessibilityIdentifier("mapListHybridChips")
-                mapControlsLayer(bottomInset: sheetHeight + 14)
-                bottomSheet(height: sheetHeight)
+                mapControlsLayer(bottomInset: controlsInset)
+                bottomSheet(height: sheetHeight, containerHeight: geo.size.height)
             }
             .ignoresSafeArea(edges: .bottom)
         }
@@ -107,6 +126,9 @@ public struct MapListHybridShell<
             recenterCamera()
         }
         .onChange(of: anchor) { _, _ in
+            recenterCamera()
+        }
+        .onChange(of: recenterTrigger) { _, _ in
             recenterCamera()
         }
     }
@@ -168,7 +190,7 @@ public struct MapListHybridShell<
 
     // MARK: - Bottom sheet
 
-    private func bottomSheet(height: CGFloat) -> some View {
+    private func bottomSheet(height: CGFloat, containerHeight: CGFloat) -> some View {
         VStack(spacing: 0) {
             Spacer(minLength: 0)
             VStack(spacing: 0) {
@@ -197,11 +219,14 @@ public struct MapListHybridShell<
                         // Pass raw velocity (positive = downward) so the
                         // resolver semantics align with Android + web.
                         let velocity = gesture.predictedEndTranslation.height
-                        let displacedHeight = detent.height + dragTranslation
+                        let displacedHeight = detent.height(in: containerHeight) + dragTranslation
+                        let displacedFraction = containerHeight > 0
+                            ? displacedHeight / containerHeight
+                            : detent.heightFraction
                         let target = MapListHybridDetentResolver.resolve(
                             from: detent,
                             velocity: velocity,
-                            displacedHeight: displacedHeight
+                            displacedFraction: displacedFraction
                         )
                         withAnimation(snapAnimation) {
                             detent = target
