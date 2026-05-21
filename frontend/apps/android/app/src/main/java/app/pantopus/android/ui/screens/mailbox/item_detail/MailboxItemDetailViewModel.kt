@@ -10,6 +10,7 @@ import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxCategoryPayload
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxV2Item
+import app.pantopus.android.data.api.models.mailbox.v2.MemoryDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.PackageDetailResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
@@ -146,8 +147,27 @@ class MailboxItemDetailViewModel
                 MailItemCategory.Certified -> {
                     if (_certifiedAckChecked.value) acknowledgeReceipt()
                 }
+                MailItemCategory.Memory -> saveMemoryToVault()
                 else -> Unit
             }
+        }
+
+        /**
+         * "Save to Vault" — client-side keepsake flip (no backend).
+         * Re-projects the loaded content with `isSaved == true` so the body
+         * swaps the facts grid for the vault-location card and the elf copy
+         * switches to the saved variant. No-ops if already kept.
+         */
+        private fun saveMemoryToVault() {
+            val current = _state.value as? MailboxItemDetailUiState.Loaded ?: return
+            val payload = current.content.payload as? MailboxCategoryPayload.Memory ?: return
+            if (payload.detail.isSaved) return
+            _state.value =
+                MailboxItemDetailUiState.Loaded(
+                    current.content.copy(
+                        payload = MailboxCategoryPayload.Memory(payload.detail.copy(isSaved = true)),
+                    ),
+                )
         }
 
         /** Ghost CTA tap. Mirrors [performPrimaryAction]'s dispatch. */
@@ -324,6 +344,7 @@ class MailboxItemDetailViewModel
                         MailItemCategory.Coupon,
                         MailItemCategory.Booklet,
                         MailItemCategory.Certified,
+                        MailItemCategory.Memory,
                         ->
                             _state.value =
                                 MailboxItemDetailUiState.Loaded(projectCategoryBody(item, category))
@@ -354,9 +375,39 @@ class MailboxItemDetailViewModel
                 is MailboxCategoryPayload.Coupon -> projectCoupon(item, category, payload.detail, baseTrust)
                 is MailboxCategoryPayload.Booklet -> projectBooklet(item, category, payload.detail, baseTrust)
                 is MailboxCategoryPayload.Certified -> projectCertified(item, category, payload.detail)
+                is MailboxCategoryPayload.Memory -> projectMemory(item, category, payload.detail)
                 MailboxCategoryPayload.Other -> projectBase(item, category)
             }
         }
+
+        /**
+         * Memory (A17.7) — project the keepsake payload. The body owns the
+         * polaroid / note / facts / vault rendering; the shell only needs a
+         * verified sender block (the elf + facts are not the standard
+         * slots), so [aiElf] / keyFacts / timeline stay empty.
+         */
+        private fun projectMemory(
+            item: MailboxV2Item,
+            category: MailItemCategory,
+            memory: MemoryDetailDto,
+        ): MailboxItemDetailContent =
+            MailboxItemDetailContent(
+                category = category,
+                trust = MailTrust.Verified,
+                sender =
+                    SenderBlockContent(
+                        displayName = item.senderDisplay,
+                        meta = item.createdAt,
+                        initials = initials(item.senderDisplay),
+                        senderUserId = item.senderUserId,
+                    ),
+                aiElf = null,
+                keyFacts = emptyList(),
+                timeline = emptyList(),
+                packageInfo = null,
+                ctaEnabled = true,
+                payload = MailboxCategoryPayload.Memory(memory),
+            )
 
         private fun projectCoupon(
             item: MailboxV2Item,

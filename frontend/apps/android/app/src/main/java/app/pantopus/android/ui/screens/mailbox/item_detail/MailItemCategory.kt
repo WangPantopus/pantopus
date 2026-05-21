@@ -151,6 +151,15 @@ enum class MailItemCategory(
         label = "Social",
         detailTrust = MailDetailTrust.Neutral,
     ),
+    Memory(
+        raw = "memory",
+        // Sun-amber per A17.7 stationery-summer accent.
+        accent = PantopusColors.warning,
+        icon = PantopusIcon.Heart,
+        rowBackground = PantopusColors.warningBg,
+        label = "Memory",
+        detailTrust = MailDetailTrust.Verified,
+    ),
     General(
         raw = "general",
         accent = PantopusColors.appTextSecondary,
