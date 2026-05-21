@@ -222,9 +222,6 @@ private object ChildRoutes {
     const val MY_CLAIMS = "homes/my-claims"
     const val ADD_HOME = "homes/add"
 
-    /** P6.6 — Today detail (weather + AQI + commute + today's events). */
-    const val TODAY = "hub/today"
-
     /** P6.6 — "Register a business · coming soon" waitlist surface. */
     const val BUSINESS_WAITLIST = "businesses/waitlist"
     const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
@@ -972,7 +969,7 @@ private object ChildRoutes {
     // the NavHost below; when an A.x screen ships, swap that one composable
     // body for the real screen (the route + builder here are already correct).
 
-    /** A.x — Full "Today" detail expansion. Distinct from [TODAY]. */
+    /** A10.3 — Full "Today" briefing (weather, air, daylight, signals). */
     const val TODAY_DETAIL = "hub/today/detail"
 
     /** A.4 — Property details for a home. */
@@ -1192,7 +1189,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             is HubNavigationIntent.JumpBackTapped ->
                                 routeForJumpBackIn(intent.item).also { navController.navigate(it) }
                             HubNavigationIntent.OpenToday ->
-                                navController.navigate(ChildRoutes.TODAY)
+                                navController.navigate(ChildRoutes.TODAY_DETAIL)
                             HubNavigationIntent.OpenRecentActivity ->
                                 navController.navigate(ChildRoutes.RECENT_ACTIVITY)
                         }
@@ -2844,7 +2841,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             // ---- Wave A bootstrap placeholders. Swap each body for the real
             // screen when the matching A.x screen ships. ----
             composable(ChildRoutes.TODAY_DETAIL) {
-                NotYetAvailableView(tabName = "Today detail", icon = PantopusIcon.Sun)
+                TodayDetailScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.PROPERTY_DETAILS,
@@ -2906,9 +2903,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.homeDashboard(homeId))
                     },
                 )
-            }
-            composable(ChildRoutes.TODAY) {
-                TodayDetailScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.BUSINESS_WAITLIST) {
                 BusinessWaitlistScreen(onBack = { navController.popBackStack() })
