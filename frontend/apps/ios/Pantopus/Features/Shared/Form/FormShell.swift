@@ -32,6 +32,7 @@ public enum FormShellLeading: Sendable {
 @MainActor
 public struct FormShell<Content: View>: View {
     private let title: String
+    private let subtitle: String?
     private let leading: FormShellLeading
     private let rightActionLabel: String?
     private let bottomActionLabel: String?
@@ -48,6 +49,9 @@ public struct FormShell<Content: View>: View {
 
     /// - Parameters:
     ///   - title: Centered top-bar title.
+    ///   - subtitle: Optional second line under the title (e.g. an
+    ///     `@handle`). Rendered small + secondary; `nil` keeps the single-
+    ///     line title used by every other consumer.
     ///   - rightActionLabel: Text for the trailing top-bar action (`Save`,
     ///     `Send`, `Post`, `Done`). Defaults to `"Save"`. Pass `nil` to hide
     ///     the top-right action entirely — typically paired with a
@@ -80,6 +84,7 @@ public struct FormShell<Content: View>: View {
     ///     `FormFieldGroup`s.
     public init(
         title: String,
+        subtitle: String? = nil,
         leading: FormShellLeading = .close,
         rightActionLabel: String? = "Save",
         bottomActionLabel: String? = nil,
@@ -93,6 +98,7 @@ public struct FormShell<Content: View>: View {
         stickyBottom: (() -> AnyView)? = nil
     ) {
         self.title = title
+        self.subtitle = subtitle
         self.leading = leading
         self.rightActionLabel = rightActionLabel
         self.bottomActionLabel = bottomActionLabel
@@ -110,6 +116,7 @@ public struct FormShell<Content: View>: View {
         VStack(spacing: 0) {
             FormTopBar(
                 title: title,
+                subtitle: subtitle,
                 leading: leading,
                 rightActionLabel: showsTopRightAction ? rightActionLabel : nil,
                 rightActionEnabled: isValid && isDirty && !isSaving,
@@ -166,6 +173,7 @@ public struct FormShell<Content: View>: View {
 /// 44pt top bar: leading X, centered title, optional trailing action label.
 private struct FormTopBar: View {
     let title: String
+    let subtitle: String?
     let leading: FormShellLeading
     let rightActionLabel: String?
     let rightActionEnabled: Bool
@@ -175,10 +183,18 @@ private struct FormTopBar: View {
 
     var body: some View {
         ZStack {
-            Text(title)
-                .pantopusTextStyle(.body)
-                .foregroundStyle(Theme.Color.appText)
-                .accessibilityAddTraits(.isHeader)
+            VStack(spacing: 1) {
+                Text(title)
+                    .pantopusTextStyle(.body)
+                    .foregroundStyle(Theme.Color.appText)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
             HStack {
                 Button(action: onClose) {
                     Icon(leading == .back ? .chevronLeft : .x, size: 22, color: Theme.Color.appText)

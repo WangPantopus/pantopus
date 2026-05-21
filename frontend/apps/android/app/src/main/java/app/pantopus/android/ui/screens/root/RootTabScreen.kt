@@ -34,6 +34,8 @@ import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileViewModel
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BROADCAST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BroadcastDetailScreen
+import app.pantopus.android.ui.screens.audience_profile.edit_persona.EditPersonaSampleData
+import app.pantopus.android.ui.screens.audience_profile.edit_persona.EditPersonaScreen
 import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_BUSINESS_ID_KEY
 import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
@@ -2680,6 +2682,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenMembership = { personaId ->
                         navController.navigate(ChildRoutes.membershipDetail(personaId))
                     },
+                    onOpenEditPersona = {
+                        navController.navigate(ChildRoutes.editPersona(EditPersonaSampleData.PERSONA_ID))
+                    },
                     viewModel = audienceViewModel,
                 )
             }
@@ -2946,7 +2951,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments =
                     listOf(navArgument(ChildRoutes.EDIT_PERSONA_PERSONA_ID_KEY) { type = NavType.StringType }),
             ) {
-                NotYetAvailableView(tabName = "Edit persona", icon = PantopusIcon.UserRound)
+                EditPersonaScreen(
+                    onClose = { navController.popBackStack() },
+                )
             }
             composable(
                 route = ChildRoutes.COMPOSE_BROADCAST,
