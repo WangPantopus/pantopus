@@ -43,58 +43,50 @@ public struct EditPersonaView: View {
     @ViewBuilder private var content: some View {
         switch viewModel.state {
         case .loading:
-            shell(
-                subtitle: nil,
-                isDirty: false,
-                body: { EditPersonaLoadingBody() },
-                sticky: { EmptyView() }
-            )
+            shell(subtitle: nil, isDirty: false, body: { EditPersonaLoadingBody() }, stickyBottom: nil)
         case let .live(loaded):
             shell(
                 subtitle: loaded.atHandle,
                 isDirty: false,
                 body: { EditPersonaEditor(content: loaded, variant: .live) },
-                sticky: { PersonaStickyBar(variant: .live, onDiscard: onClose) }
+                stickyBottom: { AnyView(PersonaStickyBar(variant: .live, onDiscard: onClose)) }
             )
         case let .setup(loaded, done, total):
             shell(
                 subtitle: loaded.atHandle,
                 isDirty: true,
                 body: { EditPersonaEditor(content: loaded, variant: .setup, stepsDone: done, stepsTotal: total) },
-                sticky: { PersonaStickyBar(variant: .setup, onDiscard: onClose) }
+                stickyBottom: { AnyView(PersonaStickyBar(variant: .setup, onDiscard: onClose)) }
             )
         case let .error(message):
             shell(
                 subtitle: nil,
                 isDirty: false,
                 body: { EditPersonaErrorBody(message: message) { Task { await viewModel.load() } } },
-                sticky: { EmptyView() }
+                stickyBottom: nil
             )
         }
     }
 
-    /// Compose `FormShell` (chrome + scroll + dirty-close confirm) with a
-    /// custom sticky bar pinned below the scroll area.
+    /// Compose `FormShell` (chrome + scroll + dirty-close confirm) with the
+    /// shared `stickyBottom` slot for the persona-aware sticky save bar.
     private func shell(
         subtitle: String?,
         isDirty: Bool,
         @ViewBuilder body: () -> some View,
-        @ViewBuilder sticky: () -> some View
+        stickyBottom: (() -> AnyView)?
     ) -> some View {
-        VStack(spacing: 0) {
-            FormShell(
-                title: "Edit persona",
-                subtitle: subtitle,
-                rightActionLabel: nil,
-                isValid: true,
-                isDirty: isDirty,
-                onClose: onClose,
-                onCommit: personaNoOp
-            ) {
-                body()
-            }
-            sticky()
-        }
+        FormShell(
+            title: "Edit persona",
+            subtitle: subtitle,
+            rightActionLabel: nil,
+            isValid: true,
+            isDirty: isDirty,
+            onClose: onClose,
+            onCommit: personaNoOp,
+            content: { body() },
+            stickyBottom: stickyBottom
+        )
     }
 }
 

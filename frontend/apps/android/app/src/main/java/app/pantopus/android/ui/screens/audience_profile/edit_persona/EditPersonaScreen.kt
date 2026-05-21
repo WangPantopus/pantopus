@@ -64,7 +64,7 @@ fun EditPersonaScreen(
 
     when (val current = state) {
         is EditPersonaUiState.Loading ->
-            EditPersonaShell(subtitle = null, isDirty = false, onClose = onClose, sticky = {}) {
+            EditPersonaShell(subtitle = null, isDirty = false, onClose = onClose, stickyBottom = null) {
                 LoadingFrame()
             }
         is EditPersonaUiState.Live ->
@@ -82,7 +82,7 @@ fun EditPersonaScreen(
                 onClose = onClose,
             )
         is EditPersonaUiState.Error ->
-            EditPersonaShell(subtitle = null, isDirty = false, onClose = onClose, sticky = {}) {
+            EditPersonaShell(subtitle = null, isDirty = false, onClose = onClose, stickyBottom = null) {
                 ErrorFrame(message = current.message, onRetry = viewModel::load)
             }
     }
@@ -104,7 +104,7 @@ internal fun EditPersonaLoadedContent(
         subtitle = content.atHandle,
         isDirty = variant == EditPersonaVariant.Setup,
         onClose = onClose,
-        sticky = { StickyBar(variant = variant, onDiscard = onClose) },
+        stickyBottom = { StickyBar(variant = variant, onDiscard = onClose) },
     ) {
         EditPersonaEditor(
             content = content,
@@ -120,29 +120,21 @@ private fun EditPersonaShell(
     subtitle: String?,
     isDirty: Boolean,
     onClose: () -> Unit,
-    sticky: @Composable () -> Unit,
+    stickyBottom: (@Composable () -> Unit)?,
     body: @Composable () -> Unit,
 ) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(PantopusColors.appBg)
-                .testTag("editPersona"),
-    ) {
-        Box(modifier = Modifier.weight(1f)) {
-            FormShell(
-                title = "Edit persona",
-                subtitle = subtitle,
-                isValid = true,
-                isDirty = isDirty,
-                onClose = onClose,
-                onCommit = {},
-                rightActionLabel = null,
-                body = body,
-            )
-        }
-        sticky()
+    Box(modifier = Modifier.fillMaxSize().testTag("editPersona")) {
+        FormShell(
+            title = "Edit persona",
+            subtitle = subtitle,
+            isValid = true,
+            isDirty = isDirty,
+            onClose = onClose,
+            onCommit = {},
+            rightActionLabel = null,
+            stickyBottom = stickyBottom,
+            body = body,
+        )
     }
 }
 
