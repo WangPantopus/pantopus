@@ -77,6 +77,13 @@ class IconTest {
             "clock",
             "users",
             "dollar-sign",
+            // A13.11 — Professional profile.
+            "ribbon",
+            "palette",
+            "play-circle",
+            "grip-vertical",
+            "grid-3x3",
+            "square",
             "dog",
             "cat",
             "bird",

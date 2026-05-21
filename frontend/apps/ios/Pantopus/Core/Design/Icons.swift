@@ -256,6 +256,18 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case bus
     case droplets
 
+    // A.5 (A13.11) Professional profile — certification seal glyph, portfolio
+    // host glyphs (palette / play-circle for Behance / YouTube previews),
+    // skill-chip glyphs (grid-3x3 / square), and the drag-reorder handle.
+    // SF Symbols ships near-1:1 equivalents; `grip-vertical` has no native
+    // drag-handle glyph so it falls back to `line.3.horizontal`.
+    case ribbon
+    case palette
+    case playCircle = "play-circle"
+    case gripVertical = "grip-vertical"
+    case grid3x3 = "grid-3x3"
+    case square
+
     // A13.1 Add guest — "Allowed areas" guest-pass chip iconography.
     // Mirrors the `data-lucide` tokens in the Add Guest design
     // (`door-open` / `car` / `warehouse`). `warehouse` backs the
@@ -466,6 +478,15 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .wind: "wind"
         case .bus: "bus.fill"
         case .droplets: "drop"
+        // A.5 Professional profile. `rosette` is the closest cert-seal glyph;
+        // `grip-vertical` collapses to the hamburger `line.3.horizontal`
+        // since SF Symbols has no 2-column drag-dot handle.
+        case .ribbon: "rosette"
+        case .palette: "paintpalette"
+        case .playCircle: "play.circle"
+        case .gripVertical: "line.3.horizontal"
+        case .grid3x3: "square.grid.3x3"
+        case .square: "square"
         // A13.1 Add guest — allowed-areas chips.
         case .doorOpen: "door.left.hand.open"
         case .car: "car"
