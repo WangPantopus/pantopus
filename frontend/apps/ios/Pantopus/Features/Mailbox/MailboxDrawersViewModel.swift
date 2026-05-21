@@ -14,8 +14,16 @@ import Observation
 @MainActor
 final class MailboxDrawersViewModel: ListOfRowsDataSource {
     let title = "Mailbox"
+    /// A11.4 — surface the Mailbox map (physical postal venues) from the
+    /// drawers root. The dedicated mailbox-root archetype (Wave B) will
+    /// host this entry too once it lands.
     var topBarAction: TopBarAction? {
-        nil
+        TopBarAction(
+            icon: .map,
+            accessibilityLabel: "Map view"
+        ) { [weak self] in
+            Task { @MainActor in self?.onOpenMap() }
+        }
     }
 
     let tabs: [ListOfRowsTab] = []
@@ -29,15 +37,18 @@ final class MailboxDrawersViewModel: ListOfRowsDataSource {
     private let api: APIClient
     private let onOpenDrawer: (String) -> Void
     private let onOpenVault: () -> Void
+    private let onOpenMap: @MainActor () -> Void
 
     init(
         api: APIClient = .shared,
         onOpenDrawer: @escaping (String) -> Void = { _ in },
-        onOpenVault: @escaping () -> Void = {}
+        onOpenVault: @escaping () -> Void = {},
+        onOpenMap: @escaping @MainActor () -> Void = {}
     ) {
         self.api = api
         self.onOpenDrawer = onOpenDrawer
         self.onOpenVault = onOpenVault
+        self.onOpenMap = onOpenMap
     }
 
     func load() async {

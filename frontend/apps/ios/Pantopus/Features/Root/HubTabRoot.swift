@@ -937,7 +937,8 @@ public struct HubTabRoot: View {
                     },
                     onOpenVault: {
                         Task { @MainActor in push(.mailboxVault) }
-                    }
+                    },
+                    onOpenMap: { push(.mailboxMap) }
                 )
             )
         case let .drawerDetail(drawer):
@@ -1390,7 +1391,7 @@ public struct HubTabRoot: View {
         case .mailboxRoot:
             NotYetAvailableView(tabName: "Mailbox", icon: .mailbox)
         case .mailboxMap:
-            NotYetAvailableView(tabName: "Mailbox map", icon: .map)
+            MailboxMapView { pop() }
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to
