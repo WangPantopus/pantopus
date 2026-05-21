@@ -503,6 +503,9 @@ public struct HubTabRoot: View {
                 },
                 onOpenMembers: { id in
                     Task { @MainActor in push(.homeMembers(homeId: id)) }
+                },
+                onOpenPropertyDetails: { id in
+                    Task { @MainActor in push(.propertyDetails(homeId: id)) }
                 }
             )
         case let .homeMaintenance(homeId):
@@ -1350,8 +1353,14 @@ public struct HubTabRoot: View {
         // ships, swap its single line below for the real view.
         case .todayDetail:
             NotYetAvailableView(tabName: "Today detail", icon: .sun)
-        case .propertyDetails:
-            NotYetAvailableView(tabName: "Property details", icon: .home)
+        case let .propertyDetails(homeId):
+            PropertyDetailsView(
+                homeId: homeId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onRequestCorrection: {
+                    Task { @MainActor in push(.placeholder(label: "Request correction")) }
+                }
+            )
         case .addGuest:
             NotYetAvailableView(tabName: "Add guest", icon: .userPlus)
         case .tasksMap:

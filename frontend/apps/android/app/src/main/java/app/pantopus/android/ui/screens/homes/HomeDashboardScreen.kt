@@ -24,6 +24,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -69,6 +74,7 @@ fun HomeDashboardScreen(
     onOpenAccessCodes: ((homeId: String, homeName: String?) -> Unit)? = null,
     onOpenTasks: ((String) -> Unit)? = null,
     onOpenMaintenance: ((String) -> Unit)? = null,
+    onOpenPropertyDetails: ((String) -> Unit)? = null,
     /** T6.3a / P9 — push to the per-home Members list. When wired, the
      *  "Members" / "Add member" quick-actions navigate to the list
      *  (which owns its own invite FAB) instead of opening the legacy
@@ -199,6 +205,11 @@ fun HomeDashboardScreen(
                         }
                     },
                     onViewClaims = { onOpenClaimsList?.invoke() ?: openPlaceholder("verify") },
+                    onOpenPropertyDetails = {
+                        viewModel.currentHomeId()?.let { homeId ->
+                            onOpenPropertyDetails?.invoke(homeId) ?: openPlaceholder("property_details")
+                        }
+                    },
                 )
             is HomeDashboardUiState.Error ->
                 ErrorLayout(message = current.message, onBack = onBack, onRetry = viewModel::refresh)
@@ -216,6 +227,7 @@ private fun LoadedLayout(
     onFabAction: (String) -> Unit,
     onClaim: () -> Unit,
     onViewClaims: () -> Unit,
+    onOpenPropertyDetails: () -> Unit,
 ) {
     ContentDetailShell(
         title = "Home",
@@ -246,7 +258,7 @@ private fun LoadedLayout(
                     onSelectTab = onSelectTab,
                     onQuickAction = onQuickAction,
                 ) {
-                    OverviewSection(content = content)
+                    OverviewSection(content = content, onOpenPropertyDetails = onOpenPropertyDetails)
                 }
             }
         },
@@ -330,19 +342,73 @@ private fun ClaimOwnershipBanner(
 }
 
 @Composable
-private fun OverviewSection(content: HomeDashboardContent) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-        SectionHeader("Summary")
-        KeyFactsPanel(
-            rows =
-                listOf(
-                    KeyFactRow("Address", content.address),
-                    KeyFactRow("Status", if (content.verified) "Verified" else "Unverified"),
-                    KeyFactRow(
-                        label = "Members",
-                        value = content.stats.firstOrNull { it.id == "members" }?.value ?: "—",
+private fun OverviewSection(
+    content: HomeDashboardContent,
+    onOpenPropertyDetails: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+            SectionHeader("Summary")
+            KeyFactsPanel(
+                rows =
+                    listOf(
+                        KeyFactRow("Address", content.address),
+                        KeyFactRow("Status", if (content.verified) "Verified" else "Unverified"),
+                        KeyFactRow(
+                            label = "Members",
+                            value = content.stats.firstOrNull { it.id == "members" }?.value ?: "—",
+                        ),
                     ),
-                ),
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+            SectionHeader("About this home")
+            PropertyDetailsRow(onClick = onOpenPropertyDetails)
+        }
+    }
+}
+
+@Composable
+private fun PropertyDetailsRow(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.lg))
+                .clickable(onClick = onClick)
+                .padding(Spacing.s4)
+                .semantics(
+                    mergeDescendants = true,
+                ) {
+                    role = Role.Button
+                    contentDescription = "Property details. County records, beds, baths and verification"
+                }
+                .testTag("homeDashboard_propertyDetailsRow"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.Home, contentDescription = null, size = 20.dp, tint = PantopusColors.home)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+            Text(
+                text = "Property details",
+                style = PantopusTextStyle.body,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "County records, beds, baths & verification",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 18.dp,
+            tint = PantopusColors.appTextMuted,
         )
     }
 }
