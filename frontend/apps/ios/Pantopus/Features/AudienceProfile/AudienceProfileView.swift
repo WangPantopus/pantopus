@@ -21,6 +21,10 @@ public struct AudienceProfileView: View {
     private let onOpenBroadcast: @MainActor (UpdateCardContent, [TierBreakdownContent.TierSegment]) -> Void
     private let onOpenSetup: @MainActor () -> Void
     private let onOpenCreatorInbox: @MainActor () -> Void
+    /// A.10.8 — "You're a member" footer entry point into the fan-side
+    /// membership detail. Wave A direct-link until the Memberships index
+    /// list ships.
+    private let onOpenMembership: @MainActor (String) -> Void
 
     init(
         viewModel: AudienceProfileViewModel = AudienceProfileViewModel(),
@@ -29,7 +33,8 @@ public struct AudienceProfileView: View {
         onOpenThread: @escaping @MainActor (ThreadRowContent) -> Void = { _ in },
         onOpenBroadcast: @escaping @MainActor (UpdateCardContent, [TierBreakdownContent.TierSegment]) -> Void = { _, _ in },
         onOpenSetup: @escaping @MainActor () -> Void = {},
-        onOpenCreatorInbox: @escaping @MainActor () -> Void = {}
+        onOpenCreatorInbox: @escaping @MainActor () -> Void = {},
+        onOpenMembership: @escaping @MainActor (String) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
@@ -38,6 +43,7 @@ public struct AudienceProfileView: View {
         self.onOpenBroadcast = onOpenBroadcast
         self.onOpenSetup = onOpenSetup
         self.onOpenCreatorInbox = onOpenCreatorInbox
+        self.onOpenMembership = onOpenMembership
     }
 
     public var body: some View {
@@ -174,8 +180,50 @@ public struct AudienceProfileView: View {
             headerCard(loaded.header)
             tabStrip
             tabContent(loaded)
+            memberFooter
         }
         .accessibilityIdentifier("audienceProfileContent")
+    }
+
+    /// "You're a member" footer — the Wave A direct-link entry point into
+    /// the fan-side Membership detail (A10.8). The standalone Memberships
+    /// index list lands in a follow-up; until then this footer is the
+    /// single tap from a creator's profile to managing your tier.
+    private var memberFooter: some View {
+        let footer = MembershipSampleData.audienceFooter
+        return Button {
+            onOpenMembership(footer.personaId)
+        } label: {
+            HStack(spacing: Spacing.s2) {
+                Icon(.crown, size: 16, color: Theme.Color.primary600)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("You're a member")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("\(footer.personaName) · \(footer.tierName) tier")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Spacer(minLength: 0)
+                Text("Manage")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.primary700)
+                Icon(.chevronRight, size: 14, color: Theme.Color.primary600)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(minHeight: 44)
+            .background(Theme.Color.appSurface)
+            .overlay(alignment: .top) {
+                Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "You're a member of \(footer.personaName), \(footer.tierName) tier. Manage membership."
+        )
+        .accessibilityIdentifier("audienceProfileMemberFooter")
     }
 
     private func headerCard(_ header: AudienceHeaderContent) -> some View {

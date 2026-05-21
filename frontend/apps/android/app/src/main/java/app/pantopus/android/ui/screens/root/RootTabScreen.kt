@@ -176,6 +176,7 @@ import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
 import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
+import app.pantopus.android.ui.screens.membership.MembershipDetailScreen
 import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
 import app.pantopus.android.ui.screens.my_posts.MyPostsScreen
 import app.pantopus.android.ui.screens.my_tasks.MyTasksScreen
@@ -222,9 +223,6 @@ private object ChildRoutes {
     const val MY_HOMES = "homes/my-homes"
     const val MY_CLAIMS = "homes/my-claims"
     const val ADD_HOME = "homes/add"
-
-    /** P6.6 — Today detail (weather + AQI + commute + today's events). */
-    const val TODAY = "hub/today"
 
     /** P6.6 — "Register a business · coming soon" waitlist surface. */
     const val BUSINESS_WAITLIST = "businesses/waitlist"
@@ -973,7 +971,7 @@ private object ChildRoutes {
     // the NavHost below; when an A.x screen ships, swap that one composable
     // body for the real screen (the route + builder here are already correct).
 
-    /** A.x — Full "Today" detail expansion. Distinct from [TODAY]. */
+    /** A10.3 — Full "Today" briefing (weather, air, daylight, signals). */
     const val TODAY_DETAIL = "hub/today/detail"
 
     /** A.4 — Property details for a home. */
@@ -1193,7 +1191,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             is HubNavigationIntent.JumpBackTapped ->
                                 routeForJumpBackIn(intent.item).also { navController.navigate(it) }
                             HubNavigationIntent.OpenToday ->
-                                navController.navigate(ChildRoutes.TODAY)
+                                navController.navigate(ChildRoutes.TODAY_DETAIL)
                             HubNavigationIntent.OpenRecentActivity ->
                                 navController.navigate(ChildRoutes.RECENT_ACTIVITY)
                         }
@@ -2665,6 +2663,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenCreatorInbox = {
                         navController.navigate(ChildRoutes.CREATOR_INBOX)
                     },
+                    onOpenMembership = { personaId ->
+                        navController.navigate(ChildRoutes.membershipDetail(personaId))
+                    },
                     viewModel = audienceViewModel,
                 )
             }
@@ -2848,7 +2849,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             // ---- Wave A bootstrap placeholders. Swap each body for the real
             // screen when the matching A.x screen ships. ----
             composable(ChildRoutes.TODAY_DETAIL) {
-                NotYetAvailableView(tabName = "Today detail", icon = PantopusIcon.Sun)
+                TodayDetailScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.PROPERTY_DETAILS,
@@ -2886,7 +2887,27 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments =
                     listOf(navArgument(ChildRoutes.MEMBERSHIP_DETAIL_PERSONA_ID_KEY) { type = NavType.StringType }),
             ) {
-                NotYetAvailableView(tabName = "Membership", icon = PantopusIcon.Crown)
+                MembershipDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onShare = {
+                        navController.navigate(ChildRoutes.placeholder("Share membership"))
+                    },
+                    onOpenPersona = {
+                        navController.navigate(ChildRoutes.AUDIENCE_PROFILE)
+                    },
+                    onChangeTier = {
+                        navController.navigate(ChildRoutes.placeholder("Change tier"))
+                    },
+                    onUpdatePayment = {
+                        navController.navigate(ChildRoutes.placeholder("Update payment"))
+                    },
+                    onCancel = {
+                        navController.navigate(ChildRoutes.placeholder("Membership cancelled"))
+                    },
+                    onRequestRefund = {
+                        navController.navigate(ChildRoutes.placeholder("Request refund"))
+                    },
+                )
             }
             composable(ChildRoutes.PROFESSIONAL_PROFILE) {
                 NotYetAvailableView(tabName = "Professional profile", icon = PantopusIcon.Briefcase)
@@ -2915,9 +2936,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.homeDashboard(homeId))
                     },
                 )
-            }
-            composable(ChildRoutes.TODAY) {
-                TodayDetailScreen(onBack = { navController.popBackStack() })
             }
             composable(ChildRoutes.BUSINESS_WAITLIST) {
                 BusinessWaitlistScreen(onBack = { navController.popBackStack() })
