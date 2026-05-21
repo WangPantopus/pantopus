@@ -50,6 +50,9 @@ public enum MembersTab {
 /// Outbound event the host view reacts to (sheet presentation, alerts).
 public enum MembersListEvent: Sendable, Equatable {
     case openInvite
+    /// A13.1 — open the Add Guest form (issue a short-term guest pass).
+    /// Fired from the Guests tab's FAB + empty-state CTA.
+    case openAddGuest
     case confirmRemove(userId: String, name: String)
 }
 
@@ -88,7 +91,20 @@ public final class MembersListViewModel: ListOfRowsDataSource {
         // dashboard, so the canonical create lives on the parent and
         // this FAB carries the secondary tint. Home-green per the
         // home-pillar identity (Bills / Maintenance use the same).
-        FABAction(
+        //
+        // A13.1 — the FAB is contextual: on the Guests tab it issues a
+        // guest pass; on Members / Pending it invites a member.
+        if selectedTab == MembersTab.guests {
+            return FABAction(
+                icon: .userPlus,
+                accessibilityLabel: "Add guest",
+                variant: .secondaryCreate,
+                tint: .home
+            ) { @Sendable [weak self] in
+                Task { @MainActor in self?.pendingEvent = .openAddGuest }
+            }
+        }
+        return FABAction(
             icon: .userPlus,
             accessibilityLabel: "Invite member",
             variant: .secondaryCreate,
@@ -292,7 +308,7 @@ public final class MembersListViewModel: ListOfRowsDataSource {
                 subcopy: "Add someone short-term — a sitter, visitor, or contractor — to share access while they're around.",
                 ctaTitle: "Add a guest"
             ) { @Sendable [weak self] in
-                Task { @MainActor in self?.pendingEvent = .openInvite }
+                Task { @MainActor in self?.pendingEvent = .openAddGuest }
             }
         case MembersTab.pending:
             ListOfRowsState.EmptyContent(

@@ -268,6 +268,15 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case grid3x3 = "grid-3x3"
     case square
 
+    // A13.1 Add guest — "Allowed areas" guest-pass chip iconography.
+    // Mirrors the `data-lucide` tokens in the Add Guest design
+    // (`door-open` / `car` / `warehouse`). `warehouse` backs the
+    // "Garden shed" chip; SF Symbols has no warehouse glyph so it maps
+    // to the closest small-building vector.
+    case doorOpen = "door-open"
+    case car
+    case warehouse
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -478,6 +487,10 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .gripVertical: "line.3.horizontal"
         case .grid3x3: "square.grid.3x3"
         case .square: "square"
+        // A13.1 Add guest — allowed-areas chips.
+        case .doorOpen: "door.left.hand.open"
+        case .car: "car"
+        case .warehouse: "house.lodge"
         }
     }
 }

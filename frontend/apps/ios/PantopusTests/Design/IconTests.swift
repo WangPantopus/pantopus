@@ -68,7 +68,9 @@ final class IconTests: XCTestCase {
         // P2.10 Document detail — sticky-footer action glyphs.
         "external-link", "refresh-cw",
         // A10.3 Today detail — weather and signal glyphs from today-frames.jsx.
-        "sun-dim", "flower", "snowflake", "wind", "bus", "droplets"
+        "sun-dim", "flower", "snowflake", "wind", "bus", "droplets",
+        // A13.1 Add Guest — allowed-area chips.
+        "door-open", "car", "warehouse"
     ]
 
     func testInventoryMatches() {

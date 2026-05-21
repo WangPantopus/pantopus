@@ -60,6 +60,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.DirectionsBus
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Download
@@ -104,6 +105,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MarkAsUnread
 import androidx.compose.material.icons.filled.MarkunreadMailbox
 import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -163,6 +165,7 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material.icons.filled.Warehouse
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
@@ -444,6 +447,13 @@ enum class PantopusIcon(
     // externally + Replace. Fall back to Material OpenInNew / Refresh.
     ExternalLink("external-link"),
     RefreshCw("refresh-cw"),
+
+    // A13.1 Add guest — "Allowed areas" guest-pass chips. Mirror the
+    // Lucide tokens `door-open` / `car` / `warehouse`; `warehouse` backs
+    // the "Garden shed" chip via Material's Warehouse glyph.
+    DoorOpen("door-open"),
+    Car("car"),
+    Warehouse("warehouse"),
     ;
 
     companion object {
@@ -721,6 +731,13 @@ internal fun PantopusIcon.source(): IconSource =
         // P2.10 — Document detail sticky-footer action glyphs.
         PantopusIcon.ExternalLink -> IconSource.Material(Icons.Filled.OpenInNew)
         PantopusIcon.RefreshCw -> IconSource.Material(Icons.Filled.Refresh)
+
+        // A13.1 Add guest — allowed-areas chips. Material's MeetingRoom
+        // (open-door glyph) backs `door-open`; DirectionsCar backs `car`;
+        // Warehouse backs the "Garden shed" chip.
+        PantopusIcon.DoorOpen -> IconSource.Material(Icons.Filled.MeetingRoom)
+        PantopusIcon.Car -> IconSource.Material(Icons.Filled.DirectionsCar)
+        PantopusIcon.Warehouse -> IconSource.Material(Icons.Filled.Warehouse)
     }
 
 /**

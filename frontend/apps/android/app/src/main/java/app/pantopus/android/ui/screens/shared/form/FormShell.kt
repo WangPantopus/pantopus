@@ -82,6 +82,9 @@ const val FORM_BOTTOM_COMMIT_BUTTON_TAG = "formBottomCommitButton"
  * @param stickyBottom Optional bespoke sticky bar pinned below the scroll
  *     area. Takes precedence over [bottomActionLabel] and hides the
  *     top-right action when supplied.
+ * @param bottomActionIcon Optional leading icon rendered before the
+ *     bottom CTA label (e.g. `KeyRound` for "Send pass"). Ignored when
+ *     [bottomActionLabel] is null.
  * @param body Content slot — typically a vertical stack of
  *     [FormFieldGroup]s.
  */
@@ -96,6 +99,7 @@ fun FormShell(
     onCommit: () -> Unit,
     rightActionLabel: String? = "Save",
     bottomActionLabel: String? = null,
+    bottomActionIcon: PantopusIcon? = null,
     isSaving: Boolean = false,
     leading: FormShellLeading = FormShellLeading.Close,
     stickyBottom: (@Composable () -> Unit)? = null,
@@ -141,6 +145,7 @@ fun FormShell(
         } else if (bottomActionLabel != null) {
             FormBottomCTA(
                 label = bottomActionLabel,
+                icon = bottomActionIcon,
                 isEnabled = isValid && !isSaving,
                 isSaving = isSaving,
                 onCommit = onCommit,
@@ -262,6 +267,7 @@ private fun FormTopBar(
 @Composable
 private fun FormBottomCTA(
     label: String,
+    icon: PantopusIcon?,
     isEnabled: Boolean,
     isSaving: Boolean,
     onCommit: () -> Unit,
@@ -296,11 +302,24 @@ private fun FormBottomCTA(
                         modifier = Modifier.size(20.dp),
                     )
                 } else {
-                    Text(
-                        text = label,
-                        style = PantopusTextStyle.body,
-                        color = PantopusColors.appTextInverse,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                    ) {
+                        if (icon != null) {
+                            PantopusIconImage(
+                                icon = icon,
+                                contentDescription = null,
+                                size = 16.dp,
+                                tint = PantopusColors.appTextInverse,
+                            )
+                        }
+                        Text(
+                            text = label,
+                            style = PantopusTextStyle.body,
+                            color = PantopusColors.appTextInverse,
+                        )
+                    }
                 }
             }
         }

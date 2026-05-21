@@ -33,8 +33,18 @@ public struct ChipPicker: View {
 
     private enum Mode { case single, multi }
 
+    /// Selected-chip appearance.
+    ///
+    /// - `filled`: solid `primary600` fill with inverse text/icon — the
+    ///   default high-emphasis treatment.
+    /// - `tinted`: pale `primary50` wash with a `primary100` border and
+    ///   `primary600` icon / `primary700` text — the soft treatment the
+    ///   A13.1 Add Guest design uses for its duration + areas chips.
+    public enum Style: Sendable { case filled, tinted }
+
     private let options: [Option]
     private let mode: Mode
+    private let style: Style
     private let identifier: String?
     @Binding private var single: String?
     @Binding private var multi: Set<String>
@@ -44,10 +54,12 @@ public struct ChipPicker: View {
     public init(
         options: [Option],
         selection: Binding<String?>,
+        style: Style = .filled,
         identifier: String? = nil
     ) {
         self.options = options
         mode = .single
+        self.style = style
         self.identifier = identifier
         _single = selection
         _multi = .constant([])
@@ -57,10 +69,12 @@ public struct ChipPicker: View {
     public init(
         options: [Option],
         selection: Binding<Set<String>>,
+        style: Style = .filled,
         identifier: String? = nil
     ) {
         self.options = options
         mode = .multi
+        self.style = style
         self.identifier = identifier
         _single = .constant(nil)
         _multi = selection
@@ -82,18 +96,18 @@ public struct ChipPicker: View {
         } label: {
             HStack(spacing: Spacing.s1) {
                 if let icon = option.icon {
-                    Icon(icon, size: 16, color: selected ? Theme.Color.appTextInverse : Theme.Color.appText)
+                    Icon(icon, size: 16, color: iconColor(selected: selected))
                 }
                 Text(option.label)
                     .pantopusTextStyle(.small)
-                    .foregroundStyle(selected ? Theme.Color.appTextInverse : Theme.Color.appText)
+                    .foregroundStyle(foregroundColor(selected: selected))
             }
             .padding(.horizontal, Spacing.s3)
             .frame(minHeight: 36)
-            .background(selected ? Theme.Color.primary600 : Theme.Color.appSurface)
+            .background(backgroundColor(selected: selected))
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
-                    .stroke(selected ? Color.clear : Theme.Color.appBorder, lineWidth: 1)
+                    .stroke(borderColor(selected: selected), lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
         }
@@ -118,6 +132,28 @@ public struct ChipPicker: View {
         case .multi:
             if multi.contains(id) { multi.remove(id) } else { multi.insert(id) }
         }
+    }
+
+    // MARK: - Style-aware colors
+
+    private func backgroundColor(selected: Bool) -> Color {
+        guard selected else { return Theme.Color.appSurface }
+        return style == .tinted ? Theme.Color.primary50 : Theme.Color.primary600
+    }
+
+    private func borderColor(selected: Bool) -> Color {
+        guard selected else { return Theme.Color.appBorder }
+        return style == .tinted ? Theme.Color.primary100 : Color.clear
+    }
+
+    private func foregroundColor(selected: Bool) -> Color {
+        guard selected else { return Theme.Color.appText }
+        return style == .tinted ? Theme.Color.primary700 : Theme.Color.appTextInverse
+    }
+
+    private func iconColor(selected: Bool) -> Color {
+        guard selected else { return Theme.Color.appText }
+        return style == .tinted ? Theme.Color.primary600 : Theme.Color.appTextInverse
     }
 }
 

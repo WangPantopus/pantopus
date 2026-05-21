@@ -56,6 +56,9 @@ object MembersTab {
 sealed interface MembersListEvent {
     data object OpenInvite : MembersListEvent
 
+    /** A13.1 — open the Add Guest form from the Guests tab. */
+    data object OpenAddGuest : MembersListEvent
+
     data class ConfirmRemove(
         val userId: String,
         val name: String,
@@ -96,17 +99,27 @@ class MembersListViewModel
         private val _pendingEvent = MutableStateFlow<MembersListEvent?>(null)
         val pendingEvent: StateFlow<MembersListEvent?> = _pendingEvent.asStateFlow()
 
-        /** 52dp home-green secondary-create FAB — design contract calls
-         *  for `secondaryCreate` because this is a sub-screen of the
-         *  home dashboard. */
-        val fab: FabAction =
-            FabAction(
-                icon = PantopusIcon.UserPlus,
-                contentDescription = "Invite member",
-                variant = FabVariant.SecondaryCreate,
-                tint = FabTint.Home,
-                onClick = ::requestInvite,
-            )
+        /** 52dp home-green secondary-create FAB. Contextual on Guests:
+         *  issue a guest pass; otherwise invite a household member. */
+        val fab: FabAction
+            get() =
+                if (_selectedTab.value == MembersTab.GUESTS) {
+                    FabAction(
+                        icon = PantopusIcon.UserPlus,
+                        contentDescription = "Add guest",
+                        variant = FabVariant.SecondaryCreate,
+                        tint = FabTint.Home,
+                        onClick = ::requestAddGuest,
+                    )
+                } else {
+                    FabAction(
+                        icon = PantopusIcon.UserPlus,
+                        contentDescription = "Invite member",
+                        variant = FabVariant.SecondaryCreate,
+                        tint = FabTint.Home,
+                        onClick = ::requestInvite,
+                    )
+                }
 
         /** Idempotent — re-running won't refetch once content is loaded. */
         fun load() {
@@ -135,6 +148,11 @@ class MembersListViewModel
         /** Fired by the FAB / empty-state CTA. */
         fun requestInvite() {
             _pendingEvent.value = MembersListEvent.OpenInvite
+        }
+
+        /** Fired by the Guests-tab FAB / empty-state CTA. */
+        fun requestAddGuest() {
+            _pendingEvent.value = MembersListEvent.OpenAddGuest
         }
 
         /**
@@ -278,7 +296,7 @@ class MembersListViewModel
                         headline = "No active guests",
                         subcopy = "Add someone short-term — a sitter, visitor, or contractor — to share access while they're around.",
                         ctaTitle = "Add a guest",
-                        onCta = ::requestInvite,
+                        onCta = ::requestAddGuest,
                     )
                 MembersTab.PENDING ->
                     ListOfRowsUiState.Empty(
