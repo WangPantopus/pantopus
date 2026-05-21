@@ -107,6 +107,8 @@ import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_DETAIL_ITEM_ID_
 import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoDetailScreen
 import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoScreen
+import app.pantopus.android.ui.screens.homes.guests.ADD_GUEST_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.guests.AddGuestFormScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
@@ -1905,8 +1907,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(
                 route = ChildRoutes.HOME_MEMBERS,
                 arguments = listOf(navArgument(MEMBERS_LIST_HOME_ID_KEY) { type = NavType.StringType }),
-            ) {
-                MembersListScreen(onBack = { navController.popBackStack() })
+            ) { entry ->
+                val homeId = entry.arguments?.getString(MEMBERS_LIST_HOME_ID_KEY).orEmpty()
+                MembersListScreen(
+                    onBack = { navController.popBackStack() },
+                    onAddGuest = { navController.navigate(ChildRoutes.addGuest(homeId)) },
+                )
             }
             composable(ChildRoutes.MAILBOX_LIST) {
                 MailboxListScreen(
@@ -2865,10 +2871,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             composable(
                 route = ChildRoutes.ADD_GUEST,
-                arguments =
-                    listOf(navArgument(ChildRoutes.ADD_GUEST_HOME_ID_KEY) { type = NavType.StringType }),
+                arguments = listOf(navArgument(ADD_GUEST_HOME_ID_KEY) { type = NavType.StringType }),
             ) {
-                NotYetAvailableView(tabName = "Add guest", icon = PantopusIcon.UserPlus)
+                AddGuestFormScreen(
+                    onClose = { navController.popBackStack() },
+                    onSent = { navController.popBackStack() },
+                )
             }
             composable(ChildRoutes.TASKS_MAP) {
                 NotYetAvailableView(tabName = "Tasks map", icon = PantopusIcon.Map)

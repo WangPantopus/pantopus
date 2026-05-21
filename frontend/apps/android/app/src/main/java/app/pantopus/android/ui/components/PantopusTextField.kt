@@ -68,6 +68,7 @@ fun PantopusTextField(
     modifier: Modifier = Modifier,
     placeholder: String = "",
     state: PantopusFieldState = PantopusFieldState.Default,
+    isRequired: Boolean = false,
     isSecure: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
     fieldTestTag: String? = null,
@@ -79,20 +80,30 @@ fun PantopusTextField(
     Column(
         modifier =
             modifier.semantics {
-                contentDescription =
+                val base =
                     when (state) {
                         is PantopusFieldState.Error -> "$label, error: ${state.message}"
                         PantopusFieldState.Valid -> "$label, valid"
                         PantopusFieldState.Default -> label
                     }
+                contentDescription = if (isRequired) "$base, required" else base
             },
         verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        Text(
-            text = label,
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextSecondary,
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = label,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+            )
+            if (isRequired) {
+                Text(
+                    text = "*",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.error,
+                )
+            }
+        }
         Row(
             modifier =
                 Modifier

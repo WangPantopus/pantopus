@@ -47,6 +47,17 @@ data class ChipPickerOption(
 )
 
 /**
+ * Selected-chip appearance.
+ *
+ * - [Filled]: solid `primary600` fill with inverse text/icon — the
+ *   default high-emphasis treatment.
+ * - [Tinted]: pale `primary50` wash with a `primary100` border and
+ *   `primary600` icon / `primary700` text — the soft treatment the
+ *   A13.1 Add Guest design uses for its duration + areas chips.
+ */
+enum class ChipPickerStyle { Filled, Tinted }
+
+/**
  * Multi-select chip group (checkbox semantics). `selectedIds` holds the set
  * of chosen ids; `onSelectionChange` is called with the next set on tap.
  */
@@ -56,11 +67,13 @@ fun ChipPicker(
     selectedIds: Set<String>,
     onSelectionChange: (Set<String>) -> Unit,
     modifier: Modifier = Modifier,
+    style: ChipPickerStyle = ChipPickerStyle.Filled,
     testTag: String? = null,
 ) {
     ChipPickerImpl(
         options = options,
         modifier = modifier,
+        style = style,
         testTag = testTag,
         isSelected = { it in selectedIds },
         onToggle = { id ->
@@ -79,11 +92,13 @@ fun ChipPicker(
     selectedId: String?,
     onSelectionChange: (String?) -> Unit,
     modifier: Modifier = Modifier,
+    style: ChipPickerStyle = ChipPickerStyle.Filled,
     testTag: String? = null,
 ) {
     ChipPickerImpl(
         options = options,
         modifier = modifier,
+        style = style,
         testTag = testTag,
         isSelected = { it == selectedId },
         onToggle = { id -> onSelectionChange(if (id == selectedId) null else id) },
@@ -96,6 +111,7 @@ private fun ChipPickerImpl(
     isSelected: (String) -> Boolean,
     onToggle: (String) -> Unit,
     modifier: Modifier,
+    style: ChipPickerStyle,
     testTag: String?,
 ) {
     FlowRow(
@@ -107,6 +123,7 @@ private fun ChipPickerImpl(
             ChipPickerChip(
                 option = option,
                 isSelected = isSelected(option.id),
+                style = style,
                 onClick = { onToggle(option.id) },
                 testTag = testTag?.let { "$it.${option.id}" } ?: option.id,
             )
@@ -118,12 +135,35 @@ private fun ChipPickerImpl(
 private fun ChipPickerChip(
     option: ChipPickerOption,
     isSelected: Boolean,
+    style: ChipPickerStyle,
     onClick: () -> Unit,
     testTag: String,
 ) {
-    val fg = if (isSelected) PantopusColors.appTextInverse else PantopusColors.appText
-    val bg = if (isSelected) PantopusColors.primary600 else PantopusColors.appSurface
-    val border = if (isSelected) Color.Transparent else PantopusColors.appBorder
+    val tinted = style == ChipPickerStyle.Tinted
+    val textColor =
+        when {
+            !isSelected -> PantopusColors.appText
+            tinted -> PantopusColors.primary700
+            else -> PantopusColors.appTextInverse
+        }
+    val iconColor =
+        when {
+            !isSelected -> PantopusColors.appText
+            tinted -> PantopusColors.primary600
+            else -> PantopusColors.appTextInverse
+        }
+    val bg =
+        when {
+            !isSelected -> PantopusColors.appSurface
+            tinted -> PantopusColors.primary50
+            else -> PantopusColors.primary600
+        }
+    val border =
+        when {
+            !isSelected -> PantopusColors.appBorder
+            tinted -> PantopusColors.primary100
+            else -> Color.Transparent
+        }
 
     Row(
         modifier =
@@ -150,9 +190,9 @@ private fun ChipPickerChip(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         if (option.icon != null) {
-            PantopusIconImage(icon = option.icon, contentDescription = null, size = 16.dp, tint = fg)
+            PantopusIconImage(icon = option.icon, contentDescription = null, size = 16.dp, tint = iconColor)
         }
-        Text(text = option.label, style = PantopusTextStyle.small, color = fg)
+        Text(text = option.label, style = PantopusTextStyle.small, color = textColor)
     }
 }
 
