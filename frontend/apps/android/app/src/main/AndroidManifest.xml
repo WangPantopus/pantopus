@@ -79,6 +79,17 @@
             android:name="io.sentry.auto-init"
             android:value="false" />
 
+        <!-- P6.6 — FileProvider for sharing the generated emergency-card PDF. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
     </application>
 
 </manifest>

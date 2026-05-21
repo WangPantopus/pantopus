@@ -74,7 +74,9 @@ object DiscoverBusinessesSection {
 sealed interface DiscoverBusinessesTarget {
     data class Business(val businessId: String, val name: String) : DiscoverBusinessesTarget
 
-    data object WidenRadius : DiscoverBusinessesTarget
+    /** No-location empty state — host pushes the Add Home wizard. Radius
+     * widening for the no-results state stays in the top-bar filter sheet. */
+    data object SetHomeAddress : DiscoverBusinessesTarget
 
     data object InviteBusiness : DiscoverBusinessesTarget
 }
@@ -335,8 +337,8 @@ class DiscoverBusinessesViewModel
                 subcopy =
                     "We need a verified home address to surface businesses near " +
                         "you. Add one in your profile and they'll appear here.",
-                ctaTitle = "Widen radius",
-                onCta = { onSelect(DiscoverBusinessesTarget.WidenRadius) },
+                ctaTitle = "Set a home address",
+                onCta = { onSelect(DiscoverBusinessesTarget.SetHomeAddress) },
             )
 
         // MARK: - Row mapping (pure projection)

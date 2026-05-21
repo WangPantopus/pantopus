@@ -384,6 +384,7 @@ private fun AuthenticatedUser.toSessionUser(): UserDto =
         displayName = name.takeIf { it.isNotEmpty() },
         avatarUrl = null,
         isAdmin = role == "admin",
+        username = username,
     )
 
 /** Projection of [UserProfile] → the compact [UserDto] used in session state. */
@@ -394,4 +395,5 @@ private fun UserProfile.toSessionUser(): UserDto =
         displayName = name.takeIf { it.isNotEmpty() },
         avatarUrl = avatarUrl ?: profilePictureUrl,
         isAdmin = role == "admin",
+        username = username,
     )

@@ -25,6 +25,8 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
 import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.util.EmergencyCardContent
+import app.pantopus.android.ui.util.EmergencyCardPdf
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -144,6 +146,39 @@ class EmergencyInfoViewModel
             _selectedFilter.value = id
             _chipStrip.value = chipStripFromState()
             emergencies?.let(::renderForCurrentFilter)
+        }
+
+        // P6.6 — share / print payloads built from the loaded rows.
+
+        /** Plain-text summary handed to the share sheet ("Share emergency
+         * info"). Null until the first load returns. */
+        fun shareSummaryText(): String? {
+            val rows = emergencies?.takeIf { it.isNotEmpty() } ?: return null
+            val card = EmergencyCardPdf.content(rows, homeLabel = "Emergency info")
+            return buildString {
+                append("${card.homeLabel} — emergency info")
+                for (section in card.sections) {
+                    if (section.items.isEmpty()) continue
+                    append("\n\n").append(section.heading)
+                    for (item in section.items) {
+                        append("\n")
+                        append(
+                            if (item.detail.isEmpty()) {
+                                "• ${item.title}"
+                            } else {
+                                "• ${item.title}: ${item.detail}"
+                            },
+                        )
+                    }
+                }
+            }
+        }
+
+        /** Printable A4 card content for "Print emergency card". Null until
+         * the first load returns. */
+        fun printableCard(): EmergencyCardContent? {
+            val rows = emergencies?.takeIf { it.isNotEmpty() } ?: return null
+            return EmergencyCardPdf.content(rows, homeLabel = "Emergency info")
         }
 
         val topBarAction: TopBarAction =

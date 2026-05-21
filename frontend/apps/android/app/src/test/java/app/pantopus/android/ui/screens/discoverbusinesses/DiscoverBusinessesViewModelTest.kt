@@ -140,7 +140,7 @@ class DiscoverBusinessesViewModelTest {
             assertTrue("Expected Empty, got $state", state is ListOfRowsUiState.Empty)
             val empty = state as ListOfRowsUiState.Empty
             assertEquals("Set a home address", empty.headline)
-            assertEquals("Widen radius", empty.ctaTitle)
+            assertEquals("Set a home address", empty.ctaTitle)
         }
 
     @Test
