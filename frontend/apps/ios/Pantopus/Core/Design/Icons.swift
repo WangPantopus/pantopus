@@ -32,6 +32,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case scanLine = "scan-line"
     case plusSquare = "plus-square"
     case sun
+    case sunDim = "sun-dim"
     case chevronRight = "chevron-right"
     case chevronLeft = "chevron-left"
     case megaphone
@@ -102,6 +103,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case hourglass
     case handCoins = "hand-coins"
     case package
+    case flower
     case compass
     case filter
 
@@ -247,6 +249,13 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case externalLink = "external-link"
     case refreshCw = "refresh-cw"
 
+    // A10.3 Today briefing — weather + transit glyphs from `today-frames.jsx`
+    // (hero condition glyph, Wind chip, transit signals).
+    case snowflake
+    case wind
+    case bus
+    case droplets
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -265,6 +274,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .scanLine: "barcode.viewfinder"
         case .plusSquare: "plus.square"
         case .sun: "sun.max"
+        case .sunDim: "sun.max"
         case .chevronRight: "chevron.right"
         case .chevronLeft: "chevron.left"
         case .megaphone: "megaphone"
@@ -329,6 +339,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .hourglass: "hourglass"
         case .handCoins: "hand.raised"
         case .package: "shippingbox"
+        case .flower: "camera.macro"
         case .compass: "safari"
         case .filter: "line.3.horizontal.decrease"
         case .crown: "crown"
@@ -441,6 +452,11 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         // P2.10 Document detail.
         case .externalLink: "arrow.up.right.square"
         case .refreshCw: "arrow.triangle.2.circlepath"
+        // A10.3 Today briefing.
+        case .snowflake: "snowflake"
+        case .wind: "wind"
+        case .bus: "bus.fill"
+        case .droplets: "drop"
         }
     }
 }

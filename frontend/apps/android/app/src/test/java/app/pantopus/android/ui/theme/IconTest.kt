@@ -175,6 +175,13 @@ class IconTest {
             "trees",
             "paint-roller",
             "bell-ring",
+            // A.1 — Today detail weather, transit, and signal glyphs.
+            "sun-dim",
+            "flower",
+            "snowflake",
+            "wind",
+            "bus",
+            "droplets",
             // T6.5e — Mailbox Vault envelope/folder palette.
             "mail",
             "mail-open",

@@ -2,10 +2,14 @@
 //  TodayDetailViewModelTests.swift
 //  PantopusTests
 //
-//  Covers the Today detail VM (P6.6):
-//    - four-state transitions (loading / loaded / empty / error)
-//    - `projectToday` extraction from the opaque Hub today payload
-//    - `todaysEvents` filtering to the current day + start-time sort
+//  A10.3 — Covers the Today briefing VM:
+//    - initial loading state,
+//    - load() selecting populated vs. alert from the content,
+//    - seeded states (loading / error chrome) surviving load(),
+//    - the shape of the populated + alert sample fixtures.
+//
+//  Today always has data, so there is no `.empty` state — the advisory
+//  variant stands in for it.
 //
 
 import XCTest
@@ -13,124 +17,84 @@ import XCTest
 
 @MainActor
 final class TodayDetailViewModelTests: XCTestCase {
-    override func setUp() {
-        super.setUp()
-        SequencedURLProtocol.reset()
-    }
+    // MARK: - State machine
 
-    private func makeAPI() -> APIClient {
-        APIClient(
-            environment: .current,
-            session: SequencedURLProtocol.makeSession(),
-            retryPolicy: .none
-        )
-    }
-
-    private func makeVM() -> TodayDetailViewModel {
-        TodayDetailViewModel(api: makeAPI())
-    }
-
-    // MARK: - Four states
-
-    func testLoadErrorWhenTodayFails() async {
-        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
-        let vm = makeVM()
-        await vm.load()
-        guard case .error = vm.state else {
-            return XCTFail("Expected error, got \(vm.state)")
+    func testInitialStateIsLoading() {
+        let vm = TodayDetailViewModel()
+        guard case .loading = vm.state else {
+            return XCTFail("Expected loading, got \(vm.state)")
         }
     }
 
-    func testLoadEmptyWhenNoContext() async {
-        // today=null and overview unstubbed (599 → swallowed by `try?`).
-        SequencedURLProtocol.sequence = [.status(200, body: "{\"today\":null}")]
-        let vm = makeVM()
+    func testLoadResolvesToPopulated() async {
+        let vm = TodayDetailViewModel(content: TodaySampleData.populated)
         await vm.load()
-        guard case .empty = vm.state else {
-            return XCTFail("Expected empty, got \(vm.state)")
+        guard case let .populated(content) = vm.state else {
+            return XCTFail("Expected populated, got \(vm.state)")
+        }
+        XCTAssertEqual(content.temperature, "67°")
+        XCTAssertEqual(content.condition, "Mostly sunny")
+        XCTAssertFalse(content.isAlert)
+    }
+
+    func testLoadResolvesToAlertWhenRibbonPresent() async {
+        let vm = TodayDetailViewModel(content: TodaySampleData.alert)
+        await vm.load()
+        guard case let .alert(content) = vm.state else {
+            return XCTFail("Expected alert, got \(vm.state)")
+        }
+        XCTAssertNotNil(content.ribbon)
+        XCTAssertTrue(content.isAlert)
+        XCTAssertEqual(content.glyph, .snowflake)
+    }
+
+    func testRefreshReloadsSameState() async {
+        let vm = TodayDetailViewModel(content: TodaySampleData.alert)
+        await vm.refresh()
+        guard case .alert = vm.state else {
+            return XCTFail("Expected alert after refresh, got \(vm.state)")
         }
     }
 
-    func testLoadLoadedWithWeather() async {
-        let body = """
-        {"today":{"weather":{"temperatureF":72,"conditions":"Sunny"},\
-        "aqi":{"label":"Good","value":35},"commute":{"label":"12 min drive"}}}
-        """
-        SequencedURLProtocol.sequence = [.status(200, body: body)]
-        let vm = makeVM()
+    func testSeededStateSurvivesLoad() async {
+        let vm = TodayDetailViewModel(state: .error(message: "Boom"))
         await vm.load()
-        guard case let .loaded(content) = vm.state else {
-            return XCTFail("Expected loaded, got \(vm.state)")
+        guard case let .error(message) = vm.state else {
+            return XCTFail("Expected seeded error to persist, got \(vm.state)")
         }
-        XCTAssertEqual(content.temperatureF, 72)
-        XCTAssertEqual(content.conditions, "Sunny")
-        XCTAssertEqual(content.aqiLabel, "Good")
-        XCTAssertEqual(content.aqiValue, 35)
-        XCTAssertEqual(content.commute, "12 min drive")
+        XCTAssertEqual(message, "Boom")
     }
 
-    // MARK: - projectToday
+    // MARK: - Sample fixtures
 
-    func testProjectTodayExtractsFields() throws {
-        let json = """
-        {"today":{"weather":{"temperatureF":58,"conditions":"Cloudy"},\
-        "aqi":{"label":"Moderate","value":80},"commute":{"label":"20 min"}}}
-        """
-        let response = try JSONDecoder().decode(HubTodayResponse.self, from: Data(json.utf8))
-        let projection = TodayDetailViewModel.projectToday(response)
-        XCTAssertEqual(projection.temperatureF, 58)
-        XCTAssertEqual(projection.conditions, "Cloudy")
-        XCTAssertEqual(projection.aqiLabel, "Moderate")
-        XCTAssertEqual(projection.aqiValue, 80)
-        XCTAssertEqual(projection.commute, "20 min")
+    func testPopulatedFixtureShape() {
+        let content = TodaySampleData.populated
+        XCTAssertNil(content.ribbon)
+        XCTAssertEqual(content.chips.map(\.label), ["AQI", "UV", "Wind"])
+        XCTAssertEqual(content.signals.count, 4)
+        XCTAssertEqual(content.around.count, 3)
+        XCTAssertEqual(content.signalsTitle, "Signals · 4 today")
+        XCTAssertEqual(content.signalsAccent, .personal)
+        // Pollen is the only severity-tagged signal in the populated frame.
+        XCTAssertEqual(content.signals.filter { $0.severity != nil }.count, 1)
     }
 
-    func testProjectTodayNilPayload() throws {
-        let response = try JSONDecoder().decode(
-            HubTodayResponse.self,
-            from: Data("{\"today\":null}".utf8)
-        )
-        let projection = TodayDetailViewModel.projectToday(response)
-        XCTAssertNil(projection.temperatureF)
-        XCTAssertNil(projection.conditions)
-        XCTAssertNil(projection.aqiLabel)
-        XCTAssertNil(projection.commute)
+    func testAlertFixtureShape() {
+        let content = TodaySampleData.alert
+        XCTAssertEqual(content.ribbon?.title, "NWS hard-freeze warning · until 8am Fri")
+        XCTAssertEqual(content.signals.count, 5)
+        XCTAssertEqual(content.signalsTitle, "Signals · 5 today")
+        XCTAssertEqual(content.signalsAccent, .error)
+        XCTAssertTrue(content.around.isEmpty)
+        // Critical (pipe) + Watch (grid) carry severity pills.
+        let severities = content.signals.compactMap { $0.severity?.label }
+        XCTAssertEqual(severities, ["Critical", "Watch"])
     }
 
-    // MARK: - todaysEvents
-
-    private func utcCalendar() -> Calendar {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
-        return calendar
-    }
-
-    private func event(id: String, type: String, start: String) -> CalendarEventDTO {
-        CalendarEventDTO(id: id, homeId: "home-1", eventType: type, title: "Event \(id)", startAt: start)
-    }
-
-    func testTodaysEventsFiltersToTodayAndSorts() throws {
-        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-05-20T12:00:00Z"))
-        let events = [
-            event(id: "e1", type: "social", start: "2026-05-20T16:00:00Z"),
-            event(id: "e2", type: "chore", start: "2026-05-20T09:00:00Z"),
-            event(id: "e3", type: "repair", start: "2026-05-21T10:00:00Z")
-        ]
-        let rows = TodayDetailViewModel.todaysEvents(events, now: now, calendar: utcCalendar())
-        XCTAssertEqual(rows.map(\.id), ["e2", "e1"])
-        XCTAssertEqual(rows.first?.typeLabel, "Chore")
-    }
-
-    func testTodaysEventsEmptyWhenNoneToday() throws {
-        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-05-20T12:00:00Z"))
-        let events = [event(id: "e3", type: "repair", start: "2026-05-25T10:00:00Z")]
-        let rows = TodayDetailViewModel.todaysEvents(events, now: now, calendar: utcCalendar())
-        XCTAssertTrue(rows.isEmpty)
-    }
-
-    func testEventIconMapping() {
-        XCTAssertEqual(TodayDetailViewModel.icon(for: "repair"), .hammer)
-        XCTAssertEqual(TodayDetailViewModel.icon(for: "pet"), .pawPrint)
-        XCTAssertEqual(TodayDetailViewModel.icon(for: "social"), .calendarDays)
+    func testChipDotTonesMatchScale() {
+        let chips = TodaySampleData.populated.chips
+        XCTAssertEqual(chips[0].dotTone, .success) // AQI Good
+        XCTAssertEqual(chips[1].dotTone, .warning) // UV High
+        XCTAssertNil(chips[2].dotTone) // Wind has no scale dot in A10.3
     }
 }

@@ -64,7 +64,9 @@ final class IconTests: XCTestCase {
         // P6.5 Public profile · Persona vs Local.
         "message-square", "globe",
         // P2.10 Document detail — sticky-footer action glyphs.
-        "external-link", "refresh-cw"
+        "external-link", "refresh-cw",
+        // A10.3 Today detail — weather and signal glyphs from today-frames.jsx.
+        "sun-dim", "flower", "snowflake", "wind", "bus", "droplets"
     ]
 
     func testInventoryMatches() {

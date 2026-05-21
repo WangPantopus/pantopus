@@ -2,147 +2,95 @@
 
 package app.pantopus.android.ui.screens.hub.today
 
-import app.pantopus.android.data.api.models.homes.CalendarEventDto
-import app.pantopus.android.data.api.models.hub.HubTodayResponse
-import app.pantopus.android.data.api.net.NetworkError
-import app.pantopus.android.data.api.net.NetworkResult
-import app.pantopus.android.data.homes.HomesRepository
-import app.pantopus.android.data.hub.HubRepository
 import app.pantopus.android.ui.theme.PantopusIcon
-import io.mockk.coEvery
-import io.mockk.mockk
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
-import java.time.Instant
-import java.time.ZoneId
 
-@OptIn(ExperimentalCoroutinesApi::class)
+/**
+ * A10.3 Today detail state machine. Backend has been removed, so the
+ * view-model projects deterministic fixtures instead of repositories.
+ */
 class TodayDetailViewModelTest {
-    private val hubRepo: HubRepository = mockk()
-    private val homesRepo: HomesRepository = mockk()
-
-    @Before
-    fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
-    }
-
-    private fun vm() = TodayDetailViewModel(hubRepo, homesRepo)
-
-    // MARK: - Four states
-
     @Test
-    fun loadErrorWhenTodayFails() =
-        runTest {
-            coEvery { hubRepo.today() } returns NetworkResult.Failure(NetworkError.Server(500, "boom"))
-            val viewModel = vm()
-            viewModel.load()
-            assertTrue(viewModel.state.value is TodayDetailViewModel.UiState.Error)
-        }
+    fun initialStateIsLoading() {
+        val viewModel = TodayDetailViewModel()
 
-    @Test
-    fun loadEmptyWhenNoContext() =
-        runTest {
-            coEvery { hubRepo.today() } returns NetworkResult.Success(HubTodayResponse(today = null, error = null))
-            coEvery { hubRepo.overview() } returns NetworkResult.Failure(NetworkError.Server(500, "x"))
-            val viewModel = vm()
-            viewModel.load()
-            assertTrue(viewModel.state.value is TodayDetailViewModel.UiState.Empty)
-        }
-
-    @Test
-    fun loadLoadedWithWeather() =
-        runTest {
-            coEvery { hubRepo.today() } returns
-                NetworkResult.Success(
-                    HubTodayResponse(
-                        today = mapOf("weather" to mapOf("temperatureF" to 72, "conditions" to "Sunny")),
-                        error = null,
-                    ),
-                )
-            coEvery { hubRepo.overview() } returns NetworkResult.Failure(NetworkError.Server(500, "x"))
-            val viewModel = vm()
-            viewModel.load()
-            val state = viewModel.state.value
-            assertTrue(state is TodayDetailViewModel.UiState.Loaded)
-            assertEquals(72, (state as TodayDetailViewModel.UiState.Loaded).content.temperatureFahrenheit)
-        }
-
-    // MARK: - Pure projections
-
-    @Test
-    fun projectTodayExtractsFields() {
-        val response =
-            HubTodayResponse(
-                today =
-                    mapOf(
-                        "weather" to mapOf("temperatureF" to 58, "conditions" to "Cloudy"),
-                        "aqi" to mapOf("label" to "Moderate", "value" to 80),
-                        "commute" to mapOf("label" to "20 min"),
-                    ),
-                error = null,
-            )
-        val projection = TodayDetailViewModel.projectToday(response)
-        assertEquals(58, projection.temperatureFahrenheit)
-        assertEquals("Cloudy", projection.conditions)
-        assertEquals("Moderate", projection.aqiLabel)
-        assertEquals(80, projection.aqiValue)
-        assertEquals("20 min", projection.commute)
+        assertTrue(viewModel.state.value is TodayDetailUiState.Loading)
     }
 
     @Test
-    fun projectTodayNullPayload() {
-        val projection = TodayDetailViewModel.projectToday(HubTodayResponse(today = null, error = null))
-        assertEquals(null, projection.temperatureFahrenheit)
-        assertEquals(null, projection.aqiLabel)
-        assertEquals(null, projection.commute)
+    fun loadResolvesToPopulated() {
+        val viewModel = TodayDetailViewModel()
+        viewModel.setFixture(TodaySampleData.populated)
+
+        viewModel.load()
+
+        val state = viewModel.state.value
+        assertTrue(state is TodayDetailUiState.Populated)
+        val content = (state as TodayDetailUiState.Populated).content
+        assertEquals("67°", content.temperature)
+        assertEquals("Mostly sunny", content.condition)
+        assertFalse(content.isAlert)
     }
 
     @Test
-    fun todaysEventsFiltersToTodayAndSorts() {
-        val zone = ZoneId.of("UTC")
-        val now = Instant.parse("2026-05-20T12:00:00Z")
-        val events =
-            listOf(
-                event("e1", "social", "2026-05-20T16:00:00Z"),
-                event("e2", "chore", "2026-05-20T09:00:00Z"),
-                event("e3", "repair", "2026-05-21T10:00:00Z"),
-            )
-        val rows = TodayDetailViewModel.todaysEvents(events, now, zone)
-        assertEquals(listOf("e2", "e1"), rows.map { it.id })
-        assertEquals("Chore", rows.first().typeLabel)
+    fun loadResolvesToAlertWhenRibbonPresent() {
+        val viewModel = TodayDetailViewModel()
+        viewModel.setFixture(TodaySampleData.alert)
+
+        viewModel.load()
+
+        val state = viewModel.state.value
+        assertTrue(state is TodayDetailUiState.Alert)
+        val content = (state as TodayDetailUiState.Alert).content
+        assertTrue(content.isAlert)
+        assertEquals(PantopusIcon.Snowflake, content.glyph)
     }
 
     @Test
-    fun eventIconMapping() {
-        assertEquals(PantopusIcon.Hammer, TodayDetailViewModel.iconFor("repair"))
-        assertEquals(PantopusIcon.PawPrint, TodayDetailViewModel.iconFor("pet"))
-        assertEquals(PantopusIcon.CalendarDays, TodayDetailViewModel.iconFor("social"))
+    fun refreshReloadsCurrentFixture() {
+        val viewModel = TodayDetailViewModel()
+        viewModel.setFixture(TodaySampleData.alert)
+
+        viewModel.refresh()
+
+        assertTrue(viewModel.state.value is TodayDetailUiState.Alert)
     }
 
-    private fun event(
-        id: String,
-        type: String,
-        start: String,
-    ): CalendarEventDto =
-        CalendarEventDto(
-            id = id,
-            homeId = "h",
-            eventType = type,
-            title = "Event $id",
-            startAt = start,
-        )
+    @Test
+    fun populatedFixtureShape() {
+        val content = TodaySampleData.populated
+
+        assertNull(content.ribbon)
+        assertEquals(listOf("AQI", "UV", "Wind"), content.chips.map { it.label })
+        assertEquals(4, content.signals.size)
+        assertEquals(3, content.around.size)
+        assertEquals("Signals · 4 today", content.signalsTitle)
+        assertEquals(TodayTone.Personal, content.signalsAccent)
+        assertEquals(1, content.signals.count { it.severity != null })
+    }
+
+    @Test
+    fun alertFixtureShape() {
+        val content = TodaySampleData.alert
+
+        assertEquals("NWS hard-freeze warning · until 8am Fri", content.ribbon?.title)
+        assertEquals(5, content.signals.size)
+        assertEquals("Signals · 5 today", content.signalsTitle)
+        assertEquals(TodayTone.Error, content.signalsAccent)
+        assertTrue(content.around.isEmpty())
+        assertEquals(listOf("Critical", "Watch"), content.signals.mapNotNull { it.severity?.label })
+    }
+
+    @Test
+    fun chipDotTonesMatchScale() {
+        val chips = TodaySampleData.populated.chips
+
+        assertEquals(TodayTone.Success, chips[0].dotTone)
+        assertEquals(TodayTone.Warning, chips[1].dotTone)
+        assertNull(chips[2].dotTone)
+    }
 }
