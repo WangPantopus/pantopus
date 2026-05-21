@@ -25,6 +25,10 @@ public struct AudienceProfileView: View {
     /// membership detail. Wave A direct-link until the Memberships index
     /// list ships.
     private let onOpenMembership: @MainActor (String) -> Void
+    /// A.7 (A22.2) — Push the full-screen Compose Broadcast surface. The
+    /// inline composer below stays a lightweight quick-post; this is the
+    /// canonical broadcast composer.
+    private let onComposeBroadcast: @MainActor (String) -> Void
     /// A13.12 — top-bar "Edit persona" action into the creator-side editor.
     private let onOpenEditPersona: @MainActor () -> Void
 
@@ -37,6 +41,7 @@ public struct AudienceProfileView: View {
         onOpenSetup: @escaping @MainActor () -> Void = {},
         onOpenCreatorInbox: @escaping @MainActor () -> Void = {},
         onOpenMembership: @escaping @MainActor (String) -> Void = { _ in },
+        onComposeBroadcast: @escaping @MainActor (String) -> Void = { _ in },
         onOpenEditPersona: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
@@ -47,6 +52,7 @@ public struct AudienceProfileView: View {
         self.onOpenSetup = onOpenSetup
         self.onOpenCreatorInbox = onOpenCreatorInbox
         self.onOpenMembership = onOpenMembership
+        self.onComposeBroadcast = onComposeBroadcast
         self.onOpenEditPersona = onOpenEditPersona
     }
 
@@ -335,6 +341,7 @@ public struct AudienceProfileView: View {
 
     private func composerCard(channelId: String?) -> some View {
         VStack(alignment: .leading, spacing: 10) {
+            fullComposerEntry
             HStack(spacing: 6) {
                 Text("Posting as")
                     .font(.system(size: 11, weight: .bold))
@@ -402,6 +409,43 @@ public struct AudienceProfileView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityIdentifier("audienceProfileComposer")
+    }
+
+    /// Entry to the canonical full-screen Compose Broadcast surface. The
+    /// quick-post composer beneath it stays for one-tap text updates.
+    private var fullComposerEntry: some View {
+        Button {
+            onComposeBroadcast(viewModel.personaId ?? "")
+        } label: {
+            HStack(spacing: 10) {
+                Icon(.megaphone, size: 16, color: Theme.Color.primary600)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.Color.primary50)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Compose a broadcast")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("Full editor · media · audience · scheduling")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Spacer(minLength: 0)
+                Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity)
+            .background(Theme.Color.primary50.opacity(0.5))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Theme.Color.primary100, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Compose a broadcast")
+        .accessibilityHint("Opens the full broadcast composer")
+        .accessibilityIdentifier("audienceProfileComposeBroadcast")
     }
 
     private var visibilityPicker: some View {

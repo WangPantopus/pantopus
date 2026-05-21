@@ -73,6 +73,7 @@ fun AudienceProfileScreen(
     onOpenSetup: () -> Unit = {},
     onOpenCreatorInbox: () -> Unit = {},
     onOpenMembership: (String) -> Unit = {},
+    onComposeBroadcast: (String) -> Unit = {},
     onOpenEditPersona: () -> Unit = {},
     viewModel: AudienceProfileViewModel = hiltViewModel(),
 ) {
@@ -129,6 +130,7 @@ fun AudienceProfileScreen(
                                         onVisibility = viewModel::onComposerVisibility,
                                         onTier = viewModel::onComposerTier,
                                         onSubmit = viewModel::submitUpdate,
+                                        onOpenFullComposer = { onComposeBroadcast(viewModel.composePersonaId ?: "") },
                                     ),
                                 navigation =
                                     AudienceProfileNavigationActions(
@@ -453,6 +455,7 @@ internal data class AudienceProfileComposerActions(
     val onVisibility: (UpdateVisibility) -> Unit,
     val onTier: (Int?) -> Unit,
     val onSubmit: () -> Unit,
+    val onOpenFullComposer: () -> Unit = {},
 )
 
 internal data class AudienceProfileNavigationActions(
@@ -581,6 +584,7 @@ private fun UpdatesTab(
             onVisibility = composerActions.onVisibility,
             onTier = composerActions.onTier,
             onSubmit = composerActions.onSubmit,
+            onOpenFullComposer = composerActions.onOpenFullComposer,
         )
         if (updates.isEmpty()) {
             EmptyUpdatesCard()
@@ -593,6 +597,56 @@ private fun UpdatesTab(
     }
 }
 
+/**
+ * Entry to the canonical full-screen Compose Broadcast surface. The
+ * quick-post composer beneath it stays for one-tap text updates.
+ */
+@Composable
+private fun FullComposerEntry(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(PantopusColors.primary50.copy(alpha = 0.5f))
+                .border(1.dp, PantopusColors.primary100, RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick)
+                .padding(10.dp)
+                .testTag("audienceProfileComposeBroadcast")
+                .semantics { contentDescription = "Compose a broadcast" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(PantopusColors.primary50),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Megaphone,
+                contentDescription = null,
+                size = 16.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.primary600,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "Compose a broadcast", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+            Text(
+                text = "Full editor · media · audience · scheduling",
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 14.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.appTextMuted,
+        )
+    }
+}
+
 @Composable
 private fun ComposerCard(
     composer: UpdateComposerState,
@@ -601,6 +655,7 @@ private fun ComposerCard(
     onVisibility: (UpdateVisibility) -> Unit,
     onTier: (Int?) -> Unit,
     onSubmit: () -> Unit,
+    onOpenFullComposer: () -> Unit = {},
 ) {
     Column(
         modifier =
@@ -613,6 +668,7 @@ private fun ComposerCard(
                 .testTag("audienceProfileComposer"),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        FullComposerEntry(onClick = onOpenFullComposer)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 text = "POSTING AS",

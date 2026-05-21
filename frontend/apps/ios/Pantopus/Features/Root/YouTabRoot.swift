@@ -782,8 +782,14 @@ public struct YouTabRoot: View {
             EditPersonaView(viewModel: EditPersonaViewModel(personaId: personaId)) {
                 if !path.isEmpty { path.removeLast() }
             }
-        case .composeBroadcast:
-            NotYetAvailableView(tabName: "Compose broadcast", icon: .megaphone)
+        case let .composeBroadcast(personaId):
+            ComposeBroadcastView(
+                viewModel: .live(personaId: personaId) {
+                    if !path.isEmpty { path.removeLast() }
+                }
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case .offers:
             OffersView(
                 viewModel: OffersViewModel(
@@ -1086,6 +1092,9 @@ public struct YouTabRoot: View {
                 },
                 onOpenMembership: { personaId in
                     Task { @MainActor in path.append(.membershipDetail(personaId: personaId)) }
+                },
+                onComposeBroadcast: { personaId in
+                    Task { @MainActor in path.append(.composeBroadcast(personaId: personaId)) }
                 },
                 onOpenEditPersona: {
                     Task { @MainActor in path.append(.editPersona(personaId: EditPersonaSampleData.personaId)) }
