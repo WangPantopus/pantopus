@@ -15,6 +15,7 @@ public enum MailboxCategoryPayload: Sendable, Hashable {
     case booklet(BookletDetailDTO)
     case certified(CertifiedDetailDTO)
     case gig(GigDetailDTO)
+    case memory(MemoryDetailDTO)
     /// No category-specific decoder applies (Package, Bill, Notice, …).
     /// Bodies fall back to the generic placeholder layout.
     case other
@@ -42,6 +43,10 @@ public enum MailboxCategoryPayload: Sendable, Hashable {
         case .gig:
             if let dto = GigDetailDTO.decode(from: objectPayload) {
                 return .gig(dto)
+            }
+        case .memory:
+            if let dto = MemoryDetailDTO.decode(from: objectPayload) {
+                return .memory(dto)
             }
         default:
             break

@@ -200,8 +200,10 @@ public enum HubRoute: Hashable {
     case propertyDetails(homeId: String)
     /// A.3 — Add a guest to a home.
     case addGuest(homeId: String)
-    /// A.x — Tasks map (full-bleed map of household / neighbourhood tasks).
-    case tasksMap
+    /// A11.1 — Tasks map. Gigs-only mode of the MapListHybrid archetype,
+    /// opened from the Gigs feed's list/map toggle. Carries the active
+    /// category so the map renders the same filtered window.
+    case tasksMap(categoryKey: String)
     /// A.x — Explore (neighbourhood discovery surface).
     case explore
     /// B.1 prerequisite — Mailbox root archetype.
@@ -935,7 +937,8 @@ public struct HubTabRoot: View {
                     },
                     onOpenVault: {
                         Task { @MainActor in push(.mailboxVault) }
-                    }
+                    },
+                    onOpenMap: { push(.mailboxMap) }
                 )
             )
         case let .drawerDetail(drawer):
@@ -992,7 +995,7 @@ public struct HubTabRoot: View {
                     Task { @MainActor in push(.composeGig(category: category.rawValue)) }
                 },
                 onOpenMap: { category in
-                    Task { @MainActor in push(.nearbyMapForGigs(categoryKey: category.rawValue)) }
+                    Task { @MainActor in push(.tasksMap(categoryKey: category.rawValue)) }
                 },
                 onOpenSearch: { Task { @MainActor in push(.gigSearch) } },
                 onBack: pop
@@ -1221,28 +1224,31 @@ public struct HubTabRoot: View {
             }
         case .discoverHub:
             DiscoverHubView(
-                viewModel: DiscoverHubViewModel { target in
-                    Task { @MainActor in
-                        switch target {
-                        case let .person(userId, _):
-                            push(.publicProfile(userId: userId))
-                        case let .business(businessId, _):
-                            push(.businessProfile(businessId: businessId))
-                        case let .gig(gigId):
-                            push(.gigDetail(gigId: gigId))
-                        case let .listing(listingId):
-                            push(.listingDetail(listingId: listingId))
-                        case .seeAllPeople:
-                            push(.connections)
-                        case .seeAllBusinesses:
-                            push(.discoverBusinesses)
-                        case .seeAllGigs:
-                            push(.gigsFeed)
-                        case .seeAllListings:
-                            push(.marketplace)
+                viewModel: DiscoverHubViewModel(
+                    onSelect: { target in
+                        Task { @MainActor in
+                            switch target {
+                            case let .person(userId, _):
+                                push(.publicProfile(userId: userId))
+                            case let .business(businessId, _):
+                                push(.businessProfile(businessId: businessId))
+                            case let .gig(gigId):
+                                push(.gigDetail(gigId: gigId))
+                            case let .listing(listingId):
+                                push(.listingDetail(listingId: listingId))
+                            case .seeAllPeople:
+                                push(.connections)
+                            case .seeAllBusinesses:
+                                push(.discoverBusinesses)
+                            case .seeAllGigs:
+                                push(.gigsFeed)
+                            case .seeAllListings:
+                                push(.marketplace)
+                            }
                         }
-                    }
-                }
+                    },
+                    onOpenMap: { Task { @MainActor in push(.explore) } }
+                )
             )
         case .discoverBusinesses:
             DiscoverBusinessesView(
@@ -1303,7 +1309,8 @@ public struct HubTabRoot: View {
                     mode: Self.chatMode(for: dest.mode),
                     counterparty: Self.chatCounterparty(for: dest),
                     currentUserId: currentUserId
-                )
+                ),
+                mode: dest.kind
             ) { if !path.isEmpty { path.removeLast() } }
         case .menu:
             SettingsView(
@@ -1370,14 +1377,37 @@ public struct HubTabRoot: View {
             AddGuestFormView(
                 viewModel: AddGuestFormViewModel(homeId: homeId)
             )
-        case .tasksMap:
-            NotYetAvailableView(tabName: "Tasks map", icon: .map)
+        case let .tasksMap(categoryKey):
+            TasksMapView(
+                viewModel: TasksMapViewModel(
+                    initialCategory: GigsCategory(rawValue: categoryKey) ?? .all
+                ),
+                onOpenTask: { taskId in
+                    Task { @MainActor in push(.gigDetail(gigId: taskId)) }
+                },
+                onCompose: { category in
+                    Task { @MainActor in push(.composeGig(category: category.rawValue)) }
+                },
+                onBack: pop
+            )
         case .explore:
-            NotYetAvailableView(tabName: "Explore", icon: .compass)
+            ExploreMapView(
+                onOpenEntity: { entity in
+                    Task { @MainActor in
+                        switch entity.kind {
+                        case .task: push(.gigDetail(gigId: entity.id))
+                        case .item: push(.listingDetail(listingId: entity.id))
+                        case .post: push(.pulsePost(postId: entity.id))
+                        case .spot: push(.businessProfile(businessId: entity.id))
+                        }
+                    }
+                },
+                onBack: { pop() }
+            )
         case .mailboxRoot:
             NotYetAvailableView(tabName: "Mailbox", icon: .mailbox)
         case .mailboxMap:
-            NotYetAvailableView(tabName: "Mailbox map", icon: .map)
+            MailboxMapView { pop() }
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to

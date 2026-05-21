@@ -64,6 +64,10 @@ class AudienceProfileViewModel
         private var personaHandle: String? = null
         private var channelId: String? = null
 
+        /** Exposed so the host can route the full Compose Broadcast surface. */
+        val composePersonaId: String?
+            get() = personaId
+
         fun load() {
             _state.value = AudienceProfileUiState.Loading
             _composer.value = _composer.value.copy(error = null)

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -166,22 +168,65 @@ private fun GigsTopBar(
             modifier = Modifier.semantics { heading() },
         )
         Spacer(modifier = Modifier.weight(1f))
-        Box(
-            modifier =
-                Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onOpenMap)
-                    .testTag("gigsMapToggle"),
-            contentAlignment = Alignment.Center,
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.Map,
-                contentDescription = "Open map",
-                size = 19.dp,
-                tint = PantopusColors.appText,
-            )
-        }
+        GigsViewModeToggle(onOpenMap = onOpenMap)
+    }
+}
+
+/**
+ * List/Map view-mode toggle for the Gigs feed top bar. "List" is the
+ * active segment; tapping "Map" pushes the Tasks map (which returns to the
+ * feed via its floating-pill chevron). Mirrors iOS `GigsViewModeToggle`.
+ */
+@Composable
+private fun GigsViewModeToggle(onOpenMap: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(2.dp)
+                .testTag("gigsViewModeToggle"),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GigsViewModeSegment(icon = PantopusIcon.Menu, label = "List", active = true, onClick = {})
+        GigsViewModeSegment(icon = PantopusIcon.Map, label = "Map", active = false, onClick = onOpenMap)
+    }
+}
+
+@Composable
+private fun GigsViewModeSegment(
+    icon: PantopusIcon,
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(if (active) PantopusColors.primary600 else Color.Transparent)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp)
+                .height(32.dp)
+                .testTag("gigsViewMode_${label.lowercase()}")
+                .semantics { contentDescription = if (active) "$label view, selected" else "$label view" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        PantopusIconImage(
+            icon = icon,
+            contentDescription = null,
+            size = 14.dp,
+            strokeWidth = 2.2f,
+            tint = if (active) PantopusColors.appTextInverse else PantopusColors.appTextSecondary,
+        )
+        Text(
+            text = label,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (active) PantopusColors.appTextInverse else PantopusColors.appTextSecondary,
+        )
     }
 }
 

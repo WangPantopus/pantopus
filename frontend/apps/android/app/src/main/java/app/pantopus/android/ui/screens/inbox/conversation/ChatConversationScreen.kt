@@ -21,11 +21,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
@@ -50,6 +51,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.screens.inbox.conversation.ai.AiCapabilityChip
+import app.pantopus.android.ui.screens.inbox.conversation.ai.AiEstimateCard
+import app.pantopus.android.ui.screens.inbox.conversation.ai.ChatAiAvatar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -67,6 +71,7 @@ fun ChatConversationScreen(
     mode: ChatThreadMode,
     counterparty: ChatCounterparty,
     currentUserId: String,
+    conversationMode: ChatConversationMode = ChatConversationMode.Dm,
     onBack: () -> Unit = {},
     scrollToMessageId: String? = null,
     viewModel: ChatConversationViewModel = hiltViewModel(),
@@ -93,7 +98,7 @@ fun ChatConversationScreen(
                 .background(PantopusColors.appSurface)
                 .testTag("chatConversation"),
     ) {
-        ChatHeader(counterparty = activeCounterparty, onBack = onBack)
+        ChatHeader(conversationMode = conversationMode, counterparty = activeCounterparty, onBack = onBack)
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (val s = state) {
                 ChatConversationUiState.Loading -> LoadingFrame()
@@ -103,6 +108,8 @@ fun ChatConversationScreen(
                         aiPrompts = viewModel.aiPrompts,
                         emptyChips = viewModel.emptyChips,
                         onChipTap = viewModel::tapPrompt,
+                        conversationMode = conversationMode,
+                        onCapabilityTap = viewModel::sendCapabilityPrompt,
                     )
                 is ChatConversationUiState.Loaded ->
                     PopulatedFrame(
@@ -120,7 +127,7 @@ fun ChatConversationScreen(
         }
         Composer(
             text = composerText,
-            placeholder = composerPlaceholder(activeCounterparty),
+            placeholder = composerPlaceholder(conversationMode, activeCounterparty),
             canSend = composerText.isNotBlank() && !isSending,
             onTextChange = viewModel::setComposerText,
             onSend = viewModel::send,
@@ -128,11 +135,18 @@ fun ChatConversationScreen(
     }
 }
 
-private fun composerPlaceholder(c: ChatCounterparty): String =
-    when (c) {
-        is ChatCounterparty.Ai -> "Ask anything…"
-        is ChatCounterparty.Group -> "Message ${c.displayName.firstWord()}…"
-        is ChatCounterparty.Person -> "Message ${c.displayName.firstWord()}…"
+private fun composerPlaceholder(
+    conversationMode: ChatConversationMode,
+    c: ChatCounterparty,
+): String =
+    if (conversationMode == ChatConversationMode.AiAssistant) {
+        "Ask Pantopus AI…"
+    } else {
+        when (c) {
+            is ChatCounterparty.Ai -> "Ask Pantopus AI…"
+            is ChatCounterparty.Group -> "Message ${c.displayName.firstWord()}…"
+            is ChatCounterparty.Person -> "Message ${c.displayName.firstWord()}…"
+        }
     }
 
 private fun String.firstWord(): String = split(" ").firstOrNull() ?: this
@@ -143,7 +157,9 @@ private fun String.firstWord(): String = split(" ").firstOrNull() ?: this
 internal fun ChatHeader(
     counterparty: ChatCounterparty,
     onBack: () -> Unit,
+    conversationMode: ChatConversationMode = ChatConversationMode.Dm,
 ) {
+    val isAi = conversationMode == ChatConversationMode.AiAssistant || counterparty is ChatCounterparty.Ai
     Row(
         modifier =
             Modifier
@@ -170,7 +186,7 @@ internal fun ChatHeader(
                 tint = PantopusColors.appText,
             )
         }
-        HeaderAvatar(counterparty)
+        HeaderAvatar(isAi = isAi, counterparty = counterparty)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -181,7 +197,7 @@ internal fun ChatHeader(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (counterparty is ChatCounterparty.Ai) BetaPill()
+                if (isAi) BetaPill()
             }
             presenceFor(counterparty)?.let { (online, text) ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -262,18 +278,22 @@ private fun HeaderIcon(icon: PantopusIcon) {
 }
 
 @Composable
-private fun HeaderAvatar(counterparty: ChatCounterparty) {
-    when (counterparty) {
-        is ChatCounterparty.Person ->
+private fun HeaderAvatar(
+    isAi: Boolean,
+    counterparty: ChatCounterparty,
+) {
+    when {
+        isAi -> ChatAiAvatar(size = 32.dp)
+        counterparty is ChatCounterparty.Person ->
             PersonAvatar(
                 initials = counterparty.initials,
                 verified = counterparty.verified,
                 online = counterparty.online,
                 size = 32.dp,
             )
-        is ChatCounterparty.Group ->
+        counterparty is ChatCounterparty.Group ->
             PersonAvatar(initials = counterparty.displayName.initials(), verified = false, online = false, size = 32.dp)
-        is ChatCounterparty.Ai -> AiAvatar(size = 32.dp)
+        else -> ChatAiAvatar(size = 32.dp)
     }
 }
 
@@ -334,29 +354,6 @@ private fun PersonAvatar(
     }
 }
 
-@Composable
-private fun AiAvatar(size: androidx.compose.ui.unit.Dp) {
-    Box(
-        modifier =
-            Modifier
-                .size(size)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(PantopusColors.primary500, PantopusColors.primary700),
-                    ),
-                ),
-        contentAlignment = Alignment.Center,
-    ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Sparkles,
-            contentDescription = "AI",
-            size = size * 0.5f,
-            tint = PantopusColors.appTextInverse,
-        )
-    }
-}
-
 // MARK: - Frames
 
 @Composable
@@ -375,12 +372,15 @@ internal fun EmptyFrame(
     aiPrompts: List<ChatPromptChip>,
     emptyChips: List<ChatPromptChip>,
     onChipTap: (ChatPromptChip) -> Unit,
+    conversationMode: ChatConversationMode = ChatConversationMode.Dm,
+    onCapabilityTap: (ChatPromptChip) -> Unit = {},
 ) {
-    when (counterparty) {
-        is ChatCounterparty.Ai -> AiWelcomeFrame(prompts = aiPrompts, onChipTap = onChipTap)
-        is ChatCounterparty.Person ->
+    val isAi = conversationMode == ChatConversationMode.AiAssistant || counterparty is ChatCounterparty.Ai
+    when {
+        isAi -> AiWelcomeFrame(prompts = aiPrompts, onCapabilityTap = onCapabilityTap)
+        counterparty is ChatCounterparty.Person ->
             PersonEmptyFrame(counterparty = counterparty, chips = emptyChips, onChipTap = onChipTap)
-        is ChatCounterparty.Group ->
+        counterparty is ChatCounterparty.Group ->
             PersonEmptyFrame(
                 counterparty =
                     ChatCounterparty.Person(
@@ -390,6 +390,7 @@ internal fun EmptyFrame(
                 chips = emptyChips,
                 onChipTap = onChipTap,
             )
+        else -> AiWelcomeFrame(prompts = aiPrompts, onCapabilityTap = onCapabilityTap)
     }
 }
 
@@ -499,72 +500,79 @@ private fun EncryptionPill() {
 @Composable
 private fun AiWelcomeFrame(
     prompts: List<ChatPromptChip>,
-    onChipTap: (ChatPromptChip) -> Unit,
+    onCapabilityTap: (ChatPromptChip) -> Unit,
 ) {
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(top = 18.dp, start = 14.dp, end = 14.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(top = 14.dp, start = 14.dp, end = 14.dp)
                 .testTag("chatConversationAI"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            AiAvatar(size = 32.dp)
-            Column(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = Radii.lg, bottomEnd = Radii.lg, bottomStart = Radii.lg))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(PantopusColors.primary50, PantopusColors.appSurface),
-                            ),
-                        )
-                        .border(
-                            1.dp,
-                            PantopusColors.primary100,
-                            RoundedCornerShape(topStart = 4.dp, topEnd = Radii.lg, bottomEnd = Radii.lg, bottomStart = Radii.lg),
-                        )
-                        .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    PantopusIconImage(
-                        icon = PantopusIcon.Sparkles,
-                        contentDescription = null,
-                        size = 10.dp,
-                        tint = PantopusColors.primary700,
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.xl))
+                    .background(PantopusColors.magicBgSoft)
+                    .border(1.dp, PantopusColors.magicBorder, RoundedCornerShape(Radii.xl))
+                    .padding(14.dp)
+                    .testTag("chatAIWelcomeCard"),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ChatAiAvatar(size = 32.dp)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text(
+                        text = "Hi — I'm Pantopus AI",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appText,
                     )
                     Text(
-                        text = "PANTOPUS AI",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PantopusColors.primary700,
+                        text = "I can use your verified neighbors, tasks, and mailbox to help.",
+                        fontSize = 11.sp,
+                        color = PantopusColors.appTextSecondary,
                     )
                 }
-                Text(
-                    text = "Hi! I can help you post tasks, find listings, or summarize mail. What can I help with today?",
-                    fontSize = 14.sp,
-                    color = PantopusColors.appText,
-                )
             }
-        }
-        Spacer(modifier = Modifier.size(14.dp))
-        Column(
-            modifier = Modifier.padding(start = 42.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            Text(
-                text = "SUGGESTED",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appTextSecondary,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                prompts.forEach { prompt ->
-                    QuickChip(chip = prompt, onTap = onChipTap)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                prompts.chunked(2).forEach { rowChips ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        rowChips.forEach { chip ->
+                            AiCapabilityChip(
+                                chip = chip,
+                                onTap = onCapabilityTap,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (rowChips.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.ShieldCheck,
+                contentDescription = null,
+                size = 11.dp,
+                tint = PantopusColors.success,
+            )
+            Spacer(modifier = Modifier.size(6.dp))
+            Text(
+                text = "Private to your account · never shared with neighbors",
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+            )
         }
     }
 }
@@ -690,6 +698,7 @@ private fun BubbleRow(
                     }
                 }
             is ChatBubbleBody.SystemLink -> SystemLinkPill(body)
+            is ChatBubbleBody.AiReply -> AiReplyBubble(body = body, hasTail = content.hasTail)
         }
         if (content.stamp != null) {
             StampRow(content = content, onRetry = onRetry)
@@ -719,6 +728,54 @@ private fun BubbleContainer(
                 .padding(horizontal = 13.dp, vertical = 9.dp),
     ) {
         inner()
+    }
+}
+
+@Composable
+private fun AiReplyBubble(
+    body: ChatBubbleBody.AiReply,
+    hasTail: Boolean,
+) {
+    Column(
+        modifier =
+            Modifier
+                .widthIn(max = 300.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 16.dp,
+                        bottomEnd = 16.dp,
+                        bottomStart = if (hasTail) 4.dp else 16.dp,
+                    ),
+                )
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(horizontal = 13.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        AiTag()
+        Text(text = body.text, fontSize = 14.sp, color = PantopusColors.appText)
+        body.estimate?.let { AiEstimateCard(estimate = it, modifier = Modifier.fillMaxWidth()) }
+    }
+}
+
+@Composable
+private fun AiTag() {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.magicBg)
+                .padding(horizontal = 6.dp, vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.Bot, contentDescription = null, size = 9.dp, tint = PantopusColors.magic)
+        Text(
+            text = "PANTOPUS AI",
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.magic,
+        )
     }
 }
 

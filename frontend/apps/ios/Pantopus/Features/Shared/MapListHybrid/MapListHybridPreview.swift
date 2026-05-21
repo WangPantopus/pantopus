@@ -123,9 +123,9 @@ public struct MapListHybridPreviewHost: View {
 
     private func label(for detent: MapListHybridDetent) -> String {
         switch detent {
-        case .collapsed: "Collapsed (160)"
-        case .standard: "Standard (296)"
-        case .expanded: "Expanded (518)"
+        case .collapsed: "Collapsed (20%)"
+        case .standard: "Standard (40%)"
+        case .expanded: "Expanded (90%)"
         }
     }
 }

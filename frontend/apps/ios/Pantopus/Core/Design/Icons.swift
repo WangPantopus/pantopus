@@ -181,6 +181,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     // archive / scan) + category section icons (lease / insurance /
     // warranty / tax / permit / hoa / id) + banner / row chip glyphs.
     case image
+    case imagePlus = "image-plus"
     case fileType = "file-type"
     case fileSpreadsheet = "file-spreadsheet"
     case fileSignature = "file-signature"
@@ -276,6 +277,13 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case doorOpen = "door-open"
     case car
     case warehouse
+
+    /// A15.3 AI Assistant — the conversation AI avatar + "Pantopus AI" reply
+    /// tag glyph. SF Symbols ships no robot/`bot` glyph, so this falls back
+    /// to `sparkles` (the house AI/magic glyph); Android renders the truer
+    /// `SmartToy` robot. Kept a distinct case so the call sites read as the
+    /// Lucide `bot` token and can swap to a real vector later.
+    case bot
 
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
@@ -417,6 +425,7 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .alertTriangle: "exclamationmark.triangle"
         // T6.4b Documents
         case .image: "photo"
+        case .imagePlus: "photo.badge.plus"
         case .fileType: "doc.fill"
         case .fileSpreadsheet: "tablecells"
         case .fileSignature: "doc.text.fill"
@@ -491,6 +500,9 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .doorOpen: "door.left.hand.open"
         case .car: "car"
         case .warehouse: "house.lodge"
+        // A15.3 AI Assistant. SF Symbols has no robot glyph; `bot` falls
+        // back to `sparkles`, the house AI/magic glyph.
+        case .bot: "sparkles"
         }
     }
 }

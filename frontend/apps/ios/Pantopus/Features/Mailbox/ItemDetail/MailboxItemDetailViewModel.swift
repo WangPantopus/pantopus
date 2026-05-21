@@ -207,9 +207,35 @@ final class MailboxItemDetailViewModel {
         case .certified:
             guard certifiedAckChecked else { return }
             await acknowledgeReceipt()
+        case .memory:
+            saveMemoryToVault()
         default:
             break
         }
+    }
+
+    /// "Save to Vault" — client-side keepsake flip (no backend). Re-projects
+    /// the loaded content with `isSaved == true` so the body swaps the facts
+    /// grid for the vault-location card and the elf copy switches to the
+    /// saved variant. No-ops if the memory is already kept.
+    private func saveMemoryToVault() {
+        guard case let .loaded(content) = state,
+              case let .memory(memory) = content.payload,
+              !memory.isSaved
+        else { return }
+        state = .loaded(
+            MailboxItemDetailContent(
+                category: content.category,
+                trust: content.trust,
+                sender: content.sender,
+                aiElf: content.aiElf,
+                keyFacts: content.keyFacts,
+                timeline: content.timeline,
+                packageInfo: content.packageInfo,
+                ctaEnabled: content.ctaEnabled,
+                payload: .memory(memory.withSaved(true))
+            )
+        )
     }
 
     /// Ghost CTA tap. Mirrors `performPrimaryAction`'s dispatch.
@@ -310,7 +336,7 @@ final class MailboxItemDetailViewModel {
             switch category {
             case .package:
                 await fetchPackageDetails(for: response.mail, category: category)
-            case .coupon, .booklet, .certified, .gig:
+            case .coupon, .booklet, .certified, .gig, .memory:
                 applyCategoryBody(response.mail, category: category)
             default:
                 applyItem(response.mail, category: category)
@@ -348,10 +374,41 @@ final class MailboxItemDetailViewModel {
             applyCertified(item: item, category: category, certified: certified)
         case let .gig(gig):
             applyGig(item: item, category: category, gig: gig, baseTrust: baseTrust)
+        case let .memory(memory):
+            applyMemory(item: item, category: category, memory: memory)
         case .other:
             // Payload didn't decode — fall back to the placeholder body.
             applyItem(item, category: category)
         }
+    }
+
+    /// Memory (A17.7) — project the keepsake payload. The body owns the
+    /// polaroid / note / facts / vault rendering; the shell only needs a
+    /// verified sender block (the elf + facts are not the standard slots),
+    /// so `aiElf` / `keyFacts` / `timeline` stay empty.
+    private func applyMemory(
+        item: MailboxV2ItemResponse.Item,
+        category: MailItemCategory,
+        memory: MemoryDetailDTO
+    ) {
+        state = .loaded(
+            MailboxItemDetailContent(
+                category: category,
+                trust: .verified,
+                sender: SenderBlockContent(
+                    displayName: item.senderDisplay,
+                    meta: item.base.createdAt,
+                    initials: Self.initials(from: item.senderDisplay),
+                    senderUserId: item.base.senderUserId
+                ),
+                aiElf: nil,
+                keyFacts: [],
+                timeline: [],
+                packageInfo: nil,
+                ctaEnabled: true,
+                payload: .memory(memory)
+            )
+        )
     }
 
     private func applyCoupon(

@@ -150,6 +150,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Star
@@ -454,6 +455,12 @@ enum class PantopusIcon(
     DoorOpen("door-open"),
     Car("car"),
     Warehouse("warehouse"),
+
+    // A15.3 AI Assistant — the conversation AI avatar + "Pantopus AI" reply
+    // tag glyph. Material ships `SmartToy` (a robot face), the closest match
+    // for Lucide `bot`. iOS has no robot SF Symbol and falls back to
+    // `sparkles`.
+    Bot("bot"),
     ;
 
     companion object {
@@ -738,6 +745,8 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.DoorOpen -> IconSource.Material(Icons.Filled.MeetingRoom)
         PantopusIcon.Car -> IconSource.Material(Icons.Filled.DirectionsCar)
         PantopusIcon.Warehouse -> IconSource.Material(Icons.Filled.Warehouse)
+        // A15.3 AI Assistant — Material's robot-assistant glyph.
+        PantopusIcon.Bot -> IconSource.Material(Icons.Filled.SmartToy)
     }
 
 /**

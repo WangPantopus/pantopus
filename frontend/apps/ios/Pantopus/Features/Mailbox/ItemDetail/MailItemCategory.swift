@@ -2,7 +2,7 @@
 //  MailItemCategory.swift
 //  Pantopus
 //
-//  14-category enum for mailbox items. Each case carries its accent
+//  19-category enum for mailbox items. Each case carries its accent
 //  color for the 4pt top strip.
 //
 
@@ -28,6 +28,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
     case delivery
     case social
     case gig
+    case memory
     case general
 
     /// 4pt accent strip color sitting at the top of the detail shell.
@@ -50,6 +51,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .delivery: Theme.Color.handyman
         case .social: Theme.Color.cleaning
         case .gig: Theme.Color.handyman // "cat-gigs" orange per A17.6 gig accent
+        case .memory: Theme.Color.warning // sun-amber per A17.7 stationery-summer accent
         case .general: Theme.Color.appTextSecondary
         }
     }
@@ -76,6 +78,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .delivery: .package
         case .social: .users
         case .gig: .handCoins
+        case .memory: .heart
         case .general: .mailbox
         }
     }
@@ -100,6 +103,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .delivery: Theme.Color.appSurfaceSunken
         case .social: Theme.Color.homeBg
         case .gig: Theme.Color.warningBg
+        case .memory: Theme.Color.warningBg
         case .general: Theme.Color.appSurfaceSunken
         }
     }
@@ -125,6 +129,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .delivery: "Delivery"
         case .social: "Social"
         case .gig: "Gig"
+        case .memory: "Memory"
         case .general: "Mail"
         }
     }
@@ -133,7 +138,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
     /// kind used by the A17 shell's top-bar eyebrow.
     public var detailTrust: MailDetailTrust {
         switch self {
-        case .certified, .community, .legal, .tax: .verified
+        case .certified, .community, .legal, .tax, .memory: .verified
         case .notice, .bill: .warning
         default: .neutral
         }

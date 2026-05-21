@@ -96,6 +96,50 @@ final class ChatConversationViewModelTests: XCTestCase {
         }
     }
 
+    func testSendCapabilityPromptStartsAIThreadWithUserBubble() async {
+        let vm = ChatConversationViewModel(
+            mode: .ai,
+            counterparty: Self.counterpartyAI,
+            currentUserId: "u_me",
+            api: makeAPI()
+        )
+        await vm.load()
+        // Welcome/empty before any capability is tapped.
+        if case .empty = vm.state { /* ok */ } else { XCTFail("Expected .empty welcome state") }
+        await vm.sendCapabilityPrompt(ChatPromptChip(id: "price", label: "Price a task", icon: .hammer))
+        guard case let .loaded(rows) = vm.state else {
+            XCTFail("Expected .loaded after tapping a capability, got \(vm.state)")
+            return
+        }
+        let bubbles = rows.compactMap { row -> ChatBubbleContent? in
+            if case let .bubble(content) = row { return content } else { return nil }
+        }
+        let outgoing = bubbles.first { $0.side == .outgoing }
+        XCTAssertNotNil(outgoing, "capability tap should append an outgoing user bubble")
+        if case let .text(text)? = outgoing?.body {
+            XCTAssertEqual(text, "Price a task")
+        } else {
+            XCTFail("Expected a text bubble carrying the capability label")
+        }
+    }
+
+    func testAIActiveSampleRendersStructuredReplyWithEstimate() {
+        let rows = ChatConversationSampleData.aiActiveRows
+        let bubbles = rows.compactMap { row -> ChatBubbleContent? in
+            if case let .bubble(content) = row { return content } else { return nil }
+        }
+        let aiBubble = bubbles.first { content in
+            if case .aiReply = content.body { true } else { false }
+        }
+        XCTAssertNotNil(aiBubble, "active AI sample should contain an aiReply bubble")
+        if case let .aiReply(_, estimate)? = aiBubble?.body {
+            XCTAssertNotNil(estimate, "the sample AI reply should carry an estimate card")
+            XCTAssertEqual(estimate?.amount, "$55–70")
+        } else {
+            XCTFail("Expected an aiReply body")
+        }
+    }
+
     func testSendFailureMarksClientIdAsFailed() async {
         URLProtocolStub.stub(path: "/api/chat/conversations/u_other/messages", response: .json(Self.messagesJSON()))
         URLProtocolStub.stub(path: "/api/chat/conversations/u_other/read", response: .json("{}"))

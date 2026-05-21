@@ -18,8 +18,12 @@ import org.junit.Test
  * it (toward Expanded).
  */
 class MapListHybridResolverTest {
+    // Detents are screen-relative fractions now; resolve them against a
+    // reference container so the resolver math stays in px space.
+    // 0.20/0.40/0.90 × 800 = 160 / 320 / 720.
+    private val containerPx = 800f
     private val targets: Map<MapListHybridDetent, Float> =
-        MapListHybridDetent.entries.associateWith { it.height.value }
+        MapListHybridDetent.entries.associateWith { it.heightFraction * containerPx }
 
     // MARK: - Snap-to-nearest
 
@@ -53,7 +57,8 @@ class MapListHybridResolverTest {
             MapListHybridDetentResolver.resolve(
                 current = MapListHybridDetent.Standard,
                 velocity = 0f,
-                displacedHeightPx = 500f,
+                // near expanded (720)
+                displacedHeightPx = 680f,
                 targetsPx = targets,
             )
         assertEquals(MapListHybridDetent.Expanded, next)
@@ -148,10 +153,10 @@ class MapListHybridResolverTest {
     // MARK: - Detent contract
 
     @Test
-    fun detent_heights_match_q9_contract() {
-        assertEquals(160f, MapListHybridDetent.Collapsed.height.value)
-        assertEquals(296f, MapListHybridDetent.Standard.height.value)
-        assertEquals(518f, MapListHybridDetent.Expanded.height.value)
+    fun detent_fractions_match_q9_contract() {
+        assertEquals(0.20f, MapListHybridDetent.Collapsed.heightFraction)
+        assertEquals(0.40f, MapListHybridDetent.Standard.heightFraction)
+        assertEquals(0.90f, MapListHybridDetent.Expanded.heightFraction)
     }
 
     @Test

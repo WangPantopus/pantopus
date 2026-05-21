@@ -13,6 +13,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -56,15 +57,23 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 
 /**
+ * Vertical room reserved below the status bar for the floating map-control
+ * stack, so a near-full (90%) sheet can't push it off the top of the
+ * screen (≈ a 48dp FAB + two 38dp control buttons + gaps). Mirrors the
+ * iOS `controlsTopReserve`.
+ */
+internal val CONTROLS_TOP_RESERVE = 168.dp
+
+/**
  * T6.6a (P24) — shared archetype for map+list hybrid surfaces.
  *
  * Full-bleed Google Maps canvas underneath, five chrome slots overlaid
  * (top pill, category chips at the top edge, map-controls stack pinned
  * to the right above the sheet edge), and a draggable bottom sheet
- * that snaps between three detents per Q9:
- * [MapListHybridDetent.Collapsed] (160 dp),
- * [MapListHybridDetent.Standard] (296 dp), and
- * [MapListHybridDetent.Expanded] (518 dp).
+ * that snaps between three detents per Q9 (screen-relative fractions,
+ * revised by A11.1): [MapListHybridDetent.Collapsed] (20%),
+ * [MapListHybridDetent.Standard] (40%), and
+ * [MapListHybridDetent.Expanded] (90%).
  *
  * The shell owns:
  * - the Google Maps canvas (rendering supplied [pins] + optional [anchor] disc)
@@ -88,6 +97,7 @@ fun MapListHybridShell(
     modifier: Modifier = Modifier,
     anchor: MapAnchor? = null,
     selectedPinId: String? = null,
+    recenterTrigger: Int = 0,
     onPinTap: (String) -> Unit = {},
     reduceMotionOverride: Boolean? = null,
     topPill: @Composable () -> Unit = {},
@@ -122,25 +132,44 @@ fun MapListHybridShell(
         }
     }
 
-    var dragDelta by remember { mutableStateOf(0f) }
-    val baseHeightDp = detent.height
-    val baseHeightPx = with(density) { baseHeightDp.toPx() }
-    val minHeightPx = 120f * density.density
-    val targetHeightPx = (baseHeightPx - dragDelta).coerceAtLeast(minHeightPx)
-    val targetHeightDp = with(density) { targetHeightPx.toDp() }
-    val animatedHeight by animateDpAsState(
-        targetValue = targetHeightDp,
-        animationSpec = if (reduceMotion) tween(1) else tween(durationMillis = 240),
-        label = "mapListHybridSheetHeight",
-    )
+    // Recenter on demand (locate-me) — increment [recenterTrigger] to
+    // snap the camera back to the anchor without changing it.
+    LaunchedEffect(recenterTrigger) {
+        if (recenterTrigger != 0 && anchor != null) {
+            cameraState.position =
+                CameraPosition.fromLatLngZoom(LatLng(anchor.latitude, anchor.longitude), 15f)
+        }
+    }
 
-    Box(
+    var dragDelta by remember { mutableStateOf(0f) }
+
+    BoxWithConstraints(
         modifier =
             modifier
                 .fillMaxSize()
                 .background(PantopusColors.appBg)
                 .testTag("mapListHybridShell"),
     ) {
+        val containerHeight = maxHeight
+        val baseHeightDp = detent.height(containerHeight)
+        val baseHeightPx = with(density) { baseHeightDp.toPx() }
+        val minHeightPx = 120f * density.density
+        val targetHeightPx = (baseHeightPx - dragDelta).coerceAtLeast(minHeightPx)
+        val targetHeightDp = with(density) { targetHeightPx.toDp() }
+        val animatedHeight by animateDpAsState(
+            targetValue = targetHeightDp,
+            animationSpec = if (reduceMotion) tween(1) else tween(durationMillis = 240),
+            label = "mapListHybridSheetHeight",
+        )
+        // Map controls follow the sheet edge but clamp so the 90% detent
+        // can't push the stack (e.g. a Post-task FAB) off the top.
+        val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val controlsBottom =
+            minOf(
+                targetHeightDp + 14.dp,
+                (containerHeight - statusBarTop - CONTROLS_TOP_RESERVE).coerceAtLeast(14.dp),
+            )
+
         MapLayer(
             cameraState = cameraState,
             pins = pins,
@@ -178,7 +207,7 @@ fun MapListHybridShell(
             modifier =
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 14.dp, bottom = targetHeightDp + 14.dp)
+                    .padding(end = 14.dp, bottom = controlsBottom)
                     .testTag("mapListHybridMapControls"),
         ) {
             mapControls()
@@ -191,7 +220,7 @@ fun MapListHybridShell(
                 val displacedPx = baseHeightPx - dragDelta
                 val targetsPx =
                     MapListHybridDetent.entries.associateWith { stop ->
-                        with(density) { stop.height.toPx() }
+                        with(density) { stop.height(containerHeight).toPx() }
                     }
                 val next =
                     MapListHybridDetentResolver.resolve(

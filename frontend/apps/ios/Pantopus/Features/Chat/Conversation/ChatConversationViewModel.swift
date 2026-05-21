@@ -50,11 +50,27 @@ public final class ChatConversationViewModel {
     /// Set when typing indicator should render above the composer.
     public private(set) var isCounterpartyTyping: Bool = false
 
-    /// Suggested prompts for the AI welcome card.
+    /// Capability chips for the AI welcome card (tap-to-send).
     public let aiPrompts: [ChatPromptChip]
 
     /// Quick-start chips for the empty state.
     public let emptyChips: [ChatPromptChip]
+
+    /// A15.3 capability chips shown in the AI welcome card. Tapping one
+    /// sends its label as the thread's first message.
+    public static let defaultAICapabilities: [ChatPromptChip] = [
+        ChatPromptChip(id: "price", label: "Price a task", icon: .hammer),
+        ChatPromptChip(id: "draft", label: "Draft a Pulse post", icon: .pencil),
+        ChatPromptChip(id: "mail", label: "Summarize mail", icon: .mailbox),
+        ChatPromptChip(id: "neighbor", label: "Find a neighbor", icon: .search)
+    ]
+
+    /// Quick-start chips for a human DM's empty state.
+    public static let defaultEmptyChips: [ChatPromptChip] = [
+        ChatPromptChip(id: "intro", label: "Introduce yourself", icon: .hand),
+        ChatPromptChip(id: "gig", label: "Ask about the gig", icon: .briefcase),
+        ChatPromptChip(id: "listing", label: "Share a listing", icon: .tag)
+    ]
 
     /// Whether the composer's send disc is enabled (text present + not
     /// in flight). Bound by the view.
@@ -94,16 +110,24 @@ public final class ChatConversationViewModel {
         self.scrollToMessageId = scrollToMessageId
         self.api = api
         self.socket = socket
-        aiPrompts = [
-            ChatPromptChip(id: "mail", label: "Summarize my inbox", icon: .mailbox),
-            ChatPromptChip(id: "task", label: "Post a task", icon: .pencil),
-            ChatPromptChip(id: "handy", label: "Find a handyman nearby", icon: .hammer)
-        ]
-        emptyChips = [
-            ChatPromptChip(id: "intro", label: "Introduce yourself", icon: .hand),
-            ChatPromptChip(id: "gig", label: "Ask about the gig", icon: .briefcase),
-            ChatPromptChip(id: "listing", label: "Share a listing", icon: .tag)
-        ]
+        aiPrompts = Self.defaultAICapabilities
+        emptyChips = Self.defaultEmptyChips
+    }
+
+    /// Preview/snapshot seam — seeds a fixed render state with no network
+    /// fetch or socket subscriptions. Not used in production navigation;
+    /// `load()` early-returns on a seeded `.loaded` state so the fixture
+    /// survives `.task`.
+    init(previewState: ChatConversationState, counterparty: ChatCounterparty) {
+        mode = .ai
+        self.counterparty = counterparty
+        currentUserId = "preview_me"
+        scrollToMessageId = nil
+        api = .shared
+        socket = .shared
+        aiPrompts = Self.defaultAICapabilities
+        emptyChips = Self.defaultEmptyChips
+        state = previewState
     }
 
     // No `deinit { cancel }` — Swift 6's strict concurrency disallows
@@ -223,8 +247,12 @@ public final class ChatConversationViewModel {
         socketTasks.removeAll()
     }
 
-    public func tapAIPrompt(_ chip: ChatPromptChip) {
+    /// Tap a welcome-card capability chip — send its label as the
+    /// thread's first message (transitions the AI thread out of the
+    /// welcome/empty state).
+    public func sendCapabilityPrompt(_ chip: ChatPromptChip) async {
         composerText = chip.label
+        await send()
     }
 
     // MARK: - Fetch

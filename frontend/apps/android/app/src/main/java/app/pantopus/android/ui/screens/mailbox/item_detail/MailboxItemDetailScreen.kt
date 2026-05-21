@@ -32,6 +32,7 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CertifiedBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CouponBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.GigBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.MailItemPlaceholderBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.MemoryBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.PackageBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedTermsSheet
 import app.pantopus.android.ui.theme.PantopusColors
@@ -186,6 +187,16 @@ private fun ctaContent(
                 primaryEnabled =
                     content.ctaEnabled && ackChecked && !flags.primaryCompleted,
             )
+        MailItemCategory.Memory -> {
+            val saved = (content.payload as? MailboxCategoryPayload.Memory)?.detail?.isSaved ?: false
+            MailboxCTAShelfContent(
+                primaryTitle = if (saved) "Saved to Vault" else "Save to Vault",
+                ghostTitle = "Share",
+                primaryLoading = flags.primaryLoading,
+                ghostLoading = flags.ghostLoading,
+                primaryEnabled = !saved,
+            )
+        }
         else -> null
     }
 
@@ -218,6 +229,11 @@ private fun CategoryBody(
             GigBody(
                 gig = content.payload.detail,
                 onAccept = onAcceptGig,
+            )
+        content.payload is MailboxCategoryPayload.Memory ->
+            MemoryBody(
+                memory = content.payload.detail,
+                isSaved = content.payload.detail.isSaved,
             )
         content.category != MailItemCategory.Package ->
             MailItemPlaceholderBody(category = content.category)

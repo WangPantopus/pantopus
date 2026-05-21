@@ -137,6 +137,29 @@ jobs:
           MAPS_API_KEY=
           ENV
 
+      - name: Free disk space for emulator image
+        run: |
+          echo "Disk before cleanup:"
+          df -h
+
+          sudo rm -rf \
+            /opt/ghc \
+            /usr/local/share/boost \
+            /usr/share/dotnet
+
+          if [[ -n "${ANDROID_HOME:-}" ]]; then
+            sudo rm -rf \
+              "${ANDROID_HOME}/cmake" \
+              "${ANDROID_HOME}/ndk" \
+              "${ANDROID_HOME}/system-images"
+          fi
+
+          docker system prune --all --force || true
+          sudo apt-get clean
+
+          echo "Disk after cleanup:"
+          df -h
+
       - name: Run Compose UI + instrumented tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
