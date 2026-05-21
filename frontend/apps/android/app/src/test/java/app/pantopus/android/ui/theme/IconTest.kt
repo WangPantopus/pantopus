@@ -204,6 +204,10 @@ class IconTest {
             // P2.10 — Document detail sticky-footer action glyphs.
             "external-link",
             "refresh-cw",
+            // A13.1 — Add Guest allowed-area chips.
+            "door-open",
+            "car",
+            "warehouse",
         )
 
     @Test

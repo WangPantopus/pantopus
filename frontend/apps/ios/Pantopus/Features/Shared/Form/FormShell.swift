@@ -19,6 +19,7 @@ public struct FormShell<Content: View>: View {
     private let title: String
     private let rightActionLabel: String?
     private let bottomActionLabel: String?
+    private let bottomActionIcon: PantopusIcon?
     private let isValid: Bool
     private let isDirty: Bool
     private let isSaving: Bool
@@ -39,6 +40,9 @@ public struct FormShell<Content: View>: View {
     ///     The label also drives whether the top-right action is hidden.
     ///     Enabled when `isValid && !isSaving` — does not gate on `isDirty`
     ///     so create flows (where every field is "new") work cleanly.
+    ///   - bottomActionIcon: Optional leading icon rendered before the
+    ///     bottom CTA label (e.g. `key-round` for "Send pass"). Ignored
+    ///     when `bottomActionLabel` is nil.
     ///   - isValid: Drives whether the right action is enabled.
     ///   - isDirty: Drives whether the top-right action is enabled and
     ///     whether close prompts the discard confirm. Ignored by the
@@ -56,6 +60,7 @@ public struct FormShell<Content: View>: View {
         title: String,
         rightActionLabel: String? = "Save",
         bottomActionLabel: String? = nil,
+        bottomActionIcon: PantopusIcon? = nil,
         isValid: Bool,
         isDirty: Bool,
         isSaving: Bool = false,
@@ -66,6 +71,7 @@ public struct FormShell<Content: View>: View {
         self.title = title
         self.rightActionLabel = rightActionLabel
         self.bottomActionLabel = bottomActionLabel
+        self.bottomActionIcon = bottomActionIcon
         self.isValid = isValid
         self.isDirty = isDirty
         self.isSaving = isSaving
@@ -94,6 +100,7 @@ public struct FormShell<Content: View>: View {
             if let bottomActionLabel {
                 FormBottomCTA(
                     label: bottomActionLabel,
+                    icon: bottomActionIcon,
                     isEnabled: isValid && !isSaving,
                     isSaving: isSaving,
                     onCommit: onCommit
@@ -189,6 +196,7 @@ private struct FormTopBar: View {
 /// of view in long forms.
 private struct FormBottomCTA: View {
     let label: String
+    let icon: PantopusIcon?
     let isEnabled: Bool
     let isSaving: Bool
     let onCommit: () -> Void
@@ -200,10 +208,15 @@ private struct FormBottomCTA: View {
                     ProgressView()
                         .tint(Theme.Color.appTextInverse)
                 } else {
-                    Text(label)
-                        .pantopusTextStyle(.body)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Theme.Color.appTextInverse)
+                    HStack(spacing: Spacing.s2) {
+                        if let icon {
+                            Icon(icon, size: 16, color: Theme.Color.appTextInverse)
+                        }
+                        Text(label)
+                            .pantopusTextStyle(.body)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Theme.Color.appTextInverse)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 48)
