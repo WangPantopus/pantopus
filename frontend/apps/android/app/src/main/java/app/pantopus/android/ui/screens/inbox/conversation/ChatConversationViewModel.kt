@@ -55,11 +55,13 @@ class ChatConversationViewModel
         private val _pendingScrollTarget = MutableStateFlow<String?>(null)
         val pendingScrollTarget: StateFlow<String?> = _pendingScrollTarget.asStateFlow()
 
+        // A15.3 capability chips for the AI welcome card (tap-to-send).
         val aiPrompts: List<ChatPromptChip> =
             listOf(
-                ChatPromptChip("mail", "Summarize my inbox", PantopusIcon.Mailbox),
-                ChatPromptChip("task", "Post a task", PantopusIcon.Pencil),
-                ChatPromptChip("handy", "Find a handyman nearby", PantopusIcon.Hammer),
+                ChatPromptChip("price", "Price a task", PantopusIcon.Hammer),
+                ChatPromptChip("draft", "Draft a Pulse post", PantopusIcon.Pencil),
+                ChatPromptChip("mail", "Summarize mail", PantopusIcon.Mailbox),
+                ChatPromptChip("neighbor", "Find a neighbor", PantopusIcon.Search),
             )
 
         val emptyChips: List<ChatPromptChip> =
@@ -121,6 +123,16 @@ class ChatConversationViewModel
 
         fun tapPrompt(chip: ChatPromptChip) {
             _composerText.value = chip.label
+        }
+
+        /**
+         * Tap a welcome-card capability chip — send its label as the
+         * thread's first message (transitions the AI thread out of the
+         * welcome/empty state).
+         */
+        fun sendCapabilityPrompt(chip: ChatPromptChip) {
+            _composerText.value = chip.label
+            send()
         }
 
         fun send() {

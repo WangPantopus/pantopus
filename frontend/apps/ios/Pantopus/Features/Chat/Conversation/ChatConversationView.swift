@@ -17,19 +17,24 @@ public struct ChatConversationView: View {
     @State private var viewModel: ChatConversationViewModel
     @State private var attachmentsPresented = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Presentation mode — drives the AI chrome (avatar, welcome card,
+    /// reply bubbles). Default `.dm`.
+    private let mode: ChatConversationMode
     private let onBack: @MainActor () -> Void
 
     public init(
         viewModel: ChatConversationViewModel,
+        mode: ChatConversationMode = .dm,
         onBack: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
+        self.mode = mode
         self.onBack = onBack
     }
 
     public var body: some View {
         VStack(spacing: 0) {
-            ChatConversationHeader(counterparty: viewModel.counterparty, onBack: onBack)
+            ChatConversationHeader(mode: mode, counterparty: viewModel.counterparty, onBack: onBack)
             content
             if viewModel.isCounterpartyTyping {
                 ChatTypingIndicator(name: viewModel.counterparty.displayName)
@@ -65,10 +70,11 @@ public struct ChatConversationView: View {
     }
 
     private var composerPlaceholder: String {
+        if mode == .aiAssistant { return "Ask Pantopus AI…" }
         switch viewModel.counterparty {
-        case let .person(name, _, _, _, _): "Message \(firstWord(name))…"
-        case let .group(name, _): "Message \(firstWord(name))…"
-        case .ai: "Ask anything…"
+        case let .person(name, _, _, _, _): return "Message \(firstWord(name))…"
+        case let .group(name, _): return "Message \(firstWord(name))…"
+        case .ai: return "Ask Pantopus AI…"
         }
     }
 
@@ -100,13 +106,17 @@ public struct ChatConversationView: View {
     }
 
     @ViewBuilder private var emptyFrame: some View {
-        switch viewModel.counterparty {
-        case .ai:
+        if mode == .aiAssistant {
             aiWelcomeFrame
-        case let .person(name, initials, locality, verified, _):
-            personEmptyFrame(name: name, initials: initials, locality: locality, verified: verified)
-        case let .group(name, _):
-            personEmptyFrame(name: name, initials: initials(of: name), locality: nil, verified: false)
+        } else {
+            switch viewModel.counterparty {
+            case .ai:
+                aiWelcomeFrame
+            case let .person(name, initials, locality, verified, _):
+                personEmptyFrame(name: name, initials: initials, locality: locality, verified: verified)
+            case let .group(name, _):
+                personEmptyFrame(name: name, initials: initials(of: name), locality: nil, verified: false)
+            }
         }
     }
 
@@ -186,79 +196,63 @@ public struct ChatConversationView: View {
 extension ChatConversationView {
     private var aiWelcomeFrame: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 10) {
-                    ChatAIAvatar(size: 32)
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 5) {
-                            Icon(.sparkles, size: 10, strokeWidth: 2.4, color: Theme.Color.primary700)
-                            Text("PANTOPUS AI")
-                                .font(.system(size: 10, weight: .bold))
-                                .tracking(0.4)
-                                .foregroundStyle(Theme.Color.primary700)
-                        }
-                        Text("Hi! I can help you post tasks, find listings, or summarize mail. What can I help with today?")
-                            .font(.system(size: 14))
-                            .foregroundStyle(Theme.Color.appText)
-                    }
-                    .padding(12)
-                    .background(
-                        LinearGradient(
-                            colors: [Theme.Color.primary50, Theme.Color.appSurface],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                            .stroke(Theme.Color.primary100, lineWidth: 1)
-                    )
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: 4,
-                            bottomLeadingRadius: Radii.lg,
-                            bottomTrailingRadius: Radii.lg,
-                            topTrailingRadius: Radii.lg
-                        )
-                    )
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 14)
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("SUGGESTED")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.4)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                    HStack(spacing: 8) {
-                        ForEach(viewModel.aiPrompts) { prompt in
-                            Button { viewModel.tapAIPrompt(prompt) } label: {
-                                HStack(spacing: 6) {
-                                    Icon(prompt.icon, size: 13, strokeWidth: 2.2, color: Theme.Color.primary600)
-                                    Text(prompt.label)
-                                        .font(.system(size: 12.5, weight: .semibold))
-                                        .foregroundStyle(Theme.Color.appTextStrong)
-                                }
-                                .padding(.horizontal, 14)
-                                .frame(height: 32)
-                                .background(Theme.Color.appSurface)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
-                                        .stroke(Theme.Color.appBorder, lineWidth: 1)
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("chatAIPrompt_\(prompt.id)")
-                        }
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.leading, 42)
-                Spacer(minLength: 24)
+            VStack(alignment: .leading, spacing: 10) {
+                aiWelcomeCard
+                aiPrivacyRow
+                Spacer(minLength: 0)
             }
-            .padding(.top, 18)
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
         }
         .accessibilityIdentifier("chatConversationAI")
+    }
+
+    private var aiWelcomeCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                ChatAIAvatar(size: 32)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Hi — I'm Pantopus AI")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("I can use your verified neighbors, tasks, and mailbox to help.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)],
+                spacing: 6
+            ) {
+                ForEach(viewModel.aiPrompts) { chip in
+                    AICapabilityChip(chip: chip) {
+                        Task { await viewModel.sendCapabilityPrompt(chip) }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(Theme.Color.magicBgSoft)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.magicBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .accessibilityIdentifier("chatAIWelcomeCard")
+    }
+
+    private var aiPrivacyRow: some View {
+        HStack(spacing: 6) {
+            Icon(.shieldCheck, size: 11, strokeWidth: 2.5, color: Theme.Color.success)
+            Text("Private to your account · never shared with neighbors")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.top, 2)
     }
 
     // MARK: - Populated + error
@@ -355,6 +349,7 @@ extension ChatConversationViewModel {
 // MARK: - Header
 
 private struct ChatConversationHeader: View {
+    let mode: ChatConversationMode
     let counterparty: ChatCounterparty
     let onBack: @MainActor () -> Void
 
@@ -373,7 +368,7 @@ private struct ChatConversationHeader: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(1)
-                    if case .ai = counterparty { betaPill }
+                    if mode == .aiAssistant { betaPill }
                 }
                 if let presence {
                     HStack(spacing: 5) {
@@ -401,13 +396,17 @@ private struct ChatConversationHeader: View {
     }
 
     @ViewBuilder private var avatar: some View {
-        switch counterparty {
-        case let .person(_, initials, _, verified, online):
-            ChatPersonAvatar(initials: initials, verified: verified, online: online, size: 32)
-        case let .group(name, _):
-            ChatPersonAvatar(initials: groupInitials(name), verified: false, online: false, size: 32)
-        case .ai:
+        if mode == .aiAssistant {
             ChatAIAvatar(size: 32)
+        } else {
+            switch counterparty {
+            case let .person(_, initials, _, verified, online):
+                ChatPersonAvatar(initials: initials, verified: verified, online: online, size: 32)
+            case let .group(name, _):
+                ChatPersonAvatar(initials: groupInitials(name), verified: false, online: false, size: 32)
+            case .ai:
+                ChatAIAvatar(size: 32)
+            }
         }
     }
 
@@ -507,26 +506,6 @@ private struct ChatPersonAvatar: View {
     }
 }
 
-private struct ChatAIAvatar: View {
-    let size: CGFloat
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [Theme.Color.primary500, Theme.Color.primary700],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            Icon(.sparkles, size: size * 0.5, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
-        }
-        .frame(width: size, height: size)
-        .accessibilityLabel("AI")
-    }
-}
-
 // MARK: - Day divider + bubble rows
 
 private struct ChatDayDividerRow: View {
@@ -560,6 +539,8 @@ private struct ChatBubbleRow: View {
                 bubbleContainer { attachmentBody(filename: filename, sizeLabel: sizeLabel) }
             case let .systemLink(label, sub, accent):
                 systemLinkPill(label: label, sub: sub, accent: accent)
+            case let .aiReply(text, estimate):
+                aiReplyBubble(text: text, estimate: estimate)
             }
             if let stamp = content.stamp {
                 stampView(stamp)
@@ -652,6 +633,49 @@ private struct ChatBubbleRow: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - AI reply
+
+    private func aiReplyBubble(text: String, estimate: ChatEstimate?) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            aiTag
+            Text(text)
+                .font(.system(size: 14))
+                .lineSpacing(5)
+                .foregroundStyle(Theme.Color.appText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let estimate {
+                AIEstimateCard(estimate: estimate)
+            }
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 10)
+        .frame(maxWidth: 300, alignment: .leading)
+        .background(Theme.Color.appSurfaceSunken, in: aiBubbleShape)
+    }
+
+    private var aiTag: some View {
+        HStack(spacing: 4) {
+            Icon(.bot, size: 9, strokeWidth: 3, color: Theme.Color.magic)
+            Text("PANTOPUS AI")
+                .font(.system(size: 9.5, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(Theme.Color.magic)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 1)
+        .background(Theme.Color.magicBg)
+        .clipShape(Capsule())
+    }
+
+    private var aiBubbleShape: some Shape {
+        UnevenRoundedRectangle(
+            topLeadingRadius: 16,
+            bottomLeadingRadius: content.hasTail ? 4 : 16,
+            bottomTrailingRadius: 16,
+            topTrailingRadius: 16
+        )
     }
 
     private func stampView(_ raw: String) -> some View {

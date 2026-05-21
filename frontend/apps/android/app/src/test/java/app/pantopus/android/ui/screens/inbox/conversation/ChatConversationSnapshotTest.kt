@@ -54,7 +54,13 @@ class ChatConversationSnapshotTest {
     @Test
     fun chat_conversation_header_ai() {
         paparazzi.snapshot {
-            Frame { ChatHeader(counterparty = aiCounterparty, onBack = {}) }
+            Frame {
+                ChatHeader(
+                    counterparty = aiCounterparty,
+                    onBack = {},
+                    conversationMode = ChatConversationMode.AiAssistant,
+                )
+            }
         }
     }
 
@@ -85,12 +91,28 @@ class ChatConversationSnapshotTest {
                     counterparty = aiCounterparty,
                     aiPrompts =
                         listOf(
-                            ChatPromptChip("mail", "Summarize my inbox", PantopusIcon.Mailbox),
-                            ChatPromptChip("task", "Post a task", PantopusIcon.Pencil),
-                            ChatPromptChip("handy", "Find a handyman nearby", PantopusIcon.Hammer),
+                            ChatPromptChip("price", "Price a task", PantopusIcon.Hammer),
+                            ChatPromptChip("draft", "Draft a Pulse post", PantopusIcon.Pencil),
+                            ChatPromptChip("mail", "Summarize mail", PantopusIcon.Mailbox),
+                            ChatPromptChip("neighbor", "Find a neighbor", PantopusIcon.Search),
                         ),
                     emptyChips = emptyList(),
                     onChipTap = {},
+                    conversationMode = ChatConversationMode.AiAssistant,
+                    onCapabilityTap = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun chat_conversation_ai_active_with_estimate() {
+        paparazzi.snapshot {
+            Frame {
+                PopulatedFrame(
+                    rows = ChatConversationSampleData.aiActiveRows,
+                    onRetry = {},
+                    onLoadOlder = {},
                 )
             }
         }

@@ -168,6 +168,7 @@ import app.pantopus.android.ui.screens.inbox.chat.ConversationIdentityChip
 import app.pantopus.android.ui.screens.inbox.chat.ConversationRowContent
 import app.pantopus.android.ui.screens.inbox.chat.ConversationRowVariant
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationHost
+import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationMode
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
 import app.pantopus.android.ui.screens.inbox.conversation.ChatThreadMode
 import app.pantopus.android.ui.screens.inbox.newmessage.NewMessageScreen
@@ -2115,9 +2116,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 online = online,
                             )
                     }
+                val conversationMode: ChatConversationMode =
+                    if (kind == "ai") ChatConversationMode.AiAssistant else ChatConversationMode.Dm
                 ChatConversationHost(
                     mode = mode,
                     counterparty = counterparty,
+                    conversationMode = conversationMode,
                     onBack = { navController.popBackStack() },
                     scrollToMessageId = scrollTo,
                 )

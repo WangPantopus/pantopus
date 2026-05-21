@@ -278,6 +278,13 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
     case car
     case warehouse
 
+    /// A15.3 AI Assistant — the conversation AI avatar + "Pantopus AI" reply
+    /// tag glyph. SF Symbols ships no robot/`bot` glyph, so this falls back
+    /// to `sparkles` (the house AI/magic glyph); Android renders the truer
+    /// `SmartToy` robot. Kept a distinct case so the call sites read as the
+    /// Lucide `bot` token and can swap to a real vector later.
+    case bot
+
     /// SF Symbol name used to render this icon. Chosen for closest visual
     /// parity with the Lucide source; designers can later swap the
     /// rendering layer without changing call sites.
@@ -493,6 +500,9 @@ public enum PantopusIcon: String, CaseIterable, Sendable {
         case .doorOpen: "door.left.hand.open"
         case .car: "car"
         case .warehouse: "house.lodge"
+        // A15.3 AI Assistant. SF Symbols has no robot glyph; `bot` falls
+        // back to `sparkles`, the house AI/magic glyph.
+        case .bot: "sparkles"
         }
     }
 }

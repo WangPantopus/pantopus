@@ -72,7 +72,7 @@ public struct ConversationRow: View {
         case .dm:
             DMAvatarView(content: content)
         case .aiAssistant:
-            AIAvatarView()
+            ChatAIAvatar(size: 44)
         case let .group(extras, extraCount):
             GroupAvatarView(content: content, extras: extras, extraCount: extraCount)
         }
@@ -149,24 +149,6 @@ private struct DMAvatarView: View {
             }
         }
         .frame(width: 46, height: 46)
-    }
-}
-
-private struct AIAvatarView: View {
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [Theme.Color.primary500, Theme.Color.primary700],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            Icon(.info, size: 20, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
-        }
-        .frame(width: 44, height: 44)
-        .accessibilityLabel("AI assistant")
     }
 }
 
