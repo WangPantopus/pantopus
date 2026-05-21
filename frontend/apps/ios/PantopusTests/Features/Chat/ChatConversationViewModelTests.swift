@@ -129,7 +129,7 @@ final class ChatConversationViewModelTests: XCTestCase {
             if case let .bubble(content) = row { return content } else { return nil }
         }
         let aiBubble = bubbles.first { content in
-            if case .aiReply = content.body { return true } else { return false }
+            if case .aiReply = content.body { true } else { false }
         }
         XCTAssertNotNil(aiBubble, "active AI sample should contain an aiReply bubble")
         if case let .aiReply(_, estimate)? = aiBubble?.body {
