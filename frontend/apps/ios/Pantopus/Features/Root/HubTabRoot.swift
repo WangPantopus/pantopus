@@ -196,7 +196,6 @@ public enum HubRoute: Hashable {
     /// Generic placeholder for any intent whose destination hasn't been
     /// built yet. The label is shown by `NotYetAvailableView`.
     case placeholder(label: String)
-    // MARK: Wave A — pre-staged routes (placeholder destinations until A.x ships)
     /// A.x — Full "Today" detail expansion. Distinct from `today` (the
     /// existing weather / AQI / commute card); reconcile when the Wave A
     /// "Today detail" screen lands.
@@ -1347,8 +1346,8 @@ public struct HubTabRoot: View {
             )
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
-        // MARK: Wave A — pre-staged placeholder destinations. When an A.x
-        // screen ships, swap its single line below for the real view.
+        // Wave A — pre-staged placeholder destinations. When an A.x screen
+        // ships, swap its single line below for the real view.
         case .todayDetail:
             NotYetAvailableView(tabName: "Today detail", icon: .sun)
         case .propertyDetails:

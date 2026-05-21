@@ -47,10 +47,10 @@ public struct ChipPicker: View {
         identifier: String? = nil
     ) {
         self.options = options
-        self.mode = .single
+        mode = .single
         self.identifier = identifier
-        self._single = selection
-        self._multi = .constant([])
+        _single = selection
+        _multi = .constant([])
     }
 
     /// Multi-select picker. `selection` holds the set of chosen ids.
@@ -60,10 +60,10 @@ public struct ChipPicker: View {
         identifier: String? = nil
     ) {
         self.options = options
-        self.mode = .multi
+        mode = .multi
         self.identifier = identifier
-        self._single = .constant(nil)
-        self._multi = selection
+        _single = .constant(nil)
+        _multi = selection
     }
 
     public var body: some View {
@@ -172,7 +172,7 @@ private struct ChipFlowLayout: Layout {
 
 #Preview("Single + Multi") {
     @Previewable @State var single: String? = "owner"
-    @Previewable @State var multi: Set<String> = ["wifi", "gate"]
+    @Previewable @State var multi = Set(["wifi", "gate"])
     return VStack(alignment: .leading, spacing: Spacing.s4) {
         ChipPicker(
             options: [

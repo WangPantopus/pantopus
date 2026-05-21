@@ -199,7 +199,6 @@ public enum YouRoute: Hashable {
     /// overflow ("Edit listing") for the owner, or from the listing-
     /// offers panel's "Edit price" affordance.
     case editListing(listingId: String, jumpToStep: ListingComposeStep?)
-    // MARK: Wave A — pre-staged routes (placeholder destinations until A.x ships)
     /// A.x — Membership detail for a persona.
     case membershipDetail(personaId: String)
     /// A.5 — Professional profile.
@@ -750,8 +749,8 @@ public struct YouTabRoot: View {
             )
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
-        // MARK: Wave A — pre-staged placeholder destinations. When an A.x
-        // screen ships, swap its single line below for the real view.
+        // Wave A — pre-staged placeholder destinations. When an A.x screen
+        // ships, swap its single line below for the real view.
         case .membershipDetail:
             NotYetAvailableView(tabName: "Membership", icon: .crown)
         case .professionalProfile:
