@@ -166,6 +166,96 @@ final class MailboxItemDetailCategoryDispatchTests: XCTestCase {
         }
     }
 
+    // MARK: - Memory
+
+    private static let memoryJSON = """
+    {"mail":{
+      "id":"m-memory","type":"memory","mail_type":"memory",
+      "created_at":"2026-05-19T19:42:00Z",
+      "sender_display":"Mei L.","sender_trust":"pantopus_user",
+      "display_title":"One year ago, you found Pepper.","tags":[],
+      "object_payload":{
+        "title":"One year ago, you found Pepper.",
+        "reference":"Memory MEM-0518 · marked Mon May 18",
+        "photo":{"caption":"Pepper, May 19 2025","label":"1 of 1 · sent by Mei"},
+        "note":["It's been a year.","He's nine now.","I baked you a loaf."],
+        "note_signature":"Mei (and Pepper)",
+        "facts":[
+          {"kind":"anniversary","label":"A year ago today","value":"Mon, May 19, 2025"},
+          {"kind":"pulseThread","label":"Originally a Pulse post",
+           "value":"Missing — Pepper","link_hint":"Tap to reopen the thread"},
+          {"kind":"location","label":"Where it happened","value":"Redwood Trail · Stop 4"},
+          {"kind":"others","label":"Others on the thread","value":"6 neighbors helped search"}
+        ],
+        "elf_fresh":{
+          "headline":"Pantopus surfaced this memory",
+          "summary":"It released to you tonight.",
+          "bullets":[{"glyph":"calendar","label":"Anniversary release",
+                      "text":"Mei scheduled this on May 11"}]
+        },
+        "elf_saved":{
+          "headline":"Saved to your Vault",
+          "summary":"Only you can see it.",
+          "bullets":[{"glyph":"archive","label":"Mailbox vault","text":"12 items"}]
+        },
+        "vault":{
+          "trail":[
+            {"glyph":"inbox","label":"Mailbox"},
+            {"glyph":"archive","label":"Vault"},
+            {"glyph":"heart","label":"Memories"},
+            {"glyph":"calendar","label":"2025","current":true}
+          ],
+          "stats":[
+            {"value":"12","label":"Memories"},
+            {"value":"2025","label":"Folder"},
+            {"value":"Only you","label":"Visibility"}
+          ]
+        },
+        "is_saved":false
+      }
+    }}
+    """
+
+    func testMemoryDispatchProjectsMemoryPayload() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.memoryJSON)]
+        let vm = MailboxItemDetailViewModel(mailId: "m-memory", api: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(content.category, .memory)
+        XCTAssertEqual(content.trust, .verified)
+        guard case let .memory(memory) = content.payload else {
+            XCTFail("Expected .memory payload, got \(content.payload)")
+            return
+        }
+        XCTAssertEqual(memory.title, "One year ago, you found Pepper.")
+        XCTAssertEqual(memory.facts.count, 4)
+        XCTAssertEqual(memory.note.count, 3)
+        XCTAssertFalse(memory.isSaved)
+        // The body owns the polaroid / note / facts / vault — the shell's
+        // standard elf + key-facts slots stay empty.
+        XCTAssertNil(content.aiElf)
+        XCTAssertTrue(content.keyFacts.isEmpty)
+        XCTAssertFalse(content.sender.showStamp)
+    }
+
+    func testMemorySaveToVaultFlipsSavedState() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.memoryJSON)]
+        let vm = MailboxItemDetailViewModel(mailId: "m-memory", api: makeAPI())
+        await vm.load()
+
+        // "Save to Vault" is a client-side flip — no network request.
+        await vm.performPrimaryAction()
+        guard case let .loaded(content) = vm.state,
+              case let .memory(memory) = content.payload else {
+            XCTFail("Expected loaded memory after save")
+            return
+        }
+        XCTAssertTrue(memory.isSaved, "Save to Vault should flip the memory to saved")
+    }
+
     // MARK: - daysUntil regression
 
     /// Regression: backend payloads commonly carry date-only strings

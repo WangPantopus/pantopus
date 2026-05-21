@@ -23,6 +23,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -135,6 +136,92 @@ class MailboxItemDetailCategoryDispatchTest {
             assertNotNull(loaded.content.aiElf)
             assertEquals(2, loaded.content.timeline.size)
             assertTrue(loaded.content.payload is MailboxCategoryPayload.Certified)
+        }
+
+    private fun memoryPayload(): Map<String, Any?> =
+        mapOf(
+            "title" to "One year ago, you found Pepper.",
+            "reference" to "Memory MEM-0518",
+            "photo" to mapOf("caption" to "Pepper, May 19 2025", "label" to "1 of 1 · sent by Mei"),
+            "note" to listOf("It's been a year.", "He's nine now.", "I baked you a loaf."),
+            "note_signature" to "Mei (and Pepper)",
+            "facts" to
+                listOf(
+                    mapOf("kind" to "anniversary", "label" to "A year ago today", "value" to "Mon, May 19"),
+                    mapOf(
+                        "kind" to "pulseThread",
+                        "label" to "Originally a Pulse post",
+                        "value" to "Missing — Pepper",
+                        "link_hint" to "Tap to reopen the thread",
+                    ),
+                    mapOf("kind" to "location", "label" to "Where it happened", "value" to "Redwood Trail"),
+                    mapOf("kind" to "others", "label" to "Others on the thread", "value" to "6 neighbors"),
+                ),
+            "elf_fresh" to
+                mapOf(
+                    "headline" to "Pantopus surfaced this memory",
+                    "summary" to "It released to you tonight.",
+                    "bullets" to
+                        listOf(
+                            mapOf("glyph" to "calendar", "label" to "Anniversary release", "text" to "May 11"),
+                        ),
+                ),
+            "elf_saved" to
+                mapOf(
+                    "headline" to "Saved to your Vault",
+                    "summary" to "Only you can see it.",
+                    "bullets" to
+                        listOf(
+                            mapOf("glyph" to "archive", "label" to "Mailbox vault", "text" to "12 items"),
+                        ),
+                ),
+            "vault" to
+                mapOf(
+                    "trail" to
+                        listOf(
+                            mapOf("glyph" to "inbox", "label" to "Mailbox"),
+                            mapOf("glyph" to "calendar", "label" to "2025", "current" to true),
+                        ),
+                    "stats" to
+                        listOf(
+                            mapOf("value" to "12", "label" to "Memories"),
+                            mapOf("value" to "Only you", "label" to "Visibility"),
+                        ),
+                ),
+            "is_saved" to false,
+        )
+
+    @Test fun memory_dispatch_projects_memory_payload() =
+        runTest {
+            coEvery { repo.item("m1") } returns NetworkResult.Success(item("memory", memoryPayload()))
+            val vm = makeVm()
+            vm.load()
+            val loaded = vm.state.value as MailboxItemDetailUiState.Loaded
+            assertEquals(MailItemCategory.Memory, loaded.content.category)
+            assertEquals(MailTrust.Verified, loaded.content.trust)
+            val memory = loaded.content.payload as MailboxCategoryPayload.Memory
+            assertEquals("One year ago, you found Pepper.", memory.detail.title)
+            assertEquals(4, memory.detail.facts.size)
+            assertEquals(3, memory.detail.note.size)
+            assertFalse(memory.detail.isSaved)
+            // The body owns the polaroid / note / facts / vault — the
+            // shell's standard elf + key-facts slots stay empty.
+            assertNull(loaded.content.aiElf)
+            assertTrue(loaded.content.keyFacts.isEmpty())
+            assertFalse(loaded.content.sender.showStamp)
+        }
+
+    @Test fun memory_save_to_vault_flips_saved_state() =
+        runTest {
+            coEvery { repo.item("m1") } returns NetworkResult.Success(item("memory", memoryPayload()))
+            val vm = makeVm()
+            vm.load()
+
+            // "Save to Vault" is a client-side flip — no network request.
+            vm.performPrimaryAction()
+            val loaded = vm.state.value as MailboxItemDetailUiState.Loaded
+            val memory = loaded.content.payload as MailboxCategoryPayload.Memory
+            assertTrue(memory.detail.isSaved)
         }
 
     @Test fun certified_primary_action_gated_on_ack_checkbox() =
