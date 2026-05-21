@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
@@ -56,6 +57,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DesktopWindows
+import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.DoneAll
@@ -93,6 +95,7 @@ import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.LocalFlorist
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
@@ -198,6 +201,7 @@ enum class PantopusIcon(
     ScanLine("scan-line"),
     PlusSquare("plus-square"),
     Sun("sun"),
+    SunDim("sun-dim"),
     ChevronRight("chevron-right"),
     ChevronLeft("chevron-left"),
     Megaphone("megaphone"),
@@ -272,6 +276,7 @@ enum class PantopusIcon(
     Hourglass("hourglass"),
     HandCoins("hand-coins"),
     Package("package"),
+    Flower("flower"),
     Compass("compass"),
     Filter("filter"),
 
@@ -380,6 +385,12 @@ enum class PantopusIcon(
     // [app.pantopus.android.ui.screens.homes.maintenance.MaintenanceCategoryPalette].
     Fan("fan"),
     CloudRain("cloud-rain"),
+
+    // A10.3 Today briefing — weather + transit glyphs from `today-frames.jsx`.
+    Snowflake("snowflake"),
+    Wind("wind"),
+    Bus("bus"),
+    Droplets("droplets"),
     Refrigerator("refrigerator"),
     Bug("bug"),
     Trees("trees"),
@@ -482,6 +493,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.ScanLine -> IconSource.Material(Icons.Filled.DocumentScanner)
         PantopusIcon.PlusSquare -> IconSource.Material(Icons.Filled.AddBox)
         PantopusIcon.Sun -> IconSource.Material(Icons.Filled.WbSunny)
+        PantopusIcon.SunDim -> IconSource.Material(Icons.Filled.WbSunny)
         PantopusIcon.ChevronRight -> IconSource.Material(Icons.Filled.ChevronRight)
         PantopusIcon.ChevronLeft -> IconSource.Material(Icons.Filled.ChevronLeft)
         PantopusIcon.Megaphone -> IconSource.Material(Icons.Filled.Campaign)
@@ -547,6 +559,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Hourglass -> IconSource.Material(Icons.Filled.HourglassEmpty)
         PantopusIcon.HandCoins -> IconSource.Material(Icons.Filled.Payments)
         PantopusIcon.Package -> IconSource.Material(Icons.Filled.Inventory2)
+        PantopusIcon.Flower -> IconSource.Material(Icons.Filled.LocalFlorist)
         PantopusIcon.Compass -> IconSource.Material(Icons.Filled.Explore)
         PantopusIcon.Filter -> IconSource.Material(Icons.Filled.FilterAlt)
         PantopusIcon.Crown -> IconSource.Material(Icons.Filled.WorkspacePremium)
@@ -652,6 +665,11 @@ internal fun PantopusIcon.source(): IconSource =
         // ships a wrench glyph).
         PantopusIcon.Fan -> IconSource.Material(Icons.Filled.Air)
         PantopusIcon.CloudRain -> IconSource.Material(Icons.Filled.Grain)
+        // A10.3 Today briefing.
+        PantopusIcon.Snowflake -> IconSource.Material(Icons.Filled.AcUnit)
+        PantopusIcon.Wind -> IconSource.Material(Icons.Filled.Air)
+        PantopusIcon.Bus -> IconSource.Material(Icons.Filled.DirectionsBus)
+        PantopusIcon.Droplets -> IconSource.Material(Icons.Filled.WaterDrop)
         PantopusIcon.Refrigerator -> IconSource.Material(Icons.Filled.Kitchen)
         PantopusIcon.Bug -> IconSource.Material(Icons.Filled.PestControl)
         PantopusIcon.Trees -> IconSource.Material(Icons.Filled.Park)

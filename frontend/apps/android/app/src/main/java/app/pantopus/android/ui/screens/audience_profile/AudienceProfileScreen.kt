@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "TooManyFunctions")
+@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "TooManyFunctions", "LongParameterList")
 
 package app.pantopus.android.ui.screens.audience_profile
 
@@ -58,6 +58,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.ui.screens.membership.MembershipSampleData
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -71,6 +72,7 @@ fun AudienceProfileScreen(
     onOpenBroadcast: (UpdateCardContent, List<TierBreakdownContent.TierSegment>) -> Unit = { _, _ -> },
     onOpenSetup: () -> Unit = {},
     onOpenCreatorInbox: () -> Unit = {},
+    onOpenMembership: (String) -> Unit = {},
     viewModel: AudienceProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -98,44 +100,103 @@ fun AudienceProfileScreen(
             is AudienceProfileUiState.Empty -> EmptyFrame(message = current.message, onSetup = onOpenSetup)
             is AudienceProfileUiState.Error ->
                 ErrorFrame(message = current.message, onRetry = viewModel::load)
-            is AudienceProfileUiState.Loaded ->
-                LoadedFrame(
-                    state =
-                        AudienceProfileLoadedFrameState(
-                            loaded = current.content,
-                            activeTab = activeTab,
-                            composer = composer,
-                            selectedTier = selectedTier,
-                            followerSearchText = followerSearch,
-                            followerSort = followerSort,
-                            visibleFollowers = viewModel.visibleFollowers(),
-                            activeThreadFilter = activeThreadFilter,
-                            visibleThreads = viewModel.visibleThreads(),
-                        ),
-                    actions =
-                        AudienceProfileLoadedFrameActions(
-                            onSelectTab = viewModel::selectTab,
-                            onSelectTier = viewModel::selectTierFilter,
-                            onFollowerSearch = viewModel::onFollowerSearchText,
-                            onFollowerSort = viewModel::selectFollowerSort,
-                            onSelectThreadFilter = viewModel::selectThreadFilter,
-                            composer =
-                                AudienceProfileComposerActions(
-                                    onText = viewModel::onComposerText,
-                                    onVisibility = viewModel::onComposerVisibility,
-                                    onTier = viewModel::onComposerTier,
-                                    onSubmit = viewModel::submitUpdate,
-                                ),
-                            navigation =
-                                AudienceProfileNavigationActions(
-                                    onOpenFollower = onOpenFollower,
-                                    onOpenThread = onOpenThread,
-                                    onOpenBroadcast = onOpenBroadcast,
-                                    onOpenCreatorInbox = onOpenCreatorInbox,
-                                ),
-                        ),
-                )
+            is AudienceProfileUiState.Loaded -> {
+                Box(modifier = Modifier.weight(1f)) {
+                    LoadedFrame(
+                        state =
+                            AudienceProfileLoadedFrameState(
+                                loaded = current.content,
+                                activeTab = activeTab,
+                                composer = composer,
+                                selectedTier = selectedTier,
+                                followerSearchText = followerSearch,
+                                followerSort = followerSort,
+                                visibleFollowers = viewModel.visibleFollowers(),
+                                activeThreadFilter = activeThreadFilter,
+                                visibleThreads = viewModel.visibleThreads(),
+                            ),
+                        actions =
+                            AudienceProfileLoadedFrameActions(
+                                onSelectTab = viewModel::selectTab,
+                                onSelectTier = viewModel::selectTierFilter,
+                                onFollowerSearch = viewModel::onFollowerSearchText,
+                                onFollowerSort = viewModel::selectFollowerSort,
+                                onSelectThreadFilter = viewModel::selectThreadFilter,
+                                composer =
+                                    AudienceProfileComposerActions(
+                                        onText = viewModel::onComposerText,
+                                        onVisibility = viewModel::onComposerVisibility,
+                                        onTier = viewModel::onComposerTier,
+                                        onSubmit = viewModel::submitUpdate,
+                                    ),
+                                navigation =
+                                    AudienceProfileNavigationActions(
+                                        onOpenFollower = onOpenFollower,
+                                        onOpenThread = onOpenThread,
+                                        onOpenBroadcast = onOpenBroadcast,
+                                        onOpenCreatorInbox = onOpenCreatorInbox,
+                                    ),
+                            ),
+                    )
+                }
+                MemberFooter(onOpenMembership = onOpenMembership)
+            }
         }
+    }
+}
+
+@Composable
+private fun MemberFooter(onOpenMembership: (String) -> Unit) {
+    val footer = MembershipSampleData.audienceFooter
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .clickable { onOpenMembership(footer.personaId) }
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .heightIn(min = 48.dp)
+                .testTag("audienceProfileMemberFooter")
+                .semantics {
+                    contentDescription =
+                        "You're a member of ${footer.personaName}, ${footer.tierName} tier. Manage membership."
+                },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Crown,
+            contentDescription = null,
+            size = 16.dp,
+            strokeWidth = 2.3f,
+            tint = PantopusColors.primary600,
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(
+                text = "You're a member",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "${footer.personaName} · ${footer.tierName} tier",
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        Text(
+            text = "Manage",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.primary700,
+        )
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 14.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.primary600,
+        )
     }
 }
 

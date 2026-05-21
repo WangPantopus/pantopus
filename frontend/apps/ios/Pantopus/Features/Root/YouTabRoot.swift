@@ -751,8 +751,31 @@ public struct YouTabRoot: View {
             NotYetAvailableView(tabName: label, icon: .info)
         // Wave A — pre-staged placeholder destinations. When an A.x screen
         // ships, swap its single line below for the real view.
-        case .membershipDetail:
-            NotYetAvailableView(tabName: "Membership", icon: .crown)
+        case let .membershipDetail(personaId):
+            MembershipDetailView(
+                viewModel: MembershipDetailViewModel(personaId: personaId),
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onShare: {
+                    systemSheet = .share(
+                        items: ["Check out this membership on Pantopus — \(InviteLinks.downloadURLString)"]
+                    )
+                },
+                onOpenPersona: {
+                    Task { @MainActor in path.append(.placeholder(label: "Creator profile")) }
+                },
+                onChangeTier: {
+                    Task { @MainActor in path.append(.placeholder(label: "Change tier")) }
+                },
+                onUpdatePayment: {
+                    Task { @MainActor in path.append(.placeholder(label: "Update payment")) }
+                },
+                onCancel: {
+                    Task { @MainActor in path.append(.placeholder(label: "Membership cancelled")) }
+                },
+                onRequestRefund: {
+                    Task { @MainActor in path.append(.placeholder(label: "Request refund")) }
+                }
+            )
         case .professionalProfile:
             NotYetAvailableView(tabName: "Professional profile", icon: .briefcase)
         case .editPersona:
@@ -1049,6 +1072,9 @@ public struct YouTabRoot: View {
                 },
                 onOpenCreatorInbox: {
                     Task { @MainActor in path.append(.creatorInbox) }
+                },
+                onOpenMembership: { personaId in
+                    Task { @MainActor in path.append(.membershipDetail(personaId: personaId)) }
                 }
             )
         case let .broadcastDetail(broadcastId, card, tierSegments):

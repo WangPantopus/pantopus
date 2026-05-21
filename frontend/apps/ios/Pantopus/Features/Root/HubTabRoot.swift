@@ -183,9 +183,6 @@ public enum HubRoute: Hashable {
     /// P1.5 — Recent activity log. Pushed when the Hub's
     /// `HubRecentActivity` "See all" CTA fires.
     case recentActivity
-    /// P6.6 — Full "Today" detail (weather + AQI + commute + today's
-    /// events). Pushed when the Hub's Today card is tapped.
-    case today
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
     case menu
     /// Edit profile form — pushed by Settings → "Edit profile". P1.4.
@@ -196,9 +193,8 @@ public enum HubRoute: Hashable {
     /// Generic placeholder for any intent whose destination hasn't been
     /// built yet. The label is shown by `NotYetAvailableView`.
     case placeholder(label: String)
-    /// A.x — Full "Today" detail expansion. Distinct from `today` (the
-    /// existing weather / AQI / commute card); reconcile when the Wave A
-    /// "Today detail" screen lands.
+    /// A10.3 — Full "Today" briefing (weather, air, daylight, signals).
+    /// Pushed when the Hub's Today card is tapped.
     case todayDetail
     /// A.4 — Property details for a home.
     case propertyDetails(homeId: String)
@@ -339,9 +335,9 @@ public struct HubTabRoot: View {
             case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
             case .openDiscoverHub: path.append(.discoverHub)
             case let .jumpBackIn(item): path.append(Self.route(forJumpBackIn: item))
-            // `openToday` taps the weather/today card → full Today detail
-            // (weather + AQI + commute + today's events) per the Hub design.
-            case .openToday: path.append(.today)
+            // `openToday` taps the weather/today card → full Today briefing
+            // (A10.3 — weather, air, daylight, and neighbourhood signals).
+            case .openToday: path.append(.todayDetail)
             case .openRecentActivity: path.append(.recentActivity)
             }
         }
@@ -1134,8 +1130,6 @@ public struct HubTabRoot: View {
                     }
                 }
             )
-        case .today:
-            TodayDetailView { pop() }
         case .notifications:
             NotificationsView(
                 viewModel: NotificationsViewModel()
@@ -1357,7 +1351,7 @@ public struct HubTabRoot: View {
         // Wave A — pre-staged placeholder destinations. When an A.x screen
         // ships, swap its single line below for the real view.
         case .todayDetail:
-            NotYetAvailableView(tabName: "Today detail", icon: .sun)
+            TodayDetailView { pop() }
         case .propertyDetails:
             NotYetAvailableView(tabName: "Property details", icon: .home)
         case let .addGuest(homeId):
