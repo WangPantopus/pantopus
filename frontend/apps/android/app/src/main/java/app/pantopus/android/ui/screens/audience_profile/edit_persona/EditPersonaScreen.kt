@@ -443,7 +443,13 @@ private fun ChecklistRow(step: PersonaChecklistStep) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier =
             Modifier.semantics {
-                contentDescription = step.label + if (step.done) ", done" else if (step.isNext) ", next" else ""
+                contentDescription =
+                    step.label +
+                    when {
+                        step.done -> ", done"
+                        step.isNext -> ", next"
+                        else -> ""
+                    }
             },
     ) {
         if (step.done) {

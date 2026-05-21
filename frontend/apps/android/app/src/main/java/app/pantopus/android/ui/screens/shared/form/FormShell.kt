@@ -200,86 +200,123 @@ private fun FormTopBar(
                     .height(44.dp)
                     .background(PantopusColors.appSurface),
         ) {
-            Column(
-                modifier =
-                    Modifier
-                        .align(Alignment.Center)
-                        .semantics(mergeDescendants = true) { heading() },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(1.dp),
-            ) {
-                Text(
-                    text = title,
-                    style = PantopusTextStyle.body,
-                    color = PantopusColors.appText,
-                )
-                if (subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = FontFamily.Monospace,
-                        color = PantopusColors.appTextSecondary,
-                    )
-                }
-            }
+            FormTopBarTitle(
+                title = title,
+                subtitle = subtitle,
+                modifier = Modifier.align(Alignment.Center),
+            )
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(44.dp)
-                            .clickable(onClick = onClose)
-                            .testTag(if (leading == FormShellLeading.Back) FORM_BACK_BUTTON_TAG else FORM_CLOSE_BUTTON_TAG)
-                            .semantics { contentDescription = if (leading == FormShellLeading.Back) "Back" else "Close" },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    PantopusIconImage(
-                        icon = if (leading == FormShellLeading.Back) PantopusIcon.ChevronLeft else PantopusIcon.X,
-                        contentDescription = null,
-                        size = 22.dp,
-                        tint = PantopusColors.appText,
-                    )
-                }
+                FormTopBarLeadingButton(
+                    leading = leading,
+                    onClose = onClose,
+                )
                 Box(modifier = Modifier.fillMaxWidth().sizeIn(minHeight = 44.dp).weight(1f))
-                if (rightActionLabel != null) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .sizeIn(minWidth = 60.dp, minHeight = 44.dp)
-                                .clickable(enabled = rightActionEnabled, onClick = onCommit)
-                                .testTag(FORM_COMMIT_BUTTON_TAG)
-                                .semantics { contentDescription = rightActionLabel },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (isSaving) {
-                            CircularProgressIndicator(
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        } else {
-                            Text(
-                                text = rightActionLabel,
-                                style = PantopusTextStyle.body,
-                                color =
-                                    if (rightActionEnabled) {
-                                        PantopusColors.primary600
-                                    } else {
-                                        PantopusColors.appTextMuted
-                                    },
-                            )
-                        }
-                    }
-                } else {
-                    // Reserve 60dp so the centered title stays optically
-                    // centered against the leading X button.
-                    Box(modifier = Modifier.size(width = 60.dp, height = 44.dp))
-                }
+                FormTopBarAction(
+                    rightActionLabel = rightActionLabel,
+                    rightActionEnabled = rightActionEnabled,
+                    isSaving = isSaving,
+                    onCommit = onCommit,
+                )
             }
         }
         HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
+    }
+}
+
+@Composable
+private fun FormTopBarTitle(
+    title: String,
+    subtitle: String?,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.semantics(mergeDescendants = true) { heading() },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        Text(
+            text = title,
+            style = PantopusTextStyle.body,
+            color = PantopusColors.appText,
+        )
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.Monospace,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FormTopBarLeadingButton(
+    leading: FormShellLeading,
+    onClose: () -> Unit,
+) {
+    val isBack = leading == FormShellLeading.Back
+
+    Box(
+        modifier =
+            Modifier
+                .size(44.dp)
+                .clickable(onClick = onClose)
+                .testTag(if (isBack) FORM_BACK_BUTTON_TAG else FORM_CLOSE_BUTTON_TAG)
+                .semantics { contentDescription = if (isBack) "Back" else "Close" },
+        contentAlignment = Alignment.Center,
+    ) {
+        PantopusIconImage(
+            icon = if (isBack) PantopusIcon.ChevronLeft else PantopusIcon.X,
+            contentDescription = null,
+            size = 22.dp,
+            tint = PantopusColors.appText,
+        )
+    }
+}
+
+@Composable
+private fun FormTopBarAction(
+    rightActionLabel: String?,
+    rightActionEnabled: Boolean,
+    isSaving: Boolean,
+    onCommit: () -> Unit,
+) {
+    if (rightActionLabel != null) {
+        Box(
+            modifier =
+                Modifier
+                    .sizeIn(minWidth = 60.dp, minHeight = 44.dp)
+                    .clickable(enabled = rightActionEnabled, onClick = onCommit)
+                    .testTag(FORM_COMMIT_BUTTON_TAG)
+                    .semantics { contentDescription = rightActionLabel },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (isSaving) {
+                CircularProgressIndicator(
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                Text(
+                    text = rightActionLabel,
+                    style = PantopusTextStyle.body,
+                    color =
+                        if (rightActionEnabled) {
+                            PantopusColors.primary600
+                        } else {
+                            PantopusColors.appTextMuted
+                        },
+                )
+            }
+        }
+    } else {
+        // Reserve 60dp so the centered title stays optically centered against the leading control.
+        Box(modifier = Modifier.size(width = 60.dp, height = 44.dp))
     }
 }
 
