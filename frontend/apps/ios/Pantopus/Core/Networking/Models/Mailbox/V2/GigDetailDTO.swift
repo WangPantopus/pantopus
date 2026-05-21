@@ -225,7 +225,7 @@ public struct GigDetailDTO: Sendable, Hashable {
             responseTime: bidderDict["response_time"]?.stringValue ?? "—",
             identityLabel: bidderDict["identity"]?.stringValue ?? "Personal",
             isVerified: bidderDict["verified"]?.boolValue ?? false,
-            badges: (bidderDict["badges"]?.arrayValue ?? []).compactMap { $0.stringValue }
+            badges: (bidderDict["badges"]?.arrayValue ?? []).compactMap(\.stringValue)
         )
 
         let bid = Bid(
@@ -233,7 +233,7 @@ public struct GigDetailDTO: Sendable, Hashable {
             unit: bidDict["unit"]?.stringValue ?? "flat",
             eta: bidDict["eta"]?.stringValue ?? "—",
             expires: bidDict["expires"]?.stringValue ?? "",
-            message: (bidDict["message"]?.arrayValue ?? []).compactMap { $0.stringValue }
+            message: (bidDict["message"]?.arrayValue ?? []).compactMap(\.stringValue)
         )
 
         let post = Post(

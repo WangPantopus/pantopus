@@ -153,7 +153,8 @@ enum class MailItemCategory(
     ),
     Gig(
         raw = "gig",
-        accent = PantopusColors.handyman, // "cat-gigs" orange per A17.6 gig accent
+        // "cat-gigs" orange per A17.6 gig accent.
+        accent = PantopusColors.handyman,
         icon = PantopusIcon.HandCoins,
         rowBackground = PantopusColors.warningBg,
         label = "Gig",

@@ -126,10 +126,9 @@ struct MailboxItemDetailView: View {
                 }
             }
         case let (.gig, .gig(gig)):
-            GigBody(
-                gig: gig,
-                onAccept: { Task { await viewModel.acceptGigBid() } }
-            )
+            GigBody(gig: gig) {
+                Task { await viewModel.acceptGigBid() }
+            }
         default:
             MailItemPlaceholderBody(category: content.category)
         }
