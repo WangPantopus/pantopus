@@ -179,6 +179,7 @@ import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
+import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
 import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
@@ -2019,6 +2020,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         navController.navigate(ChildRoutes.placeholder("Drawer · $drawer"))
                     },
                     onOpenVault = { navController.navigate(ChildRoutes.MAILBOX_VAULT) },
+                    onOpenMap = { navController.navigate(ChildRoutes.MAILBOX_MAP) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -2918,7 +2920,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 NotYetAvailableView(tabName = "Mailbox", icon = PantopusIcon.Mailbox)
             }
             composable(ChildRoutes.MAILBOX_MAP) {
-                NotYetAvailableView(tabName = "Mailbox map", icon = PantopusIcon.Map)
+                MailboxMapScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = ChildRoutes.MEMBERSHIP_DETAIL,
