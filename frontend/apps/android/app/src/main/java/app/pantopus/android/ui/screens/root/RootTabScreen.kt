@@ -34,8 +34,9 @@ import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileViewModel
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BROADCAST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BroadcastDetailScreen
-import app.pantopus.android.ui.screens.audience_profile.compose_broadcast.COMPOSE_BROADCAST_PERSONA_ID_KEY
 import app.pantopus.android.ui.screens.audience_profile.compose_broadcast.ComposeBroadcastScreen
+import app.pantopus.android.ui.screens.audience_profile.edit_persona.EditPersonaSampleData
+import app.pantopus.android.ui.screens.audience_profile.edit_persona.EditPersonaScreen
 import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_BUSINESS_ID_KEY
 import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
@@ -61,6 +62,7 @@ import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.gigs.GigSearchScreen
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
+import app.pantopus.android.ui.screens.gigs.tasks_map.TasksMapScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
@@ -889,6 +891,9 @@ private object ChildRoutes {
     fun nearbyMapForGigs(category: String): String =
         "gigs/map?$NEARBY_MAP_FOR_GIGS_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
 
+    /** Build the Tasks-map path with the active category seed. */
+    fun tasksMap(category: String): String = "tasks/map?$TASKS_MAP_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
+
     /** Build the listing-detail path. */
     fun listingDetail(listingId: String): String = "listings/$listingId"
 
@@ -991,8 +996,11 @@ private object ChildRoutes {
 
     fun addGuest(homeId: String): String = "homes/$homeId/guests/new"
 
-    /** A.x — Tasks map (full-bleed map of household / neighbourhood tasks). */
-    const val TASKS_MAP = "tasks/map"
+    /** A11.1 — Tasks map. Gigs-only mode of the MapListHybrid archetype,
+     *  opened from the Gigs feed's list/map toggle. Seeded with the active
+     *  category so the same filter applies on the map. */
+    const val TASKS_MAP_CATEGORY_KEY = "category"
+    const val TASKS_MAP = "tasks/map?$TASKS_MAP_CATEGORY_KEY={$TASKS_MAP_CATEGORY_KEY}"
 
     /** A.x — Explore (neighbourhood discovery surface). */
     const val EXPLORE = "explore"
@@ -2254,7 +2262,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 GigsFeedScreen(
                     onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
                     onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
-                    onOpenMap = { category -> navController.navigate(ChildRoutes.nearbyMapForGigs(category.key)) },
+                    onOpenMap = { category -> navController.navigate(ChildRoutes.tasksMap(category.key)) },
                     onOpenSearch = { navController.navigate(ChildRoutes.GIG_SEARCH) },
                     onBack = { navController.popBackStack() },
                 )
@@ -2678,6 +2686,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onComposeBroadcast = { personaId ->
                         navController.navigate(ChildRoutes.composeBroadcast(personaId))
                     },
+                    onOpenEditPersona = {
+                        navController.navigate(ChildRoutes.editPersona(EditPersonaSampleData.PERSONA_ID))
+                    },
                     viewModel = audienceViewModel,
                 )
             }
@@ -2699,15 +2710,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onPin = {
                         navController.navigate(ChildRoutes.placeholder("Pin broadcast"))
                     },
-                )
-            }
-            composable(
-                ChildRoutes.COMPOSE_BROADCAST,
-                arguments = listOf(navArgument(COMPOSE_BROADCAST_PERSONA_ID_KEY) { type = NavType.StringType }),
-            ) {
-                ComposeBroadcastScreen(
-                    onClose = { navController.popBackStack() },
-                    onSent = { navController.popBackStack() },
                 )
             }
             composable(ChildRoutes.CREATOR_INBOX) {
@@ -2893,8 +2895,21 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onSent = { navController.popBackStack() },
                 )
             }
-            composable(ChildRoutes.TASKS_MAP) {
-                NotYetAvailableView(tabName = "Tasks map", icon = PantopusIcon.Map)
+            composable(
+                route = ChildRoutes.TASKS_MAP,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.TASKS_MAP_CATEGORY_KEY) {
+                            type = NavType.StringType
+                            defaultValue = GigsCategory.All.key
+                        },
+                    ),
+            ) {
+                TasksMapScreen(
+                    onOpenTask = { taskId -> navController.navigate(ChildRoutes.gigDetail(taskId)) },
+                    onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(ChildRoutes.EXPLORE) {
                 NotYetAvailableView(tabName = "Explore", icon = PantopusIcon.Compass)
@@ -2940,14 +2955,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 arguments =
                     listOf(navArgument(ChildRoutes.EDIT_PERSONA_PERSONA_ID_KEY) { type = NavType.StringType }),
             ) {
-                NotYetAvailableView(tabName = "Edit persona", icon = PantopusIcon.UserRound)
+                EditPersonaScreen(
+                    onClose = { navController.popBackStack() },
+                )
             }
             composable(
                 route = ChildRoutes.COMPOSE_BROADCAST,
                 arguments =
                     listOf(navArgument(ChildRoutes.COMPOSE_BROADCAST_PERSONA_ID_KEY) { type = NavType.StringType }),
             ) {
-                NotYetAvailableView(tabName = "Compose broadcast", icon = PantopusIcon.Megaphone)
+                ComposeBroadcastScreen(
+                    onClose = { navController.popBackStack() },
+                    onSent = { navController.popBackStack() },
+                )
             }
             composable(ChildRoutes.ADD_HOME) {
                 AddHomeWizardScreen(

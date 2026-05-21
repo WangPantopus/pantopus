@@ -7,8 +7,10 @@
 //  resolver. The shell itself (`MapListHybridShell`) lives alongside.
 //
 //  Decision context: docs/t6-open-questions-decisions.md Q9. The three
-//  detents are absolute heights (160 / 296 / 518 pt) — the same fixed
-//  values that the design's 740pt mockup mapped to (~20% / 40% / 70%).
+//  detents are screen-relative fractions (20% / 40% / 90%) so the same
+//  gesture lands at the same visual proportion on every device. (A11.1
+//  Tasks map raised the expanded stop from 70% → 90%; the move to
+//  fractions also retired the device-fragile absolute 160/296/518 pt.)
 //
 
 import CoreGraphics
@@ -17,22 +19,30 @@ import SwiftUI
 
 /// Three snap stops for the map+list hybrid sheet.
 ///
-/// Heights are absolute per the T6.6a Q9 contract:
-/// - `.collapsed` (160 pt) shows header + drag-to-expand prompt
-/// - `.standard` (296 pt) shows header + carousel of rail cards
-/// - `.expanded` (518 pt) shows header + full vertical list
+/// Heights are screen-relative fractions per the T6.6a Q9 contract
+/// (revised by A11.1):
+/// - `.collapsed` (20%) shows header + drag-to-expand prompt
+/// - `.standard` (40%) shows header + carousel of rail cards
+/// - `.expanded` (90%) shows header + full vertical list
 public enum MapListHybridDetent: CaseIterable, Sendable, Hashable {
     case collapsed
     case standard
     case expanded
 
-    /// Pixel height the sheet occupies at this stop.
-    public var height: CGFloat {
+    /// Fraction of the available screen height the sheet occupies at this
+    /// stop. Screen-relative (not absolute pt) so the same gesture lands
+    /// at the same visual proportion on every device size.
+    public var heightFraction: CGFloat {
         switch self {
-        case .collapsed: 160
-        case .standard: 296
-        case .expanded: 518
+        case .collapsed: 0.20
+        case .standard: 0.40
+        case .expanded: 0.90
         }
+    }
+
+    /// Absolute sheet height for a given container height.
+    public func height(in containerHeight: CGFloat) -> CGFloat {
+        containerHeight * heightFraction
     }
 }
 
@@ -102,8 +112,8 @@ public struct MapAnchor: Sendable, Hashable {
 ///   - current: detent at drag start
 ///   - velocity: predicted vertical velocity in points / second
 ///     (positive = downward)
-///   - displacedHeight: live sheet height in points the moment the
-///     gesture released
+///   - displacedFraction: live sheet height as a fraction of the screen
+///     height the moment the gesture released
 /// - Returns: the detent the sheet should snap to.
 public enum MapListHybridDetentResolver {
     /// Points-per-second threshold for a flick gesture to nudge one
@@ -113,10 +123,10 @@ public enum MapListHybridDetentResolver {
     public static func resolve(
         from current: MapListHybridDetent,
         velocity: CGFloat,
-        displacedHeight: CGFloat
+        displacedFraction: CGFloat
     ) -> MapListHybridDetent {
         let sorted = MapListHybridDetent.allCases.sorted { a, b in
-            abs(a.height - displacedHeight) < abs(b.height - displacedHeight)
+            abs(a.heightFraction - displacedFraction) < abs(b.heightFraction - displacedFraction)
         }
         var target = sorted.first ?? current
 

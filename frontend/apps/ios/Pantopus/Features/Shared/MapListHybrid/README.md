@@ -8,7 +8,7 @@ those want the same pattern.
 
 | File | Role |
 |---|---|
-| `MapListHybridShell.swift` | The view shell — wraps a full-bleed `WorldMap` view + a 3-detent SwiftUI `.sheet` (160 / 296 / 518 pt) + 6 floating slots (top pill · category chips · map controls · sheet header · sheet body · per-pin overlay). |
+| `MapListHybridShell.swift` | The view shell — wraps a full-bleed `WorldMap` view + a 3-detent draggable sheet (20% / 40% / 90% of screen height) + 6 floating slots (top pill · category chips · map controls · sheet header · sheet body · per-pin overlay). |
 | `MapListHybridContent.swift` | `MapListHybridContent`, `MapPin`, `MapListHybridDetent` (`.collapsed` / `.standard` / `.expanded`), `MapListHybridDetentResolver` (the snap-to-nearest + velocity-nudge math shared with Android + web). |
 | `MapListHybridPreview.swift` | Static designer canvas with sample pins, reachable on iOS via the debug Token gallery → "Map+List hybrid shell" (`MapListHybridPreviewHost`). |
 
@@ -27,8 +27,11 @@ view, gig-location preview from a Gig detail.
 **If a future map-list consumer needs a 4th detent** or a different
 sheet anchor scheme, propose an additive extension to
 `MapListHybridDetent` here first — never change the existing
-absolute heights (160 / 296 / 518) without coordinated iOS +
-Android + web changes; the detents are part of the visual contract.
+fractions (0.20 / 0.40 / 0.90) without coordinated iOS + Android +
+web changes; the detents are part of the visual contract. (A11.1
+Tasks map raised the expanded stop 70% → 90% and migrated the three
+stops from absolute pt to screen-relative fractions — done in
+lock-step across iOS + Android.)
 
 ## Anatomy
 
@@ -73,20 +76,21 @@ they need.
 
 ## Detent contract
 
-Three detents, absolute heights (per Q9 of the buildout-plan
-decisions doc — same numbers on iOS, Android, web so the same
-gesture lands at the same stop):
+Three detents, screen-relative fractions (per Q9 of the buildout-plan
+decisions doc, revised by A11.1 — same fractions on iOS, Android, web
+so the same gesture lands at the same proportion on every device):
 
-| Detent | Height | Behaviour |
+| Detent | Fraction | Behaviour |
 |---|---|---|
-| Collapsed | 160 pt | header + drag-to-expand prompt |
-| Standard  | 296 pt | header + horizontal card carousel |
-| Expanded  | 518 pt | header + full vertical list |
+| Collapsed | 20% | header + drag-to-expand prompt |
+| Standard  | 40% | header + horizontal card carousel |
+| Expanded  | 90% | header + full vertical list |
 
-iOS implementation:
-`.presentationDetents([.height(160), .height(296), .height(518)])` on
-a `.sheet`. The `MapListHybridDetentResolver` is the pure function
-that maps a release height + velocity to the snapped detent. Sign
+iOS implementation: the shell sizes the sheet to
+`detent.height(in: geo.size.height)` inside its own `GeometryReader`
+(no `.presentationDetents` — the sheet is a hand-rolled draggable
+card). The `MapListHybridDetentResolver` is the pure function that
+maps a release fraction + velocity to the snapped detent. Sign
 convention:
 
 - positive velocity = downward flick → shrink one detent

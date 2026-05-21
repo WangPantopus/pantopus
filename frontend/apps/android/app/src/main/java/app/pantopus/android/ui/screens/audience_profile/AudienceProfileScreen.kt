@@ -74,6 +74,7 @@ fun AudienceProfileScreen(
     onOpenCreatorInbox: () -> Unit = {},
     onOpenMembership: (String) -> Unit = {},
     onComposeBroadcast: (String) -> Unit = {},
+    onOpenEditPersona: () -> Unit = {},
     viewModel: AudienceProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -95,7 +96,7 @@ fun AudienceProfileScreen(
                 .background(PantopusColors.appBg)
                 .testTag("audienceProfile"),
     ) {
-        TopBar(title = displayName, onBack = onBack)
+        TopBar(title = displayName, onBack = onBack, onEditPersona = onOpenEditPersona)
         when (val current = state) {
             is AudienceProfileUiState.Loading -> LoadingFrame()
             is AudienceProfileUiState.Empty -> EmptyFrame(message = current.message, onSetup = onOpenSetup)
@@ -206,6 +207,7 @@ private fun MemberFooter(onOpenMembership: (String) -> Unit) {
 private fun TopBar(
     title: String,
     onBack: () -> Unit,
+    onEditPersona: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
         Row(
@@ -242,7 +244,24 @@ private fun TopBar(
                 modifier = Modifier.semantics { heading() },
             )
             Spacer(modifier = Modifier.weight(1f))
-            Box(modifier = Modifier.size(36.dp))
+            Box(
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onEditPersona)
+                        .testTag("audienceProfileEditPersonaButton")
+                        .semantics { contentDescription = "Edit persona" },
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Pencil,
+                    contentDescription = null,
+                    size = 20.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.appText,
+                )
+            }
         }
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
     }

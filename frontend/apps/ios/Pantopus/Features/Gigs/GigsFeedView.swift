@@ -81,15 +81,7 @@ public struct GigsFeedView: View {
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
-            Button {
-                onOpenMap(viewModel.activeCategory)
-            } label: {
-                Icon(.map, size: 19, color: Theme.Color.appText)
-                    .frame(width: 36, height: 36)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open map")
-            .accessibilityIdentifier("gigsMapToggle")
+            GigsViewModeToggle { onOpenMap(viewModel.activeCategory) }
         }
         .padding(.horizontal, Spacing.s4)
         .padding(.vertical, Spacing.s2)
@@ -407,6 +399,52 @@ private struct GigsFilterButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel(active ? "Filters, \(activeCount) active" : "Filters")
         .accessibilityIdentifier("gigsFiltersButton")
+    }
+}
+
+/// List/Map view-mode toggle for the Gigs feed top bar. "List" is the
+/// active segment; tapping "Map" pushes the Tasks map (which returns to
+/// the feed via its floating-pill chevron).
+private struct GigsViewModeToggle: View {
+    let onOpenMap: () -> Void
+
+    var body: some View {
+        HStack(spacing: 2) {
+            segment(icon: .menu, label: "List", active: true) {}
+            segment(icon: .map, label: "Map", active: false, action: onOpenMap)
+        }
+        .padding(2)
+        .background(Theme.Color.appSurfaceSunken)
+        .clipShape(Capsule())
+        .accessibilityIdentifier("gigsViewModeToggle")
+    }
+
+    private func segment(
+        icon: PantopusIcon,
+        label: String,
+        active: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Icon(
+                    icon,
+                    size: 14,
+                    strokeWidth: 2.2,
+                    color: active ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary
+                )
+                Text(label)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(active ? Theme.Color.primary600 : Color.clear)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(active ? "\(label) view, selected" : "\(label) view")
+        .accessibilityIdentifier("gigsViewMode_\(label.lowercased())")
     }
 }
 

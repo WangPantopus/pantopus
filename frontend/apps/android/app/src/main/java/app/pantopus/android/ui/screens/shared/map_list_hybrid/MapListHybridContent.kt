@@ -5,20 +5,25 @@ package app.pantopus.android.ui.screens.shared.map_list_hybrid
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 
 /**
  * T6.6a (P24) — three snap stops for the map+list hybrid sheet.
  *
- * Heights are absolute per the Q9 contract:
- * - [Collapsed] (160 dp) — header + drag-to-expand prompt
- * - [Standard] (296 dp) — header + carousel of rail cards
- * - [Expanded] (518 dp) — header + full vertical list
+ * Heights are screen-relative fractions per the Q9 contract (revised by
+ * A11.1 — same fractions on iOS, Android, web so the same gesture lands
+ * at the same proportion on every device):
+ * - [Collapsed] (20%) — header + drag-to-expand prompt
+ * - [Standard] (40%) — header + carousel of rail cards
+ * - [Expanded] (90%) — header + full vertical list
  */
-enum class MapListHybridDetent(val height: Dp) {
-    Collapsed(160.dp),
-    Standard(296.dp),
-    Expanded(518.dp),
+enum class MapListHybridDetent(val heightFraction: Float) {
+    Collapsed(0.20f),
+    Standard(0.40f),
+    Expanded(0.90f),
+    ;
+
+    /** Absolute sheet height for a given container height. */
+    fun height(container: Dp): Dp = container * heightFraction
 }
 
 /**
@@ -69,7 +74,7 @@ object MapListHybridDetentResolver {
     ): MapListHybridDetent {
         val nearest =
             MapListHybridDetent.entries.minByOrNull { stop ->
-                val target = targetsPx[stop] ?: stop.height.value
+                val target = targetsPx[stop] ?: Float.MAX_VALUE
                 kotlin.math.abs(target - displacedHeightPx)
             } ?: current
 
