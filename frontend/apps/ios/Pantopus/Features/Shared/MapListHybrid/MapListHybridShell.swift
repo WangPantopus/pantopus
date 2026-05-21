@@ -66,7 +66,9 @@ public struct MapListHybridShell<
     /// map-control stack, so a near-full sheet can't push it off-screen
     /// (≈ a 48pt FAB + two 38pt control buttons + gaps). Computed (not
     /// stored) — generic types can't hold static stored properties.
-    private static var controlsTopReserve: CGFloat { 168 }
+    private static var controlsTopReserve: CGFloat {
+        168
+    }
 
     public init(
         pins: [MapPin],

@@ -30,7 +30,7 @@ public final class TasksMapViewModel {
         seed: [TaskMapItem] = TasksMapSampleData.items,
         failWith: String? = nil
     ) {
-        self.activeCategory = initialCategory
+        activeCategory = initialCategory
         self.anchor = anchor
         self.seed = seed
         self.failWith = failWith
