@@ -1223,28 +1223,31 @@ public struct HubTabRoot: View {
             }
         case .discoverHub:
             DiscoverHubView(
-                viewModel: DiscoverHubViewModel { target in
-                    Task { @MainActor in
-                        switch target {
-                        case let .person(userId, _):
-                            push(.publicProfile(userId: userId))
-                        case let .business(businessId, _):
-                            push(.businessProfile(businessId: businessId))
-                        case let .gig(gigId):
-                            push(.gigDetail(gigId: gigId))
-                        case let .listing(listingId):
-                            push(.listingDetail(listingId: listingId))
-                        case .seeAllPeople:
-                            push(.connections)
-                        case .seeAllBusinesses:
-                            push(.discoverBusinesses)
-                        case .seeAllGigs:
-                            push(.gigsFeed)
-                        case .seeAllListings:
-                            push(.marketplace)
+                viewModel: DiscoverHubViewModel(
+                    onSelect: { target in
+                        Task { @MainActor in
+                            switch target {
+                            case let .person(userId, _):
+                                push(.publicProfile(userId: userId))
+                            case let .business(businessId, _):
+                                push(.businessProfile(businessId: businessId))
+                            case let .gig(gigId):
+                                push(.gigDetail(gigId: gigId))
+                            case let .listing(listingId):
+                                push(.listingDetail(listingId: listingId))
+                            case .seeAllPeople:
+                                push(.connections)
+                            case .seeAllBusinesses:
+                                push(.discoverBusinesses)
+                            case .seeAllGigs:
+                                push(.gigsFeed)
+                            case .seeAllListings:
+                                push(.marketplace)
+                            }
                         }
-                    }
-                }
+                    },
+                    onOpenMap: { Task { @MainActor in push(.explore) } }
+                )
             )
         case .discoverBusinesses:
             DiscoverBusinessesView(
@@ -1386,7 +1389,19 @@ public struct HubTabRoot: View {
                 onBack: pop
             )
         case .explore:
-            NotYetAvailableView(tabName: "Explore", icon: .compass)
+            ExploreMapView(
+                onOpenEntity: { entity in
+                    Task { @MainActor in
+                        switch entity.kind {
+                        case .task: push(.gigDetail(gigId: entity.id))
+                        case .item: push(.listingDetail(listingId: entity.id))
+                        case .post: push(.pulsePost(postId: entity.id))
+                        case .spot: push(.businessProfile(businessId: entity.id))
+                        }
+                    }
+                },
+                onBack: { pop() }
+            )
         case .mailboxRoot:
             NotYetAvailableView(tabName: "Mailbox", icon: .mailbox)
         case .mailboxMap:
