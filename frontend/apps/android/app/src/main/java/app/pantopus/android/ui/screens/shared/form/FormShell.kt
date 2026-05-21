@@ -34,7 +34,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -68,6 +71,9 @@ const val FORM_BOTTOM_COMMIT_BUTTON_TAG = "formBottomCommitButton"
  * re-implement it.
  *
  * @param title Centered top-bar title.
+ * @param subtitle Optional second line under the title (e.g. an `@handle`).
+ *     Rendered small + secondary; `null` keeps the single-line title used by
+ *     every other consumer.
  * @param rightActionLabel Text for the trailing action; defaults to `Save`.
  * @param isValid Whether the right action is enabled.
  * @param isDirty Whether the right action is enabled, and whether
@@ -97,6 +103,7 @@ fun FormShell(
     isDirty: Boolean,
     onClose: () -> Unit,
     onCommit: () -> Unit,
+    subtitle: String? = null,
     rightActionLabel: String? = "Save",
     bottomActionLabel: String? = null,
     bottomActionIcon: PantopusIcon? = null,
@@ -122,6 +129,7 @@ fun FormShell(
     ) {
         FormTopBar(
             title = title,
+            subtitle = subtitle,
             rightActionLabel = if (showsTopRightAction) rightActionLabel else null,
             rightActionEnabled = isValid && isDirty && !isSaving,
             isSaving = isSaving && bottomActionLabel == null && stickyBottom == null,
@@ -176,6 +184,7 @@ fun FormShell(
 @Composable
 private fun FormTopBar(
     title: String,
+    subtitle: String?,
     rightActionLabel: String?,
     rightActionEnabled: Boolean,
     isSaving: Boolean,
@@ -191,15 +200,29 @@ private fun FormTopBar(
                     .height(44.dp)
                     .background(PantopusColors.appSurface),
         ) {
-            Text(
-                text = title,
-                style = PantopusTextStyle.body,
-                color = PantopusColors.appText,
+            Column(
                 modifier =
                     Modifier
                         .align(Alignment.Center)
-                        .semantics { heading() },
-            )
+                        .semantics(mergeDescendants = true) { heading() },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(1.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = PantopusTextStyle.body,
+                    color = PantopusColors.appText,
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s2),
                 verticalAlignment = Alignment.CenterVertically,

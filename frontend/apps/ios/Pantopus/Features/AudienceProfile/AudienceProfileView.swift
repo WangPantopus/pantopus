@@ -25,6 +25,8 @@ public struct AudienceProfileView: View {
     /// membership detail. Wave A direct-link until the Memberships index
     /// list ships.
     private let onOpenMembership: @MainActor (String) -> Void
+    /// A13.12 — top-bar "Edit persona" action into the creator-side editor.
+    private let onOpenEditPersona: @MainActor () -> Void
 
     init(
         viewModel: AudienceProfileViewModel = AudienceProfileViewModel(),
@@ -34,7 +36,8 @@ public struct AudienceProfileView: View {
         onOpenBroadcast: @escaping @MainActor (UpdateCardContent, [TierBreakdownContent.TierSegment]) -> Void = { _, _ in },
         onOpenSetup: @escaping @MainActor () -> Void = {},
         onOpenCreatorInbox: @escaping @MainActor () -> Void = {},
-        onOpenMembership: @escaping @MainActor (String) -> Void = { _ in }
+        onOpenMembership: @escaping @MainActor (String) -> Void = { _ in },
+        onOpenEditPersona: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
@@ -44,6 +47,7 @@ public struct AudienceProfileView: View {
         self.onOpenSetup = onOpenSetup
         self.onOpenCreatorInbox = onOpenCreatorInbox
         self.onOpenMembership = onOpenMembership
+        self.onOpenEditPersona = onOpenEditPersona
     }
 
     public var body: some View {
@@ -71,8 +75,13 @@ public struct AudienceProfileView: View {
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
-            // 36-pt spacer so the title centers between back and trailing.
-            Color.clear.frame(width: 36, height: 36)
+            Button(action: onOpenEditPersona) {
+                Icon(.pencil, size: 20, color: Theme.Color.appText)
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Edit persona")
+            .accessibilityIdentifier("audienceProfileEditPersonaButton")
         }
         .padding(.horizontal, 12)
         .frame(height: 52)
