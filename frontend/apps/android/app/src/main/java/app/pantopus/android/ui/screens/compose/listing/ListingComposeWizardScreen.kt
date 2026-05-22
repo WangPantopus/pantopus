@@ -1,7 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "TooManyFunctions")
+@file:Suppress("PackageNaming", "LongMethod", "TooManyFunctions", "MagicNumber")
 
 package app.pantopus.android.ui.screens.compose.listing
 
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,11 +14,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -22,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,15 +43,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
@@ -193,19 +215,28 @@ private fun ListingComposeStepContent(
 ) {
     when (state.form.currentStep) {
         ListingComposeStep.Photos ->
-            PhotosStep(
-                state = state,
-                onAdd = { viewModel.addPhoto() },
-                onRequestRemove = onRequestRemove,
-                onMoveUp = { index ->
-                    viewModel.movePhoto(from = index, to = index - 1)
-                },
-                onMoveDown = { index ->
-                    viewModel.movePhoto(from = index, to = index + 1)
-                },
-                onMakeHero = viewModel::makeHero,
-            )
-        ListingComposeStep.TitleCategory -> TitleCategoryStep(state, viewModel)
+            if (viewModel.isCameraCaptureStep) {
+                CameraCaptureStep(state = state, vm = viewModel)
+            } else {
+                PhotosStep(
+                    state = state,
+                    onAdd = { viewModel.addPhoto() },
+                    onRequestRemove = onRequestRemove,
+                    onMoveUp = { index ->
+                        viewModel.movePhoto(from = index, to = index - 1)
+                    },
+                    onMoveDown = { index ->
+                        viewModel.movePhoto(from = index, to = index + 1)
+                    },
+                    onMakeHero = viewModel::makeHero,
+                )
+            }
+        ListingComposeStep.TitleCategory ->
+            if (viewModel.isSnapReviewStep) {
+                SnapReviewStep(state, viewModel)
+            } else {
+                TitleCategoryStep(state, viewModel)
+            }
         ListingComposeStep.ConditionDescription -> ConditionDescriptionStep(state, viewModel)
         ListingComposeStep.Price -> PriceStep(state, viewModel)
         ListingComposeStep.Location -> LocationStep(state, viewModel)
@@ -239,7 +270,363 @@ private fun PhotoRemovalDialog(
     }
 }
 
-// MARK: - Step 1: Photos
+// MARK: - Step 1A: Camera capture
+
+@Composable
+private fun CameraCaptureStep(
+    state: ListingComposeUiState,
+    vm: ListingComposeWizardViewModel,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(612.dp)
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(Color(0xFF0A0B0D))
+                .testTag("listingComposeCameraStep"),
+    ) {
+        CameraPreviewSurface()
+        CameraSceneOverlay()
+        RuleOfThirdsGrid(modifier = Modifier.padding(horizontal = 28.dp, vertical = 96.dp))
+        FramingBrackets(modifier = Modifier.padding(horizontal = 28.dp, vertical = 96.dp))
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s4),
+        ) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                GhostCameraPill(
+                    label = "Skip to manual",
+                    icon = PantopusIcon.ArrowRight,
+                    onClick = vm::skipToManualPhotoEditor,
+                    testTag = "listingComposeSkipManual",
+                )
+                Box(modifier = Modifier.weight(1f))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.s3),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                AiCoachPill(vm.snapCoachingText)
+            }
+            CapturedAnglesTray(
+                photos = state.form.photos,
+                progressText = vm.snapCaptureProgressText,
+                modifier = Modifier.padding(top = Spacing.s4),
+            )
+        }
+        Column(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s5),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+        ) {
+            BottomTipPill()
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CameraRailButton(
+                    icon = PantopusIcon.Image,
+                    label = "Library",
+                    testTag = "listingComposeLibraryPhoto",
+                    onClick = vm::addLibraryPhoto,
+                )
+                Box(modifier = Modifier.weight(1f))
+                ShutterButton(onClick = vm::captureSnapPhoto)
+                Box(modifier = Modifier.weight(1f))
+                CameraRailButton(
+                    icon = PantopusIcon.Zap,
+                    label = "Auto",
+                    testTag = "listingComposeFlash",
+                    onClick = {},
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CameraPreviewSurface() {
+    val inspectionMode = LocalInspectionMode.current
+    if (inspectionMode) {
+        Box(modifier = Modifier.fillMaxWidth().fillMaxHeight().background(Color(0xFF0A0B0D)))
+        return
+    }
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    AndroidView(
+        modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+        factory = { ctx ->
+            PreviewView(ctx).apply {
+                scaleType = PreviewView.ScaleType.FILL_CENTER
+                val providerFuture = ProcessCameraProvider.getInstance(ctx)
+                providerFuture.addListener(
+                    {
+                        val provider = providerFuture.get()
+                        val preview =
+                            Preview.Builder().build().also {
+                                it.setSurfaceProvider(surfaceProvider)
+                            }
+                        provider.unbindAll()
+                        provider.bindToLifecycle(
+                            lifecycleOwner,
+                            CameraSelector.DEFAULT_BACK_CAMERA,
+                            preview,
+                        )
+                    },
+                    ContextCompat.getMainExecutor(context),
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun CameraSceneOverlay() {
+    Canvas(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+        drawCircle(
+            brush =
+                Brush.radialGradient(
+                    colors = listOf(Color(0x665D7A66), Color.Transparent),
+                    center = Offset(size.width / 2f, size.height * 0.6f),
+                    radius = size.width * 0.9f,
+                ),
+        )
+        val sofaWidth = size.width * 0.72f
+        val sofaX = (size.width - sofaWidth) / 2f
+        val sofaY = size.height * 0.56f
+        drawRoundRect(
+            color = Color(0x884F6658),
+            topLeft = Offset(sofaX, sofaY + 28f),
+            size = Size(sofaWidth, 90f),
+            cornerRadius = CornerRadius(30f, 30f),
+        )
+        drawRoundRect(
+            color = Color(0x99617668),
+            topLeft = Offset(sofaX, sofaY),
+            size = Size(sofaWidth, 54f),
+            cornerRadius = CornerRadius(22f, 22f),
+        )
+        drawRoundRect(
+            color = Color(0xAA465C4E),
+            topLeft = Offset(sofaX, sofaY),
+            size = Size(40f, 124f),
+            cornerRadius = CornerRadius(16f, 16f),
+        )
+        drawRoundRect(
+            color = Color(0xAA465C4E),
+            topLeft = Offset(sofaX + sofaWidth - 40f, sofaY),
+            size = Size(40f, 124f),
+            cornerRadius = CornerRadius(16f, 16f),
+        )
+    }
+}
+
+@Composable
+private fun RuleOfThirdsGrid(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.fillMaxWidth().fillMaxHeight()) {
+        val lineColor = Color.White.copy(alpha = 0.18f)
+        drawLine(lineColor, Offset(size.width / 3f, 0f), Offset(size.width / 3f, size.height))
+        drawLine(lineColor, Offset(size.width * 2f / 3f, 0f), Offset(size.width * 2f / 3f, size.height))
+        drawLine(lineColor, Offset(0f, size.height / 3f), Offset(size.width, size.height / 3f))
+        drawLine(lineColor, Offset(0f, size.height * 2f / 3f), Offset(size.width, size.height * 2f / 3f))
+    }
+}
+
+@Composable
+private fun FramingBrackets(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.fillMaxWidth().fillMaxHeight()) {
+        val color = Color.White
+        val len = 28f
+        val inset = 0f
+        val stroke = 4f
+
+        fun corner(
+            x: Float,
+            y: Float,
+            xDir: Float,
+            yDir: Float,
+        ) {
+            drawLine(color, Offset(x, y), Offset(x + len * xDir, y), strokeWidth = stroke, cap = StrokeCap.Round)
+            drawLine(color, Offset(x, y), Offset(x, y + len * yDir), strokeWidth = stroke, cap = StrokeCap.Round)
+        }
+        corner(inset, inset, 1f, 1f)
+        corner(size.width - inset, inset, -1f, 1f)
+        corner(inset, size.height - inset, 1f, -1f)
+        corner(size.width - inset, size.height - inset, -1f, -1f)
+    }
+}
+
+@Composable
+private fun GhostCameraPill(
+    label: String,
+    icon: PantopusIcon,
+    testTag: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.34f))
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                .testTag(testTag),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        Text(label, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.78f))
+        PantopusIconImage(icon = icon, contentDescription = null, size = 13.dp, tint = Color.White.copy(alpha = 0.78f))
+    }
+}
+
+@Composable
+private fun AiCoachPill(text: String) {
+    Row(
+        modifier =
+            Modifier
+                .clip(CircleShape)
+                .background(Color(0xEA7C3AED))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                .testTag("listingComposeAiCoachingPill"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.Sparkles, contentDescription = null, size = 12.dp, tint = Color.White)
+        Text(text, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = Color.White)
+    }
+}
+
+@Composable
+private fun CapturedAnglesTray(
+    photos: List<ListingComposePhoto>,
+    progressText: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        Text(
+            text = progressText.uppercase(),
+            style = PantopusTextStyle.overline,
+            color = Color.White.copy(alpha = 0.7f),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.fillMaxWidth()) {
+            val labels = listOf("Wide", "Detail", "Tag", "Back")
+            repeat(ListingComposeFormState.TARGET_CAPTURE_ANGLES) { index ->
+                AngleSlot(
+                    isFilled = index < photos.size,
+                    label = labels[index],
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AngleSlot(
+    isFilled: Boolean,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .height(56.dp)
+                .clip(RoundedCornerShape(Radii.md))
+                .background(if (isFilled) Color(0xCC5C7A66) else Color.White.copy(alpha = 0.06f))
+                .border(
+                    width = 1.5.dp,
+                    color = if (isFilled) Color.White else Color.White.copy(alpha = 0.55f),
+                    shape = RoundedCornerShape(Radii.md),
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (isFilled) {
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp)
+                        .size(16.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.success),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 9.dp, tint = Color.White)
+            }
+        } else {
+            Text(text = label.uppercase(), style = PantopusTextStyle.overline, color = Color.White.copy(alpha = 0.85f))
+        }
+    }
+}
+
+@Composable
+private fun BottomTipPill() {
+    Row(
+        modifier =
+            Modifier
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.52f))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.Lightbulb, contentDescription = null, size = 12.dp, tint = Color.White.copy(alpha = 0.9f))
+        Text(
+            text = "Daylight · clutter-free background = better price",
+            style = PantopusTextStyle.caption,
+            color = Color.White.copy(alpha = 0.92f),
+        )
+    }
+}
+
+@Composable
+private fun CameraRailButton(
+    icon: PantopusIcon,
+    label: String,
+    testTag: String,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(Color.White.copy(alpha = 0.14f))
+                .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(Radii.lg))
+                .clickable(role = Role.Button, onClick = onClick)
+                .testTag(testTag),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        PantopusIconImage(icon = icon, contentDescription = null, size = 18.dp, tint = Color.White)
+        Text(text = label.uppercase(), style = PantopusTextStyle.overline, color = Color.White)
+    }
+}
+
+@Composable
+private fun ShutterButton(onClick: () -> Unit) {
+    Box(
+        modifier =
+            Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .border(4.dp, Color.White.copy(alpha = 0.95f), CircleShape)
+                .clickable(role = Role.Button, onClick = onClick)
+                .testTag("listingComposeShutter"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(modifier = Modifier.size(54.dp).clip(CircleShape).background(Color.White))
+    }
+}
+
+// MARK: - Step 1B: Manual photos
 
 @Composable
 private fun PhotosStep(
@@ -415,6 +802,545 @@ private fun AddPhotoTile(onTap: () -> Unit) {
                 style = PantopusTextStyle.caption,
                 color = PantopusColors.appTextSecondary,
             )
+        }
+    }
+}
+
+// MARK: - Step 2: Snap review
+
+@Composable
+private fun SnapReviewStep(
+    state: ListingComposeUiState,
+    vm: ListingComposeWizardViewModel,
+) {
+    IdentityChip()
+    HeadlineBlock("Review your listing")
+    SubcopyBlock("We pulled title, category, and price from your photos. Edit anything that looks off.")
+    SnapPhotoStrip(photos = state.form.photos)
+    SuggestionsBanner()
+    SuggestedTitleField(state = state, vm = vm)
+    SuggestedCategoryField(state = state, vm = vm)
+    SuggestedPriceField(state = state, vm = vm)
+    SuggestedConditionControl(state = state, vm = vm)
+    PickupDeliveryPanel(state = state, vm = vm)
+}
+
+@Composable
+private fun IdentityChip() {
+    Row(
+        modifier =
+            Modifier
+                .clip(CircleShape)
+                .background(PantopusColors.personalBg)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s1)
+                .testTag("listingComposeIdentityChip"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.User, contentDescription = null, size = 11.dp, tint = PantopusColors.personal)
+        Text(
+            text = "Personal · You".uppercase(),
+            style = PantopusTextStyle.overline,
+            color = PantopusColors.personal,
+        )
+    }
+}
+
+@Composable
+private fun SnapPhotoStrip(photos: List<ListingComposePhoto>) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.testTag("listingComposePhotoStrip")) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Photos · ${photos.size} of ${ListingComposeFormState.MAX_PHOTOS}",
+                style = PantopusTextStyle.overline,
+                color = PantopusColors.appTextSecondary,
+            )
+            Box(modifier = Modifier.weight(1f))
+            Row(
+                modifier =
+                    Modifier
+                        .clip(CircleShape)
+                        .background(PantopusColors.successLight)
+                        .padding(horizontal = Spacing.s2, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                PantopusIconImage(icon = PantopusIcon.Sparkles, contentDescription = null, size = 11.dp, tint = PantopusColors.success)
+                Text("Good lighting", style = PantopusTextStyle.overline, color = PantopusColors.success)
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth().height(168.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SnapPhotoTile(
+                index = 0,
+                isFilled = photos.isNotEmpty(),
+                isHero = true,
+                modifier = Modifier.weight(2f).fillMaxHeight(),
+            )
+            Column(modifier = Modifier.weight(2f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SnapPhotoTile(1, photos.size > 1, modifier = Modifier.weight(1f).fillMaxHeight())
+                    SnapPhotoTile(2, photos.size > 2, modifier = Modifier.weight(1f).fillMaxHeight())
+                }
+                Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SnapPhotoTile(3, photos.size > 3, modifier = Modifier.weight(1f).fillMaxHeight())
+                    AddMoreSnapPhotoTile(modifier = Modifier.weight(1f).fillMaxHeight())
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SnapPhotoTile(
+    index: Int,
+    isFilled: Boolean,
+    modifier: Modifier = Modifier,
+    isHero: Boolean = false,
+) {
+    Box(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(if (isHero) Radii.xl else Radii.lg))
+                .background(
+                    if (isFilled) {
+                        Brush.linearGradient(listOf(Color(0xFF86A889), Color(0xFF48644F)))
+                    } else {
+                        Brush.linearGradient(listOf(PantopusColors.appSurfaceMuted, PantopusColors.appSurfaceMuted))
+                    },
+                )
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(if (isHero) Radii.xl else Radii.lg))
+                .testTag("listingComposeSnapPhoto_$index"),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (isFilled) {
+            SofaThumbMark()
+        } else {
+            PantopusIconImage(icon = PantopusIcon.Image, contentDescription = null, size = if (isHero) 26.dp else 20.dp)
+        }
+        if (isHero && isFilled) {
+            Text(
+                text = "Cover".uppercase(),
+                style = PantopusTextStyle.overline,
+                color = Color.White,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(Spacing.s2)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.56f))
+                        .padding(horizontal = Spacing.s2, vertical = 3.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SofaThumbMark() {
+    Canvas(modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(Spacing.s3)) {
+        drawRoundRect(
+            color = Color.White.copy(alpha = 0.20f),
+            topLeft = Offset(size.width * 0.12f, size.height * 0.42f),
+            size = Size(size.width * 0.76f, size.height * 0.34f),
+            cornerRadius = CornerRadius(22f, 22f),
+        )
+        drawRoundRect(
+            color = Color.White.copy(alpha = 0.24f),
+            topLeft = Offset(size.width * 0.14f, size.height * 0.28f),
+            size = Size(size.width * 0.72f, size.height * 0.25f),
+            cornerRadius = CornerRadius(18f, 18f),
+        )
+    }
+}
+
+@Composable
+private fun AddMoreSnapPhotoTile(modifier: Modifier = Modifier) {
+    Box(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurfaceRaised)
+                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.lg)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            PantopusIconImage(icon = PantopusIcon.Plus, contentDescription = null, size = 18.dp, tint = PantopusColors.appTextSecondary)
+            Text("Add photo", style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextSecondary)
+        }
+    }
+}
+
+@Composable
+private fun SuggestionsBanner() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.magicBgSoft)
+                .border(1.dp, PantopusColors.magicBorder, RoundedCornerShape(Radii.lg))
+                .padding(horizontal = Spacing.s3, vertical = 10.dp)
+                .testTag("listingComposeSuggestionsBanner"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.magic),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(icon = PantopusIcon.Sparkles, contentDescription = null, size = 14.dp, tint = Color.White)
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                "Snap-and-sell suggested everything below",
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.magic,
+            )
+            Text(
+                "Tap any field to edit. Based on 47 similar comps within 3 mi.",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SuggestedTitleField(
+    state: ListingComposeUiState,
+    vm: ListingComposeWizardViewModel,
+) {
+    SuggestedFieldShell(label = "Title", hint = "Snap-and-sell pulled this from the photos") {
+        BasicTextField(
+            value = state.form.title,
+            onValueChange = vm::setTitle,
+            textStyle = PantopusTextStyle.body.copy(fontWeight = FontWeight.SemiBold, color = PantopusColors.appText),
+            cursorBrush = SolidColor(PantopusColors.primary600),
+            singleLine = true,
+            modifier = Modifier.weight(1f).testTag("listingComposeSnapTitle"),
+        )
+        PantopusIconImage(icon = PantopusIcon.Pencil, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextMuted)
+    }
+}
+
+@Composable
+private fun SuggestedCategoryField(
+    state: ListingComposeUiState,
+    vm: ListingComposeWizardViewModel,
+) {
+    SuggestedFieldShell(label = "Category") {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.fillMaxWidth()) {
+            ListingComposeCategory.entries.forEach { category ->
+                CategoryChip(
+                    category = category,
+                    selected = state.form.category == category,
+                    onClick = { vm.setCategory(category) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryChip(
+    category: ListingComposeCategory,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = category.label,
+        style = PantopusTextStyle.caption,
+        fontWeight = FontWeight.Bold,
+        color = if (selected) PantopusColors.goods else PantopusColors.appTextSecondary,
+        modifier =
+            modifier
+                .clip(CircleShape)
+                .background(if (selected) PantopusColors.magicBgSoft else PantopusColors.appSurfaceRaised)
+                .border(1.dp, if (selected) PantopusColors.goods else PantopusColors.appBorder, CircleShape)
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(horizontal = Spacing.s2, vertical = 7.dp)
+                .testTag("listingComposeSnapCategory_${category.key}"),
+    )
+}
+
+@Composable
+private fun SuggestedPriceField(
+    state: ListingComposeUiState,
+    vm: ListingComposeWizardViewModel,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.testTag("listingComposeSnapPrice")) {
+        SuggestedLabel("Price")
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                    .padding(Spacing.s3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("$", style = PantopusTextStyle.h3, color = PantopusColors.appText)
+                BasicTextField(
+                    value = state.form.priceAmount,
+                    onValueChange = vm::setPriceAmount,
+                    textStyle = PantopusTextStyle.h2.copy(color = PantopusColors.appText, fontWeight = FontWeight.Bold),
+                    cursorBrush = SolidColor(PantopusColors.primary600),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.weight(1f),
+                )
+                Text("USD · firm", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            }
+            PriceCompRangeTrack()
+        }
+    }
+}
+
+@Composable
+private fun PriceCompRangeTrack() {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.testTag("listingComposeCompRange")) {
+        Canvas(modifier = Modifier.fillMaxWidth().height(12.dp)) {
+            val y = size.height / 2f
+            drawLine(
+                color = PantopusColors.appSurfaceSunken,
+                start = Offset(0f, y),
+                end = Offset(size.width, y),
+                strokeWidth = 6f,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = PantopusColors.successLight,
+                start = Offset(size.width * 0.22f, y),
+                end = Offset(size.width * 0.68f, y),
+                strokeWidth = 6f,
+                cap = StrokeCap.Round,
+            )
+            drawCircle(color = Color.White, radius = 8f, center = Offset(size.width * 0.52f, y))
+            drawCircle(color = PantopusColors.primary600, radius = 6f, center = Offset(size.width * 0.52f, y))
+        }
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("$180 low", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            Box(modifier = Modifier.weight(1f))
+            Text("$240–$320 typical", style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.success)
+            Box(modifier = Modifier.weight(1f))
+            Text("$420 high", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+        }
+    }
+}
+
+@Composable
+private fun SuggestedConditionControl(
+    state: ListingComposeUiState,
+    vm: ListingComposeWizardViewModel,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        SectionLabel("Condition")
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+            ListingComposeCondition.entries.forEach { condition ->
+                val selected = state.form.condition == condition
+                Text(
+                    text = condition.shortLabel,
+                    style = PantopusTextStyle.caption,
+                    fontWeight = FontWeight.Bold,
+                    color = if (selected) PantopusColors.primary700 else PantopusColors.appTextStrong,
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(Radii.md))
+                            .background(if (selected) PantopusColors.primary50 else PantopusColors.appSurface)
+                            .border(
+                                width = if (selected) 1.5.dp else 1.dp,
+                                color = if (selected) PantopusColors.primary600 else PantopusColors.appBorder,
+                                shape = RoundedCornerShape(Radii.md),
+                            )
+                            .clickable(role = Role.Button, onClick = { vm.setCondition(condition) })
+                            .padding(vertical = 9.dp)
+                            .testTag("listingComposeSnapCondition_${condition.key}"),
+                )
+            }
+        }
+        Text(
+            "Light wear on one cushion · minor sun fade. Add notes in description.",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+        )
+    }
+}
+
+private val ListingComposeCondition.shortLabel: String
+    get() =
+        when (this) {
+            ListingComposeCondition.New -> "New"
+            ListingComposeCondition.LikeNew -> "Like new"
+            ListingComposeCondition.Good -> "Good"
+            ListingComposeCondition.Fair -> "Fair"
+            ListingComposeCondition.ForParts -> "Parts"
+        }
+
+@Composable
+private fun PickupDeliveryPanel(
+    state: ListingComposeUiState,
+    vm: ListingComposeWizardViewModel,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.testTag("listingComposePickupDelivery")) {
+        SectionLabel("Pickup & delivery")
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(Spacing.s3),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+            ) {
+                Box(
+                    modifier = Modifier.size(28.dp).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.primary50),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(icon = PantopusIcon.MapPin, contentDescription = null, size = 14.dp, tint = PantopusColors.primary600)
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        "412 Elm St · West Loop",
+                        style = PantopusTextStyle.caption,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appText,
+                    )
+                    Text(
+                        "Shown as approximate location to buyers",
+                        style = PantopusTextStyle.caption,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronRight,
+                    contentDescription = null,
+                    size = 14.dp,
+                    tint = PantopusColors.appTextMuted,
+                )
+            }
+            HorizontalDivider(color = PantopusColors.appBorder)
+            Column(modifier = Modifier.padding(Spacing.s3), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                FulfillmentToggleRow(
+                    icon = PantopusIcon.HandCoins,
+                    title = "Local pickup",
+                    subtitle = "Buyers come to you",
+                    isOn = state.form.fulfillment == ListingComposeFulfillment.Pickup,
+                    onClick = { vm.setFulfillment(ListingComposeFulfillment.Pickup) },
+                )
+                FulfillmentToggleRow(
+                    icon = PantopusIcon.Package,
+                    title = "Local delivery",
+                    subtitle = "Up to 3 mi · $40 fee",
+                    isOn = state.form.deliveryEnabled,
+                    onClick = { vm.setDeliveryEnabled(!state.form.deliveryEnabled) },
+                )
+                FulfillmentToggleRow(
+                    icon = PantopusIcon.Package,
+                    title = "Ship nationwide",
+                    subtitle = "Too large to ship",
+                    isOn = false,
+                    enabled = false,
+                    onClick = {},
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FulfillmentToggleRow(
+    icon: PantopusIcon,
+    title: String,
+    subtitle: String,
+    isOn: Boolean,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        PantopusIconImage(icon = icon, contentDescription = null, size = 15.dp, tint = PantopusColors.appTextSecondary)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(title, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+            Text(subtitle, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+        }
+        TogglePill(isOn = isOn)
+    }
+}
+
+@Composable
+private fun TogglePill(isOn: Boolean) {
+    Box(
+        modifier =
+            Modifier
+                .width(32.dp)
+                .height(18.dp)
+                .clip(CircleShape)
+                .background(if (isOn) PantopusColors.primary600 else PantopusColors.appBorderStrong),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .align(if (isOn) Alignment.CenterEnd else Alignment.CenterStart)
+                    .padding(2.dp)
+                    .size(14.dp)
+                    .clip(CircleShape)
+                    .background(Color.White),
+        )
+    }
+}
+
+@Composable
+private fun SuggestedFieldShell(
+    label: String,
+    hint: String? = null,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        SuggestedLabel(label)
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                    .padding(horizontal = Spacing.s3),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            content()
+        }
+        hint?.let {
+            Text(it, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+        }
+    }
+}
+
+@Composable
+private fun SuggestedLabel(label: String) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label.uppercase(), style = PantopusTextStyle.overline, color = PantopusColors.appTextSecondary)
+        Box(modifier = Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+            PantopusIconImage(icon = PantopusIcon.Sparkles, contentDescription = null, size = 10.dp, tint = PantopusColors.magic)
+            Text("AI suggested", style = PantopusTextStyle.overline, color = PantopusColors.magic)
         }
     }
 }
@@ -802,15 +1728,24 @@ internal fun ListingComposeStepPreview(
     ) {
         when (state.form.currentStep) {
             ListingComposeStep.Photos ->
-                PhotosStep(
-                    state = state,
-                    onAdd = {},
-                    onRequestRemove = {},
-                    onMoveUp = {},
-                    onMoveDown = {},
-                    onMakeHero = {},
-                )
-            ListingComposeStep.TitleCategory -> TitleCategoryStepPreview(state)
+                if (state.form.entryMode == ListingComposeEntryMode.Snap) {
+                    CameraCapturePreview(state)
+                } else {
+                    PhotosStep(
+                        state = state,
+                        onAdd = {},
+                        onRequestRemove = {},
+                        onMoveUp = {},
+                        onMoveDown = {},
+                        onMakeHero = {},
+                    )
+                }
+            ListingComposeStep.TitleCategory ->
+                if (state.form.entryMode == ListingComposeEntryMode.Snap) {
+                    SnapReviewStepPreview(state)
+                } else {
+                    TitleCategoryStepPreview(state)
+                }
             ListingComposeStep.ConditionDescription -> ConditionDescriptionStepPreview(state)
             ListingComposeStep.Price -> PriceStepPreview(state)
             ListingComposeStep.Location -> LocationStepPreview(state)
@@ -818,6 +1753,220 @@ internal fun ListingComposeStepPreview(
             ListingComposeStep.Success -> SuccessStep()
         }
         state.errorMessage?.let { ErrorBanner(it) }
+    }
+}
+
+@Composable
+internal fun ListingComposeSnapCameraPreview(
+    state: ListingComposeUiState,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appBg)
+                .padding(Spacing.s4),
+    ) {
+        CameraCapturePreview(state)
+    }
+}
+
+@Composable
+internal fun ListingComposeSnapReviewPreview(
+    state: ListingComposeUiState,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appBg)
+                .padding(Spacing.s4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s5),
+    ) {
+        SnapReviewStepPreview(state)
+    }
+}
+
+@Composable
+private fun CameraCapturePreview(state: ListingComposeUiState) {
+    val count = state.form.photos.size
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(612.dp)
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(Color(0xFF0A0B0D))
+                .testTag("listingComposeCameraStep"),
+    ) {
+        CameraSceneOverlay()
+        RuleOfThirdsGrid(modifier = Modifier.padding(horizontal = 28.dp, vertical = 96.dp))
+        FramingBrackets(modifier = Modifier.padding(horizontal = 28.dp, vertical = 96.dp))
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s4),
+        ) {
+            GhostCameraPill(
+                label = "Skip to manual",
+                icon = PantopusIcon.ArrowRight,
+                testTag = "listingComposeSkipManual",
+                onClick = {},
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.s3),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                AiCoachPill(snapCoachingText(count))
+            }
+            CapturedAnglesTray(
+                photos = state.form.photos,
+                progressText = snapProgressText(count),
+                modifier = Modifier.padding(top = Spacing.s4),
+            )
+        }
+        Column(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s5),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+        ) {
+            BottomTipPill()
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CameraRailButton(PantopusIcon.Image, "Library", "listingComposeLibraryPhoto") {}
+                Box(modifier = Modifier.weight(1f))
+                ShutterButton {}
+                Box(modifier = Modifier.weight(1f))
+                CameraRailButton(PantopusIcon.Zap, "Auto", "listingComposeFlash") {}
+            }
+        }
+    }
+}
+
+private fun snapCoachingText(count: Int): String =
+    when (count) {
+        0 -> "Center the whole item · step back a bit"
+        1 -> "Get a wider shot for scale"
+        2 -> "Move closer for fabric and wear"
+        else -> "Looks great — capture now"
+    }
+
+private fun snapProgressText(count: Int): String {
+    val captured = count.coerceAtMost(ListingComposeFormState.TARGET_CAPTURE_ANGLES)
+    val remaining = (ListingComposeFormState.TARGET_CAPTURE_ANGLES - captured).coerceAtLeast(0)
+    return if (remaining == 0) "$captured of 4 angles · ready to review" else "$captured of 4 angles · add $remaining more"
+}
+
+@Composable
+private fun SnapReviewStepPreview(state: ListingComposeUiState) {
+    IdentityChip()
+    HeadlineBlock("Review your listing")
+    SubcopyBlock("We pulled title, category, and price from your photos. Edit anything that looks off.")
+    SnapPhotoStrip(photos = state.form.photos)
+    SuggestionsBanner()
+    ReadOnlySuggestedField("Title", state.form.title, "Snap-and-sell pulled this from the photos")
+    ReadOnlySuggestedField("Category", state.form.category?.label ?: "Goods")
+    SuggestedPriceReadOnly(state.form.priceAmount.ifEmpty { "280" })
+    StaticConditionControl(state.form.condition ?: ListingComposeCondition.Good)
+    StaticPickupDeliveryPanel(state.form.deliveryEnabled)
+}
+
+@Composable
+private fun ReadOnlySuggestedField(
+    label: String,
+    value: String,
+    hint: String? = null,
+) {
+    SuggestedFieldShell(label = label, hint = hint) {
+        Text(
+            text = value,
+            style = PantopusTextStyle.body,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+            modifier = Modifier.weight(1f),
+        )
+        PantopusIconImage(icon = PantopusIcon.Pencil, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextMuted)
+    }
+}
+
+@Composable
+private fun SuggestedPriceReadOnly(amount: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.testTag("listingComposeSnapPrice")) {
+        SuggestedLabel("Price")
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                    .padding(Spacing.s3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("$", style = PantopusTextStyle.h3, color = PantopusColors.appText)
+                Text(amount, style = PantopusTextStyle.h2, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+                Box(modifier = Modifier.weight(1f))
+                Text("USD · firm", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            }
+            PriceCompRangeTrack()
+        }
+    }
+}
+
+@Composable
+private fun StaticConditionControl(selected: ListingComposeCondition) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        SectionLabel("Condition")
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+            ListingComposeCondition.entries.forEach { condition ->
+                val active = selected == condition
+                Text(
+                    text = condition.shortLabel,
+                    style = PantopusTextStyle.caption,
+                    fontWeight = FontWeight.Bold,
+                    color = if (active) PantopusColors.primary700 else PantopusColors.appTextStrong,
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(Radii.md))
+                            .background(if (active) PantopusColors.primary50 else PantopusColors.appSurface)
+                            .border(
+                                width = if (active) 1.5.dp else 1.dp,
+                                color = if (active) PantopusColors.primary600 else PantopusColors.appBorder,
+                                shape = RoundedCornerShape(Radii.md),
+                            )
+                            .padding(vertical = 9.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StaticPickupDeliveryPanel(deliveryEnabled: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        SectionLabel("Pickup & delivery")
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                    .padding(Spacing.s3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            FulfillmentToggleRow(PantopusIcon.HandCoins, "Local pickup", "Buyers come to you", true, onClick = {})
+            FulfillmentToggleRow(PantopusIcon.Package, "Local delivery", "Up to 3 mi · $40 fee", deliveryEnabled, onClick = {})
+            FulfillmentToggleRow(PantopusIcon.Package, "Ship nationwide", "Too large to ship", false, enabled = false, onClick = {})
+        }
     }
 }
 

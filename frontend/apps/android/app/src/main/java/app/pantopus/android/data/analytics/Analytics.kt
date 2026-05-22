@@ -19,6 +19,8 @@ sealed class AnalyticsEvent(
 
     data object ScreenMailboxDrawersViewed : AnalyticsEvent("screen.mailbox_drawers.viewed")
 
+    data object ScreenMailboxRootViewed : AnalyticsEvent("screen.mailbox_root.viewed")
+
     data object ScreenMyHomesViewed : AnalyticsEvent("screen.my_homes.viewed")
 
     data object ScreenHomeDashboardViewed : AnalyticsEvent("screen.home_dashboard.viewed")

@@ -18,6 +18,8 @@ import app.pantopus.android.ui.screens.shared.wizard.WizardModel
 import app.pantopus.android.ui.screens.shared.wizard.WizardProgressLabel
 import app.pantopus.android.ui.screens.shared.wizard.WizardSecondaryCta
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -66,6 +68,9 @@ open class GigComposeViewModel
         /** One-shot navigation events the screen reacts to. */
         val pendingEvent = MutableStateFlow<GigComposeOutboundEvent?>(null)
 
+        /** B.3 — in-flight debounce for the Magic Task archetype parse. */
+        private var detectionJob: Job? = null
+
         // MARK: - WizardModel
 
         override val chrome: WizardChrome
@@ -88,8 +93,12 @@ open class GigComposeViewModel
         }
 
         override fun onSecondary() {
-            if (_state.value.form.currentStep == GigComposeStep.Success) {
-                pendingEvent.value = GigComposeOutboundEvent.Dismiss
+            val form = _state.value.form
+            when {
+                form.currentStep == GigComposeStep.Success ->
+                    pendingEvent.value = GigComposeOutboundEvent.Dismiss
+                form.currentStep == GigComposeStep.Category && form.composeMode == ComposeMode.Magic ->
+                    setComposeMode(ComposeMode.Manual)
             }
         }
 
@@ -107,7 +116,53 @@ open class GigComposeViewModel
             if (category == null) return
             val current = _state.value.form
             if (current.category != null || current.hasAnyData) return
-            _state.update { it.copy(form = it.form.copy(category = category)) }
+            // A preselected category means the user already chose one, so
+            // land on the manual picker (tile pre-selected) rather than Magic.
+            _state.update { it.copy(form = it.form.copy(composeMode = ComposeMode.Manual, category = category)) }
+            persist()
+        }
+
+        // MARK: - B.3 Magic Task
+
+        /** Switch the step-1 entry mode (Magic describe ⇄ manual picker). */
+        fun setComposeMode(mode: ComposeMode) {
+            _state.update { it.copy(form = it.form.copy(composeMode = mode)) }
+            persist()
+        }
+
+        /**
+         * Update the plain-English describe text and (re)schedule a
+         * debounced archetype parse. Real backend NLP is deferred;
+         * [detectArchetype] is a deterministic keyword match standing in.
+         */
+        fun setDescribeText(text: String) {
+            val clamped = text.take(GigComposeLimits.DESCRIBE_MAX)
+            _state.update { it.copy(form = it.form.copy(describeText = clamped)) }
+            persist()
+            detectionJob?.cancel()
+            detectionJob =
+                viewModelScope.launch {
+                    delay(DETECTION_DEBOUNCE_MS)
+                    applyDetection(clamped)
+                }
+        }
+
+        /**
+         * Apply the parsed archetype if the text hasn't changed since the
+         * debounce fired. Mirrors the detected category into [form.category].
+         */
+        fun applyDetection(text: String) {
+            if (_state.value.form.describeText != text) return
+            val detected = detectArchetype(text)
+            _state.update {
+                it.copy(
+                    form =
+                        it.form.copy(
+                            detectedArchetype = detected,
+                            category = detected ?: it.form.category,
+                        ),
+                )
+            }
             persist()
         }
 
@@ -115,6 +170,29 @@ open class GigComposeViewModel
 
         fun selectCategory(category: GigComposeCategory) {
             _state.update { it.copy(form = it.form.copy(category = category)) }
+            persist()
+        }
+
+        fun selectEngagementMode(mode: GigComposeEngagementMode) {
+            _state.update {
+                val form = it.form
+                val next =
+                    when (mode) {
+                        GigComposeEngagementMode.OneTime ->
+                            form.copy(
+                                scheduleType = GigComposeScheduleType.OneTime,
+                                budgetType = form.budgetType.takeUnless { type -> type == GigComposeBudgetType.Offers },
+                            )
+                        GigComposeEngagementMode.Recurring ->
+                            form.copy(
+                                scheduleType = GigComposeScheduleType.Recurring,
+                                budgetType = form.budgetType.takeUnless { type -> type == GigComposeBudgetType.Offers },
+                            )
+                        GigComposeEngagementMode.OpenBidding ->
+                            form.copy(budgetType = GigComposeBudgetType.Offers)
+                    }
+                it.copy(form = next)
+            }
             persist()
         }
 
@@ -417,7 +495,7 @@ open class GigComposeViewModel
                 leading = leadingControl(step),
                 primaryCtaLabel = primaryCtaLabel(step),
                 primaryCtaEnabled = primaryEnabled(state) && !state.isSubmitting,
-                secondaryCta = secondaryCta(step),
+                secondaryCta = secondaryCta(state),
                 isSubmitting = state.isSubmitting,
                 dirty = step != GigComposeStep.Success && state.form.hasAnyData,
                 showsProgressBar = step != GigComposeStep.Success,
@@ -447,12 +525,17 @@ open class GigComposeViewModel
                 GigComposeStep.Success -> "View task"
             }
 
-        private fun secondaryCta(step: GigComposeStep): WizardSecondaryCta? =
-            if (step == GigComposeStep.Success) {
-                WizardSecondaryCta(label = "Done", testTag = "composeGigDone")
-            } else {
-                null
+        private fun secondaryCta(state: GigComposeUiState): WizardSecondaryCta? {
+            val form = state.form
+            return when {
+                form.currentStep == GigComposeStep.Success ->
+                    WizardSecondaryCta(label = "Done", testTag = "composeGigDone")
+                form.currentStep == GigComposeStep.Category && form.composeMode == ComposeMode.Magic ->
+                    // Ghost link beside the primary CTA → manual picker.
+                    WizardSecondaryCta(label = "Pick category", testTag = "composeGigPickCategory")
+                else -> null
             }
+        }
 
         private fun progressLabel(step: GigComposeStep): WizardProgressLabel {
             val number = step.stepNumber ?: return WizardProgressLabel.Hidden
@@ -467,7 +550,10 @@ open class GigComposeViewModel
         private fun primaryEnabled(state: GigComposeUiState): Boolean {
             val form = state.form
             return when (form.currentStep) {
-                GigComposeStep.Category -> form.category != null
+                GigComposeStep.Category ->
+                    // Magic: enabled once an archetype is detected. Manual:
+                    // enabled once a category tile is selected.
+                    if (form.composeMode == ComposeMode.Magic) form.detectedArchetype != null else form.category != null
                 GigComposeStep.Basics -> hasValidBasics(form)
                 GigComposeStep.Budget -> hasValidBudget(form)
                 GigComposeStep.Schedule -> hasValidSchedule(form)
@@ -538,6 +624,9 @@ open class GigComposeViewModel
         private fun persist() {
             val form = _state.value.form
             savedStateHandle[KEY_STEP] = form.step
+            savedStateHandle[KEY_COMPOSE_MODE] = form.composeMode.name
+            savedStateHandle[KEY_DESCRIBE] = form.describeText
+            savedStateHandle[KEY_DETECTED] = form.detectedArchetype?.name
             savedStateHandle[KEY_CATEGORY] = form.category?.name
             savedStateHandle[KEY_TITLE] = form.title
             savedStateHandle[KEY_DESCRIPTION] = form.description
@@ -554,8 +643,11 @@ open class GigComposeViewModel
             savedStateHandle[KEY_PLACE_ZIP] = form.placeAddress.zip
         }
 
+        @Suppress("CyclomaticComplexMethod")
         private fun restoreFormState(): GigComposeFormState {
             val step: Int = savedStateHandle[KEY_STEP] ?: GigComposeStep.Category.ordinal0
+            val composeModeName: String? = savedStateHandle[KEY_COMPOSE_MODE]
+            val detectedName: String? = savedStateHandle[KEY_DETECTED]
             val categoryName: String? = savedStateHandle[KEY_CATEGORY]
             val budgetTypeName: String? = savedStateHandle[KEY_BUDGET_TYPE]
             val scheduleTypeName: String? = savedStateHandle[KEY_SCHEDULE_TYPE]
@@ -563,6 +655,9 @@ open class GigComposeViewModel
             val photos: ArrayList<String> = savedStateHandle[KEY_PHOTOS] ?: arrayListOf()
             return GigComposeFormState(
                 step = step,
+                composeMode = composeModeName?.let { name -> ComposeMode.entries.firstOrNull { it.name == name } } ?: ComposeMode.Magic,
+                describeText = savedStateHandle[KEY_DESCRIBE] ?: "",
+                detectedArchetype = detectedName?.let { name -> GigComposeCategory.entries.firstOrNull { it.name == name } },
                 category = categoryName?.let { name -> GigComposeCategory.entries.firstOrNull { it.name == name } },
                 title = savedStateHandle[KEY_TITLE] ?: "",
                 description = savedStateHandle[KEY_DESCRIPTION] ?: "",
@@ -585,6 +680,9 @@ open class GigComposeViewModel
 
         companion object {
             private const val KEY_STEP = "composeGig.step"
+            private const val KEY_COMPOSE_MODE = "composeGig.composeMode"
+            private const val KEY_DESCRIBE = "composeGig.describeText"
+            private const val KEY_DETECTED = "composeGig.detectedArchetype"
             private const val KEY_CATEGORY = "composeGig.category"
             private const val KEY_TITLE = "composeGig.title"
             private const val KEY_DESCRIPTION = "composeGig.description"
@@ -599,6 +697,35 @@ open class GigComposeViewModel
             private const val KEY_PLACE_CITY = "composeGig.placeCity"
             private const val KEY_PLACE_STATE = "composeGig.placeState"
             private const val KEY_PLACE_ZIP = "composeGig.placeZip"
+            private const val DETECTION_DEBOUNCE_MS = 350L
+            private const val MIN_DETECT_TEXT_LENGTH = 3
+
+            /** B.3 — deterministic keyword → archetype map (stand-in for backend NLP). */
+            fun detectArchetype(text: String): GigComposeCategory? {
+                val lower = text.lowercase()
+                if (lower.length < MIN_DETECT_TEXT_LENGTH) return null
+
+                fun has(words: List<String>) = words.any { lower.contains(it) }
+
+                return when {
+                    has(listOf("move", "moving", "haul", "u-haul", "load boxes")) -> GigComposeCategory.Moving
+                    has(listOf("clean", "tidy", "scrub", "vacuum", "mop")) -> GigComposeCategory.Cleaning
+                    has(
+                        listOf(
+                            "assemble", "ikea", "furniture", "shelf", "shelves", "mount", "drill",
+                            "fix", "repair", "install", "handy", "patch", "drywall",
+                        ),
+                    ) -> GigComposeCategory.Handyman
+                    has(listOf("dog", "cat", " pet", "puppy", "litter", "groom", "walk")) -> GigComposeCategory.PetCare
+                    has(listOf("babysit", "nanny", "kids", "child", "daycare")) -> GigComposeCategory.ChildCare
+                    has(listOf("tutor", "lesson", "math", "homework", "test prep", "teach")) -> GigComposeCategory.Tutoring
+                    has(listOf("deliver", "pickup", "pick up", "drop off", "errand", "courier")) -> GigComposeCategory.Delivery
+                    has(
+                        listOf("wifi", "wi-fi", "computer", "laptop", "printer", "router", "troubleshoot", "setup"),
+                    ) -> GigComposeCategory.Tech
+                    else -> null
+                }
+            }
 
             /** Strip everything except digits + a single decimal point. */
             internal fun sanitizeBudget(raw: String): String {

@@ -19,14 +19,15 @@ final class ListingComposeWizardViewModelTests: ListingComposeWizardViewModelTes
         let chrome = vm.chrome
         XCTAssertEqual(chrome.title, "List an item")
         XCTAssertFalse(chrome.primaryCTAEnabled, "Continue is disabled until ≥1 photo is added.")
-        XCTAssertEqual(chrome.primaryCTALabel, "Continue")
+        XCTAssertEqual(chrome.primaryCTALabel, "Review suggestions")
         XCTAssertEqual(chrome.leading, .close)
-        XCTAssertEqual(chrome.progressLabel, .stepOf(current: 1, total: 6))
+        XCTAssertEqual(chrome.progressLabel, .stepOf(current: 1, total: 3))
     }
 
     func testProgressLabelOnEachStep() {
         for step in ListingComposeStep.allCases where step != .success {
             var seed = ListingComposeFormState.empty
+            seed.entryMode = .manual
             seed.step = step.rawValue
             let vm = makeVM(initialState: seed)
             if let number = step.stepNumber {
@@ -92,10 +93,60 @@ final class ListingComposeWizardViewModelTests: ListingComposeWizardViewModelTes
         XCTAssertEqual(vm.heroPhoto?.token, "a")
     }
 
+    func testSkipToManualPreservesOriginalPhotoGridPath() {
+        let vm = makeVM()
+        XCTAssertTrue(vm.isCameraCaptureStep)
+        vm.skipToManualPhotoEditor()
+        XCTAssertEqual(vm.form.entryMode, .manual)
+        XCTAssertFalse(vm.isCameraCaptureStep)
+        XCTAssertEqual(vm.chrome.primaryCTALabel, "Continue")
+    }
+
+    func testCameraCaptureSeedsSnapSuggestions() async {
+        let vm = makeVM()
+        vm.captureSnapPhoto()
+        vm.captureSnapPhoto()
+        vm.captureSnapPhoto()
+        XCTAssertEqual(vm.form.photos.count, 3)
+        XCTAssertEqual(vm.form.title, "Sage green velvet sofa, 3-seater")
+        XCTAssertEqual(vm.form.category, .goods)
+        XCTAssertEqual(vm.form.condition, .good)
+        XCTAssertEqual(vm.form.priceKind, .fixed)
+        XCTAssertEqual(vm.form.priceAmount, "280")
+        XCTAssertEqual(vm.form.locationKind, .savedAddress)
+        XCTAssertTrue(vm.form.deliveryEnabled)
+
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.currentStep, .titleCategory)
+        XCTAssertTrue(vm.isSnapReviewStep)
+        XCTAssertEqual(vm.chrome.primaryCTALabel, "Post listing")
+        XCTAssertEqual(vm.chrome.secondaryCTA?.identifier, "listingComposeSaveDraft")
+        XCTAssertTrue(vm.chrome.primaryCTAEnabled)
+    }
+
+    func testSnapReviewPrimarySubmitsListing() async {
+        SequencedURLProtocol.sequence = [.status(201, body: Self.createListingJSON)]
+        let vm = makeVM()
+        vm.captureSnapPhoto()
+        await vm.advanceForTesting()
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.currentStep, .success)
+        XCTAssertEqual(vm.createdListingId, "listing_42")
+    }
+
+    func testSnapReviewSaveDraftDismisses() async {
+        let vm = makeVM()
+        vm.captureSnapPhoto()
+        await vm.advanceForTesting()
+        vm.secondaryTapped()
+        XCTAssertEqual(vm.pendingEvent, .dismiss)
+    }
+
     // MARK: - Title + category
 
     func testTitleCategoryGate() {
         var seed = ListingComposeFormState.empty
+        seed.entryMode = .manual
         seed.step = ListingComposeStep.titleCategory.rawValue
         seed.photos = [ListingComposePhoto(token: "p")]
         let vm = makeVM(initialState: seed)
@@ -110,6 +161,7 @@ final class ListingComposeWizardViewModelTests: ListingComposeWizardViewModelTes
 
     func testTitleMaxLength() {
         var seed = ListingComposeFormState.empty
+        seed.entryMode = .manual
         seed.step = ListingComposeStep.titleCategory.rawValue
         seed.photos = [ListingComposePhoto(token: "p")]
         let vm = makeVM(initialState: seed)
@@ -302,6 +354,7 @@ final class ListingComposeWizardViewModelTests: ListingComposeWizardViewModelTes
 
     func testBackOnTitleStepGoesToPhotos() {
         var seed = ListingComposeFormState.empty
+        seed.entryMode = .manual
         seed.step = ListingComposeStep.titleCategory.rawValue
         seed.photos = [ListingComposePhoto(token: "p")]
         let vm = makeVM(initialState: seed)

@@ -163,10 +163,14 @@ final class MailboxListViewModel: ListOfRowsDataSource {
     ///   - `unread` highlight when `!viewed`.
     static func makeRow(
         for mail: MailItem,
+        trust trustOverride: MailTrust? = nil,
         onOpenMail: @escaping @Sendable (String) -> Void
     ) -> RowModel {
         let category = MailItemCategory.fromRaw(mail.mailType ?? mail.type)
-        let trust = MailTrust.fromRaw(nil) // V1 list endpoint doesn't surface sender_trust.
+        // V1 list endpoint doesn't surface sender_trust, so it defaults to
+        // unverified; surfaces that carry trust (e.g. the B.1 Mailbox root
+        // sample data) pass it explicitly.
+        let trust = trustOverride ?? MailTrust.fromRaw(nil)
         let chips: [RowChip] = [
             RowChip(
                 text: category.label,

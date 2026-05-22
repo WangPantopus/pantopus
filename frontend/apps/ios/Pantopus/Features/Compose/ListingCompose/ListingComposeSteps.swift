@@ -58,6 +58,13 @@ public enum ListingComposeStep: Int, CaseIterable, Sendable {
     }
 }
 
+/// A12.9 — create-mode entry path. Snap starts in the camera
+/// viewfinder; manual preserves the original photo-grid wizard.
+public enum ListingComposeEntryMode: String, CaseIterable, Codable, Sendable, Hashable {
+    case snap
+    case manual
+}
+
 /// Category selectable in step 2. Mirrors the five Marketplace chips and
 /// resolves onto backend `layer` + the wanted/free flags.
 public enum ListingComposeCategory: String, CaseIterable, Codable, Sendable, Hashable {
@@ -250,6 +257,7 @@ public struct ListingComposePhoto: Codable, Sendable, Equatable, Identifiable, H
 /// Persistable form state for the wizard.
 public struct ListingComposeFormState: Codable, Sendable, Equatable {
     public var step: Int
+    public var entryMode: ListingComposeEntryMode
     public var photos: [ListingComposePhoto]
     public var title: String
     public var category: ListingComposeCategory?
@@ -258,11 +266,13 @@ public struct ListingComposeFormState: Codable, Sendable, Equatable {
     public var priceKind: ListingComposePriceKind?
     public var priceAmount: String
     public var fulfillment: ListingComposeFulfillment
+    public var deliveryEnabled: Bool
     public var locationKind: ListingComposeLocationKind?
     public var locationLabel: String
 
     public init(
         step: Int = ListingComposeStep.photos.rawValue,
+        entryMode: ListingComposeEntryMode = .snap,
         photos: [ListingComposePhoto] = [],
         title: String = "",
         category: ListingComposeCategory? = nil,
@@ -271,10 +281,12 @@ public struct ListingComposeFormState: Codable, Sendable, Equatable {
         priceKind: ListingComposePriceKind? = nil,
         priceAmount: String = "",
         fulfillment: ListingComposeFulfillment = .pickup,
+        deliveryEnabled: Bool = false,
         locationKind: ListingComposeLocationKind? = nil,
         locationLabel: String = ""
     ) {
         self.step = step
+        self.entryMode = entryMode
         self.photos = photos
         self.title = title
         self.category = category
@@ -283,14 +295,51 @@ public struct ListingComposeFormState: Codable, Sendable, Equatable {
         self.priceKind = priceKind
         self.priceAmount = priceAmount
         self.fulfillment = fulfillment
+        self.deliveryEnabled = deliveryEnabled
         self.locationKind = locationKind
         self.locationLabel = locationLabel
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case step
+        case entryMode
+        case photos
+        case title
+        case category
+        case condition
+        case bodyText
+        case priceKind
+        case priceAmount
+        case fulfillment
+        case deliveryEnabled
+        case locationKind
+        case locationLabel
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        step = try container.decodeIfPresent(Int.self, forKey: .step) ?? ListingComposeStep.photos.rawValue
+        entryMode = try container.decodeIfPresent(ListingComposeEntryMode.self, forKey: .entryMode) ?? .snap
+        photos = try container.decodeIfPresent([ListingComposePhoto].self, forKey: .photos) ?? []
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
+        category = try container.decodeIfPresent(ListingComposeCategory.self, forKey: .category)
+        condition = try container.decodeIfPresent(ListingComposeCondition.self, forKey: .condition)
+        bodyText = try container.decodeIfPresent(String.self, forKey: .bodyText) ?? ""
+        priceKind = try container.decodeIfPresent(ListingComposePriceKind.self, forKey: .priceKind)
+        priceAmount = try container.decodeIfPresent(String.self, forKey: .priceAmount) ?? ""
+        fulfillment = try container.decodeIfPresent(ListingComposeFulfillment.self, forKey: .fulfillment) ?? .pickup
+        deliveryEnabled = try container.decodeIfPresent(Bool.self, forKey: .deliveryEnabled) ?? false
+        locationKind = try container.decodeIfPresent(ListingComposeLocationKind.self, forKey: .locationKind)
+        locationLabel = try container.decodeIfPresent(String.self, forKey: .locationLabel) ?? ""
     }
 
     public static let empty = ListingComposeFormState()
 
     /// Max photos in the grid.
     public static let maxPhotos: Int = 8
+
+    /// A12.9 camera coaching target before the user reviews suggestions.
+    public static let targetCaptureAngles: Int = 4
 
     /// Min / max bounds enforced on step transitions.
     public static let titleMinLength = 5

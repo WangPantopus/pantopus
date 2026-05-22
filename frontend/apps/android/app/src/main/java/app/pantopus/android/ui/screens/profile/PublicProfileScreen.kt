@@ -68,6 +68,7 @@ fun PublicProfileScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
+    val selectedNeighborTab by viewModel.selectedNeighborTab.collectAsStateWithLifecycle()
     val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
     val showOverflow by viewModel.showOverflow.collectAsStateWithLifecycle()
     val connectState by viewModel.connectState.collectAsStateWithLifecycle()
@@ -95,20 +96,38 @@ fun PublicProfileScreen(
         when (val s = state) {
             PublicProfileUiState.Loading -> LoadingLayout(onBack = onBack)
             is PublicProfileUiState.Error -> ErrorLayout(message = s.message, onRetry = { viewModel.refresh() }, onBack = onBack)
-            is PublicProfileUiState.Loaded ->
-                PublicProfileLoadedFrame(
-                    content = s.content,
-                    selectedTab = selectedTab,
-                    followState = followState,
-                    connectState = connectState,
-                    onBack = onBack,
-                    onSelectTab = { viewModel.selectTab(it) },
-                    onFollow = { viewModel.follow() },
-                    onMessage = { onOpenMessages(s.content.profile) },
-                    onConnect = { viewModel.connect() },
-                    onOverflow = { viewModel.setShowOverflow(true) },
-                    onUnlock = { viewModel.showSubscribeToast() },
-                )
+            is PublicProfileUiState.Loaded -> {
+                val content = s.content
+                val neighbor = content.neighbor
+                if (content.kind == PublicProfileKind.Local && neighbor != null) {
+                    NeighborProfileLayout(
+                        content = neighbor,
+                        selectedTab = selectedNeighborTab,
+                        connectState = connectState,
+                        onBack = onBack,
+                        onSelectTab = { viewModel.selectNeighborTab(it) },
+                        onMessage = { onOpenMessages(content.profile) },
+                        onConnect = { viewModel.connect() },
+                        onReport = { showReportSheet = true },
+                        onBlock = { viewModel.block() },
+                        onOverflow = { viewModel.setShowOverflow(true) },
+                    )
+                } else {
+                    PublicProfileLoadedFrame(
+                        content = content,
+                        selectedTab = selectedTab,
+                        followState = followState,
+                        connectState = connectState,
+                        onBack = onBack,
+                        onSelectTab = { viewModel.selectTab(it) },
+                        onFollow = { viewModel.follow() },
+                        onMessage = { onOpenMessages(content.profile) },
+                        onConnect = { viewModel.connect() },
+                        onOverflow = { viewModel.setShowOverflow(true) },
+                        onUnlock = { viewModel.showSubscribeToast() },
+                    )
+                }
+            }
         }
         toast?.let { message ->
             Box(

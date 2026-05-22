@@ -101,7 +101,29 @@ public struct PublicProfileView: View {
         }
     }
 
+    @ViewBuilder
     private func loadedLayout(_ payload: PublicProfileContent) -> some View {
+        if payload.kind == .local, let neighbor = payload.neighbor {
+            NeighborProfileLayout(
+                content: neighbor,
+                selectedTab: Binding(
+                    get: { viewModel.selectedNeighborTab },
+                    set: { viewModel.selectedNeighborTab = $0 }
+                ),
+                connectState: viewModel.connectState,
+                onBack: onBack,
+                onMessage: { onOpenMessages(payload.profile) },
+                onConnect: { Task { await viewModel.connect() } },
+                onReport: { showReportSheet = true },
+                onBlock: { Task { await viewModel.block() } },
+                onOverflow: { viewModel.showOverflow = true }
+            )
+        } else {
+            personaLayout(payload)
+        }
+    }
+
+    private func personaLayout(_ payload: PublicProfileContent) -> some View {
         ContentDetailShell(
             title: nil,
             onBack: onBack,

@@ -49,6 +49,23 @@ public enum GigComposeCategory: String, CaseIterable, Sendable, Codable, Hashabl
     }
 }
 
+/// B.3 (A12.8) — entry mode for step 1. `.magic` is the default
+/// AI-assisted describe path; `.manual` is the category-grid fallback
+/// reachable via the "Pick a category instead" link.
+public enum ComposeMode: String, CaseIterable, Sendable, Codable, Hashable {
+    case magic
+    case manual
+}
+
+/// B.3 (A12.8) — compact Magic Task engagement selector. It pre-fills the
+/// downstream schedule / budget steps instead of adding a separate backend
+/// field.
+public enum GigComposeEngagementMode: String, CaseIterable, Sendable, Hashable {
+    case oneTime
+    case recurring
+    case openBidding
+}
+
 /// Budget-type radio in step 3.
 public enum GigComposeBudgetType: String, CaseIterable, Sendable, Codable, Hashable {
     case fixed
@@ -196,12 +213,21 @@ public enum GigComposeLimits {
     public static let descriptionMin: Int = 20
     public static let descriptionMax: Int = 2000
     public static let maxPhotos: Int = 6
+    /// B.3 — Magic Task describe textarea cap (matches A12.8 "184 / 500").
+    public static let describeMax: Int = 500
 }
 
 /// Snapshot of all wizard form state. Encoded into `@SceneStorage` so
 /// the in-progress wizard survives process death and config changes.
 public struct GigComposeFormState: Codable, Sendable, Equatable {
     public var step: Int
+    /// B.3 — step-1 entry mode (Magic describe vs manual picker).
+    public var composeMode: ComposeMode
+    /// B.3 — plain-English Magic Task input.
+    public var describeText: String
+    /// B.3 — archetype parsed from `describeText` (debounced). Mirrored
+    /// into `category` so downstream steps + submission use it.
+    public var detectedArchetype: GigComposeCategory?
     public var category: GigComposeCategory?
     public var title: String
     public var description: String
@@ -218,6 +244,9 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
 
     public init(
         step: Int = GigComposeStep.category.rawValue,
+        composeMode: ComposeMode = .magic,
+        describeText: String = "",
+        detectedArchetype: GigComposeCategory? = nil,
         category: GigComposeCategory? = nil,
         title: String = "",
         description: String = "",
@@ -231,6 +260,9 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
         placeAddress: GigComposePlaceAddress = .init()
     ) {
         self.step = step
+        self.composeMode = composeMode
+        self.describeText = describeText
+        self.detectedArchetype = detectedArchetype
         self.category = category
         self.title = title
         self.description = description
@@ -246,10 +278,16 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
 
     public static let empty = GigComposeFormState()
 
+    public var engagementMode: GigComposeEngagementMode {
+        if budgetType == .offers { return .openBidding }
+        return scheduleType == .recurring ? .recurring : .oneTime
+    }
+
     /// True when any user-visible field carries data — drives the
     /// discard-confirm gate.
     public var hasAnyData: Bool {
-        category != nil
+        !describeText.isEmpty
+            || category != nil
             || !title.isEmpty
             || !description.isEmpty
             || !photoIds.isEmpty

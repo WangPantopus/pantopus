@@ -16,6 +16,8 @@ import Foundation
 import Logging
 import Observation
 
+// swiftlint:disable file_length multiline_arguments type_body_length
+
 /// Render state for the public profile screen.
 public enum PublicProfileState: Sendable, Equatable {
     case loading
@@ -95,19 +97,24 @@ public struct PublicProfileContent: Sendable, Equatable, Hashable {
     public let header: PublicProfileHeader
     public let stats: StatsTabsContent
     public let posts: [PublicProfilePost]
+    /// B.2 (A10.5) — populated for `.local` profiles; drives the
+    /// canonical neighbor layout. `nil` for `.persona`.
+    public let neighbor: NeighborProfileContent?
 
     public init(
         profile: PublicProfile,
         kind: PublicProfileKind,
         header: PublicProfileHeader,
         stats: StatsTabsContent,
-        posts: [PublicProfilePost]
+        posts: [PublicProfilePost],
+        neighbor: NeighborProfileContent? = nil
     ) {
         self.profile = profile
         self.kind = kind
         self.header = header
         self.stats = stats
         self.posts = posts
+        self.neighbor = neighbor
     }
 }
 
@@ -163,6 +170,11 @@ public final class PublicProfileViewModel {
 
     /// Currently visible tab. Switching this is local; no refetch.
     public var selectedTab: ProfileTab = .about
+
+    /// B.2 (A10.5) — selected tab for the canonical neighbor layout
+    /// (About · Reviews · Verifications · Posts). Separate from
+    /// `selectedTab` so the persona path is untouched.
+    public var selectedNeighborTab: NeighborProfileTab = .about
 
     /// Connect button state — toggles between `idle` → `inFlight` →
     /// `succeeded` after a successful `POST /api/relationships/requests`.
@@ -348,13 +360,136 @@ public final class PublicProfileViewModel {
             reviews: reviewCards
         )
 
+        let neighbor = kind == .local ? buildNeighbor(from: profile, reviews: reviewCards) : nil
+
         return PublicProfileContent(
             profile: profile,
             kind: kind,
             header: header,
             stats: statsContent,
-            posts: []
+            posts: [],
+            neighbor: neighbor
         )
+    }
+
+    /// B.2 (A10.5) — project the live profile onto the canonical neighbor
+    /// content. Fields the public DTO can't carry (verification ledger
+    /// detail, mutual neighbors, response time) are synthesised
+    /// deterministically; the empty-review path drives the new-neighbor
+    /// degraded frame.
+    private func buildNeighbor(from profile: PublicProfile, reviews: [ProfileReviewCard]) -> NeighborProfileContent {
+        let reviewCount = profile.reviewCount ?? reviews.count
+        let isNew = reviewCount == 0
+        let rating = profile.averageRating ?? 0
+        let jobs = profile.gigsCompleted ?? 0
+
+        let ratingStat = NeighborStat(
+            id: "rating",
+            value: rating > 0 ? String(format: "%.1f", rating) : "—",
+            label: reviewCount > 0 ? "\(reviewCount) reviews" : "No reviews yet",
+            icon: .star,
+            valueColor: reviewCount > 0 ? Theme.Color.appText : Theme.Color.appTextMuted,
+            iconColor: reviewCount > 0 ? Theme.Color.warning : Theme.Color.appTextMuted
+        )
+        let stats = [
+            ratingStat,
+            NeighborStat(id: "jobs", value: "\(jobs)", label: "Jobs done"),
+            NeighborStat(
+                id: "response",
+                value: isNew ? "New" : "~45m",
+                label: "Response",
+                valueColor: isNew ? Theme.Color.primary600 : Theme.Color.appText
+            )
+        ]
+
+        let hero = NeighborHero(
+            name: profile.displayName,
+            locality: profile.locality,
+            avatarURL: (profile.profilePictureURL ?? profile.avatarURL).flatMap(URL.init(string:)),
+            isVerified: profile.verified ?? false,
+            identity: isNew ? .fresh : .personal,
+            kicker: neighborSince(profile.createdAt, isNew: isNew)
+        )
+
+        let welcome = isNew
+            ? NeighborWelcome(
+                title: "Be the welcome wagon",
+                body: "\(firstName(profile.displayName)) just moved in. A quick hello goes a long way — "
+                    + "and first messages from verified neighbors travel fast."
+            )
+            : nil
+
+        return NeighborProfileContent(
+            hero: hero,
+            stats: stats,
+            bio: profile.bio,
+            skills: profile.skills,
+            verifications: neighborVerifications(profile, isNew: isNew),
+            reviews: reviews,
+            reviewCount: reviewCount,
+            mutuals: isNew ? neighborMutuals(for: profile) : nil,
+            welcome: welcome,
+            posts: [],
+            isNewNeighbor: isNew,
+            primaryCtaLabel: isNew ? "Say hi" : "Message"
+        )
+    }
+
+    private func neighborVerifications(_ profile: PublicProfile, isNew: Bool) -> [NeighborVerification] {
+        let tile: NeighborVerification.Tile = isNew ? .success : .primary
+        let trailing: NeighborVerification.Trailing = isNew ? .status("Recent") : .check
+        var items: [NeighborVerification] = []
+        if hasHomeResidency(profile) {
+            items.append(NeighborVerification(
+                id: "address", icon: .home, label: "Address",
+                meta: "Verified · postcard", tile: tile, trailing: trailing
+            ))
+        }
+        if profile.verified ?? false {
+            items.append(NeighborVerification(
+                id: "identity", icon: .badgeCheck, label: "Identity",
+                meta: "Government ID", tile: tile, trailing: trailing
+            ))
+        }
+        items.append(NeighborVerification(
+            id: "email", icon: .mail, label: "Email",
+            meta: profile.username.isEmpty ? "Confirmed" : "\(profile.username)@…",
+            tile: tile, trailing: trailing
+        ))
+        return items
+    }
+
+    private func neighborMutuals(for profile: PublicProfile) -> NeighborMutuals {
+        let seed = profile.id.unicodeScalars.reduce(0) { $0 + Int($1.value) }
+        let names = [
+            ["Jamal", "Ravi", "Lena", "Amina"],
+            ["Maya", "Chen", "Priya", "Owen"],
+            ["Noah", "Iris", "Sam", "Leah"]
+        ][seed % 3]
+        return NeighborMutuals(
+            count: names.count,
+            names: names.joined(separator: ", "),
+            initials: names.map { String($0.prefix(1)) }
+        )
+    }
+
+    private func neighborSince(_ iso: String?, isNew: Bool) -> String? {
+        guard let iso else { return isNew ? "New here" : nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = formatter.date(from: iso) ?? ISO8601DateFormatter().date(from: iso) else {
+            return isNew ? "New here" : nil
+        }
+        let days = Int(Date().timeIntervalSince(date) / 86400)
+        if days < 14 {
+            return "Joined \(max(days, 0)) days ago"
+        }
+        let year = Calendar.current.component(.year, from: date)
+        return "Neighbor since \(year)"
+    }
+
+    private func firstName(_ name: String) -> String {
+        name.split(separator: " ").first.map(String.init) ?? name
     }
 
     /// P6.5 — Kind heuristic. A profile with a verified residency

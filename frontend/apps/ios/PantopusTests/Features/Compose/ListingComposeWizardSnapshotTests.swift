@@ -11,7 +11,9 @@
 //  rendered baselines.
 //
 
+import SwiftUI
 import XCTest
+@testable import Pantopus
 
 final class ListingComposeWizardSnapshotTests: XCTestCase {
     private var baselineURL: URL {
@@ -68,6 +70,38 @@ final class ListingComposeWizardSnapshotTests: XCTestCase {
         try assertBaselineOrSkip("edit-jump-to-price")
     }
 
+    @MainActor
+    func test_listing_compose_snap_capture_frame_renders() {
+        let view = ListingComposeWizardView { _ in }
+            .frame(width: 390, height: 820)
+        assertRenders(view)
+    }
+
+    @MainActor
+    func test_listing_compose_snap_review_frame_renders() {
+        let vm = ListingComposeWizardViewModel(
+            initialState: ListingComposeFormState(
+                step: ListingComposeStep.titleCategory.rawValue,
+                entryMode: .snap,
+                photos: [
+                    ListingComposePhoto(token: "snap_angle_1"),
+                    ListingComposePhoto(token: "snap_angle_2"),
+                    ListingComposePhoto(token: "snap_angle_3")
+                ],
+                title: "Sage green velvet sofa, 3-seater",
+                category: .goods,
+                condition: .good,
+                bodyText: "Comfortable three-seat velvet sofa with light wear on one cushion and minor sun fade.",
+                priceKind: .fixed,
+                priceAmount: "280",
+                fulfillment: .pickup,
+                deliveryEnabled: true,
+                locationKind: .savedAddress
+            )
+        )
+        assertRenders(ListingComposeSnapReviewStep(viewModel: vm).frame(width: 390, height: 820))
+    }
+
     private func assertBaselineOrSkip(_ slug: String) throws {
         let url = baselineURL.appendingPathComponent("\(slug)-ios.png")
         guard FileManager.default.fileExists(atPath: url.path) else {
@@ -83,5 +117,15 @@ final class ListingComposeWizardSnapshotTests: XCTestCase {
                 data[3] == 0x47,
             "Not a PNG: \(url.path)"
         )
+    }
+
+    @MainActor
+    private func assertRenders(_ view: some View) {
+        let host = UIHostingController(rootView: view)
+        host.view.frame = CGRect(x: 0, y: 0, width: 390, height: 820)
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
+        XCTAssertGreaterThan(host.view.frame.size.width, 0)
+        XCTAssertGreaterThan(host.view.frame.size.height, 0)
     }
 }

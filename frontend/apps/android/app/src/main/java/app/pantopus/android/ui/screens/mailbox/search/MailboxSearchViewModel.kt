@@ -86,7 +86,7 @@ class MailboxSearchViewModel
 
         /** Result row identical to the Mailbox list row, routing taps to
          *  this surface's `onOpenMail`. */
-        fun rowModel(mail: MailItem): RowModel = MailboxListViewModel.makeRow(mail, onOpenMail)
+        fun rowModel(mail: MailItem): RowModel = MailboxListViewModel.makeRow(mail, onOpenMail = onOpenMail)
 
         private fun recompute() {
             _results.value = filter(corpus, _query.value)

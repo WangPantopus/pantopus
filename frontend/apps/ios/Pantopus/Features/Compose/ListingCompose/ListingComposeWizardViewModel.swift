@@ -132,6 +132,10 @@ final class ListingComposeWizardViewModel: WizardModel {
     }
 
     func secondaryTapped() {
+        if isSnapReviewStep {
+            pendingEvent = .dismiss
+            return
+        }
         // Success step's "Back to Marketplace" (create) / "Done" (edit) —
         // no other step uses the secondary. In edit mode "Done" still
         // signals the host to pop and refresh the listing detail, so we
@@ -151,6 +155,28 @@ final class ListingComposeWizardViewModel: WizardModel {
     #endif
 
     // MARK: - Step 1 (photos) mutations
+
+    /// A12.9 — camera capture appends a deterministic placeholder token
+    /// and seeds editable AI suggestions for the review surface.
+    func captureSnapPhoto() {
+        let next = min(form.photos.count + 1, ListingComposeFormState.maxPhotos)
+        addPhoto(token: "snap_angle_\(next)")
+        applySnapSuggestionsIfNeeded()
+    }
+
+    /// Escape hatch from the camera-first entry into the original photo
+    /// grid editor.
+    func skipToManualPhotoEditor() {
+        form.entryMode = .manual
+    }
+
+    /// The library affordance follows the same placeholder path until
+    /// real media import/upload is wired.
+    func addLibraryPhoto() {
+        let next = min(form.photos.count + 1, ListingComposeFormState.maxPhotos)
+        addPhoto(token: "library_photo_\(next)")
+        applySnapSuggestionsIfNeeded()
+    }
 
     /// Append a new photo to the grid. Captures up to `maxPhotos`.
     func addPhoto(token: String = "photo_\(UUID().uuidString.prefix(6))") {
@@ -180,6 +206,32 @@ final class ListingComposeWizardViewModel: WizardModel {
         guard let index = form.photos.firstIndex(where: { $0.id == id }), index != 0 else { return }
         let photo = form.photos.remove(at: index)
         form.photos.insert(photo, at: 0)
+    }
+
+    private func applySnapSuggestionsIfNeeded() {
+        if form.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            form.title = "Sage green velvet sofa, 3-seater"
+        }
+        if form.category == nil {
+            setCategory(.goods)
+        }
+        if form.condition == nil {
+            form.condition = .good
+        }
+        if form.bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            form.bodyText = "Comfortable three-seat velvet sofa with light wear on one cushion and minor sun fade."
+        }
+        if form.priceKind == nil {
+            form.priceKind = .fixed
+        }
+        if form.priceAmount.isEmpty {
+            form.priceAmount = "280"
+        }
+        form.fulfillment = .pickup
+        form.deliveryEnabled = true
+        if form.locationKind == nil {
+            form.locationKind = .savedAddress
+        }
     }
 
     // MARK: - Other step mutations
@@ -230,6 +282,10 @@ final class ListingComposeWizardViewModel: WizardModel {
         form.fulfillment = value
     }
 
+    func setDeliveryEnabled(_ value: Bool) {
+        form.deliveryEnabled = value
+    }
+
     func setLocationKind(_ kind: ListingComposeLocationKind) {
         form.locationKind = kind
     }
@@ -245,7 +301,11 @@ final class ListingComposeWizardViewModel: WizardModel {
         case .photos:
             transition(to: .titleCategory)
         case .titleCategory:
-            transition(to: .conditionDescription)
+            if isSnapReviewStep {
+                await submit()
+            } else {
+                transition(to: .conditionDescription)
+            }
         case .conditionDescription:
             transition(to: .price)
         case .price:
@@ -299,7 +359,7 @@ final class ListingComposeWizardViewModel: WizardModel {
         let price: Double? = isFree ? nil : parsedPrice
         let mediaUrls = form.photos.map(\.token)
         let locationName: String? = form.locationLabel.isEmpty ? nil : form.locationLabel
-        let deliveryAvailable = form.fulfillment == .delivery
+        let deliveryAvailable = form.deliveryEnabled || form.fulfillment == .delivery
 
         switch mode {
         case .create:

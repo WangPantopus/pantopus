@@ -85,13 +85,17 @@ final class GigComposeViewModelTests: XCTestCase {
     }
 
     func testSelectCategoryEnablesContinue() {
+        // B.3 — category selection enables Continue in the manual picker.
         let vm = makeVM()
+        vm.setComposeMode(.manual)
         vm.selectCategory(.handyman)
         XCTAssertTrue(vm.chrome.primaryCTAEnabled)
     }
 
     func testPreselectFromRouteArgument() {
-        let preselected = GigComposeFormState(category: .cleaning)
+        // B.3 — a preselected category lands on the manual picker so the
+        // pre-chosen tile keeps Continue enabled.
+        let preselected = GigComposeFormState(composeMode: .manual, category: .cleaning)
         let vm = makeVM(initialState: preselected)
         XCTAssertEqual(vm.form.category, .cleaning)
         XCTAssertTrue(vm.chrome.primaryCTAEnabled)

@@ -13,10 +13,7 @@ import UIKit
 public enum HubRoute: Hashable {
     case myHomes
     case myClaims
-    case mailboxDrawers
-    case mailbox
     case mailItemDetail(mailId: String)
-    case drawerDetail(drawer: String)
     /// T6.5e (P19.5) Mailbox Vault — saved mail list. Personal pillar.
     case mailboxVault
     case addHome
@@ -206,7 +203,8 @@ public enum HubRoute: Hashable {
     case tasksMap(categoryKey: String)
     /// A.x — Explore (neighbourhood discovery surface).
     case explore
-    /// B.1 prerequisite — Mailbox root archetype.
+    /// B.1 — unified Mailbox root (drawer chips × tabs). Entry point for
+    /// all mailbox navigation; supersedes `.mailboxDrawers` and `.mailbox`.
     case mailboxRoot
     /// A.x — Mailbox map.
     case mailboxMap
@@ -327,10 +325,10 @@ public struct HubTabRoot: View {
             case .openMenu: path.append(.menu)
             case .startVerification: path.append(.addHome)
             case .action(.addHome): path.append(.addHome)
-            case .action(.scanMail): path.append(.mailboxDrawers)
+            case .action(.scanMail): path.append(.mailboxRoot)
             case .action(.postTask): path.append(.placeholder(label: "Post a gig"))
             case .action(.snapAndSell): path.append(.placeholder(label: "Snap & sell"))
-            case .pillar(.mail): path.append(.mailbox)
+            case .pillar(.mail): path.append(.mailboxRoot)
             case .pillar(.pulse): path.append(.pulseFeed)
             case .pillar(.gigs): path.append(.gigsFeed)
             case .pillar(.marketplace): path.append(.marketplace)
@@ -399,7 +397,7 @@ public struct HubTabRoot: View {
     private static func route(forJumpBackIn item: JumpBackItem) -> HubRoute {
         let path = item.route
         if path.hasPrefix("/app/mailbox") {
-            return .mailbox
+            return .mailboxRoot
         }
         if let homeId = Self.homeId(in: path) {
             return .homeDashboard(homeId: homeId)
@@ -869,15 +867,6 @@ public struct HubTabRoot: View {
                     path.append(.myClaims)
                 }
             )
-        case .mailbox:
-            MailboxListView(
-                viewModel: MailboxListViewModel(
-                    onOpenMail: { mailId in
-                        Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
-                    },
-                    onOpenSearch: { push(.mailboxSearch) }
-                )
-            )
         case let .mailItemDetail(mailId):
             // T6.5b (P20) — Generic A17.1 mail detail. P21–P23 will
             // extend this with package / coupon / booklet / certified
@@ -929,20 +918,6 @@ public struct HubTabRoot: View {
                     Task { @MainActor in push(.editPost(postId: id)) }
                 }
             )
-        case .mailboxDrawers:
-            MailboxDrawersView(
-                viewModel: MailboxDrawersViewModel(
-                    onOpenDrawer: { drawer in
-                        Task { @MainActor in push(.drawerDetail(drawer: drawer)) }
-                    },
-                    onOpenVault: {
-                        Task { @MainActor in push(.mailboxVault) }
-                    },
-                    onOpenMap: { push(.mailboxMap) }
-                )
-            )
-        case let .drawerDetail(drawer):
-            NotYetAvailableView(tabName: "Drawer · \(drawer)", icon: .mailbox)
         case .mailboxVault:
             // T6.5e (P19.5) — Mailbox Vault list. Personal-pillar
             // surface — both the FAB ("Save mail to vault") and the
@@ -951,12 +926,12 @@ public struct HubTabRoot: View {
             // on the stack so we don't pile mailbox screens on top of
             // each other.
             let goToMailbox: @MainActor () -> Void = {
-                if path.contains(.mailbox) {
-                    while let last = path.last, last != .mailbox {
+                if path.contains(.mailboxRoot) {
+                    while let last = path.last, last != .mailboxRoot {
                         path.removeLast()
                     }
                 } else {
-                    push(.mailbox)
+                    push(.mailboxRoot)
                 }
             }
             VaultListView(
@@ -1405,7 +1380,16 @@ public struct HubTabRoot: View {
                 onBack: { pop() }
             )
         case .mailboxRoot:
-            NotYetAvailableView(tabName: "Mailbox", icon: .mailbox)
+            MailboxRootView(
+                viewModel: MailboxRootViewModel(
+                    onOpenMail: { mailId in
+                        Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
+                    },
+                    onOpenSearch: { push(.mailboxSearch) },
+                    onOpenMap: { push(.mailboxMap) },
+                    onBrowseGigs: { push(.gigsFeed) }
+                )
+            )
         case .mailboxMap:
             MailboxMapView { pop() }
         case .addHome:

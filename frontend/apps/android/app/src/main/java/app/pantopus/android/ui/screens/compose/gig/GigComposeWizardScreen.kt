@@ -58,7 +58,6 @@ import java.time.format.FormatStyle
 /** Test tag applied to the GigCompose screen container. */
 const val GIG_COMPOSE_SCREEN_TAG = "composeGigWizard"
 
-private const val CATEGORY_GRID_COLUMNS = 3
 private const val SECONDS_PER_MINUTE = 60L
 private const val MINUTES_PER_HOUR = 60L
 private const val HOURS_PER_DAY = 24L
@@ -116,7 +115,14 @@ fun GigComposeWizardScreen(
         modifier = Modifier.testTag(GIG_COMPOSE_SCREEN_TAG),
     ) {
         when (state.form.currentStep) {
-            GigComposeStep.Category -> CategoryStep(state, viewModel)
+            GigComposeStep.Category ->
+                // B.3 — Step 1 renders Magic describe (default) or the
+                // manual archetype picker, toggled by `composeMode`.
+                if (state.form.composeMode == ComposeMode.Magic) {
+                    MagicDescribeStep(state, viewModel)
+                } else {
+                    ManualPickerStep(state, viewModel)
+                }
             GigComposeStep.Basics -> BasicsStep(state, viewModel)
             GigComposeStep.Budget -> BudgetStep(state, viewModel)
             GigComposeStep.Schedule -> ScheduleStep(state, viewModel)
@@ -127,88 +133,6 @@ fun GigComposeWizardScreen(
         state.errorMessage?.let { ErrorBanner(it) }
     }
 }
-
-// MARK: - Step 1: Category
-
-@Composable
-private fun CategoryStep(
-    state: GigComposeUiState,
-    vm: GigComposeViewModel,
-) {
-    HeadlineBlock("What kind of help do you need?")
-    SubcopyBlock("Pick the closest match. You can refine it later.")
-    val rows = GigComposeCategory.entries.toList().chunked(CATEGORY_GRID_COLUMNS)
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-        for (row in rows) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                for (category in row) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        CategoryTile(
-                            category = category,
-                            isSelected = state.form.category == category,
-                            onTap = { vm.selectCategory(category) },
-                        )
-                    }
-                }
-                // Pad the last row out to 3 cells so the tiles don't
-                // stretch when the count isn't a multiple of 3.
-                repeat(CATEGORY_GRID_COLUMNS - row.size) {
-                    Box(modifier = Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CategoryTile(
-    category: GigComposeCategory,
-    isSelected: Boolean,
-    onTap: () -> Unit,
-) {
-    val (icon, _) = categoryIconAndLabel(category)
-    val borderColor = if (isSelected) PantopusColors.primary600 else PantopusColors.appBorder
-    val bg = if (isSelected) PantopusColors.primary50 else PantopusColors.appSurface
-    val iconTint = if (isSelected) PantopusColors.primary600 else PantopusColors.appTextSecondary
-
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 88.dp)
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(bg)
-                .border(width = if (isSelected) 2.dp else 1.dp, color = borderColor, shape = RoundedCornerShape(Radii.lg))
-                .clickable(role = Role.Button, onClick = onTap)
-                .padding(Spacing.s3)
-                .testTag("composeGig_category_${category.key}")
-                .semantics {
-                    contentDescription = if (isSelected) "${category.label}, selected" else category.label
-                },
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2, alignment = Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 22.dp, tint = iconTint)
-        Text(
-            text = category.label,
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appText,
-        )
-    }
-}
-
-private fun categoryIconAndLabel(category: GigComposeCategory): Pair<PantopusIcon, String> =
-    when (category) {
-        GigComposeCategory.Handyman -> PantopusIcon.Hammer to "Handyman"
-        GigComposeCategory.Cleaning -> PantopusIcon.Sparkles to "Cleaning"
-        GigComposeCategory.Moving -> PantopusIcon.Package to "Moving"
-        GigComposeCategory.PetCare -> PantopusIcon.PawPrint to "Pet care"
-        GigComposeCategory.ChildCare -> PantopusIcon.Heart to "Child care"
-        GigComposeCategory.Tutoring -> PantopusIcon.Lightbulb to "Tutoring"
-        GigComposeCategory.Delivery -> PantopusIcon.Send to "Delivery"
-        GigComposeCategory.Tech -> PantopusIcon.Zap to "Tech"
-        GigComposeCategory.Other -> PantopusIcon.MoreHorizontal to "Other"
-    }
 
 // MARK: - Step 2: Basics
 

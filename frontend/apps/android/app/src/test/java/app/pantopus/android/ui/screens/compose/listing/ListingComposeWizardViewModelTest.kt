@@ -29,10 +29,10 @@ class ListingComposeWizardViewModelTest : ListingComposeWizardViewModelTestCase(
         val vm = makeVm()
         val chrome = vm.chrome
         assertEquals("List an item", chrome.title)
-        assertEquals("Continue", chrome.primaryCtaLabel)
+        assertEquals("Review suggestions", chrome.primaryCtaLabel)
         assertFalse(chrome.primaryCtaEnabled)
         assertEquals(WizardLeadingControl.Close, chrome.leading)
-        assertEquals(WizardProgressLabel.StepOf(current = 1, total = 6), chrome.progressLabel)
+        assertEquals(WizardProgressLabel.StepOf(current = 1, total = 3), chrome.progressLabel)
     }
 
     // MARK: - Photo step
@@ -95,12 +95,73 @@ class ListingComposeWizardViewModelTest : ListingComposeWizardViewModelTestCase(
         assertEquals("a", vm.state.value.form.photos.first().token)
     }
 
+    @Test
+    fun skip_to_manual_preserves_original_photo_grid_path() {
+        val vm = makeVm()
+        assertTrue(vm.isCameraCaptureStep)
+        vm.skipToManualPhotoEditor()
+        assertEquals(ListingComposeEntryMode.Manual, vm.state.value.form.entryMode)
+        assertFalse(vm.isCameraCaptureStep)
+        assertEquals("Continue", vm.chrome.primaryCtaLabel)
+    }
+
+    @Test
+    fun camera_capture_seeds_snap_suggestions() =
+        runTest {
+            val vm = makeVm()
+            vm.captureSnapPhoto()
+            vm.captureSnapPhoto()
+            vm.captureSnapPhoto()
+            assertEquals(3, vm.state.value.form.photos.size)
+            assertEquals("Sage green velvet sofa, 3-seater", vm.state.value.form.title)
+            assertEquals(ListingComposeCategory.Goods, vm.state.value.form.category)
+            assertEquals(ListingComposeCondition.Good, vm.state.value.form.condition)
+            assertEquals(ListingComposePriceKind.Fixed, vm.state.value.form.priceKind)
+            assertEquals("280", vm.state.value.form.priceAmount)
+            assertEquals(ListingComposeLocationKind.SavedAddress, vm.state.value.form.locationKind)
+            assertTrue(vm.state.value.form.deliveryEnabled)
+
+            vm.onPrimary()
+            advanceTimeBy(10)
+            assertEquals(ListingComposeStep.TitleCategory, vm.state.value.form.currentStep)
+            assertTrue(vm.isSnapReviewStep)
+            assertEquals("Post listing", vm.chrome.primaryCtaLabel)
+            assertEquals("listingComposeSaveDraft", vm.chrome.secondaryCta?.testTag)
+            assertTrue(vm.chrome.primaryCtaEnabled)
+        }
+
+    @Test
+    fun snap_review_primary_submits_listing() =
+        runTest {
+            coEvery { repo.create(any<CreateListingRequest>()) } returns NetworkResult.Success(createResponse)
+            val vm = makeVm()
+            vm.captureSnapPhoto()
+            vm.onPrimary()
+            advanceTimeBy(10)
+            vm.onPrimary()
+            advanceTimeBy(50)
+            assertEquals(ListingComposeStep.Success, vm.state.value.form.currentStep)
+            assertEquals("listing_42", vm.state.value.createdListingId)
+        }
+
+    @Test
+    fun snap_review_save_draft_dismisses() =
+        runTest {
+            val vm = makeVm()
+            vm.captureSnapPhoto()
+            vm.onPrimary()
+            advanceTimeBy(10)
+            vm.onSecondary()
+            assertEquals(ListingComposeOutboundEvent.Dismiss, vm.pendingEvent.value)
+        }
+
     // MARK: - Title + category
 
     @Test
     fun title_category_gate() =
         runTest {
             val vm = makeVm()
+            vm.skipToManualPhotoEditor()
             vm.addPhoto("a")
             vm.onPrimary() // -> TitleCategory
             advanceTimeBy(10)
@@ -118,6 +179,7 @@ class ListingComposeWizardViewModelTest : ListingComposeWizardViewModelTestCase(
     fun title_max_length_enforced() =
         runTest {
             val vm = makeVm()
+            vm.skipToManualPhotoEditor()
             vm.addPhoto("a")
             vm.onPrimary()
             advanceTimeBy(10)
@@ -139,6 +201,7 @@ class ListingComposeWizardViewModelTest : ListingComposeWizardViewModelTestCase(
     fun wanted_category_clears_condition_and_skips_gate() =
         runTest {
             val vm = makeVm()
+            vm.skipToManualPhotoEditor()
             vm.addPhoto("a")
             vm.setTitle("Looking for a sewing machine")
             vm.setCategory(ListingComposeCategory.Wanted)
@@ -158,6 +221,7 @@ class ListingComposeWizardViewModelTest : ListingComposeWizardViewModelTestCase(
     fun description_min_length_enforced() =
         runTest {
             val vm = makeVm()
+            vm.skipToManualPhotoEditor()
             vm.addPhoto("a")
             vm.setTitle("Moving boxes — bundle of 18")
             vm.setCategory(ListingComposeCategory.Goods)
@@ -178,6 +242,7 @@ class ListingComposeWizardViewModelTest : ListingComposeWizardViewModelTestCase(
     fun condition_required_for_goods() =
         runTest {
             val vm = makeVm()
+            vm.skipToManualPhotoEditor()
             vm.addPhoto("a")
             vm.setTitle("Moving boxes — bundle of 18")
             vm.setCategory(ListingComposeCategory.Goods)
@@ -351,6 +416,7 @@ class ListingComposeWizardViewModelTest : ListingComposeWizardViewModelTestCase(
     fun back_on_title_step_returns_to_photos() =
         runTest {
             val vm = makeVm()
+            vm.skipToManualPhotoEditor()
             vm.addPhoto("a")
             vm.onPrimary()
             advanceTimeBy(10)
