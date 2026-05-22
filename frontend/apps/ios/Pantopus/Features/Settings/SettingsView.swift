@@ -82,7 +82,7 @@ public struct SettingsView: View {
                 }
             )
         case .audienceProfile:
-            AudienceProfileView { popLast() }
+            AudienceProfileView(onBack: popLast)
         case .blockedUsers:
             BlockedUsersView { popLast() }
         case .password:

@@ -49,8 +49,36 @@ final class AudienceProfileSnapshotTests: XCTestCase {
         try assertBaselineOrSkip("filter-empty")
     }
 
+    func test_a22_1_audience_populated_ios_baseline_is_present() throws {
+        try assertA221BaselineOrSkip("populated")
+    }
+
+    func test_a22_1_audience_empty_ios_baseline_is_present() throws {
+        try assertA221BaselineOrSkip("empty")
+    }
+
     private func assertBaselineOrSkip(_ slug: String) throws {
         let url = baselineURL.appendingPathComponent("\(slug)-ios.png")
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw XCTSkip("Baseline pending follow-up commit: \(url.path)")
+        }
+        let data = try Data(contentsOf: url)
+        XCTAssertGreaterThan(data.count, 8 * 1024, "Baseline too small (\(data.count) bytes)")
+        XCTAssertTrue(
+            data.count > 4 &&
+                data[0] == 0x89 &&
+                data[1] == 0x50 &&
+                data[2] == 0x4E &&
+                data[3] == 0x47,
+            "Not a PNG: \(url.path)"
+        )
+    }
+
+    private func assertA221BaselineOrSkip(_ slug: String) throws {
+        let url = baselineURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("a22-1-audience")
+            .appendingPathComponent("\(slug)-ios.png")
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw XCTSkip("Baseline pending follow-up commit: \(url.path)")
         }
