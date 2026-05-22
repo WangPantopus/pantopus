@@ -17,6 +17,8 @@ public struct PostCommentRow: Sendable, Identifiable, Hashable {
     public let authorIdentity: IdentityPillar
     public let body: String
     public let timestamp: String
+    public let reactionCount: Int
+    public let userReacted: Bool
     /// 0 for top-level, 1 for nested. We collapse deeper threads to 1.
     public let indentLevel: Int
     public let authorUserId: String?
@@ -28,6 +30,8 @@ public struct PostCommentRow: Sendable, Identifiable, Hashable {
         authorIdentity: IdentityPillar,
         body: String,
         timestamp: String,
+        reactionCount: Int = 0,
+        userReacted: Bool = false,
         indentLevel: Int,
         authorUserId: String?
     ) {
@@ -37,8 +41,23 @@ public struct PostCommentRow: Sendable, Identifiable, Hashable {
         self.authorIdentity = authorIdentity
         self.body = body
         self.timestamp = timestamp
+        self.reactionCount = reactionCount
+        self.userReacted = userReacted
         self.indentLevel = indentLevel
         self.authorUserId = authorUserId
+    }
+}
+
+/// Quick-reply prompt rendered in the empty thread state.
+public struct PostQuickReplyPrompt: Sendable, Identifiable, Hashable {
+    public let id: String
+    public let label: String
+    public let icon: PantopusIcon
+
+    public init(label: String, icon: PantopusIcon) {
+        id = label
+        self.label = label
+        self.icon = icon
     }
 }
 
@@ -64,6 +83,7 @@ public struct PostReactionCounts: Sendable, Hashable {
 public struct BodyReactionsBody: View {
     private let bodyText: String
     private let mediaURLs: [URL]
+    private let intent: PostIntent
     private let reactions: PostReactionCounts
     private let onReactionTap: @MainActor (PostReactionKind) -> Void
     private let composerAvatarURL: URL?
@@ -79,6 +99,7 @@ public struct BodyReactionsBody: View {
     public init(
         body: String,
         mediaURLs: [URL],
+        intent: PostIntent = .share,
         reactions: PostReactionCounts,
         onReactionTap: @escaping @MainActor (PostReactionKind) -> Void,
         composerAvatarURL: URL?,
@@ -93,6 +114,7 @@ public struct BodyReactionsBody: View {
     ) {
         bodyText = body
         self.mediaURLs = mediaURLs
+        self.intent = intent
         self.reactions = reactions
         self.onReactionTap = onReactionTap
         self.composerAvatarURL = composerAvatarURL
@@ -122,13 +144,25 @@ public struct BodyReactionsBody: View {
                     .padding(.horizontal, Spacing.s4)
             }
 
-            ReactionsBar(counts: reactions, onTap: onReactionTap)
+            ReactionsBar(
+                counts: reactions,
+                commentCount: visibleCommentCount,
+                commentsAreFresh: comments.isEmpty,
+                onTap: onReactionTap
+            )
+            .padding(.horizontal, Spacing.s4)
+
+            Rectangle()
+                .fill(Theme.Color.appBorder)
+                .frame(height: 1)
                 .padding(.horizontal, Spacing.s4)
 
             CommentComposer(
                 avatarName: composerAvatarName,
                 avatarURL: composerAvatarURL,
                 text: $composerText,
+                placeholder: comments.isEmpty ? "Be the first to reply..." : "Add a comment",
+                isFocusedPresentation: comments.isEmpty,
                 isSending: isSending,
                 onSend: onSendTap
             )
@@ -156,8 +190,20 @@ public struct BodyReactionsBody: View {
                     }
                 }
                 .padding(.horizontal, Spacing.s4)
+            } else {
+                EmptyThreadState(
+                    intent: intent,
+                    prompts: intent.quickReplyPrompts
+                ) { prompt in
+                    composerText = prompt.label
+                }
+                .padding(.horizontal, Spacing.s4)
             }
         }
+    }
+
+    private var visibleCommentCount: Int {
+        comments.count + hiddenReplyCount
     }
 }
 
@@ -224,43 +270,64 @@ private struct PostMediaGrid: View {
 
 private struct ReactionsBar: View {
     let counts: PostReactionCounts
+    let commentCount: Int
+    let commentsAreFresh: Bool
     let onTap: @MainActor (PostReactionKind) -> Void
 
     var body: some View {
         HStack(spacing: Spacing.s2) {
             ReactionPill(
-                kind: .helpful,
-                icon: .thumbsUp,
-                count: counts.helpful,
-                isSelected: counts.userReaction == .helpful
-            ) { onTap(.helpful) }
-            // Heart and Going are display-only until the backend supports
-            // reactions beyond `like`. They show the count but don't
-            // announce as buttons or accept taps.
-            ReactionPill(
-                kind: .heart,
+                id: "heart",
                 icon: .heart,
+                count: counts.helpful,
+                accessibilityLabel: "Heart reaction, \(counts.helpful)",
+                isSelected: counts.userReaction == .helpful,
+                selectedForeground: Theme.Color.error,
+                selectedBackground: Theme.Color.errorBg
+            ) { onTap(.helpful) }
+            ReactionPill(
+                id: "hand",
+                icon: .hand,
                 count: counts.heart,
+                accessibilityLabel: "Raised hand reaction, \(counts.heart)",
                 isSelected: counts.userReaction == .heart,
                 onTap: nil
             )
             ReactionPill(
-                kind: .going,
-                icon: .check,
+                id: "eye",
+                icon: .eye,
                 count: counts.going,
+                accessibilityLabel: "Watching reaction, \(counts.going)",
                 isSelected: counts.userReaction == .going,
                 onTap: nil
             )
             Spacer()
+            HStack(spacing: Spacing.s1) {
+                Icon(.messageCircle, size: 13, color: commentsAreFresh ? Theme.Color.appTextMuted : Theme.Color.appTextSecondary)
+                Text(commentSummary)
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(commentsAreFresh ? Theme.Color.appTextMuted : Theme.Color.appTextSecondary)
+            }
+            .accessibilityLabel(commentSummary)
         }
+    }
+
+    private var commentSummary: String {
+        if commentsAreFresh {
+            return "0 comments · just posted"
+        }
+        return "\(commentCount) \(commentCount == 1 ? "comment" : "comments")"
     }
 }
 
 private struct ReactionPill: View {
-    let kind: PostReactionKind
+    let id: String
     let icon: PantopusIcon
     let count: Int
+    let accessibilityLabel: String
     let isSelected: Bool
+    var selectedForeground: Color = Theme.Color.primary700
+    var selectedBackground: Color = Theme.Color.primary50
     /// `nil` renders the pill as display-only (no Button wrapper).
     let onTap: (@MainActor () -> Void)?
 
@@ -269,138 +336,44 @@ private struct ReactionPill: View {
             Button(action: { onTap() }) { pillBody }
                 .buttonStyle(.plain)
                 .frame(minHeight: 44, alignment: .center)
-                .accessibilityLabel("\(kind.accessibilityLabel), \(count)")
+                .accessibilityIdentifier("pulsePostDetail-reaction-\(id)")
+                .accessibilityLabel(accessibilityLabel)
                 .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         } else {
             pillBody
                 .accessibilityElement()
-                .accessibilityLabel("\(kind.accessibilityLabel), \(count)")
+                .accessibilityIdentifier("pulsePostDetail-reaction-\(id)")
+                .accessibilityLabel(accessibilityLabel)
         }
     }
 
     private var pillBody: some View {
         HStack(spacing: Spacing.s1) {
             Icon(icon, size: 14, color: foreground)
-            Text(label)
-                .font(.system(size: PantopusTextStyle.caption.size, weight: .semibold))
-                .foregroundStyle(foreground)
             Text("\(count)")
                 .font(.system(size: PantopusTextStyle.caption.size, weight: .regular))
-                .foregroundStyle(foreground.opacity(0.85))
+                .foregroundStyle(foreground)
         }
         .padding(.horizontal, Spacing.s3)
         .frame(height: 32)
         .background(background)
+        .overlay {
+            RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                .stroke(border, lineWidth: 1)
+        }
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
     }
 
-    private var label: String {
-        switch kind {
-        case .helpful: "Helpful"
-        case .heart: "Heart"
-        case .going: "Going"
-        }
-    }
-
     private var foreground: Color {
-        isSelected ? Theme.Color.appTextInverse : Theme.Color.appText
+        isSelected ? selectedForeground : Theme.Color.appTextSecondary
     }
 
     private var background: Color {
-        isSelected ? Theme.Color.primary600 : Theme.Color.appSurfaceSunken
+        isSelected ? selectedBackground : Theme.Color.appSurface
     }
-}
 
-private struct CommentComposer: View {
-    let avatarName: String
-    let avatarURL: URL?
-    @Binding var text: String
-    let isSending: Bool
-    let onSend: @MainActor () -> Void
-
-    var body: some View {
-        HStack(spacing: Spacing.s2) {
-            AvatarWithIdentityRing(
-                name: avatarName,
-                imageURL: avatarURL,
-                identity: .personal,
-                ringProgress: 1,
-                size: 28
-            )
-            TextField("Add a comment", text: $text)
-                .font(.system(size: PantopusTextStyle.small.size))
-                .foregroundStyle(Theme.Color.appText)
-                .submitLabel(.send)
-                .onSubmit { if !text.isEmpty { onSend() } }
-                .padding(.horizontal, Spacing.s3)
-                .frame(height: 40)
-                .background(Theme.Color.appSurfaceSunken)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
-                .accessibilityLabel("Add a comment")
-            Button(action: { onSend() }) {
-                ZStack {
-                    if isSending {
-                        ProgressView().tint(Theme.Color.appTextInverse)
-                    } else {
-                        Icon(
-                            .send,
-                            size: 18,
-                            color: text.trimmingCharacters(in: .whitespaces).isEmpty
-                                ? Theme.Color.appTextMuted
-                                : Theme.Color.primary600
-                        )
-                    }
-                }
-                .frame(width: 40, height: 40)
-            }
-            .buttonStyle(.plain)
-            .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty || isSending)
-            .accessibilityLabel("Send comment")
-        }
-    }
-}
-
-private struct CommentRow: View {
-    let comment: PostCommentRow
-    let onAvatarTap: @MainActor () -> Void
-
-    var body: some View {
-        HStack(alignment: .top, spacing: Spacing.s2) {
-            Spacer().frame(width: CGFloat(comment.indentLevel) * 28)
-            Button(action: { onAvatarTap() }) {
-                AvatarWithIdentityRing(
-                    name: comment.authorName,
-                    imageURL: comment.authorAvatarURL,
-                    identity: comment.authorIdentity,
-                    ringProgress: 1,
-                    size: 28
-                )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open \(comment.authorName)'s profile")
-            .frame(minWidth: 28, minHeight: 28)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: Spacing.s1) {
-                    Text(comment.authorName)
-                        .font(.system(size: PantopusTextStyle.caption.size, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appText)
-                    Text("·")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.Color.appTextMuted)
-                    Text(comment.timestamp)
-                        .font(.system(size: 11, weight: .regular))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-                Text(comment.body)
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(Theme.Color.appTextStrong)
-                    .lineSpacing(3)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 2)
-        .accessibilityElement(children: .combine)
+    private var border: Color {
+        isSelected ? selectedForeground.opacity(0.25) : Theme.Color.appBorder
     }
 }
 

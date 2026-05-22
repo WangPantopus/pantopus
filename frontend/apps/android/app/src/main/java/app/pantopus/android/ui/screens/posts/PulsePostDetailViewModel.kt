@@ -303,6 +303,8 @@ class PulsePostDetailViewModel
                 authorIdentity = mapAccountType(comment.author?.accountType),
                 body = comment.comment,
                 timestamp = relativeTimestamp(comment.createdAt),
+                reactionCount = comment.likeCount ?: 0,
+                userReacted = comment.userHasLiked ?: false,
                 indentLevel = indent,
                 authorUserId = comment.author?.id,
             )

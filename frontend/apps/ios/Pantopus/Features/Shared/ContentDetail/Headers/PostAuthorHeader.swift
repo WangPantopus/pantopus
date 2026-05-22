@@ -9,11 +9,11 @@
 
 import SwiftUI
 
-/// One of the five intent buckets the design draws for a post. Source:
-/// `Pantopus_pages/content-detail-frames.jsx::FramePost`. The backend's
-/// `purpose` enum is wider (13 values); the view-model collapses those
-/// onto these five for display.
+/// One of the six intent buckets the design draws for a post. Source:
+/// A10.4 `post_author`. The backend's `purpose` enum is wider; the
+/// view-model collapses those onto these intents for display.
 public enum PostIntent: String, Sendable, CaseIterable, Identifiable {
+    case lostFound
     case ask
     case offer
     case event
@@ -27,6 +27,7 @@ public enum PostIntent: String, Sendable, CaseIterable, Identifiable {
     /// Display label.
     public var label: String {
         switch self {
+        case .lostFound: "Lost & Found"
         case .ask: "Ask"
         case .offer: "Offer"
         case .event: "Event"
@@ -38,11 +39,24 @@ public enum PostIntent: String, Sendable, CaseIterable, Identifiable {
     /// Maps to a semantic `StatusChip` variant.
     public var chipVariant: StatusChipVariant {
         switch self {
+        case .lostFound: .error
         case .ask: .info
         case .offer: .success
         case .event: .personal
-        case .share: .neutral
+        case .share: .home
         case .alert: .warning
+        }
+    }
+
+    /// Leading chip icon from the A10.4 frame.
+    public var icon: PantopusIcon {
+        switch self {
+        case .lostFound: .search
+        case .ask: .helpCircle
+        case .offer: .hand
+        case .event: .calendar
+        case .share: .messageCircle
+        case .alert: .alertCircle
         }
     }
 
@@ -51,13 +65,13 @@ public enum PostIntent: String, Sendable, CaseIterable, Identifiable {
     public static func from(purpose: String?, postType: String?) -> PostIntent {
         let needle = (purpose ?? postType ?? "").lowercased()
         switch needle {
+        case "lost_found", "lost", "found": return .lostFound
         case "ask": return .ask
         case "offer": return .offer
         case "event": return .event
         case "alert", "safety", "heads_up": return .alert
         case "deal", "recommend", "share", "showcase", "story",
-             "neighborhood_win", "visitor_guide", "local_update", "learn",
-             "lost_found":
+             "neighborhood_win", "visitor_guide", "local_update", "learn":
             return .share
         default: return .share
         }
@@ -106,7 +120,7 @@ public struct PostAuthorHeader: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
             Spacer()
-            StatusChip(intent.label, variant: intent.chipVariant)
+            StatusChip(intent.label.uppercased(), variant: intent.chipVariant, icon: intent.icon)
                 .accessibilityLabel("\(intent.label) post")
         }
         .padding(.horizontal, Spacing.s4)
@@ -120,6 +134,7 @@ public struct PostAuthorHeader: View {
             }
             .buttonStyle(.plain)
             .frame(minWidth: 44, minHeight: 44)
+            .accessibilityIdentifier("pulsePostDetail-authorAvatar")
             .accessibilityLabel("Open \(displayName)'s profile")
         } else {
             avatarStack

@@ -125,6 +125,10 @@ final class PulsePostDetailViewModelTests: XCTestCase {
         XCTAssertTrue(content.timeAndLocality.contains("Cambridge, MA"))
     }
 
+    func testLostFoundPurposeMapsToLostFoundIntent() {
+        XCTAssertEqual(PostIntent.from(purpose: "lost_found", postType: nil), .lostFound)
+    }
+
     // MARK: - Reactions
 
     func testHelpfulOptimisticToggleAndReconcile() async {
