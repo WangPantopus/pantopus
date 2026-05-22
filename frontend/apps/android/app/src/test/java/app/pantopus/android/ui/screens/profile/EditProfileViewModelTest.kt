@@ -126,6 +126,7 @@ class EditProfileViewModelTest {
             assertEquals("alice@example.com", vm.email.value)
             assertTrue(vm.emailVerified.value)
             assertFalse(vm.isDirty)
+            assertEquals(0, vm.dirtyFieldCount)
             assertTrue(vm.isValid)
         }
 
@@ -268,6 +269,7 @@ class EditProfileViewModelTest {
             vm.load()
             vm.update(EditProfileField.FirstName, "Alex")
             vm.update(EditProfileField.Bio, "Hello world!")
+            assertEquals(2, vm.dirtyFieldCount)
             vm.save()
             assertEquals("Alex", captured.captured.firstName)
             assertEquals("Hello world!", captured.captured.bio)
@@ -306,5 +308,31 @@ class EditProfileViewModelTest {
             vm.save()
             assertNull(captured.captured.address)
             assertEquals("still here", captured.captured.bio)
+        }
+
+    @Test fun dirtyFieldCountTracksChangedFields() =
+        runTest {
+            val vm = loaded()
+            assertEquals(0, vm.dirtyFieldCount)
+            vm.update(EditProfileField.FirstName, "Alex")
+            vm.update(EditProfileField.Bio, "Hello world!")
+            vm.update(EditProfileField.Website, "https://alex.example")
+            vm.update(EditProfileField.ProfileVisibility, "registered")
+            assertEquals(4, vm.dirtyFieldCount)
+            vm.update(EditProfileField.FirstName, "Alice")
+            assertEquals(3, vm.dirtyFieldCount)
+        }
+
+    @Test fun discardChangesRestoresOriginalValuesAndClearsDirtyCount() =
+        runTest {
+            val vm = loaded()
+            vm.update(EditProfileField.FirstName, "Alex")
+            vm.update(EditProfileField.Bio, "Hello world!")
+            assertEquals(2, vm.dirtyFieldCount)
+            vm.discardChanges()
+            assertEquals("Alice", vm.fields.value[EditProfileField.FirstName]?.value)
+            assertEquals("Hello world", vm.fields.value[EditProfileField.Bio]?.value)
+            assertEquals(0, vm.dirtyFieldCount)
+            assertFalse(vm.isDirty)
         }
 }

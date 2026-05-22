@@ -7,10 +7,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -69,6 +72,7 @@ fun PantopusTextField(
     placeholder: String = "",
     state: PantopusFieldState = PantopusFieldState.Default,
     isRequired: Boolean = false,
+    isDirty: Boolean = false,
     isSecure: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
     fieldTestTag: String? = null,
@@ -90,7 +94,10 @@ fun PantopusTextField(
             },
         verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 text = label,
                 style = PantopusTextStyle.caption,
@@ -101,6 +108,15 @@ fun PantopusTextField(
                     text = "*",
                     style = PantopusTextStyle.caption,
                     color = PantopusColors.error,
+                )
+            }
+            if (isDirty) {
+                Box(
+                    modifier =
+                        Modifier
+                            .padding(start = 4.dp)
+                            .size(6.dp)
+                            .background(PantopusColors.warning, CircleShape),
                 )
             }
         }

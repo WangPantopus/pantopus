@@ -130,6 +130,23 @@ final class EditProfileViewModel {
         aggregate.isDirty
     }
 
+    /// Number of editable fields whose current value differs from the
+    /// last-saved baseline. Drives the A13.9 sticky "N unsaved" pill.
+    var dirtyFieldCount: Int {
+        fields.values.filter(\.isDirty).count
+    }
+
+    /// Revert all unsaved edits to the last-saved baseline.
+    func discardChanges() {
+        for field in EditProfileField.allCases {
+            guard var snapshot = fields[field] else { continue }
+            snapshot.value = snapshot.originalValue
+            snapshot.touched = false
+            snapshot.error = validator(for: field).validate(snapshot.originalValue)
+            fields[field] = snapshot
+        }
+    }
+
     /// Runs all validators and returns the first failing field id, if any.
     @discardableResult
     func validateAll() -> EditProfileField? {
