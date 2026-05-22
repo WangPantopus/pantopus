@@ -264,7 +264,7 @@ public struct HubTabRoot: View {
     }
 
     public var body: some View {
-        NavigationStack(path: $path.navigationPath) {
+        NavigationStack(path: navigationPathBinding) {
             hub
                 .navigationTitle("Hub")
                 .toolbar(.hidden, for: .navigationBar)
@@ -277,9 +277,6 @@ public struct HubTabRoot: View {
                 }
             #endif
         }
-        .onChange(of: path.navigationPath.count) { _, count in
-            path.syncToNavigationPathCount(count)
-        }
         .onChange(of: router.pending) { _, pending in
             consumeDeepLinkIfNeeded(pending: pending)
         }
@@ -291,6 +288,13 @@ public struct HubTabRoot: View {
         }
         .sheet(item: $systemSheet) { request in request.makeView() }
         .findPeopleSheet(isPresented: $showFindPeople)
+    }
+
+    private var navigationPathBinding: Binding<NavigationPath> {
+        Binding(
+            get: { path.navigationPath },
+            set: { path.replaceNavigationPath($0) }
+        )
     }
 
     /// Consume the subset of deep-link destinations that map onto a

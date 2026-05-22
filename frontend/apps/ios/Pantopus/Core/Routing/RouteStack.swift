@@ -43,9 +43,12 @@ struct RouteStack<Route: Hashable> {
         routes.contains(route)
     }
 
-    mutating func syncToNavigationPathCount(_ count: Int) {
-        guard count < routes.count else { return }
-        routes.removeLast(routes.count - count)
+    mutating func replaceNavigationPath(_ newPath: NavigationPath) {
+        guard newPath.count <= routes.count else { return }
+        if newPath.count < routes.count {
+            routes.removeLast(routes.count - newPath.count)
+        }
+        navigationPath = newPath
     }
 
     private mutating func rebuildNavigationPath() {

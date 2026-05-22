@@ -37,7 +37,7 @@ public struct NearbyTabRoot: View {
     }
 
     public var body: some View {
-        NavigationStack(path: $path.navigationPath) {
+        NavigationStack(path: navigationPathBinding) {
             NearbyMapView(
                 onOpenEntity: { entity in
                     path.append(.entityDetail(kind: entity.kind, id: entity.id))
@@ -50,10 +50,14 @@ public struct NearbyTabRoot: View {
                     .toolbar(.hidden, for: .navigationBar)
             }
         }
-        .onChange(of: path.navigationPath.count) { _, count in
-            path.syncToNavigationPathCount(count)
-        }
         .sheet(item: $systemSheet) { request in request.makeView() }
+    }
+
+    private var navigationPathBinding: Binding<NavigationPath> {
+        Binding(
+            get: { path.navigationPath },
+            set: { path.replaceNavigationPath($0) }
+        )
     }
 
     @ViewBuilder

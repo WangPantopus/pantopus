@@ -69,7 +69,7 @@ public struct InboxTabRoot: View {
     public init() {}
 
     public var body: some View {
-        NavigationStack(path: $path.navigationPath) {
+        NavigationStack(path: navigationPathBinding) {
             ChatListView(
                 onOpenConversation: { row in
                     path.append(.conversation(destination(from: row)))
@@ -83,10 +83,14 @@ public struct InboxTabRoot: View {
                     .toolbar(.hidden, for: .navigationBar)
             }
         }
-        .onChange(of: path.navigationPath.count) { _, count in
-            path.syncToNavigationPathCount(count)
-        }
         .sheet(item: $systemSheet) { request in request.makeView() }
+    }
+
+    private var navigationPathBinding: Binding<NavigationPath> {
+        Binding(
+            get: { path.navigationPath },
+            set: { path.replaceNavigationPath($0) }
+        )
     }
 
     private var currentUserId: String {

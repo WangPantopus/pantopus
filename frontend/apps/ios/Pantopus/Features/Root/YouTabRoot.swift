@@ -280,7 +280,7 @@ public struct YouTabRoot: View {
     public init() {}
 
     public var body: some View {
-        NavigationStack(path: $path.navigationPath) {
+        NavigationStack(path: navigationPathBinding) {
             MeView(
                 onAction: { tile in handleAction(tile) },
                 onSection: { row in handleSection(row) },
@@ -423,9 +423,13 @@ public struct YouTabRoot: View {
                 }
             #endif
         }
-        .onChange(of: path.navigationPath.count) { _, count in
-            path.syncToNavigationPathCount(count)
-        }
+    }
+
+    private var navigationPathBinding: Binding<NavigationPath> {
+        Binding(
+            get: { path.navigationPath },
+            set: { path.replaceNavigationPath($0) }
+        )
     }
 
     /// Dispatch a tap on an action-grid tile to the matching route.
