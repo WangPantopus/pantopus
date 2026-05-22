@@ -1214,6 +1214,8 @@ public struct HubTabRoot: View {
                                 push(.gigDetail(gigId: gigId))
                             case let .listing(listingId):
                                 push(.listingDetail(listingId: listingId))
+                            case let .post(postId):
+                                push(.pulsePost(postId: postId))
                             case .seeAllPeople:
                                 push(.connections)
                             case .seeAllBusinesses:
@@ -1222,6 +1224,8 @@ public struct HubTabRoot: View {
                                 push(.gigsFeed)
                             case .seeAllListings:
                                 push(.marketplace)
+                            case .seeAllPosts:
+                                push(.pulseFeed)
                             }
                         }
                     },

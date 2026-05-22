@@ -2411,6 +2411,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 navController.navigate(ChildRoutes.gigDetail(target.gigId))
                             is DiscoverHubTarget.Listing ->
                                 navController.navigate(ChildRoutes.listingDetail(target.listingId))
+                            is DiscoverHubTarget.Post ->
+                                navController.navigate(ChildRoutes.pulsePost(target.postId))
                             DiscoverHubTarget.SeeAllPeople ->
                                 navController.navigate(ChildRoutes.CONNECTIONS)
                             DiscoverHubTarget.SeeAllBusinesses ->
@@ -2419,6 +2421,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 navController.navigate(ChildRoutes.GIGS_FEED)
                             DiscoverHubTarget.SeeAllListings ->
                                 navController.navigate(ChildRoutes.MARKETPLACE)
+                            DiscoverHubTarget.SeeAllPosts ->
+                                navController.navigate(ChildRoutes.PULSE_FEED)
                         }
                     },
                     onOpenMap = { navController.navigate(ChildRoutes.EXPLORE) },

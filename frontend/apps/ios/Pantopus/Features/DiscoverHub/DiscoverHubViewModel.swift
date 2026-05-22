@@ -67,10 +67,12 @@ public enum DiscoverHubTarget: Sendable, Hashable {
     case business(businessId: String, name: String)
     case gig(gigId: String)
     case listing(listingId: String)
+    case post(postId: String)
     case seeAllPeople
     case seeAllBusinesses
     case seeAllGigs
     case seeAllListings
+    case seeAllPosts
 }
 
 /// Tone palette for category-icon backgrounds + thumbnail gradients.
@@ -138,6 +140,8 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
     }
 
     public private(set) var state: ListOfRowsState = .loading
+    public private(set) var magazineState: DiscoverHubMagazineState = .loading
+    public private(set) var selectedMagazineFilter: DiscoverHubMapKind?
 
     public var chipStrip: ChipStripConfig? {
         ChipStripConfig(
@@ -175,6 +179,8 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
     /// A11.2 — invoked by the "Open map" FAB to push the Explore map.
     private let onOpenMap: @MainActor () -> Void
     private let perTypeLimit: Int
+    private let magazineScenario: DiscoverHubMagazineScenario
+    private let magazineSeed: DiscoverHubMagazineContent
 
     private var people: [HubDiscoveryResponse.Item] = []
     private var businesses: [HubDiscoveryResponse.Item] = []
@@ -185,11 +191,15 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
     init(
         api: APIClient = .shared,
         perTypeLimit: Int = 5,
+        magazineScenario: DiscoverHubMagazineScenario = .populated,
+        magazineSeed: DiscoverHubMagazineContent = DiscoverHubSampleData.populated,
         onSelect: @escaping @MainActor (DiscoverHubTarget) -> Void = { _ in },
         onOpenMap: @escaping @MainActor () -> Void = {}
     ) {
         self.api = api
         self.perTypeLimit = perTypeLimit
+        self.magazineScenario = magazineScenario
+        self.magazineSeed = magazineSeed
         self.onSelect = onSelect
         self.onOpenMap = onOpenMap
     }
@@ -210,6 +220,63 @@ public final class DiscoverHubViewModel: ListOfRowsDataSource {
         // Discover hub caps each section at `perTypeLimit` — see-all
         // pushes the user into the type-specific full list instead of
         // paginating in-place.
+    }
+
+    // MARK: - A11.3 Magazine state
+
+    public func loadMagazine() async {
+        magazineState = .loading
+        switch magazineScenario {
+        case .loading:
+            break
+        case .empty:
+            magazineState = .empty
+        case .populated:
+            magazineState = .populated(magazineSeed)
+        case .error:
+            magazineState = .error(message: "Couldn't load discovery. Try again.")
+        }
+    }
+
+    public func refreshMagazine() async {
+        await loadMagazine()
+    }
+
+    public func selectMagazineFilter(_ filter: DiscoverHubMapKind?) {
+        selectedMagazineFilter = filter
+    }
+
+    public func openMap() {
+        onOpenMap()
+    }
+
+    public func selectTask(_ id: String) {
+        onSelect(.gig(gigId: id))
+    }
+
+    public func selectMarketplaceItem(_ id: String) {
+        onSelect(.listing(listingId: id))
+    }
+
+    public func selectPost(_ id: String) {
+        onSelect(.post(postId: id))
+    }
+
+    public func seeAllTasks() {
+        onSelect(.seeAllGigs)
+    }
+
+    public func seeAllMarketplace() {
+        onSelect(.seeAllListings)
+    }
+
+    public func seeAllPosts() {
+        onSelect(.seeAllPosts)
+    }
+
+    public func notifyWhenActive() {
+        // A11.3 empty-frame escape hatch. Notification persistence lands
+        // with the eventual alerts service; no network call is made here.
     }
 
     // MARK: - Chip selection
