@@ -19,6 +19,7 @@ final class A11yLabelAudit: XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment["UI_TESTS_SIGNED_IN"] = "1"
         app.launchEnvironment["UI_TESTS_STUB_API"] = "1"
+        app.launchEnvironment["UI_TESTS_DISABLE_NOTIFICATIONS"] = "1"
         app.launch()
         guard app.staticTexts["Hub"].waitForExistence(timeout: 5) else {
             app.terminateAfterSkippedLaunch()

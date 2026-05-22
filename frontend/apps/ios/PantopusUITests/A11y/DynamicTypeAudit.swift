@@ -19,6 +19,7 @@ final class DynamicTypeAudit: XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment["UI_TESTS_SIGNED_IN"] = "1"
         app.launchEnvironment["UI_TESTS_STUB_API"] = "1"
+        app.launchEnvironment["UI_TESTS_DISABLE_NOTIFICATIONS"] = "1"
         // Forces the simulator's preferred content size category.
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXXL"]
         app.launch()
