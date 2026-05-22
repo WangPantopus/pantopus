@@ -667,12 +667,14 @@ open class ListingComposeWizardViewModel
             }
         }
 
-        private fun progressLabel(step: ListingComposeStep): WizardProgressLabel {
-            if (!isEditMode &&
+        private fun isSnapProgressStep(step: ListingComposeStep): Boolean =
+            !isEditMode &&
                 _state.value.form.entryMode == ListingComposeEntryMode.Snap &&
                 (step == ListingComposeStep.Photos || step == ListingComposeStep.TitleCategory)
-            ) {
-                return WizardProgressLabel.StepOf(current = 1, total = 3)
+
+        private fun progressLabel(step: ListingComposeStep): WizardProgressLabel {
+            if (isSnapProgressStep(step)) {
+                return WizardProgressLabel.StepOf(current = 1, total = SNAP_PROGRESS_TOTAL)
             }
             val number = step.stepNumber ?: return WizardProgressLabel.Hidden
             return WizardProgressLabel.StepOf(
@@ -682,11 +684,8 @@ open class ListingComposeWizardViewModel
         }
 
         private fun progressFraction(step: ListingComposeStep): Float? {
-            if (!isEditMode &&
-                _state.value.form.entryMode == ListingComposeEntryMode.Snap &&
-                (step == ListingComposeStep.Photos || step == ListingComposeStep.TitleCategory)
-            ) {
-                return 1f / 3f
+            if (isSnapProgressStep(step)) {
+                return 1f / SNAP_PROGRESS_TOTAL.toFloat()
             }
             val number = step.stepNumber ?: return null
             return number.toFloat() / ListingComposeStep.PROGRESS_TOTAL
@@ -740,6 +739,7 @@ open class ListingComposeWizardViewModel
             private const val KEY_DELIVERY_ENABLED = "listingCompose.deliveryEnabled"
             private const val KEY_LOCATION_KIND = "listingCompose.locationKind"
             private const val KEY_LOCATION_LABEL = "listingCompose.locationLabel"
+            private const val SNAP_PROGRESS_TOTAL = 3
 
             /** Nav-arg key for the listing being edited. Present when the
              *  wizard is reached via the EDIT_LISTING route. */

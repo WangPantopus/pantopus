@@ -156,7 +156,7 @@ extension ListingComposeWizardViewModel {
     }
 
     private func primaryEnabled(for step: ListingComposeStep) -> Bool {
-        return switch step {
+        switch step {
         case .photos:
             !form.photos.isEmpty
         case .titleCategory:

@@ -26,7 +26,9 @@ public enum MailboxDrawer: String, CaseIterable, Hashable, Sendable, Identifiabl
     case business
     case earn
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -68,7 +70,9 @@ public enum MailboxTab: String, CaseIterable, Hashable, Sendable, Identifiable {
     case counter
     case vault
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -102,7 +106,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     /// the shell's custom-header slot, not by the shell's tab strip.
     public let tabs: [ListOfRowsTab] = []
 
-    private(set) public var state: ListOfRowsState = .loading
+    public private(set) var state: ListOfRowsState = .loading
 
     public var topBarAction: TopBarAction? {
         TopBarAction(icon: .search, accessibilityLabel: "Search mail") { [weak self] in
@@ -127,9 +131,17 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
 
     // MARK: - Header inputs
 
-    public var drawers: [MailboxDrawer] { MailboxDrawer.allCases }
-    public var mailTabs: [MailboxTab] { MailboxTab.allCases }
-    public var currentTab: MailboxTab { MailboxTab(rawValue: selectedTab) ?? .incoming }
+    public var drawers: [MailboxDrawer] {
+        MailboxDrawer.allCases
+    }
+
+    public var mailTabs: [MailboxTab] {
+        MailboxTab.allCases
+    }
+
+    public var currentTab: MailboxTab {
+        MailboxTab(rawValue: selectedTab) ?? .incoming
+    }
 
     /// Unread badge for a drawer chip — total unread across its three tabs.
     public func drawerBadge(_ drawer: MailboxDrawer) -> Int {
@@ -245,27 +257,26 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     ) -> ListOfRowsState.EmptyContent {
         switch (drawer, tab) {
         case (.earn, .incoming):
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .wallet,
                 headline: "No earn items yet",
                 subcopy: "Complete gigs to see payouts, 1099s, and tax docs land here automatically.",
-                ctaTitle: "Browse gigs",
-                onCTA: { [weak self] in Task { @MainActor in self?.onBrowseGigs() } }
-            )
+                ctaTitle: "Browse gigs"
+            ) { [weak self] in Task { @MainActor in self?.onBrowseGigs() } }
         case (.earn, .counter):
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .wallet,
                 headline: "Nothing to action",
                 subcopy: "Payout approvals and tax to-dos for your gigs show up here."
             )
         case (.earn, .vault):
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: .archive,
                 headline: "No saved earn mail",
                 subcopy: "Save payout statements and 1099s to find them fast."
             )
         default:
-            return ListOfRowsState.EmptyContent(
+            ListOfRowsState.EmptyContent(
                 icon: tab == .vault ? .archive : .mailbox,
                 headline: "No mail in \(drawer.label) → \(tab.label) yet",
                 subcopy: "When something lands here, it shows up in this view."

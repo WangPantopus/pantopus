@@ -142,7 +142,7 @@ open class GigComposeViewModel
             detectionJob?.cancel()
             detectionJob =
                 viewModelScope.launch {
-                    delay(350)
+                    delay(DETECTION_DEBOUNCE_MS)
                     applyDetection(clamped)
                 }
         }
@@ -643,6 +643,7 @@ open class GigComposeViewModel
             savedStateHandle[KEY_PLACE_ZIP] = form.placeAddress.zip
         }
 
+        @Suppress("CyclomaticComplexMethod")
         private fun restoreFormState(): GigComposeFormState {
             val step: Int = savedStateHandle[KEY_STEP] ?: GigComposeStep.Category.ordinal0
             val composeModeName: String? = savedStateHandle[KEY_COMPOSE_MODE]
@@ -696,11 +697,13 @@ open class GigComposeViewModel
             private const val KEY_PLACE_CITY = "composeGig.placeCity"
             private const val KEY_PLACE_STATE = "composeGig.placeState"
             private const val KEY_PLACE_ZIP = "composeGig.placeZip"
+            private const val DETECTION_DEBOUNCE_MS = 350L
+            private const val MIN_DETECT_TEXT_LENGTH = 3
 
             /** B.3 — deterministic keyword → archetype map (stand-in for backend NLP). */
             fun detectArchetype(text: String): GigComposeCategory? {
                 val lower = text.lowercase()
-                if (lower.length < 3) return null
+                if (lower.length < MIN_DETECT_TEXT_LENGTH) return null
 
                 fun has(words: List<String>) = words.any { lower.contains(it) }
 

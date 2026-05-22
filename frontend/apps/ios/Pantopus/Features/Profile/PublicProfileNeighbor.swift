@@ -19,6 +19,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 // MARK: - Models
 
 /// Identity pillar treatment for the hero chip. `fresh` is the
@@ -140,7 +142,9 @@ public struct NeighborWelcome: Sendable, Hashable {
 public enum NeighborProfileTab: String, Sendable, CaseIterable, Identifiable {
     case about, reviews, verifications, posts
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -177,10 +181,12 @@ public struct NeighborHero: Sendable, Hashable {
         self.kicker = kicker
     }
 
-    var initials: String { Self.initials(from: name) }
+    var initials: String {
+        Self.initials(from: name)
+    }
 
     static func initials(from name: String) -> String {
-        let parts = name.split(separator: " ").prefix(2).compactMap { $0.first }
+        let parts = name.split(separator: " ").prefix(2).compactMap(\.first)
         return parts.map(String.init).joined().uppercased()
     }
 }
@@ -656,7 +662,9 @@ struct NeighborVerificationLedger: View {
                 .padding(.horizontal, Spacing.s3)
                 .padding(.vertical, 10)
                 if index < items.count - 1 {
-                    Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+                    Rectangle()
+                        .fill(Theme.Color.appBorderSubtle)
+                        .frame(height: 1)
                         .padding(.leading, 50)
                 }
             }

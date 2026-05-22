@@ -14,6 +14,8 @@
 
 import Foundation
 
+// swiftlint:disable multiline_arguments function_parameter_count
+
 /// One sample row: a `MailItem` plus the sender-trust the V1 list DTO
 /// can't carry on the wire (so the trust chip can vary per the design).
 public struct MailboxSampleItem: Sendable, Hashable {

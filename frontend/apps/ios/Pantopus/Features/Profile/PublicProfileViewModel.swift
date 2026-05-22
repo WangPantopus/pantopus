@@ -16,6 +16,8 @@ import Foundation
 import Logging
 import Observation
 
+// swiftlint:disable file_length multiline_arguments type_body_length
+
 /// Render state for the public profile screen.
 public enum PublicProfileState: Sendable, Equatable {
     case loading

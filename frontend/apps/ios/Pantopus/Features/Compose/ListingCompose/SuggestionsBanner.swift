@@ -9,6 +9,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 struct ListingComposeSnapReviewStep: View {
     @Bindable var viewModel: ListingComposeWizardViewModel
 

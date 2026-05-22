@@ -10,6 +10,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 // MARK: - Module prompt model + fixture
 
 /// One JSONB module prompt row in the Magic Task "Task details" card.
@@ -27,16 +29,41 @@ struct GigModulePrompt: Identifiable, Hashable {
 func gigMagicModulePrompts(for archetype: GigComposeCategory?) -> [GigModulePrompt] {
     guard archetype != nil else { return [] }
     return [
-        GigModulePrompt(id: "when", icon: .calendar, label: "When",
-                        value: "Sat Oct 18 · Morning (8a–12p)", isFilled: true),
-        GigModulePrompt(id: "where", icon: .mapPin, label: "Where",
-                        value: "412 Elm St · Inside, upstairs", isFilled: true),
-        GigModulePrompt(id: "effort", icon: .timer, label: "Effort",
-                        value: "~2 hours · 1 tasker", isFilled: true),
-        GigModulePrompt(id: "photos", icon: .camera, label: "Photos",
-                        value: "Recommended for better bids", isFilled: false),
-        GigModulePrompt(id: "budget", icon: .wallet, label: "Budget",
-                        value: "$80–120 (suggested)", isFilled: true)
+        GigModulePrompt(
+            id: "when",
+            icon: .calendar,
+            label: "When",
+            value: "Sat Oct 18 · Morning (8a–12p)",
+            isFilled: true
+        ),
+        GigModulePrompt(
+            id: "where",
+            icon: .mapPin,
+            label: "Where",
+            value: "412 Elm St · Inside, upstairs",
+            isFilled: true
+        ),
+        GigModulePrompt(
+            id: "effort",
+            icon: .timer,
+            label: "Effort",
+            value: "~2 hours · 1 tasker",
+            isFilled: true
+        ),
+        GigModulePrompt(
+            id: "photos",
+            icon: .camera,
+            label: "Photos",
+            value: "Recommended for better bids",
+            isFilled: false
+        ),
+        GigModulePrompt(
+            id: "budget",
+            icon: .wallet,
+            label: "Budget",
+            value: "$80–120 (suggested)",
+            isFilled: true
+        )
     ]
 }
 
@@ -297,7 +324,9 @@ private struct DetectedArchetypePill: View {
 private struct ModulePromptsCard: View {
     let prompts: [GigModulePrompt]
 
-    private var filledCount: Int { prompts.filter(\.isFilled).count }
+    private var filledCount: Int {
+        prompts.filter(\.isFilled).count
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -384,8 +413,12 @@ private struct EngagementModeControl: View {
                     let active = option == selected
                     Button { onSelect(option) } label: {
                         VStack(spacing: 4) {
-                            Icon(option.icon, size: 16, strokeWidth: 2.2,
-                                 color: active ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
+                            Icon(
+                                option.icon,
+                                size: 16,
+                                strokeWidth: 2.2,
+                                color: active ? Theme.Color.primary600 : Theme.Color.appTextSecondary
+                            )
                             Text(option.label)
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(active ? Theme.Color.primary700 : Theme.Color.appText)

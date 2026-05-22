@@ -8,6 +8,8 @@
 import AVFoundation
 import SwiftUI
 
+// swiftlint:disable file_length
+
 struct ListingComposePhotosStep: View {
     @Bindable var viewModel: ListingComposeWizardViewModel
     let onRequestRemove: (ListingComposePhoto) -> Void
@@ -191,11 +193,11 @@ private struct ListingCameraPreview: View {
 
 #if !targetEnvironment(simulator)
 private struct ListingCameraPreviewRepresentable: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> ListingCameraPreviewController {
+    func makeUIViewController(context _: Context) -> ListingCameraPreviewController {
         ListingCameraPreviewController()
     }
 
-    func updateUIViewController(_ uiViewController: ListingCameraPreviewController, context: Context) {}
+    func updateUIViewController(_: ListingCameraPreviewController, context _: Context) {}
 }
 
 private final class ListingCameraPreviewController: UIViewController {

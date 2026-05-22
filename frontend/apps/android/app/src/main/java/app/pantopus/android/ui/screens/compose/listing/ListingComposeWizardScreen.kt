@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "TooManyFunctions")
+@file:Suppress("PackageNaming", "LongMethod", "TooManyFunctions", "MagicNumber")
 
 package app.pantopus.android.ui.screens.compose.listing
 

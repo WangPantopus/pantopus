@@ -10,6 +10,8 @@
 import Foundation
 import Observation
 
+// swiftlint:disable file_length
+
 /// One-shot navigation events the host view consumes.
 public enum GigComposeOutboundEvent: Sendable, Equatable {
     /// Pop the wizard with no further navigation.
@@ -145,7 +147,7 @@ extension GigComposeViewModel {
         detectionTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 350_000_000)
             guard let self, !Task.isCancelled else { return }
-            self.applyDetection(for: snapshot)
+            applyDetection(for: snapshot)
         }
     }
 
@@ -163,11 +165,26 @@ extension GigComposeViewModel {
     static func detectArchetype(from text: String) -> GigComposeCategory? {
         let lower = text.lowercased()
         guard lower.count >= 3 else { return nil }
-        func has(_ words: [String]) -> Bool { words.contains { lower.contains($0) } }
+        func has(_ words: [String]) -> Bool {
+            words.contains { lower.contains($0) }
+        }
         if has(["move", "moving", "haul", "u-haul", "load boxes"]) { return .moving }
         if has(["clean", "tidy", "scrub", "vacuum", "mop"]) { return .cleaning }
-        if has(["assemble", "ikea", "furniture", "shelf", "shelves", "mount", "drill",
-                "fix", "repair", "install", "handy", "patch", "drywall"]) { return .handyman }
+        if has([
+            "assemble",
+            "ikea",
+            "furniture",
+            "shelf",
+            "shelves",
+            "mount",
+            "drill",
+            "fix",
+            "repair",
+            "install",
+            "handy",
+            "patch",
+            "drywall"
+        ]) { return .handyman }
         if has(["dog", "cat", " pet", "puppy", "litter", "groom", "walk"]) { return .petcare }
         if has(["babysit", "nanny", "kids", "child", "daycare"]) { return .childcare }
         if has(["tutor", "lesson", "math", "homework", "test prep", "teach"]) { return .tutoring }
@@ -452,12 +469,12 @@ extension GigComposeViewModel {
     private func secondaryCTA(for step: GigComposeStep) -> WizardSecondaryCTA? {
         switch step {
         case .success:
-            return WizardSecondaryCTA(label: "Done", identifier: "composeGigDone")
+            WizardSecondaryCTA(label: "Done", identifier: "composeGigDone")
         case .category where form.composeMode == .magic:
             // Ghost link beside the primary CTA → manual picker.
-            return WizardSecondaryCTA(label: "Pick category", identifier: "composeGigPickCategory")
+            WizardSecondaryCTA(label: "Pick category", identifier: "composeGigPickCategory")
         default:
-            return nil
+            nil
         }
     }
 

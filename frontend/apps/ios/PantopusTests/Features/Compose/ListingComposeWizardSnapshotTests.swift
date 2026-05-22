@@ -72,7 +72,7 @@ final class ListingComposeWizardSnapshotTests: XCTestCase {
 
     @MainActor
     func test_listing_compose_snap_capture_frame_renders() {
-        let view = ListingComposeWizardView(onOpenListingDetail: { _ in })
+        let view = ListingComposeWizardView { _ in }
             .frame(width: 390, height: 820)
         assertRenders(view)
     }
@@ -120,7 +120,7 @@ final class ListingComposeWizardSnapshotTests: XCTestCase {
     }
 
     @MainActor
-    private func assertRenders<V: View>(_ view: V) {
+    private func assertRenders(_ view: some View) {
         let host = UIHostingController(rootView: view)
         host.view.frame = CGRect(x: 0, y: 0, width: 390, height: 820)
         host.view.setNeedsLayout()
