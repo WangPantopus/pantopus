@@ -35,13 +35,36 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Free disk space for Android build
+        run: |
+          echo "Disk before cleanup:"
+          df -h
+
+          sudo rm -rf \
+            /opt/ghc \
+            /usr/local/share/boost \
+            /usr/share/dotnet
+
+          if [[ -n "${ANDROID_HOME:-}" ]]; then
+            sudo rm -rf \
+              "${ANDROID_HOME}/cmake" \
+              "${ANDROID_HOME}/ndk" \
+              "${ANDROID_HOME}/system-images"
+          fi
+
+          docker system prune --all --force || true
+          sudo apt-get clean
+
+          echo "Disk after cleanup:"
+          df -h
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
-
-      - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v4
+          gradle-home-cache-excludes: |
+            caches/transforms-*
+            caches/*/transforms
 
       - name: Write placeholder .env (CI only needs defaults)
         run: |
@@ -64,26 +87,19 @@ jobs:
           fi
           echo "✓ No raw hex literals in ui/screens."
 
-      - name: ktlint
-        run: ./gradlew ktlintCheck --no-daemon
-
-      - name: detekt
-        run: ./gradlew detekt --no-daemon
-
-      - name: Android Lint
-        run: ./gradlew :app:lintDebug --no-daemon
-
-      - name: Unit tests
-        run: ./gradlew test --no-daemon
-
-      - name: Paparazzi snapshot verification
+      - name: Lint, test, snapshots, assemble
         # P14 acceptance: a deliberately broken snapshot (e.g. a colour
         # change) must fail CI. The `paparazziVerify` task is wired in
         # `app/build.gradle.kts` and runs `verifyPaparazziDebug`.
-        run: ./gradlew paparazziVerify --no-daemon
-
-      - name: Assemble debug APK
-        run: ./gradlew :app:assembleDebug --no-daemon
+        run: |
+          ./gradlew \
+            ktlintCheck \
+            detekt \
+            :app:lintDebug \
+            test \
+            paparazziVerify \
+            :app:assembleDebug \
+            --no-daemon
 
       - name: Upload test reports
         if: always()

@@ -20,6 +20,7 @@ final class EditProfileUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment["UI_TESTS_SIGNED_IN"] = "1"
         app.launchEnvironment["UI_TESTS_STUB_API"] = "1"
+        app.launchEnvironment["UI_TESTS_DISABLE_NOTIFICATIONS"] = "1"
         app.launch()
         // Skip rather than fail when the build wasn't compiled with the
         // hooks (older artifacts). Mirrors the pattern in RootTabUITests.

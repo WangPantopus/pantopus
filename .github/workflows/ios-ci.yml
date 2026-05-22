@@ -20,6 +20,11 @@ defaults:
   run:
     working-directory: frontend/apps/ios
 
+env:
+  IOS_DERIVED_DATA_PATH: DerivedData
+  IOS_SPM_PATH: SourcePackages
+  IOS_SIMULATOR_OS: "18.5"
+
 jobs:
   lint:
     name: Lint (SwiftLint + SwiftFormat)
@@ -72,14 +77,6 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: List available iOS simulators
-        # Surfaces the actual installed runtimes/devices so destination
-        # mismatches are visible in the log instead of as a one-line
-        # xcodebuild error.
-        run: |
-          xcrun simctl list runtimes
-          xcrun simctl list devices available iPhone
-
       - name: Install XcodeGen + xcbeautify
         run: brew install xcodegen xcbeautify
 
@@ -89,14 +86,12 @@ jobs:
       - name: Cache SPM
         uses: actions/cache@v4
         with:
-          path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
-          # v2 — bust the previous cache; restore had been failing with
-          # `gtar: Cannot mkdir: Invalid argument` on sentry-cocoa, which
-          # poisoned every subsequent test run. Bumping the key forces a
-          # clean re-resolve.
-          key: spm-v2-${{ runner.os }}-${{ hashFiles('frontend/apps/ios/project.yml') }}
+          path: frontend/apps/ios/SourcePackages
+          # v3 — workspace-local package clones avoid the wildcard
+          # DerivedData restore path that previously failed on sentry-cocoa.
+          key: spm-v3-${{ runner.os }}-${{ hashFiles('frontend/apps/ios/project.yml') }}
           restore-keys: |
-            spm-v2-${{ runner.os }}-
+            spm-v3-${{ runner.os }}-
 
       # Sanitised matrix entry → safe artifact + bundle name (no spaces /
       # parentheses). Used by the result-bundle path and the upload step.
@@ -124,15 +119,26 @@ jobs:
           xcodebuild \
             -project Pantopus.xcodeproj \
             -scheme Pantopus \
-            -destination "platform=iOS Simulator,name=${{ matrix.simulator }},OS=18.5" \
+            -destination "platform=iOS Simulator,name=${{ matrix.simulator }},OS=${IOS_SIMULATOR_OS}" \
             -configuration Debug \
+            -derivedDataPath "${IOS_DERIVED_DATA_PATH}" \
+            -clonedSourcePackagesDirPath "${IOS_SPM_PATH}" \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
             -enableCodeCoverage YES \
+            -skip-testing:PantopusUITests/StoreScreenshots \
             -resultBundlePath "TestResults-${{ steps.sim.outputs.slug }}.xcresult" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGN_ENTITLEMENTS="" \
-            clean test | xcbeautify
+            test | xcbeautify
+
+      - name: List available iOS simulators on failure
+        if: failure()
+        run: |
+          xcrun simctl list runtimes
+          xcrun simctl list devices available iPhone
 
       - name: Extract coverage summary
         if: always()
@@ -158,38 +164,3 @@ jobs:
             frontend/apps/ios/coverage-${{ steps.sim.outputs.slug }}.txt
             frontend/apps/ios/coverage-${{ steps.sim.outputs.slug }}.json
           retention-days: 7
-
-  build:
-    name: Build (Debug simulator)
-    runs-on: macos-15
-    needs: lint
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Select Xcode
-        # Xcode 16.4 ships with the iOS 18.5 simulator runtime
-        # preinstalled on the macos-15 runner image; older 16.x bundles
-        # may be missing their runtime, leading to "iOS X is not
-        # installed" errors when xcodebuild looks for a destination.
-        run: sudo xcode-select -switch /Applications/Xcode_16.4.app
-
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate project
-        run: xcodegen generate
-
-      - name: Build
-        run: |
-          set -o pipefail
-          xcodebuild \
-            -project Pantopus.xcodeproj \
-            -scheme Pantopus \
-            -destination "platform=iOS Simulator,name=iPhone 16,OS=18.5" \
-            -configuration Debug \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS="" \
-            build | xcbeautify

@@ -98,7 +98,8 @@ class HomeDashboardViewModelTest {
             val loaded = vm.state.value as HomeDashboardUiState.Loaded
             assertEquals("1 Main", loaded.content.address)
             assertTrue(loaded.content.verified)
-            assertEquals(4, loaded.content.tabs.size)
+            assertEquals(6, loaded.content.tabs.size)
+            assertEquals(listOf("Packages", "Access codes", "Tasks"), loaded.content.stats.map { it.label })
         }
 
     @Test
@@ -111,6 +112,8 @@ class HomeDashboardViewModelTest {
             val loaded = vm.state.value as HomeDashboardUiState.Loaded
             assertEquals("200 Public St", loaded.content.address)
             assertTrue(loaded.content.verified)
+            assertEquals("Packages", loaded.content.stats.first().label)
+            assertEquals("0", loaded.content.stats.first().value)
         }
 
     @Test
@@ -130,5 +133,48 @@ class HomeDashboardViewModelTest {
             vm.load()
             vm.selectTab("members")
             assertEquals("members", vm.selectedTab.value)
+        }
+
+    @Test
+    fun brand_new_sample_renders_empty_state() =
+        runTest {
+            val vm =
+                HomeDashboardViewModel(
+                    repo = repo,
+                    savedStateHandle =
+                        SavedStateHandle(
+                            mapOf(HOME_DASHBOARD_HOME_ID_KEY to HomeDashboardSampleData.EMPTY_HOME_ID),
+                        ),
+                )
+            vm.load()
+            val empty = vm.state.value as HomeDashboardUiState.Empty
+            assertEquals(
+                listOf("Add members", "Set access codes", "Log emergency info"),
+                empty.brandNew.onboardingSteps.map { it.title },
+            )
+            assertEquals(listOf("0", "0", "0"), empty.brandNew.content.stats.map { it.value })
+        }
+
+    @Test
+    fun needs_attention_sample_renders_attention_state() =
+        runTest {
+            val vm =
+                HomeDashboardViewModel(
+                    repo = repo,
+                    savedStateHandle =
+                        SavedStateHandle(
+                            mapOf(HOME_DASHBOARD_HOME_ID_KEY to HomeDashboardSampleData.NEEDS_ATTENTION_HOME_ID),
+                        ),
+                )
+            vm.load()
+            val needsAttention = vm.state.value as HomeDashboardUiState.NeedsAttention
+            assertEquals(
+                "3 items need attention: 1 overdue bill, 2 maintenance items past due, 1 pending claim",
+                needsAttention.content.attentionSummary?.message,
+            )
+            assertEquals(
+                listOf("view_bills", "view_maintenance", "view_claims"),
+                needsAttention.content.attentionSummary?.chips?.map { it.actionId },
+            )
         }
 }

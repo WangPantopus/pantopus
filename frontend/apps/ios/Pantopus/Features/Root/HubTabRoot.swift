@@ -497,6 +497,9 @@ public struct HubTabRoot: View {
                 onOpenPackages: { id in
                     Task { @MainActor in push(.homePackages(homeId: id)) }
                 },
+                onOpenAccessCodes: { _, _ in
+                    Task { @MainActor in push(.placeholder(label: "Access codes")) }
+                },
                 onOpenTasks: { id in
                     Task { @MainActor in push(.homeTasks(homeId: id)) }
                 },

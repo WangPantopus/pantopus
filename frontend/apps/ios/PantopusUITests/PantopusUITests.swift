@@ -18,6 +18,7 @@ final class PantopusUITests: XCTestCase {
     private func launchSignedOut() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["UI_TESTS_SIGNED_OUT"] = "1"
+        app.launchEnvironment["UI_TESTS_DISABLE_NOTIFICATIONS"] = "1"
         app.launch()
         return app
     }

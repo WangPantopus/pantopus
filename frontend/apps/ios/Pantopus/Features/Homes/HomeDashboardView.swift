@@ -27,7 +27,9 @@ struct HomeDashboardView: View {
         "calendar": "Calendar",
         "view_docs": "Documents",
         "view_emergency": "Emergency info",
-        "view_tasks": "Tasks"
+        "view_tasks": "Tasks",
+        "access_codes": "Access codes",
+        "view_claims": "Claims"
     ]
     private let homeId: String
     private let onBack: (() -> Void)?
@@ -56,18 +58,21 @@ struct HomeDashboardView: View {
     /// Push onto the host stack when the user taps the Packages
     /// quick-action tile. Receives this home's id (T6.3d / P14).
     private let onOpenPackages: ((String) -> Void)?
+    /// Push onto the host stack when the user taps the Access codes
+    /// onboarding step. Receives this home's id and optional display name.
+    private let onOpenAccessCodes: ((String, String?) -> Void)?
     /// Push onto the host stack when the user taps the Tasks (T6.3c)
     /// quick-action tile. Receives this home's id so the destination
     /// can pre-fetch.
     private let onOpenTasks: ((String) -> Void)?
-    /// T6.3b / P10 — Push onto the host stack when the user taps the
+    /// T6.3b / P10 - Push onto the host stack when the user taps the
     /// Maintenance quick-action tile. Receives this home's id.
     private let onOpenMaintenance: ((String) -> Void)?
     /// Push onto the host stack when the user taps the Members
     /// quick-action tile or "Add member" CTA (T6.3a / P9). Receives
     /// this home's id so the destination can pre-fetch the roster.
     private let onOpenMembers: ((String) -> Void)?
-    /// A.4 / A13.5 — Push onto the host stack when the user taps the
+    /// A.4 / A13.5 - Push onto the host stack when the user taps the
     /// "Property details" affordance in the Overview section. Receives
     /// this home's id so the destination can resolve the property.
     private let onOpenPropertyDetails: ((String) -> Void)?
@@ -85,6 +90,7 @@ struct HomeDashboardView: View {
         onOpenDocs: ((String) -> Void)? = nil,
         onOpenEmergency: ((String) -> Void)? = nil,
         onOpenPackages: ((String) -> Void)? = nil,
+        onOpenAccessCodes: ((String, String?) -> Void)? = nil,
         onOpenTasks: ((String) -> Void)? = nil,
         onOpenMaintenance: ((String) -> Void)? = nil,
         onOpenMembers: ((String) -> Void)? = nil,
@@ -103,13 +109,14 @@ struct HomeDashboardView: View {
         self.onOpenDocs = onOpenDocs
         self.onOpenEmergency = onOpenEmergency
         self.onOpenPackages = onOpenPackages
+        self.onOpenAccessCodes = onOpenAccessCodes
         self.onOpenTasks = onOpenTasks
         self.onOpenMaintenance = onOpenMaintenance
         self.onOpenMembers = onOpenMembers
         self.onOpenPropertyDetails = onOpenPropertyDetails
     }
 
-    /// Current signed-in user's email — used by the Invite Owner form
+    /// Current signed-in user's email; used by the Invite Owner form
     /// to reject self-invites. Returns empty when in preview mode.
     private var currentUserEmail: String {
         if case let .signedIn(user) = auth.state { return user.email }
@@ -120,11 +127,15 @@ struct HomeDashboardView: View {
         Group {
             switch viewModel.state {
             case .loading:
-                LoadingView(onBack: onBack)
+                HomeDashboardLoadingView(onBack: onBack)
             case let .loaded(content):
-                loadedBody(for: content)
+                dashboardBody(for: content, brandNew: nil)
+            case let .empty(brandNew):
+                dashboardBody(for: brandNew.content, brandNew: brandNew)
+            case let .needsAttention(content):
+                dashboardBody(for: content, brandNew: nil)
             case let .error(message):
-                ErrorView(message: message, onBack: onBack) { Task { await viewModel.refresh() } }
+                HomeDashboardErrorView(message: message, onBack: onBack) { Task { await viewModel.refresh() } }
             }
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
@@ -133,7 +144,10 @@ struct HomeDashboardView: View {
         .task { await viewModel.load() }
     }
 
-    private func loadedBody(for content: HomeDashboardContent) -> some View {
+    private func dashboardBody(
+        for content: HomeDashboardContent,
+        brandNew: HomeDashboardBrandNewContent?
+    ) -> some View {
         ContentDetailShell(
             title: "Home",
             onBack: onBack,
@@ -146,6 +160,10 @@ struct HomeDashboardView: View {
             },
             body: {
                 VStack(spacing: Spacing.s4) {
+                    if let attention = content.attentionSummary {
+                        NeedsAttentionBanner(summary: attention) { handleQuickAction($0) }
+                            .padding(.horizontal, Spacing.s4)
+                    }
                     if !content.isVerifiedOwner {
                         ClaimOwnershipBanner(
                             onClaim: { onClaimOwnership?() },
@@ -162,8 +180,14 @@ struct HomeDashboardView: View {
                         ),
                         onQuickAction: { handleQuickAction($0) },
                         overview: {
-                            HomeOverviewSection(content: content) {
-                                onOpenPropertyDetails?(homeId)
+                            if let brandNew {
+                                BrandNewHomeSection(brandNew: brandNew) { handleQuickAction($0) }
+                            } else {
+                                HomeOverviewSection(
+                                    content: content,
+                                    onOpenEmergency: { onOpenEmergency?(homeId) },
+                                    onOpenPropertyDetails: { onOpenPropertyDetails?(homeId) }
+                                )
                             }
                         }
                     )
@@ -197,32 +221,29 @@ struct HomeDashboardView: View {
     }
 
     private func handleQuickAction(_ action: String) {
-        switch action {
-        case "verify":
-            onClaimOwnership?()
-        case "add_member":
-            openMembersOrInvite()
-        case "view_bills":
-            onOpenBills?()
-        case "view_polls":
-            onOpenPolls?()
-        case "view_maintenance":
-            onOpenMaintenance?(homeId)
-        case "pets":
-            onOpenPets?(homeId)
-        case "calendar":
-            onOpenCalendar?(homeId)
-        case "view_docs":
-            onOpenDocs?(homeId)
-        case "view_emergency":
-            onOpenEmergency?(homeId)
-        case "view_packages":
-            onOpenPackages?(homeId)
-        case "view_tasks":
-            onOpenTasks?(homeId)
-        default:
+        if let handler = quickActionHandlers[action] {
+            handler()
+        } else {
             onOpenPlaceholder?(actionLabel(action))
         }
+    }
+
+    private var quickActionHandlers: [String: () -> Void] {
+        [
+            "verify": { onClaimOwnership?() },
+            "add_member": { openMembersOrInvite() },
+            "view_bills": { onOpenBills?() },
+            "view_polls": { onOpenPolls?() },
+            "view_maintenance": { onOpenMaintenance?(homeId) },
+            "pets": { onOpenPets?(homeId) },
+            "calendar": { onOpenCalendar?(homeId) },
+            "view_docs": { onOpenDocs?(homeId) },
+            "view_emergency": { onOpenEmergency?(homeId) },
+            "view_packages": { onOpenPackages?(homeId) },
+            "access_codes": { onOpenAccessCodes?(homeId, currentAddress) },
+            "view_tasks": { onOpenTasks?(homeId) },
+            "view_claims": { onOpenClaimsList?() }
+        ]
     }
 
     private func openMembersOrInvite() {
@@ -238,176 +259,16 @@ struct HomeDashboardView: View {
     private func actionLabel(_ id: String) -> String {
         Self.actionLabels[id] ?? id.replacingOccurrences(of: "_", with: " ").capitalized
     }
-}
 
-// MARK: - Subviews
-
-/// Inline banner shown above the grid-tabs body when the signed-in user
-/// is not yet a verified owner of this home. Two CTAs: "Claim" (opens
-/// the wizard) and "View status" (opens MyClaimsList).
-private struct ClaimOwnershipBanner: View {
-    let onClaim: () -> Void
-    let onViewClaims: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s2) {
-                Icon(.shieldCheck, size: 20, color: Theme.Color.primary600)
-                Text("Are you the owner?")
-                    .pantopusTextStyle(.body)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Theme.Color.appText)
-            }
-            Text("Claim this home to unlock private features for owners.")
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            HStack(spacing: Spacing.s3) {
-                Button(action: onClaim) {
-                    Text("Claim ownership")
-                        .pantopusTextStyle(.small)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Theme.Color.appTextInverse)
-                        .padding(.horizontal, Spacing.s4)
-                        .padding(.vertical, Spacing.s2)
-                        .background(Theme.Color.primary600)
-                        .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
-                }
-                .buttonStyle(.plain)
-                .frame(minHeight: 44)
-                .accessibilityIdentifier("homeDashboard_claimCTA")
-
-                Button(action: onViewClaims) {
-                    Text("View claims")
-                        .pantopusTextStyle(.small)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Theme.Color.primary600)
-                        .padding(.horizontal, Spacing.s4)
-                        .padding(.vertical, Spacing.s2)
-                }
-                .buttonStyle(.plain)
-                .frame(minHeight: 44)
-                .accessibilityIdentifier("homeDashboard_viewClaimsCTA")
-            }
+    private var currentAddress: String? {
+        switch viewModel.state {
+        case let .loaded(content), let .needsAttention(content):
+            content.address
+        case let .empty(brandNew):
+            brandNew.content.address
+        case .loading, .error:
+            nil
         }
-        .padding(Spacing.s4)
-        .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
-                .stroke(Theme.Color.primary600.opacity(0.4), lineWidth: 1)
-        )
-    }
-}
-
-private struct HomeOverviewSection: View {
-    let content: HomeDashboardContent
-    let onOpenPropertyDetails: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s4) {
-            VStack(alignment: .leading, spacing: Spacing.s3) {
-                SectionHeader("Summary")
-                KeyFactsPanel(rows: [
-                    KeyFactRow(id: "address", label: "Address", value: content.address),
-                    KeyFactRow(id: "status", label: "Status", value: content.verified ? "Verified" : "Unverified"),
-                    KeyFactRow(
-                        id: "members",
-                        label: "Members",
-                        value: content.stats.first { $0.id == "members" }?.value ?? "—"
-                    )
-                ])
-            }
-            VStack(alignment: .leading, spacing: Spacing.s3) {
-                SectionHeader("About this home")
-                PropertyDetailsRow(onTap: onOpenPropertyDetails)
-            }
-        }
-    }
-}
-
-/// Tappable affordance into A.4 — Property details (county records, beds,
-/// baths, and verification sources).
-private struct PropertyDetailsRow: View {
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: Spacing.s3) {
-                Icon(.home, size: 20, color: Theme.Color.home)
-                VStack(alignment: .leading, spacing: Spacing.s1) {
-                    Text("Property details")
-                        .pantopusTextStyle(.body)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Theme.Color.appText)
-                    Text("County records, beds, baths & verification")
-                        .pantopusTextStyle(.caption)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Spacer(minLength: Spacing.s2)
-                Icon(.chevronRight, size: 18, color: Theme.Color.appTextMuted)
-            }
-            .padding(Spacing.s4)
-            .background(Theme.Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                    .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .frame(minHeight: 44)
-        .accessibilityIdentifier("homeDashboard_propertyDetailsRow")
-        .accessibilityHint("Opens property details")
-    }
-}
-
-private struct LoadingView: View {
-    let onBack: (() -> Void)?
-
-    var body: some View {
-        ContentDetailShell(
-            title: "Home",
-            onBack: onBack,
-            header: {
-                Shimmer(height: 180, cornerRadius: Radii.xl2)
-                    .padding(.horizontal, Spacing.s4)
-            },
-            body: {
-                VStack(spacing: Spacing.s3) {
-                    Shimmer(height: 80, cornerRadius: Radii.md)
-                    Shimmer(height: 40, cornerRadius: Radii.sm)
-                    Shimmer(height: 120, cornerRadius: Radii.lg)
-                }
-                .padding(.horizontal, Spacing.s4)
-            },
-            cta: { NoCTA() }
-        )
-    }
-}
-
-private struct ErrorView: View {
-    let message: String
-    let onBack: (() -> Void)?
-    let onRetry: () -> Void
-
-    var body: some View {
-        ContentDetailShell(
-            title: "Home",
-            onBack: onBack,
-            header: { EmptyView() },
-            body: {
-                EmptyState(
-                    icon: .alertCircle,
-                    headline: "Couldn't load this home",
-                    subcopy: message,
-                    cta: EmptyState.CTA(title: "Try again") { await MainActor.run { onRetry() } }
-                )
-                .frame(height: 400)
-            },
-            cta: { NoCTA() }
-        )
     }
 }
 
