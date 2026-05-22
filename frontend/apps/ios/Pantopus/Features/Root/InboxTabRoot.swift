@@ -61,7 +61,7 @@ public struct InboxConversationDestination: Hashable, Sendable {
 /// NavigationStack wrapper for the Inbox tab.
 public struct InboxTabRoot: View {
     @Environment(AuthManager.self) private var auth
-    @State private var path: [InboxRoute] = []
+    @State private var path = RouteStack<InboxRoute>()
     /// P6.6 — "Invite to Pantopus" opens the system share sheet with the
     /// store link prefilled.
     @State private var systemSheet: SystemSheetRequest?
@@ -69,7 +69,7 @@ public struct InboxTabRoot: View {
     public init() {}
 
     public var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack(path: $path.navigationPath) {
             ChatListView(
                 onOpenConversation: { row in
                     path.append(.conversation(destination(from: row)))
@@ -82,6 +82,9 @@ public struct InboxTabRoot: View {
                 destination(for: route)
                     .toolbar(.hidden, for: .navigationBar)
             }
+        }
+        .onChange(of: path.navigationPath.count) { _, count in
+            path.syncToNavigationPathCount(count)
         }
         .sheet(item: $systemSheet) { request in request.makeView() }
     }

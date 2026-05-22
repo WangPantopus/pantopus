@@ -239,7 +239,7 @@ private struct DebugDisambiguateItem: Identifiable, Hashable {
 /// NavigationStack wrapper for the You tab.
 public struct YouTabRoot: View {
     @Environment(AuthManager.self) private var auth
-    @State private var path: [YouRoute] = []
+    @State private var path = RouteStack<YouRoute>()
     @State private var showsSignOutConfirm = false
     @State private var showsEditProfile = false
     /// P6.6 — share system sheet driven by "Share train".
@@ -280,7 +280,7 @@ public struct YouTabRoot: View {
     public init() {}
 
     public var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack(path: $path.navigationPath) {
             MeView(
                 onAction: { tile in handleAction(tile) },
                 onSection: { row in handleSection(row) },
@@ -422,6 +422,9 @@ public struct YouTabRoot: View {
                     ) { debugDisambiguateFormMailId = nil }
                 }
             #endif
+        }
+        .onChange(of: path.navigationPath.count) { _, count in
+            path.syncToNavigationPathCount(count)
         }
     }
 

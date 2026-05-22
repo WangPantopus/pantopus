@@ -218,7 +218,7 @@ public enum HubRoute: Hashable {
 /// NavigationStack wrapper for the Hub tab.
 public struct HubTabRoot: View {
     @Environment(AuthManager.self) private var auth
-    @State private var path: [HubRoute] = []
+    @State private var path = RouteStack<HubRoute>()
     @State private var router = DeepLinkRouter.shared
     /// P6.6 — share / mail system sheet driven by "Share listing",
     /// "Share train", and "Invite a business".
@@ -264,7 +264,7 @@ public struct HubTabRoot: View {
     }
 
     public var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack(path: $path.navigationPath) {
             hub
                 .navigationTitle("Hub")
                 .toolbar(.hidden, for: .navigationBar)
@@ -276,6 +276,9 @@ public struct HubTabRoot: View {
                     destination(for: route) { _ in }
                 }
             #endif
+        }
+        .onChange(of: path.navigationPath.count) { _, count in
+            path.syncToNavigationPathCount(count)
         }
         .onChange(of: router.pending) { _, pending in
             consumeDeepLinkIfNeeded(pending: pending)
