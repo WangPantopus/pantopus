@@ -70,6 +70,42 @@ open class ListingComposeWizardViewModel
         /** The listing id being edited, or null in create mode. */
         val editingListingId: String? get() = mode.editingListingId
 
+        val isCameraCaptureStep: Boolean
+            get() {
+                val form = _state.value.form
+                return !isEditMode &&
+                    form.currentStep == ListingComposeStep.Photos &&
+                    form.entryMode == ListingComposeEntryMode.Snap
+            }
+
+        val isSnapReviewStep: Boolean
+            get() {
+                val form = _state.value.form
+                return !isEditMode &&
+                    form.currentStep == ListingComposeStep.TitleCategory &&
+                    form.entryMode == ListingComposeEntryMode.Snap
+            }
+
+        val snapCaptureProgressText: String
+            get() {
+                val captured = _state.value.form.photos.size.coerceAtMost(ListingComposeFormState.TARGET_CAPTURE_ANGLES)
+                val remaining = (ListingComposeFormState.TARGET_CAPTURE_ANGLES - captured).coerceAtLeast(0)
+                return if (remaining == 0) {
+                    "$captured of 4 angles · ready to review"
+                } else {
+                    "$captured of 4 angles · add $remaining more"
+                }
+            }
+
+        val snapCoachingText: String
+            get() =
+                when (_state.value.form.photos.size) {
+                    0 -> "Center the whole item · step back a bit"
+                    1 -> "Get a wider shot for scale"
+                    2 -> "Move closer for fabric and wear"
+                    else -> "Looks great — capture now"
+                }
+
         private val _state =
             MutableStateFlow(restoreFormState().let { ListingComposeUiState(form = it) })
 
@@ -101,6 +137,10 @@ open class ListingComposeWizardViewModel
         }
 
         override fun onSecondary() {
+            if (isSnapReviewStep) {
+                pendingEvent.value = ListingComposeOutboundEvent.Dismiss
+                return
+            }
             // Success step's "Back to Marketplace" (create) / "Done" (edit).
             if (_state.value.form.currentStep != ListingComposeStep.Success) return
             val listingId = _state.value.createdListingId
@@ -148,11 +188,55 @@ open class ListingComposeWizardViewModel
 
         // MARK: - Photo step
 
+        /** A12.9 camera capture placeholder. Real upload is still deferred. */
+        fun captureSnapPhoto() {
+            val next = (_state.value.form.photos.size + 1).coerceAtMost(ListingComposeFormState.MAX_PHOTOS)
+            addPhoto("snap_angle_$next")
+            applySnapSuggestionsIfNeeded()
+        }
+
+        /** Escape hatch from camera-first entry into the original photo-grid editor. */
+        fun skipToManualPhotoEditor() {
+            _state.update { it.copy(form = it.form.copy(entryMode = ListingComposeEntryMode.Manual)) }
+            persist()
+        }
+
+        fun addLibraryPhoto() {
+            val next = (_state.value.form.photos.size + 1).coerceAtMost(ListingComposeFormState.MAX_PHOTOS)
+            addPhoto("library_photo_$next")
+            applySnapSuggestionsIfNeeded()
+        }
+
         /** Append a new photo to the grid. Captures up to [MAX_PHOTOS]. */
         fun addPhoto(token: String = "photo_${java.util.UUID.randomUUID().toString().take(PHOTO_TOKEN_SUFFIX_LENGTH)}") {
             _state.update { current ->
                 if (current.form.photos.size >= ListingComposeFormState.MAX_PHOTOS) return@update current
                 current.copy(form = current.form.copy(photos = current.form.photos + ListingComposePhoto(token = token)))
+            }
+            persist()
+        }
+
+        private fun applySnapSuggestionsIfNeeded() {
+            _state.update { current ->
+                var form = current.form
+                if (form.title.trim().isEmpty()) form = form.copy(title = "Sage green velvet sofa, 3-seater")
+                if (form.category == null) form = form.copy(category = ListingComposeCategory.Goods)
+                if (form.condition == null) form = form.copy(condition = ListingComposeCondition.Good)
+                if (form.bodyText.trim().isEmpty()) {
+                    form =
+                        form.copy(
+                            bodyText = "Comfortable three-seat velvet sofa with light wear on one cushion and minor sun fade.",
+                        )
+                }
+                if (form.priceKind == null) form = form.copy(priceKind = ListingComposePriceKind.Fixed)
+                if (form.priceAmount.isEmpty()) form = form.copy(priceAmount = "280")
+                form =
+                    form.copy(
+                        fulfillment = ListingComposeFulfillment.Pickup,
+                        deliveryEnabled = true,
+                        locationKind = form.locationKind ?: ListingComposeLocationKind.SavedAddress,
+                    )
+                current.copy(form = form)
             }
             persist()
         }
@@ -261,6 +345,11 @@ open class ListingComposeWizardViewModel
             persist()
         }
 
+        fun setDeliveryEnabled(value: Boolean) {
+            _state.update { it.copy(form = it.form.copy(deliveryEnabled = value)) }
+            persist()
+        }
+
         fun setLocationKind(kind: ListingComposeLocationKind) {
             _state.update { it.copy(form = it.form.copy(locationKind = kind)) }
             persist()
@@ -277,7 +366,12 @@ open class ListingComposeWizardViewModel
             val current = _state.value.form.currentStep
             when (current) {
                 ListingComposeStep.Photos -> transitionTo(ListingComposeStep.TitleCategory)
-                ListingComposeStep.TitleCategory -> transitionTo(ListingComposeStep.ConditionDescription)
+                ListingComposeStep.TitleCategory ->
+                    if (isSnapReviewStep) {
+                        submit()
+                    } else {
+                        transitionTo(ListingComposeStep.ConditionDescription)
+                    }
                 ListingComposeStep.ConditionDescription -> transitionTo(ListingComposeStep.Price)
                 ListingComposeStep.Price -> transitionTo(ListingComposeStep.Location)
                 ListingComposeStep.Location -> transitionTo(ListingComposeStep.Review)
@@ -335,7 +429,7 @@ open class ListingComposeWizardViewModel
             val price: Double? = if (isFree) null else form.priceAmount.toDoubleOrNull()
             val mediaUrls = form.photos.map { it.token }
             val locationName = form.locationLabel.takeIf { it.isNotEmpty() }
-            val deliveryAvailable = form.fulfillment == ListingComposeFulfillment.Delivery
+            val deliveryAvailable = form.deliveryEnabled || form.fulfillment == ListingComposeFulfillment.Delivery
 
             when (val m = mode) {
                 is ListingComposeMode.Create -> {
@@ -447,6 +541,7 @@ open class ListingComposeWizardViewModel
         private fun persist() {
             val form = _state.value.form
             savedStateHandle[KEY_STEP] = form.step
+            savedStateHandle[KEY_ENTRY_MODE] = form.entryMode.name
             savedStateHandle[KEY_PHOTOS_IDS] = form.photos.map { it.id }
             savedStateHandle[KEY_PHOTOS_TOKENS] = form.photos.map { it.token }
             savedStateHandle[KEY_TITLE] = form.title
@@ -456,12 +551,17 @@ open class ListingComposeWizardViewModel
             savedStateHandle[KEY_PRICE_KIND] = form.priceKind?.name
             savedStateHandle[KEY_PRICE_AMOUNT] = form.priceAmount
             savedStateHandle[KEY_FULFILLMENT] = form.fulfillment.name
+            savedStateHandle[KEY_DELIVERY_ENABLED] = form.deliveryEnabled
             savedStateHandle[KEY_LOCATION_KIND] = form.locationKind?.name
             savedStateHandle[KEY_LOCATION_LABEL] = form.locationLabel
         }
 
         private fun restoreFormState(): ListingComposeFormState {
             val step: Int = savedStateHandle[KEY_STEP] ?: ListingComposeStep.Photos.ordinal0
+            val entryModeName: String? = savedStateHandle[KEY_ENTRY_MODE]
+            val entryMode =
+                entryModeName?.let { name -> ListingComposeEntryMode.entries.firstOrNull { it.name == name } }
+                    ?: ListingComposeEntryMode.Snap
             val ids: List<String> = savedStateHandle[KEY_PHOTOS_IDS] ?: emptyList()
             val tokens: List<String> = savedStateHandle[KEY_PHOTOS_TOKENS] ?: emptyList()
             val photos =
@@ -485,6 +585,7 @@ open class ListingComposeWizardViewModel
                 fulfillmentName?.let { name ->
                     ListingComposeFulfillment.entries.firstOrNull { it.name == name }
                 } ?: ListingComposeFulfillment.Pickup
+            val deliveryEnabled: Boolean = savedStateHandle[KEY_DELIVERY_ENABLED] ?: false
             val locationKindName: String? = savedStateHandle[KEY_LOCATION_KIND]
             val locationKind =
                 locationKindName?.let { name ->
@@ -493,6 +594,7 @@ open class ListingComposeWizardViewModel
             val locationLabel: String = savedStateHandle[KEY_LOCATION_LABEL] ?: ""
             return ListingComposeFormState(
                 step = step,
+                entryMode = entryMode,
                 photos = photos,
                 title = title,
                 category = category,
@@ -501,6 +603,7 @@ open class ListingComposeWizardViewModel
                 priceKind = priceKind,
                 priceAmount = priceAmount,
                 fulfillment = fulfillment,
+                deliveryEnabled = deliveryEnabled,
                 locationKind = locationKind,
                 locationLabel = locationLabel,
             )
@@ -533,8 +636,8 @@ open class ListingComposeWizardViewModel
 
         private fun primaryCtaLabel(step: ListingComposeStep): String =
             when (step) {
-                ListingComposeStep.Photos,
-                ListingComposeStep.TitleCategory,
+                ListingComposeStep.Photos -> if (isCameraCaptureStep) "Review suggestions" else "Continue"
+                ListingComposeStep.TitleCategory -> if (isSnapReviewStep) "Post listing" else "Continue"
                 ListingComposeStep.ConditionDescription,
                 ListingComposeStep.Price,
                 ListingComposeStep.Location,
@@ -544,6 +647,12 @@ open class ListingComposeWizardViewModel
             }
 
         private fun secondaryCta(step: ListingComposeStep): WizardSecondaryCta? {
+            if (isSnapReviewStep) {
+                return WizardSecondaryCta(
+                    label = "Save draft",
+                    testTag = "listingComposeSaveDraft",
+                )
+            }
             if (step != ListingComposeStep.Success) return null
             return if (isEditMode) {
                 WizardSecondaryCta(
@@ -559,6 +668,12 @@ open class ListingComposeWizardViewModel
         }
 
         private fun progressLabel(step: ListingComposeStep): WizardProgressLabel {
+            if (!isEditMode &&
+                _state.value.form.entryMode == ListingComposeEntryMode.Snap &&
+                (step == ListingComposeStep.Photos || step == ListingComposeStep.TitleCategory)
+            ) {
+                return WizardProgressLabel.StepOf(current = 1, total = 3)
+            }
             val number = step.stepNumber ?: return WizardProgressLabel.Hidden
             return WizardProgressLabel.StepOf(
                 current = number,
@@ -567,6 +682,12 @@ open class ListingComposeWizardViewModel
         }
 
         private fun progressFraction(step: ListingComposeStep): Float? {
+            if (!isEditMode &&
+                _state.value.form.entryMode == ListingComposeEntryMode.Snap &&
+                (step == ListingComposeStep.Photos || step == ListingComposeStep.TitleCategory)
+            ) {
+                return 1f / 3f
+            }
             val number = step.stepNumber ?: return null
             return number.toFloat() / ListingComposeStep.PROGRESS_TOTAL
         }
@@ -575,7 +696,17 @@ open class ListingComposeWizardViewModel
             val form = state.form
             return when (form.currentStep) {
                 ListingComposeStep.Photos -> form.photos.isNotEmpty()
-                ListingComposeStep.TitleCategory -> isTitleValid(form) && form.category != null
+                ListingComposeStep.TitleCategory ->
+                    if (isSnapReviewStep) {
+                        form.photos.isNotEmpty() &&
+                            isTitleValid(form) &&
+                            form.category != null &&
+                            conditionSatisfied(form) &&
+                            isPriceValid(form) &&
+                            form.locationKind != null
+                    } else {
+                        isTitleValid(form) && form.category != null
+                    }
                 ListingComposeStep.ConditionDescription -> isDescriptionValid(form) && conditionSatisfied(form)
                 ListingComposeStep.Price -> isPriceValid(form)
                 ListingComposeStep.Location -> form.locationKind != null
@@ -596,6 +727,7 @@ open class ListingComposeWizardViewModel
 
         companion object {
             private const val KEY_STEP = "listingCompose.step"
+            private const val KEY_ENTRY_MODE = "listingCompose.entryMode"
             private const val KEY_PHOTOS_IDS = "listingCompose.photoIds"
             private const val KEY_PHOTOS_TOKENS = "listingCompose.photoTokens"
             private const val KEY_TITLE = "listingCompose.title"
@@ -605,6 +737,7 @@ open class ListingComposeWizardViewModel
             private const val KEY_PRICE_KIND = "listingCompose.priceKind"
             private const val KEY_PRICE_AMOUNT = "listingCompose.priceAmount"
             private const val KEY_FULFILLMENT = "listingCompose.fulfillment"
+            private const val KEY_DELIVERY_ENABLED = "listingCompose.deliveryEnabled"
             private const val KEY_LOCATION_KIND = "listingCompose.locationKind"
             private const val KEY_LOCATION_LABEL = "listingCompose.locationLabel"
 
@@ -670,6 +803,7 @@ open class ListingComposeWizardViewModel
                 val landingStep = jumpToStep ?: ListingComposeStep.Review
                 return ListingComposeFormState(
                     step = landingStep.ordinal0,
+                    entryMode = ListingComposeEntryMode.Manual,
                     photos = photos,
                     title = listing.title.orEmpty(),
                     category = category,

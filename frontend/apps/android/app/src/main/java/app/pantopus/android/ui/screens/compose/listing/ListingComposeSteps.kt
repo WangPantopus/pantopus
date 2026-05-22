@@ -43,6 +43,9 @@ enum class ListingComposeStep(
     }
 }
 
+/** A12.9 create-mode entry path. Snap starts with camera capture; Manual preserves the old grid wizard. */
+enum class ListingComposeEntryMode { Snap, Manual }
+
 /**
  * Category selectable in step 2. Mirrors the five Marketplace chips and
  * resolves onto backend `layer` + the wanted/free flags.
@@ -164,6 +167,7 @@ data class ListingComposePhoto(
 /** Persistable form state for the wizard. */
 data class ListingComposeFormState(
     val step: Int = ListingComposeStep.Photos.ordinal0,
+    val entryMode: ListingComposeEntryMode = ListingComposeEntryMode.Snap,
     val photos: List<ListingComposePhoto> = emptyList(),
     val title: String = "",
     val category: ListingComposeCategory? = null,
@@ -172,6 +176,7 @@ data class ListingComposeFormState(
     val priceKind: ListingComposePriceKind? = null,
     val priceAmount: String = "",
     val fulfillment: ListingComposeFulfillment = ListingComposeFulfillment.Pickup,
+    val deliveryEnabled: Boolean = false,
     val locationKind: ListingComposeLocationKind? = null,
     val locationLabel: String = "",
 ) {
@@ -182,6 +187,9 @@ data class ListingComposeFormState(
 
         /** Max photos in the grid. */
         const val MAX_PHOTOS = 8
+
+        /** A12.9 camera coaching target before review. */
+        const val TARGET_CAPTURE_ANGLES = 4
 
         /** Min / max bounds enforced on step transitions. */
         const val TITLE_MIN_LENGTH = 5

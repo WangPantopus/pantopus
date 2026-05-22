@@ -43,6 +43,7 @@ extension ListingComposeWizardViewModel {
         let initialStep = jumpToStep ?? .review
         return ListingComposeFormState(
             step: initialStep.rawValue,
+            entryMode: .manual,
             photos: photos,
             title: listing.title ?? "",
             category: category,

@@ -125,6 +125,7 @@ abstract class ListingComposeWizardViewModelTestCase {
 
     /** Move the wizard to the final review state with a valid form. */
     protected fun seedReadyToSubmit(vm: ListingComposeWizardViewModel) {
+        vm.skipToManualPhotoEditor()
         vm.addPhoto("photo_1")
         vm.addPhoto("photo_2")
         vm.setTitle("Moving boxes — bundle of 18")

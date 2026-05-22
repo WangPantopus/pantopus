@@ -96,7 +96,12 @@ public struct ListingComposeWizardView: View {
             ListingComposePhotosStep(viewModel: viewModel) { photo in
                 photoPendingRemoval = photo
             }
-        case .titleCategory: ListingComposeTitleCategoryStep(viewModel: viewModel)
+        case .titleCategory:
+            if viewModel.isSnapReviewStep {
+                ListingComposeSnapReviewStep(viewModel: viewModel)
+            } else {
+                ListingComposeTitleCategoryStep(viewModel: viewModel)
+            }
         case .conditionDescription: ListingComposeConditionDescriptionStep(viewModel: viewModel)
         case .price: ListingComposePriceStep(viewModel: viewModel)
         case .location: ListingComposeLocationStep(viewModel: viewModel)

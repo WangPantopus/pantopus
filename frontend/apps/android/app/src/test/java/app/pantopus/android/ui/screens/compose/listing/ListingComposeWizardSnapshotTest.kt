@@ -42,7 +42,7 @@ class ListingComposeWizardSnapshotTest {
     fun listing_compose_step1_photos_empty() {
         paparazzi.snapshot {
             Frame {
-                ListingComposeStepPreview(
+                ListingComposeSnapCameraPreview(
                     state = ListingComposeUiState(form = ListingComposeFormState.EMPTY),
                 )
             }
@@ -56,7 +56,39 @@ class ListingComposeWizardSnapshotTest {
                 ListingComposeStepPreview(
                     state =
                         ListingComposeUiState(
-                            form = ListingComposeFormState(photos = seededPhotos),
+                            form =
+                                ListingComposeFormState(
+                                    entryMode = ListingComposeEntryMode.Manual,
+                                    photos = seededPhotos,
+                                ),
+                        ),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun listing_compose_snap_review_populated() {
+        paparazzi.snapshot {
+            Frame {
+                ListingComposeSnapReviewPreview(
+                    state =
+                        ListingComposeUiState(
+                            form =
+                                ListingComposeFormState(
+                                    step = ListingComposeStep.TitleCategory.ordinal0,
+                                    entryMode = ListingComposeEntryMode.Snap,
+                                    photos = seededPhotos,
+                                    title = "Sage green velvet sofa, 3-seater",
+                                    category = ListingComposeCategory.Goods,
+                                    condition = ListingComposeCondition.Good,
+                                    bodyText = "Comfortable three-seat velvet sofa with light wear on one cushion and minor sun fade.",
+                                    priceKind = ListingComposePriceKind.Fixed,
+                                    priceAmount = "280",
+                                    fulfillment = ListingComposeFulfillment.Pickup,
+                                    deliveryEnabled = true,
+                                    locationKind = ListingComposeLocationKind.SavedAddress,
+                                ),
                         ),
                 )
             }
@@ -73,6 +105,7 @@ class ListingComposeWizardSnapshotTest {
                             form =
                                 ListingComposeFormState(
                                     step = ListingComposeStep.TitleCategory.ordinal0,
+                                    entryMode = ListingComposeEntryMode.Manual,
                                     photos = seededPhotos,
                                     title = "Moving boxes — bundle of 18",
                                     category = ListingComposeCategory.Goods,
@@ -93,6 +126,7 @@ class ListingComposeWizardSnapshotTest {
                             form =
                                 ListingComposeFormState(
                                     step = ListingComposeStep.ConditionDescription.ordinal0,
+                                    entryMode = ListingComposeEntryMode.Manual,
                                     photos = seededPhotos,
                                     title = "Moving boxes — bundle of 18",
                                     category = ListingComposeCategory.Goods,
@@ -115,6 +149,7 @@ class ListingComposeWizardSnapshotTest {
                             form =
                                 ListingComposeFormState(
                                     step = ListingComposeStep.Price.ordinal0,
+                                    entryMode = ListingComposeEntryMode.Manual,
                                     photos = seededPhotos,
                                     title = "Moving boxes — bundle of 18",
                                     category = ListingComposeCategory.Goods,
@@ -140,6 +175,7 @@ class ListingComposeWizardSnapshotTest {
                             form =
                                 ListingComposeFormState(
                                     step = ListingComposeStep.Location.ordinal0,
+                                    entryMode = ListingComposeEntryMode.Manual,
                                     photos = seededPhotos,
                                     title = "Moving boxes — bundle of 18",
                                     category = ListingComposeCategory.Goods,
@@ -167,6 +203,7 @@ class ListingComposeWizardSnapshotTest {
                             form =
                                 ListingComposeFormState(
                                     step = ListingComposeStep.Review.ordinal0,
+                                    entryMode = ListingComposeEntryMode.Manual,
                                     photos = seededPhotos,
                                     title = "Moving boxes — bundle of 18",
                                     category = ListingComposeCategory.Goods,
@@ -211,6 +248,7 @@ class ListingComposeWizardSnapshotTest {
                             form =
                                 ListingComposeFormState(
                                     step = ListingComposeStep.Review.ordinal0,
+                                    entryMode = ListingComposeEntryMode.Manual,
                                     photos = seededPhotos,
                                     title = "Moving boxes — bundle of 18",
                                     category = ListingComposeCategory.Goods,
@@ -243,6 +281,7 @@ class ListingComposeWizardSnapshotTest {
                             form =
                                 ListingComposeFormState(
                                     step = ListingComposeStep.Review.ordinal0,
+                                    entryMode = ListingComposeEntryMode.Manual,
                                     photos = seededPhotos,
                                     title = "Mid-century walnut credenza",
                                     category = ListingComposeCategory.Goods,
@@ -276,6 +315,7 @@ class ListingComposeWizardSnapshotTest {
                             form =
                                 ListingComposeFormState(
                                     step = ListingComposeStep.Price.ordinal0,
+                                    entryMode = ListingComposeEntryMode.Manual,
                                     photos = seededPhotos,
                                     title = "Mid-century walnut credenza",
                                     category = ListingComposeCategory.Goods,

@@ -33,6 +33,30 @@ extension ListingComposeWizardViewModel {
         form.photos.first
     }
 
+    var isCameraCaptureStep: Bool {
+        !isEditMode && currentStep == .photos && form.entryMode == .snap
+    }
+
+    var isSnapReviewStep: Bool {
+        !isEditMode && currentStep == .titleCategory && form.entryMode == .snap
+    }
+
+    var snapCaptureProgressText: String {
+        let captured = min(form.photos.count, ListingComposeFormState.targetCaptureAngles)
+        let remaining = max(0, ListingComposeFormState.targetCaptureAngles - captured)
+        if remaining == 0 { return "\(captured) of 4 angles · ready to review" }
+        return "\(captured) of 4 angles · add \(remaining) more"
+    }
+
+    var snapCoachingText: String {
+        switch form.photos.count {
+        case 0: "Center the whole item · step back a bit"
+        case 1: "Get a wider shot for scale"
+        case 2: "Move closer for fabric and wear"
+        default: "Looks great — capture now"
+        }
+    }
+
     /// Numeric value parsed from `priceAmount`, or nil when unparseable.
     var parsedPrice: Double? {
         guard !form.priceAmount.isEmpty else { return nil }
@@ -84,6 +108,9 @@ extension ListingComposeWizardViewModel {
     }
 
     private func progressLabel(for step: ListingComposeStep) -> WizardProgressLabel {
+        if !isEditMode && form.entryMode == .snap && (step == .photos || step == .titleCategory) {
+            return .stepOf(current: 1, total: 3)
+        }
         if let stepNumber = step.stepNumber {
             return .stepOf(current: stepNumber, total: ListingComposeStep.progressTotal)
         }
@@ -91,19 +118,30 @@ extension ListingComposeWizardViewModel {
     }
 
     private func progressFraction(for step: ListingComposeStep) -> Double? {
+        if !isEditMode && form.entryMode == .snap && (step == .photos || step == .titleCategory) {
+            return 1.0 / 3.0
+        }
         guard let stepNumber = step.stepNumber else { return nil }
         return Double(stepNumber) / Double(ListingComposeStep.progressTotal)
     }
 
     private func primaryCTALabel(for step: ListingComposeStep) -> String {
         switch step {
-        case .photos, .titleCategory, .conditionDescription, .price, .location: "Continue"
+        case .photos: isCameraCaptureStep ? "Review suggestions" : "Continue"
+        case .titleCategory: isSnapReviewStep ? "Post listing" : "Continue"
+        case .conditionDescription, .price, .location: "Continue"
         case .review: isEditMode ? "Save changes" : "List it"
         case .success: isEditMode ? "Back to listing" : "View listing"
         }
     }
 
     private func secondaryCTA(for step: ListingComposeStep) -> WizardSecondaryCTA? {
+        if isSnapReviewStep {
+            return WizardSecondaryCTA(
+                label: "Save draft",
+                identifier: "listingComposeSaveDraft"
+            )
+        }
         guard step == .success else { return nil }
         if isEditMode {
             return WizardSecondaryCTA(
@@ -118,11 +156,20 @@ extension ListingComposeWizardViewModel {
     }
 
     private func primaryEnabled(for step: ListingComposeStep) -> Bool {
-        switch step {
+        return switch step {
         case .photos:
             !form.photos.isEmpty
         case .titleCategory:
-            isTitleValid && form.category != nil
+            if isSnapReviewStep {
+                !form.photos.isEmpty
+                    && isTitleValid
+                    && form.category != nil
+                    && conditionSatisfied
+                    && isPriceValid
+                    && form.locationKind != nil
+            } else {
+                isTitleValid && form.category != nil
+            }
         case .conditionDescription:
             isDescriptionValid && conditionSatisfied
         case .price:
