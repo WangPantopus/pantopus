@@ -164,7 +164,7 @@ class MailboxListViewModel
          * `onOpenMail`. Delegates to the shared [makeRow] factory so the
          * mailbox list and Mailbox Search (P4.2) render rows identically.
          */
-        internal fun rowFor(mail: MailItem): RowModel = makeRow(mail, onOpenMail)
+        internal fun rowFor(mail: MailItem): RowModel = makeRow(mail, onOpenMail = onOpenMail)
 
         companion object {
             /**
@@ -183,10 +183,14 @@ class MailboxListViewModel
              */
             fun makeRow(
                 mail: MailItem,
+                trustOverride: MailTrust? = null,
                 onOpenMail: (String) -> Unit,
             ): RowModel {
                 val category = MailItemCategory.fromRaw(mail.mailType ?: mail.type)
-                val trust = MailTrust.fromRaw(null) // V1 list doesn't surface sender_trust
+                // V1 list doesn't surface sender_trust, so it defaults to
+                // unverified; surfaces that carry trust (e.g. the B.1
+                // Mailbox root sample data) pass it explicitly.
+                val trust = trustOverride ?: MailTrust.fromRaw(null)
                 val chips =
                     listOf(
                         RowChip(

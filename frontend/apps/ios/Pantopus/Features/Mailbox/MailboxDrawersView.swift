@@ -6,6 +6,12 @@
 import SwiftUI
 
 /// `GET /api/mailbox/v2/drawers` wrapped in the List-of-Rows archetype.
+///
+/// B.1 — superseded by `MailboxRootView` (the unified drawer-tabs hybrid).
+/// Its route case (`HubRoute.mailboxDrawers`) has been removed, so this is
+/// no longer reachable. Kept for one migration cycle; delete once the new
+/// root has shipped.
+@available(*, deprecated, message: "Replaced by MailboxRootView (B.1). Scheduled for deletion next cycle.")
 struct MailboxDrawersView: View {
     @State private var viewModel: MailboxDrawersViewModel
 
@@ -18,8 +24,4 @@ struct MailboxDrawersView: View {
             .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
             .onAppear { Analytics.track(.screenMailboxDrawersViewed) }
     }
-}
-
-#Preview {
-    NavigationStack { MailboxDrawersView() }
 }

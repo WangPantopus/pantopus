@@ -13,7 +13,13 @@ import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
  * `GET /api/mailbox/v2/drawers` wrapped in the List-of-Rows archetype.
+ *
+ * B.1 — superseded by `MailboxRootScreen` (the unified drawer-tabs
+ * hybrid). Its route (`ChildRoutes.MAILBOX_DRAWERS`) has been removed, so
+ * this is no longer reachable. Kept for one migration cycle; delete once
+ * the new root has shipped.
  */
+@Deprecated("Replaced by MailboxRootScreen (B.1). Scheduled for deletion next cycle.")
 @Composable
 fun MailboxDrawersScreen(
     onOpenDrawer: (String) -> Unit,

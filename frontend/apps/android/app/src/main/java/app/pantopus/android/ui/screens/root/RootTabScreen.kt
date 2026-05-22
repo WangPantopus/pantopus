@@ -177,13 +177,13 @@ import app.pantopus.android.ui.screens.inbox.search.ChatSearchResultKind
 import app.pantopus.android.ui.screens.inbox.search.ChatSearchScreen
 import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
 import app.pantopus.android.ui.screens.listings.MyListingsScreen
-import app.pantopus.android.ui.screens.mailbox.MailboxDrawersScreen
 import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
+import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
 import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
 import app.pantopus.android.ui.screens.marketplace.MarketplaceScreen
@@ -240,7 +240,6 @@ private object ChildRoutes {
     const val BUSINESS_WAITLIST = "businesses/waitlist"
     const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
     const val MAILBOX_LIST = "mailbox/list"
-    const val MAILBOX_DRAWERS = "mailbox/drawers"
     const val MAILBOX_SEARCH = "mailbox/search"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
 
@@ -1185,7 +1184,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     ActionChipContent.Kind.AddHome ->
                                         navController.navigate(ChildRoutes.ADD_HOME)
                                     ActionChipContent.Kind.ScanMail ->
-                                        navController.navigate(ChildRoutes.MAILBOX_DRAWERS)
+                                        navController.navigate(ChildRoutes.MAILBOX_ROOT)
                                     ActionChipContent.Kind.PostTask ->
                                         navController.navigate(ChildRoutes.composeGig(GigsCategory.All.key))
                                     ActionChipContent.Kind.SnapAndSell ->
@@ -1194,7 +1193,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             is HubNavigationIntent.PillarTapped ->
                                 when (intent.pillar) {
                                     PillarTile.Pillar.Mail ->
-                                        navController.navigate(ChildRoutes.MAILBOX_LIST)
+                                        navController.navigate(ChildRoutes.MAILBOX_ROOT)
                                     PillarTile.Pillar.Pulse ->
                                         navController.navigate(ChildRoutes.PULSE_FEED)
                                     PillarTile.Pillar.Marketplace ->
@@ -1261,7 +1260,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     onOpenCeremonialMailOpen = { mailId ->
                         navController.navigate(ChildRoutes.ceremonialMailOpen(mailId))
                     },
-                    onOpenMailbox = { navController.navigate(ChildRoutes.MAILBOX_LIST) },
+                    onOpenMailbox = { navController.navigate(ChildRoutes.MAILBOX_ROOT) },
                     onOpenEditProfile = {
                         navController.navigate(ChildRoutes.EDIT_PROFILE)
                     },
@@ -2018,16 +2017,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             ) {
                 DisambiguateMailFormScreen(onClose = { navController.popBackStack() })
             }
-            composable(ChildRoutes.MAILBOX_DRAWERS) {
-                MailboxDrawersScreen(
-                    onOpenDrawer = { drawer ->
-                        navController.navigate(ChildRoutes.placeholder("Drawer · $drawer"))
-                    },
-                    onOpenVault = { navController.navigate(ChildRoutes.MAILBOX_VAULT) },
-                    onOpenMap = { navController.navigate(ChildRoutes.MAILBOX_MAP) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
             composable(ChildRoutes.MAILBOX_VAULT) {
                 // T6.5e (P19.5) — Mailbox Vault list-of-rows surface.
                 VaultListScreen(
@@ -2036,16 +2025,16 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onAddTapped = {
                         // FAB shortcut — drop the user back to the inbox
-                        // list where mail items expose the kebab
+                        // where mail items expose the kebab
                         // "Save to vault" action.
-                        navController.navigate(ChildRoutes.MAILBOX_LIST) {
-                            popUpTo(ChildRoutes.MAILBOX_LIST) { inclusive = false }
+                        navController.navigate(ChildRoutes.MAILBOX_ROOT) {
+                            popUpTo(ChildRoutes.MAILBOX_ROOT) { inclusive = false }
                             launchSingleTop = true
                         }
                     },
                     onOpenMailbox = {
-                        navController.navigate(ChildRoutes.MAILBOX_LIST) {
-                            popUpTo(ChildRoutes.MAILBOX_LIST) { inclusive = false }
+                        navController.navigate(ChildRoutes.MAILBOX_ROOT) {
+                            popUpTo(ChildRoutes.MAILBOX_ROOT) { inclusive = false }
                             launchSingleTop = true
                         }
                     },
@@ -2935,7 +2924,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 )
             }
             composable(ChildRoutes.MAILBOX_ROOT) {
-                NotYetAvailableView(tabName = "Mailbox", icon = PantopusIcon.Mailbox)
+                MailboxRootScreen(
+                    onOpenMail = { mailId ->
+                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                    },
+                    onOpenSearch = { navController.navigate(ChildRoutes.MAILBOX_SEARCH) },
+                    onOpenMap = { navController.navigate(ChildRoutes.MAILBOX_MAP) },
+                    onBrowseGigs = { navController.navigate(ChildRoutes.GIGS_FEED) },
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(ChildRoutes.MAILBOX_MAP) {
                 MailboxMapScreen(onBack = { navController.popBackStack() })
@@ -3097,7 +3094,7 @@ private fun routeForDiscovery(item: DiscoveryCardContent): String =
  */
 private fun routeForJumpBackIn(item: JumpBackItem): String {
     val path = item.route
-    if (path.startsWith("/app/mailbox")) return ChildRoutes.MAILBOX_LIST
+    if (path.startsWith("/app/mailbox")) return ChildRoutes.MAILBOX_ROOT
     homeIdFromRoute(path)?.let { return ChildRoutes.homeDashboard(it) }
     if (path.startsWith("/app/chat")) return ChildRoutes.placeholder("Messages")
     if (path.startsWith("/gigs/new")) return ChildRoutes.composeGig(GigsCategory.All.key)

@@ -20,6 +20,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
     case screenHubViewed
     case screenMailboxListViewed
     case screenMailboxDrawersViewed
+    case screenMailboxRootViewed
     case screenMyHomesViewed
     case screenHomeDashboardViewed
     case screenMailboxItemDetailViewed(category: String, trustLevel: String)
@@ -87,6 +88,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenHubViewed: "screen.hub.viewed"
         case .screenMailboxListViewed: "screen.mailbox_list.viewed"
         case .screenMailboxDrawersViewed: "screen.mailbox_drawers.viewed"
+        case .screenMailboxRootViewed: "screen.mailbox_root.viewed"
         case .screenMyHomesViewed: "screen.my_homes.viewed"
         case .screenHomeDashboardViewed: "screen.home_dashboard.viewed"
         case .screenMailboxItemDetailViewed: "screen.mailbox_item_detail.viewed"
@@ -189,6 +191,7 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case .screenHubViewed,
              .screenMailboxListViewed,
              .screenMailboxDrawersViewed,
+             .screenMailboxRootViewed,
              .screenMyHomesViewed,
              .screenHomeDashboardViewed,
              .screenMyClaimsViewed,

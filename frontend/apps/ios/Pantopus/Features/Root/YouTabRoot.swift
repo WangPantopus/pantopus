@@ -15,6 +15,12 @@ import SwiftUI
 /// Typed routes within the You tab's NavigationStack.
 public enum YouRoute: Hashable {
     case signOutConfirm
+    /// B.1 — unified Mailbox root (drawer chips × tabs). Entry point for
+    /// mailbox navigation from the You tab.
+    case mailboxRoot
+    /// A.x — Mailbox map (physical postal venues), reached from the root.
+    case mailboxMap
+    /// Superseded by `.mailboxRoot`; kept only for back-compat.
     case mailbox
     case mailItemDetail(mailId: String)
     /// P4.2 — Mailbox search. Client-side filter over the user's mailbox.
@@ -429,7 +435,7 @@ public struct YouTabRoot: View {
     private func handleAction(_ tile: MeActionTile) {
         switch tile.routeKey {
         case "me.mail":
-            path.append(.mailbox)
+            path.append(.mailboxRoot)
         case "me.bids":
             path.append(.myBids)
         case "me.gigs":
@@ -706,6 +712,19 @@ public struct YouTabRoot: View {
         switch route {
         case .signOutConfirm:
             EmptyView()
+        case .mailboxRoot:
+            MailboxRootView(
+                viewModel: MailboxRootViewModel(
+                    onOpenMail: { mailId in
+                        Task { @MainActor in path.append(.mailItemDetail(mailId: mailId)) }
+                    },
+                    onOpenSearch: { path.append(.mailboxSearch) },
+                    onOpenMap: { path.append(.mailboxMap) },
+                    onBrowseGigs: { path.append(.placeholder(label: "Browse gigs")) }
+                )
+            )
+        case .mailboxMap:
+            MailboxMapView { if !path.isEmpty { path.removeLast() } }
         case .mailbox:
             MailboxListView(
                 viewModel: MailboxListViewModel(
