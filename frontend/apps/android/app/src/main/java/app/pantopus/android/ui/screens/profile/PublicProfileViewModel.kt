@@ -18,6 +18,8 @@ import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileTab
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.StatsTabsContent
 import app.pantopus.android.ui.screens.shared.content_detail.headers.IdentityPillarBadge
 import app.pantopus.android.ui.screens.shared.content_detail.headers.IdentityPillarVerificationState
+import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -85,6 +87,11 @@ data class PublicProfileContent(
     val header: PublicProfileHeader,
     val stats: StatsTabsContent,
     val posts: List<PublicProfilePost> = emptyList(),
+    /**
+     * B.2 (A10.5) — populated for [PublicProfileKind.Local]; drives the
+     * canonical neighbor layout. `null` for Persona.
+     */
+    val neighbor: NeighborProfileContent? = null,
 )
 
 /** Observed UI state for the Public profile screen. */
@@ -128,6 +135,12 @@ class PublicProfileViewModel
         private val _selectedTab = MutableStateFlow(ProfileTab.About)
         val selectedTab: StateFlow<ProfileTab> = _selectedTab.asStateFlow()
 
+        // B.2 (A10.5) — selected tab for the canonical neighbor layout
+        // (About · Reviews · Verifications · Posts). Separate from
+        // [selectedTab] so the persona path is untouched.
+        private val _selectedNeighborTab = MutableStateFlow(NeighborProfileTab.About)
+        val selectedNeighborTab: StateFlow<NeighborProfileTab> = _selectedNeighborTab.asStateFlow()
+
         private val _toastMessage = MutableStateFlow<String?>(null)
         val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
 
@@ -162,6 +175,10 @@ class PublicProfileViewModel
 
         fun selectTab(tab: ProfileTab) {
             _selectedTab.value = tab
+        }
+
+        fun selectNeighborTab(tab: NeighborProfileTab) {
+            _selectedNeighborTab.value = tab
         }
 
         fun dismissToast() {
@@ -316,6 +333,8 @@ class PublicProfileViewModel
                     )
                 }
 
+            val neighbor = if (kind == PublicProfileKind.Local) buildNeighbor(profile, reviewCards) else null
+
             return PublicProfileContent(
                 profile = profile,
                 kind = kind,
@@ -327,7 +346,115 @@ class PublicProfileViewModel
                         skills = profile.skills,
                         reviews = reviewCards,
                     ),
+                neighbor = neighbor,
             )
+        }
+
+        /**
+         * B.2 (A10.5) — project the live profile onto the canonical
+         * neighbor content. Fields the public DTO can't carry (ledger
+         * detail, mutual neighbors, response time) are synthesised; the
+         * empty-review path drives the new-neighbor degraded frame.
+         */
+        private fun buildNeighbor(
+            profile: PublicProfileDto,
+            reviews: List<ProfileReviewCard>,
+        ): NeighborProfileContent {
+            val reviewCount = profile.reviewCount ?: reviews.size
+            val isNew = reviewCount == 0
+            val rating = profile.averageRating ?: 0.0
+            val jobs = profile.gigsCompleted ?: 0
+
+            val stats =
+                listOf(
+                    NeighborStat(
+                        id = "rating",
+                        value = if (rating > 0) "%.1f".format(rating) else "—",
+                        label = if (reviewCount > 0) "$reviewCount reviews" else "No reviews yet",
+                        icon = PantopusIcon.Star,
+                        valueColor = if (reviewCount > 0) PantopusColors.appText else PantopusColors.appTextMuted,
+                        iconColor = if (reviewCount > 0) PantopusColors.warning else PantopusColors.appTextMuted,
+                    ),
+                    NeighborStat(id = "jobs", value = "$jobs", label = "Jobs done"),
+                    NeighborStat(
+                        id = "response",
+                        value = if (isNew) "New" else "~45m",
+                        label = "Response",
+                        valueColor = if (isNew) PantopusColors.primary600 else PantopusColors.appText,
+                    ),
+                )
+
+            val firstName = profile.displayName.split(" ").firstOrNull() ?: profile.displayName
+            val welcome =
+                if (isNew) {
+                    NeighborWelcome(
+                        title = "Be the welcome wagon",
+                        body =
+                            "$firstName just moved in. A quick hello goes a long way — " +
+                                "and first messages from verified neighbors travel fast.",
+                    )
+                } else {
+                    null
+                }
+
+            return NeighborProfileContent(
+                hero =
+                    NeighborHero(
+                        name = profile.displayName,
+                        locality = profile.locality,
+                        avatarUrl = profile.profilePictureUrl ?: profile.avatarUrl,
+                        isVerified = profile.verified == true,
+                        identity = if (isNew) NeighborIdentity.Fresh else NeighborIdentity.Personal,
+                        kicker = neighborSince(profile.createdAt, isNew),
+                    ),
+                stats = stats,
+                bio = profile.bio,
+                skills = profile.skills,
+                verifications = neighborVerifications(profile, isNew),
+                reviews = reviews,
+                reviewCount = reviewCount,
+                mutuals = null,
+                welcome = welcome,
+                posts = emptyList(),
+                isNewNeighbor = isNew,
+                primaryCtaLabel = if (isNew) "Say hi" else "Message",
+            )
+        }
+
+        private fun neighborVerifications(
+            profile: PublicProfileDto,
+            isNew: Boolean,
+        ): List<NeighborVerification> {
+            val tile = if (isNew) NeighborVerification.Tile.Success else NeighborVerification.Tile.Primary
+            val trailing: NeighborVerification.Trailing =
+                if (isNew) NeighborVerification.Trailing.Status("Recent") else NeighborVerification.Trailing.Check
+            val items = mutableListOf<NeighborVerification>()
+            if (hasHomeResidency(profile)) {
+                items += NeighborVerification("address", PantopusIcon.Home, "Address", "Verified · postcard", tile, trailing)
+            }
+            if (profile.verified == true) {
+                items += NeighborVerification("identity", PantopusIcon.BadgeCheck, "Identity", "Government ID", tile, trailing)
+            }
+            val emailMeta = if (profile.username.isEmpty()) "Confirmed" else "${profile.username}@…"
+            items += NeighborVerification("email", PantopusIcon.Mail, "Email", emailMeta, tile, trailing)
+            return items
+        }
+
+        private fun neighborSince(
+            iso: String?,
+            isNew: Boolean,
+        ): String? {
+            if (iso.isNullOrEmpty()) return if (isNew) "New here" else null
+            val instant =
+                try {
+                    Instant.parse(iso)
+                } catch (_: Throwable) {
+                    return if (isNew) "New here" else null
+                }
+            val days = Duration.between(instant, Instant.now()).toDays()
+            if (days < 14) return "Joined ${days.coerceAtLeast(0)} days ago"
+            val year = instant.atZone(java.time.ZoneId.systemDefault()).year
+            return "Neighbor since $year"
         }
 
         /**
