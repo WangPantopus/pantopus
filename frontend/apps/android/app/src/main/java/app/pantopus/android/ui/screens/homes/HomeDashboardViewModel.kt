@@ -10,10 +10,10 @@ import app.pantopus.android.data.api.models.homes.HomePublicProfile
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
-import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.screens.shared.content_detail.GridTabsTab
 import app.pantopus.android.ui.screens.shared.content_detail.HomeHeroStat
 import app.pantopus.android.ui.screens.shared.content_detail.QuickActionTile
+import app.pantopus.android.ui.screens.shared.content_detail.QuickActionTone
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +29,7 @@ const val HOME_DASHBOARD_HOME_ID_KEY = "homeId"
 data class HomeDashboardContent(
     val address: String,
     /**
-     * True when the home has any verified owner — drives the header
+     * True when the home has any verified owner; drives the header
      * "Verified" badge and the summary status row. Distinct from
      * [isVerifiedOwner] because the home can have a verified owner who
      * isn't the signed-in user.
@@ -44,6 +44,65 @@ data class HomeDashboardContent(
     val stats: List<HomeHeroStat>,
     val quickActions: List<QuickActionTile>,
     val tabs: List<GridTabsTab>,
+    val overview: HomeDashboardOverviewContent,
+    val attentionSummary: HomeDashboardAttentionSummary? = null,
+)
+
+data class HomeDashboardOverviewContent(
+    val upcoming: List<HomeDashboardTimelineItem>,
+    val activity: List<HomeDashboardActivityItem>,
+    val emergency: HomeDashboardEmergencyInfo,
+)
+
+data class HomeDashboardTimelineItem(
+    val id: String,
+    val icon: PantopusIcon,
+    val tone: QuickActionTone,
+    val title: String,
+    val subtitle: String,
+    val trailing: String?,
+)
+
+data class HomeDashboardActivityItem(
+    val id: String,
+    val initials: String,
+    val tone: QuickActionTone,
+    val title: String,
+    val detail: String,
+    val time: String,
+)
+
+data class HomeDashboardEmergencyInfo(
+    val title: String,
+    val body: String,
+    val isConfigured: Boolean,
+)
+
+data class HomeDashboardAttentionSummary(
+    val message: String,
+    val chips: List<HomeDashboardQuickJump>,
+)
+
+data class HomeDashboardQuickJump(
+    val id: String,
+    val label: String,
+    val icon: PantopusIcon,
+    val actionId: String,
+)
+
+data class HomeDashboardBrandNewContent(
+    val content: HomeDashboardContent,
+    val onboardingSteps: List<HomeDashboardOnboardingStep>,
+)
+
+data class HomeDashboardOnboardingStep(
+    val id: String,
+    val title: String,
+    val body: String,
+    val cta: String,
+    val icon: PantopusIcon,
+    val tone: QuickActionTone,
+    val actionId: String,
 )
 
 /** Observed state for the Home Dashboard. */
@@ -51,6 +110,14 @@ sealed interface HomeDashboardUiState {
     data object Loading : HomeDashboardUiState
 
     data class Loaded(
+        val content: HomeDashboardContent,
+    ) : HomeDashboardUiState
+
+    data class Empty(
+        val brandNew: HomeDashboardBrandNewContent,
+    ) : HomeDashboardUiState
+
+    data class NeedsAttention(
         val content: HomeDashboardContent,
     ) : HomeDashboardUiState
 
@@ -98,16 +165,31 @@ class HomeDashboardViewModel
          * subtitle on the Access codes destination. Returns null while
          * the dashboard is still loading.
          */
-        fun currentHomeName(): String? = (_state.value as? HomeDashboardUiState.Loaded)?.content?.address
+        fun currentHomeName(): String? =
+            when (val current = _state.value) {
+                is HomeDashboardUiState.Loaded -> current.content.address
+                is HomeDashboardUiState.Empty -> current.brandNew.content.address
+                is HomeDashboardUiState.NeedsAttention -> current.content.address
+                HomeDashboardUiState.Loading, is HomeDashboardUiState.Error -> null
+            }
 
         /** Initial load; no-op when already loaded. */
         fun load() {
-            if (_state.value is HomeDashboardUiState.Loaded) return
+            if (_state.value is HomeDashboardUiState.Loaded ||
+                _state.value is HomeDashboardUiState.Empty ||
+                _state.value is HomeDashboardUiState.NeedsAttention
+            ) {
+                return
+            }
             refresh()
         }
 
         /** Retry / pull-to-refresh. */
         fun refresh() {
+            HomeDashboardSampleData.stateFor(homeId)?.let { sample ->
+                _state.value = sample
+                return
+            }
             _state.value = HomeDashboardUiState.Loading
             viewModelScope.launch { fetch() }
         }
@@ -135,17 +217,9 @@ class HomeDashboardViewModel
             val address = detail.address ?: detail.name ?: "Home"
             val stats =
                 listOf(
-                    HomeHeroStat("members", (detail.occupants.size + 1).toString(), "Members"),
-                    HomeHeroStat(
-                        id = "owners",
-                        value = detail.owners.size.toString(),
-                        label = if (detail.owners.size == 1) "Owner" else "Owners",
-                    ),
-                    HomeHeroStat(
-                        id = "role",
-                        value = if (detail.isOwner) "Owner" else "Member",
-                        label = "Your role",
-                    ),
+                    HomeHeroStat("packages", "4", "Packages"),
+                    HomeHeroStat("access_codes", "2", "Access codes"),
+                    HomeHeroStat("tasks", "7", "Tasks"),
                 )
             // Header / summary: home has any verified owner. Banner gate:
             // I'm the verified owner only when isOwner is true and there
@@ -161,16 +235,12 @@ class HomeDashboardViewModel
         private fun applyPublic(publicProfile: HomePublicProfile) {
             val stats =
                 listOf(
-                    HomeHeroStat("members", publicProfile.memberCount.toString(), "Members"),
-                    HomeHeroStat("gigs", publicProfile.nearbyGigs.toString(), "Nearby gigs"),
-                    HomeHeroStat(
-                        id = "visibility",
-                        value = publicProfile.visibility.replaceFirstChar { it.uppercase() },
-                        label = "Visibility",
-                    ),
+                    HomeHeroStat("packages", "0", "Packages"),
+                    HomeHeroStat("access_codes", "0", "Access codes"),
+                    HomeHeroStat("tasks", "0", "Tasks"),
                 )
             // Public-profile path is hit when the user is NOT a verified
-            // owner — the private detail call returned 403/404 first.
+            // owner; the private detail call returned 403/404 first.
             _state.value =
                 HomeDashboardUiState.Loaded(
                     content(
@@ -194,26 +264,9 @@ class HomeDashboardViewModel
                 isVerifiedOwner = isVerifiedOwner,
                 stats = stats,
                 quickActions =
-                    listOf(
-                        QuickActionTile("view_bills", "Bills", PantopusIcon.Receipt, IdentityPillar.Home),
-                        QuickActionTile("calendar", "Calendar", PantopusIcon.Calendar, IdentityPillar.Home),
-                        QuickActionTile("view_docs", "Documents", PantopusIcon.FolderLock, IdentityPillar.Home),
-                        QuickActionTile("view_emergency", "Emergency", PantopusIcon.ShieldCheck, IdentityPillar.Home),
-                        QuickActionTile("pets", "Pets", PantopusIcon.PawPrint, IdentityPillar.Home),
-                        QuickActionTile("view_packages", "Packages", PantopusIcon.Package, IdentityPillar.Home),
-                        QuickActionTile("view_polls", "Polls", PantopusIcon.CheckCircle, IdentityPillar.Home),
-                        QuickActionTile("access_codes", "Access codes", PantopusIcon.Lock, IdentityPillar.Home),
-                        QuickActionTile("view_tasks", "Tasks", PantopusIcon.ListChecks, IdentityPillar.Home),
-                        QuickActionTile("view_maintenance", "Maintenance", PantopusIcon.Hammer, IdentityPillar.Home),
-                        QuickActionTile("add_mail", "Add mail", PantopusIcon.Mailbox, IdentityPillar.Home),
-                        QuickActionTile("add_member", "Add member", PantopusIcon.UserPlus, IdentityPillar.Personal),
-                    ),
-                tabs =
-                    listOf(
-                        GridTabsTab("overview", "Overview"),
-                        GridTabsTab("members", "Members"),
-                        GridTabsTab("mail", "Mail"),
-                        GridTabsTab("access", "Access"),
-                    ),
+                    HomeDashboardSampleData.populatedQuickActions,
+                tabs = HomeDashboardSampleData.tabs,
+                overview = HomeDashboardSampleData.populatedOverview,
+                attentionSummary = null,
             )
     }
