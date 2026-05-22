@@ -33,14 +33,9 @@ public enum AddHomeStep: Int, CaseIterable, Sendable {
     }
 }
 
-/// User-supplied address fields in step 1. We deviate from the design's
-/// "single typeahead" because the backend's
-/// `propertySuggestions` Joi schema requires `{address, city, state,
-/// zipCode}` rather than a free-form `{query}` (`backend/routes/home.js:540`).
-/// A real typeahead will need a server-side autocomplete endpoint.
-///
-/// TODO(backend): expose a query-only autocomplete to enable the design's
-/// single-input typeahead UX in step 1.
+/// Structured address fields selected by the search-first step. The
+/// source is a deterministic candidate fixture until the API contract
+/// lands, but downstream wizard steps keep consuming this shape.
 public struct AddHomeAddressFields: Codable, Sendable, Equatable {
     public var street: String
     public var unit: String

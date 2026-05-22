@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod")
+@file:Suppress("PackageNaming", "LongMethod", "MagicNumber")
 
 package app.pantopus.android.ui.screens.homes.add_home
 
@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -23,19 +26,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
-import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.screens.shared.wizard.WizardShell
-import app.pantopus.android.ui.screens.shared.wizard.blocks.FormFieldsBlock
 import app.pantopus.android.ui.screens.shared.wizard.blocks.HeadlineBlock
 import app.pantopus.android.ui.screens.shared.wizard.blocks.ReviewSummaryBlock
 import app.pantopus.android.ui.screens.shared.wizard.blocks.ReviewSummaryRow
@@ -116,48 +123,30 @@ private fun AddressStep(
     state: AddHomeUiState,
     vm: AddHomeWizardViewModel,
 ) {
-    HeadlineBlock("What's the address?")
-    SubcopyBlock("Enter the street, city, state, and ZIP for the home you'd like to add.")
-    FormFieldsBlock {
-        PantopusTextField(
-            label = "Street",
-            value = state.form.address.street,
-            onValueChange = { vm.updateField(AddressField.Street, it) },
-            placeholder = "123 Main St",
-            fieldTestTag = "addHome_street",
+    HeadlineBlock("Where do you live?")
+    SubcopyBlock("Pick your address to start. You'll verify it next.")
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+        AddHomeSearchField(
+            query = state.homeSearchQuery,
+            onQueryChange = vm::updateSearchQuery,
+            onClear = vm::clearSearchQuery,
         )
-        PantopusTextField(
-            label = "Unit (optional)",
-            value = state.form.address.unit,
-            onValueChange = { vm.updateField(AddressField.Unit, it) },
-            placeholder = "Apt 4B",
-            fieldTestTag = "addHome_unit",
-        )
-        PantopusTextField(
-            label = "City",
-            value = state.form.address.city,
-            onValueChange = { vm.updateField(AddressField.City, it) },
-            fieldTestTag = "addHome_city",
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            PantopusTextField(
-                label = "State",
-                value = state.form.address.state,
-                onValueChange = { vm.updateField(AddressField.State, it) },
-                modifier = Modifier.weight(1f),
-                fieldTestTag = "addHome_state",
+        if (vm.showsAutocomplete) {
+            AddHomeAutocompleteDropdown(
+                query = state.homeSearchQuery,
+                results = vm.autocompleteResults,
+                onSelect = vm::selectAddressCandidate,
+                onAddManually = vm::addManuallyTapped,
             )
-            PantopusTextField(
-                label = "ZIP",
-                value = state.form.address.zipCode,
-                onValueChange = { vm.updateField(AddressField.Zip, it) },
-                modifier = Modifier.weight(1f),
-                fieldTestTag = "addHome_zip",
+        } else {
+            UseCurrentLocationPill(onClick = vm::useCurrentLocation)
+            NearbyHomesSection(
+                homes = vm.nearbyHomes,
+                selectedHomeId = state.selectedHomeId,
+                onSelect = vm::selectAddressCandidate,
             )
+            ManualAddressButton(onClick = vm::addManuallyTapped)
         }
-    }
-    if (state.suggestions.isNotEmpty()) {
-        SuggestionList(state.suggestions, onSelect = vm::selectSuggestion)
     }
 }
 
@@ -258,47 +247,496 @@ private fun SuccessStep() {
 // MARK: - Helpers
 
 @Composable
-private fun SuggestionList(
-    suggestions: List<String>,
-    onSelect: (String) -> Unit,
+private fun AddHomeSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(
+                    width = if (query.isEmpty()) 1.dp else 2.dp,
+                    color = if (query.isEmpty()) PantopusColors.appBorder else PantopusColors.primary600,
+                    shape = RoundedCornerShape(Radii.lg),
+                ).padding(horizontal = Spacing.s3)
+                .testTag("addHomeSearchField")
+                .semantics {
+                    contentDescription = "Search by address or nearby"
+                },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Search,
+            contentDescription = null,
+            size = 18.dp,
+            tint = if (query.isEmpty()) PantopusColors.primary600 else PantopusColors.appTextSecondary,
+        )
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            singleLine = true,
+            textStyle = PantopusTextStyle.body.copy(color = PantopusColors.appText),
+            cursorBrush = SolidColor(PantopusColors.primary600),
+            modifier = Modifier.weight(1f).testTag("addHomeSearchInput"),
+            decorationBox = { inner ->
+                if (query.isEmpty()) {
+                    Text(
+                        text = "Search by address or nearby…",
+                        style = PantopusTextStyle.body,
+                        color = PantopusColors.primary600,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                inner()
+            },
+        )
+        if (query.isNotEmpty()) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appSurfaceSunken)
+                        .clickable(role = Role.Button, onClick = onClear)
+                        .testTag("addHome_clearSearch")
+                        .semantics { contentDescription = "Clear search" },
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.X,
+                    contentDescription = null,
+                    size = 14.dp,
+                    tint = PantopusColors.appTextSecondary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UseCurrentLocationPill(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.primary50)
+                .border(1.dp, PantopusColors.primary100, RoundedCornerShape(Radii.pill))
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
+                .testTag("addHome_useCurrentLocation")
+                .semantics { contentDescription = "Use current location" },
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.MapPin,
+            contentDescription = null,
+            size = 16.dp,
+            tint = PantopusColors.primary700,
+        )
+        Text(
+            text = "Use current location",
+            style = PantopusTextStyle.small,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.primary700,
+            modifier = Modifier.padding(start = Spacing.s2),
+        )
+    }
+}
+
+@Composable
+private fun NearbyHomesSection(
+    homes: List<AddHomeAddressCandidate>,
+    selectedHomeId: String?,
+    onSelect: (AddHomeAddressCandidate) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.MapPin,
+                contentDescription = null,
+                size = 12.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = "Nearby · Brooklyn, NY",
+                style = PantopusTextStyle.overline,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            homes.forEach { home ->
+                NearbyHomeRow(
+                    home = home,
+                    isSelected = selectedHomeId == home.id,
+                    onSelect = { onSelect(home) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NearbyHomeRow(
+    home: AddHomeAddressCandidate,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 64.dp)
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(if (isSelected) PantopusColors.primary50 else PantopusColors.appSurface)
+                .border(
+                    width = if (isSelected) 2.dp else 1.dp,
+                    color = if (isSelected) PantopusColors.primary600 else PantopusColors.appBorder,
+                    shape = RoundedCornerShape(Radii.xl),
+                ).clickable(enabled = !home.isClaimed, role = Role.Button, onClick = onSelect)
+                .padding(Spacing.s3)
+                .testTag("addHome_nearby_${home.id}")
+                .semantics {
+                    contentDescription = "${home.line1}, ${home.secondaryLine}, ${home.status.label}"
+                },
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(if (isSelected) PantopusColors.primary600 else PantopusColors.appSurfaceSunken),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Home,
+                contentDescription = null,
+                size = 18.dp,
+                tint = if (isSelected) PantopusColors.appTextInverse else PantopusColors.appTextStrong,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = home.line1,
+                style = PantopusTextStyle.body,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                Text(
+                    text = home.line2,
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                home.distance?.let { distance ->
+                    Text(
+                        text = "·",
+                        style = PantopusTextStyle.caption,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                    Text(
+                        text = distance,
+                        style = PantopusTextStyle.caption,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+            }
+        }
+        StatusPill(status = home.status)
+        if (isSelected) {
+            PantopusIconImage(
+                icon = PantopusIcon.Check,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.primary600,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatusPill(status: AddHomeAddressStatus) {
+    Text(
+        text = status.label,
+        style = PantopusTextStyle.caption,
+        fontWeight = FontWeight.SemiBold,
+        color = if (status == AddHomeAddressStatus.Available) PantopusColors.success else PantopusColors.appTextSecondary,
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(
+                    if (status == AddHomeAddressStatus.Available) {
+                        PantopusColors.successBg
+                    } else {
+                        PantopusColors.appSurfaceSunken
+                    },
+                ).padding(horizontal = Spacing.s2, vertical = Spacing.s1),
+    )
+}
+
+@Composable
+private fun AddHomeAutocompleteDropdown(
+    query: String,
+    results: List<AddHomeAddressCandidate>,
+    onSelect: (AddHomeAddressCandidate) -> Unit,
+    onAddManually: () -> Unit,
 ) {
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface),
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl)),
     ) {
-        suggestions.forEachIndexed { index, suggestion ->
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(role = Role.Button) { onSelect(suggestion) }
-                        .padding(Spacing.s3)
-                        .testTag("addHome_suggestion_$index"),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = suggestion,
-                    style = PantopusTextStyle.body,
-                    color = PantopusColors.appText,
-                    modifier = Modifier.weight(1f),
-                )
-                PantopusIconImage(
-                    icon = PantopusIcon.ChevronRight,
-                    contentDescription = null,
-                    size = 16.dp,
-                    tint = PantopusColors.appTextSecondary,
-                )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(PantopusColors.appSurfaceMuted)
+                    .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Search,
+                contentDescription = null,
+                size = 10.dp,
+                tint = PantopusColors.appTextMuted,
+            )
+            Text(
+                text = "${results.size} matches",
+                style = PantopusTextStyle.overline,
+                color = PantopusColors.appTextMuted,
+            )
+        }
+        results.forEachIndexed { index, candidate ->
+            AutocompleteRow(
+                candidate = candidate,
+                query = query,
+                onSelect = { onSelect(candidate) },
+                modifier = Modifier.testTag("addHome_autocomplete_$index"),
+            )
+            HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorderSubtle)
+        }
+        ManualFallbackRow(onClick = onAddManually)
+    }
+}
+
+@Composable
+private fun AutocompleteRow(
+    candidate: AddHomeAddressCandidate,
+    query: String,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .clickable(role = Role.Button, onClick = onSelect)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
+                .semantics {
+                    contentDescription = "${candidate.line1}, ${candidate.secondaryLine}"
+                },
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurfaceSunken),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.MapPin,
+                contentDescription = null,
+                size = 15.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            HighlightedAddressText(value = candidate.line1, query = query)
+            Text(
+                text = candidate.secondaryLine,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 14.dp,
+            tint = PantopusColors.appTextMuted,
+        )
+    }
+}
+
+@Composable
+private fun HighlightedAddressText(
+    value: String,
+    query: String,
+) {
+    val ranges = highlightRanges(value = value, query = query)
+    val text =
+        buildAnnotatedString {
+            var cursor = 0
+            ranges.forEach { range ->
+                if (cursor < range.first) {
+                    append(value.substring(cursor, range.first))
+                }
+                withStyle(SpanStyle(color = PantopusColors.appText, fontWeight = FontWeight.Bold)) {
+                    append(value.substring(range.first, range.second))
+                }
+                cursor = range.second
             }
-            if (index != suggestions.lastIndex) {
-                androidx.compose.material3.HorizontalDivider(
-                    thickness = 1.dp,
-                    color = PantopusColors.appBorderSubtle,
-                )
+            if (cursor < value.length) {
+                append(value.substring(cursor))
             }
         }
+    Text(
+        text = text,
+        style = PantopusTextStyle.body,
+        color = PantopusColors.appTextStrong,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+private fun highlightRanges(
+    value: String,
+    query: String,
+): List<Pair<Int, Int>> {
+    val needle = query.trim()
+    if (needle.isEmpty()) return emptyList()
+
+    val normalizedValue = value.lowercase()
+    val normalizedNeedle = needle.lowercase()
+    val phraseIndex = normalizedValue.indexOf(normalizedNeedle)
+    if (phraseIndex >= 0) {
+        return listOf(phraseIndex to phraseIndex + needle.length)
+    }
+
+    val ranges = mutableListOf<Pair<Int, Int>>()
+    normalizedNeedle
+        .split(" ")
+        .filter { it.isNotBlank() }
+        .forEach { token ->
+            var searchStart = 0
+            while (searchStart < normalizedValue.length) {
+                val index = normalizedValue.indexOf(token, searchStart)
+                if (index < 0) break
+                val range = index to index + token.length
+                if (ranges.none { it.overlaps(range) }) {
+                    ranges += range
+                }
+                searchStart = range.second
+            }
+        }
+    return ranges.sortedBy { it.first }
+}
+
+private fun Pair<Int, Int>.overlaps(other: Pair<Int, Int>): Boolean = first < other.second && other.first < second
+
+@Composable
+private fun ManualFallbackRow(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .background(PantopusColors.primary50)
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
+                .testTag("addHome_manualFallback")
+                .semantics { contentDescription = "Add address manually" },
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurface),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Plus,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.primary600,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Add manually",
+                style = PantopusTextStyle.body,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.primary700,
+            )
+            Text(
+                text = "We'll geocode it and mail a verification code.",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 16.dp,
+            tint = PantopusColors.primary600,
+        )
+    }
+}
+
+@Composable
+private fun ManualAddressButton(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.md))
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(vertical = Spacing.s1)
+                .testTag("addHome_addAddressManually"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Plus,
+            contentDescription = null,
+            size = 14.dp,
+            tint = PantopusColors.primary600,
+        )
+        Text(
+            text = "Add address manually",
+            style = PantopusTextStyle.small,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.primary600,
+        )
     }
 }
 

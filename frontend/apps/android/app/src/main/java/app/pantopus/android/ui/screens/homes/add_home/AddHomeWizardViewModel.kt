@@ -7,11 +7,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
-import app.pantopus.android.data.api.models.common.JsonValue
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CheckAddressResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
-import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
@@ -21,8 +19,6 @@ import app.pantopus.android.ui.screens.shared.wizard.WizardModel
 import app.pantopus.android.ui.screens.shared.wizard.WizardProgressLabel
 import app.pantopus.android.ui.screens.shared.wizard.WizardSecondaryCta
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,8 +33,8 @@ import javax.inject.Inject
  */
 data class AddHomeUiState(
     val form: AddHomeFormState = AddHomeFormState.EMPTY,
-    val suggestions: List<String> = emptyList(),
-    val isLoadingSuggestions: Boolean = false,
+    val homeSearchQuery: String = "",
+    val selectedHomeId: String? = null,
     val addressCheck: CheckAddressResponse? = null,
     val isCheckingAddress: Boolean = false,
     val isSubmitting: Boolean = false,
@@ -47,10 +43,9 @@ data class AddHomeUiState(
 )
 
 /**
- * Drives the four-step + success Add-Home wizard. Calls
- * `POST /api/homes/property-suggestions`, `POST /api/homes/check-address`,
- * and `POST /api/homes` (`backend/routes/home.js:540`, `:555`, `:677`)
- * via [HomesRepository], and exposes the [WizardChrome] for the shared
+ * Drives the four-step + success Add-Home wizard. Step 1 uses
+ * deterministic address fixtures, then the remaining steps keep using
+ * the existing structured address shape and [WizardChrome] for the shared
  * [app.pantopus.android.ui.screens.shared.wizard.WizardShell].
  *
  * Form state is mirrored into [SavedStateHandle] so the wizard survives
@@ -67,15 +62,22 @@ open class AddHomeWizardViewModel
     ) : ViewModel(),
         WizardModel {
         private val _state =
-            MutableStateFlow(restoreFormState().let { AddHomeUiState(form = it) })
+            MutableStateFlow(
+                restoreFormState().let { form ->
+                    val candidate = AddHomeSampleData.candidateFor(form.address)
+                    AddHomeUiState(
+                        form = form,
+                        homeSearchQuery = candidate?.line1.orEmpty(),
+                        selectedHomeId = candidate?.id,
+                    )
+                },
+            )
 
         /** Combined UI state consumed by [AddHomeWizardScreen]. */
         val state: StateFlow<AddHomeUiState> = _state.asStateFlow()
 
         /** One-shot navigation events the screen reacts to. */
         val pendingEvent = MutableStateFlow<AddHomeOutboundEvent?>(null)
-
-        private var debounceJob: Job? = null
 
         // MARK: - WizardModel
 
@@ -105,7 +107,78 @@ open class AddHomeWizardViewModel
             }
         }
 
-        // MARK: - Field updates
+        // MARK: - Search updates
+
+        val nearbyHomes: List<AddHomeAddressCandidate>
+            get() = AddHomeSampleData.nearbyHomes
+
+        val autocompleteResults: List<AddHomeAddressCandidate>
+            get() =
+                if (_state.value.selectedHomeId == null) {
+                    AddHomeSampleData.autocompleteResults(_state.value.homeSearchQuery)
+                } else {
+                    emptyList()
+                }
+
+        val showsAutocomplete: Boolean
+            get() = _state.value.selectedHomeId == null && _state.value.homeSearchQuery.trim().isNotEmpty()
+
+        fun updateSearchQuery(query: String) {
+            _state.update {
+                it.copy(
+                    homeSearchQuery = query,
+                    selectedHomeId = null,
+                    form = it.form.copy(address = AddHomeAddressFields()),
+                )
+            }
+            persist()
+        }
+
+        fun clearSearchQuery() {
+            _state.update {
+                it.copy(
+                    homeSearchQuery = "",
+                    selectedHomeId = null,
+                    form = it.form.copy(address = AddHomeAddressFields()),
+                )
+            }
+            persist()
+        }
+
+        fun useCurrentLocation() {
+            _state.update {
+                it.copy(
+                    homeSearchQuery = "",
+                    selectedHomeId = null,
+                    form = it.form.copy(address = AddHomeAddressFields()),
+                )
+            }
+            persist()
+        }
+
+        fun selectAddressCandidate(candidate: AddHomeAddressCandidate) {
+            if (candidate.isClaimed) return
+            _state.update {
+                it.copy(
+                    homeSearchQuery = candidate.line1,
+                    selectedHomeId = candidate.id,
+                    form = it.form.copy(address = candidate.addressFields),
+                )
+            }
+            persist()
+        }
+
+        fun addManuallyTapped() {
+            _state.update {
+                it.copy(
+                    selectedHomeId = null,
+                    form = it.form.copy(address = AddHomeAddressFields()),
+                )
+            }
+            persist()
+        }
+
+        // MARK: - Legacy field updates
 
         fun updateField(
             field: AddressField,
@@ -120,17 +193,11 @@ open class AddHomeWizardViewModel
                         AddressField.State -> current.form.address.copy(state = value)
                         AddressField.Zip -> current.form.address.copy(zipCode = value)
                     }
-                current.copy(form = current.form.copy(address = next))
-            }
-            persist()
-            scheduleSuggestions()
-        }
-
-        fun selectSuggestion(value: String) {
-            _state.update { current ->
+                val candidate = AddHomeSampleData.candidateFor(next)
                 current.copy(
-                    form = current.form.copy(address = current.form.address.copy(street = value)),
-                    suggestions = emptyList(),
+                    form = current.form.copy(address = next),
+                    homeSearchQuery = candidate?.line1 ?: next.street,
+                    selectedHomeId = candidate?.id,
                 )
             }
             persist()
@@ -192,38 +259,6 @@ open class AddHomeWizardViewModel
         }
 
         // MARK: - API calls
-
-        private fun scheduleSuggestions() {
-            debounceJob?.cancel()
-            val fields = _state.value.form.address
-            if (!fields.isComplete) {
-                _state.update { it.copy(suggestions = emptyList(), isLoadingSuggestions = false) }
-                return
-            }
-            debounceJob =
-                viewModelScope.launch {
-                    delay(SUGGESTION_DEBOUNCE_MS)
-                    fetchSuggestions(fields)
-                }
-        }
-
-        private suspend fun fetchSuggestions(fields: AddHomeAddressFields) {
-            _state.update { it.copy(isLoadingSuggestions = true) }
-            val request =
-                PropertySuggestionsRequest(
-                    address = fields.street,
-                    unitNumber = fields.unit.takeIf { it.isNotEmpty() },
-                    city = fields.city,
-                    state = fields.state,
-                    zipCode = fields.zipCode,
-                )
-            val result = repository.propertySuggestions(request)
-            val suggestions =
-                if (result is NetworkResult.Success) flattenSuggestions(result.data) else emptyList()
-            _state.update {
-                it.copy(suggestions = suggestions, isLoadingSuggestions = false)
-            }
-        }
 
         private suspend fun runCheckAddress() {
             val fields = _state.value.form.address
@@ -340,7 +375,7 @@ open class AddHomeWizardViewModel
             val step = state.form.currentStep
             val progress = progressLabel(step)
             return WizardChrome(
-                title = "Add a home",
+                title = title(step),
                 progressLabel = progress,
                 progressFraction = progressFraction(step),
                 leading = leadingControl(step),
@@ -350,11 +385,20 @@ open class AddHomeWizardViewModel
                 isSubmitting = state.isSubmitting || state.isCheckingAddress,
                 dirty =
                     step != AddHomeStep.Success &&
-                        state.form.address.street
-                            .isNotEmpty(),
+                        (
+                            state.selectedHomeId != null ||
+                                state.homeSearchQuery.isNotEmpty() ||
+                                state.form.address.street.isNotEmpty()
+                        ),
                 showsProgressBar = step != AddHomeStep.Success,
             )
         }
+
+        private fun title(step: AddHomeStep): String =
+            when (step) {
+                AddHomeStep.Address -> "Find your home"
+                else -> "Add a home"
+            }
 
         private fun leadingControl(step: AddHomeStep): WizardLeadingControl =
             when (step) {
@@ -388,7 +432,7 @@ open class AddHomeWizardViewModel
 
         private fun primaryEnabled(state: AddHomeUiState): Boolean =
             when (state.form.currentStep) {
-                AddHomeStep.Address -> state.form.address.isComplete
+                AddHomeStep.Address -> state.selectedHomeId != null
                 AddHomeStep.Confirm -> !state.isCheckingAddress && state.errorMessage == null
                 AddHomeStep.Role -> state.form.role != null
                 AddHomeStep.Review -> state.form.role != null
@@ -396,9 +440,6 @@ open class AddHomeWizardViewModel
             }
 
         companion object {
-            const val SUGGESTION_DEBOUNCE_MS: Long = 300L
-            private const val MAX_SUGGESTIONS = 5
-
             private const val KEY_STEP = "addHome.step"
             private const val KEY_STREET = "addHome.street"
             private const val KEY_UNIT = "addHome.unit"
@@ -407,31 +448,6 @@ open class AddHomeWizardViewModel
             private const val KEY_ZIP = "addHome.zip"
             private const val KEY_PRIMARY = "addHome.primary"
             private const val KEY_ROLE = "addHome.role"
-
-            /**
-             * Flatten the provider-defined ATTOM JSON into a list of human-
-             * readable display strings. Returns at most [MAX_SUGGESTIONS].
-             */
-            fun flattenSuggestions(value: JsonValue): List<String> {
-                val out = mutableListOf<String>()
-                collectAny(value as Any?, out)
-                return out.take(MAX_SUGGESTIONS)
-            }
-
-            private fun collectAny(
-                value: Any?,
-                out: MutableList<String>,
-            ) {
-                when (value) {
-                    is Map<*, *> -> {
-                        val address = value["address"] as? String
-                        if (!address.isNullOrEmpty()) out += address
-                        value.values.forEach { collectAny(it, out) }
-                    }
-                    is List<*> -> value.forEach { collectAny(it, out) }
-                    else -> Unit
-                }
-            }
         }
     }
 

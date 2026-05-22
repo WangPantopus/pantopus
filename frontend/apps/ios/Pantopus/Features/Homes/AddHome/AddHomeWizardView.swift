@@ -13,7 +13,7 @@ import SwiftUI
 /// success, signals the parent stack to pop the wizard and route to the
 /// new home's dashboard via `onOpenHomeDashboard`.
 public struct AddHomeWizardView: View {
-    @State private var viewModel = AddHomeWizardViewModel()
+    @State private var viewModel: AddHomeWizardViewModel
     @SceneStorage("addHomeWizardForm") private var storedForm: String = ""
     @State private var hasRestored = false
     @Environment(\.dismiss) private var dismiss
@@ -23,6 +23,15 @@ public struct AddHomeWizardView: View {
     public init(
         onOpenHomeDashboard: @escaping (String) -> Void
     ) {
+        _viewModel = State(initialValue: AddHomeWizardViewModel())
+        self.onOpenHomeDashboard = onOpenHomeDashboard
+    }
+
+    init(
+        viewModel: AddHomeWizardViewModel,
+        onOpenHomeDashboard: @escaping (String) -> Void
+    ) {
+        _viewModel = State(initialValue: viewModel)
         self.onOpenHomeDashboard = onOpenHomeDashboard
     }
 
@@ -91,96 +100,6 @@ public struct AddHomeWizardView: View {
             onOpenHomeDashboard(homeId)
         }
         viewModel.pendingEvent = nil
-    }
-}
-
-// MARK: - Step 1: Address
-
-private struct AddressStep: View {
-    @Bindable var viewModel: AddHomeWizardViewModel
-
-    var body: some View {
-        HeadlineBlock("What's the address?")
-        SubcopyBlock(
-            "Enter the street, city, state, and ZIP for the home you'd like to add."
-        )
-        FormFieldsBlock {
-            PantopusTextField(
-                "Street",
-                text: streetBinding,
-                placeholder: "123 Main St",
-                contentType: .streetAddressLine1,
-                identifier: "addHome_street"
-            )
-            PantopusTextField(
-                "Unit (optional)",
-                text: unitBinding,
-                placeholder: "Apt 4B",
-                contentType: .streetAddressLine2,
-                identifier: "addHome_unit"
-            )
-            PantopusTextField(
-                "City",
-                text: cityBinding,
-                contentType: .addressCity,
-                identifier: "addHome_city"
-            )
-            HStack(alignment: .top, spacing: Spacing.s2) {
-                PantopusTextField(
-                    "State",
-                    text: stateBinding,
-                    contentType: .addressState,
-                    identifier: "addHome_state"
-                )
-                PantopusTextField(
-                    "ZIP",
-                    text: zipBinding,
-                    keyboardType: .numbersAndPunctuation,
-                    contentType: .postalCode,
-                    identifier: "addHome_zip"
-                )
-            }
-        }
-        if !viewModel.suggestions.isEmpty {
-            SuggestionList(suggestions: viewModel.suggestions) {
-                viewModel.selectSuggestion($0)
-            }
-        }
-    }
-
-    private var streetBinding: Binding<String> {
-        Binding(
-            get: { viewModel.form.address.street },
-            set: { viewModel.update(.street, to: $0) }
-        )
-    }
-
-    private var unitBinding: Binding<String> {
-        Binding(
-            get: { viewModel.form.address.unit },
-            set: { viewModel.update(.unit, to: $0) }
-        )
-    }
-
-    private var cityBinding: Binding<String> {
-        Binding(
-            get: { viewModel.form.address.city },
-            set: { viewModel.update(.city, to: $0) }
-        )
-    }
-
-    private var stateBinding: Binding<String> {
-        Binding(
-            get: { viewModel.form.address.state },
-            set: { viewModel.update(.state, to: $0) }
-        )
-    }
-
-    private var zipBinding: Binding<String> {
-        Binding(
-            get: { viewModel.form.address.zipCode },
-            set: { viewModel.update(.zip, to: $0) }
-        )
     }
 }
 
@@ -310,39 +229,6 @@ private extension StatusWaitingContent {
     }
 }
 
-// MARK: - Helpers
-
-private struct SuggestionList: View {
-    let suggestions: [String]
-    let onSelect: (String) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(suggestions.enumerated()), id: \.offset) { index, suggestion in
-                Button {
-                    onSelect(suggestion)
-                } label: {
-                    HStack {
-                        Text(suggestion)
-                            .pantopusTextStyle(.body)
-                            .foregroundStyle(Theme.Color.appText)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Icon(.chevronRight, size: 16, color: Theme.Color.appTextSecondary)
-                    }
-                    .padding(Spacing.s3)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("addHome_suggestion_\(index)")
-                if index != suggestions.count - 1 {
-                    Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
-                }
-            }
-        }
-        .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-    }
-}
-
 private struct AddressVerdictRow: View {
     let check: CheckAddressResponse
 
@@ -390,7 +276,7 @@ private struct AddressVerdictRow: View {
 
 private struct PrimaryHomeToggle: View {
     let isPrimary: Bool
-    let onChange: (Bool) -> Void
+    let onChange: @MainActor @Sendable (Bool) -> Void
 
     var body: some View {
         HStack {
