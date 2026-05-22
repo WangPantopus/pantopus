@@ -13,7 +13,7 @@ import Observation
 /// Projection of the home header + stats + tab strip.
 public struct HomeDashboardContent: Sendable {
     public let address: String
-    /// True when the home has any verified owner — drives the header
+    /// True when the home has any verified owner; drives the header
     /// "Verified" badge and the summary status row. Distinct from
     /// `isVerifiedOwner` because the home can have a verified owner
     /// who isn't the signed-in user.
@@ -25,12 +25,73 @@ public struct HomeDashboardContent: Sendable {
     public let stats: [HomeHeroStat]
     public let quickActions: [QuickActionTile]
     public let tabs: [GridTabsTab]
+    public let overview: HomeDashboardOverviewContent
+    public let attentionSummary: HomeDashboardAttentionSummary?
+}
+
+public struct HomeDashboardOverviewContent: Sendable {
+    public let upcoming: [HomeDashboardTimelineItem]
+    public let activity: [HomeDashboardActivityItem]
+    public let emergency: HomeDashboardEmergencyInfo
+}
+
+public struct HomeDashboardTimelineItem: Sendable, Identifiable {
+    public let id: String
+    public let icon: PantopusIcon
+    public let tone: QuickActionTone
+    public let title: String
+    public let subtitle: String
+    public let trailing: String?
+}
+
+public struct HomeDashboardActivityItem: Sendable, Identifiable {
+    public let id: String
+    public let initials: String
+    public let tone: QuickActionTone
+    public let title: String
+    public let detail: String
+    public let time: String
+}
+
+public struct HomeDashboardEmergencyInfo: Sendable {
+    public let title: String
+    public let body: String
+    public let isConfigured: Bool
+}
+
+public struct HomeDashboardAttentionSummary: Sendable {
+    public let message: String
+    public let chips: [HomeDashboardQuickJump]
+}
+
+public struct HomeDashboardQuickJump: Sendable, Identifiable {
+    public let id: String
+    public let label: String
+    public let icon: PantopusIcon
+    public let actionId: String
+}
+
+public struct HomeDashboardBrandNewContent: Sendable {
+    public let content: HomeDashboardContent
+    public let onboardingSteps: [HomeDashboardOnboardingStep]
+}
+
+public struct HomeDashboardOnboardingStep: Sendable, Identifiable {
+    public let id: String
+    public let title: String
+    public let body: String
+    public let cta: String
+    public let icon: PantopusIcon
+    public let tone: QuickActionTone
+    public let actionId: String
 }
 
 /// Observed state for the Home Dashboard screen.
 public enum HomeDashboardState: Sendable {
     case loading
     case loaded(HomeDashboardContent)
+    case empty(HomeDashboardBrandNewContent)
+    case needsAttention(HomeDashboardContent)
     case error(message: String)
 }
 
@@ -53,14 +114,31 @@ final class HomeDashboardViewModel {
 
     /// Initial load; no-op when we already have content.
     func load() async {
-        if case .loaded = state { return }
+        if isContentState { return }
+        if let sampleState = HomeDashboardSampleData.state(for: homeId) {
+            state = sampleState
+            return
+        }
         state = .loading
         await fetch()
     }
 
     /// Pull-to-refresh / retry.
     func refresh() async {
+        if let sampleState = HomeDashboardSampleData.state(for: homeId) {
+            state = sampleState
+            return
+        }
         await fetch()
+    }
+
+    private var isContentState: Bool {
+        switch state {
+        case .loaded, .empty, .needsAttention:
+            true
+        case .loading, .error:
+            false
+        }
     }
 
     private func fetch() async {
@@ -89,17 +167,9 @@ final class HomeDashboardViewModel {
     private func applyDetail(_ detail: HomeDetail) {
         let address = detail.base.address ?? detail.base.name ?? "Home"
         let stats: [HomeHeroStat] = [
-            HomeHeroStat(id: "members", value: "\(detail.occupants.count + 1)", label: "Members"),
-            HomeHeroStat(
-                id: "owners",
-                value: "\(detail.owners.count)",
-                label: detail.owners.count == 1 ? "Owner" : "Owners"
-            ),
-            HomeHeroStat(
-                id: "verified",
-                value: detail.isOwner ? "Owner" : "Member",
-                label: "Your role"
-            )
+            HomeHeroStat(id: "packages", value: "4", label: "Packages"),
+            HomeHeroStat(id: "access_codes", value: "2", label: "Access codes"),
+            HomeHeroStat(id: "tasks", value: "7", label: "Tasks")
         ]
         state = .loaded(content(
             address: address,
@@ -114,19 +184,15 @@ final class HomeDashboardViewModel {
 
     private func applyPublic(_ public_: HomePublicProfileResponse.HomePublicProfile) {
         let stats: [HomeHeroStat] = [
-            HomeHeroStat(id: "members", value: "\(public_.memberCount)", label: "Members"),
-            HomeHeroStat(id: "gigs", value: "\(public_.nearbyGigs)", label: "Nearby gigs"),
-            HomeHeroStat(
-                id: "visibility",
-                value: public_.visibility.capitalized,
-                label: "Visibility"
-            )
+            HomeHeroStat(id: "packages", value: "0", label: "Packages"),
+            HomeHeroStat(id: "access_codes", value: "0", label: "Access codes"),
+            HomeHeroStat(id: "tasks", value: "0", label: "Tasks")
         ]
         state = .loaded(content(
             address: public_.address,
             verified: public_.hasVerifiedOwner,
             // Public-profile path is hit when the user is NOT a verified
-            // owner — the private detail call returned 403/404 first.
+            // owner; the private detail call returned 403/404 first.
             isVerifiedOwner: false,
             stats: stats
         ))
@@ -143,25 +209,10 @@ final class HomeDashboardViewModel {
             verified: verified,
             isVerifiedOwner: isVerifiedOwner,
             stats: stats,
-            quickActions: [
-                QuickActionTile(id: "view_bills", label: "Bills", icon: .receipt, tint: .home),
-                QuickActionTile(id: "calendar", label: "Calendar", icon: .calendar, tint: .home),
-                QuickActionTile(id: "view_docs", label: "Documents", icon: .folderLock, tint: .home),
-                QuickActionTile(id: "view_emergency", label: "Emergency", icon: .shieldCheck, tint: .home),
-                QuickActionTile(id: "pets", label: "Pets", icon: .pawPrint, tint: .home),
-                QuickActionTile(id: "view_packages", label: "Packages", icon: .package, tint: .home),
-                QuickActionTile(id: "view_polls", label: "Polls", icon: .checkCircle, tint: .home),
-                QuickActionTile(id: "view_tasks", label: "Tasks", icon: .listChecks, tint: .home),
-                QuickActionTile(id: "view_maintenance", label: "Maintenance", icon: .hammer, tint: .home),
-                QuickActionTile(id: "add_mail", label: "Add mail", icon: .mailbox, tint: .home),
-                QuickActionTile(id: "add_member", label: "Add member", icon: .userPlus, tint: .personal)
-            ],
-            tabs: [
-                GridTabsTab(id: "overview", label: "Overview"),
-                GridTabsTab(id: "members", label: "Members"),
-                GridTabsTab(id: "mail", label: "Mail"),
-                GridTabsTab(id: "access", label: "Access")
-            ]
+            quickActions: HomeDashboardSampleData.populatedQuickActions,
+            tabs: HomeDashboardSampleData.tabs,
+            overview: HomeDashboardSampleData.populatedOverview,
+            attentionSummary: nil
         )
     }
 }

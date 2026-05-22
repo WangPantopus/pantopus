@@ -10,18 +10,76 @@ import SwiftUI
 
 // MARK: - Grid + tabs body
 
+public enum QuickActionTone: Sendable, Hashable {
+    case personal
+    case home
+    case business
+    case warning
+    case error
+
+    init(_ pillar: IdentityPillar) {
+        switch pillar {
+        case .personal: self = .personal
+        case .home: self = .home
+        case .business: self = .business
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .personal: Theme.Color.personal
+        case .home: Theme.Color.home
+        case .business: Theme.Color.business
+        case .warning: Theme.Color.warning
+        case .error: Theme.Color.error
+        }
+    }
+
+    var backgroundColor: Color {
+        switch self {
+        case .personal: Theme.Color.personalBg
+        case .home: Theme.Color.homeBg
+        case .business: Theme.Color.businessBg
+        case .warning: Theme.Color.warningBg
+        case .error: Theme.Color.errorBg
+        }
+    }
+}
+
 /// A quick-action tile in the 4-across grid.
 public struct QuickActionTile: Sendable, Identifiable {
     public let id: String
     public let label: String
     public let icon: PantopusIcon
-    public let tint: IdentityPillar
+    public let tone: QuickActionTone
+    public let badge: String?
+    public let isMuted: Bool
 
-    public init(id: String = UUID().uuidString, label: String, icon: PantopusIcon, tint: IdentityPillar) {
+    public init(
+        id: String = UUID().uuidString,
+        label: String,
+        icon: PantopusIcon,
+        tint: IdentityPillar,
+        badge: String? = nil,
+        isMuted: Bool = false
+    ) {
+        self.init(id: id, label: label, icon: icon, tone: QuickActionTone(tint), badge: badge, isMuted: isMuted)
+    }
+
+    public init(
+        id: String = UUID().uuidString,
+        label: String,
+        icon: PantopusIcon,
+        tone: QuickActionTone,
+        badge: String? = nil,
+        isMuted: Bool = false
+    ) {
         self.id = id
         self.label = label
         self.icon = icon
-        self.tint = tint
+        self.tone = tone
+        self.badge = badge
+        self.isMuted = isMuted
     }
 }
 
@@ -64,22 +122,53 @@ public struct GridTabsBody<Overview: View>: View {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s3), count: 4), spacing: Spacing.s3) {
                 ForEach(quickActions) { action in
                     Button { onQuickAction(action.id) } label: {
-                        VStack(spacing: Spacing.s1) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: Radii.md).fill(action.tint.backgroundColor)
-                                Icon(action.icon, size: 22, color: action.tint.color)
+                        ZStack(alignment: .topTrailing) {
+                            VStack(spacing: Spacing.s1) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: Radii.md)
+                                        .fill(action.isMuted ? Theme.Color.appSurfaceSunken : action.tone.backgroundColor)
+                                    Icon(
+                                        action.icon,
+                                        size: 20,
+                                        color: action.isMuted ? Theme.Color.appTextMuted : action.tone.color
+                                    )
+                                }
+                                .frame(width: 36, height: 36)
+                                Text(action.label)
+                                    .pantopusTextStyle(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(action.isMuted ? Theme.Color.appTextSecondary : Theme.Color.appText)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
                             }
-                            .frame(width: 44, height: 44)
-                            Text(action.label)
-                                .pantopusTextStyle(.caption)
-                                .foregroundStyle(Theme.Color.appText)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(2)
+                            .padding(.horizontal, Spacing.s1)
+                            .padding(.vertical, Spacing.s2)
+                            .frame(maxWidth: .infinity, minHeight: 76)
+                            .background(Theme.Color.appSurface)
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+                            )
+
+                            if let badge = action.badge {
+                                Text(badge)
+                                    .pantopusTextStyle(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(Theme.Color.appTextInverse)
+                                    .padding(.horizontal, Spacing.s1)
+                                    .frame(minWidth: 18, minHeight: 18)
+                                    .background(Theme.Color.error)
+                                    .clipShape(Capsule())
+                                    .padding(.top, Spacing.s1)
+                                    .padding(.trailing, Spacing.s1)
+                            }
                         }
                     }
                     .buttonStyle(.plain)
-                    .frame(minHeight: 72)
+                    .frame(minHeight: 76)
                     .accessibilityLabel(action.label)
+                    .accessibilityIdentifier("gridTabs_quickAction_\(action.id)")
                 }
             }
             .padding(.horizontal, Spacing.s4)
@@ -104,6 +193,7 @@ public struct GridTabsBody<Overview: View>: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(tab.label)
+                        .accessibilityIdentifier("gridTabs_tab_\(tab.id)")
                         .accessibilityAddTraits(selectedTab == tab.id ? [.isButton, .isSelected] : .isButton)
                     }
                 }

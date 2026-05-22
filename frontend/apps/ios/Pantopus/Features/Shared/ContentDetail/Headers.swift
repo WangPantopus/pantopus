@@ -25,8 +25,7 @@ public struct HomeHeroStat: Sendable, Identifiable {
     }
 }
 
-/// Gradient primary card with "VERIFIED HOME" overline, bold address, and
-/// a 3-stat row.
+/// Flat verified-home card with overline, bold address, and a 3-stat row.
 public struct HomeHeroHeader: View {
     private let address: String
     private let verified: Bool
@@ -41,44 +40,49 @@ public struct HomeHeroHeader: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             HStack(spacing: Spacing.s2) {
-                Icon(.shieldCheck, size: 14, color: Theme.Color.appTextInverse)
+                Icon(.shieldCheck, size: 14, color: Theme.Color.home)
                 Text(verified ? "VERIFIED HOME" : "UNVERIFIED HOME")
                     .pantopusTextStyle(.overline)
-                    .foregroundStyle(Theme.Color.appTextInverse.opacity(0.85))
+                    .foregroundStyle(Theme.Color.home)
             }
             Text(address)
                 .pantopusTextStyle(.h2)
-                .foregroundStyle(Theme.Color.appTextInverse)
+                .foregroundStyle(Theme.Color.appText)
                 .lineLimit(3)
                 .accessibilityAddTraits(.isHeader)
 
-            HStack(spacing: Spacing.s4) {
+            HStack(spacing: Spacing.s0) {
                 ForEach(stats) { stat in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(stat.value)
                             .pantopusTextStyle(.h3)
-                            .foregroundStyle(Theme.Color.appTextInverse)
+                            .foregroundStyle(Theme.Color.appText)
                         Text(stat.label.uppercased())
                             .pantopusTextStyle(.caption)
-                            .foregroundStyle(Theme.Color.appTextInverse.opacity(0.85))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Theme.Color.appTextSecondary)
                     }
-                    if stat.id != stats.last?.id {
-                        Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.trailing, stat.id == stats.last?.id ? 0 : Spacing.s3)
+                    .overlay(alignment: .trailing) {
+                        if stat.id != stats.last?.id {
+                            Rectangle()
+                                .fill(Theme.Color.home.opacity(0.2))
+                                .frame(width: 1)
+                                .padding(.trailing, Spacing.s2)
+                        }
                     }
                 }
             }
         }
         .padding(Spacing.s5)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [Theme.Color.primary600, Theme.Color.primary800],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background(Theme.Color.homeBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl2, style: .continuous))
-        .pantopusShadow(.primary)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl2, style: .continuous)
+                .stroke(Theme.Color.home.opacity(0.18), lineWidth: 1)
+        )
         .padding(.horizontal, Spacing.s4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(verified ? "Verified home" : "Unverified home"), \(address)")

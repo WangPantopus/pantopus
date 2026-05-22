@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.shared.content_detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -36,13 +38,46 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
+/** Visual tone for quick-action icon discs and count badges. */
+enum class QuickActionTone(
+    val color: Color,
+    val backgroundColor: Color,
+) {
+    Personal(PantopusColors.personal, PantopusColors.personalBg),
+    Home(PantopusColors.home, PantopusColors.homeBg),
+    Business(PantopusColors.business, PantopusColors.businessBg),
+    Warning(PantopusColors.warning, PantopusColors.warningBg),
+    Error(PantopusColors.error, PantopusColors.errorBg),
+    ;
+
+    companion object {
+        fun from(pillar: IdentityPillar): QuickActionTone =
+            when (pillar) {
+                IdentityPillar.Personal -> Personal
+                IdentityPillar.Home -> Home
+                IdentityPillar.Business -> Business
+            }
+    }
+}
+
 /** A quick-action tile in the 4-across grid. */
 data class QuickActionTile(
     val id: String,
     val label: String,
     val icon: PantopusIcon,
-    val tint: IdentityPillar,
-)
+    val tone: QuickActionTone,
+    val badge: String? = null,
+    val isMuted: Boolean = false,
+) {
+    constructor(
+        id: String,
+        label: String,
+        icon: PantopusIcon,
+        tint: IdentityPillar,
+        badge: String? = null,
+        isMuted: Boolean = false,
+    ) : this(id, label, icon, QuickActionTone.from(tint), badge, isMuted)
+}
 
 /** A tab in the [GridTabsBody] strip. */
 data class GridTabsTab(
@@ -88,6 +123,7 @@ fun GridTabsBody(
                             .clickable { onSelectTab(tab.id) }
                             .sizeIn(minHeight = 44.dp)
                             .padding(vertical = Spacing.s2)
+                            .testTag("gridTabs_tab_${tab.id}")
                             .semantics { contentDescription = tab.label },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -136,30 +172,49 @@ private fun QuickActionTileView(
             modifier
                 .sizeIn(minHeight = 72.dp)
                 .clickable { onTap(action.id) }
-                .padding(vertical = Spacing.s1)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(vertical = Spacing.s2, horizontal = Spacing.s1)
+                .testTag("gridTabs_quickAction_${action.id}")
                 .semantics { contentDescription = action.label },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(Radii.md))
-                    .background(action.tint.backgroundColor),
-            contentAlignment = Alignment.Center,
-        ) {
-            PantopusIconImage(
-                icon = action.icon,
-                contentDescription = null,
-                size = 22.dp,
-                tint = action.tint.color,
-            )
+        Box(contentAlignment = Alignment.TopEnd) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(if (action.isMuted) PantopusColors.appSurfaceSunken else action.tone.backgroundColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = action.icon,
+                    contentDescription = null,
+                    size = 20.dp,
+                    tint = if (action.isMuted) PantopusColors.appTextMuted else action.tone.color,
+                )
+            }
+            action.badge?.let { badge ->
+                Box(
+                    modifier =
+                        Modifier
+                            .sizeIn(minWidth = 18.dp, minHeight = 18.dp)
+                            .clip(RoundedCornerShape(Radii.pill))
+                            .background(PantopusColors.error)
+                            .padding(horizontal = Spacing.s1),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(text = badge, style = PantopusTextStyle.caption, color = PantopusColors.appTextInverse)
+                }
+            }
         }
         Text(
             text = action.label,
             style = PantopusTextStyle.caption,
-            color = PantopusColors.appText,
+            color = if (action.isMuted) PantopusColors.appTextSecondary else PantopusColors.appText,
             textAlign = TextAlign.Center,
             maxLines = 2,
         )

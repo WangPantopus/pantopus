@@ -17,7 +17,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -25,13 +24,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.theme.PantopusColors
-import app.pantopus.android.ui.theme.PantopusElevations
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
-import app.pantopus.android.ui.theme.pantopusShadow
 
 /** One stat cell inside [HomeHeroHeader]. */
 data class HomeHeroStat(
@@ -41,7 +38,7 @@ data class HomeHeroStat(
 )
 
 /**
- * Gradient primary card with VERIFIED overline, bold address, and a 3-stat row.
+ * Flat verified-home card with VERIFIED overline, bold address, and a 3-stat row.
  */
 @Composable
 fun HomeHeroHeader(
@@ -54,13 +51,9 @@ fun HomeHeroHeader(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.s4)
-                .pantopusShadow(PantopusElevations.primary, RoundedCornerShape(Radii.xl2))
                 .clip(RoundedCornerShape(Radii.xl2))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(PantopusColors.primary600, PantopusColors.primary800),
-                    ),
-                ).padding(Spacing.s5)
+                .background(PantopusColors.homeBg)
+                .padding(Spacing.s5)
                 .semantics {
                     contentDescription = "${if (verified) "Verified home" else "Unverified home"}, $address"
                 },
@@ -71,36 +64,39 @@ fun HomeHeroHeader(
                 icon = PantopusIcon.ShieldCheck,
                 contentDescription = null,
                 size = 14.dp,
-                tint = PantopusColors.appTextInverse,
+                tint = PantopusColors.home,
             )
             Text(
                 text = if (verified) "VERIFIED HOME" else "UNVERIFIED HOME",
                 style = PantopusTextStyle.overline,
-                color = PantopusColors.appTextInverse.copy(alpha = 0.85f),
+                color = PantopusColors.home,
             )
         }
         Text(
             text = address,
             style = PantopusTextStyle.h2,
-            color = PantopusColors.appTextInverse,
+            color = PantopusColors.appText,
             maxLines = 3,
             modifier = Modifier.semantics { heading() },
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s4), modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth()) {
             stats.forEachIndexed { index, stat ->
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
                     Text(
                         text = stat.value,
                         style = PantopusTextStyle.h3,
-                        color = PantopusColors.appTextInverse,
+                        color = PantopusColors.appText,
                     )
                     Text(
                         text = stat.label.uppercase(),
                         style = PantopusTextStyle.caption,
-                        color = PantopusColors.appTextInverse.copy(alpha = 0.85f),
+                        color = PantopusColors.appTextSecondary,
                     )
                 }
-                if (index != stats.lastIndex) Spacer(Modifier.weight(1f))
+                if (index != stats.lastIndex) Spacer(Modifier.height(1.dp).weight(0.08f))
             }
         }
     }

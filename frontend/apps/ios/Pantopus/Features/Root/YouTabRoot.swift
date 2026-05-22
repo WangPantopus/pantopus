@@ -1528,6 +1528,9 @@ public struct YouTabRoot: View {
                 onOpenPackages: { packagesHomeId in
                     Task { @MainActor in path.append(.homePackages(homeId: packagesHomeId)) }
                 },
+                onOpenAccessCodes: { accessHomeId, homeName in
+                    Task { @MainActor in path.append(.accessCodes(homeId: accessHomeId, homeName: homeName)) }
+                },
                 onOpenTasks: { tasksHomeId in
                     Task { @MainActor in path.append(.homeTasks(homeId: tasksHomeId)) }
                 },
