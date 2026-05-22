@@ -47,6 +47,9 @@ final class GigComposeViewModel: WizardModel {
     private let location: any LocationProviding
     private let isOnlineProvider: @MainActor () -> Bool
 
+    /// B.3 — in-flight debounce for the Magic Task archetype parse.
+    private var detectionTask: Task<Void, Never>?
+
     // MARK: - Init
 
     init(
@@ -113,8 +116,64 @@ extension GigComposeViewModel {
     #endif
 
     func secondaryTapped() {
-        // Success step's "Done" — return to the feed.
-        if currentStep == .success { pendingEvent = .dismiss }
+        switch currentStep {
+        case .success:
+            // Success step's "Done" — return to the feed.
+            pendingEvent = .dismiss
+        case .category where form.composeMode == .magic:
+            // "Pick category" — drop into the manual archetype picker.
+            setComposeMode(.manual)
+        default:
+            break
+        }
+    }
+
+    // MARK: - B.3 Magic Task
+
+    /// Switch the step-1 entry mode (Magic describe ⇄ manual picker).
+    func setComposeMode(_ mode: ComposeMode) {
+        form.composeMode = mode
+    }
+
+    /// Update the plain-English describe text and (re)schedule a debounced
+    /// archetype parse. Real backend NLP is deferred; `detectArchetype`
+    /// is a deterministic keyword match standing in for it.
+    func setDescribeText(_ text: String) {
+        form.describeText = String(text.prefix(GigComposeLimits.describeMax))
+        detectionTask?.cancel()
+        let snapshot = form.describeText
+        detectionTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard let self, !Task.isCancelled else { return }
+            self.applyDetection(for: snapshot)
+        }
+    }
+
+    /// Apply the parsed archetype if the text hasn't changed since the
+    /// debounce fired. Mirrors the detected category into `form.category`
+    /// so the rest of the wizard + submission consume it.
+    func applyDetection(for text: String) {
+        guard form.describeText == text else { return }
+        let detected = Self.detectArchetype(from: text)
+        form.detectedArchetype = detected
+        if let detected { form.category = detected }
+    }
+
+    /// Deterministic keyword → archetype map (stand-in for backend NLP).
+    static func detectArchetype(from text: String) -> GigComposeCategory? {
+        let lower = text.lowercased()
+        guard lower.count >= 3 else { return nil }
+        func has(_ words: [String]) -> Bool { words.contains { lower.contains($0) } }
+        if has(["move", "moving", "haul", "u-haul", "load boxes"]) { return .moving }
+        if has(["clean", "tidy", "scrub", "vacuum", "mop"]) { return .cleaning }
+        if has(["assemble", "ikea", "furniture", "shelf", "shelves", "mount", "drill",
+                "fix", "repair", "install", "handy", "patch", "drywall"]) { return .handyman }
+        if has(["dog", "cat", " pet", "puppy", "litter", "groom", "walk"]) { return .petcare }
+        if has(["babysit", "nanny", "kids", "child", "daycare"]) { return .childcare }
+        if has(["tutor", "lesson", "math", "homework", "test prep", "teach"]) { return .tutoring }
+        if has(["deliver", "pickup", "pick up", "drop off", "errand", "courier"]) { return .delivery }
+        if has(["wifi", "wi-fi", "computer", "laptop", "printer", "router", "troubleshoot", "setup"]) { return .tech }
+        return nil
     }
 
     // MARK: - Field updates
@@ -378,14 +437,23 @@ extension GigComposeViewModel {
     }
 
     private func secondaryCTA(for step: GigComposeStep) -> WizardSecondaryCTA? {
-        guard step == .success else { return nil }
-        return WizardSecondaryCTA(label: "Done", identifier: "composeGigDone")
+        switch step {
+        case .success:
+            return WizardSecondaryCTA(label: "Done", identifier: "composeGigDone")
+        case .category where form.composeMode == .magic:
+            // Ghost link beside the primary CTA → manual picker.
+            return WizardSecondaryCTA(label: "Pick category", identifier: "composeGigPickCategory")
+        default:
+            return nil
+        }
     }
 
     private func primaryEnabled(for step: GigComposeStep) -> Bool {
         switch step {
         case .category:
-            hasSelectedCategory
+            // Magic: enabled once an archetype is detected. Manual:
+            // enabled once a category tile is selected.
+            form.composeMode == .magic ? form.detectedArchetype != nil : hasSelectedCategory
         case .basics:
             hasValidBasics
         case .budget:

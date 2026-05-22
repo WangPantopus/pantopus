@@ -69,7 +69,14 @@ public struct GigComposeWizardView: View {
     @ViewBuilder
     private var stepContent: some View {
         switch viewModel.currentStep {
-        case .category: CategoryStep(viewModel: viewModel)
+        case .category:
+            // B.3 — Step 1 renders Magic describe (default) or the manual
+            // archetype picker, toggled by `form.composeMode`.
+            if viewModel.form.composeMode == .magic {
+                MagicDescribeStep(viewModel: viewModel)
+            } else {
+                ManualPickerStep(viewModel: viewModel)
+            }
         case .basics: BasicsStep(viewModel: viewModel)
         case .budget: BudgetStep(viewModel: viewModel)
         case .schedule: ScheduleStep(viewModel: viewModel)
@@ -88,8 +95,11 @@ public struct GigComposeWizardView: View {
         }
         // Apply the route's preselected category last — `restore(from:)`
         // is a no-op if a snapshot already populated the form, so we
-        // only seed the category when the user is starting fresh.
+        // only seed the category when the user is starting fresh. A
+        // preselected category means the user already chose one, so land
+        // on the manual picker (tile pre-selected) rather than Magic.
         if let preselected = preselectedCategory, viewModel.form == .empty {
+            viewModel.setComposeMode(.manual)
             viewModel.selectCategory(preselected)
         }
     }
@@ -112,84 +122,6 @@ public struct GigComposeWizardView: View {
             onOpenGigDetail(gigId)
         }
         viewModel.pendingEvent = nil
-    }
-}
-
-// MARK: - Step 1: Category
-
-private struct CategoryStep: View {
-    @Bindable var viewModel: GigComposeViewModel
-
-    private let columns: [GridItem] = [
-        GridItem(.flexible(), spacing: Spacing.s2),
-        GridItem(.flexible(), spacing: Spacing.s2),
-        GridItem(.flexible(), spacing: Spacing.s2)
-    ]
-
-    var body: some View {
-        HeadlineBlock("What kind of help do you need?")
-        SubcopyBlock("Pick the closest match. You can refine it later.")
-        LazyVGrid(columns: columns, spacing: Spacing.s2) {
-            ForEach(GigComposeCategory.allCases, id: \.self) { category in
-                CategoryTile(
-                    category: category,
-                    isSelected: viewModel.form.category == category
-                ) {
-                    viewModel.selectCategory(category)
-                }
-            }
-        }
-    }
-}
-
-private struct CategoryTile: View {
-    let category: GigComposeCategory
-    let isSelected: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: Spacing.s2) {
-                Icon(icon, size: 22, color: iconColor)
-                Text(category.label)
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appText)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity, minHeight: 88)
-            .padding(Spacing.s3)
-            .background(isSelected ? Theme.Color.primary50 : Theme.Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                    .stroke(
-                        isSelected ? Theme.Color.primary600 : Theme.Color.appBorder,
-                        lineWidth: isSelected ? 2 : 1
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("composeGig_category_\(category.rawValue)")
-        .accessibilityLabel("\(category.label)\(isSelected ? ", selected" : "")")
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-    }
-
-    private var icon: PantopusIcon {
-        switch category {
-        case .handyman: .hammer
-        case .cleaning: .sparkles
-        case .moving: .package
-        case .petcare: .pawPrint
-        case .childcare: .heart
-        case .tutoring: .lightbulb
-        case .delivery: .send
-        case .tech: .zap
-        case .other: .moreHorizontal
-        }
-    }
-
-    private var iconColor: Color {
-        isSelected ? Theme.Color.primary600 : Theme.Color.appTextSecondary
     }
 }
 

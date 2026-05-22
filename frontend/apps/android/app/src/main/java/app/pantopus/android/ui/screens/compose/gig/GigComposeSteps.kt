@@ -77,6 +77,13 @@ enum class GigComposeCategory(
     }
 }
 
+/**
+ * B.3 (A12.8) — entry mode for step 1. `Magic` is the default AI-assisted
+ * describe path; `Manual` is the category-grid fallback reachable via the
+ * "Pick a category instead" link.
+ */
+enum class ComposeMode { Magic, Manual }
+
 /** Budget-type radio in step 3. */
 enum class GigComposeBudgetType(
     val wireValue: String,
@@ -177,6 +184,9 @@ object GigComposeLimits {
     const val DESCRIPTION_MIN: Int = 20
     const val DESCRIPTION_MAX: Int = 2000
     const val MAX_PHOTOS: Int = 6
+
+    /** B.3 — Magic Task describe textarea cap (matches A12.8 "184 / 500"). */
+    const val DESCRIBE_MAX: Int = 500
 }
 
 /**
@@ -185,6 +195,12 @@ object GigComposeLimits {
  */
 data class GigComposeFormState(
     val step: Int = GigComposeStep.Category.ordinal0,
+    /** B.3 — step-1 entry mode (Magic describe vs manual picker). */
+    val composeMode: ComposeMode = ComposeMode.Magic,
+    /** B.3 — plain-English Magic Task input. */
+    val describeText: String = "",
+    /** B.3 — archetype parsed from [describeText] (debounced), mirrored into [category]. */
+    val detectedArchetype: GigComposeCategory? = null,
     val category: GigComposeCategory? = null,
     val title: String = "",
     val description: String = "",
@@ -203,7 +219,8 @@ data class GigComposeFormState(
     /** True when any user-visible field carries data — drives the close-confirm gate. */
     val hasAnyData: Boolean
         get() =
-            category != null ||
+            describeText.isNotEmpty() ||
+                category != null ||
                 title.isNotEmpty() ||
                 description.isNotEmpty() ||
                 photoIds.isNotEmpty() ||

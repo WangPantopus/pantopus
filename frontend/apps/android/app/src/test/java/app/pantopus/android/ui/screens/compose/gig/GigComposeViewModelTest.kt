@@ -122,7 +122,9 @@ class GigComposeViewModelTest {
 
     @Test
     fun selecting_category_enables_continue() {
+        // B.3 — category selection enables Continue in the manual picker.
         val vm = makeVm()
+        vm.setComposeMode(ComposeMode.Manual)
         vm.selectCategory(GigComposeCategory.Handyman)
         assertTrue(vm.chrome.primaryCtaEnabled)
     }
