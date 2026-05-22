@@ -135,8 +135,7 @@ class MailboxRootViewModel
         }
 
         /** Unread badge for a drawer chip — total unread across its tabs. */
-        fun drawerBadge(drawer: MailboxDrawer): Int =
-            MailboxTab.entries.sumOf { unreadCount(drawer, it) }
+        fun drawerBadge(drawer: MailboxDrawer): Int = MailboxTab.entries.sumOf { unreadCount(drawer, it) }
 
         /**
          * Per-(drawer, tab) unread count for the segmented bar. Vault never

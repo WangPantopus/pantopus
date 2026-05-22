@@ -143,8 +143,7 @@ data class NeighborHero(
     val initials: String get() = initialsFrom(name)
 
     companion object {
-        fun initialsFrom(name: String): String =
-            name.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("")
+        fun initialsFrom(name: String): String = name.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("")
     }
 }
 

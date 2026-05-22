@@ -182,6 +182,19 @@ extension GigComposeViewModel {
         form.category = category
     }
 
+    func selectEngagementMode(_ mode: GigComposeEngagementMode) {
+        switch mode {
+        case .oneTime:
+            form.scheduleType = .oneTime
+            if form.budgetType == .offers { form.budgetType = nil }
+        case .recurring:
+            form.scheduleType = .recurring
+            if form.budgetType == .offers { form.budgetType = nil }
+        case .openBidding:
+            form.budgetType = .offers
+        }
+    }
+
     func setTitle(_ title: String) {
         // Hard-stop typing past the max so the user can't enter
         // server-rejecting values. The validation guard on advance still

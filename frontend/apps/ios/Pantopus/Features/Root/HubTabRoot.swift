@@ -13,11 +13,7 @@ import UIKit
 public enum HubRoute: Hashable {
     case myHomes
     case myClaims
-    /// Superseded by `.mailboxRoot` (B.1); the flat list is kept only for
-    /// back-compat and is no longer pushed from any entry point.
-    case mailbox
     case mailItemDetail(mailId: String)
-    case drawerDetail(drawer: String)
     /// T6.5e (P19.5) Mailbox Vault — saved mail list. Personal pillar.
     case mailboxVault
     case addHome
@@ -208,8 +204,7 @@ public enum HubRoute: Hashable {
     /// A.x — Explore (neighbourhood discovery surface).
     case explore
     /// B.1 — unified Mailbox root (drawer chips × tabs). Entry point for
-    /// all mailbox navigation; supersedes `.mailboxDrawers` (removed) and
-    /// `.mailbox` (kept only for back-compat).
+    /// all mailbox navigation; supersedes `.mailboxDrawers` and `.mailbox`.
     case mailboxRoot
     /// A.x — Mailbox map.
     case mailboxMap
@@ -872,15 +867,6 @@ public struct HubTabRoot: View {
                     path.append(.myClaims)
                 }
             )
-        case .mailbox:
-            MailboxListView(
-                viewModel: MailboxListViewModel(
-                    onOpenMail: { mailId in
-                        Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
-                    },
-                    onOpenSearch: { push(.mailboxSearch) }
-                )
-            )
         case let .mailItemDetail(mailId):
             // T6.5b (P20) — Generic A17.1 mail detail. P21–P23 will
             // extend this with package / coupon / booklet / certified
@@ -932,8 +918,6 @@ public struct HubTabRoot: View {
                     Task { @MainActor in push(.editPost(postId: id)) }
                 }
             )
-        case let .drawerDetail(drawer):
-            NotYetAvailableView(tabName: "Drawer · \(drawer)", icon: .mailbox)
         case .mailboxVault:
             // T6.5e (P19.5) — Mailbox Vault list. Personal-pillar
             // surface — both the FAB ("Save mail to vault") and the

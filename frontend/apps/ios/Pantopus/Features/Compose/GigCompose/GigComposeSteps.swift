@@ -57,6 +57,15 @@ public enum ComposeMode: String, CaseIterable, Sendable, Codable, Hashable {
     case manual
 }
 
+/// B.3 (A12.8) — compact Magic Task engagement selector. It pre-fills the
+/// downstream schedule / budget steps instead of adding a separate backend
+/// field.
+public enum GigComposeEngagementMode: String, CaseIterable, Sendable, Hashable {
+    case oneTime
+    case recurring
+    case openBidding
+}
+
 /// Budget-type radio in step 3.
 public enum GigComposeBudgetType: String, CaseIterable, Sendable, Codable, Hashable {
     case fixed
@@ -268,6 +277,11 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
     }
 
     public static let empty = GigComposeFormState()
+
+    public var engagementMode: GigComposeEngagementMode {
+        if budgetType == .offers { return .openBidding }
+        return scheduleType == .recurring ? .recurring : .oneTime
+    }
 
     /// True when any user-visible field carries data — drives the
     /// discard-confirm gate.

@@ -84,6 +84,13 @@ enum class GigComposeCategory(
  */
 enum class ComposeMode { Magic, Manual }
 
+/**
+ * B.3 (A12.8) — compact Magic Task engagement selector. It pre-fills the
+ * downstream schedule / budget steps instead of adding a separate backend
+ * field.
+ */
+enum class GigComposeEngagementMode { OneTime, Recurring, OpenBidding }
+
 /** Budget-type radio in step 3. */
 enum class GigComposeBudgetType(
     val wireValue: String,
@@ -215,6 +222,16 @@ data class GigComposeFormState(
 ) {
     val currentStep: GigComposeStep
         get() = GigComposeStep.fromOrdinal(step)
+
+    val engagementMode: GigComposeEngagementMode
+        get() =
+            if (budgetType == GigComposeBudgetType.Offers) {
+                GigComposeEngagementMode.OpenBidding
+            } else if (scheduleType == GigComposeScheduleType.Recurring) {
+                GigComposeEngagementMode.Recurring
+            } else {
+                GigComposeEngagementMode.OneTime
+            }
 
     /** True when any user-visible field carries data — drives the close-confirm gate. */
     val hasAnyData: Boolean

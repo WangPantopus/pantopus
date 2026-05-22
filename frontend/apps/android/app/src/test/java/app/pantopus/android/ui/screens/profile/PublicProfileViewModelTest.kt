@@ -24,6 +24,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -192,6 +193,7 @@ class PublicProfileViewModelTest {
             assertEquals(PublicProfileKind.Local, loaded.content.kind)
             assertTrue(loaded.content.header.isVerifiedNeighbor)
             assertEquals(null, loaded.content.header.tierLabel)
+            assertNotNull(loaded.content.neighbor?.mutuals)
         }
 
     @Test fun follow_marks_succeeded_and_emits_toast() =

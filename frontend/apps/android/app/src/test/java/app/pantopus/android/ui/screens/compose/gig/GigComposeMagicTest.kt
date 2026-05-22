@@ -107,6 +107,12 @@ class GigComposeMagicTest {
     }
 
     @Test
+    fun manualPickerUsesEightConcreteArchetypes() {
+        assertEquals(8, gigComposeManualPickerCategories.size)
+        assertFalse(gigComposeManualPickerCategories.contains(GigComposeCategory.Other))
+    }
+
+    @Test
     fun magicStepExposesPickCategorySecondary() {
         assertEquals("composeGigPickCategory", makeVm().chrome.secondaryCta?.testTag)
     }
@@ -123,6 +129,21 @@ class GigComposeMagicTest {
         val vm = makeVm()
         vm.setComposeMode(ComposeMode.Manual)
         assertNull(vm.chrome.secondaryCta)
+    }
+
+    @Test
+    fun openBiddingEngagementPrefillsOffersBudget() {
+        val vm = makeVm()
+        assertEquals(GigComposeEngagementMode.OneTime, vm.state.value.form.engagementMode)
+
+        vm.selectEngagementMode(GigComposeEngagementMode.OpenBidding)
+        assertEquals(GigComposeEngagementMode.OpenBidding, vm.state.value.form.engagementMode)
+        assertEquals(GigComposeBudgetType.Offers, vm.state.value.form.budgetType)
+
+        vm.selectEngagementMode(GigComposeEngagementMode.Recurring)
+        assertEquals(GigComposeEngagementMode.Recurring, vm.state.value.form.engagementMode)
+        assertEquals(GigComposeScheduleType.Recurring, vm.state.value.form.scheduleType)
+        assertNull(vm.state.value.form.budgetType)
     }
 
     @Test

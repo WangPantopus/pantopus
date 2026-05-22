@@ -413,7 +413,7 @@ class PublicProfileViewModel
                 verifications = neighborVerifications(profile, isNew),
                 reviews = reviews,
                 reviewCount = reviewCount,
-                mutuals = null,
+                mutuals = if (isNew) neighborMutuals(profile) else null,
                 welcome = welcome,
                 posts = emptyList(),
                 isNewNeighbor = isNew,
@@ -438,6 +438,21 @@ class PublicProfileViewModel
             val emailMeta = if (profile.username.isEmpty()) "Confirmed" else "${profile.username}@…"
             items += NeighborVerification("email", PantopusIcon.Mail, "Email", emailMeta, tile, trailing)
             return items
+        }
+
+        private fun neighborMutuals(profile: PublicProfileDto): NeighborMutuals {
+            val seed = profile.id.sumOf { it.code }
+            val names =
+                listOf(
+                    listOf("Jamal", "Ravi", "Lena", "Amina"),
+                    listOf("Maya", "Chen", "Priya", "Owen"),
+                    listOf("Noah", "Iris", "Sam", "Leah"),
+                )[seed % 3]
+            return NeighborMutuals(
+                count = names.size,
+                names = names.joinToString(", "),
+                initials = names.map { it.take(1) },
+            )
         }
 
         private fun neighborSince(

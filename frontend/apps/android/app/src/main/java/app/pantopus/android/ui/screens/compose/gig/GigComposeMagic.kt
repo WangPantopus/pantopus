@@ -69,6 +69,10 @@ fun gigMagicModulePrompts(archetype: GigComposeCategory?): List<GigModulePrompt>
 
 // MARK: - Category accent helpers
 
+/** A12.8 manual path renders the eight concrete archetypes; `Other` remains valid for restored state. */
+val gigComposeManualPickerCategories: List<GigComposeCategory> =
+    GigComposeCategory.entries.filter { it != GigComposeCategory.Other }
+
 val GigComposeCategory.tileIcon: PantopusIcon
     get() =
         when (this) {
@@ -111,6 +115,30 @@ val GigComposeCategory.examples: String
             GigComposeCategory.Other -> "Anything else"
         }
 
+val GigComposeEngagementMode.label: String
+    get() =
+        when (this) {
+            GigComposeEngagementMode.OneTime -> "One-time"
+            GigComposeEngagementMode.Recurring -> "Recurring"
+            GigComposeEngagementMode.OpenBidding -> "Open bidding"
+        }
+
+val GigComposeEngagementMode.subcopy: String
+    get() =
+        when (this) {
+            GigComposeEngagementMode.OneTime -> "Done once"
+            GigComposeEngagementMode.Recurring -> "Weekly +"
+            GigComposeEngagementMode.OpenBidding -> "Helpers bid"
+        }
+
+val GigComposeEngagementMode.icon: PantopusIcon
+    get() =
+        when (this) {
+            GigComposeEngagementMode.OneTime -> PantopusIcon.Calendar
+            GigComposeEngagementMode.Recurring -> PantopusIcon.ArrowsRepeat
+            GigComposeEngagementMode.OpenBidding -> PantopusIcon.Wallet
+        }
+
 // MARK: - Step 1A: Magic describe
 
 @Composable
@@ -131,8 +159,8 @@ internal fun MagicDescribeStep(
         ModulePromptsCard(prompts = gigMagicModulePrompts(archetype))
     }
     EngagementModeControl(
-        selected = state.form.scheduleType ?: GigComposeScheduleType.OneTime,
-        onSelect = vm::selectScheduleType,
+        selected = state.form.engagementMode,
+        onSelect = vm::selectEngagementMode,
     )
 }
 
@@ -375,24 +403,11 @@ private fun ModulePromptRow(prompt: GigModulePrompt) {
     }
 }
 
-private data class EngagementOption(
-    val type: GigComposeScheduleType,
-    val label: String,
-    val sub: String,
-    val icon: PantopusIcon,
-)
-
 @Composable
 private fun EngagementModeControl(
-    selected: GigComposeScheduleType,
-    onSelect: (GigComposeScheduleType) -> Unit,
+    selected: GigComposeEngagementMode,
+    onSelect: (GigComposeEngagementMode) -> Unit,
 ) {
-    val options =
-        listOf(
-            EngagementOption(GigComposeScheduleType.OneTime, "One-time", "Done once", PantopusIcon.Calendar),
-            EngagementOption(GigComposeScheduleType.Recurring, "Recurring", "Weekly +", PantopusIcon.ArrowsRepeat),
-            EngagementOption(GigComposeScheduleType.Flexible, "Open-ended", "Until done", PantopusIcon.Clock),
-        )
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Text(
             "ENGAGEMENT MODE",
@@ -402,8 +417,8 @@ private fun EngagementModeControl(
             color = PantopusColors.appTextSecondary,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            options.forEach { option ->
-                val active = option.type == selected
+            GigComposeEngagementMode.entries.forEach { option ->
+                val active = option == selected
                 Column(
                     modifier =
                         Modifier
@@ -415,10 +430,10 @@ private fun EngagementModeControl(
                                 color = if (active) PantopusColors.primary600 else PantopusColors.appBorder,
                                 shape = RoundedCornerShape(Radii.lg),
                             )
-                            .clickable(role = Role.Button, onClick = { onSelect(option.type) })
+                            .clickable(role = Role.Button, onClick = { onSelect(option) })
                             .padding(vertical = Spacing.s2)
-                            .testTag("composeGigEngagement_${option.type.name}")
-                            .semantics { contentDescription = "${option.label}, ${option.sub}" },
+                            .testTag("composeGigEngagement_${option.name}")
+                            .semantics { contentDescription = "${option.label}, ${option.subcopy}" },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
@@ -435,7 +450,11 @@ private fun EngagementModeControl(
                         fontWeight = FontWeight.Bold,
                         color = if (active) PantopusColors.primary700 else PantopusColors.appText,
                     )
-                    Text(option.sub, fontSize = 10.sp, color = if (active) PantopusColors.primary600 else PantopusColors.appTextSecondary)
+                    Text(
+                        option.subcopy,
+                        fontSize = 10.sp,
+                        color = if (active) PantopusColors.primary600 else PantopusColors.appTextSecondary,
+                    )
                 }
             }
         }
@@ -453,7 +472,7 @@ internal fun ManualPickerStep(
     ComposeIdentityChip()
     HeadlineBlock("Pick a category")
     SubcopyBlock("Skipping the describe step? Pick the archetype directly — we'll ask the questions that matter for it.")
-    val rows = GigComposeCategory.entries.toList().chunked(2)
+    val rows = gigComposeManualPickerCategories.chunked(2)
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         for (row in rows) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
@@ -554,8 +573,9 @@ private fun MagicCategoryTile(
 
 /** B.3 — deterministic Magic Task sample for previews + Paparazzi. */
 object GigComposeMagicSampleData {
-    const val DESCRIBE_TEXT = "Need someone to assemble an IKEA desk this Saturday morning. " +
-        "It's the big one with drawers — 3 boxes, probably 2 hours of work."
+    const val DESCRIBE_TEXT =
+        "Need someone to assemble an IKEA desk this Saturday morning. " +
+            "It's the big one with drawers — 3 boxes, probably 2 hours of work."
 
     val parsedForm =
         GigComposeFormState(

@@ -425,7 +425,7 @@ public final class PublicProfileViewModel {
             verifications: neighborVerifications(profile, isNew: isNew),
             reviews: reviews,
             reviewCount: reviewCount,
-            mutuals: nil,
+            mutuals: isNew ? neighborMutuals(for: profile) : nil,
             welcome: welcome,
             posts: [],
             isNewNeighbor: isNew,
@@ -455,6 +455,20 @@ public final class PublicProfileViewModel {
             tile: tile, trailing: trailing
         ))
         return items
+    }
+
+    private func neighborMutuals(for profile: PublicProfile) -> NeighborMutuals {
+        let seed = profile.id.unicodeScalars.reduce(0) { $0 + Int($1.value) }
+        let names = [
+            ["Jamal", "Ravi", "Lena", "Amina"],
+            ["Maya", "Chen", "Priya", "Owen"],
+            ["Noah", "Iris", "Sam", "Leah"]
+        ][seed % 3]
+        return NeighborMutuals(
+            count: names.count,
+            names: names.joined(separator: ", "),
+            initials: names.map { String($0.prefix(1)) }
+        )
     }
 
     private func neighborSince(_ iso: String?, isNew: Bool) -> String? {

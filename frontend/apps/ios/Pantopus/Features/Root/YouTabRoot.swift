@@ -20,8 +20,6 @@ public enum YouRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map (physical postal venues), reached from the root.
     case mailboxMap
-    /// Superseded by `.mailboxRoot`; kept only for back-compat.
-    case mailbox
     case mailItemDetail(mailId: String)
     /// P4.2 — Mailbox search. Client-side filter over the user's mailbox.
     case mailboxSearch
@@ -725,15 +723,6 @@ public struct YouTabRoot: View {
             )
         case .mailboxMap:
             MailboxMapView { if !path.isEmpty { path.removeLast() } }
-        case .mailbox:
-            MailboxListView(
-                viewModel: MailboxListViewModel(
-                    onOpenMail: { mailId in
-                        Task { @MainActor in path.append(.mailItemDetail(mailId: mailId)) }
-                    },
-                    onOpenSearch: { path.append(.mailboxSearch) }
-                )
-            )
         case .mailboxSearch:
             MailboxSearchView(
                 viewModel: MailboxSearchViewModel(

@@ -156,10 +156,11 @@ open class GigComposeViewModel
             val detected = detectArchetype(text)
             _state.update {
                 it.copy(
-                    form = it.form.copy(
-                        detectedArchetype = detected,
-                        category = detected ?: it.form.category,
-                    ),
+                    form =
+                        it.form.copy(
+                            detectedArchetype = detected,
+                            category = detected ?: it.form.category,
+                        ),
                 )
             }
             persist()
@@ -169,6 +170,29 @@ open class GigComposeViewModel
 
         fun selectCategory(category: GigComposeCategory) {
             _state.update { it.copy(form = it.form.copy(category = category)) }
+            persist()
+        }
+
+        fun selectEngagementMode(mode: GigComposeEngagementMode) {
+            _state.update {
+                val form = it.form
+                val next =
+                    when (mode) {
+                        GigComposeEngagementMode.OneTime ->
+                            form.copy(
+                                scheduleType = GigComposeScheduleType.OneTime,
+                                budgetType = form.budgetType.takeUnless { type -> type == GigComposeBudgetType.Offers },
+                            )
+                        GigComposeEngagementMode.Recurring ->
+                            form.copy(
+                                scheduleType = GigComposeScheduleType.Recurring,
+                                budgetType = form.budgetType.takeUnless { type -> type == GigComposeBudgetType.Offers },
+                            )
+                        GigComposeEngagementMode.OpenBidding ->
+                            form.copy(budgetType = GigComposeBudgetType.Offers)
+                    }
+                it.copy(form = next)
+            }
             persist()
         }
 
@@ -677,7 +701,9 @@ open class GigComposeViewModel
             fun detectArchetype(text: String): GigComposeCategory? {
                 val lower = text.lowercase()
                 if (lower.length < 3) return null
+
                 fun has(words: List<String>) = words.any { lower.contains(it) }
+
                 return when {
                     has(listOf("move", "moving", "haul", "u-haul", "load boxes")) -> GigComposeCategory.Moving
                     has(listOf("clean", "tidy", "scrub", "vacuum", "mop")) -> GigComposeCategory.Cleaning

@@ -83,6 +83,11 @@ final class GigComposeMagicTests: XCTestCase {
         XCTAssertTrue(vm.chrome.primaryCTAEnabled)
     }
 
+    func testManualPickerUsesEightConcreteArchetypes() {
+        XCTAssertEqual(GigComposeCategory.manualPickerCases.count, 8)
+        XCTAssertFalse(GigComposeCategory.manualPickerCases.contains(.other))
+    }
+
     // MARK: - Mode toggle via secondary CTA
 
     func testMagicStepExposesPickCategorySecondary() {
@@ -100,6 +105,20 @@ final class GigComposeMagicTests: XCTestCase {
         let vm = makeVM()
         vm.setComposeMode(.manual)
         XCTAssertNil(vm.chrome.secondaryCTA, "Manual picker's back-to-magic affordance is an in-content banner.")
+    }
+
+    func testOpenBiddingEngagementPrefillsOffersBudget() {
+        let vm = makeVM()
+        XCTAssertEqual(vm.form.engagementMode, .oneTime)
+
+        vm.selectEngagementMode(.openBidding)
+        XCTAssertEqual(vm.form.engagementMode, .openBidding)
+        XCTAssertEqual(vm.form.budgetType, .offers)
+
+        vm.selectEngagementMode(.recurring)
+        XCTAssertEqual(vm.form.engagementMode, .recurring)
+        XCTAssertEqual(vm.form.scheduleType, .recurring)
+        XCTAssertNil(vm.form.budgetType)
     }
 
     // MARK: - Module prompts fixture

@@ -43,6 +43,12 @@ func gigMagicModulePrompts(for archetype: GigComposeCategory?) -> [GigModuleProm
 // MARK: - Category accent helper
 
 extension GigComposeCategory {
+    /// A12.8 manual path renders the eight concrete archetypes. `Other`
+    /// remains valid for restored / backend state, but is not a picker tile.
+    static var manualPickerCases: [GigComposeCategory] {
+        allCases.filter { $0 != .other }
+    }
+
     /// Accent colour for the manual-picker tile (A12.8 category accents).
     var accent: Color {
         switch self {
@@ -84,6 +90,32 @@ extension GigComposeCategory {
         case .delivery: "Pickups · drops · errands"
         case .tech: "Wifi · setup · troubleshoot"
         case .other: "Anything else"
+        }
+    }
+}
+
+extension GigComposeEngagementMode {
+    var label: String {
+        switch self {
+        case .oneTime: "One-time"
+        case .recurring: "Recurring"
+        case .openBidding: "Open bidding"
+        }
+    }
+
+    var subcopy: String {
+        switch self {
+        case .oneTime: "Done once"
+        case .recurring: "Weekly +"
+        case .openBidding: "Helpers bid"
+        }
+    }
+
+    var icon: PantopusIcon {
+        switch self {
+        case .oneTime: .calendar
+        case .recurring: .arrowsRepeat
+        case .openBidding: .wallet
         }
     }
 }
@@ -130,8 +162,8 @@ struct MagicDescribeStep: View {
             ModulePromptsCard(prompts: gigMagicModulePrompts(for: archetype))
         }
         EngagementModeControl(
-            selected: viewModel.form.scheduleType ?? .oneTime
-        ) { viewModel.selectScheduleType($0) }
+            selected: viewModel.form.engagementMode
+        ) { viewModel.selectEngagementMode($0) }
     }
 }
 
@@ -338,21 +370,8 @@ private struct ModulePromptRow: View {
 }
 
 private struct EngagementModeControl: View {
-    let selected: GigComposeScheduleType
-    let onSelect: (GigComposeScheduleType) -> Void
-
-    private struct Option {
-        let type: GigComposeScheduleType
-        let label: String
-        let sub: String
-        let icon: PantopusIcon
-    }
-
-    private let options: [Option] = [
-        Option(type: .oneTime, label: "One-time", sub: "Done once", icon: .calendar),
-        Option(type: .recurring, label: "Recurring", sub: "Weekly +", icon: .arrowsRepeat),
-        Option(type: .flexible, label: "Open-ended", sub: "Until done", icon: .clock)
-    ]
+    let selected: GigComposeEngagementMode
+    let onSelect: (GigComposeEngagementMode) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
@@ -361,16 +380,16 @@ private struct EngagementModeControl: View {
                 .tracking(0.6)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             HStack(spacing: Spacing.s2) {
-                ForEach(options, id: \.type) { option in
-                    let active = option.type == selected
-                    Button { onSelect(option.type) } label: {
+                ForEach(GigComposeEngagementMode.allCases, id: \.self) { option in
+                    let active = option == selected
+                    Button { onSelect(option) } label: {
                         VStack(spacing: 4) {
                             Icon(option.icon, size: 16, strokeWidth: 2.2,
                                  color: active ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
                             Text(option.label)
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(active ? Theme.Color.primary700 : Theme.Color.appText)
-                            Text(option.sub)
+                            Text(option.subcopy)
                                 .font(.system(size: 10))
                                 .foregroundStyle(active ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
                         }
@@ -384,8 +403,8 @@ private struct EngagementModeControl: View {
                         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityIdentifier("composeGigEngagement_\(option.type.rawValue)")
-                    .accessibilityLabel("\(option.label), \(option.sub)")
+                    .accessibilityIdentifier("composeGigEngagement_\(option.rawValue)")
+                    .accessibilityLabel("\(option.label), \(option.subcopy)")
                     .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
                 }
             }
@@ -409,7 +428,7 @@ struct ManualPickerStep: View {
         HeadlineBlock("Pick a category")
         SubcopyBlock("Skipping the describe step? Pick the archetype directly — we'll ask the questions that matter for it.")
         LazyVGrid(columns: columns, spacing: Spacing.s2) {
-            ForEach(GigComposeCategory.allCases, id: \.self) { category in
+            ForEach(GigComposeCategory.manualPickerCases, id: \.self) { category in
                 MagicCategoryTile(
                     category: category,
                     isSelected: viewModel.form.category == category

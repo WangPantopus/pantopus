@@ -177,7 +177,6 @@ import app.pantopus.android.ui.screens.inbox.search.ChatSearchResultKind
 import app.pantopus.android.ui.screens.inbox.search.ChatSearchScreen
 import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
 import app.pantopus.android.ui.screens.listings.MyListingsScreen
-import app.pantopus.android.ui.screens.mailbox.MailboxListScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
@@ -239,7 +238,6 @@ private object ChildRoutes {
     /** P6.6 — "Register a business · coming soon" waitlist surface. */
     const val BUSINESS_WAITLIST = "businesses/waitlist"
     const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
-    const val MAILBOX_LIST = "mailbox/list"
     const val MAILBOX_SEARCH = "mailbox/search"
     const val MAILBOX_ITEM_DETAIL = "mailbox/item/{$MAILBOX_ITEM_DETAIL_MAIL_ID_KEY}"
 
@@ -1927,15 +1925,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 MembersListScreen(
                     onBack = { navController.popBackStack() },
                     onAddGuest = { navController.navigate(ChildRoutes.addGuest(homeId)) },
-                )
-            }
-            composable(ChildRoutes.MAILBOX_LIST) {
-                MailboxListScreen(
-                    onOpenMail = { mailId ->
-                        navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
-                    },
-                    onOpenSearch = { navController.navigate(ChildRoutes.MAILBOX_SEARCH) },
-                    onBack = { navController.popBackStack() },
                 )
             }
             composable(
