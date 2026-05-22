@@ -76,10 +76,69 @@ public struct PulsePostDetailView: View {
     }
 
     private func loadedLayout(_ detail: PulsePostDetailContent) -> some View {
-        ContentDetailShell(
-            title: nil,
-            onBack: onBack,
+        PulsePostDetailLoadedContent(
+            detail: detail,
+            composerText: Binding(
+                get: { viewModel.composerText },
+                set: { viewModel.composerText = $0 }
+            ),
+            isSendingComment: viewModel.isSendingComment,
             topBarAction: viewModel.isOwner ? overflowAction : nil,
+            onBack: onBack,
+            onOpenProfile: onOpenProfile,
+            onReactionTap: { kind in Task { await viewModel.tapReaction(kind) } },
+            onSendTap: { Task { await viewModel.sendComment() } },
+            onShowMoreReplies: { viewModel.showMoreReplies() }
+        )
+    }
+
+    private var overflowAction: ContentDetailTopBarAction {
+        ContentDetailTopBarAction(
+            icon: .moreHorizontal,
+            accessibilityLabel: "Post options"
+        ) { Task { @MainActor in viewModel.showsOverflowMenu = true } }
+    }
+}
+
+@MainActor
+public struct PulsePostDetailLoadedContent: View {
+    private let detail: PulsePostDetailContent
+    @Binding private var composerText: String
+    private let isSendingComment: Bool
+    private let topBarAction: ContentDetailTopBarAction?
+    private let onBack: @MainActor () -> Void
+    private let onOpenProfile: @MainActor (String) -> Void
+    private let onReactionTap: @MainActor (PostReactionKind) -> Void
+    private let onSendTap: @MainActor () -> Void
+    private let onShowMoreReplies: @MainActor () -> Void
+
+    public init(
+        detail: PulsePostDetailContent,
+        composerText: Binding<String>,
+        isSendingComment: Bool,
+        topBarAction: ContentDetailTopBarAction? = nil,
+        onBack: @escaping @MainActor () -> Void = {},
+        onOpenProfile: @escaping @MainActor (String) -> Void = { _ in },
+        onReactionTap: @escaping @MainActor (PostReactionKind) -> Void = { _ in },
+        onSendTap: @escaping @MainActor () -> Void = {},
+        onShowMoreReplies: @escaping @MainActor () -> Void = {}
+    ) {
+        self.detail = detail
+        _composerText = composerText
+        self.isSendingComment = isSendingComment
+        self.topBarAction = topBarAction
+        self.onBack = onBack
+        self.onOpenProfile = onOpenProfile
+        self.onReactionTap = onReactionTap
+        self.onSendTap = onSendTap
+        self.onShowMoreReplies = onShowMoreReplies
+    }
+
+    public var body: some View {
+        ContentDetailShell(
+            title: "Post",
+            onBack: onBack,
+            topBarAction: topBarAction,
             header: {
                 PostAuthorHeader(
                     displayName: detail.authorDisplayName,
@@ -94,31 +153,23 @@ public struct PulsePostDetailView: View {
                 BodyReactionsBody(
                     body: detail.post.content,
                     mediaURLs: detail.mediaURLs,
+                    intent: detail.intent,
                     reactions: detail.reactions,
-                    onReactionTap: { kind in Task { await viewModel.tapReaction(kind) } },
+                    onReactionTap: onReactionTap,
                     composerAvatarURL: nil,
                     composerAvatarName: "You",
-                    composerText: Binding(
-                        get: { viewModel.composerText },
-                        set: { viewModel.composerText = $0 }
-                    ),
-                    isSending: viewModel.isSendingComment,
-                    onSendTap: { Task { await viewModel.sendComment() } },
+                    composerText: $composerText,
+                    isSending: isSendingComment,
+                    onSendTap: onSendTap,
                     comments: detail.comments,
                     hiddenReplyCount: detail.hiddenReplyCount,
-                    onShowMoreReplies: { viewModel.showMoreReplies() },
-                    onCommentAvatarTap: { userId in onOpenProfile(userId) }
-                )
+                    onShowMoreReplies: onShowMoreReplies
+                ) { userId in
+                    onOpenProfile(userId)
+                }
             },
             cta: { InlineReplyCTA() }
         )
-    }
-
-    private var overflowAction: ContentDetailTopBarAction {
-        ContentDetailTopBarAction(
-            icon: .moreHorizontal,
-            accessibilityLabel: "Post options"
-        ) { Task { @MainActor in viewModel.showsOverflowMenu = true } }
     }
 }
 
@@ -127,7 +178,7 @@ private struct LoadingLayout: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
+            ContentDetailTopBar(title: "Post", onBack: onBack, action: nil)
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 Shimmer(width: 220, height: 22, cornerRadius: Radii.sm)
                 Shimmer(height: 16, cornerRadius: Radii.sm)
@@ -153,7 +204,7 @@ private struct ErrorLayout: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
+            ContentDetailTopBar(title: "Post", onBack: onBack, action: nil)
             EmptyState(
                 icon: .alertCircle,
                 headline: "Couldn't load this post",
@@ -167,5 +218,10 @@ private struct ErrorLayout: View {
 }
 
 #Preview {
-    PulsePostDetailView(postId: "preview") {}
+    @Previewable @State var composer = ""
+    PulsePostDetailLoadedContent(
+        detail: PulsePostDetailSampleData.populated,
+        composerText: $composer,
+        isSendingComment: false
+    )
 }

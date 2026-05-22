@@ -117,6 +117,10 @@ class PulsePostDetailViewModelTest {
             assertNull(loaded.content.reactions.userReaction)
         }
 
+    @Test fun lost_found_purpose_maps_to_lost_found_intent() {
+        assertEquals(PostIntent.LostFound, PostIntent.from(purpose = "lost_found", postType = null))
+    }
+
     @Test fun reaction_optimistic_then_reconcile() =
         runTest {
             coEvery { repo.detail("p1") } returns NetworkResult.Success(sampleResponse())

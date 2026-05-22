@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -29,19 +30,25 @@ import app.pantopus.android.ui.components.StatusChip
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.components.VerifiedBadge
 import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.Spacing
 
 /**
- * One of the five intent buckets the design draws for a Pulse post.
- * Backend `Post.purpose` is wider (13 values); the view-model collapses
- * those onto these five for display.
+ * One of the six intent buckets the design draws for a Pulse post.
+ * Backend `Post.purpose` is wider; the view-model collapses those onto
+ * these intents for display.
  */
-enum class PostIntent(val label: String, val chipVariant: StatusChipVariant) {
-    Ask("Ask", StatusChipVariant.Info),
-    Offer("Offer", StatusChipVariant.Success),
-    Event("Event", StatusChipVariant.Personal),
-    Share("Share", StatusChipVariant.Neutral),
-    Alert("Alert", StatusChipVariant.Warning),
+enum class PostIntent(
+    val label: String,
+    val chipVariant: StatusChipVariant,
+    val icon: PantopusIcon,
+) {
+    LostFound("Lost & Found", StatusChipVariant.ErrorVariant, PantopusIcon.Search),
+    Ask("Ask", StatusChipVariant.Info, PantopusIcon.HelpCircle),
+    Offer("Offer", StatusChipVariant.Success, PantopusIcon.Hand),
+    Event("Event", StatusChipVariant.Personal, PantopusIcon.Calendar),
+    Share("Share", StatusChipVariant.Home, PantopusIcon.MessageCircle),
+    Alert("Alert", StatusChipVariant.Warning, PantopusIcon.AlertCircle),
     ;
 
     companion object {
@@ -54,13 +61,13 @@ enum class PostIntent(val label: String, val chipVariant: StatusChipVariant) {
             postType: String?,
         ): PostIntent =
             when ((purpose ?: postType ?: "").lowercase()) {
+                "lost_found", "lost", "found" -> LostFound
                 "ask" -> Ask
                 "offer" -> Offer
                 "event" -> Event
                 "alert", "safety", "heads_up" -> Alert
                 "deal", "recommend", "share", "showcase", "story",
                 "neighborhood_win", "visitor_guide", "local_update", "learn",
-                "lost_found",
                 -> Share
                 else -> Share
             }
@@ -95,9 +102,12 @@ fun PostAuthorHeader(
                     .sizeIn(minWidth = 44.dp, minHeight = 44.dp)
                     .then(
                         if (onAvatarTap != null) {
-                            Modifier.clickable(onClick = onAvatarTap).semantics {
-                                contentDescription = "Open $displayName's profile"
-                            }
+                            Modifier
+                                .testTag("pulsePostDetail-authorAvatar")
+                                .clickable(onClick = onAvatarTap)
+                                .semantics {
+                                    contentDescription = "Open $displayName's profile"
+                                }
                         } else {
                             Modifier
                         },
@@ -133,7 +143,7 @@ fun PostAuthorHeader(
                 color = PantopusColors.appTextSecondary,
             )
         }
-        StatusChip(text = intent.label, variant = intent.chipVariant)
+        StatusChip(text = intent.label.uppercase(), variant = intent.chipVariant, icon = intent.icon)
     }
 }
 

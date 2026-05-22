@@ -1,4 +1,4 @@
-@file:Suppress("LongMethod", "MagicNumber", "PackageNaming")
+@file:Suppress("LongMethod", "LongParameterList", "MagicNumber", "PackageNaming")
 
 package app.pantopus.android.ui.screens.posts
 
@@ -86,40 +86,17 @@ fun PulsePostDetailScreen(
                     } else {
                         null
                     }
-                ContentDetailShell(
-                    title = null,
-                    onBack = onBack,
+                PulsePostDetailLoadedContent(
+                    content = content,
+                    composerText = composer,
+                    onComposerTextChange = { viewModel.setComposerText(it) },
+                    isSending = isSending,
                     topBarAction = topBarAction,
-                    cta = { InlineReplyCta() },
-                    header = {
-                        PostAuthorHeader(
-                            displayName = content.authorDisplayName,
-                            avatarUrl = content.authorAvatarUrl,
-                            isVerified = content.authorVerified,
-                            identity = content.authorIdentity,
-                            timeAndLocality = content.timeAndLocality,
-                            intent = content.intent,
-                            onAvatarTap = { onOpenProfile(content.post.userId) },
-                        )
-                    },
-                    body = {
-                        BodyReactionsBody(
-                            body = content.post.content,
-                            mediaUrls = content.mediaUrls,
-                            reactions = content.reactions,
-                            onReactionTap = { kind -> viewModel.tapReaction(kind) },
-                            composerAvatarUrl = null,
-                            composerAvatarName = "You",
-                            composerText = composer,
-                            onComposerTextChange = { viewModel.setComposerText(it) },
-                            isSending = isSending,
-                            onSendTap = { viewModel.sendComment() },
-                            comments = content.comments,
-                            hiddenReplyCount = content.hiddenReplyCount,
-                            onShowMoreReplies = { viewModel.showMoreReplies() },
-                            onCommentAvatarTap = onOpenProfile,
-                        )
-                    },
+                    onBack = onBack,
+                    onOpenProfile = onOpenProfile,
+                    onReactionTap = { kind -> viewModel.tapReaction(kind) },
+                    onSendTap = { viewModel.sendComment() },
+                    onShowMoreReplies = { viewModel.showMoreReplies() },
                 )
             }
         }
@@ -194,9 +171,60 @@ fun PulsePostDetailScreen(
 }
 
 @Composable
+fun PulsePostDetailLoadedContent(
+    content: PulsePostDetailContent,
+    composerText: String,
+    onComposerTextChange: (String) -> Unit,
+    isSending: Boolean,
+    topBarAction: ContentDetailTopBarAction? = null,
+    onBack: () -> Unit = {},
+    onOpenProfile: (String) -> Unit = {},
+    onReactionTap: (app.pantopus.android.data.api.models.posts.PostReactionKind) -> Unit = {},
+    onSendTap: () -> Unit = {},
+    onShowMoreReplies: () -> Unit = {},
+) {
+    ContentDetailShell(
+        title = "Post",
+        onBack = onBack,
+        topBarAction = topBarAction,
+        cta = { InlineReplyCta() },
+        header = {
+            PostAuthorHeader(
+                displayName = content.authorDisplayName,
+                avatarUrl = content.authorAvatarUrl,
+                isVerified = content.authorVerified,
+                identity = content.authorIdentity,
+                timeAndLocality = content.timeAndLocality,
+                intent = content.intent,
+                onAvatarTap = { onOpenProfile(content.post.userId) },
+            )
+        },
+        body = {
+            BodyReactionsBody(
+                body = content.post.content,
+                mediaUrls = content.mediaUrls,
+                intent = content.intent,
+                reactions = content.reactions,
+                onReactionTap = onReactionTap,
+                composerAvatarUrl = null,
+                composerAvatarName = "You",
+                composerText = composerText,
+                onComposerTextChange = onComposerTextChange,
+                isSending = isSending,
+                onSendTap = onSendTap,
+                comments = content.comments,
+                hiddenReplyCount = content.hiddenReplyCount,
+                onShowMoreReplies = onShowMoreReplies,
+                onCommentAvatarTap = onOpenProfile,
+            )
+        },
+    )
+}
+
+@Composable
 private fun LoadingLayout(onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
-        ContentDetailTopBar(title = null, onBack = onBack, action = null)
+        ContentDetailTopBar(title = "Post", onBack = onBack, action = null)
         Column(
             modifier = Modifier.fillMaxWidth().padding(Spacing.s4),
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),

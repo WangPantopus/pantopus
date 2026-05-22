@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @file:Suppress("MagicNumber", "PackageNaming", "LongParameterList", "LongMethod", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.shared.content_detail.bodies
@@ -7,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -19,7 +21,10 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -27,18 +32,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.components.AvatarWithIdentityRing
 import app.pantopus.android.ui.components.IdentityPillar
+import app.pantopus.android.ui.screens.shared.content_detail.headers.PostIntent
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import coil.compose.SubcomposeAsyncImage
@@ -51,9 +64,17 @@ data class PostCommentRow(
     val authorIdentity: IdentityPillar,
     val body: String,
     val timestamp: String,
+    val reactionCount: Int = 0,
+    val userReacted: Boolean = false,
     /** 0 for top-level, 1 for nested. Deeper threads collapse to 1. */
     val indentLevel: Int,
     val authorUserId: String?,
+)
+
+/** Quick-reply prompt rendered in the empty thread state. */
+data class PostQuickReplyPrompt(
+    val label: String,
+    val icon: PantopusIcon,
 )
 
 /** Reaction-bar counts + the user's currently-selected reaction (if any). */
@@ -72,6 +93,7 @@ data class PostReactionCounts(
 fun BodyReactionsBody(
     body: String,
     mediaUrls: List<String>,
+    intent: PostIntent = PostIntent.Share,
     reactions: PostReactionCounts,
     onReactionTap: (app.pantopus.android.data.api.models.posts.PostReactionKind) -> Unit,
     composerAvatarUrl: String?,
@@ -106,7 +128,14 @@ fun BodyReactionsBody(
         }
         ReactionsBar(
             counts = reactions,
+            commentCount = comments.size + hiddenReplyCount,
+            commentsAreFresh = comments.isEmpty(),
             onTap = onReactionTap,
+            modifier = Modifier.padding(horizontal = Spacing.s4),
+        )
+        HorizontalDivider(
+            color = PantopusColors.appBorder,
+            thickness = 1.dp,
             modifier = Modifier.padding(horizontal = Spacing.s4),
         )
         CommentComposer(
@@ -114,6 +143,8 @@ fun BodyReactionsBody(
             avatarUrl = composerAvatarUrl,
             text = composerText,
             onTextChange = onComposerTextChange,
+            placeholder = if (comments.isEmpty()) "Be the first to reply..." else "Add a comment",
+            isFocusedPresentation = comments.isEmpty(),
             isSending = isSending,
             onSend = onSendTap,
             modifier = Modifier.padding(horizontal = Spacing.s4),
@@ -148,6 +179,13 @@ fun BodyReactionsBody(
                     )
                 }
             }
+        } else {
+            EmptyThreadState(
+                intent = intent,
+                prompts = intent.quickReplyPrompts,
+                onPromptTap = { onComposerTextChange(it.label) },
+                modifier = Modifier.padding(horizontal = Spacing.s4),
+            )
         }
     }
 }
@@ -242,59 +280,89 @@ private fun MediaTile(
 @Composable
 private fun ReactionsBar(
     counts: PostReactionCounts,
+    commentCount: Int,
+    commentsAreFresh: Boolean,
     onTap: (app.pantopus.android.data.api.models.posts.PostReactionKind) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         ReactionPill(
-            label = "Helpful",
-            icon = PantopusIcon.ThumbsUp,
+            id = "heart",
+            icon = PantopusIcon.Heart,
             count = counts.helpful,
             isSelected = counts.userReaction == app.pantopus.android.data.api.models.posts.PostReactionKind.Helpful,
+            selectedForeground = PantopusColors.error,
+            selectedBackground = PantopusColors.errorBg,
             onTap = { onTap(app.pantopus.android.data.api.models.posts.PostReactionKind.Helpful) },
-            accessibilityLabel = "Helpful, ${counts.helpful}",
+            accessibilityLabel = "Heart reaction, ${counts.helpful}",
         )
-        // Heart and Going are display-only until the backend supports
-        // reactions beyond `like`. They show the count but don't accept
-        // taps or announce as buttons.
         ReactionPill(
-            label = "Heart",
-            icon = PantopusIcon.Heart,
+            id = "hand",
+            icon = PantopusIcon.Hand,
             count = counts.heart,
             isSelected = counts.userReaction == app.pantopus.android.data.api.models.posts.PostReactionKind.Heart,
             onTap = null,
-            accessibilityLabel = "Loved, ${counts.heart}",
+            accessibilityLabel = "Raised hand reaction, ${counts.heart}",
         )
         ReactionPill(
-            label = "Going",
-            icon = PantopusIcon.Check,
+            id = "eye",
+            icon = PantopusIcon.Eye,
             count = counts.going,
             isSelected = counts.userReaction == app.pantopus.android.data.api.models.posts.PostReactionKind.Going,
             onTap = null,
-            accessibilityLabel = "Going, ${counts.going}",
+            accessibilityLabel = "Watching reaction, ${counts.going}",
         )
+        Spacer(Modifier.weight(1f))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            modifier = Modifier.semantics { contentDescription = commentSummary(commentCount, commentsAreFresh) },
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.MessageCircle,
+                contentDescription = null,
+                size = 13.dp,
+                tint = if (commentsAreFresh) PantopusColors.appTextMuted else PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = commentSummary(commentCount, commentsAreFresh),
+                fontSize = 11.sp,
+                color = if (commentsAreFresh) PantopusColors.appTextMuted else PantopusColors.appTextSecondary,
+            )
+        }
     }
 }
 
 @Composable
 private fun ReactionPill(
-    label: String,
+    id: String,
     icon: PantopusIcon,
     count: Int,
     isSelected: Boolean,
+    selectedForeground: Color = PantopusColors.primary700,
+    selectedBackground: Color = PantopusColors.primary50,
     /** `null` renders the pill as display-only (no click handler). */
     onTap: (() -> Unit)?,
     accessibilityLabel: String,
 ) {
-    val background = if (isSelected) PantopusColors.primary600 else PantopusColors.appSurfaceSunken
-    val foreground = if (isSelected) PantopusColors.appTextInverse else PantopusColors.appText
+    val background = if (isSelected) selectedBackground else PantopusColors.appSurface
+    val foreground = if (isSelected) selectedForeground else PantopusColors.appTextSecondary
+    val border = if (isSelected) selectedForeground.copy(alpha = 0.25f) else PantopusColors.appBorder
     val baseModifier =
         Modifier
             .clip(RoundedCornerShape(Radii.pill))
             .background(background)
+            .drawBehind {
+                drawRoundRect(
+                    color = border,
+                    style = Stroke(width = 1.dp.toPx()),
+                    cornerRadius = CornerRadius(Radii.pill.toPx(), Radii.pill.toPx()),
+                )
+            }
             .sizeIn(minHeight = 44.dp)
     val withClick =
         if (onTap != null) {
@@ -306,6 +374,7 @@ private fun ReactionPill(
         modifier =
             withClick
                 .padding(horizontal = Spacing.s3, vertical = 6.dp)
+                .testTag("pulsePostDetail-reaction-$id")
                 .semantics { contentDescription = accessibilityLabel },
         contentAlignment = Alignment.Center,
     ) {
@@ -315,12 +384,6 @@ private fun ReactionPill(
         ) {
             PantopusIconImage(icon = icon, contentDescription = null, size = 14.dp, tint = foreground)
             Text(
-                text = label,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = foreground,
-            )
-            Text(
                 text = "$count",
                 fontSize = 12.sp,
                 color = foreground.copy(alpha = 0.85f),
@@ -329,12 +392,24 @@ private fun ReactionPill(
     }
 }
 
+private fun commentSummary(
+    commentCount: Int,
+    commentsAreFresh: Boolean,
+): String =
+    if (commentsAreFresh) {
+        "0 comments · just posted"
+    } else {
+        "$commentCount ${if (commentCount == 1) "comment" else "comments"}"
+    }
+
 @Composable
 private fun CommentComposer(
     avatarName: String,
     avatarUrl: String?,
     text: String,
     onTextChange: (String) -> Unit,
+    placeholder: String,
+    isFocusedPresentation: Boolean,
     isSending: Boolean,
     onSend: () -> Unit,
     modifier: Modifier = Modifier,
@@ -351,34 +426,38 @@ private fun CommentComposer(
             ringProgress = 1f,
             size = 28.dp,
         )
+        val canSend = text.trim().isNotEmpty() && !isSending
         OutlinedTextField(
             value = text,
             onValueChange = onTextChange,
-            placeholder = { Text("Add a comment", fontSize = 14.sp) },
+            placeholder = { Text(placeholder, fontSize = 14.sp) },
             singleLine = true,
             shape = RoundedCornerShape(Radii.pill),
             textStyle = TextStyle(fontSize = 14.sp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() }),
             colors =
                 OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = PantopusColors.appBorder,
-                    unfocusedBorderColor = PantopusColors.appBorder,
-                    focusedContainerColor = PantopusColors.appSurfaceSunken,
-                    unfocusedContainerColor = PantopusColors.appSurfaceSunken,
+                    focusedBorderColor = if (isFocusedPresentation) PantopusColors.primary500 else PantopusColors.appBorder,
+                    unfocusedBorderColor = if (isFocusedPresentation) PantopusColors.primary500 else PantopusColors.appBorder,
+                    focusedContainerColor = PantopusColors.appSurface,
+                    unfocusedContainerColor = PantopusColors.appSurface,
                 ),
             modifier =
                 Modifier
                     .weight(1f)
                     .height(44.dp)
-                    .semantics { contentDescription = "Add a comment" },
+                    .testTag("pulsePostDetail-composer")
+                    .semantics { contentDescription = placeholder },
         )
-        val isEnabled = text.trim().isNotEmpty() && !isSending
         Box(
             modifier =
                 Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(if (isEnabled) PantopusColors.primary100 else Color.Transparent)
-                    .clickable(enabled = isEnabled, onClick = onSend)
+                    .background(if (canSend || isFocusedPresentation) PantopusColors.primary600 else PantopusColors.appSurfaceSunken)
+                    .clickable(enabled = canSend, onClick = onSend)
+                    .testTag("pulsePostDetail-sendComment")
                     .semantics { contentDescription = "Send comment" },
             contentAlignment = Alignment.Center,
         ) {
@@ -389,7 +468,7 @@ private fun CommentComposer(
                     icon = PantopusIcon.Send,
                     contentDescription = null,
                     size = 18.dp,
-                    tint = if (isEnabled) PantopusColors.primary600 else PantopusColors.appTextMuted,
+                    tint = if (canSend || isFocusedPresentation) PantopusColors.appTextInverse else PantopusColors.appTextMuted,
                 )
             }
         }
@@ -407,12 +486,13 @@ private fun CommentRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         if (row.indentLevel > 0) {
-            Spacer(Modifier.width((row.indentLevel * 28).dp))
+            Spacer(Modifier.width((row.indentLevel * 36).dp))
         }
         Box(
             modifier =
                 Modifier
                     .sizeIn(minWidth = 28.dp, minHeight = 28.dp)
+                    .testTag("pulsePostDetail-commentAvatar-${row.id}")
                     .clickable(onClick = onAvatarTap)
                     .semantics { contentDescription = "Open ${row.authorName}'s profile" },
         ) {
@@ -421,33 +501,263 @@ private fun CommentRow(
                 imageUrl = row.authorAvatarUrl,
                 identity = row.authorIdentity,
                 ringProgress = 1f,
-                size = 28.dp,
+                size = if (row.indentLevel > 0) 24.dp else 28.dp,
             )
         }
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            Column(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.lg))
+                        .background(PantopusColors.appSurface)
+                        .drawBehind {
+                            drawRoundRect(
+                                color = PantopusColors.appBorder,
+                                style = Stroke(width = 1.dp.toPx()),
+                                cornerRadius = CornerRadius(Radii.lg.toPx(), Radii.lg.toPx()),
+                            )
+                        }
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
             ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                ) {
+                    Text(
+                        text = row.authorName,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appText,
+                    )
+                    Text("·", fontSize = 10.sp, color = PantopusColors.appTextMuted)
+                    Text(
+                        text = row.timestamp,
+                        fontSize = 10.sp,
+                        color = PantopusColors.appTextMuted,
+                    )
+                }
                 Text(
-                    text = row.authorName,
+                    text = row.body,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = PantopusColors.appText,
-                )
-                Text("·", fontSize = 11.sp, color = PantopusColors.appTextMuted)
-                Text(
-                    text = row.timestamp,
-                    fontSize = 11.sp,
-                    color = PantopusColors.appTextSecondary,
+                    color = PantopusColors.appTextStrong,
+                    lineHeight = 16.sp,
                 )
             }
-            Text(
-                text = row.body,
-                fontSize = 12.sp,
-                color = PantopusColors.appTextStrong,
-                lineHeight = 16.sp,
-            )
+            Row(
+                modifier = Modifier.padding(start = Spacing.s1),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("pulsePostDetail-reply-${row.id}")
+                            .clickable(onClick = {})
+                            .semantics { contentDescription = "Reply to ${row.authorName}" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Reply",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+                Box(
+                    modifier =
+                        Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("pulsePostDetail-commentHeart-${row.id}")
+                            .clickable(onClick = {})
+                            .semantics { contentDescription = "Heart ${row.authorName}'s reply, ${row.reactionCount}" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.Heart,
+                            contentDescription = null,
+                            size = 11.dp,
+                            tint = if (row.userReacted) PantopusColors.error else PantopusColors.appTextSecondary,
+                        )
+                        Text(
+                            text = "${row.reactionCount}",
+                            fontSize = 10.5.sp,
+                            color = if (row.userReacted) PantopusColors.error else PantopusColors.appTextSecondary,
+                        )
+                    }
+                }
+            }
         }
     }
 }
+
+@Composable
+private fun EmptyThreadState(
+    intent: PostIntent,
+    prompts: List<PostQuickReplyPrompt>,
+    onPromptTap: (PostQuickReplyPrompt) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .drawBehind {
+                    drawRoundRect(
+                        color = PantopusColors.appBorder,
+                        style =
+                            Stroke(
+                                width = 1.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())),
+                            ),
+                        cornerRadius = CornerRadius(Radii.lg.toPx(), Radii.lg.toPx()),
+                    )
+                }
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s6)
+                .testTag("pulsePostDetail-emptyThread"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.primary50),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.MessageSquarePlus,
+                contentDescription = null,
+                size = 22.dp,
+                tint = PantopusColors.primary600,
+            )
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            Text(
+                text = "Be the first to reply",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = emptySubcopy(intent),
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp,
+                color = PantopusColors.appTextSecondary,
+                modifier = Modifier.width(250.dp),
+            )
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            prompts.forEach { prompt ->
+                QuickReplyChip(prompt = prompt, onClick = { onPromptTap(prompt) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickReplyChip(
+    prompt: PostQuickReplyPrompt,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appSurfaceSunken)
+                .drawBehind {
+                    drawRoundRect(
+                        color = PantopusColors.appBorder,
+                        style = Stroke(width = 1.dp.toPx()),
+                        cornerRadius = CornerRadius(Radii.pill.toPx(), Radii.pill.toPx()),
+                    )
+                }
+                .heightIn(min = 48.dp)
+                .clickable(onClick = onClick)
+                .testTag("pulsePostDetail-quickReply-${prompt.label}")
+                .semantics { contentDescription = prompt.label }
+                .padding(horizontal = Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(
+            icon = prompt.icon,
+            contentDescription = null,
+            size = 12.dp,
+            tint = PantopusColors.appTextSecondary,
+        )
+        Text(
+            text = prompt.label,
+            style = PantopusTextStyle.caption,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextStrong,
+        )
+    }
+}
+
+private fun emptySubcopy(intent: PostIntent): String =
+    when (intent) {
+        PostIntent.LostFound -> "A neighbor sighting, a tip, or even a \"looking\" matters in the first hour."
+        PostIntent.Ask -> "A question, tip, or resource can get the thread moving."
+        PostIntent.Offer -> "Ask a detail, claim interest, or help the offer find the right neighbor."
+        PostIntent.Event -> "A quick RSVP or offer to bring something helps the host plan."
+        PostIntent.Share -> "Add context, say thanks, or help other neighbors spot why it matters."
+        PostIntent.Alert -> "Confirm what you are seeing nearby or share a useful next step."
+    }
+
+val PostIntent.quickReplyPrompts: List<PostQuickReplyPrompt>
+    get() =
+        when (this) {
+            PostIntent.Ask ->
+                listOf(
+                    PostQuickReplyPrompt("Try a question reply", PantopusIcon.HelpCircle),
+                    PostQuickReplyPrompt("Share a tip", PantopusIcon.Lightbulb),
+                    PostQuickReplyPrompt("Suggest a resource", PantopusIcon.Share),
+                )
+            PostIntent.LostFound ->
+                listOf(
+                    PostQuickReplyPrompt("I've seen it", PantopusIcon.Eye),
+                    PostQuickReplyPrompt("Have you checked X?", PantopusIcon.MapPin),
+                    PostQuickReplyPrompt("DM me about details", PantopusIcon.MessageCircle),
+                )
+            PostIntent.Offer ->
+                listOf(
+                    PostQuickReplyPrompt("I'm interested", PantopusIcon.Hand),
+                    PostQuickReplyPrompt("Can pick up today", PantopusIcon.Check),
+                    PostQuickReplyPrompt("Any details?", PantopusIcon.HelpCircle),
+                )
+            PostIntent.Event ->
+                listOf(
+                    PostQuickReplyPrompt("I'm going", PantopusIcon.CheckCircle),
+                    PostQuickReplyPrompt("Can bring supplies", PantopusIcon.ShoppingBag),
+                    PostQuickReplyPrompt("What time?", PantopusIcon.Clock),
+                )
+            PostIntent.Share ->
+                listOf(
+                    PostQuickReplyPrompt("Thanks for sharing", PantopusIcon.Heart),
+                    PostQuickReplyPrompt("I can add context", PantopusIcon.MessageCircle),
+                    PostQuickReplyPrompt("Saving this", PantopusIcon.Bookmark),
+                )
+            PostIntent.Alert ->
+                listOf(
+                    PostQuickReplyPrompt("Thanks for the heads up", PantopusIcon.AlertCircle),
+                    PostQuickReplyPrompt("I can confirm", PantopusIcon.Check),
+                    PostQuickReplyPrompt("Need help?", PantopusIcon.HelpCircle),
+                )
+        }
