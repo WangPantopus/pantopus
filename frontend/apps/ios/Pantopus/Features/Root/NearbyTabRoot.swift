@@ -24,7 +24,7 @@ public enum NearbyRoute: Hashable {
 
 /// NavigationStack wrapper for the Nearby tab.
 public struct NearbyTabRoot: View {
-    @State private var path: [NearbyRoute] = []
+    @State private var path = RouteStack<NearbyRoute>()
     /// P6.6 — share system sheet driven by "Share listing".
     @State private var systemSheet: SystemSheetRequest?
 
@@ -37,7 +37,7 @@ public struct NearbyTabRoot: View {
     }
 
     public var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack(path: navigationPathBinding) {
             NearbyMapView(
                 onOpenEntity: { entity in
                     path.append(.entityDetail(kind: entity.kind, id: entity.id))
@@ -51,6 +51,13 @@ public struct NearbyTabRoot: View {
             }
         }
         .sheet(item: $systemSheet) { request in request.makeView() }
+    }
+
+    private var navigationPathBinding: Binding<NavigationPath> {
+        Binding(
+            get: { path.navigationPath },
+            set: { path.replaceNavigationPath($0) }
+        )
     }
 
     @ViewBuilder
