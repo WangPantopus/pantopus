@@ -2,11 +2,9 @@
 //  AddHomeWizardViewModel.swift
 //  Pantopus
 //
-//  Wizard view model. Drives the 4-step + success state machine, calls
-//  `POST /api/homes/property-suggestions`, `POST /api/homes/check-address`,
-//  and `POST /api/homes` (`backend/routes/home.js:540`, `:555`, `:677`),
-//  and exposes the small `WizardChrome` shape the shared `WizardShell`
-//  consumes.
+//  Wizard view model. Drives the 4-step + success state machine, keeps
+//  step 1 search-first with deterministic address fixtures, and exposes
+//  the small `WizardChrome` shape the shared `WizardShell` consumes.
 //
 
 import Foundation
@@ -19,7 +17,6 @@ public enum AddHomeIntent: Sendable {
     case leading
     case selectRole(AddHomeRole)
     case togglePrimaryHome(Bool)
-    case retrySuggestions
     case viewHome
     case backToHub
 }
@@ -41,11 +38,10 @@ final class AddHomeWizardViewModel: WizardModel {
     /// can be restored after process death.
     private(set) var form: AddHomeFormState
 
-    /// Current address-suggestion list (empty until the user pauses
-    /// typing in step 1).
-    private(set) var suggestions: [String] = []
-    /// True while the property-suggestions call is in flight.
-    private(set) var isLoadingSuggestions: Bool = false
+    /// Single search query used by the A12.1 step-1 typeahead.
+    private(set) var homeSearchQuery: String = ""
+    /// Candidate id selected from nearby results or autocomplete.
+    private(set) var selectedHomeID: String?
 
     /// Result of `POST /api/homes/check-address`, populated when entering
     /// step 2.
@@ -71,11 +67,6 @@ final class AddHomeWizardViewModel: WizardModel {
 
     private let api: APIClient
     private let isOnlineProvider: @MainActor () -> Bool
-    private var debounceTask: Task<Void, Never>?
-
-    /// Visible-for-testing default that fires `propertySuggestions` after
-    /// the user pauses typing.
-    static let suggestionDebounceNanoseconds: UInt64 = 300_000_000
 
     // MARK: - Init
 
@@ -91,6 +82,10 @@ final class AddHomeWizardViewModel: WizardModel {
         self.api = api
         self.isOnlineProvider = isOnlineProvider
         form = initialState
+        selectedHomeID = AddHomeSampleData.candidate(for: initialState.address)?.id
+        homeSearchQuery = AddHomeSampleData
+            .candidate(for: initialState.address)?
+            .line1 ?? ""
     }
 
     /// Replace the in-memory form state from scene storage on first
@@ -98,6 +93,9 @@ final class AddHomeWizardViewModel: WizardModel {
     func restore(from snapshot: AddHomeFormState) {
         guard form == .empty else { return }
         form = snapshot
+        let candidate = AddHomeSampleData.candidate(for: snapshot.address)
+        selectedHomeID = candidate?.id
+        homeSearchQuery = candidate?.line1 ?? ""
     }
 
     // MARK: - WizardModel
@@ -105,7 +103,7 @@ final class AddHomeWizardViewModel: WizardModel {
     var chrome: WizardChrome {
         let step = currentStep
         return WizardChrome(
-            title: "Add a home",
+            title: title(for: step),
             progressLabel: progressLabel(for: step),
             progressFraction: progressFraction(for: step),
             leading: leadingControl(for: step),
@@ -144,7 +142,53 @@ final class AddHomeWizardViewModel: WizardModel {
         if currentStep == .success { pendingEvent = .dismiss }
     }
 
-    // MARK: - Field updates (step 1)
+    // MARK: - Search updates (step 1)
+
+    var nearbyHomes: [AddHomeAddressCandidate] {
+        AddHomeSampleData.nearbyHomes
+    }
+
+    var autocompleteResults: [AddHomeAddressCandidate] {
+        guard selectedHomeID == nil else { return [] }
+        return AddHomeSampleData.autocompleteResults(matching: homeSearchQuery)
+    }
+
+    var showsAutocomplete: Bool {
+        selectedHomeID == nil
+            && !homeSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    func updateSearchQuery(_ query: String) {
+        homeSearchQuery = query
+        selectedHomeID = nil
+        form.address = .init()
+    }
+
+    func clearSearchQuery() {
+        homeSearchQuery = ""
+        selectedHomeID = nil
+        form.address = .init()
+    }
+
+    func useCurrentLocation() {
+        homeSearchQuery = ""
+        selectedHomeID = nil
+        form.address = .init()
+    }
+
+    func selectAddressCandidate(_ candidate: AddHomeAddressCandidate) {
+        guard !candidate.isClaimed else { return }
+        selectedHomeID = candidate.id
+        homeSearchQuery = candidate.line1
+        form.address = candidate.addressFields
+    }
+
+    func addManuallyTapped() {
+        selectedHomeID = nil
+        form.address = .init()
+    }
+
+    // MARK: - Legacy field updates (step 1)
 
     func update(_ field: AddressField, to value: String) {
         switch field {
@@ -154,16 +198,10 @@ final class AddHomeWizardViewModel: WizardModel {
         case .state: form.address.state = value
         case .zip: form.address.zipCode = value
         }
-        scheduleSuggestions()
-    }
-
-    /// Pick a suggestion from the list — copies its values into the form.
-    /// Today the response shape is provider-defined so we surface the
-    /// raw display string only; a richer parser lands when the backend
-    /// returns structured suggestions.
-    func selectSuggestion(_ suggestion: String) {
-        form.address.street = suggestion
-        suggestions = []
+        selectedHomeID = AddHomeSampleData.candidate(for: form.address)?.id
+        homeSearchQuery = selectedHomeID == nil
+            ? form.address.street
+            : AddHomeSampleData.candidate(for: form.address)?.line1 ?? form.address.street
     }
 
     // MARK: - Field updates (step 2/3)
@@ -227,42 +265,6 @@ final class AddHomeWizardViewModel: WizardModel {
     }
 
     // MARK: - API calls
-
-    private func scheduleSuggestions() {
-        debounceTask?.cancel()
-        guard form.address.isComplete else {
-            suggestions = []
-            isLoadingSuggestions = false
-            return
-        }
-        let snapshot = form.address
-        debounceTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: Self.suggestionDebounceNanoseconds)
-            guard let self, !Task.isCancelled else { return }
-            await fetchSuggestions(for: snapshot)
-        }
-    }
-
-    private func fetchSuggestions(for fields: AddHomeAddressFields) async {
-        isLoadingSuggestions = true
-        defer { isLoadingSuggestions = false }
-        let request = PropertySuggestionsRequest(
-            address: fields.street,
-            unitNumber: fields.unit.isEmpty ? nil : fields.unit,
-            city: fields.city,
-            state: fields.state,
-            zipCode: fields.zipCode
-        )
-        do {
-            let response: PropertySuggestionsResponse = try await api.request(
-                HomesEndpoints.propertySuggestions(request)
-            )
-            suggestions = Self.flattenSuggestions(response)
-        } catch {
-            // Suggestions are advisory — don't block the user on failure.
-            suggestions = []
-        }
-    }
 
     private func runCheckAddress() async {
         isCheckingAddress = true
@@ -337,6 +339,13 @@ final class AddHomeWizardViewModel: WizardModel {
         }
     }
 
+    private func title(for step: AddHomeStep) -> String {
+        switch step {
+        case .address: "Find your home"
+        default: "Add a home"
+        }
+    }
+
     private func primaryCTALabel(for step: AddHomeStep) -> String {
         switch step {
         case .address, .confirm, .role: "Continue"
@@ -352,7 +361,7 @@ final class AddHomeWizardViewModel: WizardModel {
 
     private func primaryEnabled(for step: AddHomeStep) -> Bool {
         switch step {
-        case .address: form.address.isComplete
+        case .address: selectedHomeID != nil
         case .confirm: !isCheckingAddress && errorMessage == nil
         case .role: form.role != nil
         case .review: form.role != nil
@@ -363,35 +372,12 @@ final class AddHomeWizardViewModel: WizardModel {
     /// Whether the wizard is "dirty" enough to warrant a discard confirm
     /// when the user taps X on step 1 / success step.
     private var dirtyForCloseConfirm: Bool {
-        currentStep != .success && !form.address.street.isEmpty
-    }
-
-    // MARK: - Suggestion parsing
-
-    /// Flatten the provider-defined ATTOM JSON into a list of human-
-    /// readable display strings. Returns at most 5.
-    static func flattenSuggestions(_ value: JSONValue) -> [String] {
-        var collected: [String] = []
-        Self.collect(value, into: &collected)
-        return Array(collected.prefix(5))
-    }
-
-    private static func collect(_ value: JSONValue, into out: inout [String]) {
-        switch value {
-        case let .object(dict):
-            if let address = dict["address"]?.stringValue,
-               !address.isEmpty {
-                out.append(address)
-            }
-            for (_, child) in dict {
-                Self.collect(child, into: &out)
-            }
-        case let .array(array):
-            for item in array {
-                Self.collect(item, into: &out)
-            }
-        default: break
-        }
+        currentStep != .success
+            && (
+                selectedHomeID != nil
+                    || !homeSearchQuery.isEmpty
+                    || !form.address.street.isEmpty
+            )
     }
 }
 

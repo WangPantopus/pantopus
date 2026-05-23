@@ -9,7 +9,6 @@ import app.pantopus.android.data.api.models.homes.CheckAddressResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.HomeDto
-import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
@@ -58,10 +57,7 @@ class AddHomeWizardViewModelTest {
         AddHomeWizardViewModel(repo, savedStateHandle, networkMonitor)
 
     private fun fillAddress(vm: AddHomeWizardViewModel) {
-        vm.updateField(AddressField.Street, "412 Elm St")
-        vm.updateField(AddressField.City, "Portland")
-        vm.updateField(AddressField.State, "OR")
-        vm.updateField(AddressField.Zip, "97214")
+        vm.selectAddressCandidate(AddHomeSampleData.nearbyHomes[0])
     }
 
     private val createHomeResponse =
@@ -100,10 +96,10 @@ class AddHomeWizardViewModelTest {
     fun initial_chrome_reflects_address_step() {
         val vm = makeVm()
         val chrome = vm.chrome
-        assertEquals("Add a home", chrome.title)
+        assertEquals("Find your home", chrome.title)
         assertEquals("Continue", chrome.primaryCtaLabel)
         assertFalse(
-            "Continue must be disabled until the address fields are filled.",
+            "Continue must be disabled until a home is selected.",
             chrome.primaryCtaEnabled,
         )
         assertEquals(WizardLeadingControl.Close, chrome.leading)
@@ -114,7 +110,7 @@ class AddHomeWizardViewModelTest {
     }
 
     @Test
-    fun filled_form_enables_continue() {
+    fun selected_home_enables_continue() {
         val vm = makeVm()
         fillAddress(vm)
         assertTrue(vm.chrome.primaryCtaEnabled)
@@ -313,31 +309,34 @@ class AddHomeWizardViewModelTest {
         assertTrue(vm.chrome.dirty)
     }
 
-    // MARK: - Suggestions
+    // MARK: - Search
 
     @Test
-    fun suggestions_debounce_and_populate() =
-        runTest {
-            coEvery { repo.propertySuggestions(any<PropertySuggestionsRequest>()) } returns
-                NetworkResult.Success(
-                    mapOf("results" to listOf(mapOf("address" to "412 Elm St"))),
-                )
-            val vm = makeVm()
-            fillAddress(vm)
-            // No fetch yet — debounce hasn't elapsed.
-            assertEquals(0, vm.state.value.suggestions.size)
-            advanceTimeBy(AddHomeWizardViewModel.SUGGESTION_DEBOUNCE_MS + 50)
-            assertTrue(
-                vm.state.value.suggestions
-                    .isNotEmpty(),
-            )
-        }
-
-    @Test
-    fun select_suggestion_populates_street() {
+    fun search_query_shows_autocomplete_without_enabling_continue() {
         val vm = makeVm()
-        vm.selectSuggestion("100 Test Ave")
-        assertEquals("100 Test Ave", vm.state.value.form.address.street)
+        vm.updateSearchQuery("412 Elm")
+        assertTrue(vm.showsAutocomplete)
+        assertEquals(5, vm.autocompleteResults.size)
+        assertFalse(vm.chrome.primaryCtaEnabled)
+    }
+
+    @Test
+    fun select_address_candidate_populates_address_and_enables_continue() {
+        val vm = makeVm()
+        val candidate = AddHomeSampleData.nearbyHomes[0]
+        vm.selectAddressCandidate(candidate)
+        assertEquals(candidate.id, vm.state.value.selectedHomeId)
+        assertEquals(candidate.line1, vm.state.value.homeSearchQuery)
+        assertEquals(candidate.addressFields, vm.state.value.form.address)
+        assertTrue(vm.chrome.primaryCtaEnabled)
+    }
+
+    @Test
+    fun claimed_candidate_does_not_select() {
+        val vm = makeVm()
+        vm.selectAddressCandidate(AddHomeSampleData.nearbyHomes[2])
+        assertNull(vm.state.value.selectedHomeId)
+        assertFalse(vm.chrome.primaryCtaEnabled)
     }
 
     // MARK: - Saved-state restore
@@ -349,10 +348,10 @@ class AddHomeWizardViewModelTest {
                 mapOf(
                     "addHome.step" to AddHomeStep.Role.ordinal0,
                     "addHome.street" to "412 Elm St",
-                    "addHome.unit" to "",
-                    "addHome.city" to "Portland",
-                    "addHome.state" to "OR",
-                    "addHome.zip" to "97214",
+                    "addHome.unit" to "Apt 3B",
+                    "addHome.city" to "Brooklyn",
+                    "addHome.state" to "NY",
+                    "addHome.zip" to "11211",
                     "addHome.primary" to true,
                     "addHome.role" to "Tenant",
                 ),
@@ -361,21 +360,6 @@ class AddHomeWizardViewModelTest {
         assertEquals(AddHomeStep.Role, vm.state.value.form.currentStep)
         assertEquals("412 Elm St", vm.state.value.form.address.street)
         assertEquals(AddHomeRole.Tenant, vm.state.value.form.role)
-    }
-
-    // MARK: - Suggestion parser
-
-    @Test
-    fun flatten_suggestions_handles_nested_payload() {
-        val payload: Map<String, Any?> =
-            mapOf(
-                "results" to
-                    listOf(
-                        mapOf("address" to "100 Main St"),
-                        mapOf("nested" to mapOf("address" to "200 Oak St")),
-                    ),
-            )
-        val flat = AddHomeWizardViewModel.flattenSuggestions(payload)
-        assertEquals(listOf("100 Main St", "200 Oak St"), flat)
+        assertEquals(AddHomeSampleData.nearbyHomes[0].id, vm.state.value.selectedHomeId)
     }
 }

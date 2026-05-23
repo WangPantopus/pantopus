@@ -83,14 +83,11 @@ class AddHomeWizardScreenTest {
     }
 
     private fun AddHomeWizardViewModel.fillAddress() {
-        updateField(AddressField.Street, "412 Elm St")
-        updateField(AddressField.City, "Portland")
-        updateField(AddressField.State, "OR")
-        updateField(AddressField.Zip, "97214")
+        selectAddressCandidate(AddHomeSampleData.nearbyHomes[0])
     }
 
     @Test
-    fun continue_button_is_disabled_until_address_is_complete() {
+    fun continue_button_is_disabled_until_home_is_selected() {
         compose.setContent {
             AddHomeWizardScreen(onDismiss = {}, onOpenHomeDashboard = {}, viewModel = makeViewModel())
         }
@@ -101,7 +98,7 @@ class AddHomeWizardScreenTest {
     }
 
     @Test
-    fun filling_all_fields_enables_continue() {
+    fun selecting_home_enables_continue() {
         val vm = makeViewModel()
         compose.setContent {
             AddHomeWizardScreen(onDismiss = {}, onOpenHomeDashboard = {}, viewModel = vm)
@@ -112,7 +109,7 @@ class AddHomeWizardScreenTest {
         // function of the form's current step + address completeness, so
         // it doesn't depend on Compose recomposition timing.
         assert(vm.chrome.primaryCtaEnabled) {
-            "After filling all 4 address fields, Continue must be enabled."
+            "After selecting a home, Continue must be enabled."
         }
     }
 
@@ -126,7 +123,7 @@ class AddHomeWizardScreenTest {
         // StateFlow → collectAsStateWithLifecycle hop sometimes lands
         // after WizardShell's onLeading closure has already captured a
         // stale chrome.
-        vm.updateField(AddressField.Street, "412 Elm St")
+        vm.updateSearchQuery("412 Elm")
         compose.setContent {
             AddHomeWizardScreen(
                 onDismiss = { dismissed = true },

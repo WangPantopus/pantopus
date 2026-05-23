@@ -2,9 +2,9 @@
 //  AddHomeWizardViewModelTests.swift
 //  PantopusTests
 //
-//  Covers the AddHome state machine: forward / back, validation gates,
-//  check-address transition, submit happy path, submit error rollback,
-//  scene-storage restore, and the 300 ms suggestion debounce.
+//  Covers the AddHome state machine: forward / back, search-first address
+//  selection, check-address transition, submit happy path, submit error
+//  rollback, and scene-storage restore.
 //
 
 import XCTest
@@ -36,43 +36,14 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         ) { true }
     }
 
-    /// Poll-and-yield helper. Replaces the brittle `Task.sleep(150ms)`
-    /// pattern: waits up to `timeout` seconds, returning as soon as the
-    /// predicate becomes true. The 15s default reflects what we
-    /// actually see on the macos-15 / Xcode 16.4 CI runners — sister
-    /// tests on the same suite have logged 9–10s for a single URL stub
-    /// roundtrip when the runner is loaded.
-    private func waitFor(
-        _ description: String = "predicate",
-        timeout: TimeInterval = 15.0,
-        _ predicate: @MainActor () -> Bool
-    ) async {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if predicate() { return }
-            try? await Task.sleep(nanoseconds: 25_000_000)
-        }
-        XCTFail("Timed out waiting for \(description)")
-    }
-
     private func filled() -> AddHomeFormState {
         AddHomeFormState(
             step: AddHomeStep.address.rawValue,
-            address: AddHomeAddressFields(
-                street: "412 Elm St",
-                unit: "",
-                city: "Portland",
-                state: "OR",
-                zipCode: "97214"
-            ),
+            address: AddHomeSampleData.nearbyHomes[0].addressFields,
             isPrimary: true,
             role: nil
         )
     }
-
-    private static let suggestionsJSON = """
-    {"results":[{"address":"412 Elm St"},{"address":"414 Elm St"}]}
-    """
 
     private static let checkAddressJSON = """
     {"exists":false,"homeCount":0,"hasVerifiedMembers":false,"verdictStatus":null}
@@ -92,14 +63,14 @@ final class AddHomeWizardViewModelTests: XCTestCase {
     func testInitialChromeReflectsAddressStep() {
         let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: .empty)
         let chrome = vm.chrome
-        XCTAssertEqual(chrome.title, "Add a home")
+        XCTAssertEqual(chrome.title, "Find your home")
         XCTAssertEqual(chrome.primaryCTALabel, "Continue")
-        XCTAssertFalse(chrome.primaryCTAEnabled, "Continue must be disabled until the address fields are filled.")
+        XCTAssertFalse(chrome.primaryCTAEnabled, "Continue must be disabled until a home is selected.")
         XCTAssertEqual(chrome.leading, .close)
         XCTAssertEqual(chrome.progressLabel, .stepOf(current: 1, total: 4))
     }
 
-    func testFilledFormEnablesContinue() {
+    func testSelectedHomeEnablesContinue() {
         let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: filled())
         XCTAssertTrue(vm.chrome.primaryCTAEnabled)
     }
@@ -218,27 +189,32 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         XCTAssertFalse(vm.chrome.dirty)
     }
 
-    // MARK: - Suggestions
+    // MARK: - Search
 
-    func testSuggestionsDebounce() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.suggestionsJSON)]
+    func testSearchQueryShowsAutocompleteWithoutEnablingContinue() {
         let vm = makeVM(initialState: .empty)
-        vm.update(.street, to: "412 Elm St")
-        vm.update(.city, to: "Portland")
-        vm.update(.state, to: "OR")
-        vm.update(.zip, to: "97214")
-        // Right away, no fetch yet.
-        XCTAssertEqual(vm.suggestions.count, 0)
-        // Default 15s timeout — debounce is 300ms, plus the URL stub
-        // round trip and main-actor hop. Tight 450ms sleeps raced on CI.
-        await waitFor("suggestions populated") { !vm.suggestions.isEmpty }
-        XCTAssertGreaterThan(vm.suggestions.count, 0)
+        vm.updateSearchQuery("412 Elm")
+        XCTAssertTrue(vm.showsAutocomplete)
+        XCTAssertEqual(vm.autocompleteResults.count, 5)
+        XCTAssertFalse(vm.chrome.primaryCTAEnabled)
     }
 
-    func testSelectSuggestionPopulatesStreet() {
+    func testSelectAddressCandidatePopulatesAddressAndEnablesContinue() {
         let vm = makeVM(initialState: .empty)
-        vm.selectSuggestion("100 Test Ave")
-        XCTAssertEqual(vm.form.address.street, "100 Test Ave")
+        let candidate = AddHomeSampleData.nearbyHomes[0]
+        vm.selectAddressCandidate(candidate)
+        XCTAssertEqual(vm.selectedHomeID, candidate.id)
+        XCTAssertEqual(vm.homeSearchQuery, candidate.line1)
+        XCTAssertEqual(vm.form.address, candidate.addressFields)
+        XCTAssertTrue(vm.chrome.primaryCTAEnabled)
+    }
+
+    func testClaimedCandidateDoesNotSelect() {
+        let vm = makeVM(initialState: .empty)
+        let claimed = AddHomeSampleData.nearbyHomes[2]
+        vm.selectAddressCandidate(claimed)
+        XCTAssertNil(vm.selectedHomeID)
+        XCTAssertFalse(vm.chrome.primaryCTAEnabled)
     }
 
     // MARK: - Restore
@@ -248,6 +224,7 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         vm.restore(from: filled())
         XCTAssertEqual(vm.currentStep, .address)
         XCTAssertEqual(vm.form.address.street, "412 Elm St")
+        XCTAssertEqual(vm.selectedHomeID, AddHomeSampleData.nearbyHomes[0].id)
     }
 
     func testRestoreNoOpsOnceFormIsDirty() {
@@ -260,15 +237,5 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         )
         vm.restore(from: other)
         XCTAssertEqual(vm.form.address.street, "412 Elm St", "Restore should not stomp existing form data.")
-    }
-
-    // MARK: - Suggestion parser
-
-    func testFlattenSuggestionsHandlesNestedPayload() throws {
-        let raw = #"{"results":[{"address":"100 Main St"},{"nested":{"address":"200 Oak St"}}]}"#
-        let json = Data(raw.utf8)
-        let value = try JSONDecoder().decode(JSONValue.self, from: json)
-        let flat = AddHomeWizardViewModel.flattenSuggestions(value)
-        XCTAssertEqual(flat, ["100 Main St", "200 Oak St"])
     }
 }
