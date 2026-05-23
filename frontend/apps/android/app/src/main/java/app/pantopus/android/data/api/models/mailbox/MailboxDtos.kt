@@ -82,6 +82,7 @@ data class MailDetail(
     @Json(name = "ack_status") val ackStatus: String? = null,
     val viewed: Boolean = false,
     @Json(name = "viewed_at") val viewedAt: String? = null,
+    val archived: Boolean = false,
     val attachments: List<String>? = null,
     @Json(name = "expires_at") val expiresAt: String? = null,
     @Json(name = "created_at") val createdAt: String,

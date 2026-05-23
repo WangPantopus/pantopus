@@ -31,6 +31,7 @@ extension MailDetailContent {
             aiSummary: content.aiSummary,
             ackRequired: content.ackRequired,
             isAcknowledged: value,
+            isArchived: content.isArchived,
             bookletDetail: content.bookletDetail,
             certifiedDetail: content.certifiedDetail,
             communityDetail: content.communityDetail
@@ -80,6 +81,7 @@ extension MailDetailContent {
             aiSummary: content.aiSummary,
             ackRequired: content.ackRequired,
             isAcknowledged: content.isAcknowledged,
+            isArchived: content.isArchived,
             bookletDetail: content.bookletDetail,
             certifiedDetail: content.certifiedDetail,
             communityDetail: updatedCommunity

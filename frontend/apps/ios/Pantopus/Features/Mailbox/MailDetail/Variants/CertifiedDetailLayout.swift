@@ -32,6 +32,9 @@ struct CertifiedDetailLayout: View {
     /// just signals the trigger. Defaults to a no-op so existing call
     /// sites compile unchanged.
     var onSaveToVault: @MainActor () -> Void = {}
+    @State private var showsConfirmGate = false
+    @State private var didAutoPresentConfirmGate = false
+    @State private var showsTermsSheet = false
 
     var body: some View {
         MailItemDetailShell(
@@ -41,20 +44,40 @@ struct CertifiedDetailLayout: View {
             hero: { HeroCard(content: content, certified: certified) },
             keyFacts: { keyFactsCard },
             body: {
-                VStack(spacing: Spacing.s3) {
-                    ChainOfCustodyTimeline(
-                        subtitle: "Postal scans · cryptographic receipts",
-                        status: chainStatus,
-                        events: makeChainEvents()
-                    )
-                    if !content.bodyParagraphs.isEmpty {
-                        BodyCard(paragraphs: content.bodyParagraphs)
-                    }
-                }
+                ChainOfCustodyTimeline(
+                    subtitle: "Postal scans · cryptographic receipts",
+                    status: chainStatus,
+                    events: makeChainEvents()
+                )
             },
-            sender: { senderCard },
+            sender: { senderAndNotice },
             actions: { actionsRow }
         )
+        .onAppear {
+            guard !didAutoPresentConfirmGate, shouldShowConfirmGate else { return }
+            didAutoPresentConfirmGate = true
+            showsConfirmGate = true
+        }
+        .sheet(isPresented: $showsConfirmGate) {
+            CertifiedConfirmGate(
+                senderName: content.senderDisplayName,
+                referenceNumber: certified.referenceNumber,
+                deadlineLabel: certified.acknowledgeBy.flatMap(formatDeadline),
+                isSigning: ackInFlight,
+                onReviewFirst: { showsConfirmGate = false },
+                onSign: {
+                    showsConfirmGate = false
+                    onAcknowledge()
+                }
+            )
+        }
+        .sheet(isPresented: $showsTermsSheet) {
+            if let termsURL = certified.termsURL {
+                CertifiedTermsSheet(termsURL: termsURL) {
+                    showsTermsSheet = false
+                }
+            }
+        }
         .accessibilityIdentifier("mailDetail_certified")
     }
 
@@ -108,24 +131,10 @@ struct CertifiedDetailLayout: View {
         CertifiedKeyFactsCard(rows: makeKeyFacts())
     }
 
-    /// Build the key facts. The first emphasis row (if present) is the
-    /// Acknowledge-by deadline lifted from the decoded certified
-    /// payload; the second is the action-required hint when the body
-    /// mentions a dollar amount. Variants extend this in P22-P23.
+    /// Build the key facts in the A17.3 order: amount first, then the
+    /// due/signing date, followed by reference and document metadata.
     private func makeKeyFacts() -> [CertifiedKeyFact] {
         var rows: [CertifiedKeyFact] = []
-        if let deadline = certified.acknowledgeBy.flatMap(formatDeadline) {
-            rows.append(
-                CertifiedKeyFact(
-                    icon: .calendarClock,
-                    label: "Acknowledge by",
-                    value: deadline,
-                    note: "Required to keep the chain unbroken",
-                    tag: countdownTag(certified.acknowledgeBy),
-                    isEmphasis: true
-                )
-            )
-        }
         if let amount = extractAmount(from: content.bodyParagraphs.joined(separator: "\n\n")) {
             rows.append(
                 CertifiedKeyFact(
@@ -134,6 +143,18 @@ struct CertifiedDetailLayout: View {
                     value: amount,
                     note: nil,
                     tag: CertifiedKeyFactTag(text: "New charge", background: Theme.Color.errorBg, foreground: Theme.Color.error),
+                    isEmphasis: true
+                )
+            )
+        }
+        if let deadline = certified.acknowledgeBy.flatMap(formatDeadline) {
+            rows.append(
+                CertifiedKeyFact(
+                    icon: .calendarClock,
+                    label: amountLabel,
+                    value: deadline,
+                    note: "Required to keep the chain unbroken",
+                    tag: countdownTag(certified.acknowledgeBy),
                     isEmphasis: true
                 )
             )
@@ -175,6 +196,10 @@ struct CertifiedDetailLayout: View {
             )
         }
         return rows
+    }
+
+    private var amountLabel: String {
+        extractAmount(from: content.bodyParagraphs.joined(separator: "\n\n")) == nil ? "Sign by" : "Pay by"
     }
 
     private var certifiedReference: String? {
@@ -238,6 +263,30 @@ struct CertifiedDetailLayout: View {
         )
     }
 
+    private var senderAndNotice: some View {
+        VStack(spacing: Spacing.s3) {
+            senderCard
+            if shouldShowTermsSummary {
+                CertifiedTermsSummaryCard(
+                    termsURL: certified.termsURL,
+                    onViewTerms: termsSummaryAction
+                )
+            }
+            if !content.bodyParagraphs.isEmpty {
+                BodyCard(paragraphs: content.bodyParagraphs)
+            }
+        }
+    }
+
+    private var shouldShowTermsSummary: Bool {
+        certified.termsURL != nil || certified.acknowledgeBy != nil
+    }
+
+    private var termsSummaryAction: (@MainActor () -> Void)? {
+        guard certified.termsURL != nil else { return nil }
+        return { showsTermsSheet = true }
+    }
+
     /// Until the backend surfaces carrier metadata on the V1 detail, we
     /// emit a sensible default per the design — USPS Certified Mail with
     /// the certified reference repurposed as the tracking number.
@@ -261,24 +310,24 @@ struct CertifiedDetailLayout: View {
     }
 
     private var acknowledgeButton: some View {
-        Button(action: { onAcknowledge() }) {
+        Button(action: { handleAcknowledgeTap() }) {
             HStack(spacing: Spacing.s2) {
                 Icon(
-                    content.isAcknowledged ? .checkCircle : .check,
+                    content.isAcknowledged || content.isArchived ? .checkCircle : .check,
                     size: 16,
-                    color: content.isAcknowledged ? Theme.Color.success : Theme.Color.appTextInverse
+                    color: content.isAcknowledged || content.isArchived ? Theme.Color.success : Theme.Color.appTextInverse
                 )
-                Text(content.isAcknowledged ? "Acknowledged · receipt on file" : "Acknowledge receipt")
+                Text(primaryActionTitle)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(content.isAcknowledged ? Theme.Color.success : Theme.Color.appTextInverse)
+                    .foregroundStyle(content.isAcknowledged || content.isArchived ? Theme.Color.success : Theme.Color.appTextInverse)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(content.isAcknowledged ? Theme.Color.appSurface : Theme.Color.primary600)
+            .background(content.isAcknowledged || content.isArchived ? Theme.Color.appSurface : Theme.Color.primary600)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .stroke(
-                        content.isAcknowledged ? Theme.Color.successLight : Color.clear,
+                        content.isAcknowledged || content.isArchived ? Theme.Color.successLight : Color.clear,
                         lineWidth: 1.5
                     )
             )
@@ -286,8 +335,28 @@ struct CertifiedDetailLayout: View {
             .opacity(ackInFlight ? 0.6 : 1)
         }
         .buttonStyle(.plain)
-        .disabled(ackInFlight)
+        .disabled(ackInFlight || content.isArchived)
         .accessibilityIdentifier("mailDetail_certified_acknowledge")
+    }
+
+    private var primaryActionTitle: String {
+        if content.isArchived { return "Archived · receipt on file" }
+        if content.isAcknowledged { return "Signed · receipt on file" }
+        return "Sign for delivery"
+    }
+
+    private var shouldShowConfirmGate: Bool {
+        content.readStatusLabel.lowercased() == "unread"
+            && !content.isAcknowledged
+            && !content.isArchived
+    }
+
+    private func handleAcknowledgeTap() {
+        if shouldShowConfirmGate {
+            showsConfirmGate = true
+        } else {
+            onAcknowledge()
+        }
     }
 
     private var secondaryRow: some View {
@@ -401,6 +470,7 @@ private struct HeroCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(alignment: .center, spacing: Spacing.s1) {
+                TrustBadge()
                 CategoryBadge(category: content.category)
                 Spacer()
                 if let received = content.createdAtLabel {
@@ -428,6 +498,9 @@ private struct HeroCard: View {
             }
             if content.isAcknowledged {
                 acknowledgedRow
+            }
+            if content.isArchived {
+                archivedRow
             }
         }
         .padding(Spacing.s3)
@@ -465,6 +538,45 @@ private struct HeroCard: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .padding(.top, Spacing.s2)
+    }
+
+    private var archivedRow: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.archive, size: 13, color: Theme.Color.appTextSecondary)
+                .frame(width: 20, height: 20)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(Circle())
+            Text("Archived · saved with certified receipt")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 8)
+        .background(Theme.Color.appSurfaceSunken)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.top, Spacing.s2)
+    }
+}
+
+private struct TrustBadge: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            Icon(.shieldCheck, size: 11, color: Theme.Color.success)
+            Text("Verified")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.3)
+                .foregroundStyle(Theme.Color.success)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 3)
+        .background(Theme.Color.successBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
+        .accessibilityLabel("Verified sender")
     }
 }
 
