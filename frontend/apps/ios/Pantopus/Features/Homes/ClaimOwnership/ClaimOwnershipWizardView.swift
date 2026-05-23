@@ -53,7 +53,7 @@ public struct ClaimOwnershipWizardView: View {
     private var stepContent: some View {
         switch viewModel.currentStep {
         case .start:
-            ClaimStartStep()
+            ClaimStartStep(content: viewModel.startContent)
         case .upload:
             ClaimUploadStep(viewModel: viewModel)
         case .success:

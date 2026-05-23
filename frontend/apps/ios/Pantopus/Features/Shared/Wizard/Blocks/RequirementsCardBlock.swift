@@ -9,19 +9,27 @@
 
 import SwiftUI
 
-/// One row inside `RequirementsCardBlock` — small leading icon, bold
-/// title, secondary subcopy.
+/// One row inside `RequirementsCardBlock` — checklist icon, bold title,
+/// secondary subcopy.
 public struct RequirementsRow: Identifiable, Sendable {
     public let id: String
     public let icon: PantopusIcon
     public let title: String
     public let subcopy: String
+    public let emphasized: Bool
 
-    public init(id: String, icon: PantopusIcon, title: String, subcopy: String) {
+    public init(
+        id: String,
+        icon: PantopusIcon,
+        title: String,
+        subcopy: String,
+        emphasized: Bool = false
+    ) {
         self.id = id
         self.icon = icon
         self.title = title
         self.subcopy = subcopy
+        self.emphasized = emphasized
     }
 }
 
@@ -37,38 +45,47 @@ public struct RequirementsCardBlock: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
             Text(title.uppercased())
                 .pantopusTextStyle(.overline)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .accessibilityAddTraits(.isHeader)
-            VStack(alignment: .leading, spacing: Spacing.s3) {
-                ForEach(rows) { row in
-                    HStack(alignment: .top, spacing: Spacing.s3) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: Radii.md)
-                                .fill(Theme.Color.primary100)
-                            Icon(row.icon, size: 18, color: Theme.Color.primary600)
+            ForEach(rows) { row in
+                HStack(alignment: .top, spacing: Spacing.s3) {
+                    Circle()
+                        .fill(row.emphasized ? Theme.Color.warningBg : Theme.Color.homeBg)
+                        .frame(width: 22, height: 22)
+                        .overlay {
+                            Icon(
+                                row.icon,
+                                size: row.emphasized ? 12 : 13,
+                                strokeWidth: row.emphasized ? 2.6 : 3,
+                                color: row.emphasized ? Theme.Color.warning : Theme.Color.home
+                            )
                         }
-                        .frame(width: 36, height: 36)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(row.title)
-                                .pantopusTextStyle(.body)
-                                .foregroundStyle(Theme.Color.appText)
-                            Text(row.subcopy)
-                                .pantopusTextStyle(.caption)
-                                .foregroundStyle(Theme.Color.appTextSecondary)
-                        }
-                        Spacer()
+                        .padding(.top, 1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.title)
+                            .pantopusTextStyle(.body)
+                            .foregroundStyle(Theme.Color.appText)
+                        Text(row.subcopy)
+                            .pantopusTextStyle(.caption)
+                            .foregroundStyle(Theme.Color.appTextSecondary)
                     }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(row.title). \(row.subcopy)")
+                    Spacer(minLength: 0)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(row.title). \(row.subcopy)")
             }
-            .padding(Spacing.s4)
-            .background(Theme.Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
+        .padding(Spacing.s4)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        }
+        .accessibilityIdentifier("requirementsCard")
     }
 }
 
@@ -76,19 +93,19 @@ public struct RequirementsCardBlock: View {
     RequirementsCardBlock(rows: [
         RequirementsRow(
             id: "id",
-            icon: .shieldCheck,
+            icon: .check,
             title: "Government-issued ID",
             subcopy: "Driver's license, state ID, or passport."
         ),
         RequirementsRow(
             id: "doc",
-            icon: .file,
+            icon: .check,
             title: "Proof of ownership",
             subcopy: "Deed, tax record, or recent mortgage statement."
         ),
         RequirementsRow(
             id: "time",
-            icon: .info,
+            icon: .check,
             title: "A few minutes",
             subcopy: "Most claims take 4–5 min end to end."
         )
