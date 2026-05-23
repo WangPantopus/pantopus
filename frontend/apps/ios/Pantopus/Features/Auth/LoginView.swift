@@ -264,6 +264,8 @@ struct PasswordField: View {
                             .textContentType(.password)
                     }
                 }
+                .accessibilityLabel("Password")
+                .accessibilityIdentifier(identifier)
                 .onChange(of: value) { _, _ in onChange() }
 
                 Button {
@@ -296,7 +298,6 @@ struct PasswordField: View {
                     .foregroundStyle(Theme.Color.error)
             }
         }
-        .accessibilityIdentifier(identifier)
     }
 
     private var borderColor: SwiftUI.Color {

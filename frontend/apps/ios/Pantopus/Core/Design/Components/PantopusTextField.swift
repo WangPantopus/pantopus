@@ -100,9 +100,6 @@ public struct PantopusTextField: View {
                     .accessibilityLabel("Error: \(message)")
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(a11yLabel)
-        .modifier(IdentifierModifier(identifier: identifier))
     }
 
     @ViewBuilder private var input: some View {
@@ -110,11 +107,15 @@ public struct PantopusTextField: View {
             SecureField(placeholder, text: $text)
                 .textContentType(contentType)
                 .focused($isFocused)
+                .accessibilityLabel(a11yLabel)
+                .modifier(IdentifierModifier(identifier: identifier))
         } else {
             TextField(placeholder, text: $text)
                 .textContentType(contentType)
                 .keyboardType(keyboardType)
                 .focused($isFocused)
+                .accessibilityLabel(a11yLabel)
+                .modifier(IdentifierModifier(identifier: identifier))
         }
     }
 
@@ -145,9 +146,8 @@ public struct PantopusTextField: View {
     }
 }
 
-/// Conditional `accessibilityIdentifier` — applied to the combined
-/// outer element so XCUITests can locate the field while the inner
-/// `TextField` keeps its first-responder behavior for keyboard input.
+/// Conditional `accessibilityIdentifier` for the real input element so
+/// XCUITests can type into the field without relying on wrapper focus.
 private struct IdentifierModifier: ViewModifier {
     let identifier: String?
 
