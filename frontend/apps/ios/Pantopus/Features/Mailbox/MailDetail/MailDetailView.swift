@@ -114,57 +114,83 @@ public struct MailDetailView: View {
                 onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
             )
         } else {
-            MailItemDetailShell(
-                topBar: makeTopBar(for: content),
-                aiElf: makeAIElf(for: content),
-                attachments: makeAttachments(for: content),
-                hero: { HeroCard(content: content) },
-                keyFacts: { KeyFactsCard(rows: content.keyFacts()) },
-                body: { BodyCard(paragraphs: content.bodyParagraphs) },
-                sender: { SenderCard(content: content, onOpenProfile: onOpenSenderProfile) },
-                actions: {
-                    ActionsRow(
-                        content: content,
-                        ackInFlight: viewModel.ackInFlight,
-                        onAck: { Task { await viewModel.acknowledge() } }
-                    )
-                }
+            GenericMailDetailLayout(
+                content: content,
+                ackInFlight: viewModel.ackInFlight,
+                onBack: { onBack() },
+                onAcknowledge: { Task { await viewModel.acknowledge() } },
+                onOpenSenderProfile: onOpenSenderProfile,
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
             )
         }
     }
+}
 
-    private func makeTopBar(for content: MailDetailContent) -> MailTopBarConfig {
+// MARK: - Slot subviews
+
+struct GenericMailDetailLayout: View {
+    let content: MailDetailContent
+    let ackInFlight: Bool
+    let onBack: @MainActor () -> Void
+    let onAcknowledge: @MainActor () -> Void
+    let onOpenSenderProfile: (@MainActor (String) -> Void)?
+    let onSaveToVault: @MainActor () -> Void
+
+    var body: some View {
+        MailItemDetailShell(
+            topBar: topBar,
+            aiElf: aiElf,
+            attachments: attachments,
+            hero: {
+                MailHeaderCard(content: content, onOpenProfile: onOpenSenderProfile)
+            },
+            keyFacts: {
+                KeyFactsCard(rows: content.keyFacts())
+            },
+            body: {
+                BodyCard(paragraphs: content.bodyParagraphs)
+            },
+            actions: {
+                ActionsRow(
+                    content: content,
+                    ackInFlight: ackInFlight,
+                    onAck: onAcknowledge,
+                    onMove: onSaveToVault
+                )
+            }
+        )
+    }
+
+    private var topBar: MailTopBarConfig {
         MailTopBarConfig(
             eyebrow: content.category.label,
             trust: content.detailTrust,
             onBack: { @Sendable in
                 Task { @MainActor in onBack() }
             },
-            trailingAction: nil,
+            trailingAction: MailTopBarTrailingAction(
+                icon: .bookmark,
+                accessibilityLabel: "Save to vault"
+            ) { @Sendable in
+                Task { @MainActor in onSaveToVault() }
+            },
             overflowItems: [
-                MailOverflowItem(id: "forward", icon: .send, label: "Forward") {},
-                MailOverflowItem(id: "saveToVault", icon: .bookmark, label: "Save to vault") { @Sendable in
-                    Task { @MainActor in await viewModel.openSaveToVaultPicker() }
-                },
                 MailOverflowItem(id: "archive", icon: .archive, label: "Archive") {},
-                MailOverflowItem(id: "unread", icon: .bell, label: "Mark unread") {},
-                MailOverflowItem(
-                    id: "delete",
-                    icon: .trash2,
-                    label: "Delete",
-                    isDestructive: true
-                ) {},
-                MailOverflowItem(id: "report", icon: .info, label: "Report") {}
+                MailOverflowItem(id: "move", icon: .folderPlus, label: "Move") { @Sendable in
+                    Task { @MainActor in onSaveToVault() }
+                },
+                MailOverflowItem(id: "share", icon: .share, label: "Share") {},
+                MailOverflowItem(id: "unread", icon: .mailOpen, label: "Mark unread") {}
             ]
         )
     }
 
-    private func makeAIElf(for content: MailDetailContent) -> AIElfStripContent? {
+    private var aiElf: AIElfStripContent? {
         guard let summary = content.aiSummary, !summary.isEmpty else { return nil }
         return AIElfStripContent(summary: summary)
     }
 
-    private func makeAttachments(for content: MailDetailContent) -> AttachmentsRowContent? {
+    private var attachments: AttachmentsRowContent? {
         guard !content.attachments.isEmpty else { return nil }
         let items = content.attachments.enumerated().map { index, name in
             AttachmentItem(
@@ -192,37 +218,15 @@ public struct MailDetailView: View {
     }
 }
 
-// MARK: - Slot subviews
-
-private struct HeroCard: View {
+private struct MailHeaderCard: View {
     let content: MailDetailContent
+    let onOpenProfile: (@MainActor (String) -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(alignment: .center, spacing: Spacing.s1) {
-                CategoryBadge(category: content.category)
-                Spacer()
-                if let received = content.createdAtLabel {
-                    Text(received)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-            }
-            Text(content.senderDisplayName.uppercased())
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.6)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-            Text(content.title)
-                .font(.system(size: 19, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-                .fixedSize(horizontal: false, vertical: true)
-            if let excerpt = content.excerpt, !excerpt.isEmpty {
-                Text(excerpt)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.Color.appTextStrong)
-                    .lineSpacing(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            senderRow
+            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+            subjectRow
         }
         .padding(Spacing.s3)
         .background(Theme.Color.appSurface)
@@ -236,6 +240,138 @@ private struct HeroCard: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+    }
+
+    private var senderRow: some View {
+        HStack(alignment: .top, spacing: Spacing.s3) {
+            avatar
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.s1) {
+                    Text(content.senderDisplayName)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .lineLimit(1)
+                    if let handle = content.senderMeta, !handle.isEmpty {
+                        Text(handle)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .lineLimit(1)
+                    }
+                }
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    senderTypeChip
+                    Text(content.carrierLine)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+            if let time = content.createdAtLabel {
+                Text(time)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.trailing)
+            }
+            if onOpenProfile != nil, content.senderUserId != nil {
+                Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
+                    .padding(.top, 2)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let onOpenProfile, let userId = content.senderUserId {
+                onOpenProfile(userId)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("mailDetail_senderCard")
+    }
+
+    private var subjectRow: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(alignment: .center, spacing: Spacing.s1) {
+                CategoryBadge(category: content.category)
+                Spacer(minLength: 0)
+            }
+            Text(content.title)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+                .lineSpacing(1)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            if let excerpt = content.excerpt, !excerpt.isEmpty {
+                Text(excerpt)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            metaRow
+        }
+        .accessibilityIdentifier("mailDetail_subjectRow")
+    }
+
+    private var metaRow: some View {
+        HStack(spacing: Spacing.s1) {
+            MetaPill(text: content.referenceLabel, icon: .hash)
+            if let received = content.createdAtLabel {
+                MetaPill(text: received, icon: .clock)
+            }
+            MetaPill(text: content.readStatusLabel, icon: .mailOpen)
+        }
+    }
+
+    private var avatar: some View {
+        Text(content.senderInitials)
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(Theme.Color.appTextInverse)
+            .frame(width: 44, height: 44)
+            .background(content.category.accent)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(alignment: .bottomTrailing) {
+                Circle()
+                    .fill(Theme.Color.success)
+                    .frame(width: 16, height: 16)
+                    .overlay {
+                        Icon(.check, size: 9, color: Theme.Color.appTextInverse)
+                    }
+                    .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
+                    .offset(x: 3, y: 3)
+            }
+    }
+
+    private var senderTypeChip: some View {
+        HStack(spacing: 3) {
+            Icon(content.trust.icon, size: 9, color: content.trust.foreground)
+            Text(content.senderTypeLabel)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(content.trust.foreground)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 3)
+        .background(content.trust.background)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
+    }
+}
+
+private struct MetaPill: View {
+    let text: String
+    let icon: PantopusIcon
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Icon(icon, size: 10, color: Theme.Color.appTextSecondary)
+            Text(text)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 4)
+        .background(Theme.Color.appSurfaceSunken)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
     }
 }
 
@@ -338,76 +474,11 @@ private struct BodyCard: View {
     }
 }
 
-private struct SenderCard: View {
-    let content: MailDetailContent
-    let onOpenProfile: (@MainActor (String) -> Void)?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            Text("SENDER")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(0.5)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .accessibilityAddTraits(.isHeader)
-            row
-        }
-        .padding(Spacing.s3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Color.appSurface)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-    }
-
-    private var row: some View {
-        HStack(spacing: Spacing.s3) {
-            avatar
-            VStack(alignment: .leading, spacing: 2) {
-                Text(content.senderDisplayName)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Theme.Color.appText)
-                if let meta = content.senderMeta {
-                    Text(meta)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-                HStack(spacing: 4) {
-                    Icon(content.trust.icon, size: 11, color: content.trust.foreground)
-                    Text(content.trust.label)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(content.trust.foreground)
-                }
-                .padding(.top, 2)
-            }
-            Spacer(minLength: 0)
-            if onOpenProfile != nil, content.senderUserId != nil {
-                Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if let onOpenProfile, let userId = content.senderUserId {
-                onOpenProfile(userId)
-            }
-        }
-    }
-
-    private var avatar: some View {
-        Text(content.senderInitials)
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(Theme.Color.appTextInverse)
-            .frame(width: 44, height: 44)
-            .background(content.category.accent)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
 private struct ActionsRow: View {
     let content: MailDetailContent
     let ackInFlight: Bool
     let onAck: @MainActor () -> Void
+    let onMove: @MainActor () -> Void
 
     var body: some View {
         VStack(spacing: Spacing.s2) {
@@ -454,14 +525,20 @@ private struct ActionsRow: View {
 
     private var secondaryRow: some View {
         HStack(spacing: Spacing.s2) {
-            secondaryTile(icon: .send, label: "Reply")
-            secondaryTile(icon: .arrowRight, label: "Forward")
-            secondaryTile(icon: .archive, label: "Archive")
+            secondaryTile(id: "archive", icon: .archive, label: "Archive")
+            secondaryTile(id: "move", icon: .folderPlus, label: "Move", action: onMove)
+            secondaryTile(id: "share", icon: .share, label: "Share")
+            secondaryTile(id: "markUnread", icon: .mailOpen, label: "Mark unread")
         }
     }
 
-    private func secondaryTile(icon: PantopusIcon, label: String) -> some View {
-        Button(action: {}) {
+    private func secondaryTile(
+        id: String,
+        icon: PantopusIcon,
+        label: String,
+        action: @escaping @MainActor () -> Void = {}
+    ) -> some View {
+        Button(action: { action() }) {
             VStack(spacing: 4) {
                 Icon(icon, size: 17, color: Theme.Color.appTextStrong)
                 Text(label)
@@ -479,6 +556,7 @@ private struct ActionsRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
+        .accessibilityIdentifier("mailDetail_action_\(id)")
     }
 }
 

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -52,6 +53,7 @@ import app.pantopus.android.ui.screens.shared.mail_item_detail.MailItemDetailShe
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailItemDetailTopBar
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailOverflowItem
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailTopBarConfig
+import app.pantopus.android.ui.screens.shared.mail_item_detail.MailTopBarTrailingAction
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -214,42 +216,13 @@ private fun LoadedLayout(
         }
         else -> {}
     }
-    MailItemDetailShell(
-        topBar =
-            MailTopBarConfig(
-                eyebrow = content.category.label,
-                trust = content.detailTrust,
-                onBack = onBack,
-                trailingAction = null,
-                overflowItems =
-                    listOf(
-                        MailOverflowItem("forward", PantopusIcon.Send, "Forward") {},
-                        MailOverflowItem("saveToVault", PantopusIcon.Bookmark, "Save to vault") { onSaveToVault() },
-                        MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {},
-                        MailOverflowItem("unread", PantopusIcon.Bell, "Mark unread") {},
-                        MailOverflowItem(
-                            id = "delete",
-                            icon = PantopusIcon.Trash2,
-                            label = "Delete",
-                            isDestructive = true,
-                        ) {},
-                        MailOverflowItem("report", PantopusIcon.Info, "Report") {},
-                    ),
-            ),
-        // V1 detail does not expose ai_summary today.
-        aiElf = null,
-        attachments = buildAttachments(content.attachments),
-        hero = { HeroCard(content = content) },
-        keyFacts = { KeyFactsCard(rows = content.keyFacts()) },
-        body = { BodyCard(paragraphs = content.bodyParagraphs) },
-        sender = { SenderCard(content = content, onOpenProfile = onOpenSenderProfile) },
-        actions = {
-            ActionsRow(
-                content = content,
-                ackInFlight = ackInFlight,
-                onAck = onAcknowledge,
-            )
-        },
+    GenericMailDetailLayout(
+        content = content,
+        ackInFlight = ackInFlight,
+        onBack = onBack,
+        onAcknowledge = onAcknowledge,
+        onOpenSenderProfile = onOpenSenderProfile,
+        onSaveToVault = onSaveToVault,
     )
 }
 
@@ -279,12 +252,64 @@ private fun guessKind(name: String): AttachmentKind {
 // ─── Slot subviews ────────────────────────────────────────────
 
 @Composable
-private fun HeroCard(content: MailDetailContent) {
+internal fun GenericMailDetailLayout(
+    content: MailDetailContent,
+    ackInFlight: Boolean,
+    onBack: () -> Unit,
+    onAcknowledge: () -> Unit,
+    onOpenSenderProfile: (String) -> Unit,
+    onSaveToVault: () -> Unit,
+) {
+    MailItemDetailShell(
+        topBar =
+            MailTopBarConfig(
+                eyebrow = content.category.label,
+                trust = content.detailTrust,
+                onBack = onBack,
+                trailingAction =
+                    MailTopBarTrailingAction(
+                        icon = PantopusIcon.Bookmark,
+                        contentDescription = "Save to vault",
+                        onClick = onSaveToVault,
+                    ),
+                overflowItems =
+                    listOf(
+                        MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {},
+                        MailOverflowItem("move", PantopusIcon.FolderPlus, "Move") { onSaveToVault() },
+                        MailOverflowItem("share", PantopusIcon.Share, "Share") {},
+                        MailOverflowItem("unread", PantopusIcon.MailOpen, "Mark unread") {},
+                    ),
+            ),
+        // V1 detail does not expose ai_summary today.
+        aiElf =
+            content.aiSummary?.takeIf { it.isNotEmpty() }?.let { summary ->
+                app.pantopus.android.ui.screens.shared.mail_item_detail.AIElfStripContent(summary = summary)
+            },
+        attachments = buildAttachments(content.attachments),
+        hero = { MailHeaderCard(content = content, onOpenProfile = onOpenSenderProfile) },
+        keyFacts = { KeyFactsCard(rows = content.keyFacts()) },
+        body = { BodyCard(paragraphs = content.bodyParagraphs) },
+        actions = {
+            ActionsRow(
+                content = content,
+                ackInFlight = ackInFlight,
+                onAck = onAcknowledge,
+                onMove = onSaveToVault,
+            )
+        },
+    )
+}
+
+@Composable
+private fun MailHeaderCard(
+    content: MailDetailContent,
+    onOpenProfile: (String) -> Unit,
+) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 80.dp)
+                .heightIn(min = 148.dp)
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
                 .border(
@@ -293,7 +318,7 @@ private fun HeroCard(content: MailDetailContent) {
                     shape = RoundedCornerShape(Radii.lg),
                 ),
     ) {
-        // 4dp signature left accent strip per `mailbox.jsx:130`.
+        // 4dp signature accent strip per `mail-detail.jsx` Card accent.
         Box(
             modifier =
                 Modifier
@@ -303,38 +328,208 @@ private fun HeroCard(content: MailDetailContent) {
         )
         Column(
             modifier = Modifier.padding(Spacing.s3),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CategoryBadge(category = content.category)
-                Spacer(Modifier.weight(1f))
-                content.createdAtLabel?.let { received ->
-                    Text(text = received, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
+            SenderSummaryRow(content = content, onOpenProfile = onOpenProfile)
+            HorizontalDivider(color = PantopusColors.appBorderSubtle)
+            SubjectSummaryRow(content = content)
+        }
+    }
+}
+
+@Composable
+private fun SenderSummaryRow(
+    content: MailDetailContent,
+    onOpenProfile: (String) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(enabled = content.senderUserId != null) {
+                    content.senderUserId?.let(onOpenProfile)
+                }
+                .testTag("mailDetail_senderCard")
+                .semantics {
+                    contentDescription =
+                        "${content.senderDisplayName}, ${content.senderTypeLabel}, ${content.carrierLine}"
+                },
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        SenderAvatar(content = content)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                Text(
+                    text = content.senderDisplayName,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appText,
+                    maxLines = 1,
+                )
+                content.senderMeta?.takeIf { it.isNotEmpty() }?.let { handle ->
+                    Text(
+                        text = handle,
+                        fontSize = 12.sp,
+                        color = PantopusColors.appTextSecondary,
+                        maxLines = 1,
+                    )
                 }
             }
-            Text(
-                text = content.senderDisplayName.uppercase(),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.6.sp,
-                color = PantopusColors.appTextSecondary,
-            )
-            Text(
-                text = content.title,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appText,
-                lineHeight = 24.sp,
-            )
-            content.excerpt?.takeIf { it.isNotEmpty() }?.let { excerpt ->
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                SenderTypeChip(content = content)
                 Text(
-                    text = excerpt,
-                    fontSize = 13.sp,
-                    color = PantopusColors.appTextStrong,
-                    lineHeight = 19.sp,
+                    text = content.carrierLine,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appTextSecondary,
+                    maxLines = 1,
                 )
             }
         }
+        content.createdAtLabel?.let { received ->
+            Text(
+                text = received,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = PantopusColors.appTextSecondary,
+                maxLines = 2,
+            )
+        }
+        if (content.senderUserId != null) {
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronRight,
+                contentDescription = null,
+                size = 14.dp,
+                tint = PantopusColors.appTextMuted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SenderAvatar(content: MailDetailContent) {
+    Box(modifier = Modifier.size(48.dp)) {
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(content.category.accent),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = content.senderInitials,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.success)
+                    .border(2.dp, PantopusColors.appSurface, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Check,
+                contentDescription = null,
+                size = 9.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SenderTypeChip(content: MailDetailContent) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(content.trust.background)
+                .padding(horizontal = Spacing.s2, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        PantopusIconImage(
+            icon = content.trust.icon,
+            contentDescription = null,
+            size = 9.dp,
+            tint = content.trust.foreground,
+        )
+        Text(
+            text = content.senderTypeLabel,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = content.trust.foreground,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun SubjectSummaryRow(content: MailDetailContent) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("mailDetail_subjectRow"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        CategoryBadge(category = content.category)
+        Text(
+            text = content.title,
+            modifier = Modifier.semantics { heading() },
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            lineHeight = 29.sp,
+        )
+        content.excerpt?.takeIf { it.isNotEmpty() }?.let { excerpt ->
+            Text(
+                text = excerpt,
+                fontSize = 13.sp,
+                color = PantopusColors.appTextStrong,
+                lineHeight = 19.sp,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+            MetaPill(icon = PantopusIcon.Hash, text = content.referenceLabel)
+            content.createdAtLabel?.let { MetaPill(icon = PantopusIcon.Clock, text = it) }
+            MetaPill(icon = PantopusIcon.MailOpen, text = content.readStatusLabel)
+        }
+    }
+}
+
+@Composable
+private fun MetaPill(
+    icon: PantopusIcon,
+    text: String,
+) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(horizontal = Spacing.s2, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        PantopusIconImage(
+            icon = icon,
+            contentDescription = null,
+            size = 10.dp,
+            tint = PantopusColors.appTextSecondary,
+        )
+        Text(
+            text = text,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextSecondary,
+            maxLines = 1,
+        )
     }
 }
 
@@ -475,112 +670,21 @@ private fun BodyCard(paragraphs: List<String>) {
 }
 
 @Composable
-private fun SenderCard(
-    content: MailDetailContent,
-    onOpenProfile: (String) -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface)
-                .border(
-                    width = 1.dp,
-                    color = PantopusColors.appBorder,
-                    shape = RoundedCornerShape(Radii.lg),
-                )
-                .padding(Spacing.s3),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-    ) {
-        Text(
-            text = "SENDER",
-            modifier = Modifier.semantics { heading() },
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.5.sp,
-            color = PantopusColors.appTextSecondary,
-        )
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = content.senderUserId != null) {
-                        content.senderUserId?.let(onOpenProfile)
-                    },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(content.category.accent),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = content.senderInitials,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PantopusColors.appTextInverse,
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = content.senderDisplayName,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PantopusColors.appText,
-                )
-                content.senderMeta?.let { meta ->
-                    Text(text = meta, fontSize = 12.sp, color = PantopusColors.appTextSecondary)
-                }
-                Row(
-                    modifier = Modifier.padding(top = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    PantopusIconImage(
-                        icon = content.trust.icon,
-                        contentDescription = null,
-                        size = 11.dp,
-                        tint = content.trust.foreground,
-                    )
-                    Text(
-                        text = content.trust.label,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = content.trust.foreground,
-                    )
-                }
-            }
-            if (content.senderUserId != null) {
-                PantopusIconImage(
-                    icon = PantopusIcon.ChevronRight,
-                    contentDescription = null,
-                    size = 14.dp,
-                    tint = PantopusColors.appTextMuted,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun ActionsRow(
     content: MailDetailContent,
     ackInFlight: Boolean,
     onAck: () -> Unit,
+    onMove: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         if (content.ackRequired || content.isAcknowledged) {
             AcknowledgeButton(content = content, ackInFlight = ackInFlight, onAck = onAck)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            SecondaryTile(icon = PantopusIcon.Send, label = "Reply", modifier = Modifier.weight(1f))
-            SecondaryTile(icon = PantopusIcon.ArrowRight, label = "Forward", modifier = Modifier.weight(1f))
-            SecondaryTile(icon = PantopusIcon.Archive, label = "Archive", modifier = Modifier.weight(1f))
+            SecondaryTile(id = "archive", icon = PantopusIcon.Archive, label = "Archive", modifier = Modifier.weight(1f))
+            SecondaryTile(id = "move", icon = PantopusIcon.FolderPlus, label = "Move", onClick = onMove, modifier = Modifier.weight(1f))
+            SecondaryTile(id = "share", icon = PantopusIcon.Share, label = "Share", modifier = Modifier.weight(1f))
+            SecondaryTile(id = "markUnread", icon = PantopusIcon.MailOpen, label = "Mark unread", modifier = Modifier.weight(1f))
         }
     }
 }
@@ -650,8 +754,10 @@ private fun AcknowledgeButton(
 
 @Composable
 private fun SecondaryTile(
+    id: String,
     icon: PantopusIcon,
     label: String,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -660,9 +766,10 @@ private fun SecondaryTile(
                 .clip(RoundedCornerShape(12.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
-                .clickable { }
+                .clickable(onClick = onClick)
                 .padding(vertical = 10.dp)
-                .semantics { contentDescription = label },
+                .semantics { contentDescription = label }
+                .testTag("mailDetail_action_$id"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {

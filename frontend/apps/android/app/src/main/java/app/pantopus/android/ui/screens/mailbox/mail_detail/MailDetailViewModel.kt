@@ -56,12 +56,16 @@ data class MailDetailContent(
     val detailTrust: MailDetailTrust,
     val senderDisplayName: String,
     val senderMeta: String?,
+    val senderTypeLabel: String,
+    val carrierLine: String,
     val senderInitials: String,
     val senderUserId: String?,
     val title: String,
     val excerpt: String?,
+    val referenceLabel: String,
     val createdAtLabel: String?,
     val expiresAtLabel: String?,
+    val readStatusLabel: String,
     val bodyParagraphs: List<String>,
     val attachments: List<String>,
     val aiSummary: String?,
@@ -303,6 +307,14 @@ class MailDetailViewModel
                         ?: detail.senderAddress
                         ?: "Unknown sender"
                 val senderMeta = detail.sender?.username?.let { "@$it" } ?: detail.senderAddress
+                val senderTypeLabel =
+                    senderTypeLabel(
+                        category = category,
+                        sender = detail.sender,
+                        businessName = detail.senderBusinessName,
+                    )
+                val carrierLine = "via ${carrierLabel(detail.`object`)}"
+                val referenceLabel = referenceLabel(detail.`object`, detail.id)
                 val title = detail.displayTitle ?: detail.subject ?: "Mail"
                 val excerpt = detail.previewText
                 val createdAtLabel = formatLongDate(detail.createdAt)
@@ -338,6 +350,7 @@ class MailDetailViewModel
                         null
                     }
                 val resolvedAck = ackStatus || (certifiedDetail?.isAcknowledged == true)
+                val readStatusLabel = if (detail.viewed || resolvedAck) "Read" else "Unread"
                 return MailDetailContent(
                     mailId = detail.id,
                     category = category,
@@ -345,12 +358,16 @@ class MailDetailViewModel
                     detailTrust = trust.detailTrust,
                     senderDisplayName = senderDisplayName,
                     senderMeta = senderMeta,
+                    senderTypeLabel = senderTypeLabel,
+                    carrierLine = carrierLine,
                     senderInitials = makeInitials(senderDisplayName),
                     senderUserId = detail.sender?.id,
                     title = title,
                     excerpt = excerpt,
+                    referenceLabel = referenceLabel,
                     createdAtLabel = createdAtLabel,
                     expiresAtLabel = expiresAtLabel,
+                    readStatusLabel = readStatusLabel,
                     bodyParagraphs = bodyParagraphs,
                     attachments = detail.attachments ?: emptyList(),
                     aiSummary = null,
@@ -380,5 +397,39 @@ class MailDetailViewModel
                 val zoned = instant.atZone(ZoneId.systemDefault())
                 return DateTimeFormatter.ofPattern("EEE MMM d, yyyy", Locale.US).format(zoned)
             }
+
+            @JvmStatic
+            fun referenceLabel(
+                payload: Map<String, Any?>?,
+                itemId: String,
+            ): String {
+                val candidates =
+                    listOf("reference", "reference_number", "case_number", "tracking_number", "document_id")
+                return candidates
+                    .firstNotNullOfOrNull { key -> (payload?.get(key) as? String)?.trim()?.takeIf { it.isNotEmpty() } }
+                    ?: "Ref ${itemId.uppercase(Locale.US)}"
+            }
+
+            @JvmStatic
+            fun carrierLabel(payload: Map<String, Any?>?): String {
+                val candidates = listOf("carrier", "service", "delivery_service", "mail_service")
+                return candidates
+                    .firstNotNullOfOrNull { key -> (payload?.get(key) as? String)?.trim()?.takeIf { it.isNotEmpty() } }
+                    ?: "Pantopus Mail"
+            }
+
+            @JvmStatic
+            fun senderTypeLabel(
+                category: MailItemCategory,
+                sender: MailDetail.Sender?,
+                businessName: String?,
+            ): String =
+                when {
+                    sender != null -> "Pantopus user"
+                    businessName != null && category.detailTrust == MailDetailTrust.Verified -> "Verified sender"
+                    businessName != null -> "Business"
+                    category.detailTrust == MailDetailTrust.Warning -> "Action notice"
+                    else -> "Mail sender"
+                }
         }
     }

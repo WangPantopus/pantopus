@@ -80,6 +80,8 @@ data class MailDetail(
     @Json(name = "sender_address") val senderAddress: String? = null,
     @Json(name = "ack_required") val ackRequired: Boolean? = null,
     @Json(name = "ack_status") val ackStatus: String? = null,
+    val viewed: Boolean = false,
+    @Json(name = "viewed_at") val viewedAt: String? = null,
     val attachments: List<String>? = null,
     @Json(name = "expires_at") val expiresAt: String? = null,
     @Json(name = "created_at") val createdAt: String,
