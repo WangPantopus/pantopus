@@ -20,7 +20,7 @@ import org.junit.Test
 /**
  * P1.4 Paparazzi baselines for the Edit Profile form. Locks the
  * shimmer skeleton, the empty-clean loaded form (Save disabled), the
- * dirty + submitting state (Save spinner), and the error empty-state.
+ * A13.9 dirty frame with four unsaved fields, and the error empty-state.
  *
  * Note: the iOS counterpart relies on
  * `PantopusTests/__Snapshots__/<screen>-ios.png` baseline tripwires.
@@ -52,6 +52,7 @@ class EditProfileSnapshotTest {
                     state = loadedState(),
                     onClose = {},
                     onCommit = {},
+                    onDiscard = {},
                     onUpdate = { _, _ -> },
                 )
             }
@@ -59,18 +60,23 @@ class EditProfileSnapshotTest {
     }
 
     @Test
-    fun edit_profile_loaded_dirty_submitting_save_spinner() {
+    fun edit_profile_loaded_dirty_four_unsaved_actions() {
         paparazzi.snapshot {
             Frame {
                 EditProfileLoaded(
                     state =
                         loadedState(
-                            fields = seededFields(firstName = "Alex"),
-                            isDirty = true,
-                            isSaving = true,
+                            fields =
+                                seededFields(
+                                    firstName = "Alex",
+                                    bio = "Hello world!",
+                                    website = "https://alex.example",
+                                    profileVisibility = "registered",
+                                ),
                         ),
                     onClose = {},
                     onCommit = {},
+                    onDiscard = {},
                     onUpdate = { _, _ -> },
                 )
             }
@@ -102,10 +108,10 @@ class EditProfileSnapshotTest {
                             loadedState(
                                 fields = seededFields(firstName = "", firstNameError = "First name is required."),
                                 isValid = false,
-                                isDirty = true,
                             ),
                         onClose = {},
                         onCommit = {},
+                        onDiscard = {},
                         onUpdate = { _, _ -> },
                     )
                     EditProfileToastView(
@@ -132,7 +138,7 @@ class EditProfileSnapshotTest {
     private fun loadedState(
         fields: Map<EditProfileField, FormFieldState> = seededFields(),
         isValid: Boolean = true,
-        isDirty: Boolean = false,
+        isDirty: Boolean = fields.values.any { it.isDirty },
         isSaving: Boolean = false,
     ): EditProfileLoadedState =
         EditProfileLoadedState(
@@ -141,6 +147,7 @@ class EditProfileSnapshotTest {
             emailVerified = true,
             isValid = isValid,
             isDirty = isDirty,
+            dirtyFieldCount = fields.values.count { it.isDirty },
             isSaving = isSaving,
         )
 
@@ -150,16 +157,20 @@ class EditProfileSnapshotTest {
     private fun seededFields(
         firstName: String = "Alice",
         firstNameError: String? = null,
+        bio: String = "Builder of homes.",
+        website: String = "https://alice.dev",
+        profileVisibility: String = "public",
     ): Map<EditProfileField, FormFieldState> {
         fun seeded(
             field: EditProfileField,
             value: String,
+            originalValue: String = value,
             error: String? = null,
             touched: Boolean = false,
         ) = FormFieldState(
             id = field.key,
             value = value,
-            originalValue = if (touched) "" else value,
+            originalValue = if (touched) originalValue else value,
             touched = touched,
             error = error,
         )
@@ -168,12 +179,19 @@ class EditProfileSnapshotTest {
                 seeded(
                     EditProfileField.FirstName,
                     value = firstName,
+                    originalValue = "Alice",
                     error = firstNameError,
                     touched = firstNameError != null || firstName != "Alice",
                 ),
             EditProfileField.MiddleName to seeded(EditProfileField.MiddleName, "Q"),
             EditProfileField.LastName to seeded(EditProfileField.LastName, "Doe"),
-            EditProfileField.Bio to seeded(EditProfileField.Bio, "Builder of homes."),
+            EditProfileField.Bio to
+                seeded(
+                    EditProfileField.Bio,
+                    bio,
+                    originalValue = "Builder of homes.",
+                    touched = bio != "Builder of homes.",
+                ),
             EditProfileField.Tagline to seeded(EditProfileField.Tagline, "Hello, neighbor."),
             EditProfileField.PhoneNumber to seeded(EditProfileField.PhoneNumber, "+15555550123"),
             EditProfileField.DateOfBirth to seeded(EditProfileField.DateOfBirth, "1990-04-12"),
@@ -181,12 +199,24 @@ class EditProfileSnapshotTest {
             EditProfileField.City to seeded(EditProfileField.City, "Portland"),
             EditProfileField.State to seeded(EditProfileField.State, "OR"),
             EditProfileField.Zipcode to seeded(EditProfileField.Zipcode, "97201"),
-            EditProfileField.Website to seeded(EditProfileField.Website, "https://alice.dev"),
+            EditProfileField.Website to
+                seeded(
+                    EditProfileField.Website,
+                    website,
+                    originalValue = "https://alice.dev",
+                    touched = website != "https://alice.dev",
+                ),
             EditProfileField.Linkedin to seeded(EditProfileField.Linkedin, ""),
             EditProfileField.Twitter to seeded(EditProfileField.Twitter, ""),
             EditProfileField.Instagram to seeded(EditProfileField.Instagram, ""),
             EditProfileField.Facebook to seeded(EditProfileField.Facebook, ""),
-            EditProfileField.ProfileVisibility to seeded(EditProfileField.ProfileVisibility, "public"),
+            EditProfileField.ProfileVisibility to
+                seeded(
+                    EditProfileField.ProfileVisibility,
+                    profileVisibility,
+                    originalValue = "public",
+                    touched = profileVisibility != "public",
+                ),
         )
     }
 }

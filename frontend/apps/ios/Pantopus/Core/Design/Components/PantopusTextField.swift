@@ -24,6 +24,7 @@ public struct PantopusTextField: View {
     private let placeholder: String
     private let state: PantopusFieldState
     private let isRequired: Bool
+    private let isDirty: Bool
     private let isSecure: Bool
     private let keyboardType: UIKeyboardType
     private let contentType: UITextContentType?
@@ -37,6 +38,7 @@ public struct PantopusTextField: View {
         placeholder: String = "",
         state: PantopusFieldState = .default,
         isRequired: Bool = false,
+        isDirty: Bool = false,
         isSecure: Bool = false,
         keyboardType: UIKeyboardType = .default,
         contentType: UITextContentType? = nil,
@@ -47,6 +49,7 @@ public struct PantopusTextField: View {
         self.placeholder = placeholder
         self.state = state
         self.isRequired = isRequired
+        self.isDirty = isDirty
         self.isSecure = isSecure
         self.keyboardType = keyboardType
         self.contentType = contentType
@@ -63,6 +66,13 @@ public struct PantopusTextField: View {
                     Text("*")
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.error)
+                        .accessibilityHidden(true)
+                }
+                if isDirty {
+                    Circle()
+                        .fill(Theme.Color.warning)
+                        .frame(width: 6, height: 6)
+                        .padding(.leading, 4)
                         .accessibilityHidden(true)
                 }
             }

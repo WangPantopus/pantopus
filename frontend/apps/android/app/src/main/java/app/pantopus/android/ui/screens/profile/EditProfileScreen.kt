@@ -11,11 +11,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +45,7 @@ import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.ui.screens.shared.form.FORM_COMMIT_BUTTON_TAG
 import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
 import app.pantopus.android.ui.screens.shared.form.FormShell
@@ -113,10 +120,12 @@ fun EditProfileScreen(
                             emailVerified = emailVerified,
                             isValid = viewModel.isValid,
                             isDirty = viewModel.isDirty,
+                            dirtyFieldCount = viewModel.dirtyFieldCount,
                             isSaving = isSaving,
                         ),
                     onClose = onBack,
                     onCommit = viewModel::save,
+                    onDiscard = viewModel::discardChanges,
                     onUpdate = viewModel::update,
                 )
             is EditProfileUiState.Error ->
@@ -169,6 +178,7 @@ internal data class EditProfileLoadedState(
     val emailVerified: Boolean,
     val isValid: Boolean,
     val isDirty: Boolean,
+    val dirtyFieldCount: Int,
     val isSaving: Boolean,
 )
 
@@ -177,6 +187,7 @@ internal fun EditProfileLoaded(
     state: EditProfileLoadedState,
     onClose: () -> Unit,
     onCommit: () -> Unit,
+    onDiscard: () -> Unit,
     onUpdate: (EditProfileField, String) -> Unit,
 ) {
     FormShell(
@@ -187,6 +198,15 @@ internal fun EditProfileLoaded(
         isSaving = state.isSaving,
         onClose = onClose,
         onCommit = onCommit,
+        stickyBottom = {
+            EditProfileStickyBar(
+                dirtyCount = state.dirtyFieldCount,
+                isValid = state.isValid,
+                isSaving = state.isSaving,
+                onDiscard = onDiscard,
+                onSave = onCommit,
+            )
+        },
     ) {
         FormFieldGroup("About") {
             // Note: the design also calls for an avatar upload (tap to
@@ -341,6 +361,8 @@ private fun TextRow(
         onValueChange = { onUpdate(field, it) },
         placeholder = placeholder,
         state = fieldStateFor(snapshot),
+        isRequired = field == EditProfileField.FirstName || field == EditProfileField.LastName,
+        isDirty = snapshot?.isDirty == true,
         keyboardType = keyboardType,
         fieldTestTag = "field_${field.key}",
     )
@@ -354,11 +376,7 @@ private fun BioField(
     val snapshot = fields[EditProfileField.Bio]
     val error = snapshot?.error
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-        Text(
-            text = "Bio",
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextSecondary,
-        )
+        DirtyFieldLabel(label = "Bio", dirty = snapshot?.isDirty == true)
         BasicTextField(
             value = snapshot?.value.orEmpty(),
             onValueChange = { onUpdate(EditProfileField.Bio, it) },
@@ -400,10 +418,9 @@ private fun DateOfBirthField(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "Date of birth (optional)",
-                style = PantopusTextStyle.caption,
-                color = PantopusColors.appTextSecondary,
+            DirtyFieldLabel(
+                label = "Date of birth (optional)",
+                dirty = snapshot?.isDirty == true,
                 modifier = Modifier.weight(1f),
             )
             if (value.isNotEmpty()) {
@@ -497,11 +514,7 @@ private fun VisibilityPicker(
             listOf("public" to "Public", "registered" to "Registered", "private" to "Private")
         }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-        Text(
-            text = "Profile visibility",
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextSecondary,
-        )
+        DirtyFieldLabel(label = "Profile visibility", dirty = snapshot?.isDirty == true)
         Row(
             modifier =
                 Modifier
@@ -546,6 +559,216 @@ private fun fieldStateFor(snapshot: FormFieldState?): PantopusFieldState =
         snapshot.touched && snapshot.isDirty -> PantopusFieldState.Valid
         else -> PantopusFieldState.Default
     }
+
+@Composable
+private fun DirtyFieldLabel(
+    label: String,
+    dirty: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+        )
+        if (dirty) {
+            Box(
+                modifier =
+                    Modifier
+                        .padding(start = 4.dp)
+                        .size(6.dp)
+                        .background(PantopusColors.warning, CircleShape),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EditProfileStickyBar(
+    dirtyCount: Int,
+    isValid: Boolean,
+    isSaving: Boolean,
+    onDiscard: () -> Unit,
+    onSave: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .testTag("editProfileStickySaveBar"),
+    ) {
+        HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            if (dirtyCount > 0) {
+                EditProfileDirtyPill(dirtyCount)
+                Box(modifier = Modifier.weight(1f))
+                EditProfileDiscardButton(enabled = !isSaving, onDiscard = onDiscard)
+                EditProfileSaveButton(
+                    dirty = true,
+                    isValid = isValid,
+                    isSaving = isSaving,
+                    onSave = onSave,
+                )
+            } else {
+                EditProfileCleanStrip()
+                Box(modifier = Modifier.weight(1f))
+                EditProfileSaveButton(
+                    dirty = false,
+                    isValid = isValid,
+                    isSaving = isSaving,
+                    onSave = onSave,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditProfileCleanStrip() {
+    Row(
+        modifier =
+            Modifier
+                .heightIn(min = 34.dp)
+                .clip(CircleShape)
+                .background(PantopusColors.appSurfaceMuted)
+                .padding(horizontal = Spacing.s3)
+                .testTag("editProfileCleanSavedStrip"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Clock,
+            contentDescription = null,
+            size = 13.dp,
+            tint = PantopusColors.appTextMuted,
+        )
+        Text(
+            text = "All changes saved · just now",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+        )
+    }
+}
+
+@Composable
+private fun EditProfileDirtyPill(dirtyCount: Int) {
+    Row(
+        modifier =
+            Modifier
+                .heightIn(min = 34.dp)
+                .clip(CircleShape)
+                .background(PantopusColors.warningBg)
+                .border(1.dp, PantopusColors.warningLight, CircleShape)
+                .padding(horizontal = Spacing.s3)
+                .testTag("editProfileDirtyCountPill")
+                .semantics { contentDescription = "$dirtyCount unsaved changes" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(6.dp)
+                    .background(PantopusColors.warning, CircleShape),
+        )
+        Text(
+            text = "$dirtyCount unsaved",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.warning,
+        )
+    }
+}
+
+@Composable
+private fun EditProfileDiscardButton(
+    enabled: Boolean,
+    onDiscard: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .height(42.dp)
+                .widthIn(min = 78.dp)
+                .clip(RoundedCornerShape(Radii.md))
+                .clickable(enabled = enabled, onClick = onDiscard)
+                .testTag("editProfileDiscardButton")
+                .semantics { contentDescription = "Discard" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "Discard",
+            style = PantopusTextStyle.body,
+            color = PantopusColors.appTextStrong,
+        )
+    }
+}
+
+@Composable
+private fun EditProfileSaveButton(
+    dirty: Boolean,
+    isValid: Boolean,
+    isSaving: Boolean,
+    onSave: () -> Unit,
+) {
+    val canSave = dirty && isValid && !isSaving
+    val primaryPose = dirty && isValid
+    Box(
+        modifier =
+            Modifier
+                .height(42.dp)
+                .widthIn(min = 86.dp)
+                .clip(RoundedCornerShape(Radii.md))
+                .background(if (primaryPose) PantopusColors.primary600 else PantopusColors.appBorder)
+                .clickable(enabled = canSave, onClick = onSave)
+                .testTag(FORM_COMMIT_BUTTON_TAG)
+                .semantics { contentDescription = "Save" },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (isSaving) {
+            CircularProgressIndicator(
+                color = if (primaryPose) PantopusColors.appTextInverse else PantopusColors.appTextMuted,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(20.dp),
+            )
+        } else if (dirty) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Check,
+                    contentDescription = null,
+                    size = 15.dp,
+                    tint = if (primaryPose) PantopusColors.appTextInverse else PantopusColors.appTextMuted,
+                )
+                Text(
+                    text = "Save",
+                    style = PantopusTextStyle.body,
+                    color = if (primaryPose) PantopusColors.appTextInverse else PantopusColors.appTextMuted,
+                )
+            }
+        } else {
+            Text(
+                text = "Save",
+                style = PantopusTextStyle.body,
+                color = PantopusColors.appTextMuted,
+            )
+        }
+    }
+}
 
 @Composable
 internal fun EditProfileSkeleton() {

@@ -326,9 +326,34 @@ final class EditProfileViewModelTests: XCTestCase {
     func testBuildRequestOnlyIncludesDirtyFields() async {
         let vm = await loaded()
         vm.update(.bio, to: "New bio")
+        XCTAssertEqual(vm.dirtyFieldCount, 1)
         XCTAssertTrue(vm.fields[.bio]?.isDirty ?? false)
         XCTAssertFalse(vm.fields[.firstName]?.isDirty ?? true)
         XCTAssertFalse(vm.fields[.lastName]?.isDirty ?? true)
+    }
+
+    func testDirtyFieldCountTracksChangedFields() async {
+        let vm = await loaded()
+        XCTAssertEqual(vm.dirtyFieldCount, 0)
+        vm.update(.firstName, to: "Alex")
+        vm.update(.bio, to: "Hello world!")
+        vm.update(.website, to: "https://alex.example")
+        vm.update(.profileVisibility, to: "registered")
+        XCTAssertEqual(vm.dirtyFieldCount, 4)
+        vm.update(.firstName, to: "Alice")
+        XCTAssertEqual(vm.dirtyFieldCount, 3)
+    }
+
+    func testDiscardChangesRestoresOriginalValuesAndClearsDirtyCount() async {
+        let vm = await loaded()
+        vm.update(.firstName, to: "Alex")
+        vm.update(.bio, to: "Hello world!")
+        XCTAssertEqual(vm.dirtyFieldCount, 2)
+        vm.discardChanges()
+        XCTAssertEqual(vm.fields[.firstName]?.value, "Alice")
+        XCTAssertEqual(vm.fields[.bio]?.value, "Hello world")
+        XCTAssertEqual(vm.dirtyFieldCount, 0)
+        XCTAssertFalse(vm.isDirty)
     }
 }
 

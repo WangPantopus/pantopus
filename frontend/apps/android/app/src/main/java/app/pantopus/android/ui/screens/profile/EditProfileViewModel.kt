@@ -137,6 +137,7 @@ class EditProfileViewModel
 
         val isValid: Boolean get() = aggregate.isValid
         val isDirty: Boolean get() = aggregate.isDirty
+        val dirtyFieldCount: Int get() = _fields.value.values.count { it.isDirty }
 
         /** Idempotent — refuses to refetch when already loaded. */
         fun load() {
@@ -177,6 +178,20 @@ class EditProfileViewModel
 
         fun dismissToast() {
             _toast.value = null
+        }
+
+        fun discardChanges() {
+            val map = _fields.value.toMutableMap()
+            for (field in EditProfileField.entries) {
+                val snapshot = map[field] ?: continue
+                map[field] =
+                    snapshot.copy(
+                        value = snapshot.originalValue,
+                        touched = false,
+                        error = validator(field).validate(snapshot.originalValue),
+                    )
+            }
+            _fields.value = map
         }
 
         fun acknowledgeDismiss() {
