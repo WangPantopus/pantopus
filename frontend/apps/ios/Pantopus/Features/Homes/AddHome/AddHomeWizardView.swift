@@ -114,12 +114,18 @@ private struct ConfirmStep: View {
             "We checked this address against our property records. Review the details before continuing."
         )
         VStack(alignment: .leading, spacing: Spacing.s3) {
-            ReviewSummaryBlock([
-                ReviewSummaryRow(label: "Street", value: viewModel.form.address.street),
-                ReviewSummaryRow(label: "City", value: viewModel.form.address.city),
-                ReviewSummaryRow(label: "State", value: viewModel.form.address.state),
-                ReviewSummaryRow(label: "ZIP", value: viewModel.form.address.zipCode)
-            ])
+            if let mismatch = viewModel.zipMismatch {
+                ZipMismatchBanner(mismatch: mismatch) {
+                    viewModel.applyGeocodedZip()
+                }
+            } else if let geocodedAddress = viewModel.geocodedAddress, viewModel.isGeocodeResolved {
+                GeocodeConfirmationBlock(address: geocodedAddress)
+            }
+            AddressConfirmationFields(
+                address: viewModel.form.address,
+                isGeocodeResolved: viewModel.isGeocodeResolved,
+                mismatch: viewModel.zipMismatch
+            )
             if let check = viewModel.addressCheck {
                 AddressVerdictRow(check: check)
             }

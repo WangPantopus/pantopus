@@ -29,6 +29,7 @@ public struct PantopusTextField: View {
     private let keyboardType: UIKeyboardType
     private let contentType: UITextContentType?
     private let identifier: String?
+    private let containerColor: Color
 
     @FocusState private var isFocused: Bool
 
@@ -42,7 +43,8 @@ public struct PantopusTextField: View {
         isSecure: Bool = false,
         keyboardType: UIKeyboardType = .default,
         contentType: UITextContentType? = nil,
-        identifier: String? = nil
+        identifier: String? = nil,
+        containerColor: Color = Theme.Color.appSurface
     ) {
         self.label = label
         _text = text
@@ -54,6 +56,7 @@ public struct PantopusTextField: View {
         self.keyboardType = keyboardType
         self.contentType = contentType
         self.identifier = identifier
+        self.containerColor = containerColor
     }
 
     public var body: some View {
@@ -83,7 +86,7 @@ public struct PantopusTextField: View {
             }
             .padding(.horizontal, Spacing.s3)
             .frame(minHeight: 44)
-            .background(Theme.Color.appSurface)
+            .background(containerColor)
             .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.md, style: .continuous)

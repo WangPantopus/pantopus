@@ -405,10 +405,26 @@ public struct CheckAddressResponse: Decodable, Sendable, Hashable {
     public let homeCount: Int
     public let hasVerifiedMembers: Bool
     public let verdictStatus: String?
+    public let normalizedAddress: NormalizedAddressDTO?
+
+    public init(
+        exists: Bool,
+        homeCount: Int,
+        hasVerifiedMembers: Bool,
+        verdictStatus: String? = nil,
+        normalizedAddress: NormalizedAddressDTO? = nil
+    ) {
+        self.exists = exists
+        self.homeCount = homeCount
+        self.hasVerifiedMembers = hasVerifiedMembers
+        self.verdictStatus = verdictStatus
+        self.normalizedAddress = normalizedAddress
+    }
 
     private enum CodingKeys: String, CodingKey {
         case exists, homeCount, hasVerifiedMembers
         case verdictStatus = "verdict_status"
+        case normalizedAddress = "normalized_address"
     }
 }
 

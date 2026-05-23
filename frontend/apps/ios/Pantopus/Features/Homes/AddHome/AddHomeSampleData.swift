@@ -162,4 +162,37 @@ enum AddHomeSampleData {
         nearbyHomes.first { $0.addressFields == address }
             ?? autocompleteHomes.first { $0.addressFields == address }
     }
+
+    static let geocodedAddress = AddHomeGeocodedAddress(
+        street: "412 Elm Street",
+        unit: "3B",
+        city: "Brooklyn",
+        state: "NY",
+        zipCode: "11211",
+        latitude: 40.7138,
+        longitude: -73.9527,
+        isMultiUnit: true
+    )
+
+    static let geocodedReadyForm = AddHomeFormState(
+        step: AddHomeStep.confirm.rawValue,
+        address: AddHomeAddressFields(
+            street: "412 Elm Street",
+            unit: "3B",
+            city: "Brooklyn",
+            state: "NY",
+            zipCode: "11211"
+        )
+    )
+
+    static let zipMismatchForm = AddHomeFormState(
+        step: AddHomeStep.confirm.rawValue,
+        address: AddHomeAddressFields(
+            street: "412 Elm Street",
+            unit: "3B",
+            city: "Brooklyn",
+            state: "NY",
+            zipCode: "11201"
+        )
+    )
 }

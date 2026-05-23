@@ -2,6 +2,8 @@
 
 package app.pantopus.android.ui.screens.homes.add_home
 
+import app.pantopus.android.data.api.models.homes.CheckAddressResponse
+
 /**
  * Deterministic address fixtures for the Add Home wizard's search-first
  * entry step. These mirror the API shape the rest of the wizard consumes
@@ -151,4 +153,62 @@ object AddHomeSampleData {
     fun candidateFor(address: AddHomeAddressFields): AddHomeAddressCandidate? =
         nearbyHomes.firstOrNull { it.addressFields == address }
             ?: autocompleteHomes.firstOrNull { it.addressFields == address }
+
+    private val geocodedAddress =
+        AddHomeGeocodedAddress(
+            street = "412 Elm Street",
+            unit = "3B",
+            city = "Brooklyn",
+            state = "NY",
+            zipCode = "11211",
+            latitude = 40.7138,
+            longitude = -73.9527,
+            isMultiUnit = true,
+        )
+
+    private val addressCheck =
+        CheckAddressResponse(
+            exists = false,
+            homeCount = 0,
+            hasVerifiedMembers = false,
+            verdictStatus = null,
+        )
+
+    fun geocodedReadyState(): AddHomeUiState =
+        AddHomeUiState(
+            form =
+                AddHomeFormState(
+                    step = AddHomeStep.Confirm.ordinal0,
+                    address =
+                        AddHomeAddressFields(
+                            street = "412 Elm Street",
+                            unit = "3B",
+                            city = "Brooklyn",
+                            state = "NY",
+                            zipCode = "11211",
+                        ),
+                ),
+            homeSearchQuery = "412 Elm Street, 3B",
+            addressCheck = addressCheck,
+            geocodedAddress = geocodedAddress,
+        )
+
+    fun zipMismatchState(): AddHomeUiState =
+        AddHomeUiState(
+            form =
+                AddHomeFormState(
+                    step = AddHomeStep.Confirm.ordinal0,
+                    address =
+                        AddHomeAddressFields(
+                            street = "412 Elm Street",
+                            unit = "3B",
+                            city = "Brooklyn",
+                            state = "NY",
+                            zipCode = "11201",
+                        ),
+                ),
+            homeSearchQuery = "412 Elm Street, 3B",
+            addressCheck = addressCheck,
+            geocodedAddress = geocodedAddress,
+        )
 }

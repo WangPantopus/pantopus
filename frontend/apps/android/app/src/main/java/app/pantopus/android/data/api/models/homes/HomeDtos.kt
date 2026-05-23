@@ -242,4 +242,27 @@ data class CheckAddressResponse(
     val homeCount: Int,
     val hasVerifiedMembers: Boolean,
     @Json(name = "verdict_status") val verdictStatus: String?,
+    @Json(name = "normalized_address") val normalizedAddress: NormalizedAddressDto? = null,
+)
+
+/** Canonical address returned when validation/geocoding normalizes input. */
+@JsonClass(generateAdapter = true)
+data class NormalizedAddressDto(
+    val address: String? = null,
+    val street: String? = null,
+    @Json(name = "address_line1") val addressLine1: String? = null,
+    val unit: String? = null,
+    @Json(name = "unit_number") val unitNumber: String? = null,
+    val city: String? = null,
+    val state: String? = null,
+    val zipCode: String? = null,
+    @Json(name = "zip_code") val zipCodeSnake: String? = null,
+    val zipcode: String? = null,
+    val postalCode: String? = null,
+    @Json(name = "postal_code") val postalCodeSnake: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    @Json(name = "is_multi_unit") val isMultiUnit: Boolean? = null,
 )

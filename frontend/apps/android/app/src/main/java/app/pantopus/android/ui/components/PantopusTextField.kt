@@ -76,6 +76,7 @@ fun PantopusTextField(
     isSecure: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
     fieldTestTag: String? = null,
+    containerColor: Color = PantopusColors.appSurface,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -125,7 +126,7 @@ fun PantopusTextField(
                 Modifier
                     .heightIn(min = 44.dp)
                     .clip(RoundedCornerShape(Radii.md))
-                    .background(PantopusColors.appSurface)
+                    .background(containerColor)
                     .border(
                         width = if (isFocused) 2.dp else 1.dp,
                         color = border,
