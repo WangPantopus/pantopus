@@ -103,6 +103,48 @@ jobs:
             | sed -E 's/[^a-z0-9]+/-/g; s/-+$//')
           echo "slug=$slug" >> "$GITHUB_OUTPUT"
 
+      - name: Ensure simulator device exists
+        run: |
+          set -euo pipefail
+
+          runtime_id=$(xcrun simctl list runtimes | awk -v os="${IOS_SIMULATOR_OS}" '
+            $0 ~ "iOS " os && $0 !~ /unavailable/ {
+              match($0, /com\.apple\.CoreSimulator\.SimRuntime\.iOS-[0-9-]+/)
+              if (RSTART) {
+                print substr($0, RSTART, RLENGTH)
+                exit
+              }
+            }
+          ')
+
+          if [[ -z "${runtime_id}" ]]; then
+            echo "::error::iOS ${IOS_SIMULATOR_OS} simulator runtime is not installed."
+            xcrun simctl list runtimes
+            exit 1
+          fi
+
+          device_type_id=$(xcrun simctl list devicetypes | awk -v name="${{ matrix.simulator }}" '
+            index($0, name " (") == 1 {
+              match($0, /com\.apple\.CoreSimulator\.SimDeviceType\.[^)]+/)
+              if (RSTART) {
+                print substr($0, RSTART, RLENGTH)
+                exit
+              }
+            }
+          ')
+
+          if [[ -z "${device_type_id}" ]]; then
+            echo "::error::Simulator device type '${{ matrix.simulator }}' is not installed."
+            xcrun simctl list devicetypes
+            exit 1
+          fi
+
+          device_id=$(xcrun simctl create "Pantopus CI ${{ matrix.simulator }}" "${device_type_id}" "${runtime_id}")
+          xcrun simctl boot "${device_id}" || true
+          xcrun simctl bootstatus "${device_id}" -b
+          echo "SIMULATOR_UDID=${device_id}" >> "$GITHUB_ENV"
+          echo "Using simulator '${{ matrix.simulator }}' (${device_id}) on ${runtime_id}."
+
       - name: Run tests
         # CI runners have no Apple Developer signing identity. Disable
         # signing so the simulator-only test/build works without a
@@ -119,7 +161,7 @@ jobs:
           xcodebuild \
             -project Pantopus.xcodeproj \
             -scheme Pantopus \
-            -destination "platform=iOS Simulator,name=${{ matrix.simulator }},OS=${IOS_SIMULATOR_OS}" \
+            -destination "platform=iOS Simulator,id=${SIMULATOR_UDID}" \
             -configuration Debug \
             -derivedDataPath "${IOS_DERIVED_DATA_PATH}" \
             -clonedSourcePackagesDirPath "${IOS_SPM_PATH}" \
