@@ -78,10 +78,10 @@ final class MailDetailSnapshotTests: XCTestCase {
     ) {
         let host = UIHostingController(
             rootView: view
-                .frame(width: 390, height: 1_500)
+                .frame(width: 390, height: 1500)
                 .background(Theme.Color.appBg)
         )
-        host.view.frame = CGRect(x: 0, y: 0, width: 390, height: 1_500)
+        host.view.frame = CGRect(x: 0, y: 0, width: 390, height: 1500)
         host.view.layoutIfNeeded()
         XCTAssertGreaterThan(host.view.frame.size.width, 0, file: file, line: line)
         XCTAssertGreaterThan(host.view.frame.size.height, 0, file: file, line: line)
