@@ -25,6 +25,34 @@ final class AddHomeWizardSnapshotTests: XCTestCase {
         assertRenders(AddHomeWizardView(viewModel: vm) { _ in })
     }
 
+    func test_add_home_geocoded_ready_renders() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [.status(200, body: Self.checkAddressGeocodedJSON)]
+        var seed = AddHomeSampleData.geocodedReadyForm
+        seed.step = AddHomeStep.address.rawValue
+        let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: seed) { true }
+        await vm.advanceForTesting()
+        assertRenders(AddHomeWizardView(viewModel: vm) { _ in })
+    }
+
+    func test_add_home_zip_mismatch_apply_renders() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [.status(200, body: Self.checkAddressGeocodedJSON)]
+        var seed = AddHomeSampleData.zipMismatchForm
+        seed.step = AddHomeStep.address.rawValue
+        let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: seed) { true }
+        await vm.advanceForTesting()
+        assertRenders(AddHomeWizardView(viewModel: vm) { _ in })
+    }
+
+    private static let checkAddressGeocodedJSON = """
+    {"exists":false,"homeCount":0,"hasVerifiedMembers":false,"verdict_status":null,
+     "normalized_address":{
+       "street":"412 Elm Street","unit":"3B","city":"Brooklyn","state":"NY",
+       "zip_code":"11211","latitude":40.7138,"longitude":-73.9527,"is_multi_unit":true
+     }}
+    """
+
     private func makeAPI() -> APIClient {
         APIClient(
             environment: .current,

@@ -1,7 +1,8 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber")
+@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.homes.add_home
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,7 +10,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,6 +29,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -42,6 +48,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
+import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
+import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
+import app.pantopus.android.ui.screens.shared.wizard.WizardModel
+import app.pantopus.android.ui.screens.shared.wizard.WizardProgressLabel
 import app.pantopus.android.ui.screens.shared.wizard.WizardShell
 import app.pantopus.android.ui.screens.shared.wizard.blocks.HeadlineBlock
 import app.pantopus.android.ui.screens.shared.wizard.blocks.ReviewSummaryBlock
@@ -55,6 +65,7 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import java.util.Locale
 
 /** Test tag applied to the AddHome screen container. */
 const val ADD_HOME_SCREEN_TAG = "addHomeWizard"
@@ -107,7 +118,12 @@ fun AddHomeWizardScreen(
     ) {
         when (state.form.currentStep) {
             AddHomeStep.Address -> AddressStep(state, viewModel)
-            AddHomeStep.Confirm -> ConfirmStep(state, viewModel)
+            AddHomeStep.Confirm ->
+                ConfirmStep(
+                    state = state,
+                    onApplyGeocodedZip = viewModel::applyGeocodedZip,
+                    onPrimaryHomeChange = viewModel::setPrimaryHome,
+                )
             AddHomeStep.Role -> RoleStep(state, viewModel)
             AddHomeStep.Review -> ReviewStep(state)
             AddHomeStep.Success -> SuccessStep()
@@ -155,28 +171,28 @@ private fun AddressStep(
 @Composable
 private fun ConfirmStep(
     state: AddHomeUiState,
-    vm: AddHomeWizardViewModel,
+    onApplyGeocodedZip: () -> Unit,
+    onPrimaryHomeChange: (Boolean) -> Unit,
 ) {
     HeadlineBlock("Confirm the property")
     SubcopyBlock(
         "We checked this address against our property records. Review the details before continuing.",
     )
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-        ReviewSummaryBlock(
-            rows =
-                listOf(
-                    ReviewSummaryRow("Street", state.form.address.street),
-                    ReviewSummaryRow("City", state.form.address.city),
-                    ReviewSummaryRow("State", state.form.address.state),
-                    ReviewSummaryRow("ZIP", state.form.address.zipCode),
-                ),
-        )
+        state.zipMismatch?.let { mismatch ->
+            ZipMismatchBanner(mismatch = mismatch, onApply = onApplyGeocodedZip)
+        } ?: run {
+            if (state.isGeocodeResolved) {
+                state.geocodedAddress?.let { GeocodeConfirmationBlock(it) }
+            }
+        }
+        AddressConfirmationFields(state)
         state.addressCheck?.let { check ->
             AddressVerdictRow(check)
         }
         PrimaryHomeToggle(
             isPrimary = state.form.isPrimary,
-            onChange = vm::setPrimaryHome,
+            onChange = onPrimaryHomeChange,
         )
     }
 }
@@ -228,6 +244,211 @@ private fun ReviewStep(state: AddHomeUiState) {
     )
 }
 
+@Composable
+private fun AddressConfirmationFields(state: AddHomeUiState) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+        ConfirmationField(
+            label = "Street address",
+            value = state.form.address.street,
+            fieldState = if (state.isGeocodeResolved) ConfirmationFieldState.Success else ConfirmationFieldState.Default,
+            testTag = "addHome_confirmStreet",
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            ConfirmationField(
+                label = "Apt / Unit",
+                value = state.form.address.unit,
+                optional = true,
+                modifier = Modifier.weight(0.4f),
+                testTag = "addHome_confirmUnit",
+            )
+            ConfirmationField(
+                label = "City",
+                value = state.form.address.city,
+                modifier = Modifier.weight(0.6f),
+                testTag = "addHome_confirmCity",
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            ConfirmationField(
+                label = "State",
+                value = state.form.address.state,
+                modifier = Modifier.weight(0.4f),
+                testTag = "addHome_confirmState",
+            )
+            ConfirmationField(
+                label = "ZIP",
+                value = state.form.address.zipCode,
+                fieldState =
+                    when {
+                        state.zipMismatch != null -> ConfirmationFieldState.Error
+                        state.isGeocodeResolved -> ConfirmationFieldState.Success
+                        else -> ConfirmationFieldState.Default
+                    },
+                helperText = state.zipMismatch?.let(::zipFieldErrorText),
+                modifier = Modifier.weight(0.6f),
+                testTag = "addHome_confirmZip",
+            )
+        }
+    }
+}
+
+private enum class ConfirmationFieldState { Default, Success, Error }
+
+@Composable
+private fun ConfirmationField(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    optional: Boolean = false,
+    fieldState: ConfirmationFieldState = ConfirmationFieldState.Default,
+    helperText: String? = null,
+    testTag: String,
+) {
+    val borderColor =
+        when (fieldState) {
+            ConfirmationFieldState.Success -> PantopusColors.success
+            ConfirmationFieldState.Error -> PantopusColors.error
+            ConfirmationFieldState.Default -> PantopusColors.appBorder
+        }
+    val containerColor =
+        if (fieldState == ConfirmationFieldState.Success) {
+            PantopusColors.successBg
+        } else {
+            PantopusColors.appSurface
+        }
+    Column(
+        modifier =
+            modifier.semantics {
+                contentDescription =
+                    buildString {
+                        append(label)
+                        if (optional) append(", optional")
+                        append(", ")
+                        append(value.ifBlank { "blank" })
+                        helperText?.let { append(", error: $it") }
+                    }
+            },
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = label,
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+            )
+            if (optional) {
+                Text(
+                    text = "Optional",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextMuted,
+                )
+            }
+        }
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(containerColor)
+                    .border(1.dp, borderColor, RoundedCornerShape(Radii.md))
+                    .padding(horizontal = Spacing.s3)
+                    .testTag(testTag),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Text(
+                text = value,
+                style = PantopusTextStyle.body,
+                color = PantopusColors.appText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            when (fieldState) {
+                ConfirmationFieldState.Success ->
+                    PantopusIconImage(
+                        icon = PantopusIcon.Check,
+                        contentDescription = null,
+                        size = 16.dp,
+                        tint = PantopusColors.success,
+                    )
+                ConfirmationFieldState.Error ->
+                    PantopusIconImage(
+                        icon = PantopusIcon.AlertCircle,
+                        contentDescription = null,
+                        size = 16.dp,
+                        tint = PantopusColors.error,
+                    )
+                ConfirmationFieldState.Default -> Unit
+            }
+        }
+        helperText?.let {
+            Text(
+                text = it,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.error,
+            )
+        }
+    }
+}
+
+private fun zipFieldErrorText(mismatch: AddHomeZipMismatch): String {
+    val city = mismatch.city.ifBlank { "this street" }
+    return "ZIP doesn't match $city for this street."
+}
+
+/**
+ * Snapshot preview for the A12.2 geocode confirmation step. Renders the
+ * real wizard shell with inert callbacks so Paparazzi can lock the sticky
+ * CTA enabled/disabled states without standing up Hilt.
+ */
+@Composable
+internal fun AddHomeWizardConfirmPreview(
+    state: AddHomeUiState,
+    modifier: Modifier = Modifier,
+) {
+    WizardShell(
+        model = AddHomePreviewWizardModel(state),
+        modifier = modifier,
+    ) {
+        ConfirmStep(
+            state = state,
+            onApplyGeocodedZip = {},
+            onPrimaryHomeChange = {},
+        )
+    }
+}
+
+private class AddHomePreviewWizardModel(
+    private val state: AddHomeUiState,
+) : WizardModel {
+    override val chrome: WizardChrome
+        get() =
+            WizardChrome(
+                title = "Add home",
+                progressLabel = WizardProgressLabel.StepOf(current = 2, total = AddHomeStep.PROGRESS_TOTAL),
+                progressFraction = 2f / AddHomeStep.PROGRESS_TOTAL,
+                leading = WizardLeadingControl.Back,
+                primaryCtaLabel = "Continue",
+                primaryCtaEnabled = !state.isCheckingAddress && state.errorMessage == null && state.zipMismatch == null,
+                secondaryCta = null,
+                isSubmitting = false,
+                dirty = true,
+                showsProgressBar = true,
+            )
+
+    override fun onLeading() = Unit
+
+    override fun onDiscard() = Unit
+
+    override fun onPrimary() = Unit
+}
+
 // MARK: - Step 5
 
 @Composable
@@ -245,6 +466,290 @@ private fun SuccessStep() {
 }
 
 // MARK: - Helpers
+
+@Composable
+private fun ZipMismatchBanner(
+    mismatch: AddHomeZipMismatch,
+    onApply: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.warningBg)
+                .border(
+                    width = 1.dp,
+                    color = PantopusColors.warning.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(Radii.lg),
+                )
+                .padding(Spacing.s3)
+                .testTag("addHome_zipMismatchBanner"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.warning),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.AlertTriangle,
+                contentDescription = null,
+                size = 14.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                Text(
+                    text = "We couldn't pinpoint this address",
+                    style = PantopusTextStyle.body,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.warning,
+                )
+                Text(
+                    text = zipMismatchMessage(mismatch),
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.warning,
+                )
+            }
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.appSurface)
+                        .border(
+                            width = 1.dp,
+                            color = PantopusColors.warning,
+                            shape = RoundedCornerShape(Radii.md),
+                        )
+                        .clickable(role = Role.Button, onClick = onApply)
+                        .padding(horizontal = Spacing.s3)
+                        .testTag("addHome_zipApply")
+                        .semantics {
+                            contentDescription = "Apply ZIP correction to ${mismatch.correctedZip}"
+                        },
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.MapPin,
+                    contentDescription = null,
+                    size = 14.dp,
+                    tint = PantopusColors.warning,
+                )
+                Text(
+                    text = "${mismatch.street}, ${mismatch.city} ${mismatch.state} ${mismatch.correctedZip}",
+                    style = PantopusTextStyle.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "Apply",
+                    style = PantopusTextStyle.overline,
+                    color = PantopusColors.warning,
+                )
+            }
+        }
+    }
+}
+
+private fun zipMismatchMessage(mismatch: AddHomeZipMismatch): String =
+    "ZIP ${mismatch.enteredZip} is in ${mismatch.city.ifBlank { "this area" }}, " +
+        "but ${mismatch.street} is in the ${mismatch.correctedZip} ZIP."
+
+@Composable
+private fun GeocodeConfirmationBlock(address: AddHomeGeocodedAddress) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        GeocodeMapStrip(address)
+        AddressRecognizedRow(address)
+    }
+}
+
+@Composable
+private fun GeocodeMapStrip(address: AddHomeGeocodedAddress) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(88.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurfaceSunken)
+                .border(
+                    width = 1.dp,
+                    color = PantopusColors.appBorder,
+                    shape = RoundedCornerShape(Radii.lg),
+                )
+                .testTag("addHome_geocodeMap"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val streetColor = PantopusColors.appSurface
+            drawLine(
+                color = streetColor,
+                start = Offset(0f, size.height * 0.25f),
+                end = Offset(size.width, size.height * 0.25f),
+                strokeWidth = 6.dp.toPx(),
+            )
+            drawLine(
+                color = streetColor,
+                start = Offset(0f, size.height * 0.64f),
+                end = Offset(size.width, size.height * 0.64f),
+                strokeWidth = 4.dp.toPx(),
+            )
+            drawLine(
+                color = streetColor,
+                start = Offset(size.width * 0.25f, 0f),
+                end = Offset(size.width * 0.25f, size.height),
+                strokeWidth = 5.dp.toPx(),
+            )
+            drawLine(
+                color = streetColor,
+                start = Offset(size.width * 0.68f, 0f),
+                end = Offset(size.width * 0.68f, size.height),
+                strokeWidth = 3.dp.toPx(),
+            )
+            val blockColor = PantopusColors.appBorderStrong.copy(alpha = 0.55f)
+            drawRoundRect(
+                color = blockColor,
+                topLeft = Offset(size.width * 0.30f, size.height * 0.32f),
+                size = Size(size.width * 0.13f, size.height * 0.25f),
+                cornerRadius = CornerRadius(Radii.xs.toPx(), Radii.xs.toPx()),
+            )
+            drawRoundRect(
+                color = blockColor,
+                topLeft = Offset(size.width * 0.46f, size.height * 0.32f),
+                size = Size(size.width * 0.19f, size.height * 0.25f),
+                cornerRadius = CornerRadius(Radii.xs.toPx(), Radii.xs.toPx()),
+            )
+            drawRoundRect(
+                color = blockColor,
+                topLeft = Offset(size.width * 0.10f, size.height * 0.70f),
+                size = Size(size.width * 0.17f, size.height * 0.22f),
+                cornerRadius = CornerRadius(Radii.xs.toPx(), Radii.xs.toPx()),
+            )
+            drawRoundRect(
+                color = blockColor,
+                topLeft = Offset(size.width * 0.70f, size.height * 0.70f),
+                size = Size(size.width * 0.16f, size.height * 0.22f),
+                cornerRadius = CornerRadius(Radii.xs.toPx(), Radii.xs.toPx()),
+            )
+        }
+        Box(
+            modifier =
+                Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.primary600),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.MapPin,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+        }
+        coordinateLabel(address)?.let { label ->
+            Text(
+                text = label,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextStrong,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(Spacing.s2)
+                        .clip(RoundedCornerShape(Radii.sm))
+                        .background(PantopusColors.appSurface.copy(alpha = 0.94f))
+                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddressRecognizedRow(address: AddHomeGeocodedAddress) {
+    val location = addressLocationCopy(address)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.successBg)
+                .border(
+                    width = 1.dp,
+                    color = PantopusColors.successLight,
+                    shape = RoundedCornerShape(Radii.md),
+                )
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                .testTag("addHome_addressRecognized")
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Address recognized. Looks like $location."
+                },
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.success),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Check,
+                contentDescription = null,
+                size = 12.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+        }
+        Text(
+            text = "Address recognized. Looks like $location.",
+            style = PantopusTextStyle.caption,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.success,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+private fun coordinateLabel(address: AddHomeGeocodedAddress): String? {
+    val latitude = address.latitude ?: return null
+    val longitude = address.longitude ?: return null
+    return "${formatLatitude(latitude)}, ${formatLongitude(longitude)}"
+}
+
+private fun formatLatitude(value: Double): String =
+    String.format(Locale.US, "%.4f°%s", kotlin.math.abs(value), if (value >= 0) "N" else "S")
+
+private fun formatLongitude(value: Double): String =
+    String.format(Locale.US, "%.4f°%s", kotlin.math.abs(value), if (value >= 0) "E" else "W")
+
+private fun addressLocationCopy(address: AddHomeGeocodedAddress): String {
+    val base =
+        listOf(address.city, address.state)
+            .filter { it.isNotBlank() }
+            .joinToString(", ")
+    return when {
+        address.isMultiUnit && base.isNotEmpty() -> "$base - multi-unit"
+        address.isMultiUnit -> "a multi-unit home"
+        base.isNotEmpty() -> base
+        else -> "a home"
+    }
+}
 
 @Composable
 private fun AddHomeSearchField(

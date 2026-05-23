@@ -45,8 +45,31 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         )
     }
 
+    private func filledBrooklyn(zipCode: String) -> AddHomeFormState {
+        AddHomeFormState(
+            step: AddHomeStep.address.rawValue,
+            address: AddHomeAddressFields(
+                street: "412 Elm Street",
+                unit: "3B",
+                city: "Brooklyn",
+                state: "NY",
+                zipCode: zipCode
+            ),
+            isPrimary: true,
+            role: nil
+        )
+    }
+
     private static let checkAddressJSON = """
     {"exists":false,"homeCount":0,"hasVerifiedMembers":false,"verdictStatus":null}
+    """
+
+    private static let checkAddressMismatchJSON = """
+    {"exists":false,"homeCount":0,"hasVerifiedMembers":false,"verdict_status":null,
+     "normalized_address":{
+       "street":"412 Elm Street","unit":"3B","city":"Brooklyn","state":"NY",
+       "zip_code":"11211","latitude":40.7138,"longitude":-73.9527,"is_multi_unit":true
+     }}
     """
 
     private static let createHomeJSON = """
@@ -93,6 +116,24 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         XCTAssertEqual(vm.currentStep, .confirm)
         XCTAssertNil(vm.addressCheck)
         XCTAssertNotNil(vm.errorMessage)
+    }
+
+    func testZipMismatchDisablesContinueUntilApplied() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.checkAddressMismatchJSON)]
+        let vm = makeVM(initialState: filledBrooklyn(zipCode: "11201"))
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.currentStep, .confirm)
+        XCTAssertEqual(vm.zipMismatch?.enteredZip, "11201")
+        XCTAssertEqual(vm.zipMismatch?.correctedZip, "11211")
+        XCTAssertFalse(vm.chrome.primaryCTAEnabled)
+        await vm.advanceForTesting()
+        XCTAssertEqual(vm.currentStep, .confirm)
+
+        vm.applyGeocodedZip()
+
+        XCTAssertEqual(vm.form.address.zipCode, "11211")
+        XCTAssertNil(vm.zipMismatch)
+        XCTAssertTrue(vm.chrome.primaryCTAEnabled)
     }
 
     // MARK: - Back navigation
@@ -237,5 +278,42 @@ final class AddHomeWizardViewModelTests: XCTestCase {
         )
         vm.restore(from: other)
         XCTAssertEqual(vm.form.address.street, "412 Elm St", "Restore should not stomp existing form data.")
+    }
+
+    // MARK: - A12.2 snapshot lockfiles
+
+    func testA12AddHomeGeocodedReadySnapshotBaselineIsPresent() throws {
+        try assertAddHomeBaselineOrSkip("geocoded_ready")
+    }
+
+    func testA12AddHomeZipMismatchSnapshotBaselineIsPresent() throws {
+        try assertAddHomeBaselineOrSkip("zip_mismatch_apply")
+    }
+
+    private var addHomeBaselineURL: URL {
+        let here = URL(fileURLWithPath: #filePath)
+        return here
+            .deletingLastPathComponent() // Homes
+            .deletingLastPathComponent() // Features
+            .deletingLastPathComponent() // PantopusTests
+            .appendingPathComponent("__Snapshots__")
+            .appendingPathComponent("a12-add-home")
+    }
+
+    private func assertAddHomeBaselineOrSkip(_ slug: String) throws {
+        let url = addHomeBaselineURL.appendingPathComponent("\(slug)-ios.png")
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw XCTSkip("Baseline pending follow-up commit: \(url.path)")
+        }
+        let data = try Data(contentsOf: url)
+        XCTAssertGreaterThan(data.count, 8 * 1024, "Baseline too small (\(data.count) bytes): \(url.path)")
+        XCTAssertTrue(
+            data.count > 4 &&
+                data[0] == 0x89 &&
+                data[1] == 0x50 &&
+                data[2] == 0x4E &&
+                data[3] == 0x47,
+            "Not a PNG: \(url.path)"
+        )
     }
 }

@@ -10,6 +10,7 @@ import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
 import app.pantopus.android.data.api.models.homes.CheckAddressResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
+import app.pantopus.android.data.api.models.homes.NormalizedAddressDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
@@ -36,10 +37,48 @@ data class AddHomeUiState(
     val homeSearchQuery: String = "",
     val selectedHomeId: String? = null,
     val addressCheck: CheckAddressResponse? = null,
+    val geocodedAddress: AddHomeGeocodedAddress? = null,
     val isCheckingAddress: Boolean = false,
     val isSubmitting: Boolean = false,
     val createdHomeId: String? = null,
     val errorMessage: String? = null,
+) {
+    val zipMismatch: AddHomeZipMismatch?
+        get() {
+            val geocoded = geocodedAddress ?: return null
+            val entered = form.address.zipCode.trim().uppercase()
+            val corrected = geocoded.zipCode.trim().uppercase()
+            if (entered.isEmpty() || corrected.isEmpty() || entered == corrected) return null
+            return AddHomeZipMismatch(
+                enteredZip = form.address.zipCode,
+                correctedZip = geocoded.zipCode,
+                street = geocoded.street,
+                city = geocoded.city,
+                state = geocoded.state,
+            )
+        }
+
+    val isGeocodeResolved: Boolean
+        get() = geocodedAddress != null && zipMismatch == null
+}
+
+data class AddHomeGeocodedAddress(
+    val street: String,
+    val unit: String,
+    val city: String,
+    val state: String,
+    val zipCode: String,
+    val latitude: Double?,
+    val longitude: Double?,
+    val isMultiUnit: Boolean,
+)
+
+data class AddHomeZipMismatch(
+    val enteredZip: String,
+    val correctedZip: String,
+    val street: String,
+    val city: String,
+    val state: String,
 )
 
 /**
@@ -129,6 +168,8 @@ open class AddHomeWizardViewModel
                     homeSearchQuery = query,
                     selectedHomeId = null,
                     form = it.form.copy(address = AddHomeAddressFields()),
+                    addressCheck = null,
+                    geocodedAddress = null,
                 )
             }
             persist()
@@ -140,6 +181,8 @@ open class AddHomeWizardViewModel
                     homeSearchQuery = "",
                     selectedHomeId = null,
                     form = it.form.copy(address = AddHomeAddressFields()),
+                    addressCheck = null,
+                    geocodedAddress = null,
                 )
             }
             persist()
@@ -151,6 +194,8 @@ open class AddHomeWizardViewModel
                     homeSearchQuery = "",
                     selectedHomeId = null,
                     form = it.form.copy(address = AddHomeAddressFields()),
+                    addressCheck = null,
+                    geocodedAddress = null,
                 )
             }
             persist()
@@ -163,6 +208,8 @@ open class AddHomeWizardViewModel
                     homeSearchQuery = candidate.line1,
                     selectedHomeId = candidate.id,
                     form = it.form.copy(address = candidate.addressFields),
+                    addressCheck = null,
+                    geocodedAddress = null,
                 )
             }
             persist()
@@ -173,6 +220,21 @@ open class AddHomeWizardViewModel
                 it.copy(
                     selectedHomeId = null,
                     form = it.form.copy(address = AddHomeAddressFields()),
+                    addressCheck = null,
+                    geocodedAddress = null,
+                )
+            }
+            persist()
+        }
+
+        fun applyGeocodedZip() {
+            val correctedZip = _state.value.zipMismatch?.correctedZip ?: return
+            _state.update { current ->
+                current.copy(
+                    form =
+                        current.form.copy(
+                            address = current.form.address.copy(zipCode = correctedZip),
+                        ),
                 )
             }
             persist()
@@ -198,6 +260,8 @@ open class AddHomeWizardViewModel
                     form = current.form.copy(address = next),
                     homeSearchQuery = candidate?.line1 ?: next.street,
                     selectedHomeId = candidate?.id,
+                    addressCheck = null,
+                    geocodedAddress = null,
                 )
             }
             persist()
@@ -227,7 +291,9 @@ open class AddHomeWizardViewModel
                     runCheckAddress()
                 }
                 AddHomeStep.Confirm -> {
-                    if (!_state.value.isCheckingAddress) transitionTo(AddHomeStep.Role)
+                    if (!_state.value.isCheckingAddress && _state.value.zipMismatch == null) {
+                        transitionTo(AddHomeStep.Role)
+                    }
                 }
                 AddHomeStep.Role -> transitionTo(AddHomeStep.Review)
                 AddHomeStep.Review -> submit()
@@ -262,7 +328,14 @@ open class AddHomeWizardViewModel
 
         private suspend fun runCheckAddress() {
             val fields = _state.value.form.address
-            _state.update { it.copy(isCheckingAddress = true, addressCheck = null, errorMessage = null) }
+            _state.update {
+                it.copy(
+                    isCheckingAddress = true,
+                    addressCheck = null,
+                    geocodedAddress = null,
+                    errorMessage = null,
+                )
+            }
             val request =
                 CheckAddressRequest(
                     address = fields.street,
@@ -274,7 +347,11 @@ open class AddHomeWizardViewModel
             when (val result = repository.checkAddress(request)) {
                 is NetworkResult.Success ->
                     _state.update {
-                        it.copy(addressCheck = result.data, isCheckingAddress = false)
+                        it.copy(
+                            addressCheck = result.data,
+                            geocodedAddress = geocodedAddress(result.data, fields),
+                            isCheckingAddress = false,
+                        )
                     }
                 is NetworkResult.Failure ->
                     _state.update {
@@ -397,7 +474,7 @@ open class AddHomeWizardViewModel
         private fun title(step: AddHomeStep): String =
             when (step) {
                 AddHomeStep.Address -> "Find your home"
-                else -> "Add a home"
+                else -> "Add home"
             }
 
         private fun leadingControl(step: AddHomeStep): WizardLeadingControl =
@@ -433,7 +510,7 @@ open class AddHomeWizardViewModel
         private fun primaryEnabled(state: AddHomeUiState): Boolean =
             when (state.form.currentStep) {
                 AddHomeStep.Address -> state.selectedHomeId != null
-                AddHomeStep.Confirm -> !state.isCheckingAddress && state.errorMessage == null
+                AddHomeStep.Confirm -> !state.isCheckingAddress && state.errorMessage == null && state.zipMismatch == null
                 AddHomeStep.Role -> state.form.role != null
                 AddHomeStep.Review -> state.form.role != null
                 AddHomeStep.Success -> state.createdHomeId != null
@@ -448,6 +525,37 @@ open class AddHomeWizardViewModel
             private const val KEY_ZIP = "addHome.zip"
             private const val KEY_PRIMARY = "addHome.primary"
             private const val KEY_ROLE = "addHome.role"
+
+            private fun geocodedAddress(
+                response: CheckAddressResponse,
+                fallback: AddHomeAddressFields,
+            ): AddHomeGeocodedAddress? {
+                val normalized = response.normalizedAddress ?: return null
+                return AddHomeGeocodedAddress(
+                    street = normalized.streetValue() ?: fallback.street,
+                    unit = normalized.unitValue() ?: fallback.unit,
+                    city = normalized.city.takeUnlessBlank() ?: fallback.city,
+                    state = normalized.state.takeUnlessBlank() ?: fallback.state,
+                    zipCode = normalized.zipValue() ?: fallback.zipCode,
+                    latitude = normalized.latitude ?: normalized.lat,
+                    longitude = normalized.longitude ?: normalized.lng,
+                    isMultiUnit = normalized.isMultiUnit ?: fallback.unit.isNotEmpty(),
+                )
+            }
+
+            private fun NormalizedAddressDto.streetValue(): String? =
+                street.takeUnlessBlank() ?: address.takeUnlessBlank() ?: addressLine1.takeUnlessBlank()
+
+            private fun NormalizedAddressDto.unitValue(): String? = unit.takeUnlessBlank() ?: unitNumber.takeUnlessBlank()
+
+            private fun NormalizedAddressDto.zipValue(): String? =
+                zipCode.takeUnlessBlank()
+                    ?: zipCodeSnake.takeUnlessBlank()
+                    ?: zipcode.takeUnlessBlank()
+                    ?: postalCode.takeUnlessBlank()
+                    ?: postalCodeSnake.takeUnlessBlank()
+
+            private fun String?.takeUnlessBlank(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
         }
     }
 

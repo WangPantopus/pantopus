@@ -29,6 +29,25 @@ public enum AddHomeOutboundEvent: Sendable, Equatable {
     case openHomeDashboard(homeId: String)
 }
 
+struct AddHomeGeocodedAddress: Equatable {
+    let street: String
+    let unit: String
+    let city: String
+    let state: String
+    let zipCode: String
+    let latitude: Double?
+    let longitude: Double?
+    let isMultiUnit: Bool
+}
+
+struct AddHomeZipMismatch: Equatable {
+    let enteredZip: String
+    let correctedZip: String
+    let street: String
+    let city: String
+    let state: String
+}
+
 @Observable
 @MainActor
 final class AddHomeWizardViewModel: WizardModel {
@@ -46,6 +65,9 @@ final class AddHomeWizardViewModel: WizardModel {
     /// Result of `POST /api/homes/check-address`, populated when entering
     /// step 2.
     private(set) var addressCheck: CheckAddressResponse?
+    /// Canonical address returned by check-address, used for the
+    /// confirmation map and one-tap ZIP correction.
+    private(set) var geocodedAddress: AddHomeGeocodedAddress?
     /// True while the check-address call is in flight.
     private(set) var isCheckingAddress: Bool = false
 
@@ -162,18 +184,24 @@ final class AddHomeWizardViewModel: WizardModel {
         homeSearchQuery = query
         selectedHomeID = nil
         form.address = .init()
+        addressCheck = nil
+        geocodedAddress = nil
     }
 
     func clearSearchQuery() {
         homeSearchQuery = ""
         selectedHomeID = nil
         form.address = .init()
+        addressCheck = nil
+        geocodedAddress = nil
     }
 
     func useCurrentLocation() {
         homeSearchQuery = ""
         selectedHomeID = nil
         form.address = .init()
+        addressCheck = nil
+        geocodedAddress = nil
     }
 
     func selectAddressCandidate(_ candidate: AddHomeAddressCandidate) {
@@ -181,11 +209,15 @@ final class AddHomeWizardViewModel: WizardModel {
         selectedHomeID = candidate.id
         homeSearchQuery = candidate.line1
         form.address = candidate.addressFields
+        addressCheck = nil
+        geocodedAddress = nil
     }
 
     func addManuallyTapped() {
         selectedHomeID = nil
         form.address = .init()
+        addressCheck = nil
+        geocodedAddress = nil
     }
 
     // MARK: - Legacy field updates (step 1)
@@ -202,6 +234,31 @@ final class AddHomeWizardViewModel: WizardModel {
         homeSearchQuery = selectedHomeID == nil
             ? form.address.street
             : AddHomeSampleData.candidate(for: form.address)?.line1 ?? form.address.street
+        addressCheck = nil
+        geocodedAddress = nil
+    }
+
+    var zipMismatch: AddHomeZipMismatch? {
+        guard let geocodedAddress else { return nil }
+        let entered = normalizedAddHomeZip(form.address.zipCode)
+        let corrected = normalizedAddHomeZip(geocodedAddress.zipCode)
+        guard !entered.isEmpty, !corrected.isEmpty, entered != corrected else { return nil }
+        return AddHomeZipMismatch(
+            enteredZip: form.address.zipCode,
+            correctedZip: geocodedAddress.zipCode,
+            street: geocodedAddress.street,
+            city: geocodedAddress.city,
+            state: geocodedAddress.state
+        )
+    }
+
+    var isGeocodeResolved: Bool {
+        geocodedAddress != nil && zipMismatch == nil
+    }
+
+    func applyGeocodedZip() {
+        guard let correctedZip = zipMismatch?.correctedZip else { return }
+        form.address.zipCode = correctedZip
     }
 
     // MARK: - Field updates (step 2/3)
@@ -232,7 +289,7 @@ final class AddHomeWizardViewModel: WizardModel {
             transition(to: .confirm)
             await runCheckAddress()
         case .confirm:
-            guard !isCheckingAddress else { return }
+            guard !isCheckingAddress, zipMismatch == nil else { return }
             transition(to: .role)
         case .role:
             transition(to: .review)
@@ -270,6 +327,7 @@ final class AddHomeWizardViewModel: WizardModel {
         isCheckingAddress = true
         defer { isCheckingAddress = false }
         addressCheck = nil
+        geocodedAddress = nil
         let request = CheckAddressRequest(
             address: form.address.street,
             unitNumber: form.address.unit.isEmpty ? nil : form.address.unit,
@@ -282,6 +340,7 @@ final class AddHomeWizardViewModel: WizardModel {
                 HomesEndpoints.checkAddress(request)
             )
             addressCheck = response
+            geocodedAddress = makeAddHomeGeocodedAddress(from: response, fallback: form.address)
         } catch {
             errorMessage = (error as? APIError)?.errorDescription
                 ?? "Couldn't verify that address. Try again."
@@ -342,7 +401,7 @@ final class AddHomeWizardViewModel: WizardModel {
     private func title(for step: AddHomeStep) -> String {
         switch step {
         case .address: "Find your home"
-        default: "Add a home"
+        default: "Add home"
         }
     }
 
@@ -362,7 +421,7 @@ final class AddHomeWizardViewModel: WizardModel {
     private func primaryEnabled(for step: AddHomeStep) -> Bool {
         switch step {
         case .address: selectedHomeID != nil
-        case .confirm: !isCheckingAddress && errorMessage == nil
+        case .confirm: !isCheckingAddress && errorMessage == nil && zipMismatch == nil
         case .role: form.role != nil
         case .review: form.role != nil
         case .success: createdHomeId != nil
@@ -379,6 +438,34 @@ final class AddHomeWizardViewModel: WizardModel {
                     || !form.address.street.isEmpty
             )
     }
+}
+
+private func makeAddHomeGeocodedAddress(
+    from response: CheckAddressResponse,
+    fallback: AddHomeAddressFields
+) -> AddHomeGeocodedAddress? {
+    guard let normalized = response.normalizedAddress else { return nil }
+    return AddHomeGeocodedAddress(
+        street: cleanAddHomeGeocodeValue(normalized.street) ?? fallback.street,
+        unit: cleanAddHomeGeocodeValue(normalized.unit) ?? fallback.unit,
+        city: cleanAddHomeGeocodeValue(normalized.city) ?? fallback.city,
+        state: cleanAddHomeGeocodeValue(normalized.state) ?? fallback.state,
+        zipCode: cleanAddHomeGeocodeValue(normalized.zipCode) ?? fallback.zipCode,
+        latitude: normalized.latitude,
+        longitude: normalized.longitude,
+        isMultiUnit: normalized.isMultiUnit ?? !fallback.unit.isEmpty
+    )
+}
+
+private func cleanAddHomeGeocodeValue(_ value: String?) -> String? {
+    guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !trimmed.isEmpty
+    else { return nil }
+    return trimmed
+}
+
+private func normalizedAddHomeZip(_ value: String) -> String {
+    value.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
 }
 
 /// The five user-facing input fields in step 1.

@@ -9,6 +9,7 @@ import app.pantopus.android.data.api.models.homes.CheckAddressResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.HomeDto
+import app.pantopus.android.data.api.models.homes.NormalizedAddressDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
@@ -60,6 +61,17 @@ class AddHomeWizardViewModelTest {
         vm.selectAddressCandidate(AddHomeSampleData.nearbyHomes[0])
     }
 
+    private fun fillBrooklynAddress(
+        vm: AddHomeWizardViewModel,
+        zipCode: String,
+    ) {
+        vm.updateField(AddressField.Street, "412 Elm Street")
+        vm.updateField(AddressField.Unit, "3B")
+        vm.updateField(AddressField.City, "Brooklyn")
+        vm.updateField(AddressField.State, "NY")
+        vm.updateField(AddressField.Zip, zipCode)
+    }
+
     private val createHomeResponse =
         CreateHomeResponse(
             message = "ok",
@@ -88,6 +100,25 @@ class AddHomeWizardViewModelTest {
             homeCount = 0,
             hasVerifiedMembers = false,
             verdictStatus = null,
+        )
+
+    private val checkAddressZipMismatch =
+        CheckAddressResponse(
+            exists = false,
+            homeCount = 0,
+            hasVerifiedMembers = false,
+            verdictStatus = null,
+            normalizedAddress =
+                NormalizedAddressDto(
+                    street = "412 Elm Street",
+                    unit = "3B",
+                    city = "Brooklyn",
+                    state = "NY",
+                    zipCodeSnake = "11211",
+                    latitude = 40.7138,
+                    longitude = -73.9527,
+                    isMultiUnit = true,
+                ),
         )
 
     // MARK: - Initial chrome
@@ -145,6 +176,31 @@ class AddHomeWizardViewModelTest {
             assertEquals(AddHomeStep.Confirm, vm.state.value.form.currentStep)
             assertNull(vm.state.value.addressCheck)
             assertNotNull(vm.state.value.errorMessage)
+        }
+
+    @Test
+    fun zip_mismatch_disables_continue_until_apply() =
+        runTest {
+            coEvery { repo.checkAddress(any<CheckAddressRequest>()) } returns
+                NetworkResult.Success(checkAddressZipMismatch)
+            val vm = makeVm()
+            fillBrooklynAddress(vm, "11201")
+            vm.onPrimary()
+            advanceTimeBy(50)
+
+            assertEquals(AddHomeStep.Confirm, vm.state.value.form.currentStep)
+            assertEquals("11201", vm.state.value.zipMismatch?.enteredZip)
+            assertEquals("11211", vm.state.value.zipMismatch?.correctedZip)
+            assertFalse(vm.chrome.primaryCtaEnabled)
+            vm.onPrimary()
+            advanceTimeBy(50)
+            assertEquals(AddHomeStep.Confirm, vm.state.value.form.currentStep)
+
+            vm.applyGeocodedZip()
+
+            assertEquals("11211", vm.state.value.form.address.zipCode)
+            assertNull(vm.state.value.zipMismatch)
+            assertTrue(vm.chrome.primaryCtaEnabled)
         }
 
     // MARK: - Back navigation
