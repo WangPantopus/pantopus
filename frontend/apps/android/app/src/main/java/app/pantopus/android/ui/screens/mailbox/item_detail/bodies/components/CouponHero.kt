@@ -366,7 +366,7 @@ private fun ExpiryBanner(
                 .semantics {
                     contentDescription =
                         "${if (isExpired) "Expired" else "Expires"} ${displayDate(expiresAt)}. " +
-                            "Minimum spend ${minimumSpend?.trim().takeUnless { it.isNullOrEmpty() } ?: "No minimum"}."
+                        "Minimum spend ${minimumSpend?.trim().takeUnless { it.isNullOrEmpty() } ?: "No minimum"}."
                 },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),

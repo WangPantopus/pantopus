@@ -60,8 +60,6 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
-enum class CouponBodyState { Unused, Redeemed, Expired }
-
 /**
  * A17.5 Coupon mailbox category body: ticket hero, fine print, and a
  * bottom "Show in store" barcode affordance that expands for scanning.
@@ -74,9 +72,10 @@ fun CouponBody(
     barcodeInitiallyExpanded: Boolean = false,
 ) {
     val context = LocalContext.current
-    val merchant = coupon.brandName?.trim().takeUnless { it.isNullOrEmpty() }
-        ?: coupon.merchant?.trim().takeUnless { it.isNullOrEmpty() }
-        ?: "Local offer"
+    val merchant =
+        coupon.brandName?.trim().takeUnless { it.isNullOrEmpty() }
+            ?: coupon.merchant?.trim().takeUnless { it.isNullOrEmpty() }
+            ?: "Local offer"
     val code = coupon.code?.trim().takeUnless { it.isNullOrEmpty() }
     var barcodeExpanded by rememberSaveable { mutableStateOf(barcodeInitiallyExpanded) }
 
@@ -96,7 +95,8 @@ fun CouponBody(
                     expiresAt = coupon.expiresAt,
                 )
             CouponBodyState.Unused,
-            CouponBodyState.Expired ->
+            CouponBodyState.Expired,
+            ->
                 CouponHero(
                     headline = coupon.headline,
                     brandName = merchant,
@@ -325,7 +325,11 @@ private fun RedeemedRibbon(
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
                 RibbonFact(label = "Code", value = code ?: "Redeemed", modifier = Modifier.weight(1f))
                 Box(Modifier.width(1.dp).height(34.dp).background(PantopusColors.appBorderSubtle))
-                RibbonFact(label = "Original expiry", value = expiresAt?.trim().takeUnless { it.isNullOrEmpty() } ?: "No expiry", modifier = Modifier.weight(1f))
+                RibbonFact(
+                    label = "Original expiry",
+                    value = expiresAt?.trim().takeUnless { it.isNullOrEmpty() } ?: "No expiry",
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
