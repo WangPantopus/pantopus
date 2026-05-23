@@ -103,7 +103,8 @@ jobs:
             | sed -E 's/[^a-z0-9]+/-/g; s/-+$//')
           echo "slug=$slug" >> "$GITHUB_OUTPUT"
 
-      - name: Ensure simulator device exists
+      - name: Create simulator
+        id: simulator
         run: |
           set -euo pipefail
 
@@ -139,10 +140,11 @@ jobs:
             exit 1
           fi
 
-          device_id=$(xcrun simctl create "Pantopus CI ${{ matrix.simulator }}" "${device_type_id}" "${runtime_id}")
+          device_id=$(xcrun simctl create "Pantopus CI ${{ steps.sim.outputs.slug }}" "${device_type_id}" "${runtime_id}")
+          echo "udid=${device_id}" >> "$GITHUB_OUTPUT"
+          echo "SIMULATOR_UDID=${device_id}" >> "$GITHUB_ENV"
           xcrun simctl boot "${device_id}" || true
           xcrun simctl bootstatus "${device_id}" -b
-          echo "SIMULATOR_UDID=${device_id}" >> "$GITHUB_ENV"
           echo "Using simulator '${{ matrix.simulator }}' (${device_id}) on ${runtime_id}."
 
       - name: Run tests
@@ -206,3 +208,9 @@ jobs:
             frontend/apps/ios/coverage-${{ steps.sim.outputs.slug }}.txt
             frontend/apps/ios/coverage-${{ steps.sim.outputs.slug }}.json
           retention-days: 7
+
+      - name: Delete simulator
+        if: always() && steps.simulator.outputs.udid != ''
+        run: |
+          xcrun simctl shutdown "${{ steps.simulator.outputs.udid }}" || true
+          xcrun simctl delete "${{ steps.simulator.outputs.udid }}" || true
