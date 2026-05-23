@@ -52,6 +52,7 @@ import java.util.Locale
  * Hub → MailboxList → MailboxItemDetail screen. The ViewModel reads the
  * mail id via the nav-backstack [androidx.lifecycle.SavedStateHandle].
  */
+@Suppress("CyclomaticComplexMethod")
 @Composable
 fun MailboxItemDetailScreen(
     onBack: () -> Unit,

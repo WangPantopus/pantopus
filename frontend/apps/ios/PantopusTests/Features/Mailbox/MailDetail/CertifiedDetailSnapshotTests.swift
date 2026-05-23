@@ -106,8 +106,14 @@ final class CertifiedDetailSnapshotTests: XCTestCase {
             bodyParagraphs: Self.paragraphs(from: certified.noticeBody),
             attachments: [],
             aiSummary: isAcknowledged
-                ? "Your signed delivery receipt is on file. Pantopus saved the chain of custody and will keep reminders attached to this item."
-                : "Your supplemental property tax bill is $1,247.82 due Jun 30. This is in addition to your regular annual property tax.",
+                ? """
+                Your signed delivery receipt is on file. Pantopus saved the chain of custody and \
+                will keep reminders attached to this item.
+                """
+                : """
+                Your supplemental property tax bill is $1,247.82 due Jun 30. This is in addition \
+                to your regular annual property tax.
+                """,
             ackRequired: true,
             isAcknowledged: isAcknowledged,
             isArchived: isArchived,

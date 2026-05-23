@@ -136,8 +136,19 @@ public enum MailItemSampleData {
     public static let certifiedArchived = certifiedSigned
 
     private static let certifiedNoticeBody = [
-        "This is a SUPPLEMENTAL property tax bill issued pursuant to Section 75 et seq. of the California Revenue and Taxation Code following a reassessment triggered by a change in ownership recorded on October 14, 2025.",
-        "Your previously assessed value of $612,000 has been adjusted to $785,400, producing supplemental taxes for the partial year October 2025 through June 2026 in the amount shown below.",
-        "Payment must be received or postmarked no later than the delinquency date or a 10% penalty plus 1.5% per month interest will accrue."
+        """
+        This is a SUPPLEMENTAL property tax bill issued pursuant to Section 75 et seq. of the \
+        California Revenue and Taxation Code following a reassessment triggered by a change in \
+        ownership recorded on October 14, 2025.
+        """,
+        """
+        Your previously assessed value of $612,000 has been adjusted to $785,400, producing \
+        supplemental taxes for the partial year October 2025 through June 2026 in the amount \
+        shown below.
+        """,
+        """
+        Payment must be received or postmarked no later than the delinquency date or a 10% \
+        penalty plus 1.5% per month interest will accrue.
+        """
     ].joined(separator: "\n\n")
 }

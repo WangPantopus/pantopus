@@ -107,96 +107,22 @@ fun CertifiedConfirmGateBody(
                 .testTag(CERTIFIED_CONFIRM_GATE_TAG),
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(Radii.lg))
-                        .background(PantopusColors.warningBg),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.BadgeCheck,
-                    contentDescription = null,
-                    size = 22.dp,
-                    tint = PantopusColors.warning,
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                Text(
-                    text = "Sign for delivery",
-                    modifier = Modifier.semantics { heading() },
-                    style = PantopusTextStyle.h3,
-                    color = PantopusColors.appText,
-                )
-                Text(
-                    text =
-                        "This certified item is unread. Signing records a delivery receipt " +
-                            "in the chain of custody.",
-                    style = PantopusTextStyle.small,
-                    color = PantopusColors.appTextSecondary,
-                )
-            }
-        }
-
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.lg))
-                    .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
-        ) {
-            SummaryRow(label = "From", value = senderName, icon = PantopusIcon.Landmark)
-            HorizontalDivider(color = PantopusColors.appBorderSubtle)
-            SummaryRow(
-                label = "Tracking",
-                value = referenceNumber,
-                icon = PantopusIcon.Hash,
-                isCode = true,
-            )
-            if (deadlineLabel != null) {
-                HorizontalDivider(color = PantopusColors.appBorderSubtle)
-                SummaryRow(label = "Respond by", value = deadlineLabel, icon = PantopusIcon.CalendarClock)
-            }
-        }
-
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.lg))
-                    .background(PantopusColors.appSurfaceRaised)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                    .padding(Spacing.s3),
-        ) {
-            PantopusCheckbox(
-                isChecked = didConfirm,
-                onCheckedChange = { didConfirm = it },
-                label = "I am the recipient and understand this confirms delivery only.",
-                modifier = Modifier.testTag("certifiedConfirmGate_confirmation"),
-            )
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            PrimaryButton(
-                title = "Sign for delivery",
-                onClick = onSign,
-                isLoading = isSigning,
-                isEnabled = didConfirm && !isSigning,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            GhostButton(
-                title = "Review first",
-                onClick = onReviewFirst,
-                isEnabled = !isSigning,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+        ConfirmGateHeader()
+        ConfirmGateSummary(
+            senderName = senderName,
+            referenceNumber = referenceNumber,
+            deadlineLabel = deadlineLabel,
+        )
+        ConfirmGateConfirmation(
+            didConfirm = didConfirm,
+            onConfirmChange = { didConfirm = it },
+        )
+        ConfirmGateActions(
+            didConfirm = didConfirm,
+            isSigning = isSigning,
+            onSign = onSign,
+            onReviewFirst = onReviewFirst,
+        )
 
         Text(
             text = "Signing does not waive your right to appeal, dispute, or pay through the issuing agency.",
@@ -205,6 +131,121 @@ fun CertifiedConfirmGateBody(
             color = PantopusColors.appTextMuted,
         )
         Spacer(Modifier.height(Spacing.s2))
+    }
+}
+
+@Composable
+private fun ConfirmGateHeader() {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.warningBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.BadgeCheck,
+                contentDescription = null,
+                size = 22.dp,
+                tint = PantopusColors.warning,
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+            Text(
+                text = "Sign for delivery",
+                modifier = Modifier.semantics { heading() },
+                style = PantopusTextStyle.h3,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text =
+                    "This certified item is unread. Signing records a delivery receipt " +
+                        "in the chain of custody.",
+                style = PantopusTextStyle.small,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConfirmGateSummary(
+    senderName: String,
+    referenceNumber: String,
+    deadlineLabel: String?,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+    ) {
+        SummaryRow(label = "From", value = senderName, icon = PantopusIcon.Landmark)
+        HorizontalDivider(color = PantopusColors.appBorderSubtle)
+        SummaryRow(
+            label = "Tracking",
+            value = referenceNumber,
+            icon = PantopusIcon.Hash,
+            isCode = true,
+        )
+        if (deadlineLabel != null) {
+            HorizontalDivider(color = PantopusColors.appBorderSubtle)
+            SummaryRow(label = "Respond by", value = deadlineLabel, icon = PantopusIcon.CalendarClock)
+        }
+    }
+}
+
+@Composable
+private fun ConfirmGateConfirmation(
+    didConfirm: Boolean,
+    onConfirmChange: (Boolean) -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurfaceRaised)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3),
+    ) {
+        PantopusCheckbox(
+            isChecked = didConfirm,
+            onCheckedChange = onConfirmChange,
+            label = "I am the recipient and understand this confirms delivery only.",
+            modifier = Modifier.testTag("certifiedConfirmGate_confirmation"),
+        )
+    }
+}
+
+@Composable
+private fun ConfirmGateActions(
+    didConfirm: Boolean,
+    isSigning: Boolean,
+    onSign: () -> Unit,
+    onReviewFirst: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        PrimaryButton(
+            title = "Sign for delivery",
+            onClick = onSign,
+            isLoading = isSigning,
+            isEnabled = didConfirm && !isSigning,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        GhostButton(
+            title = "Review first",
+            onClick = onReviewFirst,
+            isEnabled = !isSigning,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

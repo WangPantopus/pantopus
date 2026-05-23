@@ -138,73 +138,88 @@ fun CertifiedTermsSummaryCard(
                 .testTag("certifiedTermsSummary"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(Radii.md))
-                        .background(PantopusColors.warningBg),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.ShieldCheck,
-                    contentDescription = null,
-                    size = 18.dp,
-                    tint = PantopusColors.warning,
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Certified delivery terms",
-                    modifier = Modifier.semantics { heading() },
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PantopusColors.appText,
-                )
-                Text(
-                    text =
-                        "A high-stakes item needs a signed delivery receipt before Pantopus " +
-                            "marks it complete.",
-                    fontSize = 12.sp,
-                    color = PantopusColors.appTextSecondary,
-                )
-            }
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            TermsBullet(icon = PantopusIcon.CheckCircle, text = "Signing confirms receipt only.")
-            TermsBullet(icon = PantopusIcon.Flag, text = "It does not waive appeal, dispute, or payment rights.")
-            TermsBullet(icon = PantopusIcon.Archive, text = "Pantopus stores the receipt with the chain of custody.")
-        }
+        TermsSummaryHeader()
+        TermsSummaryBullets()
         if (!termsUrl.isNullOrEmpty() && onViewTerms != null) {
-            Row(
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(Radii.sm))
-                        .clickable(onClick = onViewTerms)
-                        .padding(vertical = Spacing.s2)
-                        .testTag("certifiedTermsSummary_review")
-                        .semantics { contentDescription = "Review full certified delivery terms" },
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Review full terms",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = PantopusColors.primary600,
-                )
-                PantopusIconImage(
-                    icon = PantopusIcon.ChevronRight,
-                    contentDescription = null,
-                    size = 13.dp,
-                    tint = PantopusColors.primary600,
-                )
-            }
+            ReviewTermsLink(onViewTerms = onViewTerms)
         }
+    }
+}
+
+@Composable
+private fun TermsSummaryHeader() {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.warningBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.ShieldCheck,
+                contentDescription = null,
+                size = 18.dp,
+                tint = PantopusColors.warning,
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Certified delivery terms",
+                modifier = Modifier.semantics { heading() },
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text =
+                    "A high-stakes item needs a signed delivery receipt before Pantopus " +
+                        "marks it complete.",
+                fontSize = 12.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TermsSummaryBullets() {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        TermsBullet(icon = PantopusIcon.CheckCircle, text = "Signing confirms receipt only.")
+        TermsBullet(icon = PantopusIcon.Flag, text = "It does not waive appeal, dispute, or payment rights.")
+        TermsBullet(icon = PantopusIcon.Archive, text = "Pantopus stores the receipt with the chain of custody.")
+    }
+}
+
+@Composable
+private fun ReviewTermsLink(onViewTerms: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.sm))
+                .clickable(onClick = onViewTerms)
+                .padding(vertical = Spacing.s2)
+                .testTag("certifiedTermsSummary_review")
+                .semantics { contentDescription = "Review full certified delivery terms" },
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Review full terms",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.primary600,
+        )
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 13.dp,
+            tint = PantopusColors.primary600,
+        )
     }
 }
 
