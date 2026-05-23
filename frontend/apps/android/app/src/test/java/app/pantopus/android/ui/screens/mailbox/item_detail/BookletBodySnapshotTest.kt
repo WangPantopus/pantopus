@@ -11,6 +11,13 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.BookletBody
 import app.pantopus.android.ui.theme.PantopusColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -18,12 +25,17 @@ import org.junit.Test
  * A17.2 — Booklet mail body. Paparazzi snapshots cover two deterministic
  * booklet types and exercise the folded-paper page swiper with dots.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class BookletBodySnapshotTest {
     @get:Rule
     val paparazzi =
         Paparazzi(
             deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = 2200, softButtons = false),
         )
+
+    @Before fun setup() = Dispatchers.setMain(UnconfinedTestDispatcher())
+
+    @After fun tearDown() = Dispatchers.resetMain()
 
     @Test fun booklet_voter_guide_shell() {
         paparazzi.snapshot {

@@ -15,16 +15,28 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemSampleData
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailTrust
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.BookletDetailLayout
 import app.pantopus.android.ui.theme.PantopusColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 /** A17.1 generic mail-detail snapshots across three category accents. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class MailDetailSnapshotTest {
     @get:Rule
     val paparazzi =
         Paparazzi(
             deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = 2400, softButtons = false),
         )
+
+    @Before fun setup() = Dispatchers.setMain(UnconfinedTestDispatcher())
+
+    @After fun tearDown() = Dispatchers.resetMain()
 
     @Test
     fun notice_generic_detail() {

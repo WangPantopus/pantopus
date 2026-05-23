@@ -39,8 +39,8 @@ public struct BookletPageSwiper: View {
                         pageNumber: idx + 1,
                         hasNextPage: idx < totalPages - 1
                     )
-                        .tag(idx)
-                        .padding(.horizontal, Spacing.s4)
+                    .tag(idx)
+                    .padding(.horizontal, Spacing.s4)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
@@ -278,6 +278,6 @@ private struct TopRightFoldShape: Shape {
         URL(string: "https://placehold.co/360x480/orange/white")!,
         URL(string: "https://placehold.co/360x480/blue/white")!
     ], totalPages: 3)
-    .padding(.vertical)
-    .background(Theme.Color.appBg)
+        .padding(.vertical)
+        .background(Theme.Color.appBg)
 }

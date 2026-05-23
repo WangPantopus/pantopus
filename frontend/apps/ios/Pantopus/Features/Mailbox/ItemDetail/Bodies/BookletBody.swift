@@ -5,9 +5,6 @@
 //  Concrete body for the Booklet mailbox category. Replaces the P9
 //  placeholder. Hosts the page swiper plus the optional summary copy
 //  the design draws below the pager.
-//
-// swiftlint:disable force_unwrapping
-
 import SwiftUI
 
 @MainActor
@@ -35,5 +32,5 @@ public struct BookletBody: View {
 
 #Preview {
     BookletBody(booklet: MailItemSampleData.bookletNeighborhoodCatalog)
-    .background(Theme.Color.appBg)
+        .background(Theme.Color.appBg)
 }

@@ -68,9 +68,9 @@ public struct BookletPager: View {
                         pageNumber: idx + 1,
                         hasNextPage: idx < pageCount - 1
                     )
-                        .tag(idx)
-                        .padding(.horizontal, Spacing.s4)
-                        .accessibilityIdentifier("bookletPager_page_\(idx)")
+                    .tag(idx)
+                    .padding(.horizontal, Spacing.s4)
+                    .accessibilityIdentifier("bookletPager_page_\(idx)")
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
