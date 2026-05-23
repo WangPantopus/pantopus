@@ -15,9 +15,17 @@ import SwiftUI
 @MainActor
 public struct BarcodeView: View {
     private let code: String
+    private let height: CGFloat
+    private let foreground: Color
 
-    public init(code: String) {
+    public init(
+        code: String,
+        height: CGFloat = 60,
+        foreground: Color = Theme.Color.appText
+    ) {
         self.code = code
+        self.height = height
+        self.foreground = foreground
     }
 
     public var body: some View {
@@ -25,13 +33,13 @@ public struct BarcodeView: View {
             HStack(spacing: 1) {
                 ForEach(Array(bars.enumerated()), id: \.offset) { _, width in
                     Rectangle()
-                        .fill(Theme.Color.appText)
+                        .fill(foreground)
                         .frame(width: width, height: proxy.size.height)
                 }
             }
             .frame(width: proxy.size.width, alignment: .center)
         }
-        .frame(height: 60)
+        .frame(height: height)
         .padding(.horizontal, Spacing.s4)
         .padding(.vertical, Spacing.s2)
         .background(Theme.Color.appSurface)

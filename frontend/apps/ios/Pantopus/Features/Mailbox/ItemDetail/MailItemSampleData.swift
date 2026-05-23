@@ -11,6 +11,48 @@ import Foundation
 
 /// Sample payloads for the mailbox item-detail bodies.
 public enum MailItemSampleData {
+    /// A17.5 primary coupon state — ready to scan in store.
+    public static let couponUnused = CouponDetailDTO(
+        brandLogoURL: nil,
+        brandName: "Brass Owl Bakery",
+        headline: "25% OFF",
+        subcopy: "Your next in-store purchase",
+        code: "BRASS25",
+        expiresAt: "2026-06-30",
+        merchant: "Brass Owl Bakery",
+        terms: "Valid for one in-store transaction. Cannot be combined with daily specials or loyalty rewards.",
+        minimumSpend: "$8 minimum",
+        finePrint: "Excludes whole-cake orders, catering trays, gift cards, and already-marked-down items."
+    )
+
+    /// A17.5 redeemed secondary state — success ribbon replaces the hero.
+    public static let couponRedeemed = CouponDetailDTO(
+        brandLogoURL: nil,
+        brandName: "Brass Owl Bakery",
+        headline: "25% OFF",
+        subcopy: "Your next in-store purchase",
+        code: "BRASS25",
+        expiresAt: "2026-06-30",
+        merchant: "Brass Owl Bakery",
+        terms: "Redeemed offers cannot be reused or transferred.",
+        minimumSpend: "$8 minimum",
+        finePrint: "Coupon was single-use and has been retired after checkout."
+    )
+
+    /// A17.5 terminal expired state.
+    public static let couponExpired = CouponDetailDTO(
+        brandLogoURL: nil,
+        brandName: "Brass Owl Bakery",
+        headline: "25% OFF",
+        subcopy: "Your next in-store purchase",
+        code: "BRASS25",
+        expiresAt: "2026-05-01",
+        merchant: "Brass Owl Bakery",
+        terms: "Expired offers cannot be scanned, copied, or restored.",
+        minimumSpend: "$8 minimum",
+        finePrint: "This offer expired before redemption."
+    )
+
     /// Next-steps timeline shown once a bid is accepted (A17.6 NEXT_STEPS).
     public static let gigNextSteps: [GigDetailDTO.NextStep] = [
         .init(id: "accepted", label: "Bid accepted", whenText: "Just now", state: .active),

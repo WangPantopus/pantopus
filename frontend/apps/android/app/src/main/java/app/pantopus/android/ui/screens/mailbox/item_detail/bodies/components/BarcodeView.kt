@@ -17,9 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.Radii
@@ -35,6 +37,8 @@ import app.pantopus.android.ui.theme.Spacing
 fun BarcodeView(
     code: String,
     modifier: Modifier = Modifier,
+    height: Dp = 60.dp,
+    barColor: Color = PantopusColors.appText,
 ) {
     val widths = remember(code) { computeBarWidths(code) }
     Column(
@@ -48,14 +52,14 @@ fun BarcodeView(
                 .semantics { invisibleToUser() },
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        Canvas(modifier = Modifier.fillMaxWidth().height(60.dp)) {
+        Canvas(modifier = Modifier.fillMaxWidth().height(height)) {
             val totalUnits = widths.sum().toFloat().coerceAtLeast(1f)
             val unit = size.width / totalUnits
             var x = 0f
             widths.forEach { w ->
                 val barWidth = unit * w
                 drawRect(
-                    color = PantopusColors.appText,
+                    color = barColor,
                     topLeft = Offset(x, 0f),
                     size = Size(barWidth, size.height),
                 )
