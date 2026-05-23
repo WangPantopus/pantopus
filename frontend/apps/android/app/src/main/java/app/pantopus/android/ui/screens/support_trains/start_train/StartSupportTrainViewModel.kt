@@ -96,6 +96,18 @@ class StartSupportTrainViewModel
             _selectedBeneficiary.value = null
         }
 
+        fun searchAgain() {
+            searchJob?.cancel()
+            _selectedBeneficiary.value = null
+            _beneficiaryResults.value = emptyList()
+            _isSearching.value = false
+            _form.value = _form.value.copy(beneficiaryQuery = "")
+        }
+
+        fun selectReason(value: StartSupportTrainReason) {
+            _form.value = _form.value.copy(selectedReason = value)
+        }
+
         fun updateReason(value: String) {
             val clamped =
                 if (value.length > StartSupportTrainFormState.REASON_CHAR_LIMIT) {
@@ -104,6 +116,18 @@ class StartSupportTrainViewModel
                     value
                 }
             _form.value = _form.value.copy(reason = clamped)
+        }
+
+        fun toggleInviteOnly(value: Boolean) {
+            _form.value = _form.value.copy(inviteOnly = value)
+        }
+
+        fun toggleBlockVisible(value: Boolean) {
+            _form.value = _form.value.copy(blockVisible = value)
+        }
+
+        fun selectInviteMethod(value: StartSupportTrainInviteMethod) {
+            _form.value = _form.value.copy(inviteMethod = value)
         }
 
         // ─── Step 2 actions ─────────────────────────────────────────────
@@ -168,9 +192,16 @@ class StartSupportTrainViewModel
         fun canAdvanceFromWhoAndWhy(): Boolean {
             val current = _form.value
             val hasBeneficiary =
-                _selectedBeneficiary.value != null || current.beneficiaryQuery.trim().isNotEmpty()
-            val hasReason = current.reason.trim().isNotEmpty()
-            return hasBeneficiary && hasReason
+                _selectedBeneficiary.value != null || current.beneficiaryQuery.trim().length >= 2
+            return hasBeneficiary
+        }
+
+        fun isInviteRecipientBranch(): Boolean {
+            val current = _form.value
+            return _selectedBeneficiary.value == null &&
+                current.beneficiaryQuery.trim().length >= 2 &&
+                _beneficiaryResults.value.isEmpty() &&
+                !_isSearching.value
         }
 
         fun canAdvanceFromWhatAndWhen(): Boolean {
@@ -199,15 +230,7 @@ class StartSupportTrainViewModel
                         },
                     primaryCtaLabel = primaryCtaLabelFor(current.step),
                     primaryCtaEnabled = primaryEnabledFor(current.step),
-                    secondaryCta =
-                        if (current.step == StartSupportTrainStep.Success) {
-                            WizardSecondaryCta(
-                                label = "Back to trains",
-                                testTag = "startSupportTrainBackToList",
-                            )
-                        } else {
-                            null
-                        },
+                    secondaryCta = secondaryCtaFor(current.step),
                     isSubmitting = _isSubmitting.value,
                     dirty = dirtyFor(current.step),
                     showsProgressBar = current.step != StartSupportTrainStep.Success,
@@ -249,7 +272,9 @@ class StartSupportTrainViewModel
         }
 
         override fun onSecondary() {
-            if (_form.value.step == StartSupportTrainStep.Success) {
+            if (isInviteRecipientBranch()) {
+                searchAgain()
+            } else if (_form.value.step == StartSupportTrainStep.Success) {
                 handleSuccessExit()
             }
         }
@@ -262,7 +287,7 @@ class StartSupportTrainViewModel
 
         private fun titleFor(step: StartSupportTrainStep): String =
             when (step) {
-                StartSupportTrainStep.WhoAndWhy -> "Who & why"
+                StartSupportTrainStep.WhoAndWhy -> "Start a support train"
                 StartSupportTrainStep.WhatAndWhen -> "What & when"
                 StartSupportTrainStep.ReviewAndLaunch -> "Review & launch"
                 StartSupportTrainStep.Success -> "Train launched"
@@ -270,9 +295,26 @@ class StartSupportTrainViewModel
 
         private fun primaryCtaLabelFor(step: StartSupportTrainStep): String =
             when (step) {
-                StartSupportTrainStep.WhoAndWhy, StartSupportTrainStep.WhatAndWhen -> "Continue"
+                StartSupportTrainStep.WhoAndWhy ->
+                    if (isInviteRecipientBranch()) "Send invite & continue" else "Continue"
+                StartSupportTrainStep.WhatAndWhen -> "Continue"
                 StartSupportTrainStep.ReviewAndLaunch -> "Launch train"
                 StartSupportTrainStep.Success -> "Open train"
+            }
+
+        private fun secondaryCtaFor(step: StartSupportTrainStep): WizardSecondaryCta? =
+            when {
+                step == StartSupportTrainStep.Success ->
+                    WizardSecondaryCta(
+                        label = "Back to trains",
+                        testTag = "startSupportTrainBackToList",
+                    )
+                isInviteRecipientBranch() ->
+                    WizardSecondaryCta(
+                        label = "Search again",
+                        testTag = "startSupportTrainSearchAgain",
+                    )
+                else -> null
             }
 
         private fun primaryEnabledFor(step: StartSupportTrainStep): Boolean =
@@ -288,7 +330,10 @@ class StartSupportTrainViewModel
                 StartSupportTrainStep.WhoAndWhy ->
                     canAdvanceFromWhoAndWhy() ||
                         _form.value.beneficiaryQuery.isNotEmpty() ||
-                        _form.value.reason.isNotEmpty()
+                        _form.value.reason.isNotEmpty() ||
+                        _form.value.selectedReason != StartSupportTrainReason.Surgery ||
+                        !_form.value.inviteOnly ||
+                        _form.value.blockVisible
                 StartSupportTrainStep.WhatAndWhen, StartSupportTrainStep.ReviewAndLaunch -> true
                 StartSupportTrainStep.Success -> false
             }
@@ -317,7 +362,7 @@ class StartSupportTrainViewModel
                     draftPayload = CreateSupportTrainBody.DraftPayload(story = trimmedReason),
                     title = derivedTitle(),
                     recipientUserId = _selectedBeneficiary.value?.userId,
-                    sharingMode = current.visibility.sharingModeWire,
+                    sharingMode = effectiveSharingMode(current),
                 )
             viewModelScope.launch {
                 try {
@@ -366,6 +411,13 @@ class StartSupportTrainViewModel
             _pendingEvent.value =
                 if (id != null) StartSupportTrainEvent.OpenTrain(id) else StartSupportTrainEvent.Dismiss
         }
+
+        private fun effectiveSharingMode(form: StartSupportTrainFormState): String =
+            when {
+                form.inviteOnly -> StartSupportTrainVisibility.Connections.sharingModeWire
+                form.blockVisible -> StartSupportTrainVisibility.Neighbors.sharingModeWire
+                else -> form.visibility.sharingModeWire
+            }
 
         private fun stripToStartOfDay(millis: Long): Long {
             val cal = java.util.Calendar.getInstance()

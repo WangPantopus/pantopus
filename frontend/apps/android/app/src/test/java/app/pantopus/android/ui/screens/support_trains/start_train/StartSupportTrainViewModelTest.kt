@@ -86,6 +86,18 @@ class StartSupportTrainViewModelTest {
             assertTrue(vm.canAdvanceFromWhoAndWhy())
         }
 
+    @Test fun invite_recipient_branch_updates_cta_and_search_again() =
+        runTest(dispatcher) {
+            val vm = StartSupportTrainViewModel(supportTrains, mailCompose)
+            vm.updateBeneficiaryQuery(StartSupportTrainSampleData.INVITE_QUERY)
+            vm.selectReason(StartSupportTrainReason.NewBaby)
+            assertTrue(vm.isInviteRecipientBranch())
+            assertEquals("Send invite & continue", vm.chrome.primaryCtaLabel)
+            assertEquals("Search again", vm.chrome.secondaryCta?.label)
+            vm.onSecondary()
+            assertEquals("", vm.form.value.beneficiaryQuery)
+        }
+
     @Test fun reason_clamps_at_char_limit() =
         runTest(dispatcher) {
             val vm = StartSupportTrainViewModel(supportTrains, mailCompose)
