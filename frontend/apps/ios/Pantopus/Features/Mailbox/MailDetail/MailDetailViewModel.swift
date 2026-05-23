@@ -44,12 +44,16 @@ public struct MailDetailContent: Sendable {
     public let detailTrust: MailDetailTrust
     public let senderDisplayName: String
     public let senderMeta: String?
+    public let senderTypeLabel: String
+    public let carrierLine: String
     public let senderInitials: String
     public let senderUserId: String?
     public let title: String
     public let excerpt: String?
+    public let referenceLabel: String
     public let createdAtLabel: String?
     public let expiresAtLabel: String?
+    public let readStatusLabel: String
     public let bodyParagraphs: [String]
     public let attachments: [String]
     public let aiSummary: String?
@@ -82,12 +86,16 @@ public struct MailDetailContent: Sendable {
         detailTrust: MailDetailTrust,
         senderDisplayName: String,
         senderMeta: String?,
+        senderTypeLabel: String,
+        carrierLine: String,
         senderInitials: String,
         senderUserId: String?,
         title: String,
         excerpt: String?,
+        referenceLabel: String,
         createdAtLabel: String?,
         expiresAtLabel: String?,
+        readStatusLabel: String,
         bodyParagraphs: [String],
         attachments: [String],
         aiSummary: String?,
@@ -103,12 +111,16 @@ public struct MailDetailContent: Sendable {
         self.detailTrust = detailTrust
         self.senderDisplayName = senderDisplayName
         self.senderMeta = senderMeta
+        self.senderTypeLabel = senderTypeLabel
+        self.carrierLine = carrierLine
         self.senderInitials = senderInitials
         self.senderUserId = senderUserId
         self.title = title
         self.excerpt = excerpt
+        self.referenceLabel = referenceLabel
         self.createdAtLabel = createdAtLabel
         self.expiresAtLabel = expiresAtLabel
+        self.readStatusLabel = readStatusLabel
         self.bodyParagraphs = bodyParagraphs
         self.attachments = attachments
         self.aiSummary = aiSummary
@@ -336,6 +348,13 @@ public final class MailDetailViewModel {
             ?? item.senderAddress
             ?? "Unknown sender"
         let senderMeta = detail.sender.map { "@\($0.username)" } ?? item.senderAddress
+        let senderTypeLabel = senderTypeLabel(
+            category: category,
+            sender: detail.sender,
+            businessName: item.senderBusinessName
+        )
+        let carrierLine = "via \(carrierLabel(from: detail.object))"
+        let referenceLabel = referenceLabel(from: detail.object, itemId: item.id)
         let title = item.displayTitle ?? item.subject ?? "Mail"
         let excerpt = item.previewText
         let createdAtLabel = formatLongDate(item.createdAt)
@@ -370,6 +389,7 @@ public final class MailDetailViewModel {
         // payload too — backend can ship the chain with `is_acknowledged`
         // set even before `ack_status` on the item row updates.
         let resolvedAck = isAcknowledged || (certifiedDetail?.isAcknowledged ?? false)
+        let readStatusLabel = item.viewed || resolvedAck ? "Read" : "Unread"
         let detailTrust: MailDetailTrust = switch category {
         case .certified, .community, .legal, .tax: .verified
         default: trust.detailTrust
@@ -381,12 +401,16 @@ public final class MailDetailViewModel {
             detailTrust: detailTrust,
             senderDisplayName: senderDisplayName,
             senderMeta: senderMeta,
+            senderTypeLabel: senderTypeLabel,
+            carrierLine: carrierLine,
             senderInitials: initials,
             senderUserId: detail.sender?.id,
             title: title,
             excerpt: excerpt,
+            referenceLabel: referenceLabel,
             createdAtLabel: createdAtLabel,
             expiresAtLabel: expiresAtLabel,
+            readStatusLabel: readStatusLabel,
             bodyParagraphs: body,
             attachments: attachments,
             aiSummary: aiSummary,
@@ -418,6 +442,42 @@ public final class MailDetailViewModel {
         formatter.dateFormat = "EEE MMM d, yyyy"
         return formatter.string(from: date)
     }
+
+    static func referenceLabel(from object: JSONValue?, itemId: String) -> String {
+        let dict = object?.dictValue
+        let candidates = [
+            "reference",
+            "reference_number",
+            "case_number",
+            "tracking_number",
+            "document_id"
+        ]
+        if let value = candidates
+            .compactMap({ dict?[$0]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) })
+            .first(where: { !$0.isEmpty }) {
+            return value
+        }
+        return "Ref \(itemId.uppercased())"
+    }
+
+    static func carrierLabel(from object: JSONValue?) -> String {
+        let dict = object?.dictValue
+        let candidates = ["carrier", "service", "delivery_service", "mail_service"]
+        return candidates
+            .compactMap { dict?[$0]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty })
+            ?? "Pantopus Mail"
+    }
+
+    static func senderTypeLabel(
+        category: MailItemCategory,
+        sender: MailDetailResponse.MailDetail.Sender?,
+        businessName: String?
+    ) -> String {
+        if sender != nil { return "Pantopus user" }
+        if businessName != nil { return category.detailTrust == .verified ? "Verified sender" : "Business" }
+        return category.detailTrust == .warning ? "Action notice" : "Mail sender"
+    }
 }
 
 private extension MailDetailContent {
@@ -431,12 +491,16 @@ private extension MailDetailContent {
             detailTrust: content.detailTrust,
             senderDisplayName: content.senderDisplayName,
             senderMeta: content.senderMeta,
+            senderTypeLabel: content.senderTypeLabel,
+            carrierLine: content.carrierLine,
             senderInitials: content.senderInitials,
             senderUserId: content.senderUserId,
             title: content.title,
             excerpt: content.excerpt,
+            referenceLabel: content.referenceLabel,
             createdAtLabel: content.createdAtLabel,
             expiresAtLabel: content.expiresAtLabel,
+            readStatusLabel: value ? "Read" : content.readStatusLabel,
             bodyParagraphs: content.bodyParagraphs,
             attachments: content.attachments,
             aiSummary: content.aiSummary,
@@ -476,12 +540,16 @@ private extension MailDetailContent {
             detailTrust: content.detailTrust,
             senderDisplayName: content.senderDisplayName,
             senderMeta: content.senderMeta,
+            senderTypeLabel: content.senderTypeLabel,
+            carrierLine: content.carrierLine,
             senderInitials: content.senderInitials,
             senderUserId: content.senderUserId,
             title: content.title,
             excerpt: content.excerpt,
+            referenceLabel: content.referenceLabel,
             createdAtLabel: content.createdAtLabel,
             expiresAtLabel: content.expiresAtLabel,
+            readStatusLabel: content.readStatusLabel,
             bodyParagraphs: content.bodyParagraphs,
             attachments: content.attachments,
             aiSummary: content.aiSummary,
