@@ -43,7 +43,7 @@ public final class AudienceProfileViewModel {
         do {
             let me: PersonaMeResponse = try await api.request(AudienceProfileEndpoints.me)
             guard let persona = me.persona, let handle = persona.handle else {
-                state = .empty(message: "Create a Public Profile to send updates and manage followers.")
+                state = .empty(message: "Set up payments, invite your first followers, and send a broadcast when you're ready.")
                 return
             }
             personaId = persona.id

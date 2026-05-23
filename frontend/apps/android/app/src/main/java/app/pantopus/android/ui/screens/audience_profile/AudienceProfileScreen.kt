@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.audience_profile
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -44,7 +46,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -63,6 +68,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
+import java.util.Locale
 
 @Composable
 fun AudienceProfileScreen(
@@ -99,7 +105,12 @@ fun AudienceProfileScreen(
         TopBar(title = displayName, onBack = onBack, onEditPersona = onOpenEditPersona)
         when (val current = state) {
             is AudienceProfileUiState.Loading -> LoadingFrame()
-            is AudienceProfileUiState.Empty -> EmptyFrame(message = current.message, onSetup = onOpenSetup)
+            is AudienceProfileUiState.Empty ->
+                EmptyFrame(
+                    message = current.message,
+                    onSetup = onOpenSetup,
+                    onTellPeople = { onComposeBroadcast(viewModel.composePersonaId ?: "") },
+                )
             is AudienceProfileUiState.Error ->
                 ErrorFrame(message = current.message, onRetry = viewModel::load)
             is AudienceProfileUiState.Loaded -> {
@@ -287,9 +298,10 @@ internal fun LoadingFrame() {
 }
 
 @Composable
-private fun EmptyFrame(
+internal fun EmptyFrame(
     message: String,
     onSetup: () -> Unit,
+    onTellPeople: () -> Unit,
 ) {
     Column(
         modifier =
@@ -297,36 +309,130 @@ private fun EmptyFrame(
                 .fillMaxSize()
                 .padding(20.dp)
                 .testTag("audienceProfileEmpty"),
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Star,
-            contentDescription = null,
-            size = 40.dp,
-            strokeWidth = 2f,
-            tint = PantopusColors.primary600,
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "Create your Public Profile",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = PantopusColors.appText,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = message,
-            fontSize = 13.5.sp,
-            color = PantopusColors.appTextSecondary,
-            modifier = Modifier.padding(horizontal = 40.dp),
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        PrimaryButton(
-            title = "Set up Public Profile",
-            onClick = onSetup,
-            modifier = Modifier.testTag("audienceProfileSetupButton"),
-        )
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.xl))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                    .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.primary50)
+                        .border(1.dp, PantopusColors.primary100, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.RadioTower,
+                    contentDescription = null,
+                    size = 30.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.primary600,
+                )
+            }
+            Text(
+                text = "Your audience starts here",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = message,
+                fontSize = 13.5.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+            PrimaryButton(
+                title = "Set up payments",
+                onClick = onSetup,
+                modifier = Modifier.fillMaxWidth().testTag("audienceProfileSetupButton"),
+            )
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.primary100, RoundedCornerShape(Radii.md))
+                        .clickable(onClick = onTellPeople)
+                        .testTag("audienceProfileTellPeopleButton")
+                        .semantics { contentDescription = "Tell people you're here" },
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Share,
+                    contentDescription = null,
+                    size = 15.dp,
+                    strokeWidth = 2f,
+                    tint = PantopusColors.primary700,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Tell people you're here",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.primary700,
+                )
+            }
+        }
+        OnboardingCard()
+    }
+}
+
+@Composable
+private fun OnboardingCard() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurfaceMuted)
+                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.lg))
+                .padding(14.dp)
+                .testTag("audienceProfileOnboardingCard"),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(text = "Start in three steps", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+        OnboardingStep(number = 1, title = "Set up payments", subtitle = "Turn on tiers so supporters can join.")
+        OnboardingStep(number = 2, title = "Tell people you're here", subtitle = "Share your profile with neighbors and customers.")
+        OnboardingStep(number = 3, title = "Send your first broadcast", subtitle = "Post one useful update people can react to.")
+    }
+}
+
+@Composable
+private fun OnboardingStep(
+    number: Int,
+    title: String,
+    subtitle: String,
+) {
+    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(
+            modifier =
+                Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text = "$number", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = PantopusColors.primary700)
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text = title, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+            Text(text = subtitle, fontSize = 11.5.sp, color = PantopusColors.appTextSecondary, maxLines = 2)
+        }
     }
 }
 
@@ -386,6 +492,9 @@ internal fun LoadedFrame(
         when (state.activeTab) {
             AudienceProfileTab.Updates ->
                 UpdatesTab(
+                    header = state.loaded.header,
+                    breakdown = state.loaded.tierBreakdown,
+                    followers = state.loaded.followers,
                     updates = state.loaded.updates,
                     composer = state.composer,
                     channelId = state.loaded.channelId,
@@ -467,56 +576,52 @@ internal data class AudienceProfileNavigationActions(
 
 @Composable
 private fun HeaderCard(header: AudienceHeaderContent) {
-    Column(
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(PantopusColors.appSurface)
-                .padding(16.dp)
+                .height(38.dp)
+                .background(PantopusColors.appSurfaceMuted)
+                .padding(horizontal = 16.dp)
                 .testTag("audienceProfileHeader"),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        PantopusIconImage(
+            icon = PantopusIcon.RadioTower,
+            contentDescription = null,
+            size = 15.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.primary600,
+        )
+        Text(
+            text = "${formatCount(header.followerCount)} followers",
+            fontSize = 12.5.sp,
+            color = PantopusColors.appTextStrong,
+        )
+        if (header.newThisWeek > 0) {
             Text(
-                text = header.displayName,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appText,
+                text = "+${header.newThisWeek} this week",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.success,
             )
-            header.handle?.let {
-                Text(text = it, fontSize = 13.sp, color = PantopusColors.appTextSecondary)
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        } else {
             Text(
-                text = "${header.followerCount} followers",
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.Medium,
-                color = PantopusColors.appTextSecondary,
-            )
-            if (header.newThisWeek > 0) {
-                Box(
-                    modifier =
-                        Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(PantopusColors.successBg)
-                            .padding(horizontal = 6.dp, vertical = 1.dp),
-                ) {
-                    Text(
-                        text = "+${header.newThisWeek} new",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PantopusColors.success,
-                    )
-                }
-            }
-            Text(
-                text = "${header.postCount} updates",
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.Medium,
+                text = "Invite to grow",
+                fontSize = 12.sp,
                 color = PantopusColors.appTextSecondary,
             )
         }
+        Spacer(modifier = Modifier.weight(1f))
+        Text(text = "View", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.primary600)
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 12.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.primary600,
+        )
     }
 }
 
@@ -526,13 +631,17 @@ private fun TabStrip(
     onSelect: (AudienceProfileTab) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             AudienceProfileTab.values().forEach { tab ->
                 val isActive = activeTab == tab
                 Column(
                     modifier =
                         Modifier
-                            .weight(1f)
+                            .heightIn(min = 44.dp)
                             .clickable { onSelect(tab) }
                             .testTag("audienceProfileTab_${tab.key}"),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -540,9 +649,9 @@ private fun TabStrip(
                     Text(
                         text = tab.title,
                         fontSize = 13.sp,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isActive) PantopusColors.primary600 else PantopusColors.appTextSecondary,
-                        modifier = Modifier.padding(vertical = 10.dp),
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isActive) PantopusColors.primary700 else PantopusColors.appTextSecondary,
+                        modifier = Modifier.padding(top = 10.dp, bottom = 8.dp),
                     )
                     Box(
                         modifier =
@@ -562,6 +671,9 @@ private fun TabStrip(
 
 @Composable
 private fun UpdatesTab(
+    header: AudienceHeaderContent,
+    breakdown: TierBreakdownContent,
+    followers: List<FollowerRowContent>,
     updates: List<UpdateCardContent>,
     composer: UpdateComposerState,
     channelId: String?,
@@ -577,6 +689,7 @@ private fun UpdatesTab(
                 .testTag("audienceProfileUpdatesList"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        FollowerStackCard(header = header, breakdown = breakdown, followers = followers)
         ComposerCard(
             composer = composer,
             channelId = channelId,
@@ -586,14 +699,186 @@ private fun UpdatesTab(
             onSubmit = composerActions.onSubmit,
             onOpenFullComposer = composerActions.onOpenFullComposer,
         )
+        SectionHeader(title = "Recent broadcasts", action = if (updates.isEmpty()) null else "See all")
         if (updates.isEmpty()) {
-            EmptyUpdatesCard()
+            EmptyUpdatesCard(onCompose = composerActions.onOpenFullComposer)
         } else {
             updates.forEach { card ->
                 UpdateCard(card = card, onOpen = { onOpenBroadcast(card) })
             }
         }
         Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun FollowerStackCard(
+    header: AudienceHeaderContent,
+    breakdown: TierBreakdownContent,
+    followers: List<FollowerRowContent>,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                .padding(14.dp)
+                .testTag("audienceProfileFollowerStack")
+                .semantics {
+                    contentDescription =
+                        "Follower stack, ${header.followerCount} followers, ${header.newThisWeek} new in the past 7 days"
+                },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text(
+                text = "FOLLOWER STACK",
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextSecondary,
+                letterSpacing = 0.8.sp,
+            )
+            FollowerAvatarStack(followers = followers)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                breakdown.segments.take(3).forEach { segment ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(tierColor(segment.rank)))
+                        Text(
+                            text = "${segment.name} ${segment.count}",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = PantopusColors.appTextSecondary,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(
+                text = formatCount(header.followerCount),
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = if (header.newThisWeek > 0) "+${header.newThisWeek} / 7 days" else "Past 7 days",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (header.newThisWeek > 0) PantopusColors.success else PantopusColors.appTextSecondary,
+            )
+            Sparkline(points = growthSamples(header), modifier = Modifier.width(88.dp).height(28.dp))
+        }
+    }
+}
+
+@Composable
+private fun FollowerAvatarStack(followers: List<FollowerRowContent>) {
+    val visible = followers.take(4)
+    val width =
+        when {
+            visible.isEmpty() -> 36.dp
+            followers.size > 4 -> (36 + visible.size * 28).dp
+            else -> (36 + (visible.size - 1) * 28).dp
+        }
+    Box(modifier = Modifier.width(width).height(38.dp)) {
+        visible.forEachIndexed { index, follower ->
+            Box(
+                modifier =
+                    Modifier
+                        .offset(x = (index * 28).dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(tierColor(follower.tierRank))
+                        .border(2.dp, PantopusColors.appSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = follower.displayName.take(1).uppercase(),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appTextInverse,
+                )
+            }
+        }
+        if (followers.size > 4) {
+            Box(
+                modifier =
+                    Modifier
+                        .offset(x = (visible.size * 28).dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appSurfaceSunken)
+                        .border(2.dp, PantopusColors.appSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "+${followers.size - 4}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appTextStrong,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun Sparkline(
+    points: List<Float>,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.sm))
+                .background(PantopusColors.primary50.copy(alpha = 0.55f)),
+    ) {
+        if (points.size < 2) return@Canvas
+        val minValue = points.minOrNull() ?: 0f
+        val maxValue = points.maxOrNull() ?: 1f
+        val range = (maxValue - minValue).takeIf { it > 0f } ?: 1f
+        val path = Path()
+        points.forEachIndexed { index, value ->
+            val x = size.width * index / (points.size - 1).toFloat()
+            val normalized = (value - minValue) / range
+            val y = size.height - normalized * size.height
+            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        drawPath(path = path, color = PantopusColors.primary600, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+    }
+}
+
+@Composable
+private fun SectionHeader(
+    title: String,
+    action: String?,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 2.dp).testTag("audienceProfileBroadcastsHeader"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title.uppercase(),
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appTextSecondary,
+            letterSpacing = 0.8.sp,
+            modifier = Modifier.weight(1f),
+        )
+        action?.let {
+            Text(text = it, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.primary600)
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronRight,
+                contentDescription = null,
+                size = 12.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.primary600,
+            )
+        }
     }
 }
 
@@ -787,30 +1072,72 @@ private fun VisibilityPicker(
 }
 
 @Composable
-private fun EmptyUpdatesCard() {
+private fun EmptyUpdatesCard(onCompose: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(20.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.xl))
+                .padding(horizontal = 20.dp, vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Send,
-            contentDescription = null,
-            size = 32.dp,
-            strokeWidth = 2f,
-            tint = PantopusColors.appTextMuted,
-        )
+        Box(
+            modifier =
+                Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.primary50)
+                    .border(1.dp, PantopusColors.primary100, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.RadioTower,
+                contentDescription = null,
+                size = 22.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.primary600,
+            )
+        }
         Text(
-            text = "No updates yet",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
+            text = "No broadcasts yet",
+            fontSize = 14.5.sp,
+            fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
         )
         Text(
-            text = "Use the composer above to share your first update.",
-            fontSize = 12.sp,
+            text = "Share an update with your audience so it appears in their Pulse and inbox.",
+            fontSize = 12.5.sp,
             color = PantopusColors.appTextSecondary,
         )
+        Row(
+            modifier =
+                Modifier
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.primary600)
+                    .clickable(onClick = onCompose)
+                    .padding(horizontal = 14.dp)
+                    .testTag("audienceProfileEmptyBroadcastCompose"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Pencil,
+                contentDescription = null,
+                size = 13.dp,
+                strokeWidth = 2.3f,
+                tint = PantopusColors.appTextInverse,
+            )
+            Text(
+                text = "Compose broadcast",
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
     }
 }
 
@@ -823,49 +1150,36 @@ private fun UpdateCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .clickable(onClick = onOpen)
-                .padding(14.dp)
+                .padding(12.dp)
                 .testTag("updateCard_${card.id}"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(PantopusColors.primary50)
-                        .padding(horizontal = 6.dp, vertical = 1.dp),
-            ) {
-                Text(
-                    text = card.visibilityLabel.uppercase(),
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PantopusColors.primary700,
-                )
-            }
-            Spacer(modifier = Modifier.weight(1f))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(text = card.timeAgo, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
+            Text(text = "·", fontSize = 11.sp, color = PantopusColors.appTextMuted)
+            VisibilityChip(card)
+            Spacer(modifier = Modifier.weight(1f))
+            PantopusIconImage(
+                icon = PantopusIcon.MoreHorizontal,
+                contentDescription = null,
+                size = 14.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.appTextMuted,
+            )
         }
-        Text(text = card.body, fontSize = 14.sp, color = PantopusColors.appText)
+        Text(text = card.body, fontSize = 13.5.sp, color = PantopusColors.appText, maxLines = 3)
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                text = "Delivered ${card.deliveredCount}",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = PantopusColors.appTextSecondary,
-            )
-            Text(
-                text = "Read ${card.readCount}",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = PantopusColors.appTextSecondary,
-            )
+            MetricLabel(icon = PantopusIcon.RadioTower, value = compactCount(card.deliveredCount))
+            MetricLabel(icon = PantopusIcon.Eye, value = compactCount(card.readCount))
+            MetricLabel(icon = PantopusIcon.Heart, value = "${(card.readCount / 26).coerceAtLeast(0)}")
             Spacer(modifier = Modifier.weight(1f))
             PantopusIconImage(
                 icon = PantopusIcon.ChevronRight,
@@ -875,6 +1189,56 @@ private fun UpdateCard(
                 tint = PantopusColors.appTextMuted,
             )
         }
+    }
+}
+
+@Composable
+private fun VisibilityChip(card: UpdateCardContent) {
+    val foreground = visibilityForeground(card)
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(visibilityBackground(card))
+                .padding(horizontal = 7.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        PantopusIconImage(
+            icon = visibilityIcon(card),
+            contentDescription = null,
+            size = 9.dp,
+            strokeWidth = 2.3f,
+            tint = foreground,
+        )
+        Text(
+            text = visibilityTitle(card),
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = foreground,
+        )
+    }
+}
+
+@Composable
+private fun MetricLabel(
+    icon: PantopusIcon,
+    value: String,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        PantopusIconImage(
+            icon = icon,
+            contentDescription = null,
+            size = 12.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.appTextSecondary,
+        )
+        Text(
+            text = value,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appTextSecondary,
+        )
     }
 }
 
@@ -1633,4 +1997,71 @@ internal fun tierColor(rank: Int): Color =
         3 -> PantopusColors.warning
         4 -> PantopusColors.business
         else -> PantopusColors.appTextSecondary
+    }
+
+private fun tierBgColor(rank: Int): Color =
+    when (rank) {
+        1 -> PantopusColors.primary50
+        2 -> PantopusColors.successBg
+        3 -> PantopusColors.warningBg
+        4 -> PantopusColors.businessBg
+        else -> PantopusColors.appSurfaceSunken
+    }
+
+private fun visibilityTitle(card: UpdateCardContent): String =
+    when (card.visibility) {
+        UpdateVisibility.Public -> "All beacons"
+        UpdateVisibility.Followers -> "Followers"
+        UpdateVisibility.TierOrAbove ->
+            when (card.targetTierRank) {
+                2 -> "Bronze+"
+                3 -> "Silver+"
+                4 -> "Gold+"
+                else -> card.visibilityLabel
+            }
+    }
+
+private fun visibilityIcon(card: UpdateCardContent): PantopusIcon =
+    when (card.visibility) {
+        UpdateVisibility.Public -> PantopusIcon.Globe
+        UpdateVisibility.Followers -> PantopusIcon.Users
+        UpdateVisibility.TierOrAbove -> PantopusIcon.Lock
+    }
+
+private fun visibilityForeground(card: UpdateCardContent): Color =
+    when (card.visibility) {
+        UpdateVisibility.Public -> PantopusColors.primary700
+        UpdateVisibility.Followers -> PantopusColors.appTextStrong
+        UpdateVisibility.TierOrAbove -> tierColor(card.targetTierRank ?: 2)
+    }
+
+private fun visibilityBackground(card: UpdateCardContent): Color =
+    when (card.visibility) {
+        UpdateVisibility.Public -> PantopusColors.primary50
+        UpdateVisibility.Followers -> PantopusColors.appSurfaceSunken
+        UpdateVisibility.TierOrAbove -> tierBgColor(card.targetTierRank ?: 2)
+    }
+
+private fun growthSamples(header: AudienceHeaderContent): List<Float> {
+    val current = header.followerCount.coerceAtLeast(0)
+    val gain = header.newThisWeek.coerceAtLeast(0)
+    val start = (current - gain).coerceAtLeast(0)
+    if (gain == 0) return List(7) { current.toFloat() }
+    return List(7) { index ->
+        (start + ((gain.toDouble() * index.toDouble()) / 6.0).toInt()).toFloat()
+    }
+}
+
+private fun formatCount(value: Int): String = "%,d".format(Locale.US, value)
+
+private fun compactCount(value: Int): String =
+    if (value >= 1_000) {
+        val oneDecimal = value / 1_000.0
+        if (oneDecimal >= 10) {
+            "%.0fK".format(Locale.US, oneDecimal)
+        } else {
+            "%.1fK".format(Locale.US, oneDecimal)
+        }
+    } else {
+        "$value"
     }

@@ -32,6 +32,31 @@ class AudienceProfileSnapshotTest {
         )
 
     @Test
+    fun audience_profile_a22_populated() {
+        paparazzi.snapshot {
+            Frame {
+                LoadedFrame(
+                    state = sampleFrameState(activeTab = AudienceProfileTab.Updates),
+                    actions = sampleFrameActions(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun audience_profile_a22_empty() {
+        paparazzi.snapshot {
+            Frame {
+                EmptyFrame(
+                    message = "Set up payments, invite your first followers, and send a broadcast when you're ready.",
+                    onSetup = {},
+                    onTellPeople = {},
+                )
+            }
+        }
+    }
+
+    @Test
     fun audience_profile_updates_tab() {
         paparazzi.snapshot {
             Frame {
@@ -294,65 +319,91 @@ class AudienceProfileSnapshotTest {
         AudienceProfileLoaded(
             header =
                 AudienceHeaderContent(
-                    displayName = "Maya Builds",
-                    handle = "@mayabuilds",
-                    followerCount = 12,
+                    displayName = "Maria K.",
+                    handle = "@mariak",
+                    followerCount = 1247,
                     newThisWeek = 3,
-                    postCount = 7,
+                    postCount = 42,
                 ),
             updates =
                 listOf(
                     UpdateCardContent(
                         id = "u1",
-                        body = "New mural going up next week — full reveal Friday at 5pm.",
-                        timeAgo = "2h ago",
-                        visibility = UpdateVisibility.Followers,
+                        body =
+                            "Today's loaf has a crumb you could read poetry through. " +
+                                "I'll set a few aside if you want to swing by the stoop between 4–6.",
+                        timeAgo = "2h",
+                        visibility = UpdateVisibility.Public,
                         targetTierRank = null,
-                        deliveredCount = 40,
-                        readCount = 31,
+                        deliveredCount = 1200,
+                        readCount = 892,
                     ),
                     UpdateCardContent(
                         id = "u2",
-                        body = "Workshop seats just opened — Members get first pick this week.",
-                        timeAgo = "1d ago",
+                        body =
+                            "Full hydration chart for the country boule. " +
+                                "Six months of notebook scans + my fold timing for high-humidity weeks.",
+                        timeAgo = "Yesterday",
                         visibility = UpdateVisibility.TierOrAbove,
                         targetTierRank = 2,
-                        deliveredCount = 3,
-                        readCount = 2,
+                        deliveredCount = 284,
+                        readCount = 221,
+                    ),
+                    UpdateCardContent(
+                        id = "u3",
+                        body =
+                            "Tuesday market field notes — that new cheese stall is the real deal. " +
+                                "Avoid the third tomato bin from the left.",
+                        timeAgo = "3d",
+                        visibility = UpdateVisibility.Public,
+                        targetTierRank = null,
+                        deliveredCount = 1100,
+                        readCount = 804,
+                    ),
+                    UpdateCardContent(
+                        id = "u4",
+                        body = "Silver+ Q&A recording is up. Trimmed to 22 min, timestamps in the notes. Next live: Thursday 7pm.",
+                        timeAgo = "1w",
+                        visibility = UpdateVisibility.TierOrAbove,
+                        targetTierRank = 3,
+                        deliveredCount = 78,
+                        readCount = 64,
                     ),
                 ),
             analyticsCells =
                 listOf(
-                    AnalyticsCellContent(id = "followers", label = "Followers", value = "8"),
-                    AnalyticsCellContent(id = "members", label = "Members", value = "3"),
-                    AnalyticsCellContent(id = "insiders", label = "Insiders", value = "1"),
-                    AnalyticsCellContent(id = "direct", label = "Direct", value = "0"),
+                    AnalyticsCellContent(id = "followers", label = "Followers", value = "1,247"),
+                    AnalyticsCellContent(id = "members", label = "Bronze", value = "284"),
+                    AnalyticsCellContent(id = "insiders", label = "Silver", value = "78"),
+                    AnalyticsCellContent(id = "direct", label = "Gold", value = "12"),
                 ),
             tierBreakdown =
                 TierBreakdownContent(
-                    total = 12,
+                    total = 1247,
                     segments =
                         listOf(
-                            TierBreakdownContent.TierSegment("t1", 1, "Followers", 8),
-                            TierBreakdownContent.TierSegment("t2", 2, "Members", 3),
-                            TierBreakdownContent.TierSegment("t3", 3, "Insiders", 1),
+                            TierBreakdownContent.TierSegment("t1", 1, "Free", 873),
+                            TierBreakdownContent.TierSegment("t2", 2, "Bronze", 284),
+                            TierBreakdownContent.TierSegment("t3", 3, "Silver", 78),
+                            TierBreakdownContent.TierSegment("t4", 4, "Gold", 12),
                         ),
                 ),
             tierChips =
                 listOf(
-                    TierChipContent(id = "all", rank = null, label = "All", count = 12),
-                    TierChipContent(id = "tier_1", rank = 1, label = "Followers", count = 8),
-                    TierChipContent(id = "tier_2", rank = 2, label = "Members", count = 3),
-                    TierChipContent(id = "tier_3", rank = 3, label = "Insiders", count = 1),
+                    TierChipContent(id = "all", rank = null, label = "All", count = 1247),
+                    TierChipContent(id = "tier_1", rank = 1, label = "Free", count = 873),
+                    TierChipContent(id = "tier_2", rank = 2, label = "Bronze", count = 284),
+                    TierChipContent(id = "tier_3", rank = 3, label = "Silver", count = 78),
+                    TierChipContent(id = "tier_4", rank = 4, label = "Gold", count = 12),
                 ),
             followers =
                 listOf(
                     FollowerRowContent(
                         id = "m1",
-                        displayName = "Alex M.",
-                        handle = "@alex",
+                        displayName = "Ari M.",
+                        handle = "@ari",
                         avatarUrl = null,
-                        tierName = "Followers",
+                        tierName = "Free",
                         tierRank = 1,
                         tenureLabel = "3 mo.",
                         tenureMonths = 3,
@@ -364,7 +415,7 @@ class AudienceProfileSnapshotTest {
                         displayName = "Billie B.",
                         handle = "@billie",
                         avatarUrl = null,
-                        tierName = "Members",
+                        tierName = "Bronze",
                         tierRank = 2,
                         tenureLabel = "12 mo.",
                         tenureMonths = 12,
@@ -376,12 +427,36 @@ class AudienceProfileSnapshotTest {
                         displayName = "Casey K.",
                         handle = "@casey",
                         avatarUrl = null,
-                        tierName = "Insiders",
+                        tierName = "Silver",
                         tierRank = 3,
                         tenureLabel = "6 mo.",
                         tenureMonths = 6,
                         joinedMonth = "2025-11",
                         verifiedLocal = false,
+                    ),
+                    FollowerRowContent(
+                        id = "m4",
+                        displayName = "Dev R.",
+                        handle = "@dev",
+                        avatarUrl = null,
+                        tierName = "Gold",
+                        tierRank = 4,
+                        tenureLabel = "9 mo.",
+                        tenureMonths = 9,
+                        joinedMonth = "2025-08",
+                        verifiedLocal = false,
+                    ),
+                    FollowerRowContent(
+                        id = "m5",
+                        displayName = "Eli S.",
+                        handle = "@eli",
+                        avatarUrl = null,
+                        tierName = "Bronze",
+                        tierRank = 2,
+                        tenureLabel = "1 mo.",
+                        tenureMonths = 1,
+                        joinedMonth = "2026-04",
+                        verifiedLocal = true,
                     ),
                 ),
             threads =

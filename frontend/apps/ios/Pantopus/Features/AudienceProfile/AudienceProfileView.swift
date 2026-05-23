@@ -130,34 +130,129 @@ public struct AudienceProfileView: View {
     }
 
     private func emptyFrame(message: String) -> some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Icon(.star, size: 40, color: Theme.Color.primary600)
-            Text("Create your Public Profile")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-            Text(message)
-                .font(.system(size: 13.5))
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-            Button {
-                onOpenSetup()
-            } label: {
-                Text("Set up Public Profile")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Theme.Color.appTextInverse)
-                    .padding(.horizontal, 22)
-                    .frame(height: 44)
-                    .background(Theme.Color.primary600)
-                    .clipShape(Capsule())
+        ScrollView {
+            VStack(spacing: 16) {
+                VStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(Theme.Color.primary50)
+                            .frame(width: 72, height: 72)
+                        Circle()
+                            .stroke(Theme.Color.primary100, lineWidth: 1)
+                            .frame(width: 72, height: 72)
+                        Icon(.radioTower, size: 30, color: Theme.Color.primary600)
+                    }
+                    VStack(spacing: 6) {
+                        Text("Your audience starts here")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(Theme.Color.appText)
+                            .multilineTextAlignment(.center)
+                            .accessibilityAddTraits(.isHeader)
+                        Text(message)
+                            .font(.system(size: 13.5))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(2)
+                    }
+                    VStack(spacing: 10) {
+                        Button {
+                            onOpenSetup()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Icon(.dollarSign, size: 15, color: Theme.Color.appTextInverse)
+                                Text("Set up payments")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(Theme.Color.appTextInverse)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 46)
+                            .background(Theme.Color.primary600)
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Set up payments")
+                        .accessibilityIdentifier("audienceProfileSetupButton")
+
+                        Button {
+                            onComposeBroadcast(viewModel.personaId ?? "")
+                        } label: {
+                            HStack(spacing: 8) {
+                                Icon(.share, size: 15, color: Theme.Color.primary700)
+                                Text("Tell people you're here")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(Theme.Color.primary700)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 46)
+                            .background(Theme.Color.appSurface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                                    .stroke(Theme.Color.primary100, lineWidth: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Tell people you're here")
+                        .accessibilityIdentifier("audienceProfileTellPeopleButton")
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity)
+                .background(Theme.Color.appSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+
+                onboardingCard
+                Spacer(minLength: 24)
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("audienceProfileSetupButton")
-            Spacer()
+            .padding(16)
         }
-        .padding(20)
         .accessibilityIdentifier("audienceProfileEmpty")
+    }
+
+    private var onboardingCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Start in three steps")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+            onboardingStep(number: 1, title: "Set up payments", subtitle: "Turn on tiers so supporters can join.")
+            onboardingStep(number: 2, title: "Tell people you're here", subtitle: "Share your profile with neighbors and customers.")
+            onboardingStep(number: 3, title: "Send your first broadcast", subtitle: "Post one useful update people can react to.")
+        }
+        .padding(14)
+        .background(Theme.Color.appSurfaceMuted)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .accessibilityIdentifier("audienceProfileOnboardingCard")
+    }
+
+    private func onboardingStep(number: Int, title: String, subtitle: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text("\(number)")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Theme.Color.primary700)
+                .frame(width: 24, height: 24)
+                .background(Theme.Color.appSurface)
+                .overlay(Circle().stroke(Theme.Color.appBorder, lineWidth: 1))
+                .clipShape(Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text(subtitle)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private func errorFrame(message: String) -> some View {
@@ -192,7 +287,7 @@ public struct AudienceProfileView: View {
 
     private func loadedFrame(_ loaded: AudienceProfileLoaded) -> some View {
         VStack(spacing: 0) {
-            headerCard(loaded.header)
+            statusLine(loaded.header)
             tabStrip
             tabContent(loaded)
             memberFooter
@@ -241,48 +336,45 @@ public struct AudienceProfileView: View {
         .accessibilityIdentifier("audienceProfileMemberFooter")
     }
 
-    private func headerCard(_ header: AudienceHeaderContent) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(header.displayName)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Theme.Color.appText)
-                if let handle = header.handle {
-                    Text(handle)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-            }
-            HStack(spacing: 12) {
-                Text("\(header.followerCount) followers")
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                if header.newThisWeek > 0 {
-                    Text("+\(header.newThisWeek) new")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Theme.Color.success)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(Theme.Color.successBg)
-                        .clipShape(Capsule())
-                }
-                Text("\(header.postCount) updates")
-                    .font(.system(size: 12.5, weight: .medium))
+    private func statusLine(_ header: AudienceHeaderContent) -> some View {
+        HStack(spacing: 8) {
+            Icon(.radioTower, size: 15, color: Theme.Color.primary600)
+                .frame(width: 18, height: 18)
+            Text("\(Self.formattedCount(header.followerCount)) followers")
+                .font(.system(size: 12.5))
+                .foregroundStyle(Theme.Color.appTextStrong)
+            if header.newThisWeek > 0 {
+                Text("+\(header.newThisWeek) this week")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.success)
+            } else {
+                Text("Invite to grow")
+                    .font(.system(size: 12))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
+            Spacer(minLength: 0)
+            Text("View")
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.primary600)
+            Icon(.chevronRight, size: 12, color: Theme.Color.primary600)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Theme.Color.appSurface)
+        .padding(.horizontal, 16)
+        .frame(height: 38)
+        .background(Theme.Color.appSurfaceMuted)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+        }
         .accessibilityIdentifier("audienceProfileHeader")
     }
 
     private var tabStrip: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 22) {
             ForEach(AudienceProfileTab.allCases, id: \.self) { tab in
                 tabButton(tab)
             }
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 16)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
@@ -294,16 +386,17 @@ public struct AudienceProfileView: View {
         return Button {
             viewModel.selectTab(tab)
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 0) {
                 Text(tab.title)
-                    .font(.system(size: 13, weight: isActive ? .bold : .medium))
-                    .foregroundStyle(isActive ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
-                    .frame(height: 36)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(isActive ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
+                    .padding(.top, 10)
+                    .padding(.bottom, 8)
                 Rectangle()
-                    .fill(isActive ? Theme.Color.primary600 : Color.clear)
+                    .fill(isActive ? Theme.Color.primary600 : SwiftUI.Color.clear)
                     .frame(height: 2)
             }
-            .frame(maxWidth: .infinity)
+            .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("audienceProfileTab_\(tab.rawValue)")
@@ -324,7 +417,9 @@ public struct AudienceProfileView: View {
     private func updatesTab(_ loaded: AudienceProfileLoaded) -> some View {
         ScrollView {
             VStack(spacing: 12) {
+                followerStackCard(header: loaded.header, breakdown: loaded.tierBreakdown, followers: loaded.followers)
                 composerCard(channelId: loaded.channelId)
+                sectionHeader(title: "Recent broadcasts", action: loaded.updates.isEmpty ? nil : "See all")
                 if loaded.updates.isEmpty {
                     emptyUpdatesState
                 } else {
@@ -337,6 +432,110 @@ public struct AudienceProfileView: View {
             .padding(16)
         }
         .accessibilityIdentifier("audienceProfileUpdatesList")
+    }
+
+    private func followerStackCard(
+        header: AudienceHeaderContent,
+        breakdown: TierBreakdownContent,
+        followers: [FollowerRowContent]
+    ) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 9) {
+                Text("Follower stack")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .kerning(0.8)
+                    .textCase(.uppercase)
+                HStack(spacing: 0) {
+                    ForEach(Array(followers.prefix(4).enumerated()), id: \.element.id) { index, follower in
+                        tierAvatar(follower)
+                            .offset(x: CGFloat(index) * -8)
+                            .zIndex(Double(10 - index))
+                    }
+                    if followers.count > 4 {
+                        Text("+\(followers.count - 4)")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Theme.Color.appTextStrong)
+                            .frame(width: 36, height: 36)
+                            .background(Theme.Color.appSurfaceSunken)
+                            .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
+                            .clipShape(Circle())
+                            .offset(x: -32)
+                    }
+                }
+                .frame(height: 38)
+                .padding(.leading, followers.isEmpty ? 0 : CGFloat(max(followers.prefix(4).count - 1, 0)) * 8)
+                HStack(spacing: 10) {
+                    ForEach(breakdown.segments.prefix(3), id: \.id) { segment in
+                        HStack(spacing: 4) {
+                            Circle().fill(Self.tierColor(rank: segment.rank)).frame(width: 7, height: 7)
+                            Text("\(segment.name) \(segment.count)")
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundStyle(Theme.Color.appTextSecondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+            VStack(alignment: .trailing, spacing: 5) {
+                Text(Self.formattedCount(header.followerCount))
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text(header.newThisWeek > 0 ? "+\(header.newThisWeek) / 7 days" : "Past 7 days")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(header.newThisWeek > 0 ? Theme.Color.success : Theme.Color.appTextSecondary)
+                SparklineShape(points: Self.growthSamples(header))
+                    .stroke(Theme.Color.primary600, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    .frame(width: 88, height: 28)
+                    .background(Theme.Color.primary50.opacity(0.55))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(14)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "Follower stack, \(header.followerCount) followers, \(header.newThisWeek) new in the past 7 days"
+        )
+        .accessibilityIdentifier("audienceProfileFollowerStack")
+    }
+
+    private func tierAvatar(_ follower: FollowerRowContent) -> some View {
+        Text(follower.displayName.prefix(1).uppercased())
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(Theme.Color.appTextInverse)
+            .frame(width: 36, height: 36)
+            .background(Self.tierColor(rank: follower.tierRank))
+            .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
+            .clipShape(Circle())
+            .accessibilityHidden(true)
+    }
+
+    private func sectionHeader(title: String, action: String?) -> some View {
+        HStack {
+            Text(title.uppercased())
+                .font(.system(size: 10.5, weight: .bold))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .kerning(0.8)
+            Spacer(minLength: 0)
+            if let action {
+                HStack(spacing: 2) {
+                    Text(action)
+                    Icon(.chevronRight, size: 12, color: Theme.Color.primary600)
+                }
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.primary600)
+            }
+        }
+        .padding(.top, 2)
+        .accessibilityIdentifier("audienceProfileBroadcastsHeader")
     }
 
     private func composerCard(channelId: String?) -> some View {
@@ -479,18 +678,46 @@ public struct AudienceProfileView: View {
     }
 
     private var emptyUpdatesState: some View {
-        VStack(spacing: 8) {
-            Icon(.send, size: 32, color: Theme.Color.appTextMuted)
-            Text("No updates yet")
-                .font(.system(size: 14, weight: .semibold))
+        VStack(spacing: 12) {
+            ZStack {
+                Circle().fill(Theme.Color.primary50).frame(width: 52, height: 52)
+                Circle().stroke(Theme.Color.primary100, lineWidth: 1).frame(width: 52, height: 52)
+                Icon(.radioTower, size: 22, color: Theme.Color.primary600)
+            }
+            Text("No broadcasts yet")
+                .font(.system(size: 14.5, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
-            Text("Use the composer above to share your first update.")
-                .font(.system(size: 12))
+            Text("Share an update with your audience so it appears in their Pulse and inbox.")
+                .font(.system(size: 12.5))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
+                .lineSpacing(2)
+            Button {
+                onComposeBroadcast(viewModel.personaId ?? "")
+            } label: {
+                HStack(spacing: 6) {
+                    Icon(.pencil, size: 13, color: Theme.Color.appTextInverse)
+                    Text("Compose broadcast")
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 38)
+                .background(Theme.Color.primary600)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("audienceProfileEmptyBroadcastCompose")
         }
-        .padding(20)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 28)
         .frame(maxWidth: .infinity)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorderStrong, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
     }
 
     private func updateCard(
@@ -501,43 +728,43 @@ public struct AudienceProfileView: View {
             onOpenBroadcast(card, tierSegments)
         } label: {
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(card.visibilityLabel.uppercased())
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Theme.Color.primary700)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(Theme.Color.primary50)
-                        .clipShape(Capsule())
-                    Spacer()
+                HStack(spacing: 8) {
                     Text(card.timeAgo)
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
+                    Text("·")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                    visibilityChip(card)
+                    Spacer(minLength: 0)
+                    Icon(.moreHorizontal, size: 14, color: Theme.Color.appTextMuted)
                 }
                 Text(card.body)
-                    .font(.system(size: 14))
+                    .font(.system(size: 13.5))
                     .foregroundStyle(Theme.Color.appText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .multilineTextAlignment(.leading)
-                HStack(spacing: 14) {
-                    Text("Delivered \(card.deliveredCount)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                    Text("Read \(card.readCount)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                    Spacer()
+                    .lineLimit(3)
+                HStack(spacing: 10) {
+                    metricLabel(icon: .radioTower, value: Self.compactCount(card.deliveredCount))
+                    metricLabel(icon: .eye, value: Self.compactCount(card.readCount))
+                    metricLabel(icon: .heart, value: "\(max(0, card.readCount / 26))")
+                    Spacer(minLength: 0)
                     Icon(.chevronRight, size: 13, color: Theme.Color.appTextMuted)
                 }
+                .padding(.top, 8)
+                .overlay(alignment: .top) {
+                    Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+                }
             }
-            .padding(14)
+            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
@@ -545,6 +772,29 @@ public struct AudienceProfileView: View {
         .accessibilityHint("Opens broadcast detail")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("updateCard_\(card.id)")
+    }
+
+    private func visibilityChip(_ card: UpdateCardContent) -> some View {
+        let colors = Self.visibilityColors(card)
+        return HStack(spacing: 3) {
+            Icon(Self.visibilityIcon(card), size: 9, color: colors.foreground)
+            Text(Self.visibilityTitle(card))
+                .font(.system(size: 9.5, weight: .bold))
+                .foregroundStyle(colors.foreground)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(colors.background)
+        .clipShape(Capsule())
+    }
+
+    private func metricLabel(icon: PantopusIcon, value: String) -> some View {
+        HStack(spacing: 3) {
+            Icon(icon, size: 12, color: Theme.Color.appTextSecondary)
+            Text(value)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
     }
 
     // MARK: - Followers tab
@@ -1061,6 +1311,99 @@ public struct AudienceProfileView: View {
         case 4: Theme.Color.business
         default: Theme.Color.appTextSecondary
         }
+    }
+
+    private static func tierBgColor(rank: Int) -> Color {
+        switch rank {
+        case 1: Theme.Color.primary50
+        case 2: Theme.Color.successBg
+        case 3: Theme.Color.warningBg
+        case 4: Theme.Color.businessBg
+        default: Theme.Color.appSurfaceSunken
+        }
+    }
+
+    private static func visibilityTitle(_ card: UpdateCardContent) -> String {
+        switch card.visibility {
+        case .publicVisible:
+            "All beacons"
+        case .followers:
+            "Followers"
+        case .tierOrAbove:
+            switch card.targetTierRank {
+            case 2: "Bronze+"
+            case 3: "Silver+"
+            case 4: "Gold+"
+            default: card.visibilityLabel
+            }
+        }
+    }
+
+    private static func visibilityIcon(_ card: UpdateCardContent) -> PantopusIcon {
+        switch card.visibility {
+        case .publicVisible: .globe
+        case .followers: .users
+        case .tierOrAbove: .lock
+        }
+    }
+
+    private static func visibilityColors(_ card: UpdateCardContent) -> (foreground: Color, background: Color) {
+        switch card.visibility {
+        case .publicVisible:
+            return (Theme.Color.primary700, Theme.Color.primary50)
+        case .followers:
+            return (Theme.Color.appTextStrong, Theme.Color.appSurfaceSunken)
+        case .tierOrAbove:
+            let rank = card.targetTierRank ?? 2
+            return (tierColor(rank: rank), tierBgColor(rank: rank))
+        }
+    }
+
+    private static func growthSamples(_ header: AudienceHeaderContent) -> [CGFloat] {
+        let current = max(header.followerCount, 0)
+        let gain = max(header.newThisWeek, 0)
+        let start = max(current - gain, 0)
+        guard gain > 0 else {
+            return Array(repeating: CGFloat(current), count: 7)
+        }
+        return (0..<7).map { index in
+            CGFloat(start + Int((Double(gain) * Double(index)) / 6.0))
+        }
+    }
+
+    private static func formattedCount(_ value: Int) -> String {
+        NumberFormatter.localizedString(from: NSNumber(value: value), number: .decimal)
+    }
+
+    private static func compactCount(_ value: Int) -> String {
+        if value >= 1000 {
+            let oneDecimal = Double(value) / 1000.0
+            return String(format: oneDecimal >= 10 ? "%.0fK" : "%.1fK", oneDecimal)
+        }
+        return "\(value)"
+    }
+}
+
+private struct SparklineShape: Shape {
+    let points: [CGFloat]
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard points.count > 1 else { return path }
+        let minValue = points.min() ?? 0
+        let maxValue = points.max() ?? 1
+        let range = max(maxValue - minValue, 1)
+        for index in points.indices {
+            let x = rect.minX + (rect.width * CGFloat(index) / CGFloat(points.count - 1))
+            let normalized = (points[index] - minValue) / range
+            let y = rect.maxY - (normalized * rect.height)
+            if index == points.startIndex {
+                path.move(to: CGPoint(x: x, y: y))
+            } else {
+                path.addLine(to: CGPoint(x: x, y: y))
+            }
+        }
+        return path
     }
 }
 
