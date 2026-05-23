@@ -42,6 +42,7 @@ const val CLAIM_OWNERSHIP_HOME_ID_KEY: String = "homeId"
  */
 data class ClaimOwnershipUiState(
     val currentStep: ClaimOwnershipStep = ClaimOwnershipStep.Start,
+    val startContent: ClaimOwnershipStartContent = ClaimOwnershipSampleData.canonicalStart,
     val slots: Map<ClaimEvidenceSlot, ClaimSlotState> =
         ClaimEvidenceSlot.entries.associateWith { ClaimSlotState.Empty },
     val note: String = "",
@@ -84,7 +85,12 @@ open class ClaimOwnershipWizardViewModel
                 "ClaimOwnershipWizardViewModel requires a '$CLAIM_OWNERSHIP_HOME_ID_KEY' nav arg."
             }
 
-        private val _state = MutableStateFlow(ClaimOwnershipUiState())
+        private val _state =
+            MutableStateFlow(
+                ClaimOwnershipUiState(
+                    startContent = ClaimOwnershipSampleData.startContent(homeId),
+                ),
+            )
         val state: StateFlow<ClaimOwnershipUiState> = _state.asStateFlow()
 
         /** One-shot navigation events the screen reacts to. */

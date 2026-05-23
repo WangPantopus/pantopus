@@ -37,6 +37,7 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
     private(set) var currentStep: ClaimOwnershipStep = .start
     var slots: [ClaimEvidenceSlot: ClaimSlotUiState] = [:]
     var note: String = ""
+    private(set) var startContent: ClaimOwnershipStartContent
     private(set) var isSubmitting: Bool = false
     private(set) var submitError: String?
     var pendingEvent: ClaimOwnershipOutboundEvent?
@@ -61,11 +62,13 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
     init(
         homeId: String,
         api: APIClient = .shared,
-        uploader: MultipartUploader = .shared
+        uploader: MultipartUploader = .shared,
+        startContent: ClaimOwnershipStartContent? = nil
     ) {
         self.homeId = homeId
         self.api = api
         self.uploader = uploader
+        self.startContent = startContent ?? ClaimOwnershipSampleData.startContent(for: homeId)
         for slot in ClaimEvidenceSlot.allCases {
             slots[slot] = .empty
         }
