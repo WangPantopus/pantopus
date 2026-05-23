@@ -32,7 +32,77 @@ public enum StartSupportTrainStep: Int, CaseIterable, Sendable {
         }
     }
 
-    public static let progressTotal: Int = 3
+    public static let progressTotal: Int = 5
+}
+
+/// Step-1 reason picker values from A12.11. This is separate from
+/// `SupportTrainKind`: the reason explains the moment, while kind drives
+/// the volunteer slot type on the next step.
+public enum StartSupportTrainReason: String, CaseIterable, Sendable, Identifiable {
+    case surgery
+    case newBaby = "new_baby"
+    case move
+    case illness
+    case grief
+    case other
+
+    public var id: String {
+        rawValue
+    }
+
+    public var title: String {
+        switch self {
+        case .surgery: "Surgery"
+        case .newBaby: "New baby"
+        case .move: "Move"
+        case .illness: "Illness"
+        case .grief: "Grief"
+        case .other: "Other"
+        }
+    }
+
+    public var icon: PantopusIcon {
+        switch self {
+        case .surgery: .stethoscope
+        case .newBaby: .baby
+        case .move: .car
+        case .illness: .heartPulse
+        case .grief: .flower
+        case .other: .moreHorizontal
+        }
+    }
+}
+
+/// Invite path option for a recipient who is not a verified Pantopus
+/// neighbor yet.
+public enum StartSupportTrainInviteMethod: String, CaseIterable, Sendable, Identifiable {
+    case phone
+    case email
+
+    public var id: String {
+        rawValue
+    }
+
+    public var title: String {
+        switch self {
+        case .phone: "Invite by phone"
+        case .email: "Invite by email"
+        }
+    }
+
+    public var value: String {
+        switch self {
+        case .phone: "+1 (415) 555-0142"
+        case .email: "d.chen@example.com"
+        }
+    }
+
+    public var icon: PantopusIcon {
+        switch self {
+        case .phone: .phone
+        case .email: .mail
+        }
+    }
 }
 
 /// One of the six designed train kinds plus a generic "other" escape

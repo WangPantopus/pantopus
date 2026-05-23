@@ -36,8 +36,31 @@ enum class StartSupportTrainStep {
             }
 
     companion object {
-        const val PROGRESS_TOTAL: Int = 3
+        const val PROGRESS_TOTAL: Int = 5
     }
+}
+
+/** Step-1 occasion picker values from A12.11. */
+enum class StartSupportTrainReason(
+    val title: String,
+    val icon: PantopusIcon,
+) {
+    Surgery("Surgery", PantopusIcon.Stethoscope),
+    NewBaby("New baby", PantopusIcon.Baby),
+    Move("Move", PantopusIcon.Car),
+    Illness("Illness", PantopusIcon.HeartPulse),
+    Grief("Grief", PantopusIcon.Flower),
+    Other("Other", PantopusIcon.MoreHorizontal),
+}
+
+/** Invite path option when the recipient is not on Pantopus yet. */
+enum class StartSupportTrainInviteMethod(
+    val title: String,
+    val value: String,
+    val icon: PantopusIcon,
+) {
+    Phone("Invite by phone", "+1 (415) 555-0142", PantopusIcon.Phone),
+    Email("Invite by email", "d.chen@example.com", PantopusIcon.Mail),
 }
 
 /** Six designed train kinds + a generic escape hatch. Mirrors iOS. */
@@ -111,7 +134,11 @@ data class StartSupportTrainSlot(
 data class StartSupportTrainFormState(
     val step: StartSupportTrainStep = StartSupportTrainStep.WhoAndWhy,
     val beneficiaryQuery: String = "",
+    val selectedReason: StartSupportTrainReason = StartSupportTrainReason.Surgery,
     val reason: String = "",
+    val inviteOnly: Boolean = true,
+    val blockVisible: Boolean = false,
+    val inviteMethod: StartSupportTrainInviteMethod = StartSupportTrainInviteMethod.Phone,
     val kind: SupportTrainKind = SupportTrainKind.Meals,
     val startDateMillis: Long = defaultStartMillis(),
     val endDateMillis: Long = defaultEndMillis(),

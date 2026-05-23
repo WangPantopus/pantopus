@@ -65,6 +65,17 @@ final class StartSupportTrainWizardViewModelTests: XCTestCase {
         XCTAssertTrue(vm.canAdvanceFromWhoAndWhy)
     }
 
+    func testInviteRecipientBranchUpdatesCtaAndSearchAgain() {
+        let vm = makeVM()
+        vm.updateBeneficiaryQuery(StartSupportTrainSampleData.inviteQuery)
+        vm.selectReason(.newBaby)
+        XCTAssertTrue(vm.isInviteRecipientBranch)
+        XCTAssertEqual(vm.chrome.primaryCTALabel, "Send invite & continue")
+        XCTAssertEqual(vm.chrome.secondaryCTA?.label, "Search again")
+        vm.secondaryTapped()
+        XCTAssertEqual(vm.beneficiaryQuery, "")
+    }
+
     func testReasonClampsAtCharLimit() {
         let vm = makeVM()
         let overflow = String(repeating: "a", count: 600)

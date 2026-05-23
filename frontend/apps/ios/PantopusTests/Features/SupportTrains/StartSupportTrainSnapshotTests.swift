@@ -11,8 +11,11 @@
 //  follow-up commits the baselines and removes the skip.
 //
 
+import SwiftUI
 import XCTest
+@testable import Pantopus
 
+@MainActor
 final class StartSupportTrainSnapshotTests: XCTestCase {
     private var baselineURL: URL {
         let here = URL(fileURLWithPath: #filePath)
@@ -26,6 +29,27 @@ final class StartSupportTrainSnapshotTests: XCTestCase {
 
     func test_start_support_train_who_and_why_ios_baseline_is_present() throws {
         try assertBaselineOrSkip("start-train-who-and-why")
+    }
+
+    func test_a12_11_verified_neighbor_recipient_frame_renders() {
+        let vm = StartSupportTrainWizardViewModel()
+        vm.selectBeneficiary(StartSupportTrainSampleData.verifiedNeighbor)
+        vm.selectReason(.surgery)
+        vm.updateReason(StartSupportTrainSampleData.verifiedContextNote)
+
+        assertRenders(StartSupportTrainWizardView(viewModel: vm))
+        XCTAssertEqual(vm.chrome.primaryCTALabel, "Continue")
+        XCTAssertEqual(vm.chrome.progressLabel, .stepOf(current: 1, total: 5))
+    }
+
+    func test_a12_11_invite_recipient_frame_renders() {
+        let vm = StartSupportTrainWizardViewModel()
+        vm.updateBeneficiaryQuery(StartSupportTrainSampleData.inviteQuery)
+        vm.selectReason(.newBaby)
+
+        assertRenders(StartSupportTrainWizardView(viewModel: vm))
+        XCTAssertEqual(vm.chrome.primaryCTALabel, "Send invite & continue")
+        XCTAssertEqual(vm.chrome.secondaryCTA?.label, "Search again")
     }
 
     func test_start_support_train_what_and_when_ios_baseline_is_present() throws {
@@ -55,5 +79,17 @@ final class StartSupportTrainSnapshotTests: XCTestCase {
                 data[3] == 0x47,
             "Not a PNG: \(url.path)"
         )
+    }
+
+    private func assertRenders(
+        _ view: some View,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let host = UIHostingController(rootView: view.frame(width: 390, height: 844))
+        host.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        host.view.layoutIfNeeded()
+        XCTAssertGreaterThan(host.view.frame.size.width, 0, file: file, line: line)
+        XCTAssertGreaterThan(host.view.frame.size.height, 0, file: file, line: line)
     }
 }

@@ -12,6 +12,8 @@
 import Foundation
 import Observation
 
+// swiftlint:disable type_body_length
+
 @Observable
 @MainActor
 public final class StartSupportTrainWizardViewModel: WizardModel {
@@ -25,7 +27,11 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
     public private(set) var beneficiaryResults: [MailRecipientDTO] = []
     public private(set) var isSearchingBeneficiary: Bool = false
     public private(set) var selectedBeneficiary: MailRecipientDTO?
+    public var selectedReason: StartSupportTrainReason = .surgery
     public var reason: String = ""
+    public var inviteOnly: Bool = true
+    public var blockVisible: Bool = false
+    public var inviteMethod: StartSupportTrainInviteMethod = .phone
 
     // Step 2 — What & when
     public var kind: SupportTrainKind = .meals
@@ -115,12 +121,36 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
         selectedBeneficiary = nil
     }
 
+    public func searchAgain() {
+        searchTask?.cancel()
+        selectedBeneficiary = nil
+        beneficiaryQuery = ""
+        beneficiaryResults = []
+        isSearchingBeneficiary = false
+    }
+
+    public func selectReason(_ value: StartSupportTrainReason) {
+        selectedReason = value
+    }
+
     public func updateReason(_ value: String) {
         if value.count > Self.reasonCharLimit {
             reason = String(value.prefix(Self.reasonCharLimit))
         } else {
             reason = value
         }
+    }
+
+    public func toggleInviteOnly(_ value: Bool) {
+        inviteOnly = value
+    }
+
+    public func toggleBlockVisible(_ value: Bool) {
+        blockVisible = value
+    }
+
+    public func selectInviteMethod(_ value: StartSupportTrainInviteMethod) {
+        inviteMethod = value
     }
 
     // MARK: - Step 2 actions
@@ -171,12 +201,7 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
             leading: step == .whoAndWhy ? .close : .back,
             primaryCTALabel: primaryCTALabel,
             primaryCTAEnabled: primaryCTAEnabled,
-            secondaryCTA: step == .success
-                ? WizardSecondaryCTA(
-                    label: "Back to trains",
-                    identifier: "startSupportTrainBackToList"
-                )
-                : nil,
+            secondaryCTA: secondaryCTA,
             isSubmitting: isSubmittingFlag,
             dirty: stepDirty,
             showsProgressBar: step != .success
@@ -217,7 +242,9 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
     }
 
     public func secondaryTapped() {
-        if step == .success {
+        if isInviteRecipientBranch {
+            searchAgain()
+        } else if step == .success {
             handleSuccessExit()
         }
     }
@@ -229,10 +256,15 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
     // MARK: - Computed gate state
 
     public var canAdvanceFromWhoAndWhy: Bool {
-        let hasBeneficiary = selectedBeneficiary != nil
-            || !beneficiaryQuery.trimmingCharacters(in: .whitespaces).isEmpty
-        let hasReason = !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return hasBeneficiary && hasReason
+        selectedBeneficiary != nil
+            || beneficiaryQuery.trimmingCharacters(in: .whitespaces).count >= 2
+    }
+
+    public var isInviteRecipientBranch: Bool {
+        selectedBeneficiary == nil
+            && beneficiaryQuery.trimmingCharacters(in: .whitespaces).count >= 2
+            && beneficiaryResults.isEmpty
+            && !isSearchingBeneficiary
     }
 
     public var canAdvanceFromWhatAndWhen: Bool {
@@ -250,7 +282,7 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
 
     private var stepTitle: String {
         switch step {
-        case .whoAndWhy: "Who & why"
+        case .whoAndWhy: "Start a support train"
         case .whatAndWhen: "What & when"
         case .reviewAndLaunch: "Review & launch"
         case .success: "Train launched"
@@ -259,10 +291,27 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
 
     private var primaryCTALabel: String {
         switch step {
-        case .whoAndWhy, .whatAndWhen: "Continue"
+        case .whoAndWhy: isInviteRecipientBranch ? "Send invite & continue" : "Continue"
+        case .whatAndWhen: "Continue"
         case .reviewAndLaunch: "Launch train"
         case .success: "Open train"
         }
+    }
+
+    private var secondaryCTA: WizardSecondaryCTA? {
+        if step == .success {
+            return WizardSecondaryCTA(
+                label: "Back to trains",
+                identifier: "startSupportTrainBackToList"
+            )
+        }
+        if isInviteRecipientBranch {
+            return WizardSecondaryCTA(
+                label: "Search again",
+                identifier: "startSupportTrainSearchAgain"
+            )
+        }
+        return nil
     }
 
     private var stepDirty: Bool {
@@ -271,6 +320,9 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
             canAdvanceFromWhoAndWhy
                 || !beneficiaryQuery.isEmpty
                 || !reason.isEmpty
+                || selectedReason != .surgery
+                || !inviteOnly
+                || blockVisible
         case .whatAndWhen, .reviewAndLaunch: true
         case .success: false
         }
@@ -300,7 +352,7 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
             draftPayload: CreateSupportTrainBody.DraftPayload(story: trimmedReason),
             title: derivedTitle,
             recipientUserId: selectedBeneficiary?.userId,
-            sharingMode: visibility.sharingModeWire
+            sharingMode: effectiveSharingMode
         )
         do {
             let created: CreateSupportTrainResponse = try await api.request(
@@ -349,5 +401,15 @@ public final class StartSupportTrainWizardViewModel: WizardModel {
 
     private func displayName(_ recipient: MailRecipientDTO) -> String {
         recipient.name ?? recipient.username ?? "Recipient"
+    }
+
+    private var effectiveSharingMode: String {
+        if inviteOnly {
+            return StartSupportTrainVisibility.connections.sharingModeWire
+        }
+        if blockVisible {
+            return StartSupportTrainVisibility.neighbors.sharingModeWire
+        }
+        return visibility.sharingModeWire
     }
 }

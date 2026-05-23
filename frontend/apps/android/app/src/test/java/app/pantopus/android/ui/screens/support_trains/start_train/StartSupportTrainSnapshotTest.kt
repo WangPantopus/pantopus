@@ -12,129 +12,82 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
-import app.pantopus.android.data.api.models.mail_compose.MailRecipientDto
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusTheme
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * P2.6 — Paparazzi snapshots for the three steps + success screen of
- * the Start-a-Support-Train wizard. Annotated `@Ignore` until baselines
- * land so the first PR doesn't fail CI on a missing image — a follow-up
- * records baselines via `./gradlew paparazziRecord` and removes the
- * annotation.
+ * A12.11 — Paparazzi snapshots for the two Start-a-Support-Train step-1
+ * frames: verified-neighbor recipient and invite-recipient.
  */
-@Ignore("Baselines recorded in follow-up — see commit body")
 class StartSupportTrainSnapshotTest {
     @get:Rule
     val paparazzi =
         Paparazzi(
             deviceConfig =
                 DeviceConfig.PIXEL_5.copy(
-                    screenHeight = 2400,
+                    screenHeight = 2800,
                     softButtons = false,
                 ),
         )
 
     @Test
-    fun start_train_who_and_why_step() {
+    fun start_train_verified_neighbor_recipient() {
         paparazzi.snapshot {
             Frame {
                 WhoAndWhyStep(
                     form =
                         StartSupportTrainFormState(
-                            beneficiaryQuery = "Chen family",
-                            reason = "Welcoming baby Theo — meals would be a huge help.",
+                            beneficiaryQuery = "Maya Patel",
+                            selectedReason = StartSupportTrainReason.Surgery,
+                            reason = StartSupportTrainSampleData.VERIFIED_CONTEXT_NOTE,
                         ),
-                    results = listOf(sampleRecipient()),
-                    selected = sampleRecipient(),
+                    results = emptyList(),
+                    selected = StartSupportTrainSampleData.verifiedNeighbor,
                     isSearching = false,
                     onQuery = {},
                     onSelectBeneficiary = {},
                     onClearBeneficiary = {},
+                    onSearchAgain = {},
+                    onSelectReason = {},
                     onReason = {},
-                    reasonRemaining = 440,
+                    onToggleInviteOnly = {},
+                    onToggleBlockVisible = {},
+                    onSelectInviteMethod = {},
+                    reasonRemaining = 400,
                 )
             }
         }
     }
 
     @Test
-    fun start_train_what_and_when_step() {
+    fun start_train_invite_recipient() {
         paparazzi.snapshot {
             Frame {
-                WhatAndWhenStep(
+                WhoAndWhyStep(
                     form =
                         StartSupportTrainFormState(
-                            step = StartSupportTrainStep.WhatAndWhen,
-                            kind = SupportTrainKind.Meals,
-                            slotDuration = StartSupportTrainSlotDuration.Sixty,
+                            beneficiaryQuery = StartSupportTrainSampleData.INVITE_QUERY,
+                            selectedReason = StartSupportTrainReason.NewBaby,
                         ),
-                    onSelectKind = {},
-                    onStartDate = {},
-                    onEndDate = {},
-                    onSelectDuration = {},
+                    results = emptyList(),
+                    selected = null,
+                    isSearching = false,
+                    onQuery = {},
+                    onSelectBeneficiary = {},
+                    onClearBeneficiary = {},
+                    onSearchAgain = {},
+                    onSelectReason = {},
+                    onReason = {},
+                    onToggleInviteOnly = {},
+                    onToggleBlockVisible = {},
+                    onSelectInviteMethod = {},
+                    reasonRemaining = 500,
                 )
             }
         }
     }
-
-    @Test
-    fun start_train_review_step() {
-        val form =
-            StartSupportTrainFormState(
-                step = StartSupportTrainStep.ReviewAndLaunch,
-                beneficiaryQuery = "Chen family",
-                reason = "Welcoming baby Theo — meals would be a huge help.",
-                kind = SupportTrainKind.Meals,
-                slotDuration = StartSupportTrainSlotDuration.Sixty,
-            )
-        val slots =
-            StartSupportTrainSlotGenerator.generate(
-                startMillis = form.startDateMillis,
-                endMillis = form.endDateMillis,
-                durationMinutes = form.slotDuration.minutes,
-                startHour = form.kind.defaultStartHour,
-            )
-        paparazzi.snapshot {
-            Frame {
-                ReviewStep(
-                    form = form,
-                    selectedBeneficiary = sampleRecipient(),
-                    slots = slots,
-                    onToggleComments = {},
-                    onSelectVisibility = {},
-                    launchError = null,
-                )
-            }
-        }
-    }
-
-    @Test
-    fun start_train_success_step() {
-        paparazzi.snapshot {
-            Frame {
-                SuccessStep(
-                    slotCount = 7,
-                    visibility = StartSupportTrainVisibility.Neighbors,
-                )
-            }
-        }
-    }
-
-    private fun sampleRecipient(): MailRecipientDto =
-        MailRecipientDto(
-            userId = "u_chen",
-            name = "Maya Chen",
-            username = "mayac",
-            homeId = "home_demo",
-            homeAddress = "412 Elm St, Portland, OR",
-            isVerified = true,
-            homeMediaUrl = null,
-            isOnPantopus = true,
-        )
 
     @Composable
     private fun Frame(content: @Composable () -> Unit) {

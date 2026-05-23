@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -91,7 +90,12 @@ fun StartSupportTrainWizardScreen(
                     onQuery = viewModel::updateBeneficiaryQuery,
                     onSelectBeneficiary = viewModel::selectBeneficiary,
                     onClearBeneficiary = viewModel::clearBeneficiary,
+                    onSearchAgain = viewModel::searchAgain,
+                    onSelectReason = viewModel::selectReason,
                     onReason = viewModel::updateReason,
+                    onToggleInviteOnly = viewModel::toggleInviteOnly,
+                    onToggleBlockVisible = viewModel::toggleBlockVisible,
+                    onSelectInviteMethod = viewModel::selectInviteMethod,
                     reasonRemaining = viewModel.reasonRemainingChars(),
                 )
             StartSupportTrainStep.WhatAndWhen ->
@@ -131,94 +135,731 @@ internal fun WhoAndWhyStep(
     onQuery: (String) -> Unit,
     onSelectBeneficiary: (MailRecipientDto) -> Unit,
     onClearBeneficiary: () -> Unit,
+    onSearchAgain: () -> Unit,
+    onSelectReason: (StartSupportTrainReason) -> Unit,
     onReason: (String) -> Unit,
+    onToggleInviteOnly: (Boolean) -> Unit,
+    onToggleBlockVisible: (Boolean) -> Unit,
+    onSelectInviteMethod: (StartSupportTrainInviteMethod) -> Unit,
     reasonRemaining: Int,
 ) {
+    val inviteBranch =
+        selected == null &&
+            form.beneficiaryQuery.trim().length >= 2 &&
+            results.isEmpty() &&
+            !isSearching
+
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
+        SupportTrainChip()
         Text(
-            text = "Helping who?",
+            text = "Who is this for, and why?",
             style = PantopusTextStyle.h2,
             color = PantopusColors.appText,
             modifier = Modifier.semantics { heading() },
         )
         Text(
             text =
-                "Pick the neighbor this train is for, then say what's happening so people know how they can help.",
+                "A support train coordinates meals, rides, and help around someone going through something. " +
+                    "Pick the person and the moment.",
             style = PantopusTextStyle.body,
             color = PantopusColors.appTextSecondary,
         )
 
-        Overline("BENEFICIARY")
-        OutlinedTextField(
-            value = form.beneficiaryQuery,
-            onValueChange = onQuery,
-            placeholder = { Text("Search by name or username", color = PantopusColors.appTextMuted) },
-            leadingIcon = {
-                PantopusIconImage(
-                    icon = PantopusIcon.Search,
-                    contentDescription = null,
-                    size = 16.dp,
-                    tint = PantopusColors.appTextSecondary,
+        Overline("RECIPIENT")
+        when {
+            inviteBranch ->
+                InviteRecipientCard(
+                    query = form.beneficiaryQuery,
+                    selectedMethod = form.inviteMethod,
+                    onClear = onSearchAgain,
+                    onSelectMethod = onSelectInviteMethod,
                 )
-            },
-            trailingIcon = {
-                if (isSearching) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = PantopusColors.primary600,
+            selected != null -> VerifiedRecipientCard(selected, onClear = onClearBeneficiary)
+            else -> {
+                RecipientSearchField(
+                    query = form.beneficiaryQuery,
+                    isSearching = isSearching,
+                    onQuery = onQuery,
+                )
+                if (results.isNotEmpty()) {
+                    ResultList(results = results, onSelect = onSelectBeneficiary)
+                }
+                Text(
+                    text = "Search verified neighbors, or type a name to invite them directly.",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextMuted,
+                )
+            }
+        }
+
+        ReasonPicker(selected = form.selectedReason, onSelect = onSelectReason)
+
+        if (inviteBranch) {
+            InvitePrivacyHint(query = form.beneficiaryQuery)
+        } else {
+            ContextNoteField(
+                note = form.reason,
+                remaining = reasonRemaining,
+                onReason = onReason,
+            )
+            PrivacyToggleList(
+                inviteOnly = form.inviteOnly,
+                blockVisible = form.blockVisible,
+                onToggleInviteOnly = onToggleInviteOnly,
+                onToggleBlockVisible = onToggleBlockVisible,
+            )
+        }
+        SupportTrainStepRail(current = 1)
+    }
+}
+
+@Composable
+private fun SupportTrainChip() {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.warningBg)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s1)
+                .testTag("startSupportTrainChip"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Heart,
+            contentDescription = null,
+            size = 12.dp,
+            tint = PantopusColors.warning,
+        )
+        Text(
+            text = "SUPPORT TRAIN",
+            style = PantopusTextStyle.overline,
+            color = PantopusColors.warning,
+        )
+    }
+}
+
+@Composable
+private fun RecipientSearchField(
+    query: String,
+    isSearching: Boolean,
+    onQuery: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQuery,
+        placeholder = { Text("Search by name or username", color = PantopusColors.appTextMuted) },
+        leadingIcon = {
+            PantopusIconImage(
+                icon = PantopusIcon.Search,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+        },
+        trailingIcon = {
+            if (isSearching) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = PantopusColors.primary600,
+                )
+            }
+        },
+        singleLine = true,
+        colors = pantopusTextFieldColors(),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .testTag("startSupportTrainBeneficiaryField"),
+    )
+}
+
+@Composable
+private fun VerifiedRecipientCard(
+    recipient: MailRecipientDto,
+    onClear: () -> Unit,
+) {
+    val shape = RoundedCornerShape(Radii.lg)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(PantopusColors.appSurface)
+                .border(width = 1.dp, color = PantopusColors.appBorder, shape = shape)
+                .padding(Spacing.s3)
+                .testTag("startSupportTrainSelectedBeneficiary"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.personalBg),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = initials(recipient),
+                    style = PantopusTextStyle.small.copy(fontWeight = FontWeight.Bold),
+                    color = PantopusColors.personal,
+                )
+            }
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.success),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Check,
+                    contentDescription = null,
+                    size = 10.dp,
+                    tint = PantopusColors.appTextInverse,
+                )
+            }
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                Text(
+                    text = recipient.name ?: recipient.username ?: "Recipient",
+                    style = PantopusTextStyle.small.copy(fontWeight = FontWeight.Bold),
+                    color = PantopusColors.appText,
+                )
+                if (recipient.isVerified != false) {
+                    Text(
+                        text = "VERIFIED",
+                        style = PantopusTextStyle.caption.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                        color = PantopusColors.success,
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(Radii.pill))
+                                .background(PantopusColors.successBg)
+                                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
                     )
                 }
-            },
-            singleLine = true,
-            colors = pantopusTextFieldColors(),
+            }
+            Text(
+                text = recipient.homeAddress ?: "Verified neighbor",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Users,
+                    contentDescription = null,
+                    size = 10.dp,
+                    tint = PantopusColors.appTextMuted,
+                )
+                Text(
+                    text = "3 mutual friends on your block",
+                    style = PantopusTextStyle.caption.copy(fontSize = 10.sp),
+                    color = PantopusColors.appTextMuted,
+                )
+            }
+        }
+        Box(
+            modifier =
+                Modifier
+                    .size(width = 56.dp, height = 48.dp)
+                    .clickable { onClear() }
+                    .testTag("startSupportTrainChangeRecipient"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "Change",
+                style = PantopusTextStyle.caption.copy(fontWeight = FontWeight.SemiBold),
+                color = PantopusColors.primary600,
+            )
+        }
+    }
+}
+
+@Composable
+private fun InviteRecipientCard(
+    query: String,
+    selectedMethod: StartSupportTrainInviteMethod,
+    onClear: () -> Unit,
+    onSelectMethod: (StartSupportTrainInviteMethod) -> Unit,
+) {
+    val shape = RoundedCornerShape(Radii.lg)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(PantopusColors.appSurface)
+                .border(width = 1.dp, color = PantopusColors.appBorder, shape = shape)
+                .testTag("startSupportTrainInviteRecipientCard"),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Search,
+                contentDescription = null,
+                size = 14.dp,
+                tint = PantopusColors.appTextMuted,
+            )
+            Text(
+                text = query,
+                style = PantopusTextStyle.small.copy(fontWeight = FontWeight.Medium),
+                color = PantopusColors.appText,
+                modifier = Modifier.weight(1f),
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .size(32.dp)
+                        .clickable { onClear() }
+                        .testTag("startSupportTrainClearInviteSearch"),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.X,
+                    contentDescription = "Clear recipient search",
+                    size = 12.dp,
+                    tint = PantopusColors.appTextSecondary,
+                )
+            }
+        }
+        HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorderSubtle)
+        Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .testTag("startSupportTrainBeneficiaryField"),
-        )
-
-        if (results.isNotEmpty()) {
-            ResultList(results = results, onSelect = onSelectBeneficiary)
+                    .background(PantopusColors.warningBg)
+                    .padding(Spacing.s3),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.warning),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Search,
+                    contentDescription = null,
+                    size = 14.dp,
+                    tint = PantopusColors.appTextInverse,
+                )
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                Text(
+                    text = "No verified neighbor found",
+                    style = PantopusTextStyle.small.copy(fontWeight = FontWeight.Bold),
+                    color = PantopusColors.warning,
+                )
+                Text(
+                    text = "We searched verified addresses near yours. You can still start a train and invite them directly.",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.warning,
+                )
+            }
         }
-        if (selected != null) {
-            SelectedBeneficiaryCard(selected, onClear = onClearBeneficiary)
+        HorizontalDivider(thickness = 1.dp, color = PantopusColors.warningLight)
+        StartSupportTrainInviteMethod.entries.forEachIndexed { index, method ->
+            InviteMethodRow(
+                method = method,
+                isSelected = method == selectedMethod,
+                onClick = { onSelectMethod(method) },
+            )
+            if (index < StartSupportTrainInviteMethod.entries.lastIndex) {
+                HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorderSubtle)
+            }
+        }
+    }
+}
+
+@Composable
+private fun InviteMethodRow(
+    method: StartSupportTrainInviteMethod,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable { onClick() }
+                .padding(Spacing.s3)
+                .testTag("startSupportTrainInviteMethod_${method.name}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.primary50),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = method.icon,
+                contentDescription = null,
+                size = 15.dp,
+                tint = PantopusColors.primary600,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                Text(
+                    text = method.title,
+                    style = PantopusTextStyle.small.copy(fontWeight = FontWeight.Bold),
+                    color = PantopusColors.appText,
+                )
+                if (method == StartSupportTrainInviteMethod.Phone) {
+                    Text(
+                        text = "RECOMMENDED",
+                        style = PantopusTextStyle.caption.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                        color = PantopusColors.success,
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(Radii.pill))
+                                .background(PantopusColors.successBg)
+                                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
+                    )
+                }
+            }
+            Text(
+                text = method.value,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        PantopusIconImage(
+            icon = if (isSelected) PantopusIcon.CheckCircle else PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 16.dp,
+            tint = if (isSelected) PantopusColors.primary600 else PantopusColors.appTextMuted,
+        )
+    }
+}
+
+@Composable
+private fun ReasonPicker(
+    selected: StartSupportTrainReason,
+    onSelect: (StartSupportTrainReason) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        Overline("WHAT'S THE OCCASION?")
+        StartSupportTrainReason.entries.chunked(2).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                row.forEach { reason ->
+                    ReasonTile(
+                        reason = reason,
+                        isSelected = reason == selected,
+                        onClick = { onSelect(reason) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReasonTile(
+    reason: StartSupportTrainReason,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(Radii.lg)
+    Row(
+        modifier =
+            modifier
+                .height(56.dp)
+                .clip(shape)
+                .background(if (isSelected) PantopusColors.warningBg else PantopusColors.appSurface)
+                .border(
+                    width = if (isSelected) 2.dp else 1.dp,
+                    color = if (isSelected) PantopusColors.warning else PantopusColors.appBorder,
+                    shape = shape,
+                )
+                .clickable { onClick() }
+                .padding(horizontal = Spacing.s3)
+                .testTag("startSupportTrainReason_${reason.name}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(if (isSelected) PantopusColors.warning else PantopusColors.appSurfaceSunken),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = reason.icon,
+                contentDescription = null,
+                size = 14.dp,
+                tint = if (isSelected) PantopusColors.appTextInverse else PantopusColors.appTextStrong,
+            )
         }
         Text(
-            text = "Or type a name — Pantopus will offer to link them when they're verified.",
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextMuted,
+            text = reason.title,
+            style = PantopusTextStyle.caption.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold),
+            color = if (isSelected) PantopusColors.warning else PantopusColors.appText,
         )
+    }
+}
 
-        Overline("WHAT'S HAPPENING")
+@Composable
+private fun ContextNoteField(
+    note: String,
+    remaining: Int,
+    onReason: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        Overline("SHORT NOTE")
         OutlinedTextField(
-            value = form.reason,
+            value = note,
             onValueChange = onReason,
             placeholder = {
                 Text(
-                    text =
-                        "New baby, recovering from surgery, lost a parent — neighbors will read this when deciding how to help.",
+                    text = "Add a few details so neighbors know what kind of help fits.",
                     color = PantopusColors.appTextMuted,
                     style = PantopusTextStyle.small,
                 )
             },
-            minLines = 4,
+            minLines = 3,
             colors = pantopusTextFieldColors(),
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .defaultMinSize(minHeight = 120.dp)
+                    .height(116.dp)
                     .testTag("startSupportTrainReasonField"),
         )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Lock,
+                contentDescription = null,
+                size = 10.dp,
+                tint = PantopusColors.appTextMuted,
+            )
             Text(
-                text = "$reasonRemaining left",
-                style = PantopusTextStyle.caption,
+                text = "Shared only with people you invite",
+                style = PantopusTextStyle.caption.copy(fontSize = 10.sp),
+                color = PantopusColors.appTextMuted,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "$remaining left",
+                style = PantopusTextStyle.caption.copy(fontSize = 10.sp),
                 color = PantopusColors.appTextMuted,
                 modifier = Modifier.testTag("startSupportTrainReasonRemaining"),
             )
         }
     }
+}
+
+@Composable
+private fun PrivacyToggleList(
+    inviteOnly: Boolean,
+    blockVisible: Boolean,
+    onToggleInviteOnly: (Boolean) -> Unit,
+    onToggleBlockVisible: (Boolean) -> Unit,
+) {
+    val shape = RoundedCornerShape(Radii.lg)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(PantopusColors.appSurface)
+                .border(width = 1.dp, color = PantopusColors.appBorder, shape = shape),
+    ) {
+        PrivacyToggleRow(
+            icon = PantopusIcon.UsersRound,
+            title = "Invite only",
+            subtitle = "Only people you add can see and sign up",
+            checked = inviteOnly,
+            onToggle = onToggleInviteOnly,
+            testTag = "startSupportTrainInviteOnly",
+        )
+        HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorderSubtle)
+        PrivacyToggleRow(
+            icon = PantopusIcon.Home,
+            title = "Block-visible",
+            subtitle = "Verified neighbors at 412 Elm can see and offer",
+            checked = blockVisible,
+            onToggle = onToggleBlockVisible,
+            testTag = "startSupportTrainBlockVisible",
+        )
+    }
+}
+
+@Composable
+private fun PrivacyToggleRow(
+    icon: PantopusIcon,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onToggle: (Boolean) -> Unit,
+    testTag: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(if (checked) PantopusColors.warningBg else PantopusColors.appSurfaceSunken),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 14.dp,
+                tint = if (checked) PantopusColors.warning else PantopusColors.appTextSecondary,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = PantopusTextStyle.small.copy(fontWeight = FontWeight.SemiBold),
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = subtitle,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onToggle,
+            colors =
+                SwitchDefaults.colors(
+                    checkedThumbColor = PantopusColors.appTextInverse,
+                    checkedTrackColor = PantopusColors.warning,
+                ),
+            modifier = Modifier.testTag(testTag),
+        )
+    }
+}
+
+@Composable
+private fun InvitePrivacyHint(query: String) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(Spacing.s3)
+                .testTag("startSupportTrainInvitePrivacyHint"),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Shield,
+            contentDescription = null,
+            size = 14.dp,
+            tint = PantopusColors.appTextSecondary,
+        )
+        Text(
+            text = "Invite-only by default. The train stays private until $query accepts. Other neighbors won't see it on the block.",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextStrong,
+        )
+    }
+}
+
+@Composable
+private fun SupportTrainStepRail(current: Int) {
+    val steps = listOf("Recipient", "Type", "Dates", "Invites", "Review")
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        Overline("YOU'RE ON STEP $current OF 5")
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(width = 1.dp, color = PantopusColors.appBorder, shape = RoundedCornerShape(Radii.lg))
+                    .padding(Spacing.s3)
+                    .testTag("startSupportTrainStepRail"),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            steps.forEachIndexed { index, label ->
+                val stepNumber = index + 1
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(if (stepNumber <= current) PantopusColors.warning else PantopusColors.appSurfaceSunken),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = stepNumber.toString(),
+                            style = PantopusTextStyle.caption.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                            color = if (stepNumber <= current) PantopusColors.appTextInverse else PantopusColors.appTextMuted,
+                        )
+                    }
+                    Text(
+                        text = label,
+                        style =
+                            PantopusTextStyle.caption.copy(
+                                fontWeight = if (stepNumber == current) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 9.sp,
+                            ),
+                        color = if (stepNumber == current) PantopusColors.warning else PantopusColors.appTextMuted,
+                    )
+                }
+                if (index < steps.lastIndex) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .padding(top = 10.dp)
+                                .height(2.dp)
+                                .background(if (stepNumber < current) PantopusColors.warning else PantopusColors.appBorder),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun initials(recipient: MailRecipientDto): String {
+    val source = recipient.name ?: recipient.username ?: "Recipient"
+    return source
+        .split(" ")
+        .filter { it.isNotBlank() }
+        .take(2)
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+        .joinToString("")
+        .ifBlank { "R" }
 }
 
 @Composable
@@ -275,69 +916,6 @@ private fun ResultList(
             if (index < results.size - 1) {
                 HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorderSubtle)
             }
-        }
-    }
-}
-
-@Composable
-private fun SelectedBeneficiaryCard(
-    recipient: MailRecipientDto,
-    onClear: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.md))
-                .background(PantopusColors.successBg)
-                .padding(Spacing.s3)
-                .testTag("startSupportTrainSelectedBeneficiary"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(PantopusColors.successLight),
-            contentAlignment = Alignment.Center,
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.Check,
-                contentDescription = null,
-                size = 16.dp,
-                tint = PantopusColors.success,
-            )
-        }
-        Spacer(modifier = Modifier.width(Spacing.s3))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = recipient.name ?: recipient.username ?: "Recipient",
-                style = PantopusTextStyle.small.copy(fontWeight = FontWeight.SemiBold),
-                color = PantopusColors.appText,
-            )
-            recipient.homeAddress?.let { addr ->
-                Text(
-                    text = addr,
-                    style = PantopusTextStyle.caption,
-                    color = PantopusColors.appTextSecondary,
-                )
-            }
-        }
-        Box(
-            modifier =
-                Modifier
-                    .size(32.dp)
-                    .clickable { onClear() }
-                    .testTag("startSupportTrainClearBeneficiary"),
-            contentAlignment = Alignment.Center,
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.X,
-                contentDescription = "Clear beneficiary",
-                size = 14.dp,
-                tint = PantopusColors.appTextSecondary,
-            )
         }
     }
 }
