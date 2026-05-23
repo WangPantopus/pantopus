@@ -65,6 +65,8 @@ sealed interface DiscoverHubTarget {
 
     data class Listing(val listingId: String) : DiscoverHubTarget
 
+    data class Post(val postId: String) : DiscoverHubTarget
+
     data object SeeAllPeople : DiscoverHubTarget
 
     data object SeeAllBusinesses : DiscoverHubTarget
@@ -72,6 +74,8 @@ sealed interface DiscoverHubTarget {
     data object SeeAllGigs : DiscoverHubTarget
 
     data object SeeAllListings : DiscoverHubTarget
+
+    data object SeeAllPosts : DiscoverHubTarget
 }
 
 /**
@@ -150,6 +154,13 @@ class DiscoverHubViewModel
         private val _state = MutableStateFlow<ListOfRowsUiState>(ListOfRowsUiState.Loading)
         val state: StateFlow<ListOfRowsUiState> = _state.asStateFlow()
 
+        private val _magazineState =
+            MutableStateFlow<DiscoverHubMagazineUiState>(DiscoverHubMagazineUiState.Loading)
+        val magazineState: StateFlow<DiscoverHubMagazineUiState> = _magazineState.asStateFlow()
+
+        private val _selectedMagazineFilter = MutableStateFlow<DiscoverHubMapKind?>(null)
+        val selectedMagazineFilter: StateFlow<DiscoverHubMapKind?> = _selectedMagazineFilter.asStateFlow()
+
         private val _selectedChip = MutableStateFlow(DiscoverHubChip.NEARBY)
         val selectedChip: StateFlow<String> = _selectedChip.asStateFlow()
 
@@ -187,6 +198,56 @@ class DiscoverHubViewModel
 
         /** Pull-to-refresh. */
         fun refresh() = reload()
+
+        // MARK: - A11.3 Magazine state
+
+        fun loadMagazine(scenario: DiscoverHubMagazineScenario = DiscoverHubMagazineScenario.Populated) {
+            _magazineState.value = DiscoverHubMagazineUiState.Loading
+            _magazineState.value =
+                when (scenario) {
+                    DiscoverHubMagazineScenario.Loading -> DiscoverHubMagazineUiState.Loading
+                    DiscoverHubMagazineScenario.Empty -> DiscoverHubMagazineUiState.Empty
+                    DiscoverHubMagazineScenario.Populated ->
+                        DiscoverHubMagazineUiState.Populated(DiscoverHubSampleData.populated)
+                    DiscoverHubMagazineScenario.Error ->
+                        DiscoverHubMagazineUiState.Error("Couldn't load discovery. Try again.")
+                }
+        }
+
+        fun refreshMagazine() = loadMagazine()
+
+        fun selectMagazineFilter(filter: DiscoverHubMapKind?) {
+            _selectedMagazineFilter.value = filter
+        }
+
+        fun selectTask(id: String) {
+            onSelect(DiscoverHubTarget.Gig(id))
+        }
+
+        fun selectMarketplaceItem(id: String) {
+            onSelect(DiscoverHubTarget.Listing(id))
+        }
+
+        fun selectPost(id: String) {
+            onSelect(DiscoverHubTarget.Post(id))
+        }
+
+        fun seeAllTasks() {
+            onSelect(DiscoverHubTarget.SeeAllGigs)
+        }
+
+        fun seeAllMarketplace() {
+            onSelect(DiscoverHubTarget.SeeAllListings)
+        }
+
+        fun seeAllPosts() {
+            onSelect(DiscoverHubTarget.SeeAllPosts)
+        }
+
+        fun notifyWhenActive() {
+            // A11.3 empty-frame escape hatch. Notification persistence lands
+            // with the eventual alerts service; no network call is made here.
+        }
 
         /** Update the live chip selection. Triggers a refetch. */
         fun selectChip(id: String) {
