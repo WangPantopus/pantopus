@@ -11,6 +11,29 @@ import Foundation
 
 /// Sample payloads for the mailbox item-detail bodies.
 public enum MailItemSampleData {
+    /// A17.2 primary booklet sample — neighborhood civic guide.
+    public static let bookletVoterGuide = BookletDetailDTO(
+        pages: [
+            URL(string: "https://example.com/pantopus/booklets/voter-guide/page-1.png")!,
+            URL(string: "https://example.com/pantopus/booklets/voter-guide/page-2.png")!,
+            URL(string: "https://example.com/pantopus/booklets/voter-guide/page-3.png")!,
+            URL(string: "https://example.com/pantopus/booklets/voter-guide/page-4.png")!
+        ],
+        summary: "Nonpartisan voter guide for the June 2026 primary, including local races and ballot measures.",
+        pageCount: 4
+    )
+
+    /// A17.2 secondary booklet sample — merchant catalog mailed to a neighborhood.
+    public static let bookletNeighborhoodCatalog = BookletDetailDTO(
+        pages: [
+            URL(string: "https://example.com/pantopus/booklets/catalog/page-1.png")!,
+            URL(string: "https://example.com/pantopus/booklets/catalog/page-2.png")!,
+            URL(string: "https://example.com/pantopus/booklets/catalog/page-3.png")!
+        ],
+        summary: "Spring catalog with seasonal services, repair windows, and neighborhood-only pricing.",
+        pageCount: 3
+    )
+
     /// Next-steps timeline shown once a bid is accepted (A17.6 NEXT_STEPS).
     public static let gigNextSteps: [GigDetailDTO.NextStep] = [
         .init(id: "accepted", label: "Bid accepted", whenText: "Just now", state: .active),

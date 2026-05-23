@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.mailbox.item_detail
 
+import app.pantopus.android.data.api.models.mailbox.v2.BookletDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
 
 /**
@@ -10,6 +11,34 @@ import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
  * than round-tripping the network. Mirrors the A17.6 gig.jsx sample data.
  */
 object MailItemSampleData {
+    /** A17.2 primary booklet sample — neighborhood civic guide. */
+    val bookletVoterGuide =
+        BookletDetailDto(
+            pages =
+                listOf(
+                    "https://example.com/pantopus/booklets/voter-guide/page-1.png",
+                    "https://example.com/pantopus/booklets/voter-guide/page-2.png",
+                    "https://example.com/pantopus/booklets/voter-guide/page-3.png",
+                    "https://example.com/pantopus/booklets/voter-guide/page-4.png",
+                ),
+            summary =
+                "Nonpartisan voter guide for the June 2026 primary, including local races and ballot measures.",
+            pageCount = 4,
+        )
+
+    /** A17.2 secondary booklet sample — merchant catalog mailed to a neighborhood. */
+    val bookletNeighborhoodCatalog =
+        BookletDetailDto(
+            pages =
+                listOf(
+                    "https://example.com/pantopus/booklets/catalog/page-1.png",
+                    "https://example.com/pantopus/booklets/catalog/page-2.png",
+                    "https://example.com/pantopus/booklets/catalog/page-3.png",
+                ),
+            summary = "Spring catalog with seasonal services, repair windows, and neighborhood-only pricing.",
+            pageCount = 3,
+        )
+
     /** Next-steps timeline shown once a bid is accepted (A17.6 NEXT_STEPS). */
     val gigNextSteps =
         listOf(

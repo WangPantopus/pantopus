@@ -25,12 +25,51 @@ final class MailDetailSnapshotTests: XCTestCase {
         assertRenders(makeLayout(category: .coupon, title: "Neighborhood bakery coupon"))
     }
 
+    func test_booklet_voterGuide_detail_renders() {
+        assertRenders(
+            makeBookletLayout(
+                booklet: MailItemSampleData.bookletVoterGuide,
+                title: "June 2026 primary voter guide",
+                sender: "League of Women Voters",
+                excerpt: "Vol. 47 · Nonpartisan · Local races and measures"
+            )
+        )
+    }
+
+    func test_booklet_catalog_detail_renders() {
+        assertRenders(
+            makeBookletLayout(
+                booklet: MailItemSampleData.bookletNeighborhoodCatalog,
+                title: "Spring home services booklet",
+                sender: "Elm Park Merchant Guild",
+                excerpt: "Seasonal repair windows and neighborhood-only pricing"
+            )
+        )
+    }
+
     private func makeLayout(
         category: MailItemCategory,
         title: String
     ) -> some View {
         GenericMailDetailLayout(
             content: makeContent(category: category, title: title),
+            ackInFlight: false,
+            onBack: {},
+            onAcknowledge: {},
+            onOpenSenderProfile: { _ in },
+            onSaveToVault: {}
+        )
+    }
+
+    private func makeBookletLayout(
+        booklet: BookletDetailDTO,
+        title: String,
+        sender: String,
+        excerpt: String
+    ) -> some View {
+        BookletDetailLayout(
+            content: makeBookletContent(title: title, sender: sender, excerpt: excerpt),
+            booklet: booklet,
             ackInFlight: false,
             onBack: {},
             onAcknowledge: {},
@@ -68,6 +107,42 @@ final class MailDetailSnapshotTests: XCTestCase {
             aiSummary: nil,
             ackRequired: category == .notice,
             isAcknowledged: false
+        )
+    }
+
+    private func makeBookletContent(
+        title: String,
+        sender: String,
+        excerpt: String
+    ) -> MailDetailContent {
+        MailDetailContent(
+            mailId: "mail-booklet-\(title.replacingOccurrences(of: " ", with: "-").lowercased())",
+            category: .booklet,
+            trust: .verified,
+            detailTrust: MailItemCategory.booklet.detailTrust,
+            senderDisplayName: sender,
+            senderMeta: "Verified nonprofit",
+            senderTypeLabel: "Verified sender",
+            carrierLine: "via Pantopus Mail",
+            senderInitials: sender
+                .split(separator: " ")
+                .prefix(2)
+                .compactMap(\.first)
+                .map(String.init)
+                .joined(),
+            senderUserId: "sender-booklet",
+            title: title,
+            excerpt: excerpt,
+            referenceLabel: "Booklet · 2026",
+            createdAtLabel: "Fri May 15, 2026",
+            expiresAtLabel: nil,
+            readStatusLabel: "Unread",
+            bodyParagraphs: [],
+            attachments: ["booklet.pdf"],
+            aiSummary: "Pantopus found the key sections and can jump you to the relevant pages.",
+            ackRequired: false,
+            isAcknowledged: false,
+            bookletDetail: nil
         )
     }
 

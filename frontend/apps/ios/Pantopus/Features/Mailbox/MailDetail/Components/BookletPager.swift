@@ -5,9 +5,9 @@
 //  T6.5c (P21) — Booklet variant of the A17 shell's body slot.
 //
 //  Two render modes per `booklet.jsx`:
-//    - `.page` — full-width `TabView` swiping through the page images,
-//      with an indicator strip below ("Page N of M" + sky scrubber +
-//      grid-mode toggle button).
+//    - `.page` — indicator strip ("Page N of M" + sky scrubber +
+//      grid-mode toggle button) above a full-width `TabView` swiping
+//      through folded paper page images.
 //    - `.grid` — 3-column thumbnail grid; tap a thumbnail to jump
 //      straight back to `.page` mode at that page.
 //
@@ -28,15 +28,18 @@ public enum BookletPagerMode: Sendable, Hashable {
 @MainActor
 public struct BookletPager: View {
     private let pages: [URL]
+    private let pageCount: Int
     @State private var currentIndex: Int
     @State private var mode: BookletPagerMode
 
     public init(
         pages: [URL],
+        pageCount: Int? = nil,
         initialPage: Int = 0,
         initialMode: BookletPagerMode = .page
     ) {
         self.pages = pages
+        self.pageCount = max(pageCount ?? pages.count, pages.count)
         _currentIndex = State(initialValue: max(0, min(initialPage, max(0, pages.count - 1))))
         _mode = State(initialValue: initialMode)
     }
@@ -57,17 +60,21 @@ public struct BookletPager: View {
 
     private var pageMode: some View {
         VStack(spacing: Spacing.s2) {
+            pageIndicator
             TabView(selection: $currentIndex) {
                 ForEach(Array(pages.enumerated()), id: \.offset) { idx, url in
-                    BookletPageImage(url: url)
+                    BookletPageImage(
+                        url: url,
+                        pageNumber: idx + 1,
+                        hasNextPage: idx < pageCount - 1
+                    )
                         .tag(idx)
                         .padding(.horizontal, Spacing.s4)
                         .accessibilityIdentifier("bookletPager_page_\(idx)")
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 360)
-            pageIndicator
+            .frame(height: 420)
         }
     }
 
@@ -91,11 +98,11 @@ public struct BookletPager: View {
                         Text("Page \(currentIndex + 1)")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(Theme.Color.appText)
-                        Text("of \(pages.count)")
+                        Text("of \(pageCount)")
                             .font(.system(size: 13))
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
-                    .accessibilityLabel("Page \(currentIndex + 1) of \(pages.count)")
+                    .accessibilityLabel("Page \(currentIndex + 1) of \(pageCount)")
                     .accessibilityIdentifier("bookletPager_pageLabel")
                 }
                 .frame(maxWidth: .infinity)
@@ -141,8 +148,8 @@ public struct BookletPager: View {
 
     private var scrubber: some View {
         GeometryReader { proxy in
-            let totalSegments = max(1, pages.count - 1)
-            let filled = pages.count <= 1
+            let totalSegments = max(1, pageCount - 1)
+            let filled = pageCount <= 1
                 ? proxy.size.width
                 : proxy.size.width * CGFloat(currentIndex) / CGFloat(totalSegments)
             ZStack(alignment: .leading) {
@@ -174,7 +181,7 @@ public struct BookletPager: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 Spacer(minLength: 0)
-                Text("\(pages.count) pages")
+                Text("\(pageCount) pages")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextStrong)
                     .padding(.horizontal, Spacing.s2)
@@ -194,7 +201,12 @@ public struct BookletPager: View {
                         currentIndex = idx
                         mode = .page
                     } label: {
-                        ThumbnailCell(url: url, page: idx + 1, isCurrent: idx == currentIndex)
+                        ThumbnailCell(
+                            url: url,
+                            page: idx + 1,
+                            isCurrent: idx == currentIndex,
+                            hasNextPage: idx < pageCount - 1
+                        )
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Jump to page \(idx + 1)")
@@ -235,27 +247,28 @@ public struct BookletPager: View {
 
 private struct BookletPageImage: View {
     let url: URL
+    let pageNumber: Int
+    let hasNextPage: Bool
 
     var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case let .success(image):
-                image
-                    .resizable()
-                    .aspectRatio(3.0 / 4.0, contentMode: .fit)
-            case .failure:
-                fallback(icon: .alertCircle, label: "Couldn't load page")
-            case .empty:
-                fallback(icon: .fileType, label: "Loading…")
-            @unknown default:
-                fallback(icon: .fileType, label: "")
+        BookletPaperPageChrome(hasNextPage: hasNextPage) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case let .success(image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .failure:
+                    fallback(icon: .alertCircle, label: "Couldn't load page")
+                case .empty:
+                    fallback(icon: .fileType, label: "Loading...")
+                @unknown default:
+                    fallback(icon: .fileType, label: "")
+                }
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
+        .accessibilityLabel("Booklet page \(pageNumber)")
     }
 
     private func fallback(icon: PantopusIcon, label: String) -> some View {
@@ -270,7 +283,7 @@ private struct BookletPageImage: View {
                 }
             }
         }
-        .aspectRatio(3.0 / 4.0, contentMode: .fit)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -278,26 +291,31 @@ private struct ThumbnailCell: View {
     let url: URL
     let page: Int
     let isCurrent: Bool
+    let hasNextPage: Bool
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case let .success(image):
-                    image
-                        .resizable()
-                        .aspectRatio(3.0 / 4.0, contentMode: .fit)
-                case .failure, .empty:
-                    Rectangle()
-                        .fill(Theme.Color.appSurfaceSunken)
-                        .aspectRatio(3.0 / 4.0, contentMode: .fit)
-                @unknown default:
-                    Rectangle()
-                        .fill(Theme.Color.appSurfaceSunken)
-                        .aspectRatio(3.0 / 4.0, contentMode: .fit)
+            BookletPaperPageChrome(
+                hasNextPage: hasNextPage,
+                foldSize: Spacing.s4,
+                cornerRadius: 6
+            ) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case let .success(image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    case .failure, .empty:
+                        Rectangle()
+                            .fill(Theme.Color.appSurfaceSunken)
+                    @unknown default:
+                        Rectangle()
+                            .fill(Theme.Color.appSurfaceSunken)
+                    }
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(
@@ -334,7 +352,7 @@ private struct ThumbnailCell: View {
         "https://placehold.co/360x480/green/white",
         "https://placehold.co/360x480/red/white",
         "https://placehold.co/360x480/purple/white"
-    ].compactMap(URL.init(string:)))
+    ].compactMap(URL.init(string:)), pageCount: 6)
         .padding()
         .background(Theme.Color.appBg)
 }
