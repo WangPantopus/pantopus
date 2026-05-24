@@ -3,6 +3,8 @@
 package app.pantopus.android.ui.screens.mailbox.item_detail
 
 import app.pantopus.android.data.api.models.mailbox.v2.BookletDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.CertifiedChainStep
+import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
 import app.pantopus.android.ui.components.TimelineStep
 import app.pantopus.android.ui.components.TimelineStepState
@@ -320,4 +322,62 @@ object MailItemSampleData {
 
     /** Bid-accepted secondary state. */
     val gigAccepted = gigReceived.accepted()
+
+    private val certifiedNoticeBody =
+        listOf(
+            "This is a SUPPLEMENTAL property tax bill issued pursuant to Section 75 et seq. of the " +
+                "California Revenue and Taxation Code following a reassessment triggered by a change in " +
+                "ownership recorded on October 14, 2025.",
+            "Your previously assessed value of $612,000 has been adjusted to $785,400, producing " +
+                "supplemental taxes for the partial year October 2025 through June 2026 in the amount shown below.",
+            "Payment must be received or postmarked no later than the delinquency date or a 10% penalty plus " +
+                "1.5% per month interest will accrue.",
+        ).joinToString("\n\n")
+
+    /** A17.3 open/pre-signature certified mail state. */
+    val certifiedUnread =
+        CertifiedDetailDto(
+            referenceNumber = "7014 2026 0411 3344 5577",
+            documentType = "Supplemental property tax bill",
+            acknowledgeBy = "2026-06-30T17:00:00Z",
+            chain =
+                listOf(
+                    CertifiedChainStep(
+                        id = "delivered",
+                        label = "Delivered to your Pantopus mailbox",
+                        occurredAt = "2026-05-15T13:02:00Z",
+                        isComplete = true,
+                    ),
+                    CertifiedChainStep("out_for_delivery", "Out for delivery", "2026-05-15T10:38:00Z", true),
+                    CertifiedChainStep(
+                        id = "distribution",
+                        label = "Arrived at distribution center",
+                        occurredAt = "2026-05-14T19:08:00Z",
+                        isComplete = true,
+                    ),
+                    CertifiedChainStep("transit", "In transit", "2026-05-12T17:42:00Z", true),
+                    CertifiedChainStep("accepted", "Accepted from sender", "2026-05-12T11:30:00Z", true),
+                ),
+            noticeBody = certifiedNoticeBody,
+            termsUrl = "https://example.com/certified-delivery-terms.pdf",
+            isAcknowledged = false,
+        )
+
+    /** A17.3 signed state with the Pantopus receipt at the top of the chain. */
+    val certifiedSigned =
+        certifiedUnread.copy(
+            chain =
+                listOf(
+                    CertifiedChainStep(
+                        id = "acknowledged",
+                        label = "Acknowledged on Pantopus",
+                        occurredAt = "2026-05-15T14:14:00Z",
+                        isComplete = true,
+                    ),
+                ) + certifiedUnread.chain,
+            isAcknowledged = true,
+        )
+
+    /** Same signed payload used for archived shell snapshots. */
+    val certifiedArchived = certifiedSigned
 }

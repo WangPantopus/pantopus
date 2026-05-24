@@ -34,6 +34,7 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.GigBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.MailItemPlaceholderBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.MemoryBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.PackageBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedConfirmGate
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedTermsSheet
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -41,11 +42,17 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import kotlinx.coroutines.delay
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * Hub → MailboxList → MailboxItemDetail screen. The ViewModel reads the
  * mail id via the nav-backstack [androidx.lifecycle.SavedStateHandle].
  */
+@Suppress("CyclomaticComplexMethod")
 @Composable
 fun MailboxItemDetailScreen(
     onBack: () -> Unit,
@@ -56,6 +63,8 @@ fun MailboxItemDetailScreen(
     val ctaFlags by viewModel.ctaFlags.collectAsStateWithLifecycle()
     val ackChecked by viewModel.certifiedAckChecked.collectAsStateWithLifecycle()
     var termsSheetUrl by remember { mutableStateOf<String?>(null) }
+    var showsConfirmGate by remember { mutableStateOf(false) }
+    var didAutoPresentConfirmGate by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -73,12 +82,33 @@ fun MailboxItemDetailScreen(
                 ErrorLayout(message = s.message, onRetry = { viewModel.refresh() })
             is MailboxItemDetailUiState.Loaded -> {
                 val content = s.content
+                val certifiedPayload = content.payload as? MailboxCategoryPayload.Certified
+                val shouldAutoShowConfirmGate =
+                    certifiedPayload != null &&
+                        content.isUnread &&
+                        !content.isArchived &&
+                        !certifiedPayload.detail.isAcknowledged &&
+                        content.ctaEnabled &&
+                        !ctaFlags.primaryCompleted
+                LaunchedEffect(shouldAutoShowConfirmGate) {
+                    if (shouldAutoShowConfirmGate && !didAutoPresentConfirmGate) {
+                        didAutoPresentConfirmGate = true
+                        showsConfirmGate = true
+                    }
+                }
                 val showTerms = {
                     val payload = content.payload
                     if (payload is MailboxCategoryPayload.Certified && !payload.detail.termsUrl.isNullOrEmpty()) {
                         termsSheetUrl = payload.detail.termsUrl
                     } else {
                         viewModel.performGhostAction()
+                    }
+                }
+                val primaryAction = {
+                    if (certifiedPayload != null && !ackChecked && !certifiedPayload.detail.isAcknowledged) {
+                        showsConfirmGate = true
+                    } else {
+                        viewModel.performPrimaryAction()
                     }
                 }
                 MailboxItemDetailShell(
@@ -88,13 +118,13 @@ fun MailboxItemDetailScreen(
                     aiElf = content.aiElf,
                     keyFacts = content.keyFacts,
                     timeline = if (content.category == MailItemCategory.Package) emptyList() else content.timeline,
-                    cta = ctaContent(content, ctaFlags, ackChecked),
+                    cta = ctaContent(content, ctaFlags),
                     onBack = onBack,
                     onAIChip = { kind ->
                         // AI suggestion chips are shortcuts for the bottom CTAs.
                         when (kind) {
                             MailboxItemDetailAIChipKind.Primary ->
-                                viewModel.performPrimaryAction()
+                                primaryAction()
                             MailboxItemDetailAIChipKind.Secondary ->
                                 if (content.category == MailItemCategory.Certified) {
                                     showTerms()
@@ -103,7 +133,7 @@ fun MailboxItemDetailScreen(
                                 }
                         }
                     },
-                    onPrimary = { viewModel.performPrimaryAction() },
+                    onPrimary = primaryAction,
                     onGhost = {
                         if (content.category == MailItemCategory.Certified) {
                             showTerms()
@@ -116,11 +146,23 @@ fun MailboxItemDetailScreen(
                     CategoryBody(
                         content = content,
                         ctaFlags = ctaFlags,
-                        ackChecked = ackChecked,
-                        onAckChange = { viewModel.setCertifiedAckChecked(it) },
                         onViewTerms = showTerms,
                         onAcceptGig = { viewModel.acceptGigBid() },
                         onReceiveAtDoor = { viewModel.performPrimaryAction() },
+                    )
+                }
+                if (showsConfirmGate && certifiedPayload != null) {
+                    CertifiedConfirmGate(
+                        senderName = content.sender.displayName,
+                        referenceNumber = certifiedPayload.detail.referenceNumber,
+                        deadlineLabel = formatCertifiedDeadline(certifiedPayload.detail.acknowledgeBy),
+                        isSigning = ctaFlags.primaryLoading,
+                        onReviewFirst = { showsConfirmGate = false },
+                        onSign = {
+                            viewModel.setCertifiedAckChecked(true)
+                            showsConfirmGate = false
+                            viewModel.performPrimaryAction()
+                        },
                     )
                 }
             }
@@ -151,7 +193,6 @@ fun MailboxItemDetailScreen(
 private fun ctaContent(
     content: MailboxItemDetailContent,
     flags: MailboxCTAFlags,
-    ackChecked: Boolean,
 ): MailboxCTAShelfContent? =
     when (content.category) {
         MailItemCategory.Package ->
@@ -176,12 +217,12 @@ private fun ctaContent(
         MailItemCategory.Certified ->
             MailboxCTAShelfContent(
                 primaryTitle =
-                    if (flags.primaryCompleted) "Acknowledged ✓" else "Acknowledge receipt",
+                    if (flags.primaryCompleted) "Signed ✓" else "Sign for delivery",
                 ghostTitle = "View terms",
                 primaryLoading = flags.primaryLoading,
                 ghostLoading = flags.ghostLoading,
                 primaryEnabled =
-                    content.ctaEnabled && ackChecked && !flags.primaryCompleted,
+                    content.ctaEnabled && !flags.primaryCompleted,
             )
         MailItemCategory.Memory -> {
             val saved = (content.payload as? MailboxCategoryPayload.Memory)?.detail?.isSaved ?: false
@@ -200,8 +241,6 @@ private fun ctaContent(
 private fun CategoryBody(
     content: MailboxItemDetailContent,
     ctaFlags: MailboxCTAFlags,
-    ackChecked: Boolean,
-    onAckChange: (Boolean) -> Unit,
     onViewTerms: () -> Unit,
     onAcceptGig: () -> Unit,
     onReceiveAtDoor: () -> Unit,
@@ -222,8 +261,6 @@ private fun CategoryBody(
         content.payload is MailboxCategoryPayload.Certified ->
             CertifiedBody(
                 certified = content.payload.detail,
-                isAcknowledged = ackChecked,
-                onAcknowledgedChange = onAckChange,
                 onViewTerms = onViewTerms,
             )
         content.payload is MailboxCategoryPayload.Gig ->
@@ -240,6 +277,21 @@ private fun CategoryBody(
             MailItemPlaceholderBody(category = content.category)
         else -> Unit
     }
+}
+
+private fun formatCertifiedDeadline(iso: String?): String? {
+    if (iso.isNullOrBlank()) return null
+    val instant =
+        runCatching { Instant.parse(iso) }
+            .getOrNull()
+            ?: runCatching {
+                LocalDate.parse(iso).atStartOfDay(ZoneId.systemDefault()).toInstant()
+            }.getOrNull()
+            ?: return iso
+    return DateTimeFormatter
+        .ofPattern("EEE MMM d, yyyy", Locale.US)
+        .withZone(ZoneId.systemDefault())
+        .format(instant)
 }
 
 @Composable

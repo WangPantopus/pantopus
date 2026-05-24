@@ -2,10 +2,9 @@
 //  CertifiedBody.swift
 //  Pantopus
 //
-//  Concrete body for the Certified mailbox category. Replaces the P9
-//  placeholder. The shell renders the AI elf + KeyFacts + Timeline; the
-//  body adds the long-form notice text and the "I acknowledge receipt"
-//  gate that locks the primary CTA.
+//  Concrete body for the Certified mailbox category. The surrounding
+//  shell renders the AI summary, key facts, and timeline; this body
+//  mirrors the A17.3 notice card and high-stakes delivery terms summary.
 //
 // swiftlint:disable multiple_closures_with_trailing_closure
 
@@ -14,56 +13,90 @@ import SwiftUI
 @MainActor
 public struct CertifiedBody: View {
     private let certified: CertifiedDetailDTO
-    @Binding private var isAcknowledged: Bool
     private let onViewTerms: @MainActor () -> Void
 
     public init(
         certified: CertifiedDetailDTO,
-        isAcknowledged: Binding<Bool>,
         onViewTerms: @escaping @MainActor () -> Void
     ) {
         self.certified = certified
-        _isAcknowledged = isAcknowledged
         self.onViewTerms = onViewTerms
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s4) {
-            if let body = certified.noticeBody, !body.isEmpty {
-                Text(body)
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            if isHighStakes {
+                CertifiedTermsSummaryCard(
+                    termsURL: certified.termsURL,
+                    onViewTerms: certified.termsURL == nil ? nil : onViewTerms
+                )
+                .padding(.horizontal, Spacing.s4)
+            }
+
+            noticeCard
+                .padding(.horizontal, Spacing.s4)
+        }
+    }
+
+    private var isHighStakes: Bool {
+        certified.termsURL != nil || certified.acknowledgeBy != nil
+    }
+
+    private var noticeParagraphs: [String] {
+        guard let body = certified.noticeBody?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !body.isEmpty else {
+            return ["No notice text was included with this certified item."]
+        }
+        return body
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private var noticeCard: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("NOTICE TEXT")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(Array(noticeParagraphs.enumerated()), id: \.offset) { _, paragraph in
+                Text(paragraph)
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.Color.appTextStrong)
-                    .lineSpacing(4)
-                    .padding(.horizontal, Spacing.s4)
-                    .accessibilityLabel(body)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel(paragraph)
             }
-
             if certified.termsURL != nil {
                 Button(action: { onViewTerms() }) {
-                    HStack(spacing: Spacing.s1) {
-                        Icon(.file, size: 14, color: Theme.Color.primary600)
-                        Text("View terms")
-                            .pantopusTextStyle(.small)
-                            .foregroundStyle(Theme.Color.primary600)
+                    HStack(spacing: 4) {
+                        Text("Show full terms")
+                            .font(.system(size: 12, weight: .semibold))
+                        Icon(.chevronDown, size: 13, color: Theme.Color.primary600)
                     }
-                    .frame(minHeight: 44)
-                    .padding(.horizontal, Spacing.s4)
+                    .foregroundStyle(Theme.Color.primary600)
+                    .frame(minHeight: 44, alignment: .leading)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("View terms")
+                .accessibilityLabel("Show full certified terms")
+                .accessibilityIdentifier("certifiedBody_showTerms")
             }
-
-            CertifiedConfirmGate(
-                isAcknowledged: $isAcknowledged,
-                isEnabled: !certified.isAcknowledged
-            )
         }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .accessibilityIdentifier("certifiedBody_notice")
     }
 }
 
 #Preview {
-    @Previewable @State var ack = false
-    return CertifiedBody(
+    CertifiedBody(
         certified: CertifiedDetailDTO(
             referenceNumber: "CRT-2026-0091",
             documentType: "Court summons",
@@ -79,8 +112,7 @@ public struct CertifiedBody: View {
                 "Failure to appear may result in additional penalties.",
             termsURL: URL(string: "https://example.com/terms"),
             isAcknowledged: false
-        ),
-        isAcknowledged: $ack
+        )
     ) {}
         .background(Theme.Color.appBg)
 }

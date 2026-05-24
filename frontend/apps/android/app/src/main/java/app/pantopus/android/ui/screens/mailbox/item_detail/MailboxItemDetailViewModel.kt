@@ -132,6 +132,8 @@ data class MailboxItemDetailContent(
     val timeline: List<TimelineStep>,
     val packageInfo: PackageBodyContent?,
     val ctaEnabled: Boolean,
+    val isUnread: Boolean = false,
+    val isArchived: Boolean = false,
     /**
      * Category-specific sub-payload resolved from `mail.object_payload`
      * (P18). [MailboxCategoryPayload.Other] for categories without a
@@ -498,6 +500,8 @@ class MailboxItemDetailViewModel
                 timeline = emptyList(),
                 packageInfo = null,
                 ctaEnabled = true,
+                isUnread = !item.viewed,
+                isArchived = item.archived,
                 payload = MailboxCategoryPayload.Gig(gig),
             )
 
@@ -527,6 +531,8 @@ class MailboxItemDetailViewModel
                 timeline = emptyList(),
                 packageInfo = null,
                 ctaEnabled = true,
+                isUnread = !item.viewed,
+                isArchived = item.archived,
                 payload = MailboxCategoryPayload.Memory(memory),
             )
 
@@ -587,6 +593,8 @@ class MailboxItemDetailViewModel
                 timeline = emptyList(),
                 packageInfo = null,
                 ctaEnabled = true,
+                isUnread = !item.viewed,
+                isArchived = item.archived,
                 payload = MailboxCategoryPayload.Coupon(coupon),
             )
         }
@@ -617,6 +625,8 @@ class MailboxItemDetailViewModel
                 timeline = emptyList(),
                 packageInfo = null,
                 ctaEnabled = true,
+                isUnread = !item.viewed,
+                isArchived = item.archived,
                 payload = MailboxCategoryPayload.Booklet(booklet),
             )
 
@@ -669,6 +679,8 @@ class MailboxItemDetailViewModel
                 timeline = timeline,
                 packageInfo = null,
                 ctaEnabled = !certified.isAcknowledged,
+                isUnread = !item.viewed,
+                isArchived = item.archived,
                 payload = MailboxCategoryPayload.Certified(certified),
             )
         }
@@ -708,6 +720,8 @@ class MailboxItemDetailViewModel
                 timeline = emptyList(),
                 packageInfo = null,
                 ctaEnabled = true,
+                isUnread = !item.viewed,
+                isArchived = item.archived,
             )
 
         private fun projectPackage(
@@ -755,6 +769,8 @@ class MailboxItemDetailViewModel
                         received = received,
                     ),
                 ctaEnabled = deliveryStatus == PackageDeliveryStatus.Delivered && !received,
+                isUnread = !item.viewed,
+                isArchived = item.archived,
             )
         }
 

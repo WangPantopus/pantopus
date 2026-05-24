@@ -15,6 +15,7 @@ private struct PackageTrackingFixture {
     let subtitle: String
 }
 
+// swiftlint:disable type_body_length
 /// Sample payloads for the mailbox item-detail bodies.
 public enum MailItemSampleData {
     /// A17.2 primary booklet sample — neighborhood civic guide.
@@ -318,6 +319,66 @@ public enum MailItemSampleData {
     /// Bid-accepted secondary state.
     public static let gigAccepted = gigReceived.accepted()
 
+    /// A17.3 open/pre-signature certified mail state.
+    public static let certifiedUnread = CertifiedDetailDTO(
+        referenceNumber: "7014 2026 0411 3344 5577",
+        documentType: "Supplemental property tax bill",
+        acknowledgeBy: "2026-06-30T17:00:00Z",
+        chain: [
+            .init(
+                id: "delivered",
+                label: "Delivered to your Pantopus mailbox",
+                occurredAt: "2026-05-15T13:02:00Z",
+                isComplete: true
+            ),
+            .init(id: "out_for_delivery", label: "Out for delivery", occurredAt: "2026-05-15T10:38:00Z", isComplete: true),
+            .init(id: "distribution", label: "Arrived at distribution center", occurredAt: "2026-05-14T19:08:00Z", isComplete: true),
+            .init(id: "transit", label: "In transit", occurredAt: "2026-05-12T17:42:00Z", isComplete: true),
+            .init(id: "accepted", label: "Accepted from sender", occurredAt: "2026-05-12T11:30:00Z", isComplete: true)
+        ],
+        noticeBody: certifiedNoticeBody,
+        termsURL: URL(string: "https://example.com/certified-delivery-terms.pdf"),
+        isAcknowledged: false
+    )
+
+    /// A17.3 signed state with the Pantopus receipt at the top of the chain.
+    public static let certifiedSigned = CertifiedDetailDTO(
+        referenceNumber: certifiedUnread.referenceNumber,
+        documentType: certifiedUnread.documentType,
+        acknowledgeBy: certifiedUnread.acknowledgeBy,
+        chain: [
+            .init(
+                id: "acknowledged",
+                label: "Acknowledged on Pantopus",
+                occurredAt: "2026-05-15T14:14:00Z",
+                isComplete: true
+            )
+        ] + certifiedUnread.chain,
+        noticeBody: certifiedUnread.noticeBody,
+        termsURL: certifiedUnread.termsURL,
+        isAcknowledged: true
+    )
+
+    /// Same signed payload used for archived shell snapshots.
+    public static let certifiedArchived = certifiedSigned
+
+    private static let certifiedNoticeBody = [
+        """
+        This is a SUPPLEMENTAL property tax bill issued pursuant to Section 75 et seq. of the \
+        California Revenue and Taxation Code following a reassessment triggered by a change in \
+        ownership recorded on October 14, 2025.
+        """,
+        """
+        Your previously assessed value of $612,000 has been adjusted to $785,400, producing \
+        supplemental taxes for the partial year October 2025 through June 2026 in the amount \
+        shown below.
+        """,
+        """
+        Payment must be received or postmarked no later than the delinquency date or a 10% \
+        penalty plus 1.5% per month interest will accrue.
+        """
+    ].joined(separator: "\n\n")
+
     private static func sampleURL(_ string: String) -> URL {
         guard let url = URL(string: string) else {
             preconditionFailure("Invalid sample URL: \(string)")
@@ -325,3 +386,5 @@ public enum MailItemSampleData {
         return url
     }
 }
+
+// swiftlint:enable type_body_length

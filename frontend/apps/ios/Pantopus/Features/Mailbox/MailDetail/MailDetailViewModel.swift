@@ -59,6 +59,7 @@ public struct MailDetailContent: Sendable {
     public let aiSummary: String?
     public let ackRequired: Bool
     public let isAcknowledged: Bool
+    public let isArchived: Bool
 
     // MARK: - T6.5c variant payloads
 
@@ -101,6 +102,7 @@ public struct MailDetailContent: Sendable {
         aiSummary: String?,
         ackRequired: Bool,
         isAcknowledged: Bool,
+        isArchived: Bool = false,
         bookletDetail: BookletDetailDTO? = nil,
         certifiedDetail: CertifiedDetailDTO? = nil,
         communityDetail: CommunityDetailDTO? = nil
@@ -126,6 +128,7 @@ public struct MailDetailContent: Sendable {
         self.aiSummary = aiSummary
         self.ackRequired = ackRequired
         self.isAcknowledged = isAcknowledged
+        self.isArchived = isArchived
         self.bookletDetail = bookletDetail
         self.certifiedDetail = certifiedDetail
         self.communityDetail = communityDetail
@@ -416,6 +419,7 @@ public final class MailDetailViewModel {
             aiSummary: aiSummary,
             ackRequired: ackRequired,
             isAcknowledged: resolvedAck,
+            isArchived: item.archived,
             bookletDetail: bookletDetail,
             certifiedDetail: certifiedDetail,
             communityDetail: communityDetail
