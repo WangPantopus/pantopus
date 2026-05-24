@@ -114,6 +114,9 @@ public enum HubRoute: Hashable {
     case nearbyMapForGigs(categoryKey: String)
     /// Compose gig target — placeholder until the compose flow ships.
     case composeGig(category: String)
+    /// Quick-post V1 single-screen gig form. Reached from the Hub action chip;
+    /// the Gigs feed FAB keeps the V2 wizard for power users.
+    case quickPostGig(category: String)
     /// Marketplace tab (T2.5). Reached from Hub → pillar(.marketplace).
     case marketplace
     /// Listing detail (T2.6 TransactionalDetailShell · listing variant).
@@ -333,7 +336,7 @@ public struct HubTabRoot: View {
             case .startVerification: path.append(.addHome)
             case .action(.addHome): path.append(.addHome)
             case .action(.scanMail): path.append(.mailboxRoot)
-            case .action(.postTask): path.append(.placeholder(label: "Post a gig"))
+            case .action(.postTask): path.append(.quickPostGig(category: GigsCategory.all.rawValue))
             case .action(.snapAndSell): path.append(.placeholder(label: "Snap & sell"))
             case .pillar(.mail): path.append(.mailboxRoot)
             case .pillar(.pulse): path.append(.pulseFeed)
@@ -1016,6 +1019,23 @@ public struct HubTabRoot: View {
                 // to the Gigs feed, not the success screen.
                 path.removeAll { route in
                     if case .composeGig = route { return true }
+                    return false
+                }
+                path.append(.gigDetail(gigId: gigId))
+            }
+        case let .quickPostGig(category):
+            PostGigV1View(
+                viewModel: PostGigV1ViewModel(
+                    initialState: PostGigV1State(
+                        form: PostGigV1Form(
+                            category: GigsCategory(rawValue: category) ?? .all
+                        )
+                    )
+                ),
+                onClose: pop
+            ) { gigId in
+                path.removeAll { route in
+                    if case .quickPostGig = route { return true }
                     return false
                 }
                 path.append(.gigDetail(gigId: gigId))

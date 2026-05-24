@@ -65,6 +65,7 @@ import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.gigs.GigSearchScreen
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
+import app.pantopus.android.ui.screens.gigs.quickpost.PostGigV1Screen
 import app.pantopus.android.ui.screens.gigs.tasks_map.TasksMapScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
@@ -729,6 +730,10 @@ private object ChildRoutes {
     const val COMPOSE_GIG_CATEGORY_KEY = "category"
     const val COMPOSE_GIG = "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY={$COMPOSE_GIG_CATEGORY_KEY}"
 
+    /** Quick-post V1 single-screen gig form. Hub action chip entry point. */
+    const val QUICK_POST_GIG_CATEGORY_KEY = "category"
+    const val QUICK_POST_GIG = "gigs/quick-post?$QUICK_POST_GIG_CATEGORY_KEY={$QUICK_POST_GIG_CATEGORY_KEY}"
+
     /** Nearby map opened from the Gigs feed map-toggle — seeded with the
      *  active category so the same filter applies on the map. */
     const val NEARBY_MAP_FOR_GIGS_CATEGORY_KEY = "category"
@@ -888,6 +893,9 @@ private object ChildRoutes {
 
     /** Build the compose-gig path with the active category pre-fill. */
     fun composeGig(category: String): String = "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
+
+    fun quickPostGig(category: String): String =
+        "gigs/quick-post?$QUICK_POST_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
 
     /** Build the Nearby-map-for-gigs path with the active category seed. */
     fun nearbyMapForGigs(category: String): String =
@@ -1184,7 +1192,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     ActionChipContent.Kind.ScanMail ->
                                         navController.navigate(ChildRoutes.MAILBOX_ROOT)
                                     ActionChipContent.Kind.PostTask ->
-                                        navController.navigate(ChildRoutes.composeGig(GigsCategory.All.key))
+                                        navController.navigate(ChildRoutes.quickPostGig(GigsCategory.All.key))
                                     ActionChipContent.Kind.SnapAndSell ->
                                         navController.navigate(ChildRoutes.placeholder("Snap & sell"))
                                 }
@@ -2303,6 +2311,26 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onBack = { navController.popBackStack() },
                     initialCategory = GigsCategory.fromBackendKey(raw),
+                )
+            }
+            composable(
+                route = ChildRoutes.QUICK_POST_GIG,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.QUICK_POST_GIG_CATEGORY_KEY) {
+                            type = NavType.StringType
+                            defaultValue = GigsCategory.All.key
+                        },
+                    ),
+            ) { entry ->
+                val raw = entry.arguments?.getString(ChildRoutes.QUICK_POST_GIG_CATEGORY_KEY) ?: GigsCategory.All.key
+                PostGigV1Screen(
+                    onDismiss = { navController.popBackStack() },
+                    onPosted = { gigId ->
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.gigDetail(gigId))
+                    },
+                    preselectedCategoryKey = raw,
                 )
             }
             composable(
