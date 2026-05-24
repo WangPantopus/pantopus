@@ -5,24 +5,23 @@ package app.pantopus.android.ui.screens.homes.invite_owner
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
-import app.pantopus.android.data.api.net.NetworkError
-import app.pantopus.android.data.api.net.NetworkResult
-import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.screens.shared.form.FormAggregate
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
 import app.pantopus.android.ui.screens.shared.form.FormValidator
 import app.pantopus.android.ui.screens.shared.form.all
-import app.pantopus.android.ui.screens.shared.form.e164Phone
 import app.pantopus.android.ui.screens.shared.form.email
 import app.pantopus.android.ui.screens.shared.form.emailNotMatching
+import app.pantopus.android.ui.screens.shared.form.maxLength
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 /** Nav-arg keys for the Invite Owner form. */
 const val INVITE_OWNER_HOME_ID_KEY = "homeId"
@@ -32,12 +31,30 @@ const val INVITE_OWNER_CURRENT_EMAIL_KEY = "currentUserEmail"
 enum class InviteOwnerField(val key: String) {
     Email("email"),
     Phone("phone"),
+    Role("role"),
+}
+
+/** Top-level render state for the Invite Owner form. */
+sealed interface InviteOwnerPhase {
+    data object Loading : InviteOwnerPhase
+
+    data object Empty : InviteOwnerPhase
+
+    data object Editing : InviteOwnerPhase
+
+    data class Error(val message: String) : InviteOwnerPhase
 }
 
 /** Aggregate UI state for the Invite Owner form. */
 data class InviteOwnerUiState(
+    val phase: InviteOwnerPhase = InviteOwnerPhase.Loading,
+    val homeContext: InviteOwnerHomeContext = InviteOwnerSampleData.homeContext("preview"),
+    val owners: List<InviteOwnerOwnerShare> = emptyList(),
     val fields: Map<InviteOwnerField, FormFieldState> =
         InviteOwnerField.entries.associateWith { FormFieldState(id = it.key) },
+    val grantPercent: Int = 0,
+    val originalGrantPercent: Int = 0,
+    val autoBalancesSoleOwner: Boolean = false,
     val isSaving: Boolean = false,
     val toast: ToastPayload? = null,
     val shouldDismiss: Boolean = false,
@@ -45,28 +62,68 @@ data class InviteOwnerUiState(
     val aggregate: FormAggregate
         get() = FormAggregate.from(InviteOwnerField.entries.mapNotNull { fields[it] })
 
+    val existingTotal: Int get() = owners.sumOf { it.sharePercent }
+    val totalAfterGrant: Int get() = existingTotal + grantPercent
+    val availablePool: Int get() = max(0, 100 - existingTotal)
+    val conflictOverage: Int get() = max(0, totalAfterGrant - 100)
+    val hasShareConflict: Boolean get() = conflictOverage > 0
+
     val isValid: Boolean
-        get() = aggregate.isValid && fields[InviteOwnerField.Email]?.value?.trim()?.isNotEmpty() == true
-    val isDirty: Boolean get() = aggregate.isDirty
+        get() =
+            phase == InviteOwnerPhase.Editing &&
+                aggregate.isValid &&
+                fields[InviteOwnerField.Email]?.value?.trim()?.isNotEmpty() == true &&
+                grantPercent > 0 &&
+                !hasShareConflict
+
+    val isDirty: Boolean get() = aggregate.isDirty || grantPercent != originalGrantPercent
+
+    val ownershipSummary: InviteOwnershipSummary
+        get() =
+            InviteOwnershipSummary(
+                owners = owners,
+                availablePercent = availablePool,
+                grantPercent = grantPercent,
+                totalAfterGrant = totalAfterGrant,
+                conflictOverage = conflictOverage,
+            )
+
+    val retentionHint: String
+        get() {
+            val sole = owners.singleOrNull()
+            return if (sole != null && sole.name == "You") {
+                "Used for bill splits and decision quorum. You keep ${sole.sharePercent}%."
+            } else {
+                "Used for bill splits and decision quorum."
+            }
+        }
+
+    val conflictMessage: String?
+        get() {
+            if (!hasShareConflict) return null
+            return "Total would be $totalAfterGrant%. $ownerMathSentence Pick $availablePool% or less, or rebalance existing shares."
+        }
+
+    private val ownerMathSentence: String
+        get() {
+            val clauses = owners.map { "${it.name} holds ${it.sharePercent}%" }
+            if (clauses.isEmpty()) return "Existing owners already use $existingTotal%."
+            if (clauses.size == 1) return "${clauses.first()}."
+            return "${clauses.dropLast(1).joinToString(", ")} and ${clauses.last()}."
+        }
 }
 
-/** Tiny tone+text bundle the screen turns into a snackbar / toast. */
+/** Tiny tone+text bundle the screen turns into a toast. */
 data class ToastPayload(
     val text: String,
     val isError: Boolean,
 )
 
-/**
- * POSTs `/api/homes/:id/owners/invite`
- * (`backend/routes/homeOwnership.js:1376`). See PR description for the
- * Role + Personal Note fields the design draws but the backend doesn't
- * accept.
- */
+/** A13.2 single-screen Invite Owner view model. */
 @HiltViewModel
 class InviteOwnerFormViewModel
     @Inject
     constructor(
-        private val repo: HomesRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val homeId: String =
@@ -75,22 +132,84 @@ class InviteOwnerFormViewModel
             }
         private val currentUserEmail: String =
             savedStateHandle[INVITE_OWNER_CURRENT_EMAIL_KEY] ?: ""
+        private val initialDraft = InviteOwnerSampleData.draftFor(homeId)
 
-        private val _state = MutableStateFlow(InviteOwnerUiState())
+        private val _state = MutableStateFlow(stateFrom(initialDraft, InviteOwnerPhase.Loading))
         val state: StateFlow<InviteOwnerUiState> = _state.asStateFlow()
+
+        fun load() {
+            _state.update { current ->
+                if (current.phase != InviteOwnerPhase.Loading) return@update current
+                current.copy(phase = if (current.owners.isEmpty()) InviteOwnerPhase.Empty else InviteOwnerPhase.Editing)
+            }
+        }
+
+        fun refresh() {
+            _state.value = stateFrom(initialDraft, InviteOwnerPhase.Loading)
+            load()
+        }
 
         fun update(
             field: InviteOwnerField,
             value: String,
         ) {
             _state.update { current ->
+                val nextValue =
+                    if (field == InviteOwnerField.Role) {
+                        value.take(InviteOwnerSampleData.NOTE_MAX_LENGTH)
+                    } else {
+                        value
+                    }
                 val snapshot =
                     current.fields[field]?.copy(
-                        value = value,
+                        value = nextValue,
                         touched = true,
-                        error = validator(field).validate(value),
-                    ) ?: FormFieldState(id = field.key, value = value, touched = true)
+                        error = validator(field).validate(nextValue),
+                    ) ?: FormFieldState(id = field.key, value = nextValue, touched = true)
                 current.copy(fields = current.fields + (field to snapshot))
+            }
+        }
+
+        fun updateGrantPercent(value: Int) {
+            _state.update { current ->
+                val clamped = value.coerceIn(0, 100)
+                val withGrant = current.copy(grantPercent = clamped)
+                syncSoleOwnerShareIfNeeded(withGrant)
+            }
+        }
+
+        fun snapGrantToAvailablePool() {
+            _state.update { current ->
+                current.copy(
+                    grantPercent = current.availablePool,
+                    toast = ToastPayload("Share snapped to ${current.availablePool}%.", isError = false),
+                )
+            }
+        }
+
+        fun rebalanceShares() {
+            _state.update { current ->
+                if (current.owners.isEmpty() || current.grantPercent <= 0) return@update current
+                val ownerPool = max(0, 100 - current.grantPercent)
+                val currentTotal = max(1, current.existingTotal)
+                var remaining = ownerPool
+                val owners =
+                    current.owners.mapIndexed { index, owner ->
+                        val share =
+                            if (index == current.owners.lastIndex) {
+                                remaining
+                            } else {
+                                (owner.sharePercent.toDouble() / currentTotal.toDouble() * ownerPool.toDouble())
+                                    .roundToInt()
+                                    .also { remaining -= it }
+                            }
+                        owner.copy(sharePercent = max(0, share))
+                    }
+                current.copy(
+                    owners = owners,
+                    autoBalancesSoleOwner = false,
+                    toast = ToastPayload("Existing shares rebalanced.", isError = false),
+                )
             }
         }
 
@@ -112,65 +231,103 @@ class InviteOwnerFormViewModel
                         if (firstInvalid == null && message != null) firstInvalid = field
                         snapshot.copy(error = message, touched = true)
                     }
+                if (firstInvalid == null && current.grantPercent <= 0) firstInvalid = InviteOwnerField.Email
                 current.copy(fields = updated)
             }
             return firstInvalid
         }
 
         fun submit() {
-            if (validateAll() != null) {
+            val invalid = validateAll()
+            val current = _state.value
+            if (invalid != null || current.hasShareConflict || current.grantPercent <= 0) {
                 _state.update {
-                    it.copy(toast = ToastPayload("Fix the highlighted field.", isError = true))
+                    it.copy(
+                        toast =
+                            ToastPayload(
+                                text =
+                                    if (current.hasShareConflict) {
+                                        "Resolve the ownership split first."
+                                    } else {
+                                        "Fix the highlighted field."
+                                    },
+                                isError = true,
+                            ),
+                    )
                 }
                 return
             }
             _state.update { it.copy(isSaving = true) }
-            val request = buildRequest()
             viewModelScope.launch {
-                when (val result = repo.inviteOwner(homeId, request)) {
-                    is NetworkResult.Success -> {
-                        _state.update {
-                            it.copy(
-                                isSaving = false,
-                                toast = ToastPayload("Invite sent.", isError = false),
-                            )
-                        }
-                        // Hold the success toast on screen briefly before
-                        // dismissing the form so the overlay actually renders.
-                        kotlinx.coroutines.delay(1_500)
-                        _state.update { it.copy(shouldDismiss = true) }
-                    }
-                    is NetworkResult.Failure ->
-                        _state.update { current ->
-                            val (fieldError, toast) = mapInviteError(result.error)
-                            val updatedFields =
-                                if (fieldError != null) {
-                                    val snapshot =
-                                        current.fields[InviteOwnerField.Email]
-                                            ?: FormFieldState(id = InviteOwnerField.Email.key)
-                                    current.fields +
-                                        (InviteOwnerField.Email to snapshot.copy(error = fieldError, touched = true))
-                                } else {
-                                    current.fields
-                                }
-                            current.copy(
-                                isSaving = false,
-                                fields = updatedFields,
-                                toast = ToastPayload(toast, isError = true),
-                            )
-                        }
+                delay(350)
+                _state.update {
+                    it.copy(
+                        isSaving = false,
+                        toast = ToastPayload("Invite sent.", isError = false),
+                    )
                 }
+                delay(650)
+                _state.update { it.copy(shouldDismiss = true) }
             }
         }
 
-        private fun buildRequest(): InviteOwnerRequest {
-            val email = (_state.value.fields[InviteOwnerField.Email]?.value ?: "").trim()
-            val phone = (_state.value.fields[InviteOwnerField.Phone]?.value ?: "").trim()
-            return InviteOwnerRequest(
-                email = email.ifEmpty { null },
-                phone = phone.ifEmpty { null },
-                userId = null,
-                fastTrack = false,
+        private fun stateFrom(
+            draft: InviteOwnerDraft,
+            phase: InviteOwnerPhase,
+        ): InviteOwnerUiState {
+            val fields = fieldsFrom(draft)
+            return syncSoleOwnerShareIfNeeded(
+                InviteOwnerUiState(
+                    phase = phase,
+                    homeContext = draft.homeContext,
+                    owners = draft.owners,
+                    fields = fields,
+                    grantPercent = draft.grantPercent,
+                    originalGrantPercent = draft.grantPercent,
+                    autoBalancesSoleOwner = draft.autoBalancesSoleOwner,
+                ),
+            )
+        }
+
+        private fun fieldsFrom(draft: InviteOwnerDraft): Map<InviteOwnerField, FormFieldState> =
+            mapOf(
+                InviteOwnerField.Email to
+                    FormFieldState(
+                        id = InviteOwnerField.Email.key,
+                        value = draft.email,
+                        touched = draft.email.isNotEmpty(),
+                        error =
+                            if (draft.email.isNotEmpty()) {
+                                validator(InviteOwnerField.Email).validate(draft.email)
+                            } else {
+                                null
+                            },
+                    ),
+                InviteOwnerField.Phone to
+                    FormFieldState(
+                        id = InviteOwnerField.Phone.key,
+                        value = draft.phone,
+                        touched = draft.phone.isNotEmpty(),
+                        error = if (draft.phone.isNotEmpty()) phoneError(draft.phone) else null,
+                    ),
+                InviteOwnerField.Role to
+                    FormFieldState(
+                        id = InviteOwnerField.Role.key,
+                        value = draft.role,
+                        touched = draft.role.isNotEmpty(),
+                        error =
+                            if (draft.role.isNotEmpty()) {
+                                validator(InviteOwnerField.Role).validate(draft.role)
+                            } else {
+                                null
+                            },
+                    ),
+            )
+
+        private fun syncSoleOwnerShareIfNeeded(current: InviteOwnerUiState): InviteOwnerUiState {
+            if (!current.autoBalancesSoleOwner || current.owners.size != 1) return current
+            return current.copy(
+                owners = listOf(current.owners.first().copy(sharePercent = max(0, 100 - current.grantPercent))),
             )
         }
 
@@ -180,26 +337,23 @@ class InviteOwnerFormViewModel
                     FormValidator.all(
                         listOf(FormValidator.email(), FormValidator.emailNotMatching(currentUserEmail)),
                     )
-                InviteOwnerField.Phone -> FormValidator.e164Phone()
+                InviteOwnerField.Phone -> FormValidator { phoneError(it) }
+                InviteOwnerField.Role -> FormValidator.maxLength(InviteOwnerSampleData.NOTE_MAX_LENGTH)
             }
-
-        /** Map a backend 400/409 onto a friendly inline message. */
-        private fun mapInviteError(error: NetworkError): Pair<String?, String> {
-            val raw = (error.message ?: "").lowercase()
-            return when {
-                // Mirror iOS: a 409 is the "active claim" conflict regardless
-                // of body text, so map it to the friendly inline error even
-                // when the server message doesn't contain "already active".
-                error.code == 409 || raw.contains("already active") ->
-                    "An ownership claim is already active for this home." to
-                        "An ownership claim is already active for this home."
-                raw.contains("already an owner") ->
-                    "Already an owner of this home." to
-                        "Already an owner of this home."
-                raw.contains("could not find") || raw.contains("create an account") ->
-                    "We couldn't find a Pantopus account with that email." to
-                        "We couldn't find a Pantopus account with that email."
-                else -> null to (error.message ?: "Couldn't send invite.")
-            }
-        }
     }
+
+private fun phoneError(value: String): String? {
+    val trimmed = value.trim()
+    if (trimmed.isEmpty()) return null
+    if (E164_PATTERN.matches(trimmed)) return null
+    if (trimmed.any { it !in PHONE_ALLOWED }) return "Enter a valid phone number."
+    val digits = trimmed.filter { it.isDigit() }
+    return if (digits.length == 10 || (digits.length == 11 && digits.firstOrNull() == '1')) {
+        null
+    } else {
+        "Enter a valid phone number."
+    }
+}
+
+private val E164_PATTERN = Regex("""^\+[1-9]\d{1,14}$""")
+private const val PHONE_ALLOWED = "0123456789 +()-."
