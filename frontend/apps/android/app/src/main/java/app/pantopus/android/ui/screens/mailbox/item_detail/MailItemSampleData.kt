@@ -5,6 +5,7 @@ package app.pantopus.android.ui.screens.mailbox.item_detail
 import app.pantopus.android.data.api.models.mailbox.v2.BookletDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedChainStep
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
 import app.pantopus.android.ui.components.TimelineStep
 import app.pantopus.android.ui.components.TimelineStepState
@@ -16,6 +17,51 @@ import app.pantopus.android.ui.theme.PantopusIcon
  * than round-tripping the network. Mirrors the A17.6 gig.jsx sample data.
  */
 object MailItemSampleData {
+    /** A17.5 primary coupon state — ready to scan in store. */
+    val couponUnused =
+        CouponDetailDto(
+            brandLogoUrl = null,
+            brandName = "Brass Owl Bakery",
+            headline = "25% OFF",
+            subcopy = "Your next in-store purchase",
+            code = "BRASS25",
+            expiresAt = "2026-06-30",
+            merchant = "Brass Owl Bakery",
+            terms = "Valid for one in-store transaction. Cannot be combined with daily specials or loyalty rewards.",
+            minimumSpend = "$8 minimum",
+            finePrint = "Excludes whole-cake orders, catering trays, gift cards, and already-marked-down items.",
+        )
+
+    /** A17.5 redeemed secondary state — success ribbon replaces the hero. */
+    val couponRedeemed =
+        CouponDetailDto(
+            brandLogoUrl = null,
+            brandName = "Brass Owl Bakery",
+            headline = "25% OFF",
+            subcopy = "Your next in-store purchase",
+            code = "BRASS25",
+            expiresAt = "2026-06-30",
+            merchant = "Brass Owl Bakery",
+            terms = "Redeemed offers cannot be reused or transferred.",
+            minimumSpend = "$8 minimum",
+            finePrint = "Coupon was single-use and has been retired after checkout.",
+        )
+
+    /** A17.5 terminal expired state. */
+    val couponExpired =
+        CouponDetailDto(
+            brandLogoUrl = null,
+            brandName = "Brass Owl Bakery",
+            headline = "25% OFF",
+            subcopy = "Your next in-store purchase",
+            code = "BRASS25",
+            expiresAt = "2026-05-01",
+            merchant = "Brass Owl Bakery",
+            terms = "Expired offers cannot be scanned, copied, or restored.",
+            minimumSpend = "$8 minimum",
+            finePrint = "This offer expired before redemption.",
+        )
+
     /** A17.2 primary booklet sample — neighborhood civic guide. */
     val bookletVoterGuide =
         BookletDetailDto(
