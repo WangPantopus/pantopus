@@ -128,6 +128,59 @@ class ChatConversationSnapshotTest {
     }
 
     @Test
+    fun chat_conversation_dm_photo_bubble_with_read_receipt() {
+        paparazzi.snapshot {
+            Frame {
+                DmConversationFrame {
+                    PopulatedFrame(
+                        rows = ChatConversationSampleData.dmPhotoReadRows,
+                        onRetry = {},
+                        onLoadOlder = {},
+                        incomingInitials = "JT",
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun chat_conversation_dm_typing_indicator() {
+        paparazzi.snapshot {
+            Frame {
+                DmConversationFrame {
+                    PopulatedFrame(
+                        rows = ChatConversationSampleData.dmTypingRows,
+                        onRetry = {},
+                        onLoadOlder = {},
+                        incomingInitials = "JT",
+                    )
+                    TypingIndicator(initials = "JT")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun chat_conversation_dm_queued_attachments() {
+        paparazzi.snapshot {
+            Frame {
+                DmConversationFrame {
+                    PopulatedFrame(
+                        rows = ChatConversationSampleData.dmQueuedAttachmentRows,
+                        onRetry = {},
+                        onLoadOlder = {},
+                        incomingInitials = "JT",
+                    )
+                    AttachmentStripView(
+                        attachments = ChatConversationSampleData.queuedAttachments,
+                        onRemove = {},
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
     fun chat_conversation_composer_empty_and_populated() {
         paparazzi.snapshot {
             Frame {
@@ -173,6 +226,7 @@ class ChatConversationSnapshotTest {
                     hasTail = true,
                     stamp = "Maria · 9:48 AM",
                     deliveryState = null,
+                    isContinuation = true,
                 ),
             ),
             // Outgoing pair, tail + delivered stamp on second
@@ -194,6 +248,7 @@ class ChatConversationSnapshotTest {
                     hasTail = true,
                     stamp = "9:51 AM",
                     deliveryState = ChatDeliveryState.Delivered,
+                    isContinuation = true,
                 ),
             ),
             // System link variant
@@ -223,6 +278,23 @@ class ChatConversationSnapshotTest {
                         .fillMaxSize()
                         .background(PantopusColors.appBg),
             ) { content() }
+        }
+    }
+
+    @Composable
+    private fun DmConversationFrame(content: @Composable () -> Unit) {
+        Column(modifier = Modifier.fillMaxSize().background(PantopusColors.appSurface)) {
+            ChatHeader(counterparty = ChatConversationSampleData.dmCounterparty, onBack = {})
+            Box(modifier = Modifier.weight(1f).fillMaxSize()) {
+                content()
+            }
+            Composer(
+                text = "Deal — see you",
+                placeholder = "Message Jamal…",
+                canSend = true,
+                onTextChange = {},
+                onSend = {},
+            )
         }
     }
 }

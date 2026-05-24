@@ -51,6 +51,15 @@ enum class ChatDeliveryState { Sending, Failed, Delivered, Read }
 
 enum class ChatSystemLinkAccent { Primary, Success, Warning, Error }
 
+enum class ChatQueuedAttachmentKind { Image, Document }
+
+@Immutable
+data class ChatQueuedAttachment(
+    val id: String,
+    val kind: ChatQueuedAttachmentKind,
+    val filename: String,
+)
+
 /**
  * Inline "this would cost about $X" estimate rendered inside an AI reply
  * bubble (`AiEstimateCard`).
@@ -98,6 +107,7 @@ data class ChatBubbleContent(
     val hasTail: Boolean,
     val stamp: String?,
     val deliveryState: ChatDeliveryState?,
+    val isContinuation: Boolean = false,
 )
 
 @Immutable

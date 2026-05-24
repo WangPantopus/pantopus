@@ -10,6 +10,21 @@ package app.pantopus.android.ui.screens.inbox.conversation
 object ChatConversationSampleData {
     const val AI_NAME = "Ask Pantopus"
 
+    val dmCounterparty =
+        ChatCounterparty.Person(
+            displayName = "Jamal T.",
+            initials = "JT",
+            locality = "Elm Park",
+            verified = true,
+            online = false,
+        )
+
+    val queuedAttachments =
+        listOf(
+            ChatQueuedAttachment("queued_photo", ChatQueuedAttachmentKind.Image, "shelves.jpg"),
+            ChatQueuedAttachment("queued_pdf", ChatQueuedAttachmentKind.Document, "shelf.pdf"),
+        )
+
     /**
      * An active AI thread: a user question followed by a structured AI
      * reply carrying an inline estimate card.
@@ -44,6 +59,103 @@ object ChatConversationSampleData {
                     hasTail = true,
                     stamp = "9:08 AM",
                     deliveryState = null,
+                ),
+            ),
+        )
+
+    val dmPhotoReadRows: List<ChatTimelineRow> =
+        listOf(
+            ChatTimelineRow.DayDivider(ChatDayDivider(id = "today", label = "Today")),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "m1",
+                    side = ChatMessageSide.Incoming,
+                    body = ChatBubbleBody.Text("8:30 sharp. I'll grab two."),
+                    hasTail = true,
+                    stamp = "9:10 AM",
+                    deliveryState = null,
+                ),
+            ),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "m2",
+                    side = ChatMessageSide.Outgoing,
+                    body = ChatBubbleBody.Text("Deal — see you at the bench."),
+                    hasTail = false,
+                    stamp = null,
+                    deliveryState = null,
+                ),
+            ),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "m3",
+                    side = ChatMessageSide.Outgoing,
+                    body = ChatBubbleBody.Text("Snapped a photo of the spot:"),
+                    hasTail = false,
+                    stamp = null,
+                    deliveryState = null,
+                    isContinuation = true,
+                ),
+            ),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "m4",
+                    side = ChatMessageSide.Outgoing,
+                    body = ChatBubbleBody.Image(url = null),
+                    hasTail = true,
+                    stamp = "9:14",
+                    deliveryState = ChatDeliveryState.Read,
+                    isContinuation = true,
+                ),
+            ),
+        )
+
+    val dmTypingRows: List<ChatTimelineRow> =
+        listOf(
+            ChatTimelineRow.DayDivider(ChatDayDivider(id = "today", label = "Today")),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "m1",
+                    side = ChatMessageSide.Incoming,
+                    body = ChatBubbleBody.Text("Btw — here's the bakery I keep raving about."),
+                    hasTail = true,
+                    stamp = "6:42 PM",
+                    deliveryState = null,
+                ),
+            ),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "m2",
+                    side = ChatMessageSide.Outgoing,
+                    body = ChatBubbleBody.Text("Bookmarked. Sunday morning mission."),
+                    hasTail = true,
+                    stamp = "6:44 PM",
+                    deliveryState = ChatDeliveryState.Read,
+                ),
+            ),
+        )
+
+    val dmQueuedAttachmentRows: List<ChatTimelineRow> =
+        listOf(
+            ChatTimelineRow.DayDivider(ChatDayDivider(id = "today", label = "Today")),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "m1",
+                    side = ChatMessageSide.Incoming,
+                    body = ChatBubbleBody.Text("Can you send the shelf photo and measurements?"),
+                    hasTail = true,
+                    stamp = "9:12 AM",
+                    deliveryState = null,
+                ),
+            ),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "m2",
+                    side = ChatMessageSide.Outgoing,
+                    body = ChatBubbleBody.Text("Uploading both now."),
+                    hasTail = true,
+                    stamp = "9:13 AM",
+                    deliveryState = ChatDeliveryState.Delivered,
                 ),
             ),
         )

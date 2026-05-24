@@ -27,13 +27,26 @@ final class ChatConversationSnapshotTests: XCTestCase {
         assertRenders(viewModel: ChatConversationSampleData.aiActiveViewModel())
     }
 
+    func test_dm_photo_bubble_with_read_receipt_renders() {
+        assertRenders(viewModel: ChatConversationSampleData.dmPhotoReadReceiptViewModel(), mode: .dm)
+    }
+
+    func test_dm_typing_indicator_renders() {
+        assertRenders(viewModel: ChatConversationSampleData.dmTypingViewModel(), mode: .dm)
+    }
+
+    func test_dm_queued_attachments_renders() {
+        assertRenders(viewModel: ChatConversationSampleData.dmQueuedAttachmentsViewModel(), mode: .dm)
+    }
+
     private func assertRenders(
         viewModel: ChatConversationViewModel,
+        mode: ChatConversationMode = .aiAssistant,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
         let host = UIHostingController(
-            rootView: ChatConversationView(viewModel: viewModel, mode: .aiAssistant)
+            rootView: ChatConversationView(viewModel: viewModel, mode: mode)
                 .frame(width: 390, height: 844)
         )
         host.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)

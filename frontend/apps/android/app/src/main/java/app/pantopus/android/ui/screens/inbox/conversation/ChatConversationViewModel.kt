@@ -49,6 +49,9 @@ class ChatConversationViewModel
         private val _isCounterpartyTyping = MutableStateFlow(false)
         val isCounterpartyTyping: StateFlow<Boolean> = _isCounterpartyTyping.asStateFlow()
 
+        private val _queuedAttachments = MutableStateFlow<List<ChatQueuedAttachment>>(emptyList())
+        val queuedAttachments: StateFlow<List<ChatQueuedAttachment>> = _queuedAttachments.asStateFlow()
+
         // Timeline row id ("bubble_<messageId>") the screen should scroll
         // to — set once when opened from Chat Search with a matched message
         // present in the loaded page. Cleared via [consumePendingScroll].
@@ -123,6 +126,28 @@ class ChatConversationViewModel
 
         fun tapPrompt(chip: ChatPromptChip) {
             _composerText.value = chip.label
+        }
+
+        fun queueSamplePhotoAttachment() {
+            appendQueuedAttachment(ChatQueuedAttachment("queued_photo", ChatQueuedAttachmentKind.Image, "shelves.jpg"))
+        }
+
+        fun queueSampleDocumentAttachment() {
+            appendQueuedAttachment(ChatQueuedAttachment("queued_pdf", ChatQueuedAttachmentKind.Document, "shelf.pdf"))
+        }
+
+        fun queueSampleAttachments() {
+            queueSamplePhotoAttachment()
+            queueSampleDocumentAttachment()
+        }
+
+        fun removeQueuedAttachment(id: String) {
+            _queuedAttachments.value = _queuedAttachments.value.filterNot { it.id == id }
+        }
+
+        private fun appendQueuedAttachment(attachment: ChatQueuedAttachment) {
+            if (_queuedAttachments.value.any { it.id == attachment.id }) return
+            _queuedAttachments.value = _queuedAttachments.value + attachment
         }
 
         /**
@@ -369,6 +394,10 @@ class ChatConversationViewModel
                     lastDayKey = dayKey
                 }
                 val side = if (message.userId == currentUserId) ChatMessageSide.Outgoing else ChatMessageSide.Incoming
+                val previousSameSide =
+                    index > 0 &&
+                        combined[index - 1].userId == message.userId &&
+                        dayKey(combined[index - 1].createdAt) == dayKey
                 val nextSameSide =
                     index + 1 < combined.size &&
                         combined[index + 1].userId == message.userId &&
@@ -397,6 +426,7 @@ class ChatConversationViewModel
                             hasTail = hasTail,
                             stamp = stamp,
                             deliveryState = deliveryState,
+                            isContinuation = previousSameSide,
                         ),
                     ),
                 )
