@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.cash.paparazzi.DeviceConfig
@@ -43,6 +44,15 @@ class ChatConversationSnapshotTest {
         )
 
     private val aiCounterparty = ChatCounterparty.Ai(displayName = "Ask Pantopus")
+
+    private val creatorCounterparty =
+        ChatCounterparty.Person(
+            displayName = ChatConversationSampleData.CREATOR_FAN_NAME,
+            initials = "PR",
+            locality = "0.4 mi",
+            verified = true,
+            online = true,
+        )
 
     @Test
     fun chat_conversation_header_person() {
@@ -114,6 +124,41 @@ class ChatConversationSnapshotTest {
                     onRetry = {},
                     onLoadOlder = {},
                 )
+            }
+        }
+    }
+
+    @Test
+    fun chat_conversation_creator_thread_chrome() {
+        paparazzi.snapshot {
+            Frame {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    ChatHeader(
+                        counterparty = creatorCounterparty,
+                        onBack = {},
+                        conversationMode = ChatConversationMode.CreatorThread,
+                        creatorContext = ChatConversationSampleData.creatorContext,
+                    )
+                    CreatorAudienceStrip(
+                        context = ChatConversationSampleData.creatorContext,
+                        onOpenAudienceProfile = {},
+                    )
+                    CreatorQuotaMeter(quota = ChatConversationSampleData.creatorContext.quota)
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        PopulatedFrame(
+                            rows = ChatConversationSampleData.creatorThreadRows,
+                            onRetry = {},
+                            onLoadOlder = {},
+                        )
+                    }
+                    Composer(
+                        text = "Adding you to the list — first 6 get a slot",
+                        placeholder = "Message Priya…",
+                        canSend = true,
+                        onTextChange = {},
+                        onSend = {},
+                    )
+                }
             }
         }
     }
