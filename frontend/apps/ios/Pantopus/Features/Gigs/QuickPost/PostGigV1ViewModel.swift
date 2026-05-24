@@ -15,7 +15,9 @@ public enum PostGigV1PriceType: String, CaseIterable, Identifiable, Sendable {
     case hourly
     case free
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -67,7 +69,7 @@ public struct PostGigV1Form: Equatable, Sendable {
         description: String = "",
         price: String = "",
         priceType: PostGigV1PriceType = .flat,
-        scheduledAt: Date = Date().addingTimeInterval(86_400),
+        scheduledAt: Date = Date().addingTimeInterval(86400),
         location: String = "",
         photos: [PostGigV1Photo] = []
     ) {
@@ -105,7 +107,9 @@ public struct PostGigV1ValidationError: Identifiable, Equatable, Sendable {
     public let field: PostGigV1Field
     public let message: String
 
-    public var id: String { field.rawValue }
+    public var id: String {
+        field.rawValue
+    }
 }
 
 public enum PostGigV1LoadState: Equatable, Sendable {

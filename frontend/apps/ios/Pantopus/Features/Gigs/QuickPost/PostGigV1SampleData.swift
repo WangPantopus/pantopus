@@ -19,7 +19,8 @@ public enum PostGigV1SampleData {
             category: .moving,
             title: "Help moving a sofa up 3 flights",
             description: """
-            Sleeper sofa from the curb up to apt 3B. Building has no elevator, the stairwell is wide but there's a tight corner on the 2nd-floor landing. Should take 30-45 min with two people. I'll buy pizza after.
+            Sleeper sofa from the curb up to apt 3B. Building has no elevator, the stairwell is wide but there's a tight
+            corner on the 2nd-floor landing. Should take 30-45 min with two people. I'll buy pizza after.
             """,
             price: "80",
             priceType: .flat,
@@ -61,9 +62,10 @@ public enum PostGigV1SampleData {
     public static func filledViewModel() -> PostGigV1ViewModel {
         PostGigV1ViewModel(
             initialState: PostGigV1State(form: filledForm),
-            referenceNow: referenceNow,
-            idGenerator: { "gig-v1-sofa-move" }
-        )
+            referenceNow: referenceNow
+        ) {
+            "gig-v1-sofa-move"
+        }
     }
 
     @MainActor
@@ -73,9 +75,10 @@ public enum PostGigV1SampleData {
                 form: validationErrorForm,
                 validationErrors: validationErrors
             ),
-            referenceNow: referenceNow,
-            idGenerator: { "gig-v1-sofa-move" }
-        )
+            referenceNow: referenceNow
+        ) {
+            "gig-v1-sofa-move"
+        }
     }
 
     private static func makeDate(year: Int, month: Int, day: Int, hour: Int) -> Date {

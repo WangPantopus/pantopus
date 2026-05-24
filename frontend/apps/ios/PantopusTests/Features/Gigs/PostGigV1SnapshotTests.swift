@@ -27,9 +27,10 @@ final class PostGigV1SnapshotTests: XCTestCase {
     func test_post_gig_v1_round_trip_validation_then_success() {
         let vm = PostGigV1ViewModel(
             initialState: PostGigV1State(form: PostGigV1SampleData.validationErrorForm),
-            referenceNow: PostGigV1SampleData.referenceNow,
-            idGenerator: { "gig-v1-sofa-move" }
-        )
+            referenceNow: PostGigV1SampleData.referenceNow
+        ) {
+            "gig-v1-sofa-move"
+        }
 
         XCTAssertNil(vm.submit())
         XCTAssertEqual(vm.state.validationErrors.map(\.field), [.description, .price, .dateTime])

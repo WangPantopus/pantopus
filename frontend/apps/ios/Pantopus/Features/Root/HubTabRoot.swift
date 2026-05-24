@@ -1032,15 +1032,14 @@ public struct HubTabRoot: View {
                         )
                     )
                 ),
-                onClose: pop,
-                onPosted: { gigId in
-                    path.removeAll { route in
-                        if case .quickPostGig = route { return true }
-                        return false
-                    }
-                    path.append(.gigDetail(gigId: gigId))
+                onClose: pop
+            ) { gigId in
+                path.removeAll { route in
+                    if case .quickPostGig = route { return true }
+                    return false
                 }
-            )
+                path.append(.gigDetail(gigId: gigId))
+            }
         case let .nearbyMapForGigs(categoryKey):
             NearbyMapView(
                 viewModel: NearbyMapViewModel(

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -34,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -891,8 +889,7 @@ private fun PostGigV1FatalError(
     }
 }
 
-private fun List<PostGigV1ValidationError>.messageFor(field: PostGigV1Field): String? =
-    firstOrNull { it.field == field }?.message
+private fun List<PostGigV1ValidationError>.messageFor(field: PostGigV1Field): String? = firstOrNull { it.field == field }?.message
 
 private fun List<PostGigV1ValidationError>.fieldState(field: PostGigV1Field): PantopusFieldState =
     messageFor(field)?.let { PantopusFieldState.Error(it) } ?: PantopusFieldState.Default
