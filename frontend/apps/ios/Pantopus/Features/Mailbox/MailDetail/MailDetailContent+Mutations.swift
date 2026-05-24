@@ -47,8 +47,11 @@ extension MailDetailContent {
         guard let community = content.communityDetail else { return content }
         let updatedCommunity = CommunityDetailDTO(
             communityItemId: community.communityItemId,
+            subtype: community.subtype,
             group: community.group,
             event: community.event,
+            poll: community.poll,
+            update: community.update,
             attendees: community.attendees,
             attendeeCount: status == .going && community.rsvp != .going
                 ? community.attendeeCount + 1

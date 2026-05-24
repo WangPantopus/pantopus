@@ -170,6 +170,12 @@ struct MailboxItemDetailView: View {
                     termsSheet = TermsSheetItem(url: url)
                 }
             }
+        case let (.community, .community(community)):
+            CommunityBody(
+                community: community,
+                authorName: content.sender.displayName,
+                authorInitials: content.sender.initials
+            )
         case let (.gig, .gig(gig)):
             GigBody(gig: gig) {
                 Task { await viewModel.acceptGigBid() }

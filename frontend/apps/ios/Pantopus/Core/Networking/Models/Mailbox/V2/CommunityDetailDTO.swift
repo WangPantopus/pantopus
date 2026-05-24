@@ -141,13 +141,94 @@ public enum CommunityRsvpStatus: String, Sendable, Hashable {
     }
 }
 
+/// Content variation rendered in the Community body card.
+public enum CommunityMailSubtype: String, Sendable, Hashable {
+    case event
+    case poll
+    case neighborhoodUpdate = "neighborhood_update"
+
+    public init(wire: String?) {
+        switch wire?.lowercased() {
+        case "poll", "vote": self = .poll
+        case "neighborhood_update", "neighborhood-update", "update", "announcement":
+            self = .neighborhoodUpdate
+        default:
+            self = .event
+        }
+    }
+}
+
+/// One option in a community poll.
+public struct CommunityPollOption: Sendable, Hashable, Identifiable {
+    public let id: String
+    public let label: String
+    public let voteCount: Int
+    public let isSelected: Bool
+
+    public init(id: String, label: String, voteCount: Int, isSelected: Bool = false) {
+        self.id = id
+        self.label = label
+        self.voteCount = voteCount
+        self.isSelected = isSelected
+    }
+}
+
+/// Poll card payload for community mail.
+public struct CommunityPollInfo: Sendable, Hashable {
+    public let question: String
+    public let options: [CommunityPollOption]
+    public let totalVotes: Int
+    public let closesAtLabel: String?
+    public let statusLabel: String?
+
+    public init(
+        question: String,
+        options: [CommunityPollOption],
+        totalVotes: Int,
+        closesAtLabel: String?,
+        statusLabel: String?
+    ) {
+        self.question = question
+        self.options = options
+        self.totalVotes = totalVotes
+        self.closesAtLabel = closesAtLabel
+        self.statusLabel = statusLabel
+    }
+}
+
+/// Neighborhood-update card payload for community mail.
+public struct CommunityUpdateInfo: Sendable, Hashable {
+    public let headline: String
+    public let summary: String?
+    public let items: [String]
+    public let statusLabel: String?
+    public let footerLabel: String?
+
+    public init(
+        headline: String,
+        summary: String?,
+        items: [String],
+        statusLabel: String?,
+        footerLabel: String?
+    ) {
+        self.headline = headline
+        self.summary = summary
+        self.items = items
+        self.statusLabel = statusLabel
+        self.footerLabel = footerLabel
+    }
+}
+
 /// Community detail payload — drives the A17.4 variant body.
 public struct CommunityDetailDTO: Sendable, Hashable {
     /// PK of the `CommunityMailItem` row. Required so the RSVP mutation
     /// can find the right item.
     public let communityItemId: String
+    public let subtype: CommunityMailSubtype
     public let group: CommunityGroupInfo
     public let event: CommunityEventInfo?
+    public let poll: CommunityPollInfo?
+    public let update: CommunityUpdateInfo?
     public let attendees: [CommunityAttendee]
     public let attendeeCount: Int
     public let attendeesFromBlock: Int?
@@ -156,8 +237,11 @@ public struct CommunityDetailDTO: Sendable, Hashable {
 
     public init(
         communityItemId: String,
+        subtype: CommunityMailSubtype = .event,
         group: CommunityGroupInfo,
         event: CommunityEventInfo?,
+        poll: CommunityPollInfo? = nil,
+        update: CommunityUpdateInfo? = nil,
         attendees: [CommunityAttendee],
         attendeeCount: Int,
         attendeesFromBlock: Int?,
@@ -165,8 +249,11 @@ public struct CommunityDetailDTO: Sendable, Hashable {
         rsvp: CommunityRsvpStatus
     ) {
         self.communityItemId = communityItemId
+        self.subtype = subtype
         self.group = group
         self.event = event
+        self.poll = poll
+        self.update = update
         self.attendees = attendees
         self.attendeeCount = attendeeCount
         self.attendeesFromBlock = attendeesFromBlock
@@ -182,6 +269,21 @@ public struct CommunityDetailDTO: Sendable, Hashable {
         }
         let group = decodeGroup(from: dict)
         let event = decodeEvent(from: dict["event"]?.dictValue)
+        let poll = decodePoll(from: dict)
+        let update = decodeUpdate(from: dict)
+        let explicitSubtype = CommunityMailSubtype(
+            wire: dict["community_kind"]?.stringValue
+                ?? dict["kind"]?.stringValue
+                ?? dict["subtype"]?.stringValue
+                ?? dict["variant"]?.stringValue
+        )
+        let subtype: CommunityMailSubtype = if poll != nil && explicitSubtype == .event {
+            .poll
+        } else if update != nil && event == nil && poll == nil && explicitSubtype == .event {
+            .neighborhoodUpdate
+        } else {
+            explicitSubtype
+        }
         let attendees = decodeAttendees(from: dict["attendees"]?.arrayValue)
         let attendeeCount = dict["attendee_count"]?.numberValue.map { Int($0) }
             ?? dict["rsvp_count"]?.numberValue.map { Int($0) }
@@ -190,8 +292,11 @@ public struct CommunityDetailDTO: Sendable, Hashable {
         let pulseThread = decodePulseThread(from: dict["pulse_thread"]?.dictValue)
         return CommunityDetailDTO(
             communityItemId: itemId,
+            subtype: subtype,
             group: group,
             event: event,
+            poll: poll,
+            update: update,
             attendees: attendees,
             attendeeCount: attendeeCount,
             attendeesFromBlock: attendeesFromBlock,
@@ -269,6 +374,75 @@ public struct CommunityDetailDTO: Sendable, Hashable {
             lastReplyPreview: lastReply?["preview"]?.stringValue,
             lastReplyAge: lastReply?["age"]?.stringValue
                 ?? lastReply?["when"]?.stringValue
+        )
+    }
+
+    private static func decodePoll(from dict: [String: JSONValue]) -> CommunityPollInfo? {
+        let pollDict = dict["poll"]?.dictValue ?? dict
+        let rawOptions = pollDict["options"]?.arrayValue ?? []
+        let options: [CommunityPollOption] = rawOptions.enumerated().compactMap { index, raw -> CommunityPollOption? in
+            if let label = raw.stringValue, !label.isEmpty {
+                return CommunityPollOption(id: "option-\(index)", label: label, voteCount: 0)
+            }
+            guard let option = raw.dictValue,
+                  let label = option["label"]?.stringValue
+                  ?? option["title"]?.stringValue
+                  ?? option["value"]?.stringValue,
+                  !label.isEmpty else { return nil }
+            return CommunityPollOption(
+                id: option["id"]?.stringValue ?? "option-\(index)",
+                label: label,
+                voteCount: option["vote_count"]?.numberValue.map { Int($0) }
+                    ?? option["votes"]?.numberValue.map { Int($0) }
+                    ?? 0,
+                isSelected: option["selected"]?.boolValue
+                    ?? option["is_selected"]?.boolValue
+                    ?? false
+            )
+        }
+        guard let question = pollDict["question"]?.stringValue
+            ?? pollDict["title"]?.stringValue,
+            !question.isEmpty,
+            !options.isEmpty else { return nil }
+        let voteSum = options.reduce(0) { $0 + $1.voteCount }
+        return CommunityPollInfo(
+            question: question,
+            options: options,
+            totalVotes: pollDict["total_votes"]?.numberValue.map { Int($0) }
+                ?? pollDict["vote_count"]?.numberValue.map { Int($0) }
+                ?? voteSum,
+            closesAtLabel: pollDict["closes_at"]?.stringValue
+                ?? pollDict["closes_at_label"]?.stringValue,
+            statusLabel: pollDict["status"]?.stringValue
+                ?? pollDict["status_label"]?.stringValue
+        )
+    }
+
+    private static func decodeUpdate(from dict: [String: JSONValue]) -> CommunityUpdateInfo? {
+        let updateDict = dict["update"]?.dictValue
+            ?? dict["neighborhood_update"]?.dictValue
+            ?? dict["announcement"]?.dictValue
+            ?? dict
+        let items = (
+            updateDict["items"]?.arrayValue
+                ?? updateDict["bullets"]?.arrayValue
+                ?? updateDict["updates"]?.arrayValue
+                ?? []
+        ).compactMap(\.stringValue)
+        guard let headline = updateDict["headline"]?.stringValue
+            ?? updateDict["title"]?.stringValue,
+            !headline.isEmpty,
+            updateDict["event"] == nil,
+            updateDict["poll"] == nil else { return nil }
+        return CommunityUpdateInfo(
+            headline: headline,
+            summary: updateDict["summary"]?.stringValue
+                ?? updateDict["body"]?.stringValue,
+            items: items,
+            statusLabel: updateDict["status"]?.stringValue
+                ?? updateDict["status_label"]?.stringValue,
+            footerLabel: updateDict["footer"]?.stringValue
+                ?? updateDict["footer_label"]?.stringValue
         )
     }
 

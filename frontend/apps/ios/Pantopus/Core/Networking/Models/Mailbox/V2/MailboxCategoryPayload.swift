@@ -14,6 +14,7 @@ public enum MailboxCategoryPayload: Sendable, Hashable {
     case coupon(CouponDetailDTO)
     case booklet(BookletDetailDTO)
     case certified(CertifiedDetailDTO)
+    case community(CommunityDetailDTO)
     case gig(GigDetailDTO)
     case memory(MemoryDetailDTO)
     /// No category-specific decoder applies (Package, Bill, Notice, …).
@@ -21,36 +22,51 @@ public enum MailboxCategoryPayload: Sendable, Hashable {
     case other
 
     /// Resolve a payload from a category + raw object_payload JSON. Falls
-    /// back to `.other` when the category isn't one of the three P18
-    /// shapes or when decoding fails.
+    /// back to `.other` when the category doesn't have a dedicated body
+    /// decoder or when decoding fails.
     public static func resolve(
         category: MailItemCategory,
         objectPayload: JSONValue?
     ) -> MailboxCategoryPayload {
         switch category {
         case .coupon:
-            if let dto = CouponDetailDTO.decode(from: objectPayload) {
-                return .coupon(dto)
-            }
+            resolveCoupon(from: objectPayload)
         case .booklet:
-            if let dto = BookletDetailDTO.decode(from: objectPayload) {
-                return .booklet(dto)
-            }
+            resolveBooklet(from: objectPayload)
         case .certified:
-            if let dto = CertifiedDetailDTO.decode(from: objectPayload) {
-                return .certified(dto)
-            }
+            resolveCertified(from: objectPayload)
+        case .community:
+            resolveCommunity(from: objectPayload)
         case .gig:
-            if let dto = GigDetailDTO.decode(from: objectPayload) {
-                return .gig(dto)
-            }
+            resolveGig(from: objectPayload)
         case .memory:
-            if let dto = MemoryDetailDTO.decode(from: objectPayload) {
-                return .memory(dto)
-            }
+            resolveMemory(from: objectPayload)
         default:
-            break
+            .other
         }
-        return .other
+    }
+
+    private static func resolveCoupon(from objectPayload: JSONValue?) -> MailboxCategoryPayload {
+        CouponDetailDTO.decode(from: objectPayload).map(MailboxCategoryPayload.coupon) ?? .other
+    }
+
+    private static func resolveBooklet(from objectPayload: JSONValue?) -> MailboxCategoryPayload {
+        BookletDetailDTO.decode(from: objectPayload).map(MailboxCategoryPayload.booklet) ?? .other
+    }
+
+    private static func resolveCertified(from objectPayload: JSONValue?) -> MailboxCategoryPayload {
+        CertifiedDetailDTO.decode(from: objectPayload).map(MailboxCategoryPayload.certified) ?? .other
+    }
+
+    private static func resolveCommunity(from objectPayload: JSONValue?) -> MailboxCategoryPayload {
+        CommunityDetailDTO.decode(from: objectPayload).map(MailboxCategoryPayload.community) ?? .other
+    }
+
+    private static func resolveGig(from objectPayload: JSONValue?) -> MailboxCategoryPayload {
+        GigDetailDTO.decode(from: objectPayload).map(MailboxCategoryPayload.gig) ?? .other
+    }
+
+    private static func resolveMemory(from objectPayload: JSONValue?) -> MailboxCategoryPayload {
+        MemoryDetailDTO.decode(from: objectPayload).map(MailboxCategoryPayload.memory) ?? .other
     }
 }

@@ -29,6 +29,7 @@ import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.BookletBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CertifiedBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CommunityBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CouponBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.GigBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.MailItemPlaceholderBody
@@ -262,6 +263,12 @@ private fun CategoryBody(
             CertifiedBody(
                 certified = content.payload.detail,
                 onViewTerms = onViewTerms,
+            )
+        content.payload is MailboxCategoryPayload.Community ->
+            CommunityBody(
+                community = content.payload.detail,
+                authorName = content.sender.displayName,
+                authorInitials = content.sender.initials,
             )
         content.payload is MailboxCategoryPayload.Gig ->
             GigBody(

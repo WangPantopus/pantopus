@@ -38,7 +38,7 @@ public enum MailItemCategory: String, Sendable, CaseIterable {
         case .coupon: Theme.Color.childCare
         case .booklet: Theme.Color.moving // violet token per P18 FrameBooklet
         case .certified: Theme.Color.primary600 // primary token per P18 FrameCertified
-        case .community: Theme.Color.cleaning // green token per A17.4 community accent
+        case .community: Theme.Color.cleaning
         case .notice: Theme.Color.warning
         case .bill: Theme.Color.error
         case .statement: Theme.Color.tutoring
