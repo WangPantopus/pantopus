@@ -65,9 +65,10 @@ public struct InviteOwnerFormView: View {
         case .editing:
             InviteOwnerLoadedForm(
                 viewModel: viewModel,
-                onClose: onClose,
-                onCommit: { Task { await viewModel.submit() } }
-            )
+                onClose: onClose
+            ) {
+                Task { await viewModel.submit() }
+            }
         }
     }
 
@@ -117,25 +118,26 @@ private struct InviteOwnerLoadingForm: View {
             isValid: false,
             isDirty: false,
             onClose: onClose,
-            onCommit: {}
-        ) {
-            VStack(alignment: .leading, spacing: Spacing.s5) {
-                Shimmer(height: 52, cornerRadius: Radii.lg)
-                    .padding(.horizontal, Spacing.s4)
-                FormFieldGroup("Contact info") {
-                    Shimmer(height: 64, cornerRadius: Radii.md)
-                    Shimmer(height: 64, cornerRadius: Radii.md)
+            onCommit: {},
+            content: {
+                VStack(alignment: .leading, spacing: Spacing.s5) {
+                    Shimmer(height: 52, cornerRadius: Radii.lg)
+                        .padding(.horizontal, Spacing.s4)
+                    FormFieldGroup("Contact info") {
+                        Shimmer(height: 64, cornerRadius: Radii.md)
+                        Shimmer(height: 64, cornerRadius: Radii.md)
+                    }
+                    FormFieldGroup("Ownership share") {
+                        Shimmer(height: 44, cornerRadius: Radii.md)
+                        Shimmer(height: 44, cornerRadius: Radii.md)
+                    }
+                    FormFieldGroup("Role") {
+                        Shimmer(height: 128, cornerRadius: Radii.md)
+                    }
                 }
-                FormFieldGroup("Ownership share") {
-                    Shimmer(height: 44, cornerRadius: Radii.md)
-                    Shimmer(height: 44, cornerRadius: Radii.md)
-                }
-                FormFieldGroup("Role") {
-                    Shimmer(height: 128, cornerRadius: Radii.md)
-                }
+                .accessibilityIdentifier("inviteOwnerLoading")
             }
-            .accessibilityIdentifier("inviteOwnerLoading")
-        }
+        )
     }
 }
 
@@ -150,19 +152,20 @@ private struct InviteOwnerEmptyForm: View {
             isValid: false,
             isDirty: false,
             onClose: onClose,
-            onCommit: {}
-        ) {
-            EmptyState(
-                icon: .home,
-                headline: "No ownership context",
-                subcopy: "Add or verify this home before inviting another owner.",
-                cta: .init(title: "Reload") { onRetry() },
-                tint: Theme.Color.homeBg,
-                accent: Theme.Color.home
-            )
-            .frame(minHeight: 520)
-            .accessibilityIdentifier("inviteOwnerEmpty")
-        }
+            onCommit: {},
+            content: {
+                EmptyState(
+                    icon: .home,
+                    headline: "No ownership context",
+                    subcopy: "Add or verify this home before inviting another owner.",
+                    cta: .init(title: "Reload") { onRetry() },
+                    tint: Theme.Color.homeBg,
+                    accent: Theme.Color.home
+                )
+                .frame(minHeight: 520)
+                .accessibilityIdentifier("inviteOwnerEmpty")
+            }
+        )
     }
 }
 
@@ -178,19 +181,20 @@ private struct InviteOwnerErrorForm: View {
             isValid: false,
             isDirty: false,
             onClose: onClose,
-            onCommit: {}
-        ) {
-            EmptyState(
-                icon: .alertCircle,
-                headline: "Couldn't load ownership",
-                subcopy: message,
-                cta: .init(title: "Try again") { onRetry() },
-                tint: Theme.Color.errorBg,
-                accent: Theme.Color.error
-            )
-            .frame(minHeight: 520)
-            .accessibilityIdentifier("inviteOwnerError")
-        }
+            onCommit: {},
+            content: {
+                EmptyState(
+                    icon: .alertCircle,
+                    headline: "Couldn't load ownership",
+                    subcopy: message,
+                    cta: .init(title: "Try again") { onRetry() },
+                    tint: Theme.Color.errorBg,
+                    accent: Theme.Color.error
+                )
+                .frame(minHeight: 520)
+                .accessibilityIdentifier("inviteOwnerError")
+            }
+        )
     }
 }
 

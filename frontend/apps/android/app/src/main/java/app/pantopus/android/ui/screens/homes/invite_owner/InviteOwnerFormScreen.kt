@@ -447,10 +447,10 @@ private fun OwnershipSummaryCard(summary: InviteOwnershipSummary) {
                 .background(PantopusColors.appSurfaceSunken)
                 .testTag("inviteOwnerOwnershipSummary")
                 .semantics {
-                    contentDescription =
-                        summary.owners.joinToString(", ") { "${it.name} ${it.sharePercent}%" } +
-                            ". ${summary.availablePercent}% available."
-                }.padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+                    val ownerShares = summary.owners.joinToString(", ") { "${it.name} ${it.sharePercent}%" }
+                    contentDescription = "$ownerShares. ${summary.availablePercent}% available."
+                }
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {

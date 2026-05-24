@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming")
+@file:Suppress("MagicNumber", "PackageNaming", "UnusedParameter")
 
 package app.pantopus.android.ui.screens.homes.invite_owner
 

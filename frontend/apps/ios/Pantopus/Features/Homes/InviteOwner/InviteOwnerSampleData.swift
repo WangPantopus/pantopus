@@ -63,7 +63,9 @@ public struct InviteOwnershipSummary: Sendable, Hashable {
     public let totalAfterGrant: Int
     public let conflictOverage: Int
 
-    public var hasConflict: Bool { conflictOverage > 0 }
+    public var hasConflict: Bool {
+        conflictOverage > 0
+    }
 }
 
 public struct InviteOwnerDraft: Sendable, Hashable {

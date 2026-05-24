@@ -37,8 +37,11 @@ enum class InviteOwnerField(val key: String) {
 /** Top-level render state for the Invite Owner form. */
 sealed interface InviteOwnerPhase {
     data object Loading : InviteOwnerPhase
+
     data object Empty : InviteOwnerPhase
+
     data object Editing : InviteOwnerPhase
+
     data class Error(val message: String) : InviteOwnerPhase
 }
 
@@ -353,4 +356,4 @@ private fun phoneError(value: String): String? {
 }
 
 private val E164_PATTERN = Regex("""^\+[1-9]\d{1,14}$""")
-private val PHONE_ALLOWED = "0123456789 +()-."
+private const val PHONE_ALLOWED = "0123456789 +()-."

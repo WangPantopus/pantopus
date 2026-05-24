@@ -59,14 +59,14 @@ public final class InviteOwnerFormViewModel {
         self.currentUserEmail = currentUserEmail
         let draft = initialDraft ?? InviteOwnerSampleData.initialDraft(homeId: homeId)
         self.initialDraft = draft
-        self.homeContext = draft.homeContext
-        self.owners = draft.owners
-        self.grantPercent = draft.grantPercent
-        self.originalGrantPercent = draft.grantPercent
-        self.autoBalancesSoleOwner = draft.autoBalancesSoleOwner
+        homeContext = draft.homeContext
+        owners = draft.owners
+        grantPercent = draft.grantPercent
+        originalGrantPercent = draft.grantPercent
+        autoBalancesSoleOwner = draft.autoBalancesSoleOwner
         self.onSent = onSent
-        self.state = initialState
-        self.fields = Self.fields(from: draft, currentUserEmail: currentUserEmail)
+        state = initialState
+        fields = Self.fields(from: draft, currentUserEmail: currentUserEmail)
         syncSoleOwnerShareIfNeeded()
         validateLoadedFields()
     }
@@ -287,11 +287,11 @@ public final class InviteOwnerFormViewModel {
     private func validator(for field: InviteOwnerField) -> FormValidator {
         switch field {
         case .email:
-            return .all([.email(), .emailNotMatching(currentUserEmail)])
+            .all([.email(), .emailNotMatching(currentUserEmail)])
         case .phone:
-            return Self.phoneValidator
+            Self.phoneValidator
         case .role:
-            return .maxLength(noteMaxLength)
+            .maxLength(noteMaxLength)
         }
     }
 
