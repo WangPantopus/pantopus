@@ -52,10 +52,12 @@ final class MailboxItemDetailViewModelTests: XCTestCase {
         }
         XCTAssertEqual(content.category, .package)
         XCTAssertEqual(content.trust, .verified)
-        XCTAssertNotNil(content.aiElf)
+        XCTAssertNil(content.aiElf)
         XCTAssertEqual(content.packageInfo?.carrier, "UPS")
+        XCTAssertEqual(content.packageInfo?.status, .inTransit)
+        XCTAssertFalse(content.packageInfo?.handoffSteps.isEmpty ?? true)
         XCTAssertEqual(content.timeline.count, 4)
-        XCTAssertTrue(content.ctaEnabled)
+        XCTAssertFalse(content.ctaEnabled)
     }
 
     func testNonPackageFallsBackToBase() async {
@@ -118,7 +120,7 @@ final class MailboxItemDetailViewModelTests: XCTestCase {
             return
         }
         XCTAssertEqual(rolled.timeline.map(\.state), originalStates)
-        XCTAssertTrue(rolled.ctaEnabled)
+        XCTAssertFalse(rolled.ctaEnabled)
     }
 
     func testMarkNotMineDisablesCTAs() async {

@@ -87,7 +87,7 @@ fun MailboxItemDetailScreen(
                     sender = content.sender,
                     aiElf = content.aiElf,
                     keyFacts = content.keyFacts,
-                    timeline = content.timeline,
+                    timeline = if (content.category == MailItemCategory.Package) emptyList() else content.timeline,
                     cta = ctaContent(content, ctaFlags, ackChecked),
                     onBack = onBack,
                     onAIChip = { kind ->
@@ -115,10 +115,12 @@ fun MailboxItemDetailScreen(
                 ) {
                     CategoryBody(
                         content = content,
+                        ctaFlags = ctaFlags,
                         ackChecked = ackChecked,
                         onAckChange = { viewModel.setCertifiedAckChecked(it) },
                         onViewTerms = showTerms,
                         onAcceptGig = { viewModel.acceptGigBid() },
+                        onReceiveAtDoor = { viewModel.performPrimaryAction() },
                     )
                 }
             }
@@ -153,13 +155,7 @@ private fun ctaContent(
 ): MailboxCTAShelfContent? =
     when (content.category) {
         MailItemCategory.Package ->
-            MailboxCTAShelfContent(
-                primaryTitle = if (flags.primaryCompleted) "Delivered" else "Log as received",
-                ghostTitle = "Not mine",
-                primaryLoading = flags.primaryLoading,
-                ghostLoading = flags.ghostLoading,
-                primaryEnabled = content.ctaEnabled && !flags.primaryCompleted,
-            )
+            null
         MailItemCategory.Coupon ->
             MailboxCTAShelfContent(
                 primaryTitle =
@@ -203,16 +199,21 @@ private fun ctaContent(
 @Composable
 private fun CategoryBody(
     content: MailboxItemDetailContent,
+    ctaFlags: MailboxCTAFlags,
     ackChecked: Boolean,
     onAckChange: (Boolean) -> Unit,
     onViewTerms: () -> Unit,
     onAcceptGig: () -> Unit,
+    onReceiveAtDoor: () -> Unit,
 ) {
     when {
         content.category == MailItemCategory.Package && content.packageInfo != null ->
             PackageBody(
-                carrier = content.packageInfo.carrier,
-                etaLine = content.packageInfo.etaLine,
+                content = content.packageInfo,
+                isReceiveEnabled = content.ctaEnabled && !ctaFlags.primaryCompleted,
+                isReceiveLoading = ctaFlags.primaryLoading,
+                isReceived = ctaFlags.primaryCompleted,
+                onReceiveAtDoor = onReceiveAtDoor,
             )
         content.payload is MailboxCategoryPayload.Coupon ->
             CouponBody(coupon = content.payload.detail)

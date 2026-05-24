@@ -97,10 +97,12 @@ class MailboxItemDetailViewModelTest {
             val loaded = vm.state.value as MailboxItemDetailUiState.Loaded
             assertEquals(MailItemCategory.Package, loaded.content.category)
             assertEquals(MailTrust.Verified, loaded.content.trust)
-            assertNotNull(loaded.content.aiElf)
+            assertNull(loaded.content.aiElf)
             assertEquals("UPS", loaded.content.packageInfo?.carrier)
+            assertEquals(PackageDeliveryStatus.InTransit, loaded.content.packageInfo?.status)
+            assertTrue(loaded.content.packageInfo?.handoffSteps?.isNotEmpty() == true)
             assertEquals(4, loaded.content.timeline.size)
-            assertTrue(loaded.content.ctaEnabled)
+            assertFalse(loaded.content.ctaEnabled)
         }
 
     @Test fun non_package_falls_back_to_base() =
@@ -150,7 +152,7 @@ class MailboxItemDetailViewModelTest {
             val rolled =
                 (vm.state.value as MailboxItemDetailUiState.Loaded).content.timeline.map { it.state }
             assertEquals(original, rolled)
-            assertTrue((vm.state.value as MailboxItemDetailUiState.Loaded).content.ctaEnabled)
+            assertFalse((vm.state.value as MailboxItemDetailUiState.Loaded).content.ctaEnabled)
         }
 
     @Test fun mark_not_mine_disables_ctas() =
