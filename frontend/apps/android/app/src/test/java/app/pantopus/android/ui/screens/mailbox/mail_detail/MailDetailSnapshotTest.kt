@@ -9,19 +9,34 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
+import app.pantopus.android.data.api.models.mailbox.v2.BookletDetailDto
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
+import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemSampleData
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailTrust
+import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.BookletDetailLayout
 import app.pantopus.android.ui.theme.PantopusColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 /** A17.1 generic mail-detail snapshots across three category accents. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class MailDetailSnapshotTest {
     @get:Rule
     val paparazzi =
         Paparazzi(
             deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = 2400, softButtons = false),
         )
+
+    @Before fun setup() = Dispatchers.setMain(UnconfinedTestDispatcher())
+
+    @After fun tearDown() = Dispatchers.resetMain()
 
     @Test
     fun notice_generic_detail() {
@@ -38,6 +53,26 @@ class MailDetailSnapshotTest {
         snapshot(MailItemCategory.Coupon, "Neighborhood bakery coupon")
     }
 
+    @Test
+    fun booklet_voter_guide_detail() {
+        bookletSnapshot(
+            booklet = MailItemSampleData.bookletVoterGuide,
+            title = "June 2026 primary voter guide",
+            sender = "League of Women Voters",
+            excerpt = "Vol. 47 · Nonpartisan · Local races and measures",
+        )
+    }
+
+    @Test
+    fun booklet_catalog_detail() {
+        bookletSnapshot(
+            booklet = MailItemSampleData.bookletNeighborhoodCatalog,
+            title = "Spring home services booklet",
+            sender = "Elm Park Merchant Guild",
+            excerpt = "Seasonal repair windows and neighborhood-only pricing",
+        )
+    }
+
     private fun snapshot(
         category: MailItemCategory,
         title: String,
@@ -49,6 +84,25 @@ class MailDetailSnapshotTest {
                     ackInFlight = false,
                     onBack = {},
                     onAcknowledge = {},
+                    onOpenSenderProfile = {},
+                    onSaveToVault = {},
+                )
+            }
+        }
+    }
+
+    private fun bookletSnapshot(
+        booklet: BookletDetailDto,
+        title: String,
+        sender: String,
+        excerpt: String,
+    ) {
+        paparazzi.snapshot {
+            Root {
+                BookletDetailLayout(
+                    content = makeBookletContent(title = title, sender = sender, excerpt = excerpt),
+                    booklet = booklet,
+                    onBack = {},
                     onOpenSenderProfile = {},
                     onSaveToVault = {},
                 )
@@ -85,6 +139,40 @@ class MailDetailSnapshotTest {
             attachments = listOf("notice.pdf"),
             aiSummary = null,
             ackRequired = category == MailItemCategory.Notice,
+            isAcknowledged = false,
+        )
+
+    private fun makeBookletContent(
+        title: String,
+        sender: String,
+        excerpt: String,
+    ): MailDetailContent =
+        MailDetailContent(
+            mailId = "mail-booklet-${title.lowercase().replace(" ", "-")}",
+            category = MailItemCategory.Booklet,
+            trust = MailTrust.Verified,
+            detailTrust = MailItemCategory.Booklet.detailTrust,
+            senderDisplayName = sender,
+            senderMeta = "Verified nonprofit",
+            senderTypeLabel = "Verified sender",
+            carrierLine = "via Pantopus Mail",
+            senderInitials =
+                sender
+                    .split(" ")
+                    .take(2)
+                    .mapNotNull { it.firstOrNull()?.toString() }
+                    .joinToString(""),
+            senderUserId = "sender-booklet",
+            title = title,
+            excerpt = excerpt,
+            referenceLabel = "Booklet · 2026",
+            createdAtLabel = "Fri May 15, 2026",
+            expiresAtLabel = null,
+            readStatusLabel = "Unread",
+            bodyParagraphs = emptyList(),
+            attachments = listOf("booklet.pdf"),
+            aiSummary = "Pantopus found the key sections and can jump you to the relevant pages.",
+            ackRequired = false,
             isAcknowledged = false,
         )
 

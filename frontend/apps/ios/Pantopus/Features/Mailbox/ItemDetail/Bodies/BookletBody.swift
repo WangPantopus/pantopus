@@ -5,9 +5,6 @@
 //  Concrete body for the Booklet mailbox category. Replaces the P9
 //  placeholder. Hosts the page swiper plus the optional summary copy
 //  the design draws below the pager.
-//
-// swiftlint:disable force_unwrapping
-
 import SwiftUI
 
 @MainActor
@@ -20,7 +17,7 @@ public struct BookletBody: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            BookletPageSwiper(pages: booklet.pages)
+            BookletPageSwiper(pages: booklet.pages, totalPages: booklet.pageCount)
 
             if let summary = booklet.summary, !summary.isEmpty {
                 Text(summary)
@@ -34,13 +31,6 @@ public struct BookletBody: View {
 }
 
 #Preview {
-    BookletBody(booklet: BookletDetailDTO(
-        pages: [
-            URL(string: "https://placehold.co/640x360")!,
-            URL(string: "https://placehold.co/640x360/orange/white")!
-        ],
-        summary: "Spring catalog — 24 pages of new offerings.",
-        pageCount: 24
-    ))
-    .background(Theme.Color.appBg)
+    BookletBody(booklet: MailItemSampleData.bookletNeighborhoodCatalog)
+        .background(Theme.Color.appBg)
 }

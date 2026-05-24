@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -52,6 +53,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.BookletPaperPageChrome
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -62,8 +64,8 @@ import kotlinx.coroutines.launch
 
 /**
  * T6.5c (P21) — Android twin of iOS `BookletPager`. Two render modes:
- *  - **page** — `HorizontalPager` over the page images with a control
- *    strip (prev / page-N-of-M / next + scrubber + "view all pages").
+ *  - **page** — control strip (prev / page-N-of-M / next + scrubber +
+ *    "view all pages") over the folded-paper `HorizontalPager`.
  *  - **grid** — 3-column thumbnail grid; tap a thumbnail to switch back
  *    to page mode at that page.
  */
@@ -76,11 +78,13 @@ const val BOOKLET_PAGER_TAG = "bookletPager"
 fun BookletPager(
     pages: List<String>,
     modifier: Modifier = Modifier,
+    pageCount: Int = pages.size,
     initialPage: Int = 0,
     initialMode: BookletPagerMode = BookletPagerMode.Page,
 ) {
     if (pages.isEmpty()) return
     var mode by rememberSaveable { mutableStateOf(initialMode) }
+    val totalPages = maxOf(pageCount, pages.size)
     val pagerState =
         rememberPagerState(
             initialPage = initialPage.coerceIn(0, pages.size - 1),
@@ -95,6 +99,7 @@ fun BookletPager(
             BookletPagerMode.Page ->
                 PageMode(
                     pages = pages,
+                    totalPages = totalPages,
                     state = pagerState,
                     onPrev = {
                         if (pagerState.currentPage > 0) {
@@ -111,6 +116,7 @@ fun BookletPager(
             BookletPagerMode.Grid ->
                 GridMode(
                     pages = pages,
+                    totalPages = totalPages,
                     currentPage = pagerState.currentPage,
                     onJump = { idx ->
                         scope.launch { pagerState.scrollToPage(idx) }
@@ -125,28 +131,40 @@ fun BookletPager(
 @Composable
 private fun PageMode(
     pages: List<String>,
+    totalPages: Int,
     state: androidx.compose.foundation.pager.PagerState,
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onShowGrid: () -> Unit,
 ) {
-    HorizontalPager(
-        state = state,
-        modifier = Modifier.fillMaxWidth().height(360.dp),
-        pageSpacing = Spacing.s3,
-    ) { idx ->
-        BookletPageImage(
-            url = pages[idx],
-            modifier = Modifier.padding(horizontal = Spacing.s4).testTag("bookletPager_page_$idx"),
-        )
-    }
     PageIndicator(
         currentPage = state.currentPage,
-        totalPages = pages.size,
+        totalPages = totalPages,
         onPrev = onPrev,
         onNext = onNext,
         onShowGrid = onShowGrid,
     )
+    HorizontalPager(
+        state = state,
+        modifier = Modifier.fillMaxWidth().height(420.dp),
+        pageSpacing = Spacing.s3,
+    ) { idx ->
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = Spacing.s4)
+                    .testTag("bookletPager_page_$idx"),
+            contentAlignment = Alignment.Center,
+        ) {
+            BookletPageImage(
+                url = pages[idx],
+                pageNumber = idx + 1,
+                hasNextPage = idx < totalPages - 1,
+                modifier = Modifier.fillMaxHeight(),
+            )
+        }
+    }
 }
 
 @Composable
@@ -299,6 +317,7 @@ private fun Scrubber(
 @Composable
 private fun GridMode(
     pages: List<String>,
+    totalPages: Int,
     currentPage: Int,
     onJump: (Int) -> Unit,
     onBackToReader: () -> Unit,
@@ -333,7 +352,7 @@ private fun GridMode(
                 )
             }
             Text(
-                text = "${pages.size} pages",
+                text = "$totalPages pages",
                 modifier =
                     Modifier
                         .clip(RoundedCornerShape(Radii.pill))
@@ -356,6 +375,7 @@ private fun GridMode(
                     url = pages[idx],
                     page = idx + 1,
                     isCurrent = idx == currentPage,
+                    hasNextPage = idx < totalPages - 1,
                     onClick = { onJump(idx) },
                 )
             }
@@ -396,19 +416,24 @@ private fun GridMode(
 @Composable
 private fun BookletPageImage(
     url: String,
+    pageNumber: Int,
+    hasNextPage: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    AsyncImage(
-        model = url,
-        contentDescription = "Booklet page",
+    BookletPaperPageChrome(
         modifier =
             modifier
-                .fillMaxWidth()
-                .aspectRatio(3f / 4f)
-                .clip(RoundedCornerShape(Radii.lg))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
-        contentScale = ContentScale.Fit,
-    )
+                .aspectRatio(3f / 4f),
+        hasNextPage = hasNextPage,
+        contentDescription = "Booklet page $pageNumber",
+    ) {
+        AsyncImage(
+            model = url,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit,
+        )
+    }
 }
 
 @Composable
@@ -416,6 +441,7 @@ private fun ThumbnailCell(
     url: String,
     page: Int,
     isCurrent: Boolean,
+    hasNextPage: Boolean,
     onClick: () -> Unit,
 ) {
     Box(
@@ -433,12 +459,19 @@ private fun ThumbnailCell(
                 .testTag("bookletPager_thumb_${page - 1}")
                 .semantics { contentDescription = "Jump to page $page" },
     ) {
-        AsyncImage(
-            model = url,
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize().background(PantopusColors.appSurfaceSunken),
-            contentScale = ContentScale.Fit,
-        )
+        BookletPaperPageChrome(
+            modifier = Modifier.matchParentSize(),
+            hasNextPage = hasNextPage,
+            foldSize = Spacing.s4,
+            cornerRadius = 6.dp,
+        ) {
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+            )
+        }
         if (isCurrent) {
             Box(
                 modifier =

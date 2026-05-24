@@ -33,7 +33,7 @@ fun BookletBody(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
-        BookletPageSwiper(pages = booklet.pages)
+        BookletPageSwiper(pages = booklet.pages, totalPages = booklet.pageCount)
         booklet.summary?.takeIf { it.isNotEmpty() }?.let { summary ->
             Text(
                 text = summary,
@@ -53,16 +53,7 @@ fun BookletBody(
 private fun BookletBodyPreview() {
     Box(modifier = Modifier.background(PantopusColors.appBg)) {
         BookletBody(
-            booklet =
-                BookletDetailDto(
-                    pages =
-                        listOf(
-                            "https://placehold.co/640x360",
-                            "https://placehold.co/640x360/orange/white",
-                        ),
-                    summary = "Spring catalog — 24 pages of new offerings.",
-                    pageCount = 24,
-                ),
+            booklet = app.pantopus.android.ui.screens.mailbox.item_detail.MailItemSampleData.bookletNeighborhoodCatalog,
         )
     }
 }
