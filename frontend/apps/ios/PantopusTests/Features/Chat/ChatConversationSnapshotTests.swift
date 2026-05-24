@@ -11,6 +11,8 @@
 //  States covered:
 //    • AI welcome — empty thread, tinted welcome card + capability chips
 //    • AI active  — populated thread with a structured reply + estimate
+//    • Creator thread — creator chrome + quota + broadcast reference
+//    • DM refresh — photo/read receipt, typing indicator, queued attachments
 //
 
 import SwiftUI
@@ -39,15 +41,28 @@ final class ChatConversationSnapshotTests: XCTestCase {
         assertRenders(viewModel: ChatConversationSampleData.dmQueuedAttachmentsViewModel(), mode: .dm)
     }
 
+    func test_creator_thread_chrome_renders() {
+        assertRenders(
+            viewModel: ChatConversationSampleData.creatorThreadViewModel(),
+            mode: .creatorThread,
+            creatorContext: ChatConversationSampleData.creatorContext
+        )
+    }
+
     private func assertRenders(
         viewModel: ChatConversationViewModel,
         mode: ChatConversationMode = .aiAssistant,
+        creatorContext: ChatCreatorThreadContext? = nil,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
         let host = UIHostingController(
-            rootView: ChatConversationView(viewModel: viewModel, mode: mode)
-                .frame(width: 390, height: 844)
+            rootView: ChatConversationView(
+                viewModel: viewModel,
+                mode: mode,
+                creatorContext: creatorContext
+            )
+            .frame(width: 390, height: 844)
         )
         host.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         host.view.layoutIfNeeded()

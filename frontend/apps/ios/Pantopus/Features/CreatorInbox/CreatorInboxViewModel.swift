@@ -83,7 +83,9 @@ public final class CreatorInboxViewModel {
             userId: userId,
             displayName: row.displayName.isEmpty ? row.handle : row.displayName,
             initials: row.initials,
-            verified: row.verifiedLocal
+            verified: row.verifiedLocal,
+            tierName: row.tierName ?? "Free",
+            tierRank: row.tierRank
         )
     }
 

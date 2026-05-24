@@ -14,6 +14,53 @@ import app.pantopus.android.ui.theme.PantopusIcon
  */
 enum class ChatConversationMode { Dm, AiAssistant, CreatorThread, FanThread }
 
+/** Creator-side context rendered above a creator/fan DM thread. */
+@Immutable
+data class ChatCreatorThreadContext(
+    val personaName: String,
+    val audienceSummary: String,
+    val fanTierName: String,
+    /** Tier rank (1=Free, 2=Bronze, 3=Silver, 4=Gold). */
+    val fanTierRank: Int,
+    val fanSubtitle: String,
+    val quota: ChatCreatorQuota,
+) {
+    companion object {
+        fun defaults(
+            fanTierName: String = "Bronze",
+            fanTierRank: Int = 2,
+        ): ChatCreatorThreadContext =
+            ChatCreatorThreadContext(
+                personaName = "The Sourdough Diary",
+                audienceSummary = "Reach: 2,340 · Engagement up 12% this week",
+                fanTierName = fanTierName,
+                fanTierRank = fanTierRank,
+                fanSubtitle = if (fanTierRank <= 1) "Free member" else "Member since Aug · 0.4 mi",
+                quota = ChatCreatorQuota(used = 12, total = 30, resetCopy = "Resets Monday"),
+            )
+    }
+}
+
+@Immutable
+data class ChatCreatorQuota(
+    val used: Int,
+    val total: Int,
+    val resetCopy: String,
+)
+
+class ChatCreatorThreadChrome(
+    val context: ChatCreatorThreadContext,
+    val onOpenAudienceProfile: () -> Unit = {},
+)
+
+@Immutable
+data class ChatConversationRouteArgs(
+    val mode: ChatThreadMode,
+    val counterparty: ChatCounterparty,
+    val currentUserId: String,
+    val scrollToMessageId: String? = null,
+)
+
 /** Counterparty type — drives the header swap + empty-state copy. */
 sealed interface ChatCounterparty {
     val displayName: String
@@ -116,11 +163,24 @@ data class ChatDayDivider(
     val label: String,
 )
 
+/** Inline creator-side reference to a broadcast that prompted the DM. */
+@Immutable
+data class ChatBroadcastReference(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val metric: String,
+)
+
 sealed interface ChatTimelineRow {
     val rowId: String
 
     data class DayDivider(val divider: ChatDayDivider) : ChatTimelineRow {
         override val rowId: String = "divider_${divider.id}"
+    }
+
+    data class BroadcastReference(val reference: ChatBroadcastReference) : ChatTimelineRow {
+        override val rowId: String = "broadcast_${reference.id}"
     }
 
     data class Bubble(val content: ChatBubbleContent) : ChatTimelineRow {

@@ -78,12 +78,10 @@ import coil.compose.AsyncImage
  */
 @Composable
 fun ChatConversationScreen(
-    mode: ChatThreadMode,
-    counterparty: ChatCounterparty,
-    currentUserId: String,
+    args: ChatConversationRouteArgs,
     conversationMode: ChatConversationMode = ChatConversationMode.Dm,
+    creatorChrome: ChatCreatorThreadChrome? = null,
     onBack: () -> Unit = {},
-    scrollToMessageId: String? = null,
     viewModel: ChatConversationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -95,12 +93,13 @@ fun ChatConversationScreen(
     val pendingScroll by viewModel.pendingScrollTarget.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
-        viewModel.configure(mode, counterparty, currentUserId, scrollToMessageId)
+        viewModel.configure(args.mode, args.counterparty, args.currentUserId, args.scrollToMessageId)
         viewModel.load()
     }
     DisposableEffect(Unit) {
         onDispose { viewModel.teardown() }
     }
+    val resolvedCreatorContext = creatorChrome?.context ?: ChatCreatorThreadContext.defaults()
 
     Column(
         modifier =
@@ -109,7 +108,19 @@ fun ChatConversationScreen(
                 .background(PantopusColors.appSurface)
                 .testTag("chatConversation"),
     ) {
-        ChatHeader(conversationMode = conversationMode, counterparty = activeCounterparty, onBack = onBack)
+        ChatHeader(
+            conversationMode = conversationMode,
+            counterparty = activeCounterparty,
+            creatorContext = resolvedCreatorContext,
+            onBack = onBack,
+        )
+        if (conversationMode == ChatConversationMode.CreatorThread) {
+            CreatorAudienceStrip(
+                context = resolvedCreatorContext,
+                onOpenAudienceProfile = creatorChrome?.onOpenAudienceProfile ?: {},
+            )
+            CreatorQuotaMeter(quota = resolvedCreatorContext.quota)
+        }
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (val s = state) {
                 ChatConversationUiState.Loading -> LoadingFrame()
@@ -194,13 +205,15 @@ internal fun ChatHeader(
     counterparty: ChatCounterparty,
     onBack: () -> Unit,
     conversationMode: ChatConversationMode = ChatConversationMode.Dm,
+    creatorContext: ChatCreatorThreadContext = ChatCreatorThreadContext.defaults(),
 ) {
     val isAi = conversationMode == ChatConversationMode.AiAssistant || counterparty is ChatCounterparty.Ai
+    val isCreator = conversationMode == ChatConversationMode.CreatorThread
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(if (isCreator) 64.dp else 56.dp)
                 .background(PantopusColors.appSurface)
                 .padding(horizontal = 10.dp, vertical = 6.dp)
                 .testTag("chatConversationHeader"),
@@ -222,7 +235,11 @@ internal fun ChatHeader(
                 tint = PantopusColors.appText,
             )
         }
-        HeaderAvatar(isAi = isAi, counterparty = counterparty)
+        HeaderAvatar(
+            isAi = isAi,
+            counterparty = counterparty,
+            tierRank = if (isCreator) creatorContext.fanTierRank else null,
+        )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -234,8 +251,17 @@ internal fun ChatHeader(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (isAi) BetaPill()
+                if (isCreator) {
+                    CreatorTierChip(name = creatorContext.fanTierName, rank = creatorContext.fanTierRank)
+                }
             }
-            presenceFor(counterparty)?.let { (online, text) ->
+            val presence =
+                if (isCreator) {
+                    (creatorContext.fanTierRank > 1) to creatorContext.fanSubtitle
+                } else {
+                    presenceFor(counterparty)
+                }
+            presence?.let { (online, text) ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     if (online) {
                         Box(
@@ -256,21 +282,28 @@ internal fun ChatHeader(
                 }
             }
         }
-        when (counterparty) {
-            is ChatCounterparty.Person -> {
-                Row {
-                    HeaderIcon(PantopusIcon.Phone)
-                    HeaderIcon(PantopusIcon.Video)
-                    HeaderIcon(PantopusIcon.MoreVertical)
-                }
+        if (isCreator) {
+            Row {
+                HeaderIcon(PantopusIcon.User)
+                HeaderIcon(PantopusIcon.MoreHorizontal)
             }
-            is ChatCounterparty.Ai -> {
-                Row {
-                    HeaderIcon(PantopusIcon.History)
-                    HeaderIcon(PantopusIcon.MoreVertical)
+        } else {
+            when (counterparty) {
+                is ChatCounterparty.Person -> {
+                    Row {
+                        HeaderIcon(PantopusIcon.Phone)
+                        HeaderIcon(PantopusIcon.Video)
+                        HeaderIcon(PantopusIcon.MoreVertical)
+                    }
                 }
+                is ChatCounterparty.Ai -> {
+                    Row {
+                        HeaderIcon(PantopusIcon.History)
+                        HeaderIcon(PantopusIcon.MoreVertical)
+                    }
+                }
+                is ChatCounterparty.Group -> HeaderIcon(PantopusIcon.MoreVertical)
             }
-            is ChatCounterparty.Group -> HeaderIcon(PantopusIcon.MoreVertical)
         }
     }
     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
@@ -295,6 +328,203 @@ private fun BetaPill() {
     }
 }
 
+@Composable
+internal fun CreatorAudienceStrip(
+    context: ChatCreatorThreadContext,
+    onOpenAudienceProfile: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, top = 10.dp, end = 12.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.businessBg)
+                .border(1.dp, PantopusColors.business.copy(alpha = 0.18f), RoundedCornerShape(Radii.lg))
+                .clickable(onClick = onOpenAudienceProfile)
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .testTag("chatCreatorAudienceStrip"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.business),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Users,
+                contentDescription = null,
+                size = 15.dp,
+                strokeWidth = 2.4f,
+                tint = PantopusColors.appTextInverse,
+            )
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(
+                text = "CREATOR INBOX · ${context.personaName.uppercase()}",
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.business,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = context.audienceSummary,
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = "Open audience profile",
+            size = 16.dp,
+            strokeWidth = 2.4f,
+            tint = PantopusColors.business,
+        )
+    }
+}
+
+@Composable
+internal fun CreatorQuotaMeter(quota: ChatCreatorQuota) {
+    val progress =
+        if (quota.total <= 0) {
+            0f
+        } else {
+            (quota.used.toFloat() / quota.total.toFloat()).coerceIn(0f, 1f)
+        }
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .padding(horizontal = 14.dp, vertical = 9.dp)
+                .testTag("chatCreatorQuotaMeter"),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.MessageSquare,
+                    contentDescription = null,
+                    size = 11.dp,
+                    strokeWidth = 2.5f,
+                    tint = PantopusColors.business,
+                )
+                Text(
+                    text = "Replies this week",
+                    fontSize = 11.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+            Text(
+                text = "${quota.used} of ${quota.total} replies this week",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+        }
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(PantopusColors.appSurfaceSunken),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth(progress)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(PantopusColors.primary600),
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            PantopusIconImage(
+                icon = PantopusIcon.RefreshCw,
+                contentDescription = null,
+                size = 10.dp,
+                strokeWidth = 2.4f,
+                tint = PantopusColors.appTextMuted,
+            )
+            Text(
+                text = quota.resetCopy,
+                fontSize = 10.sp,
+                color = PantopusColors.appTextMuted,
+            )
+        }
+    }
+    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
+}
+
+@Composable
+private fun CreatorTierChip(
+    name: String,
+    rank: Int,
+) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(creatorTierBgColor(rank))
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+                .testTag("chatCreatorTierChip"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        val icon =
+            when {
+                rank >= 4 -> PantopusIcon.Crown
+                rank >= 2 -> PantopusIcon.Shield
+                else -> null
+            }
+        if (icon != null) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 9.dp,
+                strokeWidth = 2.4f,
+                tint = creatorTierColor(rank),
+            )
+        }
+        Text(
+            text = name.uppercase(),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = creatorTierColor(rank),
+        )
+    }
+}
+
+private fun creatorTierColor(rank: Int): Color =
+    when (rank) {
+        1 -> PantopusColors.appTextSecondary
+        2 -> PantopusColors.warning
+        3 -> PantopusColors.appTextStrong
+        4 -> PantopusColors.warning
+        else -> PantopusColors.appTextSecondary
+    }
+
+private fun creatorTierBgColor(rank: Int): Color =
+    when (rank) {
+        1 -> PantopusColors.appSurfaceSunken
+        2 -> PantopusColors.warningBg
+        3 -> PantopusColors.appSurfaceSunken
+        4 -> PantopusColors.warningLight
+        else -> PantopusColors.appSurfaceSunken
+    }
+
 private fun presenceFor(counterparty: ChatCounterparty): Pair<Boolean, String>? =
     when (counterparty) {
         is ChatCounterparty.Person -> {
@@ -317,6 +547,7 @@ private fun HeaderIcon(icon: PantopusIcon) {
 private fun HeaderAvatar(
     isAi: Boolean,
     counterparty: ChatCounterparty,
+    tierRank: Int? = null,
 ) {
     when {
         isAi -> ChatAiAvatar(size = 32.dp)
@@ -326,9 +557,16 @@ private fun HeaderAvatar(
                 verified = counterparty.verified,
                 online = counterparty.online,
                 size = 32.dp,
+                ringColor = tierRank?.let(::creatorTierColor),
             )
         counterparty is ChatCounterparty.Group ->
-            PersonAvatar(initials = counterparty.displayName.initials(), verified = false, online = false, size = 32.dp)
+            PersonAvatar(
+                initials = counterparty.displayName.initials(),
+                verified = false,
+                online = false,
+                size = 32.dp,
+                ringColor = tierRank?.let(::creatorTierColor),
+            )
         else -> ChatAiAvatar(size = 32.dp)
     }
 }
@@ -341,6 +579,7 @@ private fun PersonAvatar(
     verified: Boolean,
     online: Boolean,
     size: androidx.compose.ui.unit.Dp,
+    ringColor: Color? = null,
 ) {
     Box(modifier = Modifier.size(size + 4.dp), contentAlignment = Alignment.BottomEnd) {
         Box(
@@ -351,6 +590,16 @@ private fun PersonAvatar(
                     .background(PantopusColors.primary500),
             contentAlignment = Alignment.Center,
         ) {
+            if (ringColor != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .matchParentSize()
+                            .border(2.dp, PantopusColors.appSurface, CircleShape)
+                            .padding(2.dp)
+                            .border(2.dp, ringColor, CircleShape),
+                )
+            }
             Text(
                 text = initials,
                 fontSize = (size.value * 0.4f).sp,
@@ -655,6 +904,7 @@ internal fun PopulatedFrame(
         items(items = rows, key = { it.rowId }) { row ->
             when (row) {
                 is ChatTimelineRow.DayDivider -> DayDividerRow(label = row.divider.label)
+                is ChatTimelineRow.BroadcastReference -> BroadcastReferenceCard(reference = row.reference)
                 is ChatTimelineRow.Bubble ->
                     BubbleRow(
                         content = row.content,
@@ -664,6 +914,71 @@ internal fun PopulatedFrame(
                         },
                     )
             }
+        }
+    }
+}
+
+@Composable
+private fun BroadcastReferenceCard(reference: ChatBroadcastReference) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp)
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.business.copy(alpha = 0.18f), RoundedCornerShape(Radii.xl))
+                .padding(12.dp)
+                .testTag("chatBroadcastReference_${reference.id}"),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.businessBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.RadioTower,
+                contentDescription = null,
+                size = 15.dp,
+                strokeWidth = 2.5f,
+                tint = PantopusColors.business,
+            )
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "BROADCAST REFERENCED",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.business,
+                maxLines = 1,
+            )
+            Text(
+                text = reference.title,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = reference.subtitle,
+                fontSize = 11.5.sp,
+                color = PantopusColors.appTextSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = reference.metric,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextStrong,
+                maxLines = 1,
+            )
         }
     }
 }
