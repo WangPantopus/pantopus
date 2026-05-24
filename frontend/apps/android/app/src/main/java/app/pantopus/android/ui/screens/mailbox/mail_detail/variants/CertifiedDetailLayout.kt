@@ -27,6 +27,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedConfirmGate
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedTermsSheet
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedTermsSummaryCard
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailContent
 import app.pantopus.android.ui.screens.mailbox.mail_detail.components.CertifiedStampBadge
 import app.pantopus.android.ui.screens.mailbox.mail_detail.components.CombinedSenderCarrierCard
@@ -85,6 +93,19 @@ fun CertifiedDetailLayout(
     // compile unchanged.
     onSaveToVault: () -> Unit = {},
 ) {
+    val shouldShowConfirmGate =
+        content.readStatusLabel.lowercase() == "unread" &&
+            !content.isAcknowledged &&
+            !content.isArchived
+    var showsConfirmGate by remember(content.mailId) { mutableStateOf(shouldShowConfirmGate) }
+    var didAutoPresentConfirmGate by remember(content.mailId) { mutableStateOf(shouldShowConfirmGate) }
+    var showsTermsSheet by remember { mutableStateOf(false) }
+    LaunchedEffect(shouldShowConfirmGate) {
+        if (shouldShowConfirmGate && !didAutoPresentConfirmGate) {
+            didAutoPresentConfirmGate = true
+            showsConfirmGate = true
+        }
+    }
     Box(modifier = Modifier.testTag("mailDetail_certified")) {
         MailItemDetailShell(
             topBar = makeTopBar(onBack = onBack, onSaveToVault = onSaveToVault),
@@ -93,37 +114,54 @@ fun CertifiedDetailLayout(
             hero = { HeroCard(content = content, certified = certified) },
             keyFacts = { CertifiedKeyFactsCard(rows = makeKeyFacts(content, certified)) },
             body = {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-                    ChainOfCustodyTimeline(
-                        events = makeChainEvents(certified),
-                        subtitle = "Postal scans · cryptographic receipts",
-                        status = chainStatus(certified),
-                    )
-                    if (content.bodyParagraphs.isNotEmpty()) {
-                        BodyCard(paragraphs = content.bodyParagraphs)
-                    }
-                }
+                ChainOfCustodyTimeline(
+                    events = makeChainEvents(certified),
+                    subtitle = "Postal scans · cryptographic receipts",
+                    status = chainStatus(certified),
+                )
             },
             sender = {
-                CombinedSenderCarrierCard(
-                    senderName = content.senderDisplayName,
-                    senderMeta = content.senderMeta,
-                    senderInitials = content.senderInitials,
-                    senderAvatarTint = content.category.accent,
-                    senderUserId = content.senderUserId,
-                    trust = content.trust,
-                    carrier = defaultCarrier(certified),
+                SenderAndNotice(
+                    content = content,
+                    certified = certified,
                     onOpenSenderProfile = onOpenSenderProfile,
+                    onViewTerms = { showsTermsSheet = true },
                 )
             },
             actions = {
                 ActionsRow(
                     isAcknowledged = content.isAcknowledged,
+                    isArchived = content.isArchived,
                     ackInFlight = ackInFlight,
-                    onAcknowledge = onAcknowledge,
+                    onAcknowledge = {
+                        if (shouldShowConfirmGate) {
+                            showsConfirmGate = true
+                        } else {
+                            onAcknowledge()
+                        }
+                    },
                 )
             },
         )
+        if (showsConfirmGate) {
+            CertifiedConfirmGate(
+                senderName = content.senderDisplayName,
+                referenceNumber = certified.referenceNumber,
+                deadlineLabel = certified.acknowledgeBy?.let(::formatLongDate),
+                isSigning = ackInFlight,
+                onReviewFirst = { showsConfirmGate = false },
+                onSign = {
+                    showsConfirmGate = false
+                    onAcknowledge()
+                },
+            )
+        }
+        if (showsTermsSheet && !certified.termsUrl.isNullOrEmpty()) {
+            CertifiedTermsSheet(
+                termsUrl = certified.termsUrl,
+                onDismiss = { showsTermsSheet = false },
+            )
+        }
     }
 }
 
@@ -195,29 +233,15 @@ private fun makeKeyFacts(
     certified: CertifiedDetailDto,
 ): List<CertifiedKeyFact> =
     buildList {
-        certified.acknowledgeBy?.let { iso ->
-            val pretty = formatLongDate(iso)
-            if (pretty != null) {
-                add(
-                    CertifiedKeyFact(
-                        id = "ackBy",
-                        icon = PantopusIcon.CalendarClock,
-                        label = "Acknowledge by",
-                        value = pretty,
-                        note = "Required to keep the chain unbroken",
-                        tag = countdownTag(iso),
-                        isEmphasis = true,
-                    ),
-                )
-            }
-        }
-        extractAmount(content.bodyParagraphs.joinToString("\n\n"))?.let { amount ->
+        val bodyText = content.bodyParagraphs.joinToString("\n\n")
+        val amount = extractAmount(bodyText)
+        amount?.let {
             add(
                 CertifiedKeyFact(
                     id = "amount",
                     icon = PantopusIcon.DollarSign,
                     label = "Amount due",
-                    value = amount,
+                    value = it,
                     note = null,
                     tag =
                         KeyFactTag(
@@ -228,6 +252,22 @@ private fun makeKeyFacts(
                     isEmphasis = true,
                 ),
             )
+        }
+        certified.acknowledgeBy?.let { iso ->
+            val pretty = formatLongDate(iso)
+            if (pretty != null) {
+                add(
+                    CertifiedKeyFact(
+                        id = "ackBy",
+                        icon = PantopusIcon.CalendarClock,
+                        label = if (amount == null) "Sign by" else "Pay by",
+                        value = pretty,
+                        note = "Required to keep the chain unbroken",
+                        tag = countdownTag(iso),
+                        isEmphasis = true,
+                    ),
+                )
+            }
         }
         certified.referenceNumber
             .trim()
@@ -399,6 +439,8 @@ private fun HeroCard(
             verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                TrustBadge()
+                Spacer(Modifier.width(Spacing.s1))
                 CategoryBadge(category = content.category)
                 Spacer(Modifier.weight(1f))
                 content.createdAtLabel?.let { received ->
@@ -436,6 +478,9 @@ private fun HeroCard(
             if (content.isAcknowledged) {
                 AcknowledgedBanner()
             }
+            if (content.isArchived) {
+                ArchivedBanner()
+            }
         }
     }
 }
@@ -472,6 +517,71 @@ private fun AcknowledgedBanner() {
             text = "Acknowledged · receipt on file",
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
+            color = PantopusColors.success,
+        )
+    }
+}
+
+@Composable
+private fun ArchivedBanner() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(PantopusColors.appSurfaceSunken)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp))
+                .padding(horizontal = 9.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.appSurface),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Archive,
+                contentDescription = null,
+                size = 13.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+        }
+        Text(
+            text = "Archived · saved with certified receipt",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextSecondary,
+        )
+    }
+}
+
+@Composable
+private fun TrustBadge() {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.successBg)
+                .padding(horizontal = Spacing.s2, vertical = 3.dp)
+                .semantics { contentDescription = "Verified sender" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.ShieldCheck,
+            contentDescription = null,
+            size = 11.dp,
+            tint = PantopusColors.success,
+        )
+        Text(
+            text = "Verified",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.3.sp,
             color = PantopusColors.success,
         )
     }
@@ -531,6 +641,36 @@ private fun BodyCard(paragraphs: List<String>) {
                 color = PantopusColors.appTextStrong,
                 lineHeight = 20.sp,
             )
+        }
+    }
+}
+
+@Composable
+private fun SenderAndNotice(
+    content: MailDetailContent,
+    certified: CertifiedDetailDto,
+    onOpenSenderProfile: (String) -> Unit,
+    onViewTerms: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+        CombinedSenderCarrierCard(
+            senderName = content.senderDisplayName,
+            senderMeta = content.senderMeta,
+            senderInitials = content.senderInitials,
+            senderAvatarTint = content.category.accent,
+            senderUserId = content.senderUserId,
+            trust = content.trust,
+            carrier = defaultCarrier(certified),
+            onOpenSenderProfile = onOpenSenderProfile,
+        )
+        if (!certified.termsUrl.isNullOrEmpty() || !certified.acknowledgeBy.isNullOrEmpty()) {
+            CertifiedTermsSummaryCard(
+                termsUrl = certified.termsUrl,
+                onViewTerms = if (certified.termsUrl.isNullOrEmpty()) null else onViewTerms,
+            )
+        }
+        if (content.bodyParagraphs.isNotEmpty()) {
+            BodyCard(paragraphs = content.bodyParagraphs)
         }
     }
 }
@@ -630,12 +770,14 @@ private fun extractAmount(body: String): String? {
 @Composable
 private fun ActionsRow(
     isAcknowledged: Boolean,
+    isArchived: Boolean,
     ackInFlight: Boolean,
     onAcknowledge: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         AcknowledgeButton(
             isAcknowledged = isAcknowledged,
+            isArchived = isArchived,
             ackInFlight = ackInFlight,
             onAcknowledge = onAcknowledge,
         )
@@ -674,11 +816,13 @@ private fun ActionsRow(
 @Composable
 private fun AcknowledgeButton(
     isAcknowledged: Boolean,
+    isArchived: Boolean,
     ackInFlight: Boolean,
     onAcknowledge: () -> Unit,
 ) {
-    val bg = if (isAcknowledged) PantopusColors.appSurface else PantopusColors.primary600
-    val fg = if (isAcknowledged) PantopusColors.success else PantopusColors.appTextInverse
+    val completed = isAcknowledged || isArchived
+    val bg = if (completed) PantopusColors.appSurface else PantopusColors.primary600
+    val fg = if (completed) PantopusColors.success else PantopusColors.appTextInverse
     Row(
         modifier =
             Modifier
@@ -686,28 +830,33 @@ private fun AcknowledgeButton(
                 .clip(RoundedCornerShape(14.dp))
                 .background(bg)
                 .then(
-                    if (isAcknowledged) {
+                    if (completed) {
                         Modifier.border(1.5.dp, PantopusColors.successLight, RoundedCornerShape(14.dp))
                     } else {
                         Modifier
                     },
                 )
-                .clickable(enabled = !ackInFlight, onClick = onAcknowledge)
+                .clickable(enabled = !ackInFlight && !isArchived, onClick = onAcknowledge)
                 .padding(vertical = 14.dp)
                 .testTag("mailDetail_certified_acknowledge")
-                .semantics { contentDescription = "Acknowledge receipt" },
+                .semantics { contentDescription = if (completed) "Signed receipt on file" else "Sign for delivery" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         PantopusIconImage(
-            icon = if (isAcknowledged) PantopusIcon.CheckCircle else PantopusIcon.Check,
+            icon = if (completed) PantopusIcon.CheckCircle else PantopusIcon.Check,
             contentDescription = null,
             size = 16.dp,
             tint = fg,
         )
         Spacer(Modifier.width(Spacing.s2))
         Text(
-            text = if (isAcknowledged) "Acknowledged · receipt on file" else "Acknowledge receipt",
+            text =
+                when {
+                    isArchived -> "Archived · receipt on file"
+                    isAcknowledged -> "Signed · receipt on file"
+                    else -> "Sign for delivery"
+                },
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = fg,
