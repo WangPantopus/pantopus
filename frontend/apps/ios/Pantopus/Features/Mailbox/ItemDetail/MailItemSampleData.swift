@@ -9,10 +9,18 @@
 
 import Foundation
 
+private struct PackageTrackingFixture {
+    let id: String
+    let title: String
+    let subtitle: String
+}
+
 /// Sample payloads for the mailbox item-detail bodies.
-public enum MailItemSampleData {
+public enum MailItemSampleData {}
+
+public extension MailItemSampleData {
     /// A17.5 primary coupon state — ready to scan in store.
-    public static let couponUnused = CouponDetailDTO(
+    static let couponUnused = CouponDetailDTO(
         brandLogoURL: nil,
         brandName: "Brass Owl Bakery",
         headline: "25% OFF",
@@ -26,7 +34,7 @@ public enum MailItemSampleData {
     )
 
     /// A17.5 redeemed secondary state — success ribbon replaces the hero.
-    public static let couponRedeemed = CouponDetailDTO(
+    static let couponRedeemed = CouponDetailDTO(
         brandLogoURL: nil,
         brandName: "Brass Owl Bakery",
         headline: "25% OFF",
@@ -40,7 +48,7 @@ public enum MailItemSampleData {
     )
 
     /// A17.5 terminal expired state.
-    public static let couponExpired = CouponDetailDTO(
+    static let couponExpired = CouponDetailDTO(
         brandLogoURL: nil,
         brandName: "Brass Owl Bakery",
         headline: "25% OFF",
@@ -52,9 +60,208 @@ public enum MailItemSampleData {
         minimumSpend: "$8 minimum",
         finePrint: "This offer expired before redemption."
     )
+}
+
+public extension MailItemSampleData {
+    static let packageContents = PackageContents(
+        title: "Lerina Books - order #LB-44218",
+        items: [
+            .init(
+                id: "calvino",
+                quantity: 1,
+                name: "Italo Calvino - Invisible Cities",
+                detail: "paperback"
+            ),
+            .init(
+                id: "dillard",
+                quantity: 1,
+                name: "Annie Dillard - Pilgrim at Tinker Creek",
+                detail: "paperback"
+            )
+        ],
+        subtotal: "$28.40",
+        shipping: "$5.20",
+        total: "$33.60"
+    )
+
+    static let packageDeliveryPhoto = PackageDeliveryPhoto(
+        capturedAt: "1:47 PM",
+        watermark: "USPS - 18/05/2026 13:47:08",
+        location: "Front porch - 1428 Elm St",
+        verificationLabel: "GPS verified"
+    )
+
+    static let packageInTransit = PackageBodyContent(
+        carrier: "USPS Priority Mail",
+        etaLine: "Expected today by 3 PM",
+        status: .inTransit,
+        trackingNumber: "9505 5125 8841 6014 2203 17",
+        referenceLine: "USPS - weight 2.4 lb - 12x9x4 in",
+        statusTitle: "In transit",
+        statusDetail: "Moving through Sacramento, CA",
+        trackingSteps: packageTrackingSteps(status: .inTransit),
+        handoffSteps: [
+            .init(
+                id: "in-transit",
+                title: "In transit",
+                location: "Sacramento, CA",
+                timestamp: "Sat May 16 - 11:40 PM",
+                icon: .arrowRight
+            ),
+            .init(
+                id: "picked-up",
+                title: "Picked up by courier",
+                location: "Portland, OR",
+                timestamp: "Thu May 14 - 4:21 PM",
+                icon: .package
+            ),
+            .init(
+                id: "label-created",
+                title: "Label created - Lerina Books",
+                location: "Portland, OR",
+                timestamp: "Wed May 13 - 10:02 AM",
+                icon: .tag
+            )
+        ],
+        contents: packageContents
+    )
+
+    static let packageOutForDelivery = PackageBodyContent(
+        carrier: "USPS Priority Mail",
+        etaLine: "ETA window 1:00 - 3:00 PM - about 6 stops away",
+        status: .outForDelivery,
+        trackingNumber: "9505 5125 8841 6014 2203 17",
+        referenceLine: "USPS - weight 2.4 lb - 12x9x4 in",
+        statusTitle: "Out for delivery - Route 22",
+        statusDetail: "ETA window 1:00 - 3:00 PM - about 6 stops away",
+        trackingSteps: packageTrackingSteps(status: .outForDelivery),
+        handoffSteps: [
+            .init(
+                id: "pending-delivery",
+                title: "Delivered to front porch",
+                location: "Pending",
+                timestamp: "Expected today - by 3 PM",
+                icon: .home
+            ),
+            .init(
+                id: "out-for-delivery",
+                title: "Out for delivery",
+                location: "Oakland Branch - Route 22",
+                timestamp: "Mon May 18 - 8:12 AM",
+                icon: .package
+            ),
+            .init(
+                id: "local-facility",
+                title: "Arrived at local facility",
+                location: "Oakland, CA",
+                timestamp: "Mon May 18 - 5:03 AM",
+                icon: .building2
+            ),
+            .init(
+                id: "in-transit",
+                title: "In transit",
+                location: "Sacramento, CA",
+                timestamp: "Sat May 16 - 11:40 PM",
+                icon: .arrowRight
+            )
+        ],
+        contents: packageContents
+    )
+
+    static let packageDelivered = PackageBodyContent(
+        carrier: "USPS Priority Mail",
+        etaLine: "Today - 1:47 PM - front porch - left in shade",
+        status: .delivered,
+        trackingNumber: "9505 5125 8841 6014 2203 17",
+        referenceLine: "USPS - weight 2.4 lb - 12x9x4 in",
+        statusTitle: "Delivered to your porch",
+        statusDetail: "Today - 1:47 PM - front porch - left in shade",
+        trackingSteps: packageTrackingSteps(status: .delivered),
+        handoffSteps: [
+            .init(
+                id: "delivered",
+                title: "Delivered to front porch",
+                location: "Oakland, CA - 1428 Elm St",
+                timestamp: "Mon May 18 - 1:47 PM",
+                icon: .home
+            ),
+            .init(
+                id: "out-for-delivery",
+                title: "Out for delivery",
+                location: "Oakland Branch - Route 22",
+                timestamp: "Mon May 18 - 8:12 AM",
+                icon: .package
+            ),
+            .init(
+                id: "local-facility",
+                title: "Arrived at local facility",
+                location: "Oakland, CA",
+                timestamp: "Mon May 18 - 5:03 AM",
+                icon: .building2
+            ),
+            .init(
+                id: "in-transit",
+                title: "In transit",
+                location: "Sacramento, CA",
+                timestamp: "Sat May 16 - 11:40 PM",
+                icon: .arrowRight
+            )
+        ],
+        deliveryPhoto: packageDeliveryPhoto,
+        contents: packageContents
+    )
+
+    static func packageBody(status: PackageDeliveryStatus) -> PackageBodyContent {
+        switch status {
+        case .shipped, .inTransit: packageInTransit
+        case .outForDelivery: packageOutForDelivery
+        case .delivered: packageDelivered
+        }
+    }
+
+    static func packageTrackingSteps(status: PackageDeliveryStatus) -> [TimelineStep] {
+        let currentIndex = switch status {
+        case .shipped: 0
+        case .inTransit: 1
+        case .outForDelivery: 2
+        case .delivered: 3
+        }
+        let items = [
+            PackageTrackingFixture(
+                id: "shipped",
+                title: "Shipped",
+                subtitle: "Wed May 13 - label created"
+            ),
+            PackageTrackingFixture(
+                id: "in_transit",
+                title: "In transit",
+                subtitle: "Sat May 16 - Sacramento, CA"
+            ),
+            PackageTrackingFixture(
+                id: "out_for_delivery",
+                title: "Out for delivery",
+                subtitle: "Mon May 18 - Route 22"
+            ),
+            PackageTrackingFixture(
+                id: "delivered",
+                title: "Delivered",
+                subtitle: status == .delivered ? "Mon May 18 - 1:47 PM" : "Expected today"
+            )
+        ]
+        return items.enumerated().map { index, item in
+            let state: TimelineStepState = if index < currentIndex {
+                .done
+            } else if index == currentIndex {
+                .current
+            } else {
+                .upcoming
+            }
+            return TimelineStep(id: item.id, title: item.title, subtitle: item.subtitle, state: state)
+        }
+    }
 
     /// Next-steps timeline shown once a bid is accepted (A17.6 NEXT_STEPS).
-    public static let gigNextSteps: [GigDetailDTO.NextStep] = [
+    static let gigNextSteps: [GigDetailDTO.NextStep] = [
         .init(id: "accepted", label: "Bid accepted", whenText: "Just now", state: .active),
         .init(id: "confirm", label: "Marcus confirms · expects 12m", whenText: "Pending", state: .pending),
         .init(id: "job", label: "Job · Sat May 24, 9 AM", whenText: "Calendar reminder set", state: .upcoming),
@@ -68,7 +275,7 @@ public enum MailItemSampleData {
     ]
 
     /// Incoming-bid state — the primary A17.6 frame.
-    public static let gigReceived = GigDetailDTO(
+    static let gigReceived = GigDetailDTO(
         isAccepted: false,
         bidder: GigDetailDTO.Bidder(
             initials: "MT",
@@ -132,5 +339,5 @@ public enum MailItemSampleData {
     )
 
     /// Bid-accepted secondary state.
-    public static let gigAccepted = gigReceived.accepted()
+    static let gigAccepted = gigReceived.accepted()
 }
