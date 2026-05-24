@@ -15,7 +15,7 @@ import Foundation
 /// `ChatCounterparty` (who you're talking to) — `mode` drives the chrome
 /// (avatar treatment, empty/welcome state, bubble shapes). `.dm` is the
 /// default human DM/group thread; `.aiAssistant` is the Pantopus AI
-/// thread; `.creatorThread` / `.fanThread` land in Wave D.
+/// thread; `.creatorThread` / `.fanThread` add creator/fan-specific chrome.
 public enum ChatConversationMode: String, Sendable, Hashable {
     case dm
     case aiAssistant
@@ -51,6 +51,36 @@ public enum ChatDeliveryState: Sendable, Hashable {
     case failed
     case delivered
     case read
+}
+
+/// Fan-side membership state for persona DMs.
+public struct ChatFanEntitlement: Sendable, Hashable {
+    public let currentTier: String
+    public let renewsOn: String
+    public let messagesLeft: Int
+    public let messageLimit: Int
+    public let resetCopy: String
+    public let requiredReplyTier: String?
+
+    public var canReply: Bool {
+        requiredReplyTier == nil && messagesLeft > 0
+    }
+
+    public init(
+        currentTier: String,
+        renewsOn: String,
+        messagesLeft: Int,
+        messageLimit: Int,
+        resetCopy: String,
+        requiredReplyTier: String? = nil
+    ) {
+        self.currentTier = currentTier
+        self.renewsOn = renewsOn
+        self.messagesLeft = messagesLeft
+        self.messageLimit = messageLimit
+        self.resetCopy = resetCopy
+        self.requiredReplyTier = requiredReplyTier
+    }
 }
 
 /// Inline "this would cost about $X" estimate rendered inside an AI
@@ -98,6 +128,10 @@ public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
     /// for bubbles in the middle of a group.
     public let stamp: String?
     public let deliveryState: ChatDeliveryState?
+    /// Required tier for messages the fan cannot read yet.
+    public let lockedTier: String?
+    /// Paid support tier attached to outgoing fan replies.
+    public let sentSupportTier: String?
 
     public init(
         id: String,
@@ -105,7 +139,9 @@ public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
         body: Body,
         hasTail: Bool,
         stamp: String?,
-        deliveryState: ChatDeliveryState? = nil
+        deliveryState: ChatDeliveryState? = nil,
+        lockedTier: String? = nil,
+        sentSupportTier: String? = nil
     ) {
         self.id = id
         self.side = side
@@ -113,6 +149,8 @@ public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
         self.hasTail = hasTail
         self.stamp = stamp
         self.deliveryState = deliveryState
+        self.lockedTier = lockedTier
+        self.sentSupportTier = sentSupportTier
     }
 }
 

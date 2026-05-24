@@ -36,6 +36,7 @@ fun ChatConversationHost(
     counterparty: ChatCounterparty,
     onBack: () -> Unit,
     conversationMode: ChatConversationMode = ChatConversationMode.Dm,
+    fanEntitlement: ChatFanEntitlement? = null,
     scrollToMessageId: String? = null,
     authViewModel: ChatConversationHostViewModel = hiltViewModel(),
 ) {
@@ -46,6 +47,7 @@ fun ChatConversationHost(
         counterparty = counterparty,
         currentUserId = currentUserId,
         conversationMode = conversationMode,
+        fanEntitlement = fanEntitlement,
         scrollToMessageId = scrollToMessageId,
         onBack = onBack,
     )

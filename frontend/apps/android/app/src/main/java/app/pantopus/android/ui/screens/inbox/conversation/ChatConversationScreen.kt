@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "CyclomaticComplexMethod")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "CyclomaticComplexMethod", "TooManyFunctions", "LongParameterList")
 
 package app.pantopus.android.ui.screens.inbox.conversation
 
@@ -29,15 +29,22 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
@@ -66,12 +73,14 @@ import app.pantopus.android.ui.theme.Spacing
  * attach + send discs; send is color-bound to text presence and
  * disabled while in flight.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatConversationScreen(
     mode: ChatThreadMode,
     counterparty: ChatCounterparty,
     currentUserId: String,
     conversationMode: ChatConversationMode = ChatConversationMode.Dm,
+    fanEntitlement: ChatFanEntitlement? = null,
     onBack: () -> Unit = {},
     scrollToMessageId: String? = null,
     viewModel: ChatConversationViewModel = hiltViewModel(),
@@ -82,6 +91,10 @@ fun ChatConversationScreen(
     val isSending by viewModel.isSending.collectAsStateWithLifecycle()
     val isCounterpartyTyping by viewModel.isCounterpartyTyping.collectAsStateWithLifecycle()
     val pendingScroll by viewModel.pendingScrollTarget.collectAsStateWithLifecycle()
+    var showFanUpgradePrompt by remember { mutableStateOf(false) }
+    val resolvedFanEntitlement = fanEntitlement ?: ChatConversationSampleData.fanEntitlement
+    val isFanThread = conversationMode == ChatConversationMode.FanThread
+    val isFanReplyLocked = isFanThread && !resolvedFanEntitlement.canReply
 
     LaunchedEffect(Unit) {
         viewModel.configure(mode, counterparty, currentUserId, scrollToMessageId)
@@ -91,61 +104,107 @@ fun ChatConversationScreen(
         onDispose { viewModel.teardown() }
     }
 
-    Column(
+    Box(
         modifier =
             Modifier
                 .fillMaxSize()
                 .background(PantopusColors.appSurface)
                 .testTag("chatConversation"),
     ) {
-        ChatHeader(conversationMode = conversationMode, counterparty = activeCounterparty, onBack = onBack)
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            when (val s = state) {
-                ChatConversationUiState.Loading -> LoadingFrame()
-                ChatConversationUiState.Empty ->
-                    EmptyFrame(
-                        counterparty = activeCounterparty,
-                        aiPrompts = viewModel.aiPrompts,
-                        emptyChips = viewModel.emptyChips,
-                        onChipTap = viewModel::tapPrompt,
-                        conversationMode = conversationMode,
-                        onCapabilityTap = viewModel::sendCapabilityPrompt,
-                    )
-                is ChatConversationUiState.Loaded ->
-                    PopulatedFrame(
-                        rows = s.rows,
-                        onRetry = viewModel::retry,
-                        onLoadOlder = viewModel::loadOlder,
-                        scrollToRowId = pendingScroll,
-                        onScrollConsumed = viewModel::consumePendingScroll,
-                    )
-                is ChatConversationUiState.Error -> ErrorFrame(message = s.message, onRetry = viewModel::refresh)
+        Column(modifier = Modifier.fillMaxSize()) {
+            ChatHeader(conversationMode = conversationMode, counterparty = activeCounterparty, onBack = onBack)
+            if (isFanThread) {
+                FanMembershipStripe(
+                    entitlement = resolvedFanEntitlement,
+                    onManage = { showFanUpgradePrompt = true },
+                )
+            }
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                when (val s = state) {
+                    ChatConversationUiState.Loading -> LoadingFrame()
+                    ChatConversationUiState.Empty ->
+                        EmptyFrame(
+                            counterparty = activeCounterparty,
+                            aiPrompts = viewModel.aiPrompts,
+                            emptyChips = viewModel.emptyChips,
+                            onChipTap = viewModel::tapPrompt,
+                            conversationMode = conversationMode,
+                            fanEntitlement = resolvedFanEntitlement,
+                            onCapabilityTap = viewModel::sendCapabilityPrompt,
+                        )
+                    is ChatConversationUiState.Loaded ->
+                        PopulatedFrame(
+                            rows = s.rows,
+                            onRetry = viewModel::retry,
+                            onLoadOlder = viewModel::loadOlder,
+                            scrollToRowId = pendingScroll,
+                            onScrollConsumed = viewModel::consumePendingScroll,
+                            conversationMode = conversationMode,
+                            onLockedAction = { showFanUpgradePrompt = true },
+                        )
+                    is ChatConversationUiState.Error -> ErrorFrame(message = s.message, onRetry = viewModel::refresh)
+                }
+            }
+            if (isCounterpartyTyping) {
+                TypingIndicator(name = activeCounterparty.displayName)
+            }
+            if (isFanThread) {
+                FanQuotaGate(
+                    entitlement = resolvedFanEntitlement,
+                    onUpgrade = { showFanUpgradePrompt = true },
+                )
+            }
+            Composer(
+                text = composerText,
+                placeholder = composerPlaceholder(conversationMode, activeCounterparty, resolvedFanEntitlement),
+                canSend = composerText.isNotBlank() && !isSending,
+                showsSendCost = isFanThread && !isFanReplyLocked,
+                isLockedAction = isFanReplyLocked,
+                onTextChange = viewModel::setComposerText,
+                onSend = {
+                    if (isFanReplyLocked) {
+                        showFanUpgradePrompt = true
+                    } else {
+                        viewModel.send()
+                    }
+                },
+            )
+        }
+
+        if (showFanUpgradePrompt) {
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = { showFanUpgradePrompt = false },
+                sheetState = sheetState,
+                containerColor = PantopusColors.appSurface,
+            ) {
+                FanTierUpgradePromptSheet(entitlement = resolvedFanEntitlement)
             }
         }
-        if (isCounterpartyTyping) {
-            TypingIndicator(name = activeCounterparty.displayName)
-        }
-        Composer(
-            text = composerText,
-            placeholder = composerPlaceholder(conversationMode, activeCounterparty),
-            canSend = composerText.isNotBlank() && !isSending,
-            onTextChange = viewModel::setComposerText,
-            onSend = viewModel::send,
-        )
     }
 }
 
 private fun composerPlaceholder(
     conversationMode: ChatConversationMode,
     c: ChatCounterparty,
+    fanEntitlement: ChatFanEntitlement = ChatConversationSampleData.fanEntitlement,
 ): String =
-    if (conversationMode == ChatConversationMode.AiAssistant) {
-        "Ask Pantopus AI…"
-    } else {
-        when (c) {
-            is ChatCounterparty.Ai -> "Ask Pantopus AI…"
-            is ChatCounterparty.Group -> "Message ${c.displayName.firstWord()}…"
-            is ChatCounterparty.Person -> "Message ${c.displayName.firstWord()}…"
+    when {
+        conversationMode == ChatConversationMode.AiAssistant -> "Ask Pantopus AI…"
+        conversationMode == ChatConversationMode.FanThread -> {
+            val required = fanEntitlement.requiredReplyTier
+            if (required != null) {
+                "Upgrade to $required to reply…"
+            } else {
+                "Message ${c.displayName.firstWord()}… (uses 1 of ${fanEntitlement.messageLimit})"
+            }
+        }
+        else -> {
+            when (c) {
+                is ChatCounterparty.Ai -> "Ask Pantopus AI…"
+                is ChatCounterparty.Group -> "Message ${c.displayName.firstWord()}…"
+                is ChatCounterparty.Person -> "Message ${c.displayName.firstWord()}…"
+            }
         }
     }
 
@@ -160,6 +219,7 @@ internal fun ChatHeader(
     conversationMode: ChatConversationMode = ChatConversationMode.Dm,
 ) {
     val isAi = conversationMode == ChatConversationMode.AiAssistant || counterparty is ChatCounterparty.Ai
+    val isFanThread = conversationMode == ChatConversationMode.FanThread
     Row(
         modifier =
             Modifier
@@ -186,7 +246,7 @@ internal fun ChatHeader(
                 tint = PantopusColors.appText,
             )
         }
-        HeaderAvatar(isAi = isAi, counterparty = counterparty)
+        HeaderAvatar(isAi = isAi, isFanThread = isFanThread, counterparty = counterparty)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -198,8 +258,9 @@ internal fun ChatHeader(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (isAi) BetaPill()
+                if (isFanThread) PersonaPill()
             }
-            presenceFor(counterparty)?.let { (online, text) ->
+            presenceFor(counterparty, isFanThread)?.let { (online, text) ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     if (online) {
                         Box(
@@ -220,21 +281,27 @@ internal fun ChatHeader(
                 }
             }
         }
-        when (counterparty) {
-            is ChatCounterparty.Person -> {
+        when {
+            isFanThread -> {
+                Row {
+                    HeaderIcon(PantopusIcon.ExternalLink)
+                    HeaderIcon(PantopusIcon.MoreHorizontal)
+                }
+            }
+            counterparty is ChatCounterparty.Person -> {
                 Row {
                     HeaderIcon(PantopusIcon.Phone)
                     HeaderIcon(PantopusIcon.Video)
                     HeaderIcon(PantopusIcon.MoreVertical)
                 }
             }
-            is ChatCounterparty.Ai -> {
+            counterparty is ChatCounterparty.Ai -> {
                 Row {
                     HeaderIcon(PantopusIcon.History)
                     HeaderIcon(PantopusIcon.MoreVertical)
                 }
             }
-            is ChatCounterparty.Group -> HeaderIcon(PantopusIcon.MoreVertical)
+            counterparty is ChatCounterparty.Group -> HeaderIcon(PantopusIcon.MoreVertical)
         }
     }
     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
@@ -259,8 +326,43 @@ private fun BetaPill() {
     }
 }
 
+@Composable
+private fun PersonaPill() {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.businessBg)
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.Briefcase, contentDescription = null, size = 9.dp, tint = PantopusColors.business)
+        Text(
+            text = "Persona",
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.business,
+        )
+    }
+}
+
 private fun presenceFor(counterparty: ChatCounterparty): Pair<Boolean, String>? =
-    when (counterparty) {
+    presenceFor(counterparty, false)
+
+private fun presenceFor(
+    counterparty: ChatCounterparty,
+    isFanThread: Boolean,
+): Pair<Boolean, String>? =
+    if (isFanThread) {
+        val text =
+            when (counterparty) {
+                is ChatCounterparty.Person -> counterparty.locality?.let { "$it · creator" } ?: "Creator"
+                else -> "Creator"
+            }
+        true to text
+    } else {
+        when (counterparty) {
         is ChatCounterparty.Person -> {
             val prefix = if (counterparty.online) "Active now" else "Verified neighbor"
             val text = if (counterparty.locality != null) "$prefix · ${counterparty.locality}" else prefix
@@ -268,6 +370,7 @@ private fun presenceFor(counterparty: ChatCounterparty): Pair<Boolean, String>? 
         }
         is ChatCounterparty.Group -> counterparty.memberCount?.let { false to "$it members" }
         is ChatCounterparty.Ai -> false to "Replies in seconds · powered by Pantopus AI"
+        }
     }
 
 @Composable
@@ -280,10 +383,12 @@ private fun HeaderIcon(icon: PantopusIcon) {
 @Composable
 private fun HeaderAvatar(
     isAi: Boolean,
+    isFanThread: Boolean,
     counterparty: ChatCounterparty,
 ) {
     when {
         isAi -> ChatAiAvatar(size = 32.dp)
+        isFanThread -> FanPersonaAvatar(initials = fanInitials(counterparty), size = 32.dp)
         counterparty is ChatCounterparty.Person ->
             PersonAvatar(
                 initials = counterparty.initials,
@@ -296,6 +401,13 @@ private fun HeaderAvatar(
         else -> ChatAiAvatar(size = 32.dp)
     }
 }
+
+private fun fanInitials(counterparty: ChatCounterparty): String =
+    when (counterparty) {
+        is ChatCounterparty.Person -> counterparty.initials
+        is ChatCounterparty.Group -> counterparty.displayName.initials()
+        is ChatCounterparty.Ai -> "AI"
+    }
 
 private fun String.initials(): String = split(" ").take(2).mapNotNull { it.firstOrNull()?.toString() }.joinToString("").uppercase()
 
@@ -354,6 +466,176 @@ private fun PersonAvatar(
     }
 }
 
+@Composable
+private fun FanPersonaAvatar(
+    initials: String,
+    size: androidx.compose.ui.unit.Dp,
+) {
+    Box(modifier = Modifier.size(size + 4.dp), contentAlignment = Alignment.BottomEnd) {
+        Box(
+            modifier =
+                Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(PantopusColors.business),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = initials,
+                fontSize = (size.value * 0.35f).sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
+        Box(
+            modifier =
+                Modifier
+                    .size(13.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.business)
+                    .border(2.dp, PantopusColors.appSurface, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Check,
+                contentDescription = null,
+                size = 7.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FanMembershipStripe(
+    entitlement: ChatFanEntitlement,
+    onManage: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .background(PantopusColors.appSurface)
+                .padding(start = 14.dp, end = 8.dp)
+                .testTag("chatFanMembershipStripe"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(PantopusColors.warningBg)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            PantopusIconImage(icon = PantopusIcon.Crown, contentDescription = null, size = 10.dp, tint = PantopusColors.warning)
+            Text(
+                text = entitlement.currentTier.uppercase(),
+                fontSize = 9.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.warning,
+            )
+        }
+        PantopusIconImage(icon = PantopusIcon.Calendar, contentDescription = null, size = 11.dp, tint = PantopusColors.appTextMuted)
+        Text(
+            text = "renews ${entitlement.renewsOn}",
+            fontSize = 11.sp,
+            color = PantopusColors.appTextSecondary,
+            modifier = Modifier.weight(1f),
+        )
+        Row(
+            modifier =
+                Modifier
+                    .heightIn(min = 44.dp)
+                    .clickable(onClick = onManage)
+                    .padding(horizontal = 6.dp)
+                    .testTag("chatFanManageMembership"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(
+                text = "Manage",
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.primary600,
+            )
+            PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 11.dp, tint = PantopusColors.primary600)
+        }
+    }
+    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
+}
+
+@Composable
+private fun FanQuotaGate(
+    entitlement: ChatFanEntitlement,
+    onUpgrade: () -> Unit,
+) {
+    val gateColor = if (entitlement.canReply) PantopusColors.primary700 else PantopusColors.warning
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .background(if (entitlement.canReply) PantopusColors.appSurface else PantopusColors.warningBg)
+                .padding(start = 14.dp, end = 8.dp)
+                .testTag("chatFanQuotaGate"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(if (entitlement.canReply) PantopusColors.infoBg else PantopusColors.appSurface)
+                    .border(
+                        1.dp,
+                        if (entitlement.canReply) PantopusColors.infoLight else PantopusColors.warningLight,
+                        RoundedCornerShape(Radii.pill),
+                    )
+                    .padding(horizontal = 9.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            PantopusIconImage(icon = PantopusIcon.MessageSquare, contentDescription = null, size = 11.dp, tint = gateColor)
+            Text(
+                text = "${entitlement.messagesLeft} of ${entitlement.messageLimit} left",
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = gateColor,
+            )
+        }
+        Text(
+            text = entitlement.requiredReplyTier?.let { "$it required" } ?: entitlement.resetCopy,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appTextSecondary,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+        Row(
+            modifier =
+                Modifier
+                    .heightIn(min = 44.dp)
+                    .clickable(onClick = onUpgrade)
+                    .padding(horizontal = 6.dp)
+                    .testTag("chatFanQuotaUpgrade"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(
+                text = "Upgrade",
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.primary600,
+            )
+            PantopusIconImage(icon = PantopusIcon.ArrowUpRight, contentDescription = null, size = 11.dp, tint = PantopusColors.primary600)
+        }
+    }
+}
+
 // MARK: - Frames
 
 @Composable
@@ -373,11 +655,18 @@ internal fun EmptyFrame(
     emptyChips: List<ChatPromptChip>,
     onChipTap: (ChatPromptChip) -> Unit,
     conversationMode: ChatConversationMode = ChatConversationMode.Dm,
+    fanEntitlement: ChatFanEntitlement = ChatConversationSampleData.fanEntitlement,
     onCapabilityTap: (ChatPromptChip) -> Unit = {},
 ) {
     val isAi = conversationMode == ChatConversationMode.AiAssistant || counterparty is ChatCounterparty.Ai
     when {
         isAi -> AiWelcomeFrame(prompts = aiPrompts, onCapabilityTap = onCapabilityTap)
+        conversationMode == ChatConversationMode.FanThread ->
+            FanEmptyFrame(
+                counterparty = counterparty,
+                entitlement = fanEntitlement,
+                onOpenerTap = { label -> onChipTap(ChatPromptChip(id = "fan-opener", label = label, icon = PantopusIcon.MessageSquare)) },
+            )
         counterparty is ChatCounterparty.Person ->
             PersonEmptyFrame(counterparty = counterparty, chips = emptyChips, onChipTap = onChipTap)
         counterparty is ChatCounterparty.Group ->
@@ -439,6 +728,172 @@ private fun PersonEmptyFrame(
         }
         Spacer(modifier = Modifier.size(14.dp))
         EncryptionPill()
+    }
+}
+
+@Composable
+private fun FanEmptyFrame(
+    counterparty: ChatCounterparty,
+    entitlement: ChatFanEntitlement,
+    onOpenerTap: (String) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(top = 14.dp, start = 14.dp, end = 14.dp, bottom = 16.dp)
+                .testTag("chatConversationFanEmpty"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        FanAutoWelcomeCard()
+        Text(
+            text = "Start a conversation",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            modifier = Modifier.semantics { heading() },
+        )
+        Text(
+            text = "You can message ${counterparty.displayName.firstWord()} directly. Each send uses one of your monthly ${entitlement.currentTier} replies.",
+            fontSize = 12.5.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+        FanQuotaHero(entitlement)
+        FanOpeners(onOpenerTap = onOpenerTap)
+    }
+}
+
+@Composable
+private fun FanAutoWelcomeCard(modifier: Modifier = Modifier) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                .padding(12.dp)
+                .testTag("chatFanAutoWelcome"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(PantopusColors.businessBg)
+                    .padding(horizontal = 7.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            PantopusIconImage(icon = PantopusIcon.Sparkles, contentDescription = null, size = 9.dp, tint = PantopusColors.business)
+            Text(
+                text = "AUTO-WELCOME · FREE",
+                fontSize = 9.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.business,
+            )
+        }
+        Text(
+            text = "Welcome to the Diary, Maria.",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+        )
+        Text(
+            text = "First message is on me — ask anything bread-related, share a bake, or just say hi. I read everything personally on Sunday evenings.",
+            fontSize = 12.5.sp,
+            color = PantopusColors.appTextStrong,
+        )
+        Text(
+            text = "— Wynn",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appTextSecondary,
+        )
+    }
+}
+
+@Composable
+private fun FanQuotaHero(entitlement: ChatFanEntitlement) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.infoBg)
+                .border(1.dp, PantopusColors.infoLight, RoundedCornerShape(Radii.pill))
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .testTag("chatFanQuotaHero"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.MessageSquare, contentDescription = null, size = 13.dp, tint = PantopusColors.primary700)
+        Text(
+            text = "${entitlement.messageLimit} messages this period",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.primary700,
+        )
+        Text(text = "·", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PantopusColors.primary300)
+        Text(text = entitlement.resetCopy, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = PantopusColors.primary600)
+    }
+}
+
+@Composable
+private fun FanOpeners(onOpenerTap: (String) -> Unit) {
+    val openers =
+        listOf(
+            Triple(PantopusIcon.HelpCircle, "Recipe question", "Why does my crumb come out tight on day 2?"),
+            Triple(PantopusIcon.Image, "Share a bake", "Send a photo for feedback"),
+            Triple(PantopusIcon.Calendar, "Workshops", "When's the next hands-on session?"),
+        )
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("chatFanOpeners"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        openers.forEachIndexed { index, opener ->
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 50.dp)
+                        .clip(RoundedCornerShape(Radii.lg))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                        .clickable { onOpenerTap(opener.third) }
+                        .padding(horizontal = 12.dp)
+                        .testTag("chatFanOpener_$index"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(30.dp)
+                            .clip(RoundedCornerShape(Radii.md))
+                            .background(PantopusColors.businessBg),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(icon = opener.first, contentDescription = null, size = 14.dp, tint = PantopusColors.business)
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = opener.second.uppercase(),
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appTextMuted,
+                    )
+                    Text(
+                        text = opener.third,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = PantopusColors.appText,
+                    )
+                }
+                PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextMuted)
+            }
+        }
     }
 }
 
@@ -584,6 +1039,8 @@ internal fun PopulatedFrame(
     onLoadOlder: () -> Unit,
     scrollToRowId: String? = null,
     onScrollConsumed: () -> Unit = {},
+    conversationMode: ChatConversationMode = ChatConversationMode.Dm,
+    onLockedAction: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(rows.size) {
@@ -615,12 +1072,18 @@ internal fun PopulatedFrame(
             }
             Spacer(modifier = Modifier.size(1.dp))
         }
+        if (conversationMode == ChatConversationMode.FanThread) {
+            item(key = "fan_auto_welcome") {
+                FanAutoWelcomeCard(modifier = Modifier.padding(bottom = 12.dp))
+            }
+        }
         items(items = rows, key = { it.rowId }) { row ->
             when (row) {
                 is ChatTimelineRow.DayDivider -> DayDividerRow(label = row.divider.label)
                 is ChatTimelineRow.Bubble ->
                     BubbleRow(
                         content = row.content,
+                        onLockedAction = onLockedAction,
                         onRetry = {
                             if (row.content.id.startsWith("client_")) onRetry(row.content.id)
                         },
@@ -651,6 +1114,7 @@ private fun DayDividerRow(label: String) {
 @Composable
 private fun BubbleRow(
     content: ChatBubbleContent,
+    onLockedAction: () -> Unit,
     onRetry: () -> Unit,
 ) {
     val isOut = content.side == ChatMessageSide.Outgoing
@@ -662,7 +1126,14 @@ private fun BubbleRow(
     ) {
         when (val body = content.body) {
             is ChatBubbleBody.Text ->
-                BubbleContainer(isOut = isOut, hasTail = content.hasTail, bubbleColor = bubbleColor) {
+                BubbleContainer(
+                    isOut = isOut,
+                    hasTail = content.hasTail,
+                    bubbleColor = bubbleColor,
+                    lockedTier = content.lockedTier?.takeIf { !isOut },
+                    onLockedAction = onLockedAction,
+                    contentId = content.id,
+                ) {
                     Text(
                         text = body.text,
                         fontSize = 14.sp,
@@ -671,7 +1142,14 @@ private fun BubbleRow(
                     )
                 }
             is ChatBubbleBody.Image ->
-                BubbleContainer(isOut = isOut, hasTail = content.hasTail, bubbleColor = PantopusColors.appSurfaceSunken) {
+                BubbleContainer(
+                    isOut = isOut,
+                    hasTail = content.hasTail,
+                    bubbleColor = PantopusColors.appSurfaceSunken,
+                    lockedTier = content.lockedTier?.takeIf { !isOut },
+                    onLockedAction = onLockedAction,
+                    contentId = content.id,
+                ) {
                     Box(
                         modifier =
                             Modifier
@@ -681,7 +1159,14 @@ private fun BubbleRow(
                     )
                 }
             is ChatBubbleBody.Attachment ->
-                BubbleContainer(isOut = isOut, hasTail = content.hasTail, bubbleColor = bubbleColor) {
+                BubbleContainer(
+                    isOut = isOut,
+                    hasTail = content.hasTail,
+                    bubbleColor = bubbleColor,
+                    lockedTier = content.lockedTier?.takeIf { !isOut },
+                    onLockedAction = onLockedAction,
+                    contentId = content.id,
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         PantopusIconImage(
                             icon = PantopusIcon.File,
@@ -700,6 +1185,9 @@ private fun BubbleRow(
             is ChatBubbleBody.SystemLink -> SystemLinkPill(body)
             is ChatBubbleBody.AiReply -> AiReplyBubble(body = body, hasTail = content.hasTail)
         }
+        if (content.sentSupportTier != null && isOut) {
+            PaidSupportFooter(tier = content.sentSupportTier, contentId = content.id)
+        }
         if (content.stamp != null) {
             StampRow(content = content, onRetry = onRetry)
         }
@@ -711,23 +1199,113 @@ private fun BubbleContainer(
     isOut: Boolean,
     hasTail: Boolean,
     bubbleColor: Color,
+    lockedTier: String? = null,
+    onLockedAction: () -> Unit = {},
+    contentId: String = "",
     inner: @Composable () -> Unit,
 ) {
+    val shape =
+        RoundedCornerShape(
+            topStart = 16.dp,
+            topEnd = 16.dp,
+            bottomEnd = if (isOut && hasTail) 4.dp else 16.dp,
+            bottomStart = if (!isOut && hasTail) 4.dp else 16.dp,
+        )
     Box(
         modifier =
             Modifier
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomEnd = if (isOut && hasTail) 4.dp else 16.dp,
-                        bottomStart = if (!isOut && hasTail) 4.dp else 16.dp,
+                .clip(shape)
+                .background(bubbleColor),
+    ) {
+        Box(modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)) {
+            inner()
+        }
+        if (lockedTier != null) {
+            LockedPaywallOverlay(
+                tier = lockedTier,
+                contentId = contentId,
+                onLockedAction = onLockedAction,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LockedPaywallOverlay(
+    tier: String,
+    contentId: String,
+    onLockedAction: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .background(
+                    Brush.verticalGradient(
+                        colors =
+                            listOf(
+                                PantopusColors.appSurface.copy(alpha = 0.15f),
+                                PantopusColors.appSurface.copy(alpha = 0.96f),
+                            ),
                     ),
                 )
-                .background(bubbleColor)
-                .padding(horizontal = 13.dp, vertical = 9.dp),
+                .testTag("chatPaywallOverlay_$contentId"),
+        contentAlignment = Alignment.BottomCenter,
     ) {
-        inner()
+        Row(
+            modifier =
+                Modifier
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(PantopusColors.appSurface)
+                    .clickable(onClick = onLockedAction)
+                    .padding(horizontal = 10.dp)
+                    .testTag("chatLockedUpgrade_$contentId"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 12.dp, tint = PantopusColors.primary600)
+            Text(
+                text = "Upgrade to read",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.primary600,
+            )
+            Text(
+                text = tier,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PaidSupportFooter(
+    tier: String,
+    contentId: String,
+) {
+    Row(
+        modifier =
+            Modifier
+                .padding(top = 4.dp)
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.warningBg)
+                .padding(horizontal = 9.dp, vertical = 4.dp)
+                .testTag("chatPaidSupportFooter_$contentId"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.Crown, contentDescription = null, size = 10.dp, tint = PantopusColors.warning)
+        Text(
+            text = "Sent with $tier support",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.warning,
+        )
     }
 }
 
@@ -964,6 +1542,8 @@ internal fun Composer(
     text: String,
     placeholder: String,
     canSend: Boolean,
+    showsSendCost: Boolean = false,
+    isLockedAction: Boolean = false,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
 ) {
@@ -1039,19 +1619,130 @@ internal fun Composer(
                         }
                     )
                         .clip(CircleShape)
-                        .background(if (canSend) PantopusColors.primary600 else PantopusColors.appSurfaceSunken)
+                        .background(sendBackground(canSend = canSend, isLockedAction = isLockedAction))
                         .clickable(enabled = canSend, onClick = onSend)
                         .testTag("chatComposerSend"),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
-                    icon = PantopusIcon.Send,
+                    icon = if (isLockedAction) PantopusIcon.Lock else PantopusIcon.Send,
                     contentDescription = "Send",
                     size = 17.dp,
                     tint = if (canSend) PantopusColors.appTextInverse else PantopusColors.appTextMuted,
                 )
+                if (showsSendCost && canSend) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 0.dp)
+                                .clip(RoundedCornerShape(Radii.pill))
+                                .background(PantopusColors.appSurface)
+                                .border(1.dp, PantopusColors.primary600, RoundedCornerShape(Radii.pill))
+                                .padding(horizontal = 5.dp, vertical = 1.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "-1",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = PantopusColors.primary700,
+                        )
+                    }
+                }
             }
         }
+    }
+}
+
+private fun sendBackground(
+    canSend: Boolean,
+    isLockedAction: Boolean,
+): Color =
+    when {
+        !canSend -> PantopusColors.appSurfaceSunken
+        isLockedAction -> PantopusColors.warning
+        else -> PantopusColors.primary600
+    }
+
+@Composable
+internal fun FanTierUpgradePromptSheet(entitlement: ChatFanEntitlement) {
+    val targetTier = entitlement.requiredReplyTier ?: "Silver"
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 24.dp)
+                .testTag("chatFanUpgradePromptSheet"),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(PantopusColors.primary50),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 20.dp, tint = PantopusColors.primary600)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Upgrade to $targetTier",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(
+                    text = "Your ${entitlement.currentTier} support does not unlock this reply yet.",
+                    fontSize = 12.5.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            FanUpgradeBenefit(icon = PantopusIcon.MessageSquare, title = "Read tier-locked replies")
+            FanUpgradeBenefit(icon = PantopusIcon.ArrowUpRight, title = "Reply without the current tier gate")
+            FanUpgradeBenefit(icon = PantopusIcon.Crown, title = "Keep supporting this creator")
+        }
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.primary600)
+                    .clickable {}
+                    .testTag("chatFanUpgradeConfirm"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "Upgrade membership",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FanUpgradeBenefit(
+    icon: PantopusIcon,
+    title: String,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(
+            modifier = Modifier.size(28.dp).clip(CircleShape).background(PantopusColors.primary50),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(icon = icon, contentDescription = null, size = 14.dp, tint = PantopusColors.primary600)
+        }
+        Text(
+            text = title,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextStrong,
+        )
     }
 }
 

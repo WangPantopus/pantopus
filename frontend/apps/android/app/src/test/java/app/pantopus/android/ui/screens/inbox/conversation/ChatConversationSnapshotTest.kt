@@ -65,6 +65,19 @@ class ChatConversationSnapshotTest {
     }
 
     @Test
+    fun chat_conversation_header_fan_thread() {
+        paparazzi.snapshot {
+            Frame {
+                ChatHeader(
+                    counterparty = ChatConversationSampleData.fanCounterparty,
+                    onBack = {},
+                    conversationMode = ChatConversationMode.FanThread,
+                )
+            }
+        }
+    }
+
+    @Test
     fun chat_conversation_empty_person() {
         paparazzi.snapshot {
             Frame {
@@ -106,6 +119,22 @@ class ChatConversationSnapshotTest {
     }
 
     @Test
+    fun chat_conversation_empty_fan_thread() {
+        paparazzi.snapshot {
+            Frame {
+                EmptyFrame(
+                    counterparty = ChatConversationSampleData.fanCounterparty,
+                    aiPrompts = emptyList(),
+                    emptyChips = emptyList(),
+                    onChipTap = {},
+                    conversationMode = ChatConversationMode.FanThread,
+                    fanEntitlement = ChatConversationSampleData.fanEntitlement,
+                )
+            }
+        }
+    }
+
+    @Test
     fun chat_conversation_ai_active_with_estimate() {
         paparazzi.snapshot {
             Frame {
@@ -114,6 +143,29 @@ class ChatConversationSnapshotTest {
                     onRetry = {},
                     onLoadOlder = {},
                 )
+            }
+        }
+    }
+
+    @Test
+    fun chat_conversation_fan_active_with_locked_reply() {
+        paparazzi.snapshot {
+            Frame {
+                PopulatedFrame(
+                    rows = ChatConversationSampleData.fanActiveRows,
+                    onRetry = {},
+                    onLoadOlder = {},
+                    conversationMode = ChatConversationMode.FanThread,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun chat_conversation_fan_upgrade_prompt() {
+        paparazzi.snapshot {
+            Frame {
+                FanTierUpgradePromptSheet(entitlement = ChatConversationSampleData.fanLockedEntitlement)
             }
         }
     }

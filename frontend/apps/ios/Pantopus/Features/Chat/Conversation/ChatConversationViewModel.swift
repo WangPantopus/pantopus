@@ -56,6 +56,10 @@ public final class ChatConversationViewModel {
     /// Quick-start chips for the empty state.
     public let emptyChips: [ChatPromptChip]
 
+    /// Fan-side quota and tier state for persona DMs. `nil` for regular
+    /// DMs and AI threads.
+    public private(set) var fanEntitlement: ChatFanEntitlement?
+
     /// A15.3 capability chips shown in the AI welcome card. Tapping one
     /// sends its label as the thread's first message.
     public static let defaultAICapabilities: [ChatPromptChip] = [
@@ -118,7 +122,11 @@ public final class ChatConversationViewModel {
     /// fetch or socket subscriptions. Not used in production navigation;
     /// `load()` early-returns on a seeded `.loaded` state so the fixture
     /// survives `.task`.
-    init(previewState: ChatConversationState, counterparty: ChatCounterparty) {
+    init(
+        previewState: ChatConversationState,
+        counterparty: ChatCounterparty,
+        fanEntitlement: ChatFanEntitlement? = nil
+    ) {
         mode = .ai
         self.counterparty = counterparty
         currentUserId = "preview_me"
@@ -127,6 +135,7 @@ public final class ChatConversationViewModel {
         socket = .shared
         aiPrompts = Self.defaultAICapabilities
         emptyChips = Self.defaultEmptyChips
+        self.fanEntitlement = fanEntitlement
         state = previewState
     }
 
@@ -462,7 +471,9 @@ public final class ChatConversationViewModel {
                 body: body,
                 hasTail: hasTail,
                 stamp: stamp,
-                deliveryState: deliveryState
+                deliveryState: deliveryState,
+                lockedTier: Self.lockedTier(for: message),
+                sentSupportTier: Self.sentSupportTier(for: message)
             )))
         }
         state = .loaded(rows: rows)
@@ -565,6 +576,27 @@ public final class ChatConversationViewModel {
         default:
             return .text(message.messageText ?? "")
         }
+    }
+
+    private static func lockedTier(for message: ChatMessageDTO) -> String? {
+        guard let metadata = message.metadata?.dictValue else { return nil }
+        let isLocked =
+            metadata["tier_locked"]?.boolValue
+                ?? metadata["is_locked"]?.boolValue
+                ?? metadata["locked"]?.boolValue
+                ?? false
+        guard isLocked else { return nil }
+        return metadata["required_tier"]?.stringValue
+            ?? metadata["locked_tier"]?.stringValue
+            ?? metadata["tier"]?.stringValue
+            ?? "Silver"
+    }
+
+    private static func sentSupportTier(for message: ChatMessageDTO) -> String? {
+        guard let metadata = message.metadata?.dictValue else { return nil }
+        return metadata["sent_support_tier"]?.stringValue
+            ?? metadata["support_tier"]?.stringValue
+            ?? metadata["paid_support_tier"]?.stringValue
     }
 
     private static func dayKey(for iso: String) -> String {

@@ -9,6 +9,35 @@ package app.pantopus.android.ui.screens.inbox.conversation
  */
 object ChatConversationSampleData {
     const val AI_NAME = "Ask Pantopus"
+    const val FAN_PERSONA_NAME = "Wynn B."
+
+    val fanCounterparty =
+        ChatCounterparty.Person(
+            displayName = FAN_PERSONA_NAME,
+            initials = "WB",
+            locality = "The Sourdough Diary",
+            verified = true,
+            online = true,
+        )
+
+    val fanEntitlement =
+        ChatFanEntitlement(
+            currentTier = "Bronze",
+            renewsOn = "Apr 12",
+            messagesLeft = 3,
+            messageLimit = 5,
+            resetCopy = "Resets May 1",
+        )
+
+    val fanLockedEntitlement =
+        ChatFanEntitlement(
+            currentTier = "Bronze",
+            renewsOn = "Apr 12",
+            messagesLeft = 3,
+            messageLimit = 5,
+            resetCopy = "Resets May 1",
+            requiredReplyTier = "Silver",
+        )
 
     /**
      * An active AI thread: a user question followed by a structured AI
@@ -44,6 +73,43 @@ object ChatConversationSampleData {
                     hasTail = true,
                     stamp = "9:08 AM",
                     deliveryState = null,
+                ),
+            ),
+        )
+
+    val fanActiveRows: List<ChatTimelineRow> =
+        listOf(
+            ChatTimelineRow.DayDivider(ChatDayDivider(id = "today", label = "Today")),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "fan1",
+                    side = ChatMessageSide.Outgoing,
+                    body = ChatBubbleBody.Text("Loved this week's loaf — quick question: can I sub bread flour for AP?"),
+                    hasTail = true,
+                    stamp = "8:51 AM",
+                    deliveryState = ChatDeliveryState.Read,
+                    sentSupportTier = "Bronze",
+                ),
+            ),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "creator1",
+                    side = ChatMessageSide.Incoming,
+                    body = ChatBubbleBody.Text("Short answer — yes, bread flour gives more chew. Drop hydration by about 5g per 100g."),
+                    hasTail = true,
+                    stamp = "Wynn · 9:03 AM",
+                    deliveryState = null,
+                ),
+            ),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "creator2",
+                    side = ChatMessageSide.Incoming,
+                    body = ChatBubbleBody.Text("Silver members also get my starter troubleshooting checklist and bake timing notes."),
+                    hasTail = true,
+                    stamp = "Wynn · 9:04 AM",
+                    deliveryState = null,
+                    lockedTier = "Silver",
                 ),
             ),
         )

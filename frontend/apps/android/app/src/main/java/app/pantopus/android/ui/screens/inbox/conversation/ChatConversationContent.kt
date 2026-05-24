@@ -10,7 +10,7 @@ import app.pantopus.android.ui.theme.PantopusIcon
  * [ChatCounterparty] (who you're talking to) — `mode` drives the chrome
  * (avatar treatment, empty/welcome state, bubble shapes). [Dm] is the
  * default human DM/group thread; [AiAssistant] is the Pantopus AI thread;
- * [CreatorThread] / [FanThread] land in Wave D.
+ * [CreatorThread] / [FanThread] add creator/fan-specific chrome.
  */
 enum class ChatConversationMode { Dm, AiAssistant, CreatorThread, FanThread }
 
@@ -48,6 +48,19 @@ sealed interface ChatThreadMode {
 enum class ChatMessageSide { Incoming, Outgoing }
 
 enum class ChatDeliveryState { Sending, Failed, Delivered, Read }
+
+@Immutable
+data class ChatFanEntitlement(
+    val currentTier: String,
+    val renewsOn: String,
+    val messagesLeft: Int,
+    val messageLimit: Int,
+    val resetCopy: String,
+    val requiredReplyTier: String? = null,
+) {
+    val canReply: Boolean
+        get() = requiredReplyTier == null && messagesLeft > 0
+}
 
 enum class ChatSystemLinkAccent { Primary, Success, Warning, Error }
 
@@ -98,6 +111,8 @@ data class ChatBubbleContent(
     val hasTail: Boolean,
     val stamp: String?,
     val deliveryState: ChatDeliveryState?,
+    val lockedTier: String? = null,
+    val sentSupportTier: String? = null,
 )
 
 @Immutable
