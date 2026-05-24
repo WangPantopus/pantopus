@@ -18,6 +18,29 @@ private struct PackageTrackingFixture {
 // swiftlint:disable type_body_length
 /// Sample payloads for the mailbox item-detail bodies.
 public enum MailItemSampleData {
+    /// A17.2 primary booklet sample — neighborhood civic guide.
+    public static let bookletVoterGuide = BookletDetailDTO(
+        pages: [
+            sampleURL("https://example.com/pantopus/booklets/voter-guide/page-1.png"),
+            sampleURL("https://example.com/pantopus/booklets/voter-guide/page-2.png"),
+            sampleURL("https://example.com/pantopus/booklets/voter-guide/page-3.png"),
+            sampleURL("https://example.com/pantopus/booklets/voter-guide/page-4.png")
+        ],
+        summary: "Nonpartisan voter guide for the June 2026 primary, including local races and ballot measures.",
+        pageCount: 4
+    )
+
+    /// A17.2 secondary booklet sample — merchant catalog mailed to a neighborhood.
+    public static let bookletNeighborhoodCatalog = BookletDetailDTO(
+        pages: [
+            sampleURL("https://example.com/pantopus/booklets/catalog/page-1.png"),
+            sampleURL("https://example.com/pantopus/booklets/catalog/page-2.png"),
+            sampleURL("https://example.com/pantopus/booklets/catalog/page-3.png")
+        ],
+        summary: "Spring catalog with seasonal services, repair windows, and neighborhood-only pricing.",
+        pageCount: 3
+    )
+
     public static let packageContents = PackageContents(
         title: "Lerina Books - order #LB-44218",
         items: [
@@ -355,6 +378,13 @@ public enum MailItemSampleData {
         penalty plus 1.5% per month interest will accrue.
         """
     ].joined(separator: "\n\n")
+
+    private static func sampleURL(_ string: String) -> URL {
+        guard let url = URL(string: string) else {
+            preconditionFailure("Invalid sample URL: \(string)")
+        }
+        return url
+    }
 }
 
 // swiftlint:enable type_body_length
