@@ -37,20 +37,18 @@ public struct ChatConversationView: View {
         VStack(spacing: 0) {
             ChatConversationHeader(mode: mode, counterparty: viewModel.counterparty, onBack: onBack)
             if mode == .fanThread {
-                FanMembershipStripe(
-                    entitlement: activeFanEntitlement,
-                    onManage: { upgradePromptPresented = true }
-                )
+                FanMembershipStripe(entitlement: activeFanEntitlement) {
+                    upgradePromptPresented = true
+                }
             }
             content
             if viewModel.isCounterpartyTyping {
                 ChatTypingIndicator(name: viewModel.counterparty.displayName)
             }
             if mode == .fanThread {
-                FanQuotaGate(
-                    entitlement: activeFanEntitlement,
-                    onUpgrade: { upgradePromptPresented = true }
-                )
+                FanQuotaGate(entitlement: activeFanEntitlement) {
+                    upgradePromptPresented = true
+                }
             }
             ChatComposer(
                 text: Binding(
@@ -204,11 +202,14 @@ public struct ChatConversationView: View {
                     Text("Start a conversation")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
-                    Text("You can message \(firstWord(viewModel.counterparty.displayName)) directly. Each send uses one of your monthly \(activeFanEntitlement.currentTier) replies.")
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 280)
+                    Text(
+                        "You can message \(firstWord(viewModel.counterparty.displayName)) directly. " +
+                            "Each send uses one of your monthly \(activeFanEntitlement.currentTier) replies."
+                    )
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 280)
                     FanQuotaHero(entitlement: activeFanEntitlement)
                     FanOpeners { label in
                         viewModel.composerText = label
@@ -380,13 +381,14 @@ extension ChatConversationView {
         case let .bubble(bubble):
             ChatBubbleRow(
                 content: bubble,
-                onLockedAction: { upgradePromptPresented = true }
-            ) {
-                if let clientId = bubble.id.split(separator: "_").last.map(String.init),
-                   bubble.id.hasPrefix("client_") {
-                    Task { await viewModel.retry(clientId: "client_\(clientId)") }
+                onLockedAction: { upgradePromptPresented = true },
+                onRetry: {
+                    if let clientId = bubble.id.split(separator: "_").last.map(String.init),
+                       bubble.id.hasPrefix("client_") {
+                        Task { await viewModel.retry(clientId: "client_\(clientId)") }
+                    }
                 }
-            }
+            )
         }
     }
 
@@ -557,10 +559,13 @@ private struct FanAutoWelcomeCard: View {
             Text("Welcome to the Diary, Maria.")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
-            Text("First message is on me — ask anything bread-related, share a bake, or just say hi. I read everything personally on Sunday evenings.")
-                .font(.system(size: 12.5))
-                .lineSpacing(4)
-                .foregroundStyle(Theme.Color.appTextStrong)
+            Text(
+                "First message is on me — ask anything bread-related, share a bake, " +
+                    "or just say hi. I read everything personally on Sunday evenings."
+            )
+            .font(.system(size: 12.5))
+            .lineSpacing(4)
+            .foregroundStyle(Theme.Color.appTextStrong)
             Text("— Wynn")
                 .font(.system(size: 12, weight: .medium))
                 .italic()
@@ -613,10 +618,25 @@ private struct FanQuotaHero: View {
 private struct FanOpeners: View {
     let onSelect: @MainActor (String) -> Void
 
-    private let openers: [(id: String, icon: PantopusIcon, label: String, title: String)] = [
-        ("recipe", .helpCircle, "Recipe question", "Why does my crumb come out tight on day 2?"),
-        ("photo", .image, "Share a bake", "Send a photo for feedback"),
-        ("workshop", .calendar, "Workshops", "When's the next hands-on session?")
+    private let openers: [FanOpener] = [
+        FanOpener(
+            id: "recipe",
+            icon: .helpCircle,
+            label: "Recipe question",
+            title: "Why does my crumb come out tight on day 2?"
+        ),
+        FanOpener(
+            id: "photo",
+            icon: .image,
+            label: "Share a bake",
+            title: "Send a photo for feedback"
+        ),
+        FanOpener(
+            id: "workshop",
+            icon: .calendar,
+            label: "Workshops",
+            title: "When's the next hands-on session?"
+        )
     ]
 
     var body: some View {
@@ -659,6 +679,13 @@ private struct FanOpeners: View {
         }
         .accessibilityIdentifier("chatFanOpeners")
     }
+}
+
+private struct FanOpener: Identifiable {
+    let id: String
+    let icon: PantopusIcon
+    let label: String
+    let title: String
 }
 
 struct FanTierUpgradePromptSheet: View {

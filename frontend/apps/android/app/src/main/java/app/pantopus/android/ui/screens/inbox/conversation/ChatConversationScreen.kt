@@ -347,8 +347,7 @@ private fun PersonaPill() {
     }
 }
 
-private fun presenceFor(counterparty: ChatCounterparty): Pair<Boolean, String>? =
-    presenceFor(counterparty, false)
+private fun presenceFor(counterparty: ChatCounterparty): Pair<Boolean, String>? = presenceFor(counterparty, false)
 
 private fun presenceFor(
     counterparty: ChatCounterparty,
@@ -363,13 +362,13 @@ private fun presenceFor(
         true to text
     } else {
         when (counterparty) {
-        is ChatCounterparty.Person -> {
-            val prefix = if (counterparty.online) "Active now" else "Verified neighbor"
-            val text = if (counterparty.locality != null) "$prefix · ${counterparty.locality}" else prefix
-            counterparty.online to text
-        }
-        is ChatCounterparty.Group -> counterparty.memberCount?.let { false to "$it members" }
-        is ChatCounterparty.Ai -> false to "Replies in seconds · powered by Pantopus AI"
+            is ChatCounterparty.Person -> {
+                val prefix = if (counterparty.online) "Active now" else "Verified neighbor"
+                val text = if (counterparty.locality != null) "$prefix · ${counterparty.locality}" else prefix
+                counterparty.online to text
+            }
+            is ChatCounterparty.Group -> counterparty.memberCount?.let { false to "$it members" }
+            is ChatCounterparty.Ai -> false to "Replies in seconds · powered by Pantopus AI"
         }
     }
 
@@ -756,7 +755,9 @@ private fun FanEmptyFrame(
             modifier = Modifier.semantics { heading() },
         )
         Text(
-            text = "You can message ${counterparty.displayName.firstWord()} directly. Each send uses one of your monthly ${entitlement.currentTier} replies.",
+            text =
+                "You can message ${counterparty.displayName.firstWord()} directly. " +
+                    "Each send uses one of your monthly ${entitlement.currentTier} replies.",
             fontSize = 12.5.sp,
             color = PantopusColors.appTextSecondary,
         )
@@ -802,7 +803,9 @@ private fun FanAutoWelcomeCard(modifier: Modifier = Modifier) {
             color = PantopusColors.appText,
         )
         Text(
-            text = "First message is on me — ask anything bread-related, share a bake, or just say hi. I read everything personally on Sunday evenings.",
+            text =
+                "First message is on me — ask anything bread-related, share a bake, " +
+                    "or just say hi. I read everything personally on Sunday evenings.",
             fontSize = 12.5.sp,
             color = PantopusColors.appTextStrong,
         )
@@ -891,7 +894,12 @@ private fun FanOpeners(onOpenerTap: (String) -> Unit) {
                         color = PantopusColors.appText,
                     )
                 }
-                PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextMuted)
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronRight,
+                    contentDescription = null,
+                    size = 14.dp,
+                    tint = PantopusColors.appTextMuted,
+                )
             }
         }
     }
