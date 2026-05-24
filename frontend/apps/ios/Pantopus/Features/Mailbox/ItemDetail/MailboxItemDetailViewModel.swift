@@ -534,7 +534,7 @@ final class MailboxItemDetailViewModel {
             switch category {
             case .package:
                 await fetchPackageDetails(for: response.mail, category: category)
-            case .coupon, .booklet, .certified, .gig, .memory:
+            case .coupon, .booklet, .certified, .community, .gig, .memory:
                 applyCategoryBody(response.mail, category: category)
             default:
                 applyItem(response.mail, category: category)
@@ -570,6 +570,8 @@ final class MailboxItemDetailViewModel {
             applyBooklet(item: item, category: category, booklet: booklet, baseTrust: baseTrust)
         case let .certified(certified):
             applyCertified(item: item, category: category, certified: certified)
+        case let .community(community):
+            applyCommunity(item: item, category: category, community: community, baseTrust: baseTrust)
         case let .gig(gig):
             applyGig(item: item, category: category, gig: gig, baseTrust: baseTrust)
         case let .memory(memory):
@@ -607,6 +609,37 @@ final class MailboxItemDetailViewModel {
                 isUnread: !item.base.viewed,
                 isArchived: item.base.archived,
                 payload: .memory(memory)
+            )
+        )
+    }
+
+    /// Community (A17.4) — group seal, poll/event/update card, attendee
+    /// strip, Pulse link, and RSVP controls live in `CommunityBody`, so
+    /// the standard shell slots stay intentionally quiet.
+    private func applyCommunity(
+        item: MailboxV2ItemResponse.Item,
+        category: MailItemCategory,
+        community: CommunityDetailDTO,
+        baseTrust: MailTrust
+    ) {
+        state = .loaded(
+            MailboxItemDetailContent(
+                category: category,
+                trust: baseTrust == .unverified ? .verified : baseTrust,
+                sender: SenderBlockContent(
+                    displayName: item.senderDisplay,
+                    meta: item.base.createdAt,
+                    initials: Self.initials(from: item.senderDisplay),
+                    senderUserId: item.base.senderUserId
+                ),
+                aiElf: nil,
+                keyFacts: [],
+                timeline: [],
+                packageInfo: nil,
+                ctaEnabled: true,
+                isUnread: !item.base.viewed,
+                isArchived: item.base.archived,
+                payload: .community(community)
             )
         )
     }

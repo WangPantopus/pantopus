@@ -66,6 +66,49 @@ enum class CommunityRsvpStatus(val wire: String) {
     }
 }
 
+/** Content variation rendered in the Community body card. */
+enum class CommunityMailSubtype(val wire: String) {
+    Event("event"),
+    Poll("poll"),
+    NeighborhoodUpdate("neighborhood_update"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): CommunityMailSubtype =
+            when (value?.lowercase()) {
+                "poll", "vote" -> Poll
+                "neighborhood_update", "neighborhood-update", "update", "announcement" -> NeighborhoodUpdate
+                else -> Event
+            }
+    }
+}
+
+/** One option in a community poll. */
+data class CommunityPollOption(
+    val id: String,
+    val label: String,
+    val voteCount: Int,
+    val isSelected: Boolean = false,
+)
+
+/** Poll card payload for community mail. */
+data class CommunityPollInfo(
+    val question: String,
+    val options: List<CommunityPollOption>,
+    val totalVotes: Int,
+    val closesAtLabel: String?,
+    val statusLabel: String?,
+)
+
+/** Neighborhood-update card payload for community mail. */
+data class CommunityUpdateInfo(
+    val headline: String,
+    val summary: String?,
+    val items: List<String>,
+    val statusLabel: String?,
+    val footerLabel: String?,
+)
+
 /**
  * Community detail sub-payload decoded from `mail.object_payload` when
  * `mail_type == "community"`. Backend stores this as untyped JSON shaped
@@ -78,8 +121,11 @@ enum class CommunityRsvpStatus(val wire: String) {
  */
 data class CommunityDetailDto(
     val communityItemId: String,
+    val subtype: CommunityMailSubtype = CommunityMailSubtype.Event,
     val group: CommunityGroupInfo,
     val event: CommunityEventInfo?,
+    val poll: CommunityPollInfo? = null,
+    val update: CommunityUpdateInfo? = null,
     val attendees: List<CommunityAttendee>,
     val attendeeCount: Int,
     val attendeesFromBlock: Int?,
@@ -145,6 +191,22 @@ data class CommunityDetailDto(
                                 ?: (weather?.get("temp") as? Number)?.toInt(),
                     )
                 }
+            val poll = decodePoll(payload)
+            val update = decodeUpdate(payload)
+            val explicitSubtype =
+                CommunityMailSubtype.fromWire(
+                    (payload["community_kind"] as? String)
+                        ?: (payload["kind"] as? String)
+                        ?: (payload["subtype"] as? String)
+                        ?: (payload["variant"] as? String),
+                )
+            val subtype =
+                when {
+                    poll != null && explicitSubtype == CommunityMailSubtype.Event -> CommunityMailSubtype.Poll
+                    update != null && event == null && poll == null &&
+                        explicitSubtype == CommunityMailSubtype.Event -> CommunityMailSubtype.NeighborhoodUpdate
+                    else -> explicitSubtype
+                }
             val attendeesRaw = payload["attendees"] as? List<*> ?: emptyList<Any?>()
             val attendees =
                 attendeesRaw.mapNotNull { entry ->
@@ -194,8 +256,11 @@ data class CommunityDetailDto(
                 }
             return CommunityDetailDto(
                 communityItemId = itemId,
+                subtype = subtype,
                 group = group,
                 event = event,
+                poll = poll,
+                update = update,
                 attendees = attendees,
                 attendeeCount = attendeeCount,
                 attendeesFromBlock = attendeesFromBlock,
@@ -209,6 +274,93 @@ data class CommunityDetailDto(
             return parts.mapNotNull { it.firstOrNull()?.uppercaseChar()?.toString() }
                 .joinToString("")
                 .ifEmpty { "·" }
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun decodePoll(payload: JsonValue): CommunityPollInfo? {
+            val poll = (payload["poll"] as? JsonValue) ?: payload
+            val options = decodePollOptions(poll["options"] as? List<*> ?: emptyList<Any?>())
+            val question = firstString(poll, "question", "title")?.takeIf { it.isNotEmpty() } ?: return null
+            if (options.isEmpty()) return null
+            val voteSum = options.sumOf { it.voteCount }
+            return CommunityPollInfo(
+                question = question,
+                options = options,
+                totalVotes = firstInt(poll, "total_votes", "vote_count") ?: voteSum,
+                closesAtLabel = firstString(poll, "closes_at", "closes_at_label"),
+                statusLabel = firstString(poll, "status", "status_label"),
+            )
+        }
+
+        private fun decodePollOptions(rawOptions: List<*>): List<CommunityPollOption> = rawOptions.mapIndexedNotNull(::decodePollOption)
+
+        private fun decodePollOption(
+            index: Int,
+            raw: Any?,
+        ): CommunityPollOption? =
+            when (raw) {
+                is String ->
+                    raw.takeIf { it.isNotEmpty() }?.let {
+                        CommunityPollOption(id = "option-$index", label = it, voteCount = 0)
+                    }
+                is Map<*, *> -> decodePollMapOption(index, raw)
+                else -> null
+            }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun decodePollMapOption(
+            index: Int,
+            raw: Map<*, *>,
+        ): CommunityPollOption? {
+            val option = raw as Map<String, Any?>
+            val label = firstString(option, "label", "title", "value")?.takeIf { it.isNotEmpty() } ?: return null
+            return CommunityPollOption(
+                id = firstString(option, "id") ?: "option-$index",
+                label = label,
+                voteCount = firstInt(option, "vote_count", "votes") ?: 0,
+                isSelected = firstBoolean(option, "selected", "is_selected") ?: false,
+            )
+        }
+
+        private fun firstString(
+            map: Map<String, Any?>,
+            vararg keys: String,
+        ): String? = keys.firstNotNullOfOrNull { map[it] as? String }
+
+        private fun firstInt(
+            map: Map<String, Any?>,
+            vararg keys: String,
+        ): Int? = keys.firstNotNullOfOrNull { (map[it] as? Number)?.toInt() }
+
+        private fun firstBoolean(
+            map: Map<String, Any?>,
+            vararg keys: String,
+        ): Boolean? = keys.firstNotNullOfOrNull { map[it] as? Boolean }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun decodeUpdate(payload: JsonValue): CommunityUpdateInfo? {
+            val update =
+                (payload["update"] as? Map<String, Any?>)
+                    ?: (payload["neighborhood_update"] as? Map<String, Any?>)
+                    ?: (payload["announcement"] as? Map<String, Any?>)
+                    ?: payload
+            val headline = (update["headline"] as? String) ?: (update["title"] as? String) ?: return null
+            if (headline.isEmpty() || update["event"] != null || update["poll"] != null) return null
+            val items =
+                (
+                    (update["items"] as? List<*>)
+                        ?: (update["bullets"] as? List<*>)
+                        ?: (update["updates"] as? List<*>)
+                        ?: emptyList<Any?>()
+                )
+                    .mapNotNull { it as? String }
+            return CommunityUpdateInfo(
+                headline = headline,
+                summary = (update["summary"] as? String) ?: (update["body"] as? String),
+                items = items,
+                statusLabel = (update["status"] as? String) ?: (update["status_label"] as? String),
+                footerLabel = (update["footer"] as? String) ?: (update["footer_label"] as? String),
+            )
         }
     }
 }

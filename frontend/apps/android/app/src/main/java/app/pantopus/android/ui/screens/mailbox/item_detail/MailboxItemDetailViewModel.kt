@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.mailbox.v2.BookletDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.MailboxCategoryPayload
@@ -435,6 +436,7 @@ class MailboxItemDetailViewModel
                         MailItemCategory.Coupon,
                         MailItemCategory.Booklet,
                         MailItemCategory.Certified,
+                        MailItemCategory.Community,
                         MailItemCategory.Gig,
                         MailItemCategory.Memory,
                         ->
@@ -467,11 +469,43 @@ class MailboxItemDetailViewModel
                 is MailboxCategoryPayload.Coupon -> projectCoupon(item, category, payload.detail, baseTrust)
                 is MailboxCategoryPayload.Booklet -> projectBooklet(item, category, payload.detail, baseTrust)
                 is MailboxCategoryPayload.Certified -> projectCertified(item, category, payload.detail)
+                is MailboxCategoryPayload.Community -> projectCommunity(item, category, payload.detail, baseTrust)
                 is MailboxCategoryPayload.Gig -> projectGig(item, category, payload.detail, baseTrust)
                 is MailboxCategoryPayload.Memory -> projectMemory(item, category, payload.detail)
                 MailboxCategoryPayload.Other -> projectBase(item, category)
             }
         }
+
+        /**
+         * Community (A17.4) — group seal, poll/event/update card, attendee
+         * strip, Pulse link, and RSVP controls live in `CommunityBody`, so
+         * the standard shell slots stay intentionally quiet.
+         */
+        private fun projectCommunity(
+            item: MailboxV2Item,
+            category: MailItemCategory,
+            community: CommunityDetailDto,
+            baseTrust: MailTrust,
+        ): MailboxItemDetailContent =
+            MailboxItemDetailContent(
+                category = category,
+                trust = if (baseTrust == MailTrust.Unverified) MailTrust.Verified else baseTrust,
+                sender =
+                    SenderBlockContent(
+                        displayName = item.senderDisplay,
+                        meta = item.createdAt,
+                        initials = initials(item.senderDisplay),
+                        senderUserId = item.senderUserId,
+                    ),
+                aiElf = null,
+                keyFacts = emptyList(),
+                timeline = emptyList(),
+                packageInfo = null,
+                ctaEnabled = true,
+                isUnread = !item.viewed,
+                isArchived = item.archived,
+                payload = MailboxCategoryPayload.Community(community),
+            )
 
         /**
          * Gig (A17.6) — the bidder becomes the sender; the rich gig surface

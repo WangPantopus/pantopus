@@ -168,6 +168,55 @@ final class MailboxItemDetailCategoryDispatchTests: XCTestCase {
         }
     }
 
+    // MARK: - Community
+
+    private static let communityPollJSON = """
+    {"mail":{
+      "id":"m-community","type":"community","mail_type":"community",
+      "created_at":"2026-05-21T10:00:00Z",
+      "sender_display":"Elm Park HOA","sender_trust":"verified_business",
+      "display_title":"Block-party date poll","tags":[],
+      "object_payload":{
+        "community_item_id":"community-poll","kind":"poll",
+        "group":{"name":"Elm Park HOA","tagline":"40 households","verified":true,
+                 "role":"Resident","since":"Mar 2024","member_count":87},
+        "poll":{
+          "question":"Which weekend should we reserve?",
+          "options":[
+            {"id":"june-7","label":"Saturday, June 7","votes":19,"selected":true},
+            {"id":"june-14","label":"Saturday, June 14","votes":11}
+          ],
+          "total_votes":30,"closes_at":"Fri 5 PM","status":"Residents only"
+        },
+        "attendees":[{"id":"jt","name":"Jamal T.","initials":"JT","verified":true}],
+        "attendee_count":30,
+        "attendees_from_block":6,
+        "pulse_thread":{"thread_id":"pulse-1","title":"Poll thread","reply_count":4}
+      }
+    }}
+    """
+
+    func testCommunityDispatchProjectsPollPayload() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.communityPollJSON)]
+        let vm = MailboxItemDetailViewModel(mailId: "m-community", api: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(content.category, .community)
+        XCTAssertEqual(content.trust, .verified)
+        XCTAssertNil(content.aiElf)
+        XCTAssertTrue(content.keyFacts.isEmpty)
+        guard case let .community(community) = content.payload else {
+            XCTFail("Expected .community payload, got \(content.payload)")
+            return
+        }
+        XCTAssertEqual(community.subtype, .poll)
+        XCTAssertEqual(community.poll?.options.count, 2)
+        XCTAssertEqual(community.poll?.totalVotes, 30)
+    }
+
     // MARK: - Gig (A17.6)
 
     private static let gigJSON = """

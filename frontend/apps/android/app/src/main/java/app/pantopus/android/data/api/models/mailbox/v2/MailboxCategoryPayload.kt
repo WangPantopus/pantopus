@@ -17,6 +17,8 @@ sealed interface MailboxCategoryPayload {
 
     data class Certified(val detail: CertifiedDetailDto) : MailboxCategoryPayload
 
+    data class Community(val detail: CommunityDetailDto) : MailboxCategoryPayload
+
     data class Gig(val detail: GigDetailDto) : MailboxCategoryPayload
 
     data class Memory(val detail: MemoryDetailDto) : MailboxCategoryPayload
@@ -30,8 +32,8 @@ sealed interface MailboxCategoryPayload {
     companion object {
         /**
          * Resolve a payload from a category + raw object_payload JSON.
-         * Falls back to [Other] when the category isn't one of the
-         * three P18 shapes or when decoding fails.
+         * Falls back to [Other] when the category doesn't have a
+         * dedicated body decoder or when decoding fails.
          */
         fun resolve(
             category: MailItemCategory,
@@ -47,6 +49,9 @@ sealed interface MailboxCategoryPayload {
                 MailItemCategory.Certified ->
                     CertifiedDetailDto.decodeFromObjectPayload(objectPayload)
                         ?.let(::Certified) ?: Other
+                MailItemCategory.Community ->
+                    CommunityDetailDto.decodeFromObjectPayload(objectPayload)
+                        ?.let(::Community) ?: Other
                 MailItemCategory.Gig ->
                     GigDetailDto.decodeFromObjectPayload(objectPayload)
                         ?.let(::Gig) ?: Other

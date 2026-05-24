@@ -5,6 +5,16 @@ package app.pantopus.android.ui.screens.mailbox.item_detail
 import app.pantopus.android.data.api.models.mailbox.v2.BookletDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedChainStep
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityAttendee
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityEventInfo
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityGroupInfo
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityMailSubtype
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityPollInfo
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityPollOption
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityPulseThread
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityUpdateInfo
 import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
 import app.pantopus.android.ui.components.TimelineStep
@@ -368,6 +378,124 @@ object MailItemSampleData {
 
     /** Bid-accepted secondary state. */
     val gigAccepted = gigReceived.accepted()
+
+    val communityGroup =
+        CommunityGroupInfo(
+            name = "Elm Park HOA",
+            tagline = "40 households on Elm, Maple & 14th",
+            founded = "Est. 2014",
+            role = "Resident",
+            membershipSince = "Mar 2024",
+            memberCount = 87,
+            isVerified = true,
+        )
+
+    val communityAttendees =
+        listOf(
+            CommunityAttendee("jt", "Jamal T.", "JT", "Your block", true),
+            CommunityAttendee("mk", "Maria K.", "MK", "Your block", true),
+            CommunityAttendee("aw", "Aliyah W.", "AW", "Organizer", true),
+            CommunityAttendee("dr", "Derek R.", "DR", "Maple St", true),
+            CommunityAttendee("ls", "Lin S.", "LS", "14th Ave", true),
+            CommunityAttendee("pc", "Paul C.", "PC", "Maple St", true),
+        )
+
+    val communityPulseThread =
+        CommunityPulseThread(
+            threadId = "pulse-cleanup",
+            title = "Talk about Saturday cleanup",
+            replyCount = 12,
+            lastReplyAuthor = "Jamal T.",
+            lastReplyPreview = "I can bring the leaf blower if anyone needs it.",
+            lastReplyAge = "12m",
+        )
+
+    /** A17.4 event subtype - playground cleanup. */
+    val communityEvent =
+        CommunityDetailDto(
+            communityItemId = "community-cleanup",
+            subtype = CommunityMailSubtype.Event,
+            group = communityGroup,
+            event =
+                CommunityEventInfo(
+                    dayLabel = "Sat",
+                    dateLabel = "May 24",
+                    timeRange = "9:00 - 11:00 AM",
+                    location = "Elm Park playground",
+                    locationNote = "Gather at the gazebo - 8:55 AM",
+                    distanceLabel = "0.3 mi - 6 min walk",
+                    bringItems = listOf("Work gloves (we have spares)", "A reusable mug", "Bug spray if you like"),
+                    weatherSummary = "Partly sunny - gentle breeze",
+                    weatherTemperatureF = 64,
+                ),
+            attendees = communityAttendees,
+            attendeeCount = 12,
+            attendeesFromBlock = 3,
+            pulseThread = communityPulseThread,
+            rsvp = CommunityRsvpStatus.Undecided,
+        )
+
+    /** A17.4 poll subtype - verified resident vote. */
+    val communityPoll =
+        CommunityDetailDto(
+            communityItemId = "community-poll",
+            subtype = CommunityMailSubtype.Poll,
+            group = communityGroup,
+            event = null,
+            poll =
+                CommunityPollInfo(
+                    question = "Which weekend should we reserve for the block-party permit?",
+                    options =
+                        listOf(
+                            CommunityPollOption("june-7", "Saturday, June 7", 19, true),
+                            CommunityPollOption("june-14", "Saturday, June 14", 11),
+                            CommunityPollOption("june-21", "Saturday, June 21", 7),
+                        ),
+                    totalVotes = 37,
+                    closesAtLabel = "Fri 5 PM",
+                    statusLabel = "Residents only",
+                ),
+            attendees = communityAttendees,
+            attendeeCount = 37,
+            attendeesFromBlock = 9,
+            pulseThread =
+                CommunityPulseThread(
+                    threadId = "pulse-block-party",
+                    title = "Block-party date poll",
+                    replyCount = 8,
+                    lastReplyAuthor = "Maria K.",
+                    lastReplyPreview = "June 7 works best before school gets out.",
+                    lastReplyAge = "24m",
+                ),
+            rsvp = CommunityRsvpStatus.Undecided,
+        )
+
+    /** A17.4 neighborhood-update subtype. */
+    val communityUpdate =
+        CommunityDetailDto(
+            communityItemId = "community-update",
+            subtype = CommunityMailSubtype.NeighborhoodUpdate,
+            group = communityGroup,
+            event = null,
+            update =
+                CommunityUpdateInfo(
+                    headline = "Oak branch pickup starts Monday",
+                    summary = "City crews added Elm Park to the first sweep after Friday's wind storm.",
+                    items =
+                        listOf(
+                            "Move branches to the curb by Sunday evening.",
+                            "Do not bag limbs or mix yard waste.",
+                            "Call the HOA desk if your alley is blocked.",
+                        ),
+                    statusLabel = "City pickup confirmed",
+                    footerLabel = "Next update Monday 10 AM",
+                ),
+            attendees = communityAttendees,
+            attendeeCount = 18,
+            attendeesFromBlock = 4,
+            pulseThread = null,
+            rsvp = CommunityRsvpStatus.Undecided,
+        )
 
     private val certifiedNoticeBody =
         listOf(
