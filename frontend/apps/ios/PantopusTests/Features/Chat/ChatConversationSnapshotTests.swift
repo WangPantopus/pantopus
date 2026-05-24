@@ -49,7 +49,7 @@ final class ChatConversationSnapshotTests: XCTestCase {
                 mode: mode,
                 creatorContext: creatorContext
             )
-                .frame(width: 390, height: 844)
+            .frame(width: 390, height: 844)
         )
         host.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         host.view.layoutIfNeeded()

@@ -68,14 +68,10 @@ import app.pantopus.android.ui.theme.Spacing
  */
 @Composable
 fun ChatConversationScreen(
-    mode: ChatThreadMode,
-    counterparty: ChatCounterparty,
-    currentUserId: String,
+    args: ChatConversationRouteArgs,
     conversationMode: ChatConversationMode = ChatConversationMode.Dm,
-    creatorContext: ChatCreatorThreadContext? = null,
-    onOpenAudienceProfile: () -> Unit = {},
+    creatorChrome: ChatCreatorThreadChrome? = null,
     onBack: () -> Unit = {},
-    scrollToMessageId: String? = null,
     viewModel: ChatConversationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -86,13 +82,13 @@ fun ChatConversationScreen(
     val pendingScroll by viewModel.pendingScrollTarget.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
-        viewModel.configure(mode, counterparty, currentUserId, scrollToMessageId)
+        viewModel.configure(args.mode, args.counterparty, args.currentUserId, args.scrollToMessageId)
         viewModel.load()
     }
     DisposableEffect(Unit) {
         onDispose { viewModel.teardown() }
     }
-    val resolvedCreatorContext = creatorContext ?: ChatCreatorThreadContext.defaults()
+    val resolvedCreatorContext = creatorChrome?.context ?: ChatCreatorThreadContext.defaults()
 
     Column(
         modifier =
@@ -108,7 +104,10 @@ fun ChatConversationScreen(
             onBack = onBack,
         )
         if (conversationMode == ChatConversationMode.CreatorThread) {
-            CreatorAudienceStrip(context = resolvedCreatorContext, onOpenAudienceProfile = onOpenAudienceProfile)
+            CreatorAudienceStrip(
+                context = resolvedCreatorContext,
+                onOpenAudienceProfile = creatorChrome?.onOpenAudienceProfile ?: {},
+            )
             CreatorQuotaMeter(quota = resolvedCreatorContext.quota)
         }
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {

@@ -48,6 +48,19 @@ data class ChatCreatorQuota(
     val resetCopy: String,
 )
 
+class ChatCreatorThreadChrome(
+    val context: ChatCreatorThreadContext,
+    val onOpenAudienceProfile: () -> Unit = {},
+)
+
+@Immutable
+data class ChatConversationRouteArgs(
+    val mode: ChatThreadMode,
+    val counterparty: ChatCounterparty,
+    val currentUserId: String,
+    val scrollToMessageId: String? = null,
+)
+
 /** Counterparty type — drives the header swap + empty-state copy. */
 sealed interface ChatCounterparty {
     val displayName: String
