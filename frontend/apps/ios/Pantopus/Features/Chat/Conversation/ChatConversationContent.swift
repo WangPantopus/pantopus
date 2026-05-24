@@ -106,6 +106,23 @@ public enum ChatDeliveryState: Sendable, Hashable {
     case read
 }
 
+public enum ChatQueuedAttachmentKind: Sendable, Hashable {
+    case image
+    case document
+}
+
+public struct ChatQueuedAttachment: Identifiable, Sendable, Hashable {
+    public let id: String
+    public let kind: ChatQueuedAttachmentKind
+    public let filename: String
+
+    public init(id: String, kind: ChatQueuedAttachmentKind, filename: String) {
+        self.id = id
+        self.kind = kind
+        self.filename = filename
+    }
+}
+
 /// Inline "this would cost about $X" estimate rendered inside an AI
 /// reply bubble (`AIEstimateCard`).
 public struct ChatEstimate: Sendable, Hashable {
@@ -147,6 +164,10 @@ public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
     /// run). The VM groups consecutive same-sender bubbles and sets
     /// `tail = true` only on the last.
     public let hasTail: Bool
+    /// True when the previous timeline row is a bubble from the same
+    /// sender on the same day. Continuation rows use tighter top spacing
+    /// and hide repeated avatar chrome.
+    public let isContinuation: Bool
     /// Stamp shown under the LAST bubble of a same-sender group. `nil`
     /// for bubbles in the middle of a group.
     public let stamp: String?
@@ -157,6 +178,7 @@ public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
         side: ChatMessageSide,
         body: Body,
         hasTail: Bool,
+        isContinuation: Bool = false,
         stamp: String?,
         deliveryState: ChatDeliveryState? = nil
     ) {
@@ -164,6 +186,7 @@ public struct ChatBubbleContent: Identifiable, Sendable, Hashable {
         self.side = side
         self.body = body
         self.hasTail = hasTail
+        self.isContinuation = isContinuation
         self.stamp = stamp
         self.deliveryState = deliveryState
     }

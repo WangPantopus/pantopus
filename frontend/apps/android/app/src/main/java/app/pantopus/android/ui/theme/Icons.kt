@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Approval
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -92,6 +93,7 @@ import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.InsertEmoticon
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.Laptop
@@ -428,6 +430,8 @@ enum class PantopusIcon(
     Video("video"),
     MoreVertical("more-vertical"),
     Hand("hand"),
+    Smile("smile"),
+    ArrowUp("arrow-up"),
 
     // P1.3 — Broadcast detail sub-route: sticky-footer Reply CTA + the
     // analytics "Reach" cell glyph borrowed from the audience-frames
@@ -724,6 +728,8 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Video -> IconSource.Material(Icons.Filled.Videocam)
         PantopusIcon.MoreVertical -> IconSource.Material(Icons.Filled.MoreVert)
         PantopusIcon.Hand -> IconSource.Material(Icons.Filled.PanTool)
+        PantopusIcon.Smile -> IconSource.Material(Icons.Filled.InsertEmoticon)
+        PantopusIcon.ArrowUp -> IconSource.Material(Icons.Filled.ArrowUpward)
         // P1.3 — Broadcast detail. Material ships an automirrored Reply
         // (correct RTL flip) and Podcasts is the closest visual analog
         // for Lucide's radio-tower (mast-with-waves).
