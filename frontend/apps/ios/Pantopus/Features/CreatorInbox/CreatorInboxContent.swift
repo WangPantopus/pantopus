@@ -161,12 +161,23 @@ public struct CreatorInboxConversationDestination: Hashable, Sendable {
     public let displayName: String
     public let initials: String
     public let verified: Bool
+    public let tierName: String
+    public let tierRank: Int
 
-    public init(userId: String, displayName: String, initials: String, verified: Bool) {
+    public init(
+        userId: String,
+        displayName: String,
+        initials: String,
+        verified: Bool,
+        tierName: String,
+        tierRank: Int
+    ) {
         self.userId = userId
         self.displayName = displayName
         self.initials = initials
         self.verified = verified
+        self.tierName = tierName
+        self.tierRank = tierRank
     }
 }
 

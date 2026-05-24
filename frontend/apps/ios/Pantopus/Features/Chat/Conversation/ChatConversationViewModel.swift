@@ -439,6 +439,10 @@ public final class ChatConversationViewModel {
                 rows.append(.dayDivider(ChatDayDivider(id: dayKey, label: Self.dayLabel(for: message.createdAt))))
                 lastDayKey = dayKey
             }
+            if message.messageType == "broadcast_reference" {
+                rows.append(.broadcastReference(Self.broadcastReference(for: message)))
+                continue
+            }
             let side: ChatMessageSide = (message.userId == currentUserId) ? .outgoing : .incoming
             let nextSameSide =
                 index + 1 < combined.count &&
@@ -565,6 +569,16 @@ public final class ChatConversationViewModel {
         default:
             return .text(message.messageText ?? "")
         }
+    }
+
+    private static func broadcastReference(for message: ChatMessageDTO) -> ChatBroadcastReference {
+        let metadata = message.metadata?.dictValue
+        return ChatBroadcastReference(
+            id: message.id,
+            title: metadata?["title"]?.stringValue ?? "Broadcast referenced",
+            subtitle: metadata?["subtitle"]?.stringValue ?? "This conversation started from a creator broadcast.",
+            metric: metadata?["metric"]?.stringValue ?? "Audience update"
+        )
     }
 
     private static func dayKey(for iso: String) -> String {

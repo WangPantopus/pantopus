@@ -23,6 +23,59 @@ public enum ChatConversationMode: String, Sendable, Hashable {
     case fanThread
 }
 
+/// Creator-side context rendered above a creator/fan DM thread.
+public struct ChatCreatorThreadContext: Sendable, Hashable {
+    public let personaName: String
+    public let audienceSummary: String
+    public let fanTierName: String
+    /// Tier rank (1=Free, 2=Bronze, 3=Silver, 4=Gold). The visual
+    /// palette intentionally mirrors Creator Inbox's semantic-token
+    /// mapping; tier-specific color tokens do not exist in the app
+    /// theme today.
+    public let fanTierRank: Int
+    public let fanSubtitle: String
+    public let quota: ChatCreatorQuota
+
+    public init(
+        personaName: String,
+        audienceSummary: String,
+        fanTierName: String,
+        fanTierRank: Int,
+        fanSubtitle: String,
+        quota: ChatCreatorQuota
+    ) {
+        self.personaName = personaName
+        self.audienceSummary = audienceSummary
+        self.fanTierName = fanTierName
+        self.fanTierRank = fanTierRank
+        self.fanSubtitle = fanSubtitle
+        self.quota = quota
+    }
+
+    public static func defaults(fanTierName: String = "Bronze", fanTierRank: Int = 2) -> ChatCreatorThreadContext {
+        ChatCreatorThreadContext(
+            personaName: "The Sourdough Diary",
+            audienceSummary: "Reach: 2,340 · Engagement up 12% this week",
+            fanTierName: fanTierName,
+            fanTierRank: fanTierRank,
+            fanSubtitle: fanTierRank <= 1 ? "Free member" : "Member since Aug · 0.4 mi",
+            quota: ChatCreatorQuota(used: 12, total: 30, resetCopy: "Resets Monday")
+        )
+    }
+}
+
+public struct ChatCreatorQuota: Sendable, Hashable {
+    public let used: Int
+    public let total: Int
+    public let resetCopy: String
+
+    public init(used: Int, total: Int, resetCopy: String) {
+        self.used = used
+        self.total = total
+        self.resetCopy = resetCopy
+    }
+}
+
 /// Counterparty type. Drives the header swap, empty-state copy, and
 /// composer placeholder.
 public enum ChatCounterparty: Sendable, Hashable {
@@ -122,14 +175,31 @@ public struct ChatDayDivider: Identifiable, Sendable, Hashable {
     public let label: String
 }
 
+/// Inline creator-side reference to a broadcast that prompted the DM.
+public struct ChatBroadcastReference: Identifiable, Sendable, Hashable {
+    public let id: String
+    public let title: String
+    public let subtitle: String
+    public let metric: String
+
+    public init(id: String, title: String, subtitle: String, metric: String) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.metric = metric
+    }
+}
+
 /// Heterogeneous timeline row.
 public enum ChatTimelineRow: Identifiable, Sendable, Hashable {
     case dayDivider(ChatDayDivider)
+    case broadcastReference(ChatBroadcastReference)
     case bubble(ChatBubbleContent)
 
     public var id: String {
         switch self {
         case let .dayDivider(divider): "divider_\(divider.id)"
+        case let .broadcastReference(reference): "broadcast_\(reference.id)"
         case let .bubble(bubble): "bubble_\(bubble.id)"
         }
     }
