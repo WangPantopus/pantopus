@@ -70,7 +70,7 @@ struct MailboxItemDetailView: View {
             sender: content.sender,
             aiElf: content.aiElf,
             keyFacts: content.keyFacts,
-            timeline: content.timeline,
+            timeline: content.category == .package ? [] : content.timeline,
             cta: ctaContent(for: content),
             onBack: onBack,
             onAIChip: { kind in
@@ -107,7 +107,14 @@ struct MailboxItemDetailView: View {
         switch (content.category, content.payload) {
         case (.package, _):
             if let pkg = content.packageInfo {
-                PackageBody(carrier: pkg.carrier, etaLine: pkg.etaLine)
+                PackageBody(
+                    content: pkg,
+                    isReceiveEnabled: content.ctaEnabled && !viewModel.ctaFlags.primaryCompleted,
+                    isReceiveLoading: viewModel.ctaFlags.primaryLoading,
+                    isReceived: viewModel.ctaFlags.primaryCompleted
+                ) {
+                    Task { await viewModel.performPrimaryAction() }
+                }
             }
         case let (.coupon, .coupon(coupon)):
             CouponBody(coupon: coupon)
@@ -139,13 +146,7 @@ struct MailboxItemDetailView: View {
     private func ctaContent(for content: MailboxItemDetailContent) -> MailboxCTAShelfContent? {
         switch content.category {
         case .package:
-            MailboxCTAShelfContent(
-                primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Delivered" : "Log as received",
-                ghostTitle: "Not mine",
-                primaryLoading: viewModel.ctaFlags.primaryLoading,
-                ghostLoading: viewModel.ctaFlags.ghostLoading,
-                primaryEnabled: content.ctaEnabled && !viewModel.ctaFlags.primaryCompleted
-            )
+            nil
         case .coupon:
             MailboxCTAShelfContent(
                 primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Added to wallet ✓" : "Add to wallet",
