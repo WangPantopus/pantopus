@@ -3,6 +3,19 @@
 package app.pantopus.android.ui.screens.mailbox.item_detail
 
 import app.pantopus.android.data.api.models.mailbox.v2.BookletDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.CertifiedChainStep
+import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityAttendee
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityDetailDto
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityEventInfo
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityGroupInfo
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityMailSubtype
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityPollInfo
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityPollOption
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityPulseThread
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
+import app.pantopus.android.data.api.models.mailbox.v2.CommunityUpdateInfo
+import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
 import app.pantopus.android.ui.components.TimelineStep
 import app.pantopus.android.ui.components.TimelineStepState
@@ -14,6 +27,51 @@ import app.pantopus.android.ui.theme.PantopusIcon
  * than round-tripping the network. Mirrors the A17.6 gig.jsx sample data.
  */
 object MailItemSampleData {
+    /** A17.5 primary coupon state — ready to scan in store. */
+    val couponUnused =
+        CouponDetailDto(
+            brandLogoUrl = null,
+            brandName = "Brass Owl Bakery",
+            headline = "25% OFF",
+            subcopy = "Your next in-store purchase",
+            code = "BRASS25",
+            expiresAt = "2026-06-30",
+            merchant = "Brass Owl Bakery",
+            terms = "Valid for one in-store transaction. Cannot be combined with daily specials or loyalty rewards.",
+            minimumSpend = "$8 minimum",
+            finePrint = "Excludes whole-cake orders, catering trays, gift cards, and already-marked-down items.",
+        )
+
+    /** A17.5 redeemed secondary state — success ribbon replaces the hero. */
+    val couponRedeemed =
+        CouponDetailDto(
+            brandLogoUrl = null,
+            brandName = "Brass Owl Bakery",
+            headline = "25% OFF",
+            subcopy = "Your next in-store purchase",
+            code = "BRASS25",
+            expiresAt = "2026-06-30",
+            merchant = "Brass Owl Bakery",
+            terms = "Redeemed offers cannot be reused or transferred.",
+            minimumSpend = "$8 minimum",
+            finePrint = "Coupon was single-use and has been retired after checkout.",
+        )
+
+    /** A17.5 terminal expired state. */
+    val couponExpired =
+        CouponDetailDto(
+            brandLogoUrl = null,
+            brandName = "Brass Owl Bakery",
+            headline = "25% OFF",
+            subcopy = "Your next in-store purchase",
+            code = "BRASS25",
+            expiresAt = "2026-05-01",
+            merchant = "Brass Owl Bakery",
+            terms = "Expired offers cannot be scanned, copied, or restored.",
+            minimumSpend = "$8 minimum",
+            finePrint = "This offer expired before redemption.",
+        )
+
     /** A17.2 primary booklet sample — neighborhood civic guide. */
     val bookletVoterGuide =
         BookletDetailDto(
@@ -320,4 +378,180 @@ object MailItemSampleData {
 
     /** Bid-accepted secondary state. */
     val gigAccepted = gigReceived.accepted()
+
+    val communityGroup =
+        CommunityGroupInfo(
+            name = "Elm Park HOA",
+            tagline = "40 households on Elm, Maple & 14th",
+            founded = "Est. 2014",
+            role = "Resident",
+            membershipSince = "Mar 2024",
+            memberCount = 87,
+            isVerified = true,
+        )
+
+    val communityAttendees =
+        listOf(
+            CommunityAttendee("jt", "Jamal T.", "JT", "Your block", true),
+            CommunityAttendee("mk", "Maria K.", "MK", "Your block", true),
+            CommunityAttendee("aw", "Aliyah W.", "AW", "Organizer", true),
+            CommunityAttendee("dr", "Derek R.", "DR", "Maple St", true),
+            CommunityAttendee("ls", "Lin S.", "LS", "14th Ave", true),
+            CommunityAttendee("pc", "Paul C.", "PC", "Maple St", true),
+        )
+
+    val communityPulseThread =
+        CommunityPulseThread(
+            threadId = "pulse-cleanup",
+            title = "Talk about Saturday cleanup",
+            replyCount = 12,
+            lastReplyAuthor = "Jamal T.",
+            lastReplyPreview = "I can bring the leaf blower if anyone needs it.",
+            lastReplyAge = "12m",
+        )
+
+    /** A17.4 event subtype - playground cleanup. */
+    val communityEvent =
+        CommunityDetailDto(
+            communityItemId = "community-cleanup",
+            subtype = CommunityMailSubtype.Event,
+            group = communityGroup,
+            event =
+                CommunityEventInfo(
+                    dayLabel = "Sat",
+                    dateLabel = "May 24",
+                    timeRange = "9:00 - 11:00 AM",
+                    location = "Elm Park playground",
+                    locationNote = "Gather at the gazebo - 8:55 AM",
+                    distanceLabel = "0.3 mi - 6 min walk",
+                    bringItems = listOf("Work gloves (we have spares)", "A reusable mug", "Bug spray if you like"),
+                    weatherSummary = "Partly sunny - gentle breeze",
+                    weatherTemperatureF = 64,
+                ),
+            attendees = communityAttendees,
+            attendeeCount = 12,
+            attendeesFromBlock = 3,
+            pulseThread = communityPulseThread,
+            rsvp = CommunityRsvpStatus.Undecided,
+        )
+
+    /** A17.4 poll subtype - verified resident vote. */
+    val communityPoll =
+        CommunityDetailDto(
+            communityItemId = "community-poll",
+            subtype = CommunityMailSubtype.Poll,
+            group = communityGroup,
+            event = null,
+            poll =
+                CommunityPollInfo(
+                    question = "Which weekend should we reserve for the block-party permit?",
+                    options =
+                        listOf(
+                            CommunityPollOption("june-7", "Saturday, June 7", 19, true),
+                            CommunityPollOption("june-14", "Saturday, June 14", 11),
+                            CommunityPollOption("june-21", "Saturday, June 21", 7),
+                        ),
+                    totalVotes = 37,
+                    closesAtLabel = "Fri 5 PM",
+                    statusLabel = "Residents only",
+                ),
+            attendees = communityAttendees,
+            attendeeCount = 37,
+            attendeesFromBlock = 9,
+            pulseThread =
+                CommunityPulseThread(
+                    threadId = "pulse-block-party",
+                    title = "Block-party date poll",
+                    replyCount = 8,
+                    lastReplyAuthor = "Maria K.",
+                    lastReplyPreview = "June 7 works best before school gets out.",
+                    lastReplyAge = "24m",
+                ),
+            rsvp = CommunityRsvpStatus.Undecided,
+        )
+
+    /** A17.4 neighborhood-update subtype. */
+    val communityUpdate =
+        CommunityDetailDto(
+            communityItemId = "community-update",
+            subtype = CommunityMailSubtype.NeighborhoodUpdate,
+            group = communityGroup,
+            event = null,
+            update =
+                CommunityUpdateInfo(
+                    headline = "Oak branch pickup starts Monday",
+                    summary = "City crews added Elm Park to the first sweep after Friday's wind storm.",
+                    items =
+                        listOf(
+                            "Move branches to the curb by Sunday evening.",
+                            "Do not bag limbs or mix yard waste.",
+                            "Call the HOA desk if your alley is blocked.",
+                        ),
+                    statusLabel = "City pickup confirmed",
+                    footerLabel = "Next update Monday 10 AM",
+                ),
+            attendees = communityAttendees,
+            attendeeCount = 18,
+            attendeesFromBlock = 4,
+            pulseThread = null,
+            rsvp = CommunityRsvpStatus.Undecided,
+        )
+
+    private val certifiedNoticeBody =
+        listOf(
+            "This is a SUPPLEMENTAL property tax bill issued pursuant to Section 75 et seq. of the " +
+                "California Revenue and Taxation Code following a reassessment triggered by a change in " +
+                "ownership recorded on October 14, 2025.",
+            "Your previously assessed value of $612,000 has been adjusted to $785,400, producing " +
+                "supplemental taxes for the partial year October 2025 through June 2026 in the amount shown below.",
+            "Payment must be received or postmarked no later than the delinquency date or a 10% penalty plus " +
+                "1.5% per month interest will accrue.",
+        ).joinToString("\n\n")
+
+    /** A17.3 open/pre-signature certified mail state. */
+    val certifiedUnread =
+        CertifiedDetailDto(
+            referenceNumber = "7014 2026 0411 3344 5577",
+            documentType = "Supplemental property tax bill",
+            acknowledgeBy = "2026-06-30T17:00:00Z",
+            chain =
+                listOf(
+                    CertifiedChainStep(
+                        id = "delivered",
+                        label = "Delivered to your Pantopus mailbox",
+                        occurredAt = "2026-05-15T13:02:00Z",
+                        isComplete = true,
+                    ),
+                    CertifiedChainStep("out_for_delivery", "Out for delivery", "2026-05-15T10:38:00Z", true),
+                    CertifiedChainStep(
+                        id = "distribution",
+                        label = "Arrived at distribution center",
+                        occurredAt = "2026-05-14T19:08:00Z",
+                        isComplete = true,
+                    ),
+                    CertifiedChainStep("transit", "In transit", "2026-05-12T17:42:00Z", true),
+                    CertifiedChainStep("accepted", "Accepted from sender", "2026-05-12T11:30:00Z", true),
+                ),
+            noticeBody = certifiedNoticeBody,
+            termsUrl = "https://example.com/certified-delivery-terms.pdf",
+            isAcknowledged = false,
+        )
+
+    /** A17.3 signed state with the Pantopus receipt at the top of the chain. */
+    val certifiedSigned =
+        certifiedUnread.copy(
+            chain =
+                listOf(
+                    CertifiedChainStep(
+                        id = "acknowledged",
+                        label = "Acknowledged on Pantopus",
+                        occurredAt = "2026-05-15T14:14:00Z",
+                        isComplete = true,
+                    ),
+                ) + certifiedUnread.chain,
+            isAcknowledged = true,
+        )
+
+    /** Same signed payload used for archived shell snapshots. */
+    val certifiedArchived = certifiedSigned
 }

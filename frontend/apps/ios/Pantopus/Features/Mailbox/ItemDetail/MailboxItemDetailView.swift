@@ -4,6 +4,7 @@
 //
 // swiftlint:disable multiple_closures_with_trailing_closure
 
+import Foundation
 import SwiftUI
 
 /// Mailbox Item Detail screen. Category-aware; Package renders the
@@ -17,6 +18,8 @@ private struct TermsSheetItem: Identifiable {
 struct MailboxItemDetailView: View {
     @State private var viewModel: MailboxItemDetailViewModel
     @State private var termsSheet: TermsSheetItem?
+    @State private var showsConfirmGate = false
+    @State private var didAutoPresentConfirmGate = false
     private let onBack: () -> Void
     private let onOpenSenderProfile: (@MainActor (String) -> Void)?
 
@@ -76,17 +79,47 @@ struct MailboxItemDetailView: View {
             onAIChip: { kind in
                 // AI suggestion chips are shortcuts for the bottom CTAs.
                 switch kind {
-                case .primary: Task { await viewModel.performPrimaryAction() }
+                case .primary: handlePrimary(for: content)
                 case .secondary: handleGhost(for: content)
                 }
             },
-            onPrimary: { Task { await viewModel.performPrimaryAction() } },
+            onPrimary: { handlePrimary(for: content) },
             onGhost: { handleGhost(for: content) },
             onSenderAvatarTap: onOpenSenderProfile
         ) { categoryBody(for: content) }
+            .onAppear {
+                guard !didAutoPresentConfirmGate,
+                      shouldShowConfirmGate(for: content) else { return }
+                didAutoPresentConfirmGate = true
+                showsConfirmGate = true
+            }
             .sheet(item: $termsSheet) { item in
                 CertifiedTermsSheet(termsURL: item.url) { termsSheet = nil }
             }
+            .sheet(isPresented: $showsConfirmGate) {
+                if case let .certified(certified) = content.payload {
+                    CertifiedConfirmGate(
+                        senderName: content.sender.displayName,
+                        referenceNumber: certified.referenceNumber,
+                        deadlineLabel: formatDeadline(certified.acknowledgeBy),
+                        isSigning: viewModel.ctaFlags.primaryLoading,
+                        onReviewFirst: { showsConfirmGate = false },
+                        onSign: {
+                            viewModel.certifiedAckChecked = true
+                            showsConfirmGate = false
+                            Task { await viewModel.performPrimaryAction() }
+                        }
+                    )
+                }
+            }
+    }
+
+    private func handlePrimary(for content: MailboxItemDetailContent) {
+        if shouldShowConfirmGate(for: content), !viewModel.certifiedAckChecked {
+            showsConfirmGate = true
+            return
+        }
+        Task { await viewModel.performPrimaryAction() }
     }
 
     /// Ghost CTA dispatcher. For certified mail this surfaces the
@@ -100,6 +133,15 @@ struct MailboxItemDetailView: View {
             return
         }
         Task { await viewModel.performGhostAction() }
+    }
+
+    private func shouldShowConfirmGate(for content: MailboxItemDetailContent) -> Bool {
+        guard content.category == .certified,
+              case let .certified(detail) = content.payload else { return false }
+        return content.isUnread
+            && !content.isArchived
+            && !detail.isAcknowledged
+            && content.ctaEnabled
     }
 
     @ViewBuilder
@@ -122,16 +164,18 @@ struct MailboxItemDetailView: View {
             BookletBody(booklet: booklet)
         case let (.certified, .certified(certified)):
             CertifiedBody(
-                certified: certified,
-                isAcknowledged: Binding(
-                    get: { viewModel.certifiedAckChecked },
-                    set: { viewModel.certifiedAckChecked = $0 }
-                )
+                certified: certified
             ) {
                 if let url = certified.termsURL {
                     termsSheet = TermsSheetItem(url: url)
                 }
             }
+        case let (.community, .community(community)):
+            CommunityBody(
+                community: community,
+                authorName: content.sender.displayName,
+                authorInitials: content.sender.initials
+            )
         case let (.gig, .gig(gig)):
             GigBody(gig: gig) {
                 Task { await viewModel.acceptGigBid() }
@@ -166,8 +210,8 @@ struct MailboxItemDetailView: View {
         case .certified:
             MailboxCTAShelfContent(
                 primaryTitle: viewModel.ctaFlags.primaryCompleted
-                    ? "Acknowledged ✓"
-                    : "Acknowledge receipt",
+                    ? "Signed ✓"
+                    : "Sign for delivery",
                 ghostTitle: "View terms",
                 primaryLoading: viewModel.ctaFlags.primaryLoading,
                 ghostLoading: viewModel.ctaFlags.ghostLoading,
@@ -198,6 +242,28 @@ struct MailboxItemDetailView: View {
             primaryEnabled: !saved
         )
     }
+
+    private func formatDeadline(_ iso: String?) -> String? {
+        guard let iso, !iso.isEmpty else { return nil }
+        let full = ISO8601DateFormatter()
+        full.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+        let parsed = full.date(from: iso) ?? plain.date(from: iso) ?? Self.dateOnlyFormatter.date(from: iso)
+        guard let parsed else { return iso }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEE MMM d, yyyy"
+        return formatter.string(from: parsed)
+    }
+
+    private static let dateOnlyFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 }
 
 private struct LoadingLayout: View {

@@ -52,6 +52,7 @@ import app.pantopus.android.ui.screens.connections.ConnectionsScreen
 import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
+import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxRowContent
 import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesTarget
@@ -65,6 +66,7 @@ import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.gigs.GigSearchScreen
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.gigs.GigsFeedScreen
+import app.pantopus.android.ui.screens.gigs.quickpost.PostGigV1Screen
 import app.pantopus.android.ui.screens.gigs.tasks_map.TasksMapScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
@@ -167,9 +169,12 @@ import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.inbox.chat.ConversationIdentityChip
 import app.pantopus.android.ui.screens.inbox.chat.ConversationRowContent
 import app.pantopus.android.ui.screens.inbox.chat.ConversationRowVariant
+import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationChrome
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationHost
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationMode
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
+import app.pantopus.android.ui.screens.inbox.conversation.ChatCreatorThreadChrome
+import app.pantopus.android.ui.screens.inbox.conversation.ChatCreatorThreadContext
 import app.pantopus.android.ui.screens.inbox.conversation.ChatThreadMode
 import app.pantopus.android.ui.screens.inbox.newmessage.NewMessageScreen
 import app.pantopus.android.ui.screens.inbox.search.ChatSearchResult
@@ -729,6 +734,10 @@ private object ChildRoutes {
     const val COMPOSE_GIG_CATEGORY_KEY = "category"
     const val COMPOSE_GIG = "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY={$COMPOSE_GIG_CATEGORY_KEY}"
 
+    /** Quick-post V1 single-screen gig form. Hub action chip entry point. */
+    const val QUICK_POST_GIG_CATEGORY_KEY = "category"
+    const val QUICK_POST_GIG = "gigs/quick-post?$QUICK_POST_GIG_CATEGORY_KEY={$QUICK_POST_GIG_CATEGORY_KEY}"
+
     /** Nearby map opened from the Gigs feed map-toggle — seeded with the
      *  active category so the same filter applies on the map. */
     const val NEARBY_MAP_FOR_GIGS_CATEGORY_KEY = "category"
@@ -797,6 +806,8 @@ private object ChildRoutes {
     const val CHAT_IDENTITY_KEY = "identity"
     const val CHAT_LOCALITY_KEY = "locality"
     const val CHAT_ONLINE_KEY = "online"
+    const val CHAT_TIER_NAME_KEY = "tierName"
+    const val CHAT_TIER_RANK_KEY = "tierRank"
 
     /** P4.3 — message id to scroll to on open (Chat Search deep-link).
      *  Empty for normal opens, which land on the latest message. */
@@ -809,6 +820,8 @@ private object ChildRoutes {
             "&$CHAT_IDENTITY_KEY={$CHAT_IDENTITY_KEY}" +
             "&$CHAT_LOCALITY_KEY={$CHAT_LOCALITY_KEY}" +
             "&$CHAT_ONLINE_KEY={$CHAT_ONLINE_KEY}" +
+            "&$CHAT_TIER_NAME_KEY={$CHAT_TIER_NAME_KEY}" +
+            "&$CHAT_TIER_RANK_KEY={$CHAT_TIER_RANK_KEY}" +
             "&$CHAT_SCROLL_TO_KEY={$CHAT_SCROLL_TO_KEY}"
 
     /** New message contact picker (T6.6b P25). Reached from Chat list
@@ -889,6 +902,9 @@ private object ChildRoutes {
     /** Build the compose-gig path with the active category pre-fill. */
     fun composeGig(category: String): String = "gigs/compose?$COMPOSE_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
 
+    fun quickPostGig(category: String): String =
+        "gigs/quick-post?$QUICK_POST_GIG_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
+
     /** Build the Nearby-map-for-gigs path with the active category seed. */
     fun nearbyMapForGigs(category: String): String =
         "gigs/map?$NEARBY_MAP_FOR_GIGS_CATEGORY_KEY=${java.net.URLEncoder.encode(category, "UTF-8")}"
@@ -925,6 +941,25 @@ private object ChildRoutes {
             "&$CHAT_IDENTITY_KEY=${enc(identity)}" +
             "&$CHAT_LOCALITY_KEY=" +
             "&$CHAT_ONLINE_KEY=false" +
+            "&$CHAT_TIER_NAME_KEY=" +
+            "&$CHAT_TIER_RANK_KEY=" +
+            "&$CHAT_SCROLL_TO_KEY="
+    }
+
+    /** Build the creator-side fan thread path from a Creator Inbox row. */
+    fun creatorThreadConversation(row: CreatorInboxRowContent): String {
+        val userId = row.counterpartyUserId ?: row.id
+
+        fun enc(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
+        return "chat/creator/${enc(userId)}?" +
+            "$CHAT_NAME_KEY=${enc(row.displayName.ifEmpty { row.handle })}" +
+            "&$CHAT_INITIALS_KEY=${enc(row.initials)}" +
+            "&$CHAT_VERIFIED_KEY=${row.verifiedLocal}" +
+            "&$CHAT_IDENTITY_KEY=business" +
+            "&$CHAT_LOCALITY_KEY=" +
+            "&$CHAT_ONLINE_KEY=false" +
+            "&$CHAT_TIER_NAME_KEY=${enc(row.tierName ?: "Free")}" +
+            "&$CHAT_TIER_RANK_KEY=${row.tierRank}" +
             "&$CHAT_SCROLL_TO_KEY="
     }
 
@@ -947,6 +982,8 @@ private object ChildRoutes {
             "&$CHAT_IDENTITY_KEY=" +
             "&$CHAT_LOCALITY_KEY=${enc(locality ?: "")}" +
             "&$CHAT_ONLINE_KEY=false" +
+            "&$CHAT_TIER_NAME_KEY=" +
+            "&$CHAT_TIER_RANK_KEY=" +
             "&$CHAT_SCROLL_TO_KEY="
     }
 
@@ -974,6 +1011,8 @@ private object ChildRoutes {
             "&$CHAT_IDENTITY_KEY=${enc(identity)}" +
             "&$CHAT_LOCALITY_KEY=" +
             "&$CHAT_ONLINE_KEY=false" +
+            "&$CHAT_TIER_NAME_KEY=" +
+            "&$CHAT_TIER_RANK_KEY=" +
             "&$CHAT_SCROLL_TO_KEY=${enc(result.matchedMessageId ?: "")}"
     }
 
@@ -1184,7 +1223,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     ActionChipContent.Kind.ScanMail ->
                                         navController.navigate(ChildRoutes.MAILBOX_ROOT)
                                     ActionChipContent.Kind.PostTask ->
-                                        navController.navigate(ChildRoutes.composeGig(GigsCategory.All.key))
+                                        navController.navigate(ChildRoutes.quickPostGig(GigsCategory.All.key))
                                     ActionChipContent.Kind.SnapAndSell ->
                                         navController.navigate(ChildRoutes.placeholder("Snap & sell"))
                                 }
@@ -2060,6 +2099,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             type = NavType.StringType
                             defaultValue = "false"
                         },
+                        navArgument(ChildRoutes.CHAT_TIER_NAME_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                        navArgument(ChildRoutes.CHAT_TIER_RANK_KEY) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
                         navArgument(ChildRoutes.CHAT_SCROLL_TO_KEY) {
                             type = NavType.StringType
                             defaultValue = ""
@@ -2074,17 +2121,28 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 val verified = args.getString(ChildRoutes.CHAT_VERIFIED_KEY) == "true"
                 val locality = args.getString(ChildRoutes.CHAT_LOCALITY_KEY).orEmpty().takeIf { it.isNotEmpty() }
                 val online = args.getString(ChildRoutes.CHAT_ONLINE_KEY) == "true"
+                val tierName = args.getString(ChildRoutes.CHAT_TIER_NAME_KEY).orEmpty().ifEmpty { "Free" }
+                val tierRank = args.getString(ChildRoutes.CHAT_TIER_RANK_KEY).orEmpty().toIntOrNull() ?: 1
                 val scrollTo = args.getString(ChildRoutes.CHAT_SCROLL_TO_KEY).orEmpty().takeIf { it.isNotEmpty() }
                 val mode: ChatThreadMode =
                     when (kind) {
                         "ai" -> ChatThreadMode.Ai
                         "room" -> ChatThreadMode.Room(id)
+                        "creator" -> ChatThreadMode.Person(otherUserId = id)
                         else -> ChatThreadMode.Person(otherUserId = id)
                     }
                 val counterparty: ChatCounterparty =
                     when (kind) {
                         "ai" -> ChatCounterparty.Ai(displayName = name)
                         "room" -> ChatCounterparty.Group(displayName = name, memberCount = null)
+                        "creator" ->
+                            ChatCounterparty.Person(
+                                displayName = name,
+                                initials = initials,
+                                locality = locality,
+                                verified = verified,
+                                online = online,
+                            )
                         else ->
                             ChatCounterparty.Person(
                                 displayName = name,
@@ -2095,11 +2153,31 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             )
                     }
                 val conversationMode: ChatConversationMode =
-                    if (kind == "ai") ChatConversationMode.AiAssistant else ChatConversationMode.Dm
+                    when (kind) {
+                        "ai" -> ChatConversationMode.AiAssistant
+                        "creator" -> ChatConversationMode.CreatorThread
+                        else -> ChatConversationMode.Dm
+                    }
+                val creatorContext =
+                    if (conversationMode == ChatConversationMode.CreatorThread) {
+                        ChatCreatorThreadContext.defaults(fanTierName = tierName, fanTierRank = tierRank)
+                    } else {
+                        null
+                    }
                 ChatConversationHost(
                     mode = mode,
                     counterparty = counterparty,
-                    conversationMode = conversationMode,
+                    chrome =
+                        ChatConversationChrome(
+                            mode = conversationMode,
+                            creatorThread =
+                                creatorContext?.let {
+                                    ChatCreatorThreadChrome(
+                                        context = it,
+                                        onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
+                                    )
+                                },
+                        ),
                     onBack = { navController.popBackStack() },
                     scrollToMessageId = scrollTo,
                 )
@@ -2303,6 +2381,26 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     },
                     onBack = { navController.popBackStack() },
                     initialCategory = GigsCategory.fromBackendKey(raw),
+                )
+            }
+            composable(
+                route = ChildRoutes.QUICK_POST_GIG,
+                arguments =
+                    listOf(
+                        navArgument(ChildRoutes.QUICK_POST_GIG_CATEGORY_KEY) {
+                            type = NavType.StringType
+                            defaultValue = GigsCategory.All.key
+                        },
+                    ),
+            ) { entry ->
+                val raw = entry.arguments?.getString(ChildRoutes.QUICK_POST_GIG_CATEGORY_KEY) ?: GigsCategory.All.key
+                PostGigV1Screen(
+                    onDismiss = { navController.popBackStack() },
+                    onPosted = { gigId ->
+                        navController.popBackStack()
+                        navController.navigate(ChildRoutes.gigDetail(gigId))
+                    },
+                    preselectedCategoryKey = raw,
                 )
             }
             composable(
@@ -2708,16 +2806,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 CreatorInboxScreen(
                     onBack = { navController.popBackStack() },
                     onOpenThread = { row ->
-                        val userId = row.counterpartyUserId ?: row.id
-                        navController.navigate(
-                            ChildRoutes.chatConversationFromPicker(
-                                userId = userId,
-                                displayName = row.displayName.ifEmpty { row.handle },
-                                initials = row.initials,
-                                verified = row.verifiedLocal,
-                                locality = null,
-                            ),
-                        )
+                        navController.navigate(ChildRoutes.creatorThreadConversation(row))
                     },
                     onOpenBroadcast = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                     onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Inbox settings")) },

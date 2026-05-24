@@ -10,6 +10,7 @@ package app.pantopus.android.ui.screens.inbox.conversation
 object ChatConversationSampleData {
     const val AI_NAME = "Ask Pantopus"
     const val FAN_PERSONA_NAME = "Wynn B."
+    const val CREATOR_FAN_NAME = "Priya R."
 
     val fanCounterparty =
         ChatCounterparty.Person(
@@ -38,6 +39,8 @@ object ChatConversationSampleData {
             resetCopy = "Resets May 1",
             requiredReplyTier = "Silver",
         )
+
+    val creatorContext: ChatCreatorThreadContext = ChatCreatorThreadContext.defaults(fanTierName = "Bronze", fanTierRank = 2)
 
     /**
      * An active AI thread: a user question followed by a structured AI
@@ -77,6 +80,10 @@ object ChatConversationSampleData {
             ),
         )
 
+    /**
+     * A15.5 fan-side persona DM with quota chrome, tier-gated creator
+     * reply, and an outgoing paid-support footer.
+     */
     val fanActiveRows: List<ChatTimelineRow> =
         listOf(
             ChatTimelineRow.DayDivider(ChatDayDivider(id = "today", label = "Today")),
@@ -110,6 +117,54 @@ object ChatConversationSampleData {
                     stamp = "Wynn · 9:04 AM",
                     deliveryState = null,
                     lockedTier = "Silver",
+                ),
+            ),
+        )
+
+    /**
+     * Creator-side thread from A15.4: audience chrome, Bronze tier fan,
+     * quota meter, and an inline broadcast reference before the fan's
+     * workshop follow-up.
+     */
+    val creatorThreadRows: List<ChatTimelineRow> =
+        listOf(
+            ChatTimelineRow.DayDivider(ChatDayDivider(id = "today", label = "Today")),
+            ChatTimelineRow.BroadcastReference(
+                ChatBroadcastReference(
+                    id = "workshop-broadcast",
+                    title = "Workshop interest list",
+                    subtitle = "Sunday bake workshop poll sent to Bronze+ members.",
+                    metric = "2,340 reached · engagement up 12%",
+                ),
+            ),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "creator_m1",
+                    side = ChatMessageSide.Incoming,
+                    body = ChatBubbleBody.Text("Hi! Loved this week's loaf — quick question: can I sub bread flour for AP?"),
+                    hasTail = true,
+                    stamp = "Priya · 8:51 AM",
+                    deliveryState = null,
+                ),
+            ),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "creator_m2",
+                    side = ChatMessageSide.Outgoing,
+                    body = ChatBubbleBody.Text("Yes — bread flour gives more chew. Use 5g less water per 100g."),
+                    hasTail = true,
+                    stamp = "9:02 AM",
+                    deliveryState = ChatDeliveryState.Read,
+                ),
+            ),
+            ChatTimelineRow.Bubble(
+                ChatBubbleContent(
+                    id = "creator_m3",
+                    side = ChatMessageSide.Incoming,
+                    body = ChatBubbleBody.Text("Also — would you ever do a hands-on workshop? I'd pay."),
+                    hasTail = true,
+                    stamp = "Priya · 9:14 AM",
+                    deliveryState = null,
                 ),
             ),
         )

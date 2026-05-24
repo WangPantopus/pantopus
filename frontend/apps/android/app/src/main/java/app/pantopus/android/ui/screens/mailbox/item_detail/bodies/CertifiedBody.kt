@@ -3,43 +3,42 @@
 package app.pantopus.android.ui.screens.mailbox.item_detail.bodies
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedChainStep
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
-import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedConfirmGate
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedTermsSummaryCard
 import app.pantopus.android.ui.theme.PantopusColors
-import app.pantopus.android.ui.theme.PantopusIcon
-import app.pantopus.android.ui.theme.PantopusIconImage
-import app.pantopus.android.ui.theme.PantopusTextStyle
+import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /**
- * Concrete body for the Certified mailbox category. Replaces the P9
- * placeholder. The shell renders the AI elf + KeyFacts + Timeline; the
- * body adds the long-form notice text and the "I acknowledge receipt"
- * gate that locks the primary CTA.
+ * Concrete body for the Certified mailbox category. The shell renders
+ * the AI summary, key facts, and timeline; this body renders the A17.3
+ * notice card and high-stakes delivery terms summary.
  */
 @Composable
 fun CertifiedBody(
     certified: CertifiedDetailDto,
-    isAcknowledged: Boolean,
-    onAcknowledgedChange: (Boolean) -> Unit,
     onViewTerms: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -47,47 +46,85 @@ fun CertifiedBody(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
-        certified.noticeBody?.takeIf { it.isNotEmpty() }?.let { body ->
-            Text(
-                text = body,
-                fontSize = 13.sp,
-                color = PantopusColors.appTextStrong,
-                lineHeight = 18.sp,
-                modifier =
-                    Modifier
-                        .padding(horizontal = Spacing.s4)
-                        .semantics { contentDescription = body },
+        if (certified.isHighStakes) {
+            CertifiedTermsSummaryCard(
+                termsUrl = certified.termsUrl,
+                onViewTerms = if (certified.termsUrl.isNullOrEmpty()) null else onViewTerms,
+                modifier = Modifier.padding(horizontal = Spacing.s4),
             )
         }
-        if (!certified.termsUrl.isNullOrEmpty()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        NoticeCard(
+            paragraphs = certified.noticeParagraphs(),
+            showTermsAction = !certified.termsUrl.isNullOrEmpty(),
+            onViewTerms = onViewTerms,
+            modifier = Modifier.padding(horizontal = Spacing.s4),
+        )
+    }
+}
+
+private val CertifiedDetailDto.isHighStakes: Boolean
+    get() = !termsUrl.isNullOrEmpty() || !acknowledgeBy.isNullOrEmpty()
+
+private fun CertifiedDetailDto.noticeParagraphs(): List<String> =
+    noticeBody
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.split("\n\n")
+        ?.map { it.trim() }
+        ?.filter { it.isNotEmpty() }
+        ?: listOf("No notice text was included with this certified item.")
+
+@Composable
+private fun NoticeCard(
+    paragraphs: List<String>,
+    showTermsAction: Boolean,
+    onViewTerms: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3)
+                .testTag("certifiedBody_notice"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Text(
+            text = "NOTICE TEXT",
+            modifier = Modifier.semantics { heading() },
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+        paragraphs.forEach { paragraph ->
+            Text(
+                text = paragraph,
+                fontSize = 13.sp,
+                color = PantopusColors.appTextStrong,
+                lineHeight = 20.sp,
+                modifier = Modifier.semantics { contentDescription = paragraph },
+            )
+        }
+        if (showTermsAction) {
+            Text(
+                text = "Show full terms",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.primary600,
                 modifier =
                     Modifier
-                        .heightIn(min = 44.dp)
-                        .padding(horizontal = Spacing.s4)
+                        .clip(RoundedCornerShape(Radii.sm))
                         .clickable(onClick = onViewTerms)
-                        .semantics { contentDescription = "View terms" },
-            ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.File,
-                    contentDescription = null,
-                    size = 14.dp,
-                    tint = PantopusColors.primary600,
-                )
-                Text(
-                    text = "View terms",
-                    style = PantopusTextStyle.small,
-                    color = PantopusColors.primary600,
-                )
-            }
+                        .heightIn(min = 48.dp)
+                        .padding(top = Spacing.s1, bottom = Spacing.s1)
+                        .testTag("certifiedBody_showTerms")
+                        .semantics { contentDescription = "Show full certified terms" },
+            )
         }
-        CertifiedConfirmGate(
-            isAcknowledged = isAcknowledged,
-            onAcknowledgedChange = onAcknowledgedChange,
-            enabled = !certified.isAcknowledged,
-        )
     }
 }
 
@@ -111,8 +148,6 @@ private fun CertifiedBodyPreview() {
                     termsUrl = "https://example.com/terms",
                     isAcknowledged = false,
                 ),
-            isAcknowledged = false,
-            onAcknowledgedChange = {},
             onViewTerms = {},
         )
     }

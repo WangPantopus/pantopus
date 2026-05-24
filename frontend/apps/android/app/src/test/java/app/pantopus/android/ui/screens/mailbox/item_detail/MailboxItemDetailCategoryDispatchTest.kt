@@ -138,6 +138,51 @@ class MailboxItemDetailCategoryDispatchTest {
             assertTrue(loaded.content.payload is MailboxCategoryPayload.Certified)
         }
 
+    @Test fun community_dispatch_projects_poll_payload() =
+        runTest {
+            val payload =
+                mapOf(
+                    "community_item_id" to "community-poll",
+                    "kind" to "poll",
+                    "group" to
+                        mapOf(
+                            "name" to "Elm Park HOA",
+                            "tagline" to "40 households",
+                            "verified" to true,
+                            "role" to "Resident",
+                            "since" to "Mar 2024",
+                            "member_count" to 87,
+                        ),
+                    "poll" to
+                        mapOf(
+                            "question" to "Which weekend should we reserve?",
+                            "options" to
+                                listOf(
+                                    mapOf("id" to "june-7", "label" to "Saturday, June 7", "votes" to 19, "selected" to true),
+                                    mapOf("id" to "june-14", "label" to "Saturday, June 14", "votes" to 11),
+                                ),
+                            "total_votes" to 30,
+                            "closes_at" to "Fri 5 PM",
+                            "status" to "Residents only",
+                        ),
+                    "attendees" to listOf(mapOf("id" to "jt", "name" to "Jamal T.", "initials" to "JT", "verified" to true)),
+                    "attendee_count" to 30,
+                    "attendees_from_block" to 6,
+                    "pulse_thread" to mapOf("thread_id" to "pulse-1", "title" to "Poll thread", "reply_count" to 4),
+                )
+            coEvery { repo.item("m1") } returns NetworkResult.Success(item("community", payload))
+            val vm = makeVm()
+            vm.load()
+            val loaded = vm.state.value as MailboxItemDetailUiState.Loaded
+            assertEquals(MailItemCategory.Community, loaded.content.category)
+            assertEquals(MailTrust.Verified, loaded.content.trust)
+            assertTrue(loaded.content.keyFacts.isEmpty())
+            val community = loaded.content.payload as MailboxCategoryPayload.Community
+            assertEquals(app.pantopus.android.data.api.models.mailbox.v2.CommunityMailSubtype.Poll, community.detail.subtype)
+            assertEquals(2, community.detail.poll?.options?.size)
+            assertEquals(30, community.detail.poll?.totalVotes)
+        }
+
     private fun memoryPayload(): Map<String, Any?> =
         mapOf(
             "title" to "One year ago, you found Pepper.",

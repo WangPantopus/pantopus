@@ -35,20 +35,21 @@ fun ChatConversationHost(
     mode: ChatThreadMode,
     counterparty: ChatCounterparty,
     onBack: () -> Unit,
-    conversationMode: ChatConversationMode = ChatConversationMode.Dm,
-    fanEntitlement: ChatFanEntitlement? = null,
+    chrome: ChatConversationChrome = ChatConversationChrome(),
     scrollToMessageId: String? = null,
     authViewModel: ChatConversationHostViewModel = hiltViewModel(),
 ) {
     val state by authViewModel.authState.collectAsStateWithLifecycle()
     val currentUserId = (state as? AuthRepository.State.SignedIn)?.user?.id.orEmpty()
     ChatConversationScreen(
-        mode = mode,
-        counterparty = counterparty,
-        currentUserId = currentUserId,
-        conversationMode = conversationMode,
-        fanEntitlement = fanEntitlement,
-        scrollToMessageId = scrollToMessageId,
+        args =
+            ChatConversationRouteArgs(
+                mode = mode,
+                counterparty = counterparty,
+                currentUserId = currentUserId,
+                scrollToMessageId = scrollToMessageId,
+            ),
+        chrome = chrome,
         onBack = onBack,
     )
 }

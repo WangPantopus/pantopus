@@ -22,6 +22,8 @@ public struct MailboxItemDetailContent: Sendable {
     public let timeline: [TimelineStep]
     public let packageInfo: PackageBodyContent?
     public let ctaEnabled: Bool
+    public let isUnread: Bool
+    public let isArchived: Bool
     /// Category-specific sub-payload resolved from `mail.object_payload`.
     /// `.other` for categories without a dedicated body decoder.
     public let payload: MailboxCategoryPayload
@@ -35,6 +37,8 @@ public struct MailboxItemDetailContent: Sendable {
         timeline: [TimelineStep],
         packageInfo: PackageBodyContent?,
         ctaEnabled: Bool,
+        isUnread: Bool = false,
+        isArchived: Bool = false,
         payload: MailboxCategoryPayload = .other
     ) {
         self.category = category
@@ -45,6 +49,8 @@ public struct MailboxItemDetailContent: Sendable {
         self.timeline = timeline
         self.packageInfo = packageInfo
         self.ctaEnabled = ctaEnabled
+        self.isUnread = isUnread
+        self.isArchived = isArchived
         self.payload = payload
     }
 }
@@ -310,6 +316,8 @@ final class MailboxItemDetailViewModel {
             timeline: updatedTimeline,
             packageInfo: content.packageInfo?.receivedCopy(),
             ctaEnabled: false,
+            isUnread: content.isUnread,
+            isArchived: content.isArchived,
             payload: content.payload
         )
         state = .loaded(content)
@@ -334,6 +342,8 @@ final class MailboxItemDetailViewModel {
                     timeline: originalTimeline,
                     packageInfo: originalPackageInfo,
                     ctaEnabled: originalCtaEnabled,
+                    isUnread: rollback.isUnread,
+                    isArchived: rollback.isArchived,
                     payload: rollback.payload
                 )
                 state = .loaded(rollback)
@@ -361,6 +371,8 @@ final class MailboxItemDetailViewModel {
                 timeline: snapshot.timeline,
                 packageInfo: snapshot.packageInfo,
                 ctaEnabled: false,
+                isUnread: snapshot.isUnread,
+                isArchived: snapshot.isArchived,
                 payload: snapshot.payload
             )
             state = .loaded(disabled)
@@ -417,6 +429,8 @@ final class MailboxItemDetailViewModel {
                 timeline: content.timeline,
                 packageInfo: content.packageInfo,
                 ctaEnabled: content.ctaEnabled,
+                isUnread: content.isUnread,
+                isArchived: content.isArchived,
                 payload: .memory(memory.withSaved(true))
             )
         )
@@ -520,7 +534,7 @@ final class MailboxItemDetailViewModel {
             switch category {
             case .package:
                 await fetchPackageDetails(for: response.mail, category: category)
-            case .coupon, .booklet, .certified, .gig, .memory:
+            case .coupon, .booklet, .certified, .community, .gig, .memory:
                 applyCategoryBody(response.mail, category: category)
             default:
                 applyItem(response.mail, category: category)
@@ -556,6 +570,8 @@ final class MailboxItemDetailViewModel {
             applyBooklet(item: item, category: category, booklet: booklet, baseTrust: baseTrust)
         case let .certified(certified):
             applyCertified(item: item, category: category, certified: certified)
+        case let .community(community):
+            applyCommunity(item: item, category: category, community: community, baseTrust: baseTrust)
         case let .gig(gig):
             applyGig(item: item, category: category, gig: gig, baseTrust: baseTrust)
         case let .memory(memory):
@@ -590,7 +606,40 @@ final class MailboxItemDetailViewModel {
                 timeline: [],
                 packageInfo: nil,
                 ctaEnabled: true,
+                isUnread: !item.base.viewed,
+                isArchived: item.base.archived,
                 payload: .memory(memory)
+            )
+        )
+    }
+
+    /// Community (A17.4) — group seal, poll/event/update card, attendee
+    /// strip, Pulse link, and RSVP controls live in `CommunityBody`, so
+    /// the standard shell slots stay intentionally quiet.
+    private func applyCommunity(
+        item: MailboxV2ItemResponse.Item,
+        category: MailItemCategory,
+        community: CommunityDetailDTO,
+        baseTrust: MailTrust
+    ) {
+        state = .loaded(
+            MailboxItemDetailContent(
+                category: category,
+                trust: baseTrust == .unverified ? .verified : baseTrust,
+                sender: SenderBlockContent(
+                    displayName: item.senderDisplay,
+                    meta: item.base.createdAt,
+                    initials: Self.initials(from: item.senderDisplay),
+                    senderUserId: item.base.senderUserId
+                ),
+                aiElf: nil,
+                keyFacts: [],
+                timeline: [],
+                packageInfo: nil,
+                ctaEnabled: true,
+                isUnread: !item.base.viewed,
+                isArchived: item.base.archived,
+                payload: .community(community)
             )
         )
     }
@@ -630,6 +679,8 @@ final class MailboxItemDetailViewModel {
                 timeline: [],
                 packageInfo: nil,
                 ctaEnabled: true,
+                isUnread: !item.base.viewed,
+                isArchived: item.base.archived,
                 payload: .coupon(coupon)
             )
         )
@@ -661,6 +712,8 @@ final class MailboxItemDetailViewModel {
                 timeline: [],
                 packageInfo: nil,
                 ctaEnabled: true,
+                isUnread: !item.base.viewed,
+                isArchived: item.base.archived,
                 payload: .booklet(booklet)
             )
         )
@@ -713,6 +766,8 @@ final class MailboxItemDetailViewModel {
                 timeline: timeline,
                 packageInfo: nil,
                 ctaEnabled: !certified.isAcknowledged,
+                isUnread: !item.base.viewed,
+                isArchived: item.base.archived,
                 payload: .certified(certified)
             )
         )
@@ -743,6 +798,8 @@ final class MailboxItemDetailViewModel {
                 timeline: [],
                 packageInfo: nil,
                 ctaEnabled: true,
+                isUnread: !item.base.viewed,
+                isArchived: item.base.archived,
                 payload: .gig(gig)
             )
         )
@@ -766,6 +823,8 @@ final class MailboxItemDetailViewModel {
                 timeline: content.timeline,
                 packageInfo: content.packageInfo,
                 ctaEnabled: false,
+                isUnread: content.isUnread,
+                isArchived: content.isArchived,
                 payload: .gig(gig.accepted())
             )
         )
@@ -811,7 +870,9 @@ final class MailboxItemDetailViewModel {
                 ],
                 timeline: [],
                 packageInfo: nil,
-                ctaEnabled: true
+                ctaEnabled: true,
+                isUnread: !item.base.viewed,
+                isArchived: item.base.archived
             )
         )
     }
@@ -867,7 +928,9 @@ final class MailboxItemDetailViewModel {
                     status: deliveryStatus,
                     received: received
                 ),
-                ctaEnabled: deliveryStatus == .delivered && !received
+                ctaEnabled: deliveryStatus == .delivered && !received,
+                isUnread: !item.base.viewed,
+                isArchived: item.base.archived
             )
         )
     }

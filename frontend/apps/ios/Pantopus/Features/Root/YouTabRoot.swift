@@ -1145,7 +1145,9 @@ public struct YouTabRoot: View {
                             userId: row.counterpartyUserId ?? row.id,
                             displayName: row.displayName.isEmpty ? row.handle : row.displayName,
                             initials: row.initials,
-                            verified: row.verifiedLocal
+                            verified: row.verifiedLocal,
+                            tierName: row.tierName ?? "Free",
+                            tierRank: row.tierRank
                         )
                         path.append(.creatorInboxConversation(dest))
                     }
@@ -1169,8 +1171,14 @@ public struct YouTabRoot: View {
                         online: false
                     ),
                     currentUserId: currentUserId ?? ""
-                )
-            ) { if !path.isEmpty { path.removeLast() } }
+                ),
+                mode: .creatorThread,
+                creatorContext: .defaults(fanTierName: dest.tierName, fanTierRank: dest.tierRank),
+                onOpenAudienceProfile: {
+                    path.append(.audienceProfile)
+                },
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
         case let .chatConversation(dest):
             ChatConversationView(
                 viewModel: ChatConversationViewModel(

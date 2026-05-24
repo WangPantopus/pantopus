@@ -368,6 +368,10 @@ class ChatConversationViewModel
                     rows.add(ChatTimelineRow.DayDivider(ChatDayDivider(id = dayKey, label = dayLabel(message.createdAt))))
                     lastDayKey = dayKey
                 }
+                if (message.messageType == "broadcast_reference") {
+                    rows.add(ChatTimelineRow.BroadcastReference(broadcastReferenceOf(message)))
+                    return@forEachIndexed
+                }
                 val side = if (message.userId == currentUserId) ChatMessageSide.Outgoing else ChatMessageSide.Incoming
                 val nextSameSide =
                     index + 1 < combined.size &&
@@ -470,6 +474,16 @@ class ChatConversationViewModel
                 ?: metadata["support_tier"] as? String
                 ?: metadata["paid_support_tier"] as? String
         }
+
+        private fun broadcastReferenceOf(message: ChatMessageDto): ChatBroadcastReference =
+            ChatBroadcastReference(
+                id = message.id,
+                title = (message.metadata?.get("title") as? String) ?: "Broadcast referenced",
+                subtitle =
+                    (message.metadata?.get("subtitle") as? String)
+                        ?: "This conversation started from a creator broadcast.",
+                metric = (message.metadata?.get("metric") as? String) ?: "Audience update",
+            )
 
         private fun optimistic(
             text: String,

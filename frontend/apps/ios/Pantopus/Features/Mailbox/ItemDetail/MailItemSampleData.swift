@@ -16,9 +16,55 @@ private struct PackageTrackingFixture {
 }
 
 /// Sample payloads for the mailbox item-detail bodies.
-public enum MailItemSampleData {
+public enum MailItemSampleData {}
+
+public extension MailItemSampleData {
+    /// A17.5 primary coupon state — ready to scan in store.
+    static let couponUnused = CouponDetailDTO(
+        brandLogoURL: nil,
+        brandName: "Brass Owl Bakery",
+        headline: "25% OFF",
+        subcopy: "Your next in-store purchase",
+        code: "BRASS25",
+        expiresAt: "2026-06-30",
+        merchant: "Brass Owl Bakery",
+        terms: "Valid for one in-store transaction. Cannot be combined with daily specials or loyalty rewards.",
+        minimumSpend: "$8 minimum",
+        finePrint: "Excludes whole-cake orders, catering trays, gift cards, and already-marked-down items."
+    )
+
+    /// A17.5 redeemed secondary state — success ribbon replaces the hero.
+    static let couponRedeemed = CouponDetailDTO(
+        brandLogoURL: nil,
+        brandName: "Brass Owl Bakery",
+        headline: "25% OFF",
+        subcopy: "Your next in-store purchase",
+        code: "BRASS25",
+        expiresAt: "2026-06-30",
+        merchant: "Brass Owl Bakery",
+        terms: "Redeemed offers cannot be reused or transferred.",
+        minimumSpend: "$8 minimum",
+        finePrint: "Coupon was single-use and has been retired after checkout."
+    )
+
+    /// A17.5 terminal expired state.
+    static let couponExpired = CouponDetailDTO(
+        brandLogoURL: nil,
+        brandName: "Brass Owl Bakery",
+        headline: "25% OFF",
+        subcopy: "Your next in-store purchase",
+        code: "BRASS25",
+        expiresAt: "2026-05-01",
+        merchant: "Brass Owl Bakery",
+        terms: "Expired offers cannot be scanned, copied, or restored.",
+        minimumSpend: "$8 minimum",
+        finePrint: "This offer expired before redemption."
+    )
+}
+
+public extension MailItemSampleData {
     /// A17.2 primary booklet sample — neighborhood civic guide.
-    public static let bookletVoterGuide = BookletDetailDTO(
+    static let bookletVoterGuide = BookletDetailDTO(
         pages: [
             sampleURL("https://example.com/pantopus/booklets/voter-guide/page-1.png"),
             sampleURL("https://example.com/pantopus/booklets/voter-guide/page-2.png"),
@@ -30,7 +76,7 @@ public enum MailItemSampleData {
     )
 
     /// A17.2 secondary booklet sample — merchant catalog mailed to a neighborhood.
-    public static let bookletNeighborhoodCatalog = BookletDetailDTO(
+    static let bookletNeighborhoodCatalog = BookletDetailDTO(
         pages: [
             sampleURL("https://example.com/pantopus/booklets/catalog/page-1.png"),
             sampleURL("https://example.com/pantopus/booklets/catalog/page-2.png"),
@@ -39,8 +85,10 @@ public enum MailItemSampleData {
         summary: "Spring catalog with seasonal services, repair windows, and neighborhood-only pricing.",
         pageCount: 3
     )
+}
 
-    public static let packageContents = PackageContents(
+public extension MailItemSampleData {
+    static let packageContents = PackageContents(
         title: "Lerina Books - order #LB-44218",
         items: [
             .init(
@@ -61,14 +109,14 @@ public enum MailItemSampleData {
         total: "$33.60"
     )
 
-    public static let packageDeliveryPhoto = PackageDeliveryPhoto(
+    static let packageDeliveryPhoto = PackageDeliveryPhoto(
         capturedAt: "1:47 PM",
         watermark: "USPS - 18/05/2026 13:47:08",
         location: "Front porch - 1428 Elm St",
         verificationLabel: "GPS verified"
     )
 
-    public static let packageInTransit = PackageBodyContent(
+    static let packageInTransit = PackageBodyContent(
         carrier: "USPS Priority Mail",
         etaLine: "Expected today by 3 PM",
         status: .inTransit,
@@ -103,7 +151,7 @@ public enum MailItemSampleData {
         contents: packageContents
     )
 
-    public static let packageOutForDelivery = PackageBodyContent(
+    static let packageOutForDelivery = PackageBodyContent(
         carrier: "USPS Priority Mail",
         etaLine: "ETA window 1:00 - 3:00 PM - about 6 stops away",
         status: .outForDelivery,
@@ -145,7 +193,7 @@ public enum MailItemSampleData {
         contents: packageContents
     )
 
-    public static let packageDelivered = PackageBodyContent(
+    static let packageDelivered = PackageBodyContent(
         carrier: "USPS Priority Mail",
         etaLine: "Today - 1:47 PM - front porch - left in shade",
         status: .delivered,
@@ -188,7 +236,7 @@ public enum MailItemSampleData {
         contents: packageContents
     )
 
-    public static func packageBody(status: PackageDeliveryStatus) -> PackageBodyContent {
+    static func packageBody(status: PackageDeliveryStatus) -> PackageBodyContent {
         switch status {
         case .shipped, .inTransit: packageInTransit
         case .outForDelivery: packageOutForDelivery
@@ -196,7 +244,7 @@ public enum MailItemSampleData {
         }
     }
 
-    public static func packageTrackingSteps(status: PackageDeliveryStatus) -> [TimelineStep] {
+    static func packageTrackingSteps(status: PackageDeliveryStatus) -> [TimelineStep] {
         let currentIndex = switch status {
         case .shipped: 0
         case .inTransit: 1
@@ -238,7 +286,7 @@ public enum MailItemSampleData {
     }
 
     /// Next-steps timeline shown once a bid is accepted (A17.6 NEXT_STEPS).
-    public static let gigNextSteps: [GigDetailDTO.NextStep] = [
+    static let gigNextSteps: [GigDetailDTO.NextStep] = [
         .init(id: "accepted", label: "Bid accepted", whenText: "Just now", state: .active),
         .init(id: "confirm", label: "Marcus confirms · expects 12m", whenText: "Pending", state: .pending),
         .init(id: "job", label: "Job · Sat May 24, 9 AM", whenText: "Calendar reminder set", state: .upcoming),
@@ -252,7 +300,7 @@ public enum MailItemSampleData {
     ]
 
     /// Incoming-bid state — the primary A17.6 frame.
-    public static let gigReceived = GigDetailDTO(
+    static let gigReceived = GigDetailDTO(
         isAccepted: false,
         bidder: GigDetailDTO.Bidder(
             initials: "MT",
@@ -316,9 +364,73 @@ public enum MailItemSampleData {
     )
 
     /// Bid-accepted secondary state.
-    public static let gigAccepted = gigReceived.accepted()
+    static let gigAccepted = gigReceived.accepted()
+}
 
-    private static func sampleURL(_ string: String) -> URL {
+public extension MailItemSampleData {
+    /// A17.3 open/pre-signature certified mail state.
+    static let certifiedUnread = CertifiedDetailDTO(
+        referenceNumber: "7014 2026 0411 3344 5577",
+        documentType: "Supplemental property tax bill",
+        acknowledgeBy: "2026-06-30T17:00:00Z",
+        chain: [
+            .init(
+                id: "delivered",
+                label: "Delivered to your Pantopus mailbox",
+                occurredAt: "2026-05-15T13:02:00Z",
+                isComplete: true
+            ),
+            .init(id: "out_for_delivery", label: "Out for delivery", occurredAt: "2026-05-15T10:38:00Z", isComplete: true),
+            .init(id: "distribution", label: "Arrived at distribution center", occurredAt: "2026-05-14T19:08:00Z", isComplete: true),
+            .init(id: "transit", label: "In transit", occurredAt: "2026-05-12T17:42:00Z", isComplete: true),
+            .init(id: "accepted", label: "Accepted from sender", occurredAt: "2026-05-12T11:30:00Z", isComplete: true)
+        ],
+        noticeBody: certifiedNoticeBody,
+        termsURL: URL(string: "https://example.com/certified-delivery-terms.pdf"),
+        isAcknowledged: false
+    )
+
+    /// A17.3 signed state with the Pantopus receipt at the top of the chain.
+    static let certifiedSigned = CertifiedDetailDTO(
+        referenceNumber: certifiedUnread.referenceNumber,
+        documentType: certifiedUnread.documentType,
+        acknowledgeBy: certifiedUnread.acknowledgeBy,
+        chain: [
+            .init(
+                id: "acknowledged",
+                label: "Acknowledged on Pantopus",
+                occurredAt: "2026-05-15T14:14:00Z",
+                isComplete: true
+            )
+        ] + certifiedUnread.chain,
+        noticeBody: certifiedUnread.noticeBody,
+        termsURL: certifiedUnread.termsURL,
+        isAcknowledged: true
+    )
+
+    /// Same signed payload used for archived shell snapshots.
+    static let certifiedArchived = certifiedSigned
+}
+
+private extension MailItemSampleData {
+    static let certifiedNoticeBody = [
+        """
+        This is a SUPPLEMENTAL property tax bill issued pursuant to Section 75 et seq. of the \
+        California Revenue and Taxation Code following a reassessment triggered by a change in \
+        ownership recorded on October 14, 2025.
+        """,
+        """
+        Your previously assessed value of $612,000 has been adjusted to $785,400, producing \
+        supplemental taxes for the partial year October 2025 through June 2026 in the amount \
+        shown below.
+        """,
+        """
+        Payment must be received or postmarked no later than the delinquency date or a 10% \
+        penalty plus 1.5% per month interest will accrue.
+        """
+    ].joined(separator: "\n\n")
+
+    static func sampleURL(_ string: String) -> URL {
         guard let url = URL(string: string) else {
             preconditionFailure("Invalid sample URL: \(string)")
         }

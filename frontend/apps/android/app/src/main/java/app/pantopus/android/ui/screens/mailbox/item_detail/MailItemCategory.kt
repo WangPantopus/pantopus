@@ -57,7 +57,7 @@ enum class MailItemCategory(
     ),
     Community(
         raw = "community",
-        accent = PantopusColors.cleaning,
+        accent = PantopusColors.home,
         icon = PantopusIcon.Users,
         rowBackground = PantopusColors.successBg,
         label = "Community",

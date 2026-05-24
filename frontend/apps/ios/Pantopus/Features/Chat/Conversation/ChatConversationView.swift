@@ -21,21 +21,39 @@ public struct ChatConversationView: View {
     /// Presentation mode — drives the AI chrome (avatar, welcome card,
     /// reply bubbles). Default `.dm`.
     private let mode: ChatConversationMode
+    private let creatorContext: ChatCreatorThreadContext?
+    private let onOpenAudienceProfile: @MainActor () -> Void
     private let onBack: @MainActor () -> Void
 
     public init(
         viewModel: ChatConversationViewModel,
         mode: ChatConversationMode = .dm,
+        creatorContext: ChatCreatorThreadContext? = nil,
+        onOpenAudienceProfile: @escaping @MainActor () -> Void = {},
         onBack: @escaping @MainActor () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
         self.mode = mode
+        self.creatorContext = creatorContext
+        self.onOpenAudienceProfile = onOpenAudienceProfile
         self.onBack = onBack
     }
 
     public var body: some View {
         VStack(spacing: 0) {
-            ChatConversationHeader(mode: mode, counterparty: viewModel.counterparty, onBack: onBack)
+            ChatConversationHeader(
+                mode: mode,
+                counterparty: viewModel.counterparty,
+                creatorContext: resolvedCreatorContext,
+                onBack: onBack
+            )
+            if mode == .creatorThread {
+                ChatCreatorAudienceStrip(
+                    context: resolvedCreatorContext,
+                    onOpenAudienceProfile: onOpenAudienceProfile
+                )
+                ChatCreatorQuotaMeter(quota: resolvedCreatorContext.quota)
+            }
             if mode == .fanThread {
                 FanMembershipStripe(entitlement: activeFanEntitlement) {
                     upgradePromptPresented = true
@@ -84,6 +102,10 @@ public struct ChatConversationView: View {
                 .presentationDetents([.medium])
         }
         .accessibilityIdentifier("chatConversation")
+    }
+
+    private var resolvedCreatorContext: ChatCreatorThreadContext {
+        creatorContext ?? .defaults()
     }
 
     private var composerPlaceholder: String {
@@ -378,6 +400,8 @@ extension ChatConversationView {
         switch row {
         case let .dayDivider(divider):
             ChatDayDividerRow(label: divider.label)
+        case let .broadcastReference(reference):
+            ChatBroadcastReferenceCard(reference: reference)
         case let .bubble(bubble):
             ChatBubbleRow(
                 content: bubble,
@@ -756,6 +780,7 @@ private struct FanUpgradeBenefit: View {
 private struct ChatConversationHeader: View {
     let mode: ChatConversationMode
     let counterparty: ChatCounterparty
+    let creatorContext: ChatCreatorThreadContext
     let onBack: @MainActor () -> Void
 
     var body: some View {
@@ -775,6 +800,12 @@ private struct ChatConversationHeader: View {
                         .lineLimit(1)
                     if mode == .aiAssistant { betaPill }
                     if mode == .fanThread { personaPill }
+                    if mode == .creatorThread {
+                        CreatorTierChip(
+                            name: creatorContext.fanTierName,
+                            rank: creatorContext.fanTierRank
+                        )
+                    }
                 }
                 if let presence {
                     HStack(spacing: 5) {
@@ -793,7 +824,7 @@ private struct ChatConversationHeader: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .frame(height: 56)
+        .frame(height: mode == .creatorThread ? 64 : 56)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
@@ -806,6 +837,27 @@ private struct ChatConversationHeader: View {
             ChatAIAvatar(size: 32)
         } else if mode == .fanThread {
             ChatFanPersonaAvatar(initials: fanInitials, size: 32)
+        } else if mode == .creatorThread {
+            switch counterparty {
+            case let .person(_, initials, _, verified, online):
+                ChatPersonAvatar(
+                    initials: initials,
+                    verified: verified,
+                    online: online,
+                    size: 32,
+                    ringColor: creatorTierColor(rank: creatorContext.fanTierRank)
+                )
+            case let .group(name, _):
+                ChatPersonAvatar(
+                    initials: groupInitials(name),
+                    verified: false,
+                    online: false,
+                    size: 32,
+                    ringColor: creatorTierColor(rank: creatorContext.fanTierRank)
+                )
+            case .ai:
+                ChatAIAvatar(size: 32)
+            }
         } else {
             switch counterparty {
             case let .person(_, initials, _, verified, online):
@@ -822,6 +874,12 @@ private struct ChatConversationHeader: View {
         if mode == .fanThread {
             HStack(spacing: 0) {
                 Icon(.externalLink, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
+                Icon(.moreHorizontal, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
+            }
+            .accessibilityHidden(true)
+        } else if mode == .creatorThread {
+            HStack(spacing: 0) {
+                Icon(.user, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
                 Icon(.moreHorizontal, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
             }
             .accessibilityHidden(true)
@@ -884,6 +942,9 @@ private struct ChatConversationHeader: View {
                 return "Creator"
             }
         }
+        if mode == .creatorThread {
+            return creatorContext.fanSubtitle
+        }
         switch counterparty {
         case let .person(_, _, locality, _, online):
             let prefix = online ? "Active now" : "Verified neighbor"
@@ -898,6 +959,9 @@ private struct ChatConversationHeader: View {
 
     private var presenceOnline: Bool {
         if mode == .fanThread { return true }
+        if mode == .creatorThread {
+            return creatorContext.fanTierRank > 1
+        }
         if case let .person(_, _, _, _, online) = counterparty { return online }
         return false
     }
@@ -916,6 +980,184 @@ private struct ChatConversationHeader: View {
     }
 }
 
+// MARK: - Creator chrome
+
+private struct ChatCreatorAudienceStrip: View {
+    let context: ChatCreatorThreadContext
+    let onOpenAudienceProfile: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: onOpenAudienceProfile) {
+            HStack(spacing: 10) {
+                Icon(.users, size: 15, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
+                    .frame(width: 28, height: 28)
+                    .background(Theme.Color.business)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Creator inbox · \(context.personaName)")
+                        .font(.system(size: 11.5, weight: .bold))
+                        .tracking(0.4)
+                        .foregroundStyle(Theme.Color.business)
+                        .textCase(.uppercase)
+                        .lineLimit(1)
+                    Text(context.audienceSummary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Icon(.chevronRight, size: 16, strokeWidth: 2.4, color: Theme.Color.business)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Theme.Color.businessBg)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.business.opacity(0.18), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .accessibilityLabel("Open audience profile")
+        .accessibilityIdentifier("chatCreatorAudienceStrip")
+    }
+}
+
+private struct ChatCreatorQuotaMeter: View {
+    let quota: ChatCreatorQuota
+
+    private var progress: CGFloat {
+        guard quota.total > 0 else { return 0 }
+        return min(max(CGFloat(quota.used) / CGFloat(quota.total), 0), 1)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                HStack(spacing: 5) {
+                    Icon(.messageSquare, size: 11, strokeWidth: 2.5, color: Theme.Color.business)
+                    Text("Replies this week")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Spacer()
+                Text("\(quota.used) of \(quota.total) replies this week")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+            }
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(Theme.Color.appSurfaceSunken)
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(Theme.Color.primary600)
+                        .frame(width: proxy.size.width * progress)
+                }
+            }
+            .frame(height: 4)
+            HStack(spacing: 4) {
+                Icon(.refreshCw, size: 10, strokeWidth: 2.4, color: Theme.Color.appTextMuted)
+                Text(quota.resetCopy)
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.Color.appTextMuted)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(Theme.Color.appSurface)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+        }
+        .accessibilityIdentifier("chatCreatorQuotaMeter")
+    }
+}
+
+private struct CreatorTierChip: View {
+    let name: String
+    let rank: Int
+
+    var body: some View {
+        HStack(spacing: 3) {
+            if rank >= 4 {
+                Icon(.crown, size: 9, strokeWidth: 2.4, color: creatorTierColor(rank: rank))
+            } else if rank >= 2 {
+                Icon(.shield, size: 9, strokeWidth: 2.4, color: creatorTierColor(rank: rank))
+            }
+            Text(name.uppercased())
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(creatorTierColor(rank: rank))
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(creatorTierBgColor(rank: rank))
+        .clipShape(Capsule())
+        .accessibilityIdentifier("chatCreatorTierChip")
+    }
+}
+
+private func creatorTierColor(rank: Int) -> Color {
+    switch rank {
+    case 1:
+        Theme.Color.appTextSecondary
+    case 2:
+        Theme.Color.warning
+    case 3:
+        Theme.Color.appTextStrong
+    case 4:
+        Theme.Color.warning
+    default:
+        Theme.Color.appTextSecondary
+    }
+}
+
+private func creatorTierBgColor(rank: Int) -> Color {
+    switch rank {
+    case 1:
+        Theme.Color.appSurfaceSunken
+    case 2:
+        Theme.Color.warningBg
+    case 3:
+        Theme.Color.appSurfaceSunken
+    case 4:
+        Theme.Color.warningLight
+    default:
+        Theme.Color.appSurfaceSunken
+    }
+}
+
+private struct ChatFanPersonaAvatar: View {
+    let initials: String
+    let size: CGFloat
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Circle()
+                .fill(Theme.Color.business)
+                .frame(width: size, height: size)
+            Circle()
+                .strokeBorder(Theme.Color.appSurface, lineWidth: 2)
+                .overlay(
+                    Circle()
+                        .strokeBorder(Theme.Color.businessBg, lineWidth: 3)
+                        .padding(2)
+                )
+                .frame(width: size, height: size)
+            Text(initials)
+                .font(.system(size: size * 0.38, weight: .bold))
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .frame(width: size, height: size)
+            Circle()
+                .fill(Theme.Color.success)
+                .frame(width: 10, height: 10)
+                .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
+        }
+        .frame(width: size + 4, height: size + 4)
+        .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Avatars
 
 private struct ChatPersonAvatar: View {
@@ -923,6 +1165,7 @@ private struct ChatPersonAvatar: View {
     let verified: Bool
     let online: Bool
     let size: CGFloat
+    var ringColor: Color?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -933,6 +1176,15 @@ private struct ChatPersonAvatar: View {
                     .foregroundStyle(Theme.Color.appTextInverse)
             }
             .frame(width: size, height: size)
+            .overlay {
+                if let ringColor {
+                    Circle()
+                        .stroke(Theme.Color.appSurface, lineWidth: 4)
+                    Circle()
+                        .stroke(ringColor, lineWidth: 2)
+                        .padding(1)
+                }
+            }
             if verified {
                 Icon(.check, size: max(6, size * 0.22), strokeWidth: 3.5, color: Theme.Color.appTextInverse)
                     .frame(width: max(12, size * 0.4), height: max(12, size * 0.4))
@@ -953,29 +1205,6 @@ private struct ChatPersonAvatar: View {
     }
 }
 
-private struct ChatFanPersonaAvatar: View {
-    let initials: String
-    let size: CGFloat
-
-    var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Circle()
-                .fill(Theme.Color.business)
-                .frame(width: size, height: size)
-            Text(initials)
-                .font(.system(size: size * 0.35, weight: .bold))
-                .foregroundStyle(Theme.Color.appTextInverse)
-            Icon(.check, size: max(6, size * 0.22), strokeWidth: 3.5, color: Theme.Color.appTextInverse)
-                .frame(width: max(12, size * 0.4), height: max(12, size * 0.4))
-                .background(Theme.Color.business)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
-                .offset(x: 1, y: 1)
-        }
-        .frame(width: size + 4, height: size + 4)
-    }
-}
-
 // MARK: - Day divider + bubble rows
 
 private struct ChatDayDividerRow: View {
@@ -991,6 +1220,48 @@ private struct ChatDayDividerRow: View {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
         }
         .padding(.vertical, 6)
+    }
+}
+
+private struct ChatBroadcastReferenceCard: View {
+    let reference: ChatBroadcastReference
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Icon(.radioTower, size: 15, strokeWidth: 2.5, color: Theme.Color.business)
+                .frame(width: 30, height: 30)
+                .background(Theme.Color.businessBg)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Broadcast referenced")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.4)
+                    .foregroundStyle(Theme.Color.business)
+                    .textCase(.uppercase)
+                Text(reference.title)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .lineLimit(1)
+                Text(reference.subtitle)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .lineLimit(2)
+                Text(reference.metric)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.business.opacity(0.18), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("chatBroadcastReference_\(reference.id)")
     }
 }
 

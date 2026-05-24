@@ -31,6 +31,7 @@ extension MailDetailContent {
             aiSummary: content.aiSummary,
             ackRequired: content.ackRequired,
             isAcknowledged: value,
+            isArchived: content.isArchived,
             bookletDetail: content.bookletDetail,
             certifiedDetail: content.certifiedDetail,
             communityDetail: content.communityDetail
@@ -46,8 +47,11 @@ extension MailDetailContent {
         guard let community = content.communityDetail else { return content }
         let updatedCommunity = CommunityDetailDTO(
             communityItemId: community.communityItemId,
+            subtype: community.subtype,
             group: community.group,
             event: community.event,
+            poll: community.poll,
+            update: community.update,
             attendees: community.attendees,
             attendeeCount: status == .going && community.rsvp != .going
                 ? community.attendeeCount + 1
@@ -80,6 +84,7 @@ extension MailDetailContent {
             aiSummary: content.aiSummary,
             ackRequired: content.ackRequired,
             isAcknowledged: content.isAcknowledged,
+            isArchived: content.isArchived,
             bookletDetail: content.bookletDetail,
             certifiedDetail: content.certifiedDetail,
             communityDetail: updatedCommunity
