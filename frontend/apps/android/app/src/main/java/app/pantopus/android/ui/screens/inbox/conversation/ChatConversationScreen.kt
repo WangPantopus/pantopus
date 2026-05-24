@@ -2,9 +2,17 @@
 
 package app.pantopus.android.ui.screens.inbox.conversation
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.StartOffsetType
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +55,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -66,6 +75,7 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import coil.compose.AsyncImage
 
 /**
  * Chat conversation screen (T2.2). Three frames: shimmer loading,
@@ -86,6 +96,7 @@ fun ChatConversationScreen(
     val composerText by viewModel.composerText.collectAsStateWithLifecycle()
     val isSending by viewModel.isSending.collectAsStateWithLifecycle()
     val isCounterpartyTyping by viewModel.isCounterpartyTyping.collectAsStateWithLifecycle()
+    val queuedAttachments by viewModel.queuedAttachments.collectAsStateWithLifecycle()
     val pendingScroll by viewModel.pendingScrollTarget.collectAsStateWithLifecycle()
     var showFanUpgradePrompt by remember { mutableStateOf(false) }
     val conversationMode = chrome.mode
@@ -150,13 +161,23 @@ fun ChatConversationScreen(
                             scrollToRowId = pendingScroll,
                             onScrollConsumed = viewModel::consumePendingScroll,
                             conversationMode = conversationMode,
+                            incomingInitials = incomingInitialsFor(conversationMode, activeCounterparty),
                             onLockedAction = { showFanUpgradePrompt = true },
                         )
                     is ChatConversationUiState.Error -> ErrorFrame(message = s.message, onRetry = viewModel::refresh)
                 }
             }
             if (isCounterpartyTyping) {
-                TypingIndicator(name = activeCounterparty.displayName)
+                val typingInitials =
+                    incomingInitialsFor(conversationMode, activeCounterparty)
+                        ?: activeCounterparty.displayName.initials()
+                TypingIndicator(initials = typingInitials)
+            }
+            if (queuedAttachments.isNotEmpty()) {
+                AttachmentStripView(
+                    attachments = queuedAttachments,
+                    onRemove = viewModel::removeQueuedAttachment,
+                )
             }
             if (isFanThread) {
                 FanQuotaGate(
@@ -178,6 +199,7 @@ fun ChatConversationScreen(
                         viewModel.send()
                     }
                 },
+                onAttach = viewModel::queueSampleAttachments,
             )
         }
 
@@ -219,6 +241,20 @@ private fun composerPlaceholder(
     }
 
 private fun String.firstWord(): String = split(" ").firstOrNull() ?: this
+
+private fun incomingInitialsFor(
+    conversationMode: ChatConversationMode,
+    counterparty: ChatCounterparty,
+): String? =
+    if (conversationMode != ChatConversationMode.Dm) {
+        null
+    } else {
+        when (counterparty) {
+            is ChatCounterparty.Person -> counterparty.initials
+            is ChatCounterparty.Group -> counterparty.displayName.initials()
+            is ChatCounterparty.Ai -> null
+        }
+    }
 
 // MARK: - Header
 
@@ -1304,6 +1340,7 @@ internal fun PopulatedFrame(
     scrollToRowId: String? = null,
     onScrollConsumed: () -> Unit = {},
     conversationMode: ChatConversationMode = ChatConversationMode.Dm,
+    incomingInitials: String? = null,
     onLockedAction: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
@@ -1348,6 +1385,7 @@ internal fun PopulatedFrame(
                 is ChatTimelineRow.Bubble ->
                     BubbleRow(
                         content = row.content,
+                        incomingInitials = incomingInitials,
                         onLockedAction = onLockedAction,
                         onRetry = {
                             if (row.content.id.startsWith("client_")) onRetry(row.content.id)
@@ -1444,82 +1482,90 @@ private fun DayDividerRow(label: String) {
 @Composable
 private fun BubbleRow(
     content: ChatBubbleContent,
+    incomingInitials: String? = null,
     onLockedAction: () -> Unit,
     onRetry: () -> Unit,
 ) {
     val isOut = content.side == ChatMessageSide.Outgoing
     val bubbleColor = if (isOut) PantopusColors.primary600 else PantopusColors.appSurfaceSunken
     val textColor = if (isOut) PantopusColors.appTextInverse else PantopusColors.appText
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(bottom = if (content.stamp == null) 3.dp else 0.dp),
-        horizontalAlignment = if (isOut) Alignment.End else Alignment.Start,
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = if (content.isContinuation) 2.dp else 8.dp, bottom = if (content.stamp == null) 3.dp else 0.dp),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = if (isOut) Arrangement.End else Arrangement.Start,
     ) {
-        when (val body = content.body) {
-            is ChatBubbleBody.Text ->
-                BubbleContainer(
-                    isOut = isOut,
-                    hasTail = content.hasTail,
-                    bubbleColor = bubbleColor,
-                    lockedTier = content.lockedTier?.takeIf { !isOut },
-                    onLockedAction = onLockedAction,
-                    contentId = content.id,
-                ) {
-                    Text(
-                        text = body.text,
-                        fontSize = 14.sp,
-                        color = textColor,
-                        modifier = Modifier.widthIn(max = 260.dp),
-                    )
-                }
-            is ChatBubbleBody.Image ->
-                BubbleContainer(
-                    isOut = isOut,
-                    hasTail = content.hasTail,
-                    bubbleColor = PantopusColors.appSurfaceSunken,
-                    lockedTier = content.lockedTier?.takeIf { !isOut },
-                    onLockedAction = onLockedAction,
-                    contentId = content.id,
-                ) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(220.dp, 140.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(PantopusColors.appBorderSubtle),
-                    )
-                }
-            is ChatBubbleBody.Attachment ->
-                BubbleContainer(
-                    isOut = isOut,
-                    hasTail = content.hasTail,
-                    bubbleColor = bubbleColor,
-                    lockedTier = content.lockedTier?.takeIf { !isOut },
-                    onLockedAction = onLockedAction,
-                    contentId = content.id,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        PantopusIconImage(
-                            icon = PantopusIcon.File,
-                            contentDescription = null,
-                            size = 18.dp,
-                            tint = if (isOut) PantopusColors.appTextInverse else PantopusColors.primary600,
-                        )
+        if (isOut) {
+            Spacer(modifier = Modifier.size(44.dp))
+        } else if (incomingInitials != null && content.body !is ChatBubbleBody.SystemLink) {
+            MiniAvatar(initials = incomingInitials, hidden = content.isContinuation)
+            Spacer(modifier = Modifier.size(8.dp))
+        }
+        Column(horizontalAlignment = if (isOut) Alignment.End else Alignment.Start) {
+            when (val body = content.body) {
+                is ChatBubbleBody.Text ->
+                    BubbleContainer(
+                        isOut = isOut,
+                        hasTail = content.hasTail,
+                        bubbleColor = bubbleColor,
+                        lockedTier = content.lockedTier?.takeIf { !isOut },
+                        onLockedAction = onLockedAction,
+                        contentId = content.id,
+                    ) {
                         Text(
-                            text = body.filename,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            text = body.text,
+                            fontSize = 14.sp,
                             color = textColor,
+                            modifier = Modifier.widthIn(max = 260.dp),
                         )
                     }
-                }
-            is ChatBubbleBody.SystemLink -> SystemLinkPill(body)
-            is ChatBubbleBody.AiReply -> AiReplyBubble(body = body, hasTail = content.hasTail)
+                is ChatBubbleBody.Image ->
+                    PhotoBubble(
+                        url = body.url,
+                        isOut = isOut,
+                        hasTail = content.hasTail,
+                        lockedTier = content.lockedTier?.takeIf { !isOut },
+                        onLockedAction = onLockedAction,
+                        contentId = content.id,
+                    )
+                is ChatBubbleBody.Attachment ->
+                    BubbleContainer(
+                        isOut = isOut,
+                        hasTail = content.hasTail,
+                        bubbleColor = bubbleColor,
+                        lockedTier = content.lockedTier?.takeIf { !isOut },
+                        onLockedAction = onLockedAction,
+                        contentId = content.id,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            PantopusIconImage(
+                                icon = PantopusIcon.File,
+                                contentDescription = null,
+                                size = 18.dp,
+                                tint = if (isOut) PantopusColors.appTextInverse else PantopusColors.primary600,
+                            )
+                            Text(
+                                text = body.filename,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = textColor,
+                            )
+                        }
+                    }
+                is ChatBubbleBody.SystemLink -> SystemLinkPill(body)
+                is ChatBubbleBody.AiReply -> AiReplyBubble(body = body, hasTail = content.hasTail)
+            }
+            if (content.sentSupportTier != null && isOut) {
+                PaidSupportFooter(tier = content.sentSupportTier, contentId = content.id)
+            }
+            if (content.stamp != null) {
+                StampRow(content = content, onRetry = onRetry)
+            }
         }
-        if (content.sentSupportTier != null && isOut) {
-            PaidSupportFooter(tier = content.sentSupportTier, contentId = content.id)
-        }
-        if (content.stamp != null) {
-            StampRow(content = content, onRetry = onRetry)
+        if (!isOut) {
+            Spacer(modifier = Modifier.size(44.dp))
         }
     }
 }
@@ -1636,6 +1682,119 @@ private fun PaidSupportFooter(
             fontWeight = FontWeight.SemiBold,
             color = PantopusColors.warning,
         )
+    }
+}
+
+@Composable
+private fun MiniAvatar(
+    initials: String,
+    hidden: Boolean,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(if (hidden) Color.Transparent else PantopusColors.primary500),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!hidden) {
+            Text(
+                text = initials,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PhotoBubble(
+    url: String?,
+    isOut: Boolean,
+    hasTail: Boolean,
+    lockedTier: String? = null,
+    onLockedAction: () -> Unit = {},
+    contentId: String = "",
+) {
+    val shape =
+        RoundedCornerShape(
+            topStart = 16.dp,
+            topEnd = 16.dp,
+            bottomEnd = if (isOut && hasTail) 4.dp else 16.dp,
+            bottomStart = if (!isOut && hasTail) 4.dp else 16.dp,
+        )
+    Box(
+        modifier =
+            Modifier
+                .size(200.dp, 130.dp)
+                .clip(shape)
+                .background(PantopusColors.appSurfaceSunken)
+                .border(1.dp, if (isOut) Color.Transparent else PantopusColors.appBorder, shape)
+                .testTag("chatPhotoBubble"),
+    ) {
+        if (url != null) {
+            AsyncImage(
+                model = url,
+                contentDescription = "Photo attachment",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            PhotoPlaceholder(modifier = Modifier.fillMaxSize())
+        }
+        if (lockedTier != null) {
+            LockedPaywallOverlay(
+                tier = lockedTier,
+                contentId = contentId,
+                onLockedAction = onLockedAction,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PhotoPlaceholder(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.background(PantopusColors.appSurfaceSunken)) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(start = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(6) { index ->
+                Box(
+                    modifier =
+                        Modifier
+                            .size(width = 18.dp, height = 150.dp)
+                            .clip(RoundedCornerShape(Radii.xs))
+                            .background(
+                                if (index % 2 == 0) {
+                                    PantopusColors.appBorder
+                                } else {
+                                    PantopusColors.appBorderStrong
+                                },
+                            ),
+                )
+            }
+        }
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 10.dp, bottom = 8.dp)
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(PantopusColors.appSurface.copy(alpha = 0.72f))
+                    .padding(horizontal = 7.dp, vertical = 2.dp),
+        ) {
+            Text(
+                text = "Photo",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
     }
 }
 
@@ -1762,7 +1921,7 @@ private fun StampRow(
     val stamp = content.stamp ?: return
     val raw =
         when (content.deliveryState) {
-            ChatDeliveryState.Read -> "$stamp · Read"
+            ChatDeliveryState.Read -> "Read $stamp"
             ChatDeliveryState.Delivered -> "$stamp · Delivered"
             ChatDeliveryState.Sending -> "Sending…"
             ChatDeliveryState.Failed -> "Couldn't send"
@@ -1774,22 +1933,19 @@ private fun StampRow(
         horizontalArrangement =
             if (content.side == ChatMessageSide.Outgoing) Arrangement.End else Arrangement.Start,
     ) {
-        Text(
-            text = raw,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            color = PantopusColors.appTextSecondary,
-        )
-        if (content.side == ChatMessageSide.Outgoing) {
+        if (content.side == ChatMessageSide.Outgoing && content.deliveryState == ChatDeliveryState.Read) {
+            ReadReceipt(timestamp = stamp)
+        } else {
+            Text(
+                text = raw,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        if (content.side == ChatMessageSide.Outgoing && content.deliveryState != ChatDeliveryState.Read) {
             when (content.deliveryState) {
-                ChatDeliveryState.Read ->
-                    PantopusIconImage(
-                        icon = PantopusIcon.CheckCheck,
-                        contentDescription = null,
-                        size = 11.dp,
-                        tint = PantopusColors.primary600,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
+                ChatDeliveryState.Read -> Unit
                 ChatDeliveryState.Delivered ->
                     PantopusIconImage(
                         icon = PantopusIcon.Check,
@@ -1834,36 +1990,88 @@ private fun StampRow(
 }
 
 @Composable
-private fun TypingIndicator(name: String) {
+private fun ReadReceipt(timestamp: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "Read $timestamp",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appTextSecondary,
+        )
+        PantopusIconImage(
+            icon = PantopusIcon.CheckCheck,
+            contentDescription = null,
+            size = 12.dp,
+            strokeWidth = 2.5f,
+            tint = PantopusColors.primary600,
+        )
+    }
+}
+
+@Composable
+internal fun TypingIndicator(initials: String) {
+    val transition = rememberInfiniteTransition(label = "typingDots")
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, top = 4.dp, end = 16.dp)
+                .padding(start = 14.dp, top = 8.dp, end = 14.dp, bottom = 6.dp)
                 .testTag("chatTypingIndicator"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        MiniAvatar(initials = initials, hidden = false)
         Row(
             modifier =
                 Modifier
-                    .clip(RoundedCornerShape(Radii.pill))
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 16.dp,
+                            topEnd = 16.dp,
+                            bottomEnd = 16.dp,
+                            bottomStart = 4.dp,
+                        ),
+                    )
                     .background(PantopusColors.appSurfaceSunken)
-                    .padding(horizontal = 9.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    .border(
+                        1.dp,
+                        PantopusColors.appBorder,
+                        RoundedCornerShape(
+                            topStart = 16.dp,
+                            topEnd = 16.dp,
+                            bottomEnd = 16.dp,
+                            bottomStart = 4.dp,
+                        ),
+                    )
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            repeat(3) {
+            repeat(3) { index ->
+                val opacity by transition.animateFloat(
+                    initialValue = 0.3f,
+                    targetValue = 1f,
+                    animationSpec =
+                        infiniteRepeatable(
+                            animation = tween(durationMillis = 600),
+                            repeatMode = RepeatMode.Reverse,
+                            initialStartOffset =
+                                StartOffset(
+                                    offsetMillis = index * 180,
+                                    offsetType = StartOffsetType.Delay,
+                                ),
+                        ),
+                    label = "typingDot$index",
+                )
                 Box(
-                    modifier = Modifier.size(5.dp).clip(CircleShape).background(PantopusColors.appTextSecondary),
+                    modifier =
+                        Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.appTextSecondary.copy(alpha = opacity)),
                 )
             }
         }
-        Text(
-            text = "$name is typing…",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = PantopusColors.appTextSecondary,
-        )
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
@@ -1876,68 +2084,99 @@ internal fun Composer(
     isLockedAction: Boolean = false,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
+    onAttach: () -> Unit = {},
+    onEmoji: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 24.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 16.dp),
+            verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Box(
                 modifier =
                     Modifier
-                        .size(38.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
-                        .background(PantopusColors.appSurfaceSunken)
-                        .clickable {}
+                        .clickable(onClick = onAttach)
                         .testTag("chatComposerAttach"),
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.Plus,
-                    contentDescription = "Attach",
-                    size = 18.dp,
-                    strokeWidth = 2.4f,
-                    tint = PantopusColors.appTextStrong,
-                )
+                Box(
+                    modifier =
+                        Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.appSurfaceSunken),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.Plus,
+                        contentDescription = "Attach",
+                        size = 18.dp,
+                        strokeWidth = 2.4f,
+                        tint = PantopusColors.appTextStrong,
+                    )
+                }
             }
-            Box(
+            Row(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .heightIn(min = 40.dp)
+                        .heightIn(min = 36.dp)
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appSurfaceSunken)
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
+                        .padding(start = 14.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (text.isEmpty()) {
-                    Text(
-                        text = placeholder,
-                        fontSize = 14.sp,
-                        color = PantopusColors.appTextMuted,
+                Box(modifier = Modifier.weight(1f)) {
+                    if (text.isEmpty()) {
+                        Text(
+                            text = placeholder,
+                            fontSize = 14.sp,
+                            color = PantopusColors.appTextMuted,
+                        )
+                    }
+                    BasicTextField(
+                        value = text,
+                        onValueChange = onTextChange,
+                        textStyle =
+                            TextStyle(
+                                fontSize = 14.sp,
+                                color = PantopusColors.appText,
+                            ),
+                        cursorBrush = SolidColor(PantopusColors.primary600),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() }),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                BasicTextField(
-                    value = text,
-                    onValueChange = onTextChange,
-                    textStyle =
-                        TextStyle(
-                            fontSize = 14.sp,
-                            color = PantopusColors.appText,
-                        ),
-                    cursorBrush = SolidColor(PantopusColors.primary600),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Box(
+                    modifier =
+                        Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onEmoji)
+                            .testTag("chatComposerEmoji"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.Smile,
+                        contentDescription = "Emoji",
+                        size = 17.dp,
+                        tint = PantopusColors.appTextMuted,
+                    )
+                }
             }
             Box(
                 modifier =
                     (
                         if (canSend) {
                             Modifier
-                                .size(38.dp)
+                                .size(44.dp)
                                 .shadow(
                                     elevation = 10.dp,
                                     shape = CircleShape,
@@ -1945,27 +2184,35 @@ internal fun Composer(
                                     spotColor = PantopusColors.primary600,
                                 )
                         } else {
-                            Modifier.size(38.dp)
+                            Modifier.size(44.dp)
                         }
                     )
                         .clip(CircleShape)
-                        .background(sendBackground(canSend = canSend, isLockedAction = isLockedAction))
                         .clickable(enabled = canSend, onClick = onSend)
                         .testTag("chatComposerSend"),
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(
-                    icon = if (isLockedAction) PantopusIcon.Lock else PantopusIcon.Send,
-                    contentDescription = "Send",
-                    size = 17.dp,
-                    tint = if (canSend) PantopusColors.appTextInverse else PantopusColors.appTextMuted,
-                )
+                Box(
+                    modifier =
+                        Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(sendBackground(canSend = canSend, isLockedAction = isLockedAction)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = if (isLockedAction) PantopusIcon.Lock else PantopusIcon.ArrowUp,
+                        contentDescription = "Send",
+                        size = 18.dp,
+                        strokeWidth = 2.5f,
+                        tint = if (canSend) PantopusColors.appTextInverse else PantopusColors.appTextMuted,
+                    )
+                }
                 if (showsSendCost && canSend) {
                     Box(
                         modifier =
                             Modifier
                                 .align(Alignment.TopEnd)
-                                .padding(top = 0.dp)
                                 .clip(RoundedCornerShape(Radii.pill))
                                 .background(PantopusColors.appSurface)
                                 .border(1.dp, PantopusColors.primary600, RoundedCornerShape(Radii.pill))
@@ -1980,6 +2227,97 @@ internal fun Composer(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun AttachmentStripView(
+    attachments: List<ChatQueuedAttachment>,
+    onRemove: (String) -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface).testTag("chatAttachmentStrip")) {
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
+        Row(
+            modifier =
+                Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            attachments.forEach { attachment ->
+                AttachmentTile(attachment = attachment, onRemove = onRemove)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttachmentTile(
+    attachment: ChatQueuedAttachment,
+    onRemove: (String) -> Unit,
+) {
+    Box(modifier = Modifier.size(64.dp)) {
+        Box(
+            modifier =
+                Modifier
+                    .matchParentSize()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurfaceSunken)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+            contentAlignment = Alignment.Center,
+        ) {
+            when (attachment.kind) {
+                ChatQueuedAttachmentKind.Image -> PhotoPlaceholder(modifier = Modifier.fillMaxSize())
+                ChatQueuedAttachmentKind.Document ->
+                    Column(
+                        modifier = Modifier.fillMaxSize().background(PantopusColors.appSurface),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.FileText,
+                            contentDescription = null,
+                            size = 22.dp,
+                            tint = PantopusColors.primary600,
+                        )
+                        Text(
+                            text = attachment.filename,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PantopusColors.appTextStrong,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+            }
+        }
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .size(44.dp)
+                    .clickable { onRemove(attachment.id) }
+                    .testTag("chatAttachmentRemove_${attachment.id}"),
+            contentAlignment = Alignment.TopEnd,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .padding(top = 3.dp, end = 3.dp)
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appText.copy(alpha = 0.78f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.X,
+                    contentDescription = "Remove ${attachment.filename}",
+                    size = 11.dp,
+                    strokeWidth = 3f,
+                    tint = PantopusColors.appTextInverse,
+                )
             }
         }
     }

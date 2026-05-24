@@ -50,6 +50,11 @@ public final class ChatConversationViewModel {
     /// Set when typing indicator should render above the composer.
     public private(set) var isCounterpartyTyping: Bool = false
 
+    /// Local pre-send queue. Backend upload/send wiring is out of scope
+    /// for this phase, but the UI can still render and remove queued
+    /// attachments deterministically.
+    public private(set) var queuedAttachments: [ChatQueuedAttachment] = []
+
     /// Capability chips for the AI welcome card (tap-to-send).
     public let aiPrompts: [ChatPromptChip]
 
@@ -125,7 +130,10 @@ public final class ChatConversationViewModel {
     init(
         previewState: ChatConversationState,
         counterparty: ChatCounterparty,
-        fanEntitlement: ChatFanEntitlement? = nil
+        fanEntitlement: ChatFanEntitlement? = nil,
+        composerText: String = "",
+        isCounterpartyTyping: Bool = false,
+        queuedAttachments: [ChatQueuedAttachment] = []
     ) {
         mode = .ai
         self.counterparty = counterparty
@@ -137,6 +145,9 @@ public final class ChatConversationViewModel {
         emptyChips = Self.defaultEmptyChips
         self.fanEntitlement = fanEntitlement
         state = previewState
+        self.composerText = composerText
+        self.isCounterpartyTyping = isCounterpartyTyping
+        self.queuedAttachments = queuedAttachments
     }
 
     // No `deinit { cancel }` — Swift 6's strict concurrency disallows
@@ -262,6 +273,28 @@ public final class ChatConversationViewModel {
     public func sendCapabilityPrompt(_ chip: ChatPromptChip) async {
         composerText = chip.label
         await send()
+    }
+
+    public func queueSamplePhotoAttachment() {
+        appendQueuedAttachment(ChatQueuedAttachment(id: "queued_photo", kind: .image, filename: "shelves.jpg"))
+    }
+
+    public func queueSampleDocumentAttachment() {
+        appendQueuedAttachment(ChatQueuedAttachment(id: "queued_pdf", kind: .document, filename: "shelf.pdf"))
+    }
+
+    public func queueSampleAttachments() {
+        queueSamplePhotoAttachment()
+        queueSampleDocumentAttachment()
+    }
+
+    public func removeQueuedAttachment(id: String) {
+        queuedAttachments.removeAll { $0.id == id }
+    }
+
+    private func appendQueuedAttachment(_ attachment: ChatQueuedAttachment) {
+        guard !queuedAttachments.contains(where: { $0.id == attachment.id }) else { return }
+        queuedAttachments.append(attachment)
     }
 
     // MARK: - Fetch
@@ -453,6 +486,10 @@ public final class ChatConversationViewModel {
                 continue
             }
             let side: ChatMessageSide = (message.userId == currentUserId) ? .outgoing : .incoming
+            let previousSameSide =
+                index > 0 &&
+                combined[index - 1].userId == message.userId &&
+                Self.dayKey(for: combined[index - 1].createdAt) == dayKey
             let nextSameSide =
                 index + 1 < combined.count &&
                 combined[index + 1].userId == message.userId &&
@@ -474,6 +511,7 @@ public final class ChatConversationViewModel {
                 side: side,
                 body: body,
                 hasTail: hasTail,
+                isContinuation: previousSameSide,
                 stamp: stamp,
                 deliveryState: deliveryState,
                 lockedTier: Self.lockedTier(for: message),
