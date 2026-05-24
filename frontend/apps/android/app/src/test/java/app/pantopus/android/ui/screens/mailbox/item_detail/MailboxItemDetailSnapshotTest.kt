@@ -9,51 +9,54 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
-import app.pantopus.android.ui.components.KeyFactRow
-import app.pantopus.android.ui.components.TimelineStep
-import app.pantopus.android.ui.components.TimelineStepState
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.PackageBody
 import app.pantopus.android.ui.theme.PantopusColors
 import org.junit.Rule
 import org.junit.Test
 
-/** Paparazzi snapshot for the populated Package-category detail shell. */
+/** A17.8 Paparazzi snapshots for the Package-category detail shell. */
 class MailboxItemDetailSnapshotTest {
     @get:Rule
     val paparazzi =
         Paparazzi(
-            deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = 2000, softButtons = false),
+            deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = 3600, softButtons = false),
         )
 
-    @Test fun package_detail_populated_shell() {
+    @Test fun package_in_transit_shell() {
+        snapshotPackage(MailItemSampleData.packageInTransit, receiveEnabled = false)
+    }
+
+    @Test fun package_out_for_delivery_shell() {
+        snapshotPackage(MailItemSampleData.packageOutForDelivery, receiveEnabled = false)
+    }
+
+    @Test fun package_delivered_shell() {
+        snapshotPackage(MailItemSampleData.packageDelivered, receiveEnabled = true)
+    }
+
+    private fun snapshotPackage(
+        packageInfo: PackageBodyContent,
+        receiveEnabled: Boolean,
+    ) {
         paparazzi.snapshot {
             Root {
                 MailboxItemDetailShell(
                     category = MailItemCategory.Package,
                     trust = MailTrust.Verified,
-                    sender = SenderBlockContent("Acme Labs", "2026-04-19", "AL"),
-                    aiElf = AIElfContent("Looks like your Amazon order", "Link", "Not mine"),
+                    sender = SenderBlockContent("Lerina Books", "12m ago", "LB"),
                     keyFacts =
                         listOf(
-                            KeyFactRow(label = "Tracking #", value = "1Z9990001", isCode = true),
-                            KeyFactRow(label = "Sender", value = "Acme Labs"),
-                            KeyFactRow(label = "Carrier", value = "UPS"),
-                        ),
-                    timeline =
-                        listOf(
-                            TimelineStep("Shipped", TimelineStepState.Done),
-                            TimelineStep("In transit", TimelineStepState.Done),
-                            TimelineStep("Out for delivery", TimelineStepState.Current),
-                            TimelineStep("Delivered", TimelineStepState.Upcoming),
-                        ),
-                    cta =
-                        MailboxCTAShelfContent(
-                            primaryTitle = "Log as received",
-                            ghostTitle = "Not mine",
+                            app.pantopus.android.ui.components.KeyFactRow(
+                                label = "Tracking #",
+                                value = packageInfo.trackingNumber ?: "Pending",
+                                isCode = true,
+                            ),
+                            app.pantopus.android.ui.components.KeyFactRow(label = "Sender", value = "Lerina Books"),
+                            app.pantopus.android.ui.components.KeyFactRow(label = "Carrier", value = packageInfo.carrier),
                         ),
                     onBack = {},
                 ) {
-                    PackageBody(carrier = "UPS", etaLine = "Arrives today by 8pm")
+                    PackageBody(content = packageInfo, isReceiveEnabled = receiveEnabled)
                 }
             }
         }

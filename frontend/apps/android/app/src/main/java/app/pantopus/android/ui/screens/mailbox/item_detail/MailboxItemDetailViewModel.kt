@@ -18,6 +18,7 @@ import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.ui.components.KeyFactRow
 import app.pantopus.android.ui.components.TimelineStep
 import app.pantopus.android.ui.components.TimelineStepState
+import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,11 +32,95 @@ import javax.inject.Inject
 /** Key used to pass the mail id through the nav backstack. */
 const val MAILBOX_ITEM_DETAIL_MAIL_ID_KEY = "mailId"
 
+/** Package delivery lifecycle used by the A17.8 body. */
+enum class PackageDeliveryStatus(
+    val raw: String,
+) {
+    Shipped("pre_receipt"),
+    InTransit("in_transit"),
+    OutForDelivery("out_for_delivery"),
+    Delivered("delivered"),
+    ;
+
+    companion object {
+        fun fromRaw(raw: String?): PackageDeliveryStatus = entries.firstOrNull { it.raw == raw } ?: InTransit
+    }
+}
+
+/** One carrier scan / handoff row for the package body. */
+data class PackageHandoffStep(
+    val id: String,
+    val title: String,
+    val location: String,
+    val timestamp: String,
+    val icon: PantopusIcon,
+)
+
+/** Courier proof-photo metadata for delivered packages. */
+data class PackageDeliveryPhoto(
+    val capturedAt: String,
+    val watermark: String,
+    val location: String,
+    val verificationLabel: String,
+    val isReceived: Boolean = false,
+)
+
+/** One line item in the package contents card. */
+data class PackageContentsItem(
+    val id: String,
+    val quantity: Int,
+    val name: String,
+    val detail: String,
+)
+
+/** Optional order summary shown after tracking details. */
+data class PackageContents(
+    val title: String,
+    val items: List<PackageContentsItem>,
+    val subtotal: String? = null,
+    val shipping: String? = null,
+    val total: String? = null,
+)
+
+private fun packageDefaultStatusTitle(status: PackageDeliveryStatus): String =
+    when (status) {
+        PackageDeliveryStatus.Shipped -> "Shipped"
+        PackageDeliveryStatus.InTransit -> "In transit"
+        PackageDeliveryStatus.OutForDelivery -> "Out for delivery"
+        PackageDeliveryStatus.Delivered -> "Delivered to your porch"
+    }
+
+private fun packageDefaultStatusDetail(status: PackageDeliveryStatus): String =
+    when (status) {
+        PackageDeliveryStatus.Shipped -> "Label created by the sender."
+        PackageDeliveryStatus.InTransit -> "Moving through the carrier network."
+        PackageDeliveryStatus.OutForDelivery -> "Expected today by 3 PM."
+        PackageDeliveryStatus.Delivered -> "Front porch - left in shade."
+    }
+
 /** Data projected onto the Package body slot. */
 data class PackageBodyContent(
     val carrier: String,
-    val etaLine: String?,
+    val etaLine: String? = null,
+    val status: PackageDeliveryStatus = PackageDeliveryStatus.InTransit,
+    val trackingNumber: String? = null,
+    val referenceLine: String? = null,
+    val statusTitle: String = packageDefaultStatusTitle(status),
+    val statusDetail: String = packageDefaultStatusDetail(status),
+    val trackingSteps: List<TimelineStep> = emptyList(),
+    val handoffSteps: List<PackageHandoffStep> = emptyList(),
+    val deliveryPhoto: PackageDeliveryPhoto? = null,
+    val contents: PackageContents? = null,
 )
+
+private fun PackageBodyContent.receivedCopy(): PackageBodyContent =
+    copy(
+        status = PackageDeliveryStatus.Delivered,
+        statusTitle = "Logged as received",
+        statusDetail = "Today - by you",
+        trackingSteps = trackingSteps.map { it.copy(state = TimelineStepState.Done) },
+        deliveryPhoto = deliveryPhoto?.copy(isReceived = true),
+    )
 
 /** Full projection of a single mailbox item for the detail screen. */
 data class MailboxItemDetailContent(
@@ -279,10 +364,12 @@ class MailboxItemDetailViewModel
             }
             val originalTimeline = current.content.timeline
             val originalCtaEnabled = current.content.ctaEnabled
+            val originalPackageInfo = current.content.packageInfo
             _state.value =
                 MailboxItemDetailUiState.Loaded(
                     current.content.copy(
                         timeline = flipCurrentToDone(originalTimeline),
+                        packageInfo = current.content.packageInfo?.receivedCopy(),
                         ctaEnabled = false,
                     ),
                 )
@@ -297,6 +384,7 @@ class MailboxItemDetailViewModel
                                 MailboxItemDetailUiState.Loaded(
                                     rolled.content.copy(
                                         timeline = originalTimeline,
+                                        packageInfo = originalPackageInfo,
                                         ctaEnabled = originalCtaEnabled,
                                     ),
                                 )
@@ -644,7 +732,11 @@ class MailboxItemDetailViewModel
             val tracking = map["tracking_number"] as? String
             val carrier = (map["carrier"] as? String) ?: "Carrier"
             val currentStatus = (map["status"] as? String) ?: "in_transit"
-            val suggested = map["suggested_order_match"] as? String
+            val deliveryStatus = PackageDeliveryStatus.fromRaw(currentStatus)
+            val received =
+                (map["logged_as_received"] as? Boolean)
+                    ?: (map["received"] as? Boolean)
+                    ?: ((map["received_at"] as? String) != null)
             val facts =
                 buildList {
                     if (tracking != null) {
@@ -653,14 +745,6 @@ class MailboxItemDetailViewModel
                     add(KeyFactRow(label = "Sender", value = item.senderDisplay))
                     add(KeyFactRow(label = "Carrier", value = carrier))
                     add(KeyFactRow(label = "Received at", value = item.createdAt))
-                }
-            val elf =
-                suggested?.let {
-                    AIElfContent(
-                        suggestion = "Looks like your $it order",
-                        primaryChip = "Link",
-                        secondaryChip = "Not mine",
-                    )
                 }
             return MailboxItemDetailContent(
                 category = MailItemCategory.Package,
@@ -672,11 +756,19 @@ class MailboxItemDetailViewModel
                         initials = initials(item.senderDisplay),
                         senderUserId = item.senderUserId,
                     ),
-                aiElf = elf,
+                aiElf = null,
                 keyFacts = facts,
                 timeline = timeline(currentStatus),
-                packageInfo = PackageBodyContent(carrier = carrier, etaLine = null),
-                ctaEnabled = currentStatus != "delivered",
+                packageInfo =
+                    packageBodyContent(
+                        carrier = carrier,
+                        trackingNumber = tracking,
+                        packageMap = map,
+                        responseTimeline = pkg.timeline,
+                        status = deliveryStatus,
+                        received = received,
+                    ),
+                ctaEnabled = deliveryStatus == PackageDeliveryStatus.Delivered && !received,
                 isUnread = !item.viewed,
                 isArchived = item.archived,
             )
@@ -713,18 +805,8 @@ class MailboxItemDetailViewModel
         }
 
         private fun timeline(status: String): List<TimelineStep> {
-            val order = listOf("pre_receipt", "in_transit", "out_for_delivery", "delivered")
-            val labels = listOf("Shipped", "In transit", "Out for delivery", "Delivered")
-            val currentIndex = order.indexOf(status).let { if (it < 0) 1 else it }
-            return order.mapIndexed { index, id ->
-                val state =
-                    when {
-                        index < currentIndex -> TimelineStepState.Done
-                        index == currentIndex -> TimelineStepState.Current
-                        else -> TimelineStepState.Upcoming
-                    }
-                TimelineStep(title = labels[index], state = state)
-            }
+            val deliveryStatus = PackageDeliveryStatus.fromRaw(status)
+            return MailItemSampleData.packageTrackingSteps(deliveryStatus)
         }
 
         private fun flipCurrentToDone(steps: List<TimelineStep>): List<TimelineStep> {
@@ -738,4 +820,116 @@ class MailboxItemDetailViewModel
                 }
             }
         }
+    }
+
+private fun packageBodyContent(
+    carrier: String,
+    trackingNumber: String?,
+    packageMap: Map<String, Any?>,
+    responseTimeline: List<Any?>,
+    status: PackageDeliveryStatus,
+    received: Boolean,
+): PackageBodyContent {
+    val sample = MailItemSampleData.packageBody(status)
+    val statusTitle =
+        (packageMap["status_title"] as? String)
+            ?: (packageMap["status_label"] as? String)
+            ?: sample.statusTitle
+    val statusDetail =
+        (packageMap["status_detail"] as? String)
+            ?: (packageMap["eta_line"] as? String)
+            ?: sample.statusDetail
+    return PackageBodyContent(
+        carrier = carrier,
+        etaLine = (packageMap["eta_line"] as? String) ?: sample.etaLine,
+        status = status,
+        trackingNumber = trackingNumber ?: sample.trackingNumber,
+        referenceLine =
+            (packageMap["reference"] as? String)
+                ?: (packageMap["reference_line"] as? String)
+                ?: sample.referenceLine,
+        statusTitle = if (received) "Logged as received" else statusTitle,
+        statusDetail = if (received) "Today - by you" else statusDetail,
+        trackingSteps =
+            MailItemSampleData.packageTrackingSteps(status).map {
+                if (received) it.copy(state = TimelineStepState.Done) else it
+            },
+        handoffSteps = packageHandoffSteps(responseTimeline, sample.handoffSteps),
+        deliveryPhoto = packagePhoto(packageMap, sample.deliveryPhoto, received),
+        contents = sample.contents,
+    )
+}
+
+private fun packageHandoffSteps(
+    timeline: List<Any?>,
+    fallback: List<PackageHandoffStep>,
+): List<PackageHandoffStep> {
+    val decoded =
+        timeline.mapIndexedNotNull { index, raw ->
+            val map = raw as? Map<*, *> ?: return@mapIndexedNotNull null
+            val title =
+                (map["label"] as? String)
+                    ?: (map["title"] as? String)
+                    ?: (map["status"] as? String)
+                    ?: return@mapIndexedNotNull null
+            PackageHandoffStep(
+                id = (map["id"] as? String) ?: "handoff-$index",
+                title = title,
+                location =
+                    (map["where"] as? String)
+                        ?: (map["location"] as? String)
+                        ?: "Carrier network",
+                timestamp =
+                    (map["when"] as? String)
+                        ?: (map["timestamp"] as? String)
+                        ?: (map["occurred_at"] as? String)
+                        ?: "Pending",
+                icon = iconNamed(map["icon"] as? String),
+            )
+        }
+    return decoded.ifEmpty { fallback }
+}
+
+private fun packagePhoto(
+    map: Map<String, Any?>,
+    fallback: PackageDeliveryPhoto?,
+    received: Boolean,
+): PackageDeliveryPhoto? {
+    val photoMap =
+        (map["delivery_photo"] as? Map<*, *>)
+            ?: (map["photo"] as? Map<*, *>)
+    if (fallback == null && photoMap == null) return null
+    return PackageDeliveryPhoto(
+        capturedAt =
+            (photoMap?.get("captured_at") as? String)
+                ?: (photoMap?.get("time") as? String)
+                ?: fallback?.capturedAt
+                ?: "Delivery scan",
+        watermark =
+            (photoMap?.get("watermark") as? String)
+                ?: fallback?.watermark
+                ?: "Courier proof photo",
+        location =
+            (photoMap?.get("location") as? String)
+                ?: (photoMap?.get("where") as? String)
+                ?: fallback?.location
+                ?: "Delivery location",
+        verificationLabel =
+            (photoMap?.get("verification_label") as? String)
+                ?: fallback?.verificationLabel
+                ?: "Verified",
+        isReceived = received || (fallback?.isReceived == true),
+    )
+}
+
+private fun iconNamed(raw: String?): PantopusIcon =
+    when (raw) {
+        "home" -> PantopusIcon.Home
+        "building-2" -> PantopusIcon.Building2
+        "tag" -> PantopusIcon.Tag
+        "camera" -> PantopusIcon.Camera
+        "map-pin" -> PantopusIcon.MapPin
+        "package", "package-2", "truck" -> PantopusIcon.Package
+        "arrow-right" -> PantopusIcon.ArrowRight
+        else -> PantopusIcon.Circle
     }

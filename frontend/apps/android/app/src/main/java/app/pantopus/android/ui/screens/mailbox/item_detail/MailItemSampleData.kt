@@ -5,6 +5,9 @@ package app.pantopus.android.ui.screens.mailbox.item_detail
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedChainStep
 import app.pantopus.android.data.api.models.mailbox.v2.CertifiedDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
+import app.pantopus.android.ui.components.TimelineStep
+import app.pantopus.android.ui.components.TimelineStepState
+import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
  * Deterministic fixtures for mailbox item-detail bodies. Backend is out of
@@ -12,6 +15,204 @@ import app.pantopus.android.data.api.models.mailbox.v2.GigDetailDto
  * than round-tripping the network. Mirrors the A17.6 gig.jsx sample data.
  */
 object MailItemSampleData {
+    val packageContents =
+        PackageContents(
+            title = "Lerina Books - order #LB-44218",
+            items =
+                listOf(
+                    PackageContentsItem(
+                        id = "calvino",
+                        quantity = 1,
+                        name = "Italo Calvino - Invisible Cities",
+                        detail = "paperback",
+                    ),
+                    PackageContentsItem(
+                        id = "dillard",
+                        quantity = 1,
+                        name = "Annie Dillard - Pilgrim at Tinker Creek",
+                        detail = "paperback",
+                    ),
+                ),
+            subtotal = "$28.40",
+            shipping = "$5.20",
+            total = "$33.60",
+        )
+
+    val packageDeliveryPhoto =
+        PackageDeliveryPhoto(
+            capturedAt = "1:47 PM",
+            watermark = "USPS - 18/05/2026 13:47:08",
+            location = "Front porch - 1428 Elm St",
+            verificationLabel = "GPS verified",
+        )
+
+    val packageInTransit =
+        PackageBodyContent(
+            carrier = "USPS Priority Mail",
+            etaLine = "Expected today by 3 PM",
+            status = PackageDeliveryStatus.InTransit,
+            trackingNumber = "9505 5125 8841 6014 2203 17",
+            referenceLine = "USPS - weight 2.4 lb - 12x9x4 in",
+            statusTitle = "In transit",
+            statusDetail = "Moving through Sacramento, CA",
+            trackingSteps = packageTrackingSteps(PackageDeliveryStatus.InTransit),
+            handoffSteps =
+                listOf(
+                    PackageHandoffStep(
+                        id = "in-transit",
+                        title = "In transit",
+                        location = "Sacramento, CA",
+                        timestamp = "Sat May 16 - 11:40 PM",
+                        icon = PantopusIcon.ArrowRight,
+                    ),
+                    PackageHandoffStep(
+                        id = "picked-up",
+                        title = "Picked up by courier",
+                        location = "Portland, OR",
+                        timestamp = "Thu May 14 - 4:21 PM",
+                        icon = PantopusIcon.Package,
+                    ),
+                    PackageHandoffStep(
+                        id = "label-created",
+                        title = "Label created - Lerina Books",
+                        location = "Portland, OR",
+                        timestamp = "Wed May 13 - 10:02 AM",
+                        icon = PantopusIcon.Tag,
+                    ),
+                ),
+            contents = packageContents,
+        )
+
+    val packageOutForDelivery =
+        PackageBodyContent(
+            carrier = "USPS Priority Mail",
+            etaLine = "ETA window 1:00 - 3:00 PM - about 6 stops away",
+            status = PackageDeliveryStatus.OutForDelivery,
+            trackingNumber = "9505 5125 8841 6014 2203 17",
+            referenceLine = "USPS - weight 2.4 lb - 12x9x4 in",
+            statusTitle = "Out for delivery - Route 22",
+            statusDetail = "ETA window 1:00 - 3:00 PM - about 6 stops away",
+            trackingSteps = packageTrackingSteps(PackageDeliveryStatus.OutForDelivery),
+            handoffSteps =
+                listOf(
+                    PackageHandoffStep(
+                        id = "pending-delivery",
+                        title = "Delivered to front porch",
+                        location = "Pending",
+                        timestamp = "Expected today - by 3 PM",
+                        icon = PantopusIcon.Home,
+                    ),
+                    PackageHandoffStep(
+                        id = "out-for-delivery",
+                        title = "Out for delivery",
+                        location = "Oakland Branch - Route 22",
+                        timestamp = "Mon May 18 - 8:12 AM",
+                        icon = PantopusIcon.Package,
+                    ),
+                    PackageHandoffStep(
+                        id = "local-facility",
+                        title = "Arrived at local facility",
+                        location = "Oakland, CA",
+                        timestamp = "Mon May 18 - 5:03 AM",
+                        icon = PantopusIcon.Building2,
+                    ),
+                    PackageHandoffStep(
+                        id = "in-transit",
+                        title = "In transit",
+                        location = "Sacramento, CA",
+                        timestamp = "Sat May 16 - 11:40 PM",
+                        icon = PantopusIcon.ArrowRight,
+                    ),
+                ),
+            contents = packageContents,
+        )
+
+    val packageDelivered =
+        PackageBodyContent(
+            carrier = "USPS Priority Mail",
+            etaLine = "Today - 1:47 PM - front porch - left in shade",
+            status = PackageDeliveryStatus.Delivered,
+            trackingNumber = "9505 5125 8841 6014 2203 17",
+            referenceLine = "USPS - weight 2.4 lb - 12x9x4 in",
+            statusTitle = "Delivered to your porch",
+            statusDetail = "Today - 1:47 PM - front porch - left in shade",
+            trackingSteps = packageTrackingSteps(PackageDeliveryStatus.Delivered),
+            handoffSteps =
+                listOf(
+                    PackageHandoffStep(
+                        id = "delivered",
+                        title = "Delivered to front porch",
+                        location = "Oakland, CA - 1428 Elm St",
+                        timestamp = "Mon May 18 - 1:47 PM",
+                        icon = PantopusIcon.Home,
+                    ),
+                    PackageHandoffStep(
+                        id = "out-for-delivery",
+                        title = "Out for delivery",
+                        location = "Oakland Branch - Route 22",
+                        timestamp = "Mon May 18 - 8:12 AM",
+                        icon = PantopusIcon.Package,
+                    ),
+                    PackageHandoffStep(
+                        id = "local-facility",
+                        title = "Arrived at local facility",
+                        location = "Oakland, CA",
+                        timestamp = "Mon May 18 - 5:03 AM",
+                        icon = PantopusIcon.Building2,
+                    ),
+                    PackageHandoffStep(
+                        id = "in-transit",
+                        title = "In transit",
+                        location = "Sacramento, CA",
+                        timestamp = "Sat May 16 - 11:40 PM",
+                        icon = PantopusIcon.ArrowRight,
+                    ),
+                ),
+            deliveryPhoto = packageDeliveryPhoto,
+            contents = packageContents,
+        )
+
+    fun packageBody(status: PackageDeliveryStatus): PackageBodyContent =
+        when (status) {
+            PackageDeliveryStatus.Shipped, PackageDeliveryStatus.InTransit -> packageInTransit
+            PackageDeliveryStatus.OutForDelivery -> packageOutForDelivery
+            PackageDeliveryStatus.Delivered -> packageDelivered
+        }
+
+    fun packageTrackingSteps(status: PackageDeliveryStatus): List<TimelineStep> {
+        val currentIndex =
+            when (status) {
+                PackageDeliveryStatus.Shipped -> 0
+                PackageDeliveryStatus.InTransit -> 1
+                PackageDeliveryStatus.OutForDelivery -> 2
+                PackageDeliveryStatus.Delivered -> 3
+            }
+        val items =
+            listOf(
+                Triple("shipped", "Shipped", "Wed May 13 - label created"),
+                Triple("in_transit", "In transit", "Sat May 16 - Sacramento, CA"),
+                Triple("out_for_delivery", "Out for delivery", "Mon May 18 - Route 22"),
+                Triple(
+                    "delivered",
+                    "Delivered",
+                    if (status == PackageDeliveryStatus.Delivered) {
+                        "Mon May 18 - 1:47 PM"
+                    } else {
+                        "Expected today"
+                    },
+                ),
+            )
+        return items.mapIndexed { index, item ->
+            val state =
+                when {
+                    index < currentIndex -> TimelineStepState.Done
+                    index == currentIndex -> TimelineStepState.Current
+                    else -> TimelineStepState.Upcoming
+                }
+            TimelineStep(title = item.second, state = state, subtitle = item.third)
+        }
+    }
+
     /** Next-steps timeline shown once a bid is accepted (A17.6 NEXT_STEPS). */
     val gigNextSteps =
         listOf(

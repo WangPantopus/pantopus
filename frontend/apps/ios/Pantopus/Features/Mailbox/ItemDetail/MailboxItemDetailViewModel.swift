@@ -55,10 +55,190 @@ public struct MailboxItemDetailContent: Sendable {
     }
 }
 
+/// Package delivery lifecycle used by the A17.8 body.
+public enum PackageDeliveryStatus: String, Sendable {
+    case shipped = "pre_receipt"
+    case inTransit = "in_transit"
+    case outForDelivery = "out_for_delivery"
+    case delivered
+
+    public init(rawStatus: String?) {
+        switch rawStatus {
+        case Self.shipped.rawValue: self = .shipped
+        case Self.outForDelivery.rawValue: self = .outForDelivery
+        case Self.delivered.rawValue: self = .delivered
+        default: self = .inTransit
+        }
+    }
+}
+
+/// One carrier scan / handoff row for the package body.
+public struct PackageHandoffStep: Identifiable, Sendable, Hashable {
+    public let id: String
+    public let title: String
+    public let location: String
+    public let timestamp: String
+    public let icon: PantopusIcon
+
+    public init(
+        id: String,
+        title: String,
+        location: String,
+        timestamp: String,
+        icon: PantopusIcon
+    ) {
+        self.id = id
+        self.title = title
+        self.location = location
+        self.timestamp = timestamp
+        self.icon = icon
+    }
+}
+
+/// Courier proof-photo metadata for delivered packages.
+public struct PackageDeliveryPhoto: Sendable, Hashable {
+    public let capturedAt: String
+    public let watermark: String
+    public let location: String
+    public let verificationLabel: String
+    public let isReceived: Bool
+
+    public init(
+        capturedAt: String,
+        watermark: String,
+        location: String,
+        verificationLabel: String,
+        isReceived: Bool = false
+    ) {
+        self.capturedAt = capturedAt
+        self.watermark = watermark
+        self.location = location
+        self.verificationLabel = verificationLabel
+        self.isReceived = isReceived
+    }
+}
+
+/// One line item in the package contents card.
+public struct PackageContentsItem: Identifiable, Sendable, Hashable {
+    public let id: String
+    public let quantity: Int
+    public let name: String
+    public let detail: String
+
+    public init(id: String, quantity: Int, name: String, detail: String) {
+        self.id = id
+        self.quantity = quantity
+        self.name = name
+        self.detail = detail
+    }
+}
+
+/// Optional order summary shown after tracking details.
+public struct PackageContents: Sendable, Hashable {
+    public let title: String
+    public let items: [PackageContentsItem]
+    public let subtotal: String?
+    public let shipping: String?
+    public let total: String?
+
+    public init(
+        title: String,
+        items: [PackageContentsItem],
+        subtotal: String? = nil,
+        shipping: String? = nil,
+        total: String? = nil
+    ) {
+        self.title = title
+        self.items = items
+        self.subtotal = subtotal
+        self.shipping = shipping
+        self.total = total
+    }
+}
+
 /// Data for the Package body sub-card.
 public struct PackageBodyContent: Sendable {
     public let carrier: String
     public let etaLine: String?
+    public let status: PackageDeliveryStatus
+    public let trackingNumber: String?
+    public let referenceLine: String?
+    public let statusTitle: String
+    public let statusDetail: String
+    public let trackingSteps: [TimelineStep]
+    public let handoffSteps: [PackageHandoffStep]
+    public let deliveryPhoto: PackageDeliveryPhoto?
+    public let contents: PackageContents?
+
+    public init(
+        carrier: String,
+        etaLine: String? = nil,
+        status: PackageDeliveryStatus = .inTransit,
+        trackingNumber: String? = nil,
+        referenceLine: String? = nil,
+        statusTitle: String? = nil,
+        statusDetail: String? = nil,
+        trackingSteps: [TimelineStep] = [],
+        handoffSteps: [PackageHandoffStep] = [],
+        deliveryPhoto: PackageDeliveryPhoto? = nil,
+        contents: PackageContents? = nil
+    ) {
+        self.carrier = carrier
+        self.etaLine = etaLine
+        self.status = status
+        self.trackingNumber = trackingNumber
+        self.referenceLine = referenceLine
+        self.statusTitle = statusTitle ?? Self.defaultStatusTitle(status: status)
+        self.statusDetail = statusDetail ?? Self.defaultStatusDetail(status: status)
+        self.trackingSteps = trackingSteps
+        self.handoffSteps = handoffSteps
+        self.deliveryPhoto = deliveryPhoto
+        self.contents = contents
+    }
+
+    private static func defaultStatusTitle(status: PackageDeliveryStatus) -> String {
+        switch status {
+        case .shipped: "Shipped"
+        case .inTransit: "In transit"
+        case .outForDelivery: "Out for delivery"
+        case .delivered: "Delivered to your porch"
+        }
+    }
+
+    private static func defaultStatusDetail(status: PackageDeliveryStatus) -> String {
+        switch status {
+        case .shipped: "Label created by the sender."
+        case .inTransit: "Moving through the carrier network."
+        case .outForDelivery: "Expected today by 3 PM."
+        case .delivered: "Front porch - left in shade."
+        }
+    }
+
+    fileprivate func receivedCopy() -> PackageBodyContent {
+        PackageBodyContent(
+            carrier: carrier,
+            etaLine: etaLine,
+            status: .delivered,
+            trackingNumber: trackingNumber,
+            referenceLine: referenceLine,
+            statusTitle: "Logged as received",
+            statusDetail: "Today - by you",
+            trackingSteps: trackingSteps.map { step in
+                TimelineStep(id: step.id, title: step.title, subtitle: step.subtitle, state: .done)
+            },
+            handoffSteps: handoffSteps,
+            deliveryPhoto: deliveryPhoto.map {
+                PackageDeliveryPhoto(
+                    capturedAt: $0.capturedAt,
+                    watermark: $0.watermark,
+                    location: $0.location,
+                    verificationLabel: $0.verificationLabel,
+                    isReceived: true
+                )
+            },
+            contents: contents
+        )
+    }
 }
 
 /// Observed detail-screen state.
@@ -123,6 +303,7 @@ final class MailboxItemDetailViewModel {
         }
         let originalTimeline = content.timeline
         let originalCtaEnabled = content.ctaEnabled
+        let originalPackageInfo = content.packageInfo
 
         // Optimistic: flip the last .current step to .done (or append one).
         let updatedTimeline = flipCurrentToDone(originalTimeline)
@@ -133,7 +314,7 @@ final class MailboxItemDetailViewModel {
             aiElf: content.aiElf,
             keyFacts: content.keyFacts,
             timeline: updatedTimeline,
-            packageInfo: content.packageInfo,
+            packageInfo: content.packageInfo?.receivedCopy(),
             ctaEnabled: false,
             isUnread: content.isUnread,
             isArchived: content.isArchived,
@@ -159,7 +340,7 @@ final class MailboxItemDetailViewModel {
                     aiElf: rollback.aiElf,
                     keyFacts: rollback.keyFacts,
                     timeline: originalTimeline,
-                    packageInfo: rollback.packageInfo,
+                    packageInfo: originalPackageInfo,
                     ctaEnabled: originalCtaEnabled,
                     isUnread: rollback.isUnread,
                     isArchived: rollback.isArchived,
@@ -671,15 +852,11 @@ final class MailboxItemDetailViewModel {
         let trackingNumber = pkgDict?["tracking_number"]?.stringValue
         let carrier = pkgDict?["carrier"]?.stringValue ?? "Carrier"
         let currentStatus = pkgDict?["status"]?.stringValue ?? "in_transit"
-        let suggested = pkgDict?["suggested_order_match"]?.stringValue
-
-        let aiElf: AIElfContent? = suggested.map { match in
-            AIElfContent(
-                suggestion: "Looks like your \(match) order",
-                primaryChip: "Link",
-                secondaryChip: "Not mine"
-            )
-        }
+        let deliveryStatus = PackageDeliveryStatus(rawStatus: currentStatus)
+        let received = pkgDict?["logged_as_received"]?.boolValue
+            ?? pkgDict?["received"]?.boolValue
+            ?? pkgDict?["received_at"]?.stringValue.map { _ in true }
+            ?? false
 
         var facts: [KeyFactRow] = []
         if let trackingNumber {
@@ -708,11 +885,17 @@ final class MailboxItemDetailViewModel {
                     initials: Self.initials(from: item.senderDisplay),
                     senderUserId: item.base.senderUserId
                 ),
-                aiElf: aiElf,
+                aiElf: nil,
                 keyFacts: facts,
                 timeline: steps,
-                packageInfo: PackageBodyContent(carrier: carrier, etaLine: nil),
-                ctaEnabled: currentStatus != "delivered",
+                packageInfo: Self.packageBodyContent(
+                    carrier: carrier,
+                    trackingNumber: trackingNumber,
+                    package: pkg,
+                    status: deliveryStatus,
+                    received: received
+                ),
+                ctaEnabled: deliveryStatus == .delivered && !received,
                 isUnread: !item.base.viewed,
                 isArchived: item.base.archived
             )
@@ -752,29 +935,153 @@ final class MailboxItemDetailViewModel {
     }()
 
     private static func timeline(for status: String) -> [TimelineStep] {
-        let order = ["pre_receipt", "in_transit", "out_for_delivery", "delivered"]
-        let labels = ["Shipped", "In transit", "Out for delivery", "Delivered"]
-        let currentIndex = order.firstIndex(of: status) ?? 1
-        return zip(order, labels).enumerated().map { index, pair in
-            let state: TimelineStepState = if index < currentIndex {
-                .done
-            } else if index == currentIndex {
-                .current
-            } else {
-                .upcoming
-            }
-            return TimelineStep(id: pair.0, title: pair.1, state: state)
+        let deliveryStatus = PackageDeliveryStatus(rawStatus: status)
+        return MailItemSampleData.packageTrackingSteps(status: deliveryStatus)
+    }
+
+    private static func packageBodyContent(
+        carrier: String,
+        trackingNumber: String?,
+        package: PackageDetailResponse,
+        status: PackageDeliveryStatus,
+        received: Bool
+    ) -> PackageBodyContent {
+        let sample = MailItemSampleData.packageBody(status: status)
+        let packageDict = package.package.dictValue ?? [:]
+        let referenceLine =
+            packageDict["reference"]?.stringValue
+                ?? packageDict["reference_line"]?.stringValue
+                ?? sample.referenceLine
+        let statusTitle =
+            packageDict["status_title"]?.stringValue
+                ?? packageDict["status_label"]?.stringValue
+                ?? sample.statusTitle
+        let statusDetail =
+            packageDict["status_detail"]?.stringValue
+                ?? packageDict["eta_line"]?.stringValue
+                ?? sample.statusDetail
+        let photo = packagePhoto(from: packageDict, fallback: sample.deliveryPhoto, received: received)
+        let handoffs = packageHandoffSteps(from: package.timeline, fallback: sample.handoffSteps)
+        return PackageBodyContent(
+            carrier: carrier,
+            etaLine: packageDict["eta_line"]?.stringValue ?? sample.etaLine,
+            status: status,
+            trackingNumber: trackingNumber ?? sample.trackingNumber,
+            referenceLine: referenceLine,
+            statusTitle: received ? "Logged as received" : statusTitle,
+            statusDetail: received ? "Today - by you" : statusDetail,
+            trackingSteps: MailItemSampleData.packageTrackingSteps(status: status).map { step in
+                if received {
+                    TimelineStep(id: step.id, title: step.title, subtitle: step.subtitle, state: .done)
+                } else {
+                    step
+                }
+            },
+            handoffSteps: handoffs,
+            deliveryPhoto: photo,
+            contents: sample.contents
+        )
+    }
+
+    private static func packageHandoffSteps(
+        from timeline: [JSONValue],
+        fallback: [PackageHandoffStep]
+    ) -> [PackageHandoffStep] {
+        let decoded = timeline.enumerated().compactMap { index, raw -> PackageHandoffStep? in
+            guard let dict = raw.dictValue else { return nil }
+            let title = dict["label"]?.stringValue
+                ?? dict["title"]?.stringValue
+                ?? dict["status"]?.stringValue
+            guard let title, !title.isEmpty else { return nil }
+            return PackageHandoffStep(
+                id: dict["id"]?.stringValue ?? "handoff-\(index)",
+                title: title,
+                location: dict["where"]?.stringValue
+                    ?? dict["location"]?.stringValue
+                    ?? "Carrier network",
+                timestamp: dict["when"]?.stringValue
+                    ?? dict["timestamp"]?.stringValue
+                    ?? dict["occurred_at"]?.stringValue
+                    ?? "Pending",
+                icon: icon(named: dict["icon"]?.stringValue)
+            )
+        }
+        return decoded.isEmpty ? fallback : decoded
+    }
+
+    private static func packagePhoto(
+        from dict: [String: JSONValue],
+        fallback: PackageDeliveryPhoto?,
+        received: Bool
+    ) -> PackageDeliveryPhoto? {
+        let photoDict = dict["delivery_photo"]?.dictValue ?? dict["photo"]?.dictValue
+        guard let fallback else {
+            guard let photoDict else { return nil }
+            return PackageDeliveryPhoto(
+                capturedAt: photoDict["captured_at"]?.stringValue
+                    ?? photoDict["time"]?.stringValue
+                    ?? "Delivery scan",
+                watermark: photoDict["watermark"]?.stringValue
+                    ?? photoDict["captured_at"]?.stringValue
+                    ?? "Courier proof photo",
+                location: photoDict["location"]?.stringValue
+                    ?? photoDict["where"]?.stringValue
+                    ?? "Delivery location",
+                verificationLabel: photoDict["verification_label"]?.stringValue
+                    ?? "Verified",
+                isReceived: received
+            )
+        }
+        guard let photoDict else {
+            return PackageDeliveryPhoto(
+                capturedAt: fallback.capturedAt,
+                watermark: fallback.watermark,
+                location: fallback.location,
+                verificationLabel: fallback.verificationLabel,
+                isReceived: received || fallback.isReceived
+            )
+        }
+        return PackageDeliveryPhoto(
+            capturedAt: photoDict["captured_at"]?.stringValue
+                ?? photoDict["time"]?.stringValue
+                ?? fallback.capturedAt,
+            watermark: photoDict["watermark"]?.stringValue ?? fallback.watermark,
+            location: photoDict["location"]?.stringValue
+                ?? photoDict["where"]?.stringValue
+                ?? fallback.location,
+            verificationLabel: photoDict["verification_label"]?.stringValue
+                ?? fallback.verificationLabel,
+            isReceived: received || fallback.isReceived
+        )
+    }
+
+    private static func icon(named raw: String?) -> PantopusIcon {
+        switch raw {
+        case "home": .home
+        case "building-2": .building2
+        case "tag": .tag
+        case "camera": .camera
+        case "map-pin": .mapPin
+        case "package", "package-2", "truck": .package
+        case "arrow-right": .arrowRight
+        default: .circle
         }
     }
 
     private func flipCurrentToDone(_ steps: [TimelineStep]) -> [TimelineStep] {
         guard let index = steps.firstIndex(where: { $0.state == .current }) else { return steps }
         var updated = steps
-        updated[index] = TimelineStep(id: steps[index].id, title: steps[index].title, state: .done)
+        updated[index] = TimelineStep(
+            id: steps[index].id,
+            title: steps[index].title,
+            subtitle: steps[index].subtitle,
+            state: .done
+        )
         if index + 1 < updated.count {
             updated[index + 1] = TimelineStep(
                 id: steps[index + 1].id,
                 title: steps[index + 1].title,
+                subtitle: steps[index + 1].subtitle,
                 state: .current
             )
         }
