@@ -25,20 +25,37 @@ public enum YouRoute: Hashable {
     case mailboxSearch
     case settings
     case placeholder(label: String)
+    case helpCenter
+    case privacySettings
+    case legal
+    case legalContent(LegalDocument)
+    case addHome
+    case myClaims
+    case claimStatus(claimId: String)
+    case claimOwnership(homeId: String)
     /// T5.2.4 — cross-listing Offers (incoming + outgoing).
     case offers
     /// T5.3.1 — My bids. The "me.bids" action tile pushes here.
     case myBids
     /// T5.3.2 — My tasks V2. The "me.gigs" action tile pushes here.
     case myTasks
+    /// Browse available neighbour gigs.
+    case gigsFeed
+    /// Search available neighbour gigs.
+    case gigSearch
+    /// Map/list browse for available neighbour gigs.
+    case tasksMap(categoryKey: String)
     /// P2.2 — Post-a-Task wizard. Pushed from the My tasks FAB / empty
     /// CTA. Routes to the new gig's detail on success.
     case composeTask
     /// T5.3.3 — My posts. The "me.posts" Activity-section row pushes here.
     case myPosts
+    /// Compose a Pulse post from the You tab's My posts surface.
+    case composePost(intent: String)
     /// P3.5 — Edit an existing Pulse post. Pushed from the per-row Edit
     /// CTA on My posts; re-uses the compose flow in edit mode.
     case editPost(postId: String)
+    case pulsePost(postId: String)
     /// T5.2.3 — Connections. The "me.connections" Personal action tile pushes here.
     case connections
     /// T6.6c (P26.5) — Support Trains. The "me.supportTrains" Personal
@@ -68,6 +85,8 @@ public enum YouRoute: Hashable {
     /// T6.3f / P14 — My businesses (avatar-first roster). The
     /// "me.businesses" Activity-section row pushes here.
     case myBusinesses
+    /// Public business profile reached from My businesses.
+    case businessProfile(businessId: String)
     /// P6.6 — "Register a business · coming soon" waitlist surface. The
     /// full registration wizard is a future Phase 9 item.
     case businessWaitlist
@@ -78,6 +97,7 @@ public enum YouRoute: Hashable {
     case identityCenter
     /// T3.3 — Audience profile. The "me.audience" Personal section row pushes here.
     case audienceProfile
+    case privacyHandshake(personaHandle: String)
     /// P1.3 — Broadcast detail full-screen takeover, pushed when the
     /// creator taps an update card on the Audience Profile. The
     /// `card` payload seeds the hero + delivered/read counters so the
@@ -96,6 +116,10 @@ public enum YouRoute: Hashable {
     /// T5.2.2 — Bills. The home-context "me.bills" action tile + Activity
     /// row push here with the primary home id resolved by the VM.
     case homeBills(homeId: String)
+    /// Bill detail (read-mostly summary with mark-paid / remove).
+    case billDetail(homeId: String, billId: String)
+    /// Add / edit Bill wizard. `billId == nil` creates a new bill.
+    case addBill(homeId: String, billId: String? = nil)
     /// T5.2.1 — Pets. The home-context "me.pets" action tile pushes here.
     case homePets(homeId: String)
     /// T6.4c (P18) — Home calendar. The home-context "me.calendar"
@@ -192,13 +216,18 @@ public enum YouRoute: Hashable {
     /// Gig detail destination for an offer-row tap. Reuses the existing
     /// Transactional Detail shell.
     case gigDetail(gigId: String)
+    /// Marketplace browse surface reached from Offers.
+    case marketplace
     /// Listing detail destination reached from the listing-offers buyer
     /// row tap so the seller can drill back into the canonical view.
     case listingDetail(listingId: String)
+    /// Snap & sell composer reached from My listings / Marketplace.
+    case composeListing
     /// Push the chat conversation for a given counterparty. Payload
     /// mirrors the Inbox tab's `InboxConversationDestination` so the same
     /// `ChatConversationView` can host the thread inside the You stack.
     case chatConversation(InboxConversationDestination)
+    case publicProfile(userId: String)
     /// P3.3 — Edit an existing listing. Reached from the listing-detail
     /// overflow ("Edit listing") for the owner, or from the listing-
     /// offers panel's "Edit price" affordance.
@@ -212,14 +241,6 @@ public enum YouRoute: Hashable {
     /// A.7 — Compose broadcast from a persona.
     case composeBroadcast(personaId: String)
     #if DEBUG
-    case publicProfile(userId: String)
-    /// P1.6 — Typed Business Profile screen. Reached today only via
-    /// the debug stack on the You tab so engineers can verify the
-    /// VM/view wiring without first navigating through DiscoverHub.
-    /// External entry points live on `HubRoute`.
-    case businessProfile(businessId: String)
-    case pulsePost(postId: String)
-    case privacyHandshake(personaHandle: String)
     case statusWaiting
     case ceremonialMail
     case ceremonialMailOpen(mailId: String)
@@ -239,6 +260,7 @@ private struct DebugDisambiguateItem: Identifiable, Hashable {
 /// NavigationStack wrapper for the You tab.
 public struct YouTabRoot: View {
     @Environment(AuthManager.self) private var auth
+    @Environment(\.openURL) private var openURL
     @State private var path = RouteStack<YouRoute>()
     @State private var showsSignOutConfirm = false
     @State private var showsEditProfile = false
@@ -561,6 +583,15 @@ public struct YouTabRoot: View {
         case "me.creatorInbox":
             path.append(.creatorInbox)
             return
+        case "me.help":
+            path.append(.helpCenter)
+            return
+        case "me.legal":
+            path.append(.legal)
+            return
+        case "me.privacy", "me.home.privacy":
+            path.append(.privacySettings)
+            return
         case "me.bills":
             if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
                 path.append(.homeBills(homeId: homeId))
@@ -725,7 +756,7 @@ public struct YouTabRoot: View {
                     },
                     onOpenSearch: { path.append(.mailboxSearch) },
                     onOpenMap: { path.append(.mailboxMap) },
-                    onBrowseGigs: { path.append(.placeholder(label: "Browse gigs")) }
+                    onBrowseGigs: { path.append(.gigsFeed) }
                 )
             )
         case .mailboxMap:
@@ -750,10 +781,8 @@ public struct YouTabRoot: View {
             MailDetailView(
                 mailId: mailId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onOpenSenderProfile: { _ in
-                    // Public-profile routing from You's mailbox is
-                    // deferred until the You tab gets its own user-
-                    // detail destination.
+                onOpenSenderProfile: { userId in
+                    Task { @MainActor in path.append(.publicProfile(userId: userId)) }
                 }
             )
         case .settings:
@@ -764,6 +793,66 @@ public struct YouTabRoot: View {
             )
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
+        case .helpCenter:
+            HelpCenterView { if !path.isEmpty { path.removeLast() } }
+        case .privacySettings:
+            GroupedListView(
+                dataSource: PrivacySettingsViewModel()
+            ) { if !path.isEmpty { path.removeLast() } }
+        case .legal:
+            LegalIndexView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onSelect: { doc in path.append(.legalContent(doc)) }
+            )
+        case let .legalContent(doc):
+            LegalContentView(document: doc) {
+                if !path.isEmpty { path.removeLast() }
+            }
+        case .addHome:
+            AddHomeWizardView { homeId in
+                path.removeAll { $0 == .addHome }
+                path.append(.homeDashboard(homeId: homeId))
+            }
+        case .myClaims:
+            MyClaimsListView(
+                viewModel: MyClaimsListViewModel(
+                    onStartNewClaim: {
+                        Task { @MainActor in path.append(.addHome) }
+                    },
+                    onOpenClaim: { claimId in
+                        Task { @MainActor in path.append(.claimStatus(claimId: claimId)) }
+                    }
+                )
+            )
+        case let .claimStatus(claimId):
+            StatusWaitingView(
+                content: .underReview(homeName: nil),
+                onAction: { card in
+                    if card.id == "addEvidence", !path.isEmpty {
+                        path.removeLast()
+                    }
+                },
+                onPrimary: { _ in
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onSecondary: { _ in
+                    if !claimId.isEmpty, !path.isEmpty { path.removeLast() }
+                }
+            )
+        case let .claimOwnership(homeId):
+            ClaimOwnershipWizardView(
+                homeId: homeId,
+                onClose: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenClaimsList: {
+                    path.removeAll { route in
+                        if case .claimOwnership = route { return true }
+                        return false
+                    }
+                    path.append(.myClaims)
+                }
+            )
         // Wave A — pre-staged placeholder destinations. When an A.x screen
         // ships, swap its single line below for the real view.
         case let .membershipDetail(personaId):
@@ -813,10 +902,10 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
                     },
                     onBrowseListings: {
-                        Task { @MainActor in path.append(.placeholder(label: "Browse listings")) }
+                        Task { @MainActor in path.append(.marketplace) }
                     },
                     onPostTask: {
-                        Task { @MainActor in path.append(.placeholder(label: "Post a task")) }
+                        Task { @MainActor in path.append(.composeTask) }
                     }
                 )
             )
@@ -837,6 +926,16 @@ public struct YouTabRoot: View {
                         )))
                     }
                 }
+            )
+        case .marketplace:
+            MarketplaceView(
+                onOpenListing: { listingId in
+                    Task { @MainActor in path.append(.listingDetail(listingId: listingId)) }
+                },
+                onCompose: {
+                    Task { @MainActor in path.append(.composeListing) }
+                },
+                onBack: { if !path.isEmpty { path.removeLast() } }
             )
         case let .listingDetail(listingId):
             ListingDetailView(
@@ -877,9 +976,9 @@ public struct YouTabRoot: View {
                             items: ["Check out \(name) on Pantopus — \(InviteLinks.downloadURLString)"]
                         )
                     },
-                    onOpenBuyer: { _ in
+                    onOpenBuyer: { buyer in
                         Task { @MainActor in
-                            path.append(.placeholder(label: "Buyer profile"))
+                            path.append(.publicProfile(userId: buyer.id))
                         }
                     },
                     onOpenTransaction: { _ in
@@ -894,6 +993,13 @@ public struct YouTabRoot: View {
                     }
                 )
             )
+        case .composeListing:
+            ListingComposeWizardView(
+                onOpenListingDetail: { listingId in
+                    path.removeAll { $0 == .composeListing }
+                    path.append(.listingDetail(listingId: listingId))
+                }
+            )
         case let .editListing(listingId, jumpToStep):
             ListingComposeWizardView(
                 mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
@@ -902,21 +1008,37 @@ public struct YouTabRoot: View {
         case .myPosts:
             MyPostsView(
                 viewModel: MyPostsViewModel(
-                    onOpenPost: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Post detail")) }
+                    onOpenPost: { dto in
+                        Task { @MainActor in path.append(.pulsePost(postId: dto.id)) }
                     },
                     onCompose: {
-                        Task { @MainActor in path.append(.placeholder(label: "Write a post")) }
+                        Task { @MainActor in path.append(.composePost(intent: PulseComposeIntent.ask.rawValue)) }
                     },
                     onEditPost: { dto in
                         Task { @MainActor in path.append(.editPost(postId: dto.id)) }
                     }
                 )
             )
+        case let .composePost(intent):
+            PulseComposeView(intent: PulseComposeIntent.from(rawValue: intent)) { _ in
+                if !path.isEmpty { path.removeLast() }
+            }
         case let .editPost(postId):
             PulseComposeView(postId: postId) { _ in
                 if !path.isEmpty { path.removeLast() }
             }
+        case let .pulsePost(postId):
+            PulsePostDetailView(
+                postId: postId,
+                currentUserId: currentUserId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOpenProfile: { userId in
+                    Task { @MainActor in path.append(.publicProfile(userId: userId)) }
+                },
+                onEdit: { id in
+                    Task { @MainActor in path.append(.editPost(postId: id)) }
+                }
+            )
         case .myBids:
             MyBidsView(
                 viewModel: MyBidsViewModel(
@@ -928,7 +1050,7 @@ public struct YouTabRoot: View {
                         }
                     },
                     onBrowseTasks: {
-                        Task { @MainActor in path.append(.placeholder(label: "Browse tasks")) }
+                        Task { @MainActor in path.append(.gigsFeed) }
                     },
                     onMessageClient: { dto in
                         Task { @MainActor in
@@ -946,6 +1068,44 @@ public struct YouTabRoot: View {
                     // Edit-bid + Leave-review are presented as sheets from
                     // inside the screen (P3.4) — no router wiring needed.
                 )
+            )
+        case .gigsFeed:
+            GigsFeedView(
+                onOpenGig: { gigId in
+                    Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
+                },
+                onCompose: { _ in
+                    Task { @MainActor in path.append(.composeTask) }
+                },
+                onOpenMap: { category in
+                    Task { @MainActor in path.append(.tasksMap(categoryKey: category.rawValue)) }
+                },
+                onOpenSearch: {
+                    Task { @MainActor in path.append(.gigSearch) }
+                },
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
+        case .gigSearch:
+            GigSearchView(
+                onOpenGig: { gigId in
+                    Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
+                },
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
+        case let .tasksMap(categoryKey):
+            NearbyMapView(
+                viewModel: NearbyMapViewModel(
+                    initialCategory: GigsCategory(rawValue: categoryKey) ?? .all
+                ),
+                onOpenEntity: { entity in
+                    Task { @MainActor in
+                        switch entity.kind {
+                        case .gig: path.append(.gigDetail(gigId: entity.id))
+                        case .listing: path.append(.listingDetail(listingId: entity.id))
+                        }
+                    }
+                },
+                onBack: { if !path.isEmpty { path.removeLast() } }
             )
         case .myTasks:
             MyTasksView(
@@ -1186,19 +1346,45 @@ public struct YouTabRoot: View {
                     counterparty: Self.chatCounterparty(for: dest),
                     currentUserId: currentUserId ?? ""
                 ),
-                mode: dest.kind
-            ) { if !path.isEmpty { path.removeLast() } }
+                mode: dest.kind,
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
         case let .homeBills(homeId):
             BillsListView(
                 viewModel: BillsListViewModel(
                     homeId: homeId,
-                    onOpenBill: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Bill detail")) }
+                    onOpenBill: { billId in
+                        Task { @MainActor in path.append(.billDetail(homeId: homeId, billId: billId)) }
                     },
                     onAddBill: {
-                        Task { @MainActor in path.append(.placeholder(label: "Add a bill")) }
+                        Task { @MainActor in path.append(.addBill(homeId: homeId)) }
                     }
                 )
+            )
+        case let .billDetail(homeId, billId):
+            BillDetailView(
+                homeId: homeId,
+                billId: billId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onEdit: {
+                    Task { @MainActor in path.append(.addBill(homeId: homeId, billId: billId)) }
+                }
+            )
+        case let .addBill(homeId, billId):
+            AddBillWizardView(
+                homeId: homeId,
+                billId: billId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onCreated: { newBillId in
+                    path.removeAll { route in
+                        if case .addBill = route { return true }
+                        return false
+                    }
+                    path.append(.billDetail(homeId: homeId, billId: newBillId))
+                },
+                onUpdated: {
+                    if !path.isEmpty { path.removeLast() }
+                }
             )
         case let .homePets(homeId):
             PetsListView(homeId: homeId)
@@ -1484,7 +1670,7 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.homeDashboard(homeId: homeId)) }
                     },
                     onAddHome: {
-                        Task { @MainActor in path.append(.placeholder(label: "Claim a home")) }
+                        Task { @MainActor in path.append(.addHome) }
                     }
                 )
             )
@@ -1495,15 +1681,15 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.listingDetail(listingId: listingId)) }
                     },
                     onCompose: {
-                        Task { @MainActor in path.append(.placeholder(label: "List something")) }
+                        Task { @MainActor in path.append(.composeListing) }
                     }
                 )
             )
         case .myBusinesses:
             MyBusinessesView(
                 viewModel: MyBusinessesViewModel(
-                    onOpenBusiness: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Business dashboard")) }
+                    onOpenBusiness: { businessId in
+                        Task { @MainActor in path.append(.businessProfile(businessId: businessId)) }
                     },
                     onRegister: {
                         Task { @MainActor in path.append(.businessWaitlist) }
@@ -1517,10 +1703,10 @@ public struct YouTabRoot: View {
                 homeId: homeId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onClaimOwnership: {
-                    Task { @MainActor in path.append(.placeholder(label: "Claim ownership")) }
+                    Task { @MainActor in path.append(.claimOwnership(homeId: homeId)) }
                 },
                 onOpenClaimsList: {
-                    Task { @MainActor in path.append(.placeholder(label: "My claims")) }
+                    Task { @MainActor in path.append(.myClaims) }
                 },
                 onOpenBills: {
                     Task { @MainActor in path.append(.homeBills(homeId: homeId)) }
@@ -1560,8 +1746,10 @@ public struct YouTabRoot: View {
             HouseholdTasksListView(
                 viewModel: HouseholdTasksListViewModel(
                     homeId: homeId,
-                    onOpenTask: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Task detail")) }
+                    onOpenTask: { taskId in
+                        Task { @MainActor in
+                            path.append(.editHouseholdTask(homeId: homeId, taskId: taskId))
+                        }
                     },
                     onAddTask: {
                         Task { @MainActor in path.append(.addHouseholdTask(homeId: homeId)) }
@@ -1648,22 +1836,36 @@ public struct YouTabRoot: View {
             )
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId)
-        #if DEBUG
         case let .publicProfile(userId):
             PublicProfileView(
-                userId: userId
-            ) { if !path.isEmpty { path.removeLast() } }
-        case let .businessProfile(businessId):
-            BusinessProfileView(businessId: businessId) {
-                if !path.isEmpty { path.removeLast() }
-            }
-        case let .pulsePost(postId):
-            PulsePostDetailView(
-                postId: postId,
+                userId: userId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
-                onOpenProfile: { userId in
-                    Task { @MainActor in path.append(.publicProfile(userId: userId)) }
+                onOpenMessages: { profile in
+                    Task { @MainActor in
+                        path.append(.chatConversation(InboxConversationDestination(
+                            mode: .person(otherUserId: profile.id),
+                            displayName: profile.displayName,
+                            initials: Self.initials(from: profile.displayName),
+                            identityKind: nil,
+                            verified: profile.verified ?? false
+                        )))
+                    }
                 }
+            )
+        case let .businessProfile(businessId):
+            BusinessProfileView(
+                businessId: businessId,
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOpenMessages: {
+                    Task { @MainActor in path.append(.placeholder(label: "Messages")) }
+                },
+                onShare: {
+                    systemSheet = .share(items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"])
+                },
+                onOpenReport: {
+                    Task { @MainActor in path.append(.placeholder(label: "Report business")) }
+                },
+                onOpenWebsite: { url in openURL(url) }
             )
         case let .privacyHandshake(personaHandle):
             PrivacyHandshakeWizardView(
@@ -1671,6 +1873,7 @@ public struct YouTabRoot: View {
                     personaHandle: personaHandle
                 ) { if !path.isEmpty { path.removeLast() } }
             )
+        #if DEBUG
         case .statusWaiting:
             StatusWaitingView(
                 content: .claimSubmitted(homeName: "412 Elm St"),

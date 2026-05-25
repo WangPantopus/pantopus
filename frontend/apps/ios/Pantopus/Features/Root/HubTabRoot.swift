@@ -13,6 +13,7 @@ import UIKit
 public enum HubRoute: Hashable {
     case myHomes
     case myClaims
+    case claimStatus(claimId: String)
     case mailItemDetail(mailId: String)
     /// T6.5e (P19.5) Mailbox Vault — saved mail list. Personal pillar.
     case mailboxVault
@@ -96,6 +97,13 @@ public enum HubRoute: Hashable {
     /// Start-a-poll composer (P2.5). Pushed from the Polls list FAB +
     /// empty-state CTA.
     case startPoll(homeId: String)
+    /// T6.4a — Access codes. Per-home roster of Wi-Fi / Alarm / Gate /
+    /// Lockbox / Garage / Smart lock codes.
+    case accessCodes(homeId: String, homeName: String?)
+    /// P3.1 — Add (no secretId) / Edit (with secretId) access code.
+    case editAccessCode(homeId: String, secretId: String?, categoryRaw: String?)
+    /// P4.6 — Access codes search scoped to one home.
+    case searchAccessCodes(homeId: String)
     /// Pulse tab (T1.2). Reached from Hub → pillar(.pulse).
     case pulseFeed
     /// Compose post target — placeholder until the compose flow ships.
@@ -283,6 +291,9 @@ public struct HubTabRoot: View {
         .onChange(of: router.pending) { _, pending in
             consumeDeepLinkIfNeeded(pending: pending)
         }
+        .onAppear {
+            consumeDeepLinkIfNeeded(pending: router.pending)
+        }
         .task {
             consumeDeepLinkIfNeeded(pending: router.pending)
         }
@@ -307,6 +318,30 @@ public struct HubTabRoot: View {
     private func consumeDeepLinkIfNeeded(pending: DeepLinkRouter.Destination?) {
         guard let pending else { return }
         switch pending {
+        case .feed:
+            path.append(.pulseFeed)
+            _ = router.consume()
+        case let .post(id):
+            path.append(.pulsePost(postId: id))
+            _ = router.consume()
+        case let .gig(id):
+            path.append(.gigDetail(gigId: id))
+            _ = router.consume()
+        case let .listing(id):
+            path.append(.listingDetail(listingId: id))
+            _ = router.consume()
+        case let .homeDetail(id), let .homeDashboard(id):
+            path.append(.homeDashboard(homeId: id))
+            _ = router.consume()
+        case let .homeMemberRequests(id):
+            path.append(.homeMembers(homeId: id))
+            _ = router.consume()
+        case .notifications:
+            path.append(.notifications)
+            _ = router.consume()
+        case let .user(id):
+            path.append(.publicProfile(userId: id))
+            _ = router.consume()
         case .connections:
             path.append(.connections)
             _ = router.consume()
@@ -337,7 +372,7 @@ public struct HubTabRoot: View {
             case .action(.addHome): path.append(.addHome)
             case .action(.scanMail): path.append(.mailboxRoot)
             case .action(.postTask): path.append(.quickPostGig(category: GigsCategory.all.rawValue))
-            case .action(.snapAndSell): path.append(.placeholder(label: "Snap & sell"))
+            case .action(.snapAndSell): path.append(.composeListing)
             case .pillar(.mail): path.append(.mailboxRoot)
             case .pillar(.pulse): path.append(.pulseFeed)
             case .pillar(.gigs): path.append(.gigsFeed)
@@ -394,7 +429,7 @@ public struct HubTabRoot: View {
         switch item.kind {
         case .post: .pulsePost(postId: item.id)
         case .person: .publicProfile(userId: item.id)
-        case .gig: .placeholder(label: "Gig detail")
+        case .gig: .gigDetail(gigId: item.id)
         case .business: .businessProfile(businessId: item.id)
         case .unknown: .placeholder(label: item.title)
         }
@@ -477,10 +512,25 @@ public struct HubTabRoot: View {
             MyClaimsListView(
                 viewModel: MyClaimsListViewModel(
                     onStartNewClaim: { Task { @MainActor in push(.addHome) } },
-                    onOpenClaim: { _ in
-                        Task { @MainActor in push(.placeholder(label: "Claim status")) }
+                    onOpenClaim: { claimId in
+                        Task { @MainActor in push(.claimStatus(claimId: claimId)) }
                     }
                 )
+            )
+        case let .claimStatus(claimId):
+            StatusWaitingView(
+                content: .underReview(homeName: nil),
+                onAction: { card in
+                    if card.id == "addEvidence", !path.isEmpty {
+                        path.removeLast()
+                    }
+                },
+                onPrimary: { _ in pop() },
+                onSecondary: { _ in
+                    if !claimId.isEmpty {
+                        pop()
+                    }
+                }
             )
         case let .homeDashboard(homeId):
             HomeDashboardView(
@@ -507,8 +557,8 @@ public struct HubTabRoot: View {
                 onOpenPackages: { id in
                     Task { @MainActor in push(.homePackages(homeId: id)) }
                 },
-                onOpenAccessCodes: { _, _ in
-                    Task { @MainActor in push(.placeholder(label: "Access codes")) }
+                onOpenAccessCodes: { accessHomeId, homeName in
+                    Task { @MainActor in push(.accessCodes(homeId: accessHomeId, homeName: homeName)) }
                 },
                 onOpenTasks: { id in
                     Task { @MainActor in push(.homeTasks(homeId: id)) }
@@ -625,6 +675,56 @@ public struct HubTabRoot: View {
             }
         case let .startPoll(homeId):
             StartPollFormView(homeId: homeId) {
+                if !path.isEmpty { path.removeLast() }
+            }
+        case let .accessCodes(homeId, homeName):
+            AccessCodesView(
+                viewModel: AccessCodesViewModel(
+                    homeId: homeId,
+                    homeName: homeName
+                ) { target in
+                    Task { @MainActor in
+                        switch target {
+                        case let .addCode(homeId: targetHomeId, category: category):
+                            push(.editAccessCode(
+                                homeId: targetHomeId,
+                                secretId: nil,
+                                categoryRaw: category?.rawValue
+                            ))
+                        case let .editCode(homeId: targetHomeId, secretId: secretId):
+                            push(.editAccessCode(
+                                homeId: targetHomeId,
+                                secretId: secretId,
+                                categoryRaw: nil
+                            ))
+                        case let .search(homeId: targetHomeId):
+                            push(.searchAccessCodes(homeId: targetHomeId))
+                        }
+                    }
+                }
+            )
+        case let .searchAccessCodes(homeId):
+            AccessCodesSearchView(
+                viewModel: AccessCodesSearchViewModel(
+                    homeId: homeId,
+                    onOpenCode: { secretId in
+                        Task { @MainActor in
+                            push(.editAccessCode(
+                                homeId: homeId,
+                                secretId: secretId,
+                                categoryRaw: nil
+                            ))
+                        }
+                    },
+                    onCancel: { if !path.isEmpty { path.removeLast() } }
+                )
+            )
+        case let .editAccessCode(homeId, secretId, categoryRaw):
+            EditAccessCodeFormView(
+                homeId: homeId,
+                secretId: secretId,
+                initialCategory: categoryRaw.flatMap { AccessCategory(rawValue: $0) }
+            ) {
                 if !path.isEmpty { path.removeLast() }
             }
         case let .homePets(homeId):
@@ -832,8 +932,10 @@ public struct HubTabRoot: View {
             HouseholdTasksListView(
                 viewModel: HouseholdTasksListViewModel(
                     homeId: homeId,
-                    onOpenTask: { _ in
-                        Task { @MainActor in push(.placeholder(label: "Task detail")) }
+                    onOpenTask: { taskId in
+                        Task { @MainActor in
+                            push(.editHouseholdTask(homeId: homeId, taskId: taskId))
+                        }
                     },
                     onAddTask: {
                         Task { @MainActor in push(.addHouseholdTask(homeId: homeId)) }
@@ -914,7 +1016,9 @@ public struct HubTabRoot: View {
                 businessId: businessId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
-                onShare: { Task { @MainActor in push(.placeholder(label: "Share business")) } },
+                onShare: {
+                    systemSheet = .share(items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"])
+                },
                 onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } }
             )
         case let .pulsePost(postId):
@@ -1102,8 +1206,8 @@ public struct HubTabRoot: View {
                             items: ["Check out \(name) on Pantopus — \(InviteLinks.downloadURLString)"]
                         )
                     },
-                    onOpenBuyer: { _ in
-                        Task { @MainActor in push(.placeholder(label: "Buyer profile")) }
+                    onOpenBuyer: { buyer in
+                        Task { @MainActor in push(.publicProfile(userId: buyer.id)) }
                     },
                     onOpenTransaction: { _ in
                         Task { @MainActor in push(.placeholder(label: "Transaction detail")) }
@@ -1319,8 +1423,9 @@ public struct HubTabRoot: View {
                     counterparty: Self.chatCounterparty(for: dest),
                     currentUserId: currentUserId
                 ),
-                mode: dest.kind
-            ) { if !path.isEmpty { path.removeLast() } }
+                mode: dest.kind,
+                onBack: { if !path.isEmpty { path.removeLast() } }
+            )
         case .menu:
             SettingsView(
                 onClose: { if !path.isEmpty { path.removeLast() } },
@@ -1370,7 +1475,14 @@ public struct HubTabRoot: View {
         // Wave A — pre-staged placeholder destinations. When an A.x screen
         // ships, swap its single line below for the real view.
         case .todayDetail:
-            TodayDetailView { pop() }
+            TodayDetailView(
+                onBack: pop,
+                onShare: {
+                    systemSheet = .share(items: ["Today's Pantopus briefing — \(InviteLinks.downloadURLString)"])
+                },
+                onMore: { push(.menu) },
+                onManage: { push(.notifications) }
+            )
         case let .propertyDetails(homeId):
             PropertyDetailsView(
                 homeId: homeId,

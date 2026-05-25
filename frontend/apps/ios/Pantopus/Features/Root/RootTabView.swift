@@ -100,32 +100,20 @@ public struct RootTabView: View {
 
     private func consumeInviteDeepLinkIfNeeded(pending: DeepLinkRouter.Destination?) {
         guard let pending else { return }
-        // Tab-level destinations: switch tabs (the per-tab route stack
-        // handles deeper drill-downs when those tabs route the
-        // pending entry into their own NavigationStack — for the T4.1
-        // pass we just land the user on the matching tab and let the
-        // user finish the drill).
+        // Root owns cross-tab dispatch. Concrete drill-down links stay
+        // pending so the selected tab can push them into its own
+        // NavigationStack.
         switch pending {
         case let .invite(token):
             pendingInviteToken = token
             _ = router.consume()
-        case .feed, .post, .supportTrain, .user:
+        case .feed, .post, .supportTrain, .user,
+             .connections, .discoverHub,
+             .gig, .listing, .homeDetail, .homeDashboard, .homeMemberRequests,
+             .notifications:
             model.selected = .hub
-            _ = router.consume()
-        case .connections, .discoverHub:
-            // Switch to Hub but leave the destination pending — `HubTabRoot`
-            // consumes it from there and pushes the target screen onto the
-            // Hub navigation stack.
-            model.selected = .hub
-        case .gig, .listing, .homeDetail, .homeDashboard, .homeMemberRequests:
-            model.selected = .hub
-            _ = router.consume()
         case .conversation:
             model.selected = .inbox
-            _ = router.consume()
-        case .notifications:
-            model.selected = .hub
-            _ = router.consume()
         case .home:
             model.selected = .hub
             _ = router.consume()
