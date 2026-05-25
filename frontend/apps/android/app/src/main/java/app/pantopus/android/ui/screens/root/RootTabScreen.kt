@@ -169,6 +169,7 @@ import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.inbox.chat.ConversationIdentityChip
 import app.pantopus.android.ui.screens.inbox.chat.ConversationRowContent
 import app.pantopus.android.ui.screens.inbox.chat.ConversationRowVariant
+import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationChrome
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationHost
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationMode
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
@@ -2166,14 +2167,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 ChatConversationHost(
                     mode = mode,
                     counterparty = counterparty,
-                    conversationMode = conversationMode,
-                    creatorChrome =
-                        creatorContext?.let {
-                            ChatCreatorThreadChrome(
-                                context = it,
-                                onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
-                            )
-                        },
+                    chrome =
+                        ChatConversationChrome(
+                            mode = conversationMode,
+                            creatorThread =
+                                creatorContext?.let {
+                                    ChatCreatorThreadChrome(
+                                        context = it,
+                                        onOpenAudienceProfile = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
+                                    )
+                                },
+                        ),
                     onBack = { navController.popBackStack() },
                     scrollToMessageId = scrollTo,
                 )

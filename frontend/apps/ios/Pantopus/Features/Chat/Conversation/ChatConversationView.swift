@@ -16,6 +16,7 @@ import SwiftUI
 public struct ChatConversationView: View {
     @State private var viewModel: ChatConversationViewModel
     @State private var attachmentsPresented = false
+    @State private var upgradePromptPresented = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Presentation mode — drives the AI chrome (avatar, welcome card,
     /// reply bubbles). Default `.dm`.
@@ -53,6 +54,11 @@ public struct ChatConversationView: View {
                 )
                 ChatCreatorQuotaMeter(quota: resolvedCreatorContext.quota)
             }
+            if mode == .fanThread {
+                FanMembershipStripe(entitlement: activeFanEntitlement) {
+                    upgradePromptPresented = true
+                }
+            }
             content
             if viewModel.isCounterpartyTyping {
                 ChatTypingIndicator(initials: incomingInitials ?? initials(of: viewModel.counterparty.displayName))
@@ -62,6 +68,11 @@ public struct ChatConversationView: View {
                     viewModel.removeQueuedAttachment(id: id)
                 }
             }
+            if mode == .fanThread {
+                FanQuotaGate(entitlement: activeFanEntitlement) {
+                    upgradePromptPresented = true
+                }
+            }
             ChatComposer(
                 text: Binding(
                     get: { viewModel.composerText },
@@ -69,9 +80,11 @@ public struct ChatConversationView: View {
                 ),
                 placeholder: composerPlaceholder,
                 canSend: viewModel.canSend,
+                showsSendCost: mode == .fanThread && !isFanReplyLocked,
+                isLockedAction: isFanReplyLocked,
                 onAttach: { attachmentsPresented = true },
                 onEmoji: {},
-                onSend: { Task { await viewModel.send() } }
+                onSend: { sendOrPromptForUpgrade() }
             )
         }
         .background(Theme.Color.appSurface)
@@ -90,6 +103,10 @@ public struct ChatConversationView: View {
             Button("Location") {}
             Button("Cancel", role: .cancel) {}
         }
+        .sheet(isPresented: $upgradePromptPresented) {
+            FanTierUpgradePromptSheet(entitlement: activeFanEntitlement)
+                .presentationDetents([.medium])
+        }
         .accessibilityIdentifier("chatConversation")
     }
 
@@ -99,11 +116,40 @@ public struct ChatConversationView: View {
 
     private var composerPlaceholder: String {
         if mode == .aiAssistant { return "Ask Pantopus AI…" }
+        if mode == .fanThread {
+            let first = firstWord(viewModel.counterparty.displayName)
+            if let required = activeFanEntitlement.requiredReplyTier {
+                return "Upgrade to \(required) to reply…"
+            }
+            return "Message \(first)… (uses 1 of \(activeFanEntitlement.messageLimit))"
+        }
         switch viewModel.counterparty {
         case let .person(name, _, _, _, _): return "Message \(firstWord(name))…"
         case let .group(name, _): return "Message \(firstWord(name))…"
         case .ai: return "Ask Pantopus AI…"
         }
+    }
+
+    private var activeFanEntitlement: ChatFanEntitlement {
+        viewModel.fanEntitlement ?? ChatFanEntitlement(
+            currentTier: "Bronze",
+            renewsOn: "Apr 12",
+            messagesLeft: 3,
+            messageLimit: 5,
+            resetCopy: "Resets May 1"
+        )
+    }
+
+    private var isFanReplyLocked: Bool {
+        mode == .fanThread && !activeFanEntitlement.canReply
+    }
+
+    private func sendOrPromptForUpgrade() {
+        if isFanReplyLocked {
+            upgradePromptPresented = true
+            return
+        }
+        Task { await viewModel.send() }
     }
 
     private func firstWord(_ raw: String) -> String {
@@ -145,6 +191,8 @@ public struct ChatConversationView: View {
     @ViewBuilder private var emptyFrame: some View {
         if mode == .aiAssistant {
             aiWelcomeFrame
+        } else if mode == .fanThread {
+            fanEmptyFrame
         } else {
             switch viewModel.counterparty {
             case .ai:
@@ -181,6 +229,37 @@ public struct ChatConversationView: View {
         .padding(.horizontal, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("chatConversationEmpty")
+    }
+
+    private var fanEmptyFrame: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                FanAutoWelcomeCard()
+                VStack(spacing: 12) {
+                    Text("Start a conversation")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text(
+                        "You can message \(firstWord(viewModel.counterparty.displayName)) directly. " +
+                            "Each send uses one of your monthly \(activeFanEntitlement.currentTier) replies."
+                    )
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 280)
+                    FanQuotaHero(entitlement: activeFanEntitlement)
+                    FanOpeners { label in
+                        viewModel.composerText = label
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 8)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 16)
+        }
+        .accessibilityIdentifier("chatConversationFanEmpty")
     }
 
     private var quickChipsRow: some View {
@@ -303,6 +382,10 @@ extension ChatConversationView {
                             .frame(height: 1)
                             .onAppear { Task { await viewModel.loadOlder() } }
                     }
+                    if mode == .fanThread {
+                        FanAutoWelcomeCard()
+                            .padding(.bottom, 12)
+                    }
                     ForEach(rows) { row in
                         timelineRowView(row)
                     }
@@ -335,12 +418,17 @@ extension ChatConversationView {
         case let .broadcastReference(reference):
             ChatBroadcastReferenceCard(reference: reference)
         case let .bubble(bubble):
-            ChatBubbleRow(content: bubble, incomingInitials: incomingInitials) {
-                if let clientId = bubble.id.split(separator: "_").last.map(String.init),
-                   bubble.id.hasPrefix("client_") {
-                    Task { await viewModel.retry(clientId: "client_\(clientId)") }
+            ChatBubbleRow(
+                content: bubble,
+                incomingInitials: incomingInitials,
+                onLockedAction: { upgradePromptPresented = true },
+                onRetry: {
+                    if let clientId = bubble.id.split(separator: "_").last.map(String.init),
+                       bubble.id.hasPrefix("client_") {
+                        Task { await viewModel.retry(clientId: "client_\(clientId)") }
+                    }
                 }
-            }
+            )
         }
     }
 
@@ -385,6 +473,324 @@ extension ChatConversationViewModel {
     }
 }
 
+// MARK: - Fan thread chrome
+
+private struct FanMembershipStripe: View {
+    let entitlement: ChatFanEntitlement
+    let onManage: @MainActor () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 4) {
+                Icon(.crown, size: 10, strokeWidth: 2.6, color: Theme.Color.warning)
+                Text(entitlement.currentTier.uppercased())
+                    .font(.system(size: 9.5, weight: .bold))
+                    .tracking(0.4)
+                    .foregroundStyle(Theme.Color.warning)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Theme.Color.warningBg)
+            .clipShape(Capsule())
+
+            HStack(spacing: 4) {
+                Icon(.calendar, size: 11, color: Theme.Color.appTextMuted)
+                Text("renews ")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                Text(entitlement.renewsOn)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+            }
+            Spacer(minLength: 0)
+            Button(action: onManage) {
+                HStack(spacing: 3) {
+                    Text("Manage")
+                    Icon(.chevronRight, size: 11, strokeWidth: 2.5, color: Theme.Color.primary600)
+                }
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.primary600)
+                .frame(minWidth: 44, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("chatFanManageMembership")
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .frame(height: 44)
+        .background(Theme.Color.appSurface)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+        }
+        .accessibilityIdentifier("chatFanMembershipStripe")
+    }
+}
+
+private struct FanQuotaGate: View {
+    let entitlement: ChatFanEntitlement
+    let onUpgrade: @MainActor () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 4) {
+                Icon(.messageSquare, size: 11, strokeWidth: 2.4, color: gateColor)
+                Text("\(entitlement.messagesLeft)")
+                    .font(.system(size: 11, weight: .heavy))
+                Text("of \(entitlement.messageLimit) left")
+                    .font(.system(size: 10.5, weight: .bold))
+            }
+            .foregroundStyle(gateColor)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(entitlement.canReply ? Theme.Color.infoBg : Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                    .stroke(entitlement.canReply ? Theme.Color.infoLight : Theme.Color.warningLight, lineWidth: 1)
+            )
+            .clipShape(Capsule())
+
+            Text(entitlement.requiredReplyTier.map { "\($0) required" } ?? entitlement.resetCopy)
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            Button(action: onUpgrade) {
+                HStack(spacing: 3) {
+                    Text("Upgrade")
+                    Icon(.arrowUpRight, size: 11, strokeWidth: 2.5, color: Theme.Color.primary600)
+                }
+                .font(.system(size: 10.5, weight: .bold))
+                .foregroundStyle(Theme.Color.primary600)
+                .frame(minWidth: 44, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("chatFanQuotaUpgrade")
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .frame(height: 50)
+        .background(entitlement.canReply ? Theme.Color.appSurface : Theme.Color.warningBg)
+        .overlay(alignment: .top) {
+            Rectangle().fill(entitlement.canReply ? Theme.Color.appBorder : Theme.Color.warningLight).frame(height: 1)
+        }
+        .accessibilityIdentifier("chatFanQuotaGate")
+    }
+
+    private var gateColor: Color {
+        entitlement.canReply ? Theme.Color.primary700 : Theme.Color.warning
+    }
+}
+
+private struct FanAutoWelcomeCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 4) {
+                Icon(.sparkles, size: 9, strokeWidth: 2.8, color: Theme.Color.business)
+                Text("AUTO-WELCOME · FREE")
+                    .font(.system(size: 9.5, weight: .bold))
+                    .tracking(0.6)
+                    .foregroundStyle(Theme.Color.business)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Theme.Color.businessBg)
+            .clipShape(Capsule())
+
+            Text("Welcome to the Diary, Maria.")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+            Text(
+                "First message is on me — ask anything bread-related, share a bake, " +
+                    "or just say hi. I read everything personally on Sunday evenings."
+            )
+            .font(.system(size: 12.5))
+            .lineSpacing(4)
+            .foregroundStyle(Theme.Color.appTextStrong)
+            Text("— Wynn")
+                .font(.system(size: 12, weight: .medium))
+                .italic()
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .shadow(color: Theme.Color.appText.opacity(0.06), radius: 6, x: 0, y: 2)
+        .accessibilityIdentifier("chatFanAutoWelcome")
+    }
+}
+
+private struct FanQuotaHero: View {
+    let entitlement: ChatFanEntitlement
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Icon(.messageSquare, size: 13, strokeWidth: 2.5, color: Theme.Color.primary700)
+            Text("\(entitlement.messageLimit) messages")
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundStyle(Theme.Color.primary700)
+            Text("this period")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.primary700)
+            Text("·")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.Color.primary300)
+            Text(entitlement.resetCopy)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.Color.primary600)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Theme.Color.infoBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                .stroke(Theme.Color.infoLight, lineWidth: 1)
+        )
+        .clipShape(Capsule())
+        .accessibilityIdentifier("chatFanQuotaHero")
+    }
+}
+
+private struct FanOpeners: View {
+    let onSelect: @MainActor (String) -> Void
+
+    private let openers: [FanOpener] = [
+        FanOpener(
+            id: "recipe",
+            icon: .helpCircle,
+            label: "Recipe question",
+            title: "Why does my crumb come out tight on day 2?"
+        ),
+        FanOpener(
+            id: "photo",
+            icon: .image,
+            label: "Share a bake",
+            title: "Send a photo for feedback"
+        ),
+        FanOpener(
+            id: "workshop",
+            icon: .calendar,
+            label: "Workshops",
+            title: "When's the next hands-on session?"
+        )
+    ]
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ForEach(openers, id: \.id) { opener in
+                Button {
+                    onSelect(opener.title)
+                } label: {
+                    HStack(spacing: 10) {
+                        Icon(opener.icon, size: 14, color: Theme.Color.business)
+                            .frame(width: 30, height: 30)
+                            .background(Theme.Color.businessBg)
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(opener.label.uppercased())
+                                .font(.system(size: 9.5, weight: .bold))
+                                .tracking(0.6)
+                                .foregroundStyle(Theme.Color.appTextMuted)
+                            Text(opener.title)
+                                .font(.system(size: 12.5, weight: .medium))
+                                .foregroundStyle(Theme.Color.appText)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                        }
+                        Spacer(minLength: 0)
+                        Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 50)
+                    .background(Theme.Color.appSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                            .stroke(Theme.Color.appBorder, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("chatFanOpener_\(opener.id)")
+            }
+        }
+        .accessibilityIdentifier("chatFanOpeners")
+    }
+}
+
+private struct FanOpener: Identifiable {
+    let id: String
+    let icon: PantopusIcon
+    let label: String
+    let title: String
+}
+
+struct FanTierUpgradePromptSheet: View {
+    let entitlement: ChatFanEntitlement
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                Icon(.lock, size: 20, color: Theme.Color.primary600)
+                    .frame(width: 44, height: 44)
+                    .background(Theme.Color.primary50)
+                    .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Upgrade to \(entitlement.requiredReplyTier ?? "Silver")")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("Your \(entitlement.currentTier) support does not unlock this reply yet.")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                FanUpgradeBenefit(icon: .messageSquare, title: "Read tier-locked replies")
+                FanUpgradeBenefit(icon: .arrowUpRight, title: "Reply without the current tier gate")
+                FanUpgradeBenefit(icon: .crown, title: "Keep supporting this creator")
+            }
+
+            Button {} label: {
+                Text("Upgrade membership")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextInverse)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Theme.Color.primary600)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("chatFanUpgradeConfirm")
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 24)
+        .background(Theme.Color.appSurface)
+        .accessibilityIdentifier("chatFanUpgradePromptSheet")
+    }
+}
+
+private struct FanUpgradeBenefit: View {
+    let icon: PantopusIcon
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Icon(icon, size: 14, color: Theme.Color.primary600)
+                .frame(width: 28, height: 28)
+                .background(Theme.Color.primary50)
+                .clipShape(Circle())
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextStrong)
+        }
+    }
+}
+
 // MARK: - Header
 
 private struct ChatConversationHeader: View {
@@ -409,6 +815,7 @@ private struct ChatConversationHeader: View {
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(1)
                     if mode == .aiAssistant { betaPill }
+                    if mode == .fanThread { personaPill }
                     if mode == .creatorThread {
                         CreatorTierChip(
                             name: creatorContext.fanTierName,
@@ -444,6 +851,8 @@ private struct ChatConversationHeader: View {
     @ViewBuilder private var avatar: some View {
         if mode == .aiAssistant {
             ChatAIAvatar(size: 32)
+        } else if mode == .fanThread {
+            ChatFanPersonaAvatar(initials: fanInitials, size: 32)
         } else if mode == .creatorThread {
             switch counterparty {
             case let .person(_, initials, _, verified, online):
@@ -478,7 +887,13 @@ private struct ChatConversationHeader: View {
     }
 
     @ViewBuilder private var trailingActions: some View {
-        if mode == .creatorThread {
+        if mode == .fanThread {
+            HStack(spacing: 0) {
+                Icon(.externalLink, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
+                Icon(.moreHorizontal, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
+            }
+            .accessibilityHidden(true)
+        } else if mode == .creatorThread {
             HStack(spacing: 0) {
                 Icon(.user, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
                 Icon(.moreHorizontal, size: 18, color: Theme.Color.appText).frame(width: 34, height: 34)
@@ -520,7 +935,29 @@ private struct ChatConversationHeader: View {
             )
     }
 
+    private var personaPill: some View {
+        HStack(spacing: 3) {
+            Icon(.briefcase, size: 9, strokeWidth: 2.6, color: Theme.Color.business)
+            Text("Persona")
+                .font(.system(size: 9, weight: .bold))
+                .tracking(0.4)
+                .foregroundStyle(Theme.Color.business)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Theme.Color.businessBg)
+        .clipShape(Capsule())
+    }
+
     private var presence: String? {
+        if mode == .fanThread {
+            switch counterparty {
+            case let .person(_, _, locality, _, _):
+                return locality.map { "\($0) · creator" } ?? "Creator"
+            default:
+                return "Creator"
+            }
+        }
         if mode == .creatorThread {
             return creatorContext.fanSubtitle
         }
@@ -537,11 +974,20 @@ private struct ChatConversationHeader: View {
     }
 
     private var presenceOnline: Bool {
+        if mode == .fanThread { return true }
         if mode == .creatorThread {
             return creatorContext.fanTierRank > 1
         }
         if case let .person(_, _, _, _, online) = counterparty { return online }
         return false
+    }
+
+    private var fanInitials: String {
+        switch counterparty {
+        case let .person(_, initials, _, _, _): initials
+        case let .group(name, _): groupInitials(name)
+        case .ai: "AI"
+        }
     }
 
     private func groupInitials(_ name: String) -> String {
@@ -581,17 +1027,16 @@ private struct ChatCreatorAudienceStrip: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .background(Theme.Color.businessBg)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(Theme.Color.business.opacity(0.18), lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-            .padding(.bottom, 0)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Open audience profile. \(context.audienceSummary)")
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .accessibilityLabel("Open audience profile")
         .accessibilityIdentifier("chatCreatorAudienceStrip")
     }
 }
@@ -601,7 +1046,7 @@ private struct ChatCreatorQuotaMeter: View {
 
     private var progress: CGFloat {
         guard quota.total > 0 else { return 0 }
-        return min(1, max(0, CGFloat(quota.used) / CGFloat(quota.total)))
+        return min(max(CGFloat(quota.used) / CGFloat(quota.total), 0), 1)
     }
 
     var body: some View {
@@ -613,16 +1058,16 @@ private struct ChatCreatorQuotaMeter: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                Spacer(minLength: 0)
+                Spacer()
                 Text("\(quota.used) of \(quota.total) replies this week")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
             }
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
                         .fill(Theme.Color.appSurfaceSunken)
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
                         .fill(Theme.Color.primary600)
                         .frame(width: proxy.size.width * progress)
                 }
@@ -633,7 +1078,6 @@ private struct ChatCreatorQuotaMeter: View {
                 Text(quota.resetCopy)
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.Color.appTextMuted)
-                Spacer(minLength: 0)
             }
         }
         .padding(.horizontal, 14)
@@ -642,8 +1086,6 @@ private struct ChatCreatorQuotaMeter: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(quota.used) of \(quota.total) replies this week. \(quota.resetCopy)")
         .accessibilityIdentifier("chatCreatorQuotaMeter")
     }
 }
@@ -654,46 +1096,81 @@ private struct CreatorTierChip: View {
 
     var body: some View {
         HStack(spacing: 3) {
-            if let icon = tierIcon {
-                Icon(icon, size: 9, strokeWidth: 2.4, color: creatorTierColor(rank: rank))
+            if rank >= 4 {
+                Icon(.crown, size: 9, strokeWidth: 2.4, color: creatorTierColor(rank: rank))
+            } else if rank >= 2 {
+                Icon(.shield, size: 9, strokeWidth: 2.4, color: creatorTierColor(rank: rank))
             }
             Text(name.uppercased())
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(creatorTierColor(rank: rank))
-                .lineLimit(1)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
         .background(creatorTierBgColor(rank: rank))
-        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
-        .accessibilityLabel("\(name) tier")
+        .clipShape(Capsule())
         .accessibilityIdentifier("chatCreatorTierChip")
-    }
-
-    private var tierIcon: PantopusIcon? {
-        if rank >= 4 { return .crown }
-        if rank >= 2 { return .shield }
-        return nil
     }
 }
 
 private func creatorTierColor(rank: Int) -> Color {
     switch rank {
-    case 1: Theme.Color.appTextSecondary
-    case 2: Theme.Color.warning
-    case 3: Theme.Color.appTextStrong
-    case 4: Theme.Color.warning
-    default: Theme.Color.appTextSecondary
+    case 1:
+        Theme.Color.appTextSecondary
+    case 2:
+        Theme.Color.warning
+    case 3:
+        Theme.Color.appTextStrong
+    case 4:
+        Theme.Color.warning
+    default:
+        Theme.Color.appTextSecondary
     }
 }
 
 private func creatorTierBgColor(rank: Int) -> Color {
     switch rank {
-    case 1: Theme.Color.appSurfaceSunken
-    case 2: Theme.Color.warningBg
-    case 3: Theme.Color.appSurfaceSunken
-    case 4: Theme.Color.warningLight
-    default: Theme.Color.appSurfaceSunken
+    case 1:
+        Theme.Color.appSurfaceSunken
+    case 2:
+        Theme.Color.warningBg
+    case 3:
+        Theme.Color.appSurfaceSunken
+    case 4:
+        Theme.Color.warningLight
+    default:
+        Theme.Color.appSurfaceSunken
+    }
+}
+
+private struct ChatFanPersonaAvatar: View {
+    let initials: String
+    let size: CGFloat
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Circle()
+                .fill(Theme.Color.business)
+                .frame(width: size, height: size)
+            Circle()
+                .strokeBorder(Theme.Color.appSurface, lineWidth: 2)
+                .overlay(
+                    Circle()
+                        .strokeBorder(Theme.Color.businessBg, lineWidth: 3)
+                        .padding(2)
+                )
+                .frame(width: size, height: size)
+            Text(initials)
+                .font(.system(size: size * 0.38, weight: .bold))
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .frame(width: size, height: size)
+            Circle()
+                .fill(Theme.Color.success)
+                .frame(width: 10, height: 10)
+                .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
+        }
+        .frame(width: size + 4, height: size + 4)
+        .accessibilityHidden(true)
     }
 }
 
@@ -804,9 +1281,11 @@ private struct ChatBroadcastReferenceCard: View {
     }
 }
 
+// swiftlint:disable:next type_body_length
 private struct ChatBubbleRow: View {
     let content: ChatBubbleContent
     let incomingInitials: String?
+    let onLockedAction: @MainActor () -> Void
     let onRetry: @MainActor () -> Void
 
     var body: some View {
@@ -842,6 +1321,9 @@ private struct ChatBubbleRow: View {
             case let .aiReply(text, estimate):
                 aiReplyBubble(text: text, estimate: estimate)
             }
+            if let tier = content.sentSupportTier, content.side == .outgoing {
+                paidSupportFooter(tier: tier)
+            }
             if let stamp = content.stamp {
                 stampView(stamp)
             }
@@ -850,14 +1332,21 @@ private struct ChatBubbleRow: View {
 
     private func bubbleContainer(@ViewBuilder _ inner: () -> some View) -> some View {
         let isOut = content.side == .outgoing
-        return inner()
-            .padding(.horizontal, 13)
-            .padding(.vertical, 9)
-            .background(
-                isOut ? Theme.Color.primary600 : Theme.Color.appSurfaceSunken,
-                in: bubbleShape
-            )
-            .foregroundStyle(isOut ? Theme.Color.appTextInverse : Theme.Color.appText)
+        return ZStack(alignment: .bottom) {
+            inner()
+                .padding(.horizontal, 13)
+                .padding(.vertical, 9)
+                .frame(maxWidth: .infinity, alignment: alignmentToFrameAlignment)
+                .background(
+                    isOut ? Theme.Color.primary600 : Theme.Color.appSurfaceSunken,
+                    in: bubbleShape
+                )
+                .foregroundStyle(isOut ? Theme.Color.appTextInverse : Theme.Color.appText)
+            if let tier = content.lockedTier, content.side == .incoming {
+                lockedPaywallOverlay(tier: tier)
+            }
+        }
+        .clipShape(bubbleShape)
     }
 
     private func textBody(_ text: String) -> some View {
@@ -868,18 +1357,23 @@ private struct ChatBubbleRow: View {
     }
 
     private func photoBubble(_ url: URL?) -> some View {
-        imageBody(url)
-            .frame(width: 200, height: 130)
-            .background(Theme.Color.appSurfaceSunken)
-            .clipShape(bubbleShape)
-            .overlay(
-                bubbleShape.stroke(
-                    content.side == .incoming ? Theme.Color.appBorder : Color.clear,
-                    lineWidth: content.side == .incoming ? 1 : 0
-                )
+        ZStack(alignment: .bottom) {
+            imageBody(url)
+                .frame(width: 200, height: 130)
+                .background(Theme.Color.appSurfaceSunken)
+            if let tier = content.lockedTier, content.side == .incoming {
+                lockedPaywallOverlay(tier: tier)
+            }
+        }
+        .clipShape(bubbleShape)
+        .overlay(
+            bubbleShape.stroke(
+                content.side == .incoming ? Theme.Color.appBorder : Color.clear,
+                lineWidth: content.side == .incoming ? 1 : 0
             )
-            .accessibilityLabel("Photo attachment")
-            .accessibilityIdentifier("chatPhotoBubble_\(content.id)")
+        )
+        .accessibilityLabel("Photo attachment")
+        .accessibilityIdentifier("chatPhotoBubble_\(content.id)")
     }
 
     @ViewBuilder
@@ -941,6 +1435,57 @@ private struct ChatBubbleRow: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
         .frame(maxWidth: .infinity)
+    }
+
+    private func lockedPaywallOverlay(tier: String) -> some View {
+        VStack {
+            Spacer(minLength: 12)
+            Button(action: onLockedAction) {
+                HStack(spacing: 6) {
+                    Icon(.lock, size: 12, strokeWidth: 2.6, color: Theme.Color.primary600)
+                    Text("Upgrade to read")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.primary600)
+                    Text(tier)
+                        .font(.system(size: 10.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                .padding(.horizontal, 10)
+                .frame(minHeight: 44)
+                .background(Theme.Color.appSurface)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Upgrade to \(tier) to read")
+            .accessibilityIdentifier("chatLockedUpgrade_\(content.id)")
+        }
+        .frame(maxWidth: 260)
+        .background(
+            LinearGradient(
+                colors: [
+                    Theme.Color.appSurface.opacity(0.15),
+                    Theme.Color.appSurface.opacity(0.96)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .accessibilityIdentifier("chatPaywallOverlay_\(content.id)")
+    }
+
+    private func paidSupportFooter(tier: String) -> some View {
+        HStack(spacing: 5) {
+            Icon(.crown, size: 10, strokeWidth: 2.4, color: Theme.Color.warning)
+            Text("Sent with \(tier) support")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Theme.Color.warning)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
+        .background(Theme.Color.warningBg)
+        .clipShape(Capsule())
+        .padding(.top, 4)
+        .accessibilityIdentifier("chatPaidSupportFooter_\(content.id)")
     }
 
     // MARK: - AI reply
@@ -1280,6 +1825,8 @@ private struct ChatComposer: View {
     @Binding var text: String
     let placeholder: String
     let canSend: Bool
+    let showsSendCost: Bool
+    let isLockedAction: Bool
     let onAttach: @MainActor () -> Void
     let onEmoji: @MainActor () -> Void
     let onSend: @MainActor () -> Void
@@ -1323,11 +1870,29 @@ private struct ChatComposer: View {
             .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
 
             Button(action: onSend) {
-                Icon(.arrowUp, size: 18, strokeWidth: 2.5, color: canSend ? Theme.Color.appTextInverse : Theme.Color.appTextMuted)
+                ZStack(alignment: .topTrailing) {
+                    Icon(
+                        isLockedAction ? .lock : .arrowUp,
+                        size: 18,
+                        strokeWidth: 2.5,
+                        color: canSend ? Theme.Color.appTextInverse : Theme.Color.appTextMuted
+                    )
                     .frame(width: 36, height: 36)
-                    .background(canSend ? Theme.Color.primary600 : Theme.Color.appSurfaceSunken, in: Circle())
-                    .shadow(color: canSend ? Theme.Color.primary600.opacity(0.30) : .clear, radius: 10, x: 0, y: 4)
+                    .background(sendBackground, in: Circle())
+                    .shadow(color: canSend ? sendBackground.opacity(0.30) : .clear, radius: 10, x: 0, y: 4)
                     .frame(width: 44, height: 44)
+                    if showsSendCost && canSend {
+                        Text("-1")
+                            .font(.system(size: 9, weight: .heavy))
+                            .foregroundStyle(Theme.Color.primary700)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Theme.Color.appSurface)
+                            .overlay(Capsule().stroke(Theme.Color.primary600, lineWidth: 1))
+                            .clipShape(Capsule())
+                            .offset(x: 7, y: -6)
+                    }
+                }
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
@@ -1341,5 +1906,10 @@ private struct ChatComposer: View {
         .overlay(alignment: .top) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
         }
+    }
+
+    private var sendBackground: Color {
+        guard canSend else { return Theme.Color.appSurfaceSunken }
+        return isLockedAction ? Theme.Color.warning : Theme.Color.primary600
     }
 }

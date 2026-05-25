@@ -29,6 +29,31 @@ final class ChatConversationSnapshotTests: XCTestCase {
         assertRenders(viewModel: ChatConversationSampleData.aiActiveViewModel())
     }
 
+    func test_fan_empty_thread_renders() {
+        assertRenders(
+            viewModel: ChatConversationSampleData.fanEmptyViewModel(),
+            mode: .fanThread
+        )
+    }
+
+    func test_fan_active_thread_with_locked_reply_renders() {
+        assertRenders(
+            viewModel: ChatConversationSampleData.fanActiveViewModel(),
+            mode: .fanThread
+        )
+    }
+
+    func test_fan_upgrade_prompt_sheet_renders() {
+        let host = UIHostingController(
+            rootView: FanTierUpgradePromptSheet(entitlement: ChatConversationSampleData.fanLockedEntitlement)
+                .frame(width: 390, height: 420)
+        )
+        host.view.frame = CGRect(x: 0, y: 0, width: 390, height: 420)
+        host.view.layoutIfNeeded()
+        XCTAssertGreaterThan(host.view.frame.size.width, 0)
+        XCTAssertGreaterThan(host.view.frame.size.height, 0)
+    }
+
     func test_dm_photo_bubble_with_read_receipt_renders() {
         assertRenders(viewModel: ChatConversationSampleData.dmPhotoReadReceiptViewModel(), mode: .dm)
     }

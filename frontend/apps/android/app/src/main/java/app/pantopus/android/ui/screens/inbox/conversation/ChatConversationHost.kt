@@ -35,8 +35,7 @@ fun ChatConversationHost(
     mode: ChatThreadMode,
     counterparty: ChatCounterparty,
     onBack: () -> Unit,
-    conversationMode: ChatConversationMode = ChatConversationMode.Dm,
-    creatorChrome: ChatCreatorThreadChrome? = null,
+    chrome: ChatConversationChrome = ChatConversationChrome(),
     scrollToMessageId: String? = null,
     authViewModel: ChatConversationHostViewModel = hiltViewModel(),
 ) {
@@ -50,8 +49,7 @@ fun ChatConversationHost(
                 currentUserId = currentUserId,
                 scrollToMessageId = scrollToMessageId,
             ),
-        conversationMode = conversationMode,
-        creatorChrome = creatorChrome,
+        chrome = chrome,
         onBack = onBack,
     )
 }

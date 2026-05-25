@@ -430,6 +430,8 @@ class ChatConversationViewModel
                             hasTail = hasTail,
                             stamp = stamp,
                             deliveryState = deliveryState,
+                            lockedTier = lockedTierOf(message),
+                            sentSupportTier = sentSupportTierOf(message),
                             isContinuation = previousSameSide,
                         ),
                     ),
@@ -481,6 +483,27 @@ class ChatConversationViewModel
                     )
                 else -> ChatBubbleBody.Text(message.messageText.orEmpty())
             }
+
+        private fun lockedTierOf(message: ChatMessageDto): String? {
+            val metadata = message.metadata ?: return null
+            val isLocked =
+                metadata["tier_locked"] as? Boolean
+                    ?: metadata["is_locked"] as? Boolean
+                    ?: metadata["locked"] as? Boolean
+                    ?: false
+            if (!isLocked) return null
+            return metadata["required_tier"] as? String
+                ?: metadata["locked_tier"] as? String
+                ?: metadata["tier"] as? String
+                ?: "Silver"
+        }
+
+        private fun sentSupportTierOf(message: ChatMessageDto): String? {
+            val metadata = message.metadata ?: return null
+            return metadata["sent_support_tier"] as? String
+                ?: metadata["support_tier"] as? String
+                ?: metadata["paid_support_tier"] as? String
+        }
 
         private fun broadcastReferenceOf(message: ChatMessageDto): ChatBroadcastReference =
             ChatBroadcastReference(
