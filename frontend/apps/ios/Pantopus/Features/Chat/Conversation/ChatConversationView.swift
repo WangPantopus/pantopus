@@ -177,14 +177,26 @@ public struct ChatConversationView: View {
     // MARK: - Frames
 
     private var loadingFrame: some View {
-        VStack(spacing: Spacing.s0) {
-            Spacer()
-            ProgressView()
-                .progressViewStyle(.circular)
-                .tint(Theme.Color.primary600)
-            Spacer()
+        // Alternating left/right pseudo-bubble shimmers approximate the
+        // populated chat geometry so the loading state doesn't reflow when
+        // messages arrive.
+        VStack(spacing: Spacing.s3) {
+            ForEach(0..<6, id: \.self) { index in
+                HStack {
+                    if index.isMultiple(of: 2) { Spacer(minLength: Spacing.s8) }
+                    Shimmer(
+                        width: index.isMultiple(of: 2) ? 220 : 180,
+                        height: index.isMultiple(of: 3) ? 60 : 40,
+                        cornerRadius: Radii.xl
+                    )
+                    if !index.isMultiple(of: 2) { Spacer(minLength: Spacing.s8) }
+                }
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(Spacing.s4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading conversation")
         .accessibilityIdentifier("chatConversationLoading")
     }
 

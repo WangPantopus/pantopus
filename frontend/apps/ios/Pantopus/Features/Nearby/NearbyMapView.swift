@@ -363,8 +363,7 @@ public struct NearbyMapView: View {
     @ViewBuilder private var sheetBody: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            loadingSheetBody
         case let .error(message):
             VStack(spacing: 10) {
                 Icon(.alertCircle, size: 28, color: Theme.Color.error)
@@ -392,6 +391,27 @@ public struct NearbyMapView: View {
             case .expanded: expandedBody(loaded)
             }
         }
+    }
+
+    private var loadingSheetBody: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            ForEach(0..<5, id: \.self) { _ in
+                HStack(spacing: Spacing.s3) {
+                    Shimmer(width: 44, height: 44, cornerRadius: Radii.lg)
+                    VStack(alignment: .leading, spacing: Spacing.s2) {
+                        Shimmer(width: 180, height: 14)
+                        Shimmer(width: 120, height: 12)
+                    }
+                    Spacer(minLength: Spacing.s0)
+                }
+                .padding(.horizontal, Spacing.s4)
+            }
+        }
+        .padding(.top, Spacing.s3)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading nearby")
+        .accessibilityIdentifier("nearbyMapLoading")
     }
 
     private var collapsedBody: some View {

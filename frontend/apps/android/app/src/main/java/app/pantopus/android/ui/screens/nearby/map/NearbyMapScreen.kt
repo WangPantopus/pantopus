@@ -35,7 +35,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -71,6 +70,7 @@ import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import com.google.android.gms.maps.model.CameraPosition
@@ -805,8 +805,30 @@ private fun headerCountLabel(state: NearbyMapUiState): String =
 
 @Composable
 private fun SheetLoading() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = PantopusColors.primary600)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(top = Spacing.s3)
+                .semantics {
+                    contentDescription = "Loading nearby"
+                }
+                .testTag("nearbyMapLoading"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        repeat(5) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Shimmer(width = 44.dp, height = 44.dp, cornerRadius = Radii.lg)
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                    Shimmer(width = 180.dp, height = 14.dp)
+                    Shimmer(width = 120.dp, height = 12.dp)
+                }
+            }
+        }
     }
 }
 

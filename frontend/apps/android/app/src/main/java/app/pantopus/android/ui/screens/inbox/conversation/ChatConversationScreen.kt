@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -67,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.inbox.conversation.ai.AiCapabilityChip
 import app.pantopus.android.ui.screens.inbox.conversation.ai.AiEstimateCard
 import app.pantopus.android.ui.screens.inbox.conversation.ai.ChatAiAvatar
@@ -931,11 +933,28 @@ private fun FanQuotaGate(
 
 @Composable
 private fun LoadingFrame() {
-    Box(
-        modifier = Modifier.fillMaxSize().testTag("chatConversationLoading"),
-        contentAlignment = Alignment.Center,
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(Spacing.s4)
+                .semantics { contentDescription = "Loading conversation" }
+                .testTag("chatConversationLoading"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        CircularProgressIndicator(color = PantopusColors.primary600)
+        repeat(6) { index ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    if (index % 2 == 0) Arrangement.End else Arrangement.Start,
+            ) {
+                Shimmer(
+                    width = if (index % 2 == 0) 220.dp else 180.dp,
+                    height = if (index % 3 == 0) 60.dp else 40.dp,
+                    cornerRadius = Radii.xl,
+                )
+            }
+        }
     }
 }
 

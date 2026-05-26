@@ -25,7 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -51,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -107,10 +107,30 @@ private fun LoadingFrame(
     onBack: () -> Unit,
     overflowItems: List<ContentDetailOverflowItem>,
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(PantopusColors.appBg)
+                .semantics { contentDescription = "Loading detail" }
+                .testTag("contentDetailLoading"),
+    ) {
         TopNav(onBack = onBack, transparent = false, overflowItems = overflowItems)
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = PantopusColors.primary600)
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+        ) {
+            Shimmer(width = 360.dp, height = 200.dp, cornerRadius = Radii.lg)
+            Shimmer(width = 240.dp, height = 20.dp, cornerRadius = Radii.sm)
+            Shimmer(width = 160.dp, height = 14.dp, cornerRadius = Radii.xs)
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                repeat(4) {
+                    Shimmer(width = 320.dp, height = 14.dp, cornerRadius = Radii.xs)
+                }
+            }
         }
     }
 }

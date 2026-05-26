@@ -87,10 +87,25 @@ public struct TransactionalDetailShell: View {
     private var loadingFrame: some View {
         VStack(spacing: Spacing.s0) {
             topNav(trailing: trailingOverflow(transparent: false), transparent: false)
-            Spacer()
-            ProgressView()
-            Spacer()
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.s4) {
+                    Shimmer(height: 200, cornerRadius: Radii.lg)
+                    Shimmer(width: 240, height: 20, cornerRadius: Radii.sm)
+                    Shimmer(width: 160, height: 14, cornerRadius: Radii.xs)
+                    VStack(alignment: .leading, spacing: Spacing.s2) {
+                        ForEach(0..<4, id: \.self) { _ in
+                            Shimmer(height: 14, cornerRadius: Radii.xs)
+                        }
+                    }
+                    .padding(.top, Spacing.s2)
+                }
+                .padding(Spacing.s4)
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.Color.appBg)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading detail")
         .accessibilityIdentifier("contentDetailLoading")
     }
 
