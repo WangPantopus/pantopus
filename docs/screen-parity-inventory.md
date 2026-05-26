@@ -6,13 +6,15 @@
 > `View` / `@Composable` (not `NotYetAvailableView` / `placeholder(...)`), and
 > lists which designed frames the current code does not render.
 >
-> **Generated:** 2026-05-26. Produced by parsing each pack's HTML
-> (`<title>`, `<b>Archetype</b>`, `label-num` / `data-screen-label` /
-> `DCArtboard label=` frame markers) and auditing every implementation file
-> against the iOS tab-root route enums (`Hub/You/Inbox/NearbyTabRoot.swift`,
-> `RootTabView.swift`, `AuthRouter.swift`) and the Android
-> `RootTabScreen.kt` / `MailboxDrawersScreen.kt` / `AuthRoute.kt` wiring.
-> **Every non-`MISSING` path in this document was confirmed to exist on disk.**
+> **Generated:** 2026-05-26 (P8.1 closeout re-run). Produced by parsing each
+> pack's HTML (`<title>`, `<b>Archetype</b>`, `label-num` /
+> `data-screen-label` / `DCArtboard label=` frame markers) and auditing every
+> implementation file against the iOS tab-root route enums
+> (`Root/HubTabRoot.swift`, `Root/YouTabRoot.swift`, `Root/InboxTabRoot.swift`,
+> `Root/NearbyTabRoot.swift`, `RootTabView.swift`, `AuthRouter.swift`) and the
+> Android `RootTabScreen.kt` / `MailboxDrawersScreen.kt` / `AuthRoute.kt`
+> wiring. **Every non-`MISSING` path in this document was confirmed to exist
+> on disk.**
 >
 > **Path roots (table cells are relative to these):**
 > - iOS — `frontend/apps/ios/Pantopus/Features/`
@@ -54,11 +56,22 @@ archetype-root demos.
 
 | Status | iOS | Android |
 |---|---:|---:|
-| **Built** — `REAL_VIEW`, all designed frames render | 82 | 82 |
-| **Partial** — `REAL_VIEW`, ≥1 designed frame missing | 5 | 5 |
+| **Built** — `REAL_VIEW`, all designed frames render | 84 | 84 |
+| **Partial** — `REAL_VIEW`, ≥1 designed frame missing | 3 | 3 |
 | **Missing** — no implementation file | 0 | 0 |
 | **Archetype shell** — `NO_ROUTE`, shared shell (n/a) | 7 | 7 |
 | **Total** | **94** | **94** |
+
+> **P8.1 closeout delta vs. the prior 2026-05-26 inventory:** two rows
+> previously marked partial — **A10.4 Post (Empty)** and **A17.2 Booklet
+> (Grid view)** — were re-verified against the current source and confirmed
+> to render their designed states. The prior rows were over-strict in those
+> two cases (they treated absence of a separate `.empty` enum case as
+> missing, even though the empty UI rendered correctly inside `.loaded`).
+> The other three previously-partial rows (Identity Center, Public Beacon
+> Profile, A15.4 Creator thread) have been independently re-walked against
+> design and still genuinely miss the cited frames — see "Closeout
+> re-verification" below for the precise rendering gaps.
 
 ### Routes reaching real views vs placeholders
 
@@ -77,22 +90,16 @@ Detail, Map List Hybrid, Transactional Detail, Wizard); the shells exist and
 are reused by concrete routed screens, but the archetype demo itself is not a
 navigable destination.
 
-### The 5 partial screens (state-coverage gaps — symmetric on both platforms)
+### The 3 partial screens (state-coverage gaps — symmetric on both platforms)
 
 | Screen | Pack | Missing designed state(s) |
 |---|---|---|
-| A10.4 Post | A10 | **Empty** — `PulsePostDetailView`/`…Screen` has loading/loaded/error only; no zero-content state. |
-| Identity Center | A08 | **First run** — `IdentityCenterUiState` is Loading/Loaded/Error; no no-identities onboarding frame. |
-| Public Beacon Profile | A08 | **Persona·owner** (no owner-vs-visitor chrome swap) and **Empty state** (no zero-content profile). |
-| A15.4 Creator thread | Chat | **Secondary (quota-exhausted lock)** — quota meter fills but composer never locks at `used ≥ total`. |
-| A17.2 Booklet | Mailbox | **Grid view** — only the page-by-page swiper renders; no thumbnail-grid toggle. |
+| Identity Center | A08 | **First-run chrome elements** — the four identity cards render with the designed `setupNeeded` badges, but the designed first-run frame also calls for a disabled "Profile links" placeholder card ("Nothing to link yet. Create a Persona or Professional profile to choose how it appears next to your Local profile.") *and* a primary-tinted "Two more profiles to go" info card at the bottom. Neither element is rendered on iOS (`IdentityCenterView.swift:108-119`) or Android (`IdentityCenterScreen.kt:231-240`) — the bridges section is conditionally hidden when empty, and there is no trailing info card. |
+| Public Beacon Profile | A08 | **Persona·owner** — no owner-vs-visitor role branching anywhere in `PublicProfileView.swift:104-188` or `PublicProfileScreen.kt`. The design's owner chrome (analytics `bar-chart-3` icon button + `Edit` pencil button + `AnalyticsStrip` + `FloatingBack right="settings"`) is not rendered for any persona profile — the personaLayout always emits visitor chrome (`Follow` CTA, `share` action). **Empty (Quiet for now)** — when persona broadcasts are empty, `PublicProfilePostsFeed` (`PublicProfileChrome.swift:396-402`; `PublicProfileChrome.kt:387-401`) renders only a single line "No broadcasts yet — check back soon.", missing the designed full empty card: 72×72 primary50 circle with `radio-tower` icon + "Quiet for now" headline + body copy + "Notify when live" primary CTA with `bell-plus` icon. |
+| A15.4 Creator thread | Chat | **Secondary (quota-exhausted lock)** — quota meter fills proportionally but never switches into the designed `maxed` state (error-red fill, "5 of 5" count) at `quota.used ≥ quota.total`; no system pill announcing the cap is rendered; the inline upgrade-fan upsell card is missing; and the composer is never locked (dashed input + italic "Out of replies until Monday" placeholder + lock icon + disabled send + alert-triangle "Bronze cap reached." lock-row). Confirmed missing in iOS (`ChatConversationView.swift:65-103, 1071-1117`) and Android (`ChatConversationScreen.kt:107-209`); no `maxed` / `quotaExhausted` / `composerLocked` references on either platform. |
 
 ### Caveats / quality notes (not counted as missing frames)
 
-- **iOS `EditProfileView`** uses `ProgressView("Loading profile…")` for its
-  loading frame instead of a shimmer skeleton (Android uses
-  `EditProfileSkeleton()`). Violates the "never a spinner-as-screen" state
-  rule — loading-frame quality/parity nit.
 - **Android `Me`** lives at `you/me/MeView.kt` (not `MeScreen.kt`); the
   composable is `MeScreen` and is wired `REAL_VIEW`. Naming-convention nit.
 - **A13.11 Professional profile** — `.pending` is modelled as a
@@ -105,6 +112,11 @@ navigable destination.
   `MailDetailView` (dispatches `Variants/` for booklet/certified/community,
   else a generic layout). Rows below cite the most specific body/variant file
   per category. Consolidating onto one host is a future cleanup.
+
+> The prior 2026-05-26 caveat about iOS `EditProfileView` using
+> `ProgressView("Loading profile…")` was resolved by P7.6a — the view now
+> renders a `Shimmer` skeleton (`EditProfileView.swift:87-90`) with
+> `accessibilityLabel("Loading profile")` (no visible spinner text).
 
 ---
 
@@ -184,7 +196,7 @@ navigable destination.
 | A10 | A10.1 Home | A10 Detail: Content | Populated, Empty | `Homes/HomeDashboardView.swift` | REAL_VIEW | `homes/HomeDashboardScreen.kt` | REAL_VIEW | none |
 | A10 | A10.2 Home (alt) | A10 Detail: Content | Populated, Needs attention | `Homes/HomeDashboardView.swift` | REAL_VIEW | `homes/HomeDashboardScreen.kt` | REAL_VIEW | none |
 | A10 | A10.3 Today | A10 Detail: Content | Populated, Advisory | `Hub/Today/TodayDetailView.swift` | REAL_VIEW | `hub/today/TodayDetailScreen.kt` | REAL_VIEW | none |
-| A10 | A10.4 Post | A10 Detail: Content | Populated, Empty | `Posts/PulsePostDetailView.swift` | REAL_VIEW | `posts/PulsePostDetailScreen.kt` | REAL_VIEW | Empty |
+| A10 | A10.4 Post | A10 Detail: Content | Populated, Empty | `Posts/PulsePostDetailView.swift` | REAL_VIEW | `posts/PulsePostDetailScreen.kt` | REAL_VIEW | none |
 | A10 | A10.5 User | A10 Detail: Content | Populated, Secondary·New neighbor | `Profile/PublicProfileView.swift` | REAL_VIEW | `profile/PublicProfileScreen.kt` | REAL_VIEW | none |
 | A10 | A10.8 Membership | A10 Detail: Content | Populated, Secondary·SLA missed | `Membership/MembershipDetailView.swift` | REAL_VIEW | `membership/MembershipDetailScreen.kt` | REAL_VIEW | none |
 
@@ -266,7 +278,7 @@ via `ChatConversationMode { .dm, .aiAssistant, .creatorThread, .fanThread }`.
 | Pack | Screen | Archetype | Designed states | iOS path | iOS reachable | Android path | Android reachable | Missing states |
 |---|---|---|---|---|---|---|---|---|
 | A17 | A17.1 Mail item (generic) | A17 Mail item detail | Open, Acknowledged | `Mailbox/MailDetail/MailDetailView.swift` | REAL_VIEW | `mailbox/mail_detail/MailDetailScreen.kt` | REAL_VIEW | none |
-| A17 | A17.2 Booklet | A17 Mail item detail | Page view, Grid view | `Mailbox/MailDetail/Variants/BookletDetailLayout.swift` | REAL_VIEW | `mailbox/mail_detail/variants/BookletDetailLayout.kt` | REAL_VIEW | Grid view |
+| A17 | A17.2 Booklet | A17 Mail item detail | Page view, Grid view | `Mailbox/MailDetail/Variants/BookletDetailLayout.swift` | REAL_VIEW | `mailbox/mail_detail/variants/BookletDetailLayout.kt` | REAL_VIEW | none |
 | A17 | A17.3 Certified mail | A17 Mail item detail | Open, Acknowledged | `Mailbox/MailDetail/Variants/CertifiedDetailLayout.swift` | REAL_VIEW | `mailbox/mail_detail/variants/CertifiedDetailLayout.kt` | REAL_VIEW | none |
 | A17 | A17.4 Community mail | A17 Mail item detail | Open, Going | `Mailbox/MailDetail/Variants/CommunityDetailLayout.swift` | REAL_VIEW | `mailbox/mail_detail/variants/CommunityDetailLayout.kt` | REAL_VIEW | none |
 | A17 | A17.5 Coupon | A17 Mail item detail | Open, Added | `Mailbox/ItemDetail/Bodies/CouponBody.swift` | REAL_VIEW | `mailbox/item_detail/bodies/CouponBody.kt` | REAL_VIEW | none |
@@ -294,4 +306,115 @@ via `ChatConversationMode { .dm, .aiAssistant, .creatorThread, .fanThread }`.
   `RootTabScreen.kt` / `MailboxDrawersScreen.kt` / `AuthRoute.kt`.
 - **State coverage** — each implementation's state enum + view body was read
   and compared against the designed frames; only genuine non-rendered frames
-  are listed under "Missing states".
+  are listed under "Missing states". A state is "rendered" iff the loaded
+  view body produces the designed empty / lock / alternate UI when the
+  underlying model is in the matching condition, regardless of whether the
+  state-enum is shaped `loading/loaded/error` or `loading/loaded/empty/error`.
+
+---
+
+## Closeout re-verification (P8.1)
+
+The prior 2026-05-26 inventory listed five partial rows. Re-walking each
+against current source confirms **two were over-strict** (the empty UI is
+rendered correctly inside `.loaded`, just not gated on a separate `.empty`
+enum case) and **three remain genuine gaps**:
+
+### Re-classified as fully built (state IS rendered, just inside `.loaded`)
+
+| Row | Prior gap | Re-verification |
+|---|---|---|
+| **A10.4 Post** — Empty | "No zero-content state" | `BodyReactionsBody.swift:193-201` and `BodyReactionsBody.kt:152-189` render `EmptyThreadState` (`PostThreadComponents.swift:164-208`) when `comments.isEmpty`: dashed-bordered card with 48×48 primary50 icon circle (`messageSquarePlus`), "Be the first to reply" headline, intent-specific subcopy, and quick-reply prompt chips. Matches the designed "Just posted — 0 comments" frame from `A10.4 Post.html`. |
+| **A17.2 Booklet** — Grid view | "No thumbnail-grid toggle" | `BookletPager.swift:23-26, 47-57` and `BookletPager.kt:73, 114-126` ship `BookletPagerMode { Page, Grid }` with a "View all pages" toggle button (page-mode → grid-mode) and a 3-column `LazyVerticalGrid` of thumbnails (grid-mode → tap a thumbnail returns to page-mode at that page). |
+
+### Remaining gaps (still partial — surfaced, not papered over)
+
+These three screens still do not render their designed secondary frame, so
+the "100% complete" acceptance line **cannot** be honestly claimed without a
+follow-up implementation prompt:
+
+1. **Identity Center — First-run chrome elements**
+   - **Pack:** A08 (`uploads/Pantopus-design/Identity Center.html` FRAME 2 ·
+     FIRST RUN; `identity-center-frames.jsx` → `FrameFirstRun`)
+   - **Missing:**
+     (a) the disabled "Profile links" placeholder card with `link-2-off` icon
+     and copy "Nothing to link yet. Create a Persona or Professional profile
+     to choose how it appears next to your Local profile.";
+     (b) the primary-tinted "Two more profiles to go" info card at the bottom
+     of the loaded frame.
+   - **Why missing:** the iOS view only renders the bridges card when
+     `!loaded.bridges.isEmpty` (`IdentityCenterView.swift:108-112`) — there
+     is no rendered placeholder when bridges are empty. The trailing
+     "Two more profiles to go" info card is not present on either platform
+     (no string match for "profiles to go" or "Nothing to link" in
+     `Features/IdentityCenter/` or `screens/identity_center/`).
+   - **Prompt that should have addressed this:** P5.9 (the Identity Center
+     follow-up) — or a dedicated `IdentityCenterFirstRunChrome` prompt.
+
+2. **Public Beacon Profile — Persona·owner + Empty (Quiet for now)**
+   - **Pack:** A08 (`uploads/Pantopus-design/Public Beacon Profile.html` +
+     `beacon-frames.jsx` → `FramePersonaOwner` at L625, `FrameEmpty` at L734)
+   - **(a) Persona·owner missing:** the JSX header switches on
+     `role === 'owner'` (L260-265) to render owner chrome — a `bar-chart-3`
+     ghost button and an `Edit` pencil ghost button instead of the visitor's
+     `share` + `Follow` pair — plus the `AnalyticsStrip` and the
+     `FloatingBack right="settings"` affordance. The current code branches
+     only on `payload.kind == .local` (`PublicProfileView.swift:106` and
+     `PublicProfileScreen.kt:102-115`); there is no second axis for
+     viewer-role, no `isOwner` / `viewer.isOwner` field anywhere in
+     `PublicProfileContent`, and `stickyFooter` always returns the visitor
+     CTA for personas (`PublicProfileView.swift:174-188`). No "Edit"
+     affordance in either overflow menu (`PublicProfileView.swift:55-67`).
+   - **(b) Empty ("Quiet for now") missing:** `PublicProfilePostsFeed` on
+     both platforms renders a single line "No broadcasts yet — check back
+     soon." (`PublicProfileChrome.swift:396-402` and
+     `PublicProfileChrome.kt:387-401`) — *not* the designed full empty card:
+     72×72 primary50 circle with `radio-tower` icon (size 32, stroke 1.6) +
+     "Quiet for now" headline (17pt bold) + body copy (max-width 240) +
+     `bell-plus` "Notify when live" primary CTA. The plain-text fallback is
+     functionally graceful but visually thin.
+   - **Prompt that should have addressed this:** the originally-scoped Public
+     Beacon Profile wave (Wave A coverage of A08 beacons). Recommend a
+     dedicated `PublicProfileOwnerChromeAndEmpty` follow-up to add
+     viewer-role branching, `OwnerHeaderControls` (analytics + edit),
+     `AnalyticsStrip`, and a proper `PersonaEmptyBroadcastsCard`.
+
+3. **A15.4 Creator thread — Secondary (quota-exhausted lock)**
+   - **Pack:** Chat conversation (`A15.4 - Creator thread.html` → JSX
+     `QuotaExhaustedThread`)
+   - **Missing:**
+     (a) quota meter's `maxed` state (error-red fill + "5 of 5" count
+     coloured `var(--color-error)`);
+     (b) the warning-tinted system pill "You've used your N weekly <tier>
+     replies with <fan>";
+     (c) the inline upgrade-fan upsell card ("Invite <fan> to Gold ·
+     Unlimited replies · $15/mo · she keeps Bronze perks");
+     (d) the locked composer (`composer-wrap.locked`): dashed input border,
+     italic muted "Out of replies until Monday" placeholder, lock icon,
+     disabled send, and the alert-triangle lock-row "<Tier> cap reached.
+     Upgrade <fan> or wait for the reset.".
+   - **Why missing:** the quota meter on iOS
+     (`ChatConversationView.swift:1071-1117`) and Android
+     (`ChatConversationScreen.kt` `CreatorQuotaMeter`) always renders the
+     primary-blue fill — no branch on `quota.used ≥ quota.total`. The
+     composer's `canSend` is only `!text.isEmpty && !isSending` on iOS
+     (`ChatConversationViewModel.swift:86-88`) and identical on Android — no
+     creator-quota lock check. No `maxed` / `quotaExhausted` /
+     `composerLocked` / "cap reached" strings exist on either platform.
+   - **Prompt that should have addressed this:** D2 (the Creator-thread
+     wave-D prompt) — the populated state shipped but the secondary
+     quota-exhausted lock state was not implemented. Recommend a dedicated
+     `CreatorThreadQuotaExhaustedLock` follow-up.
+
+### Heuristic note (why prior counts differ from these)
+
+The prior 2026-05-26 inventory used a structural heuristic — "if the state
+enum has only `.loading / .loaded / .error`, mark the empty state as
+missing." That heuristic over-counts the A10.4 Post empty card, which is
+emitted as an `if list.isEmpty { EmptyThreadState … } else { … }` branch
+inside `.loaded` and matches the full design. P8.1's deeper read inspects
+the rendered body rather than the enum shape, which is the more honest
+"are the designed frames rendered" test. The remaining three gaps survive
+both heuristics — Identity Center, Public Beacon Profile (both states),
+and Creator-thread quota-exhausted are genuine missing chrome elements
+that no current view body produces.
