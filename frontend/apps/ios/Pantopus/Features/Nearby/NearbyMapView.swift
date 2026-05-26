@@ -259,7 +259,7 @@ public struct NearbyMapView: View {
             Spacer(minLength: 0)
             VStack(spacing: 0) {
                 Capsule()
-                    .fill(Color(red: 209 / 255, green: 213 / 255, blue: 219 / 255))
+                    .fill(Theme.Color.appBorderStrong)
                     .frame(width: 40, height: 4)
                     .padding(.top, 8)
                     .padding(.bottom, 4)
@@ -695,7 +695,7 @@ private struct PaginationDots: View {
         HStack(spacing: 5) {
             ForEach(0..<max(total, 1), id: \.self) { i in
                 Capsule()
-                    .fill(i == index ? Theme.Color.primary600 : Color(red: 209 / 255, green: 213 / 255, blue: 219 / 255))
+                    .fill(i == index ? Theme.Color.primary600 : Theme.Color.appBorderStrong)
                     .frame(width: i == index ? 16 : 5, height: 5)
             }
         }

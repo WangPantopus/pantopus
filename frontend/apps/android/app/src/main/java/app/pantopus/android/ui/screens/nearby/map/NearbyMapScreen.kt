@@ -725,7 +725,7 @@ private fun DragHandle() {
                     .width(40.dp)
                     .height(4.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFFD1D5DB)),
+                    .background(PantopusColors.appBorderStrong),
         )
     }
 }
@@ -1146,7 +1146,7 @@ private fun PaginationDots(
                         .width(if (active) 16.dp else 5.dp)
                         .height(5.dp)
                         .clip(RoundedCornerShape(5.dp))
-                        .background(if (active) PantopusColors.primary600 else Color(0xFFD1D5DB)),
+                        .background(if (active) PantopusColors.primary600 else PantopusColors.appBorderStrong),
             )
         }
     }
