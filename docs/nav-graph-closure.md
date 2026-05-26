@@ -15,6 +15,14 @@
 > e.g. the old `.mailboxDrawers` / `.mailbox` / `.drawerDetail` routes are
 > gone, replaced by `.mailboxRoot`).
 >
+> **Post-rewire update (2026-05-26):** the 16 stale call sites called out in
+> the original Section 5 Group A — plus the iOS `Snap & sell` / `Gig detail`
+> equivalents on Android and the two `Share business` / `Share membership`
+> placeholders that should have always been system share sheets — have been
+> rewired. Placeholder labels dropped **iOS 40 → 23**, **Android 33 → 24**
+> (both clear the `<25` sanity bar). Counts and tables below reflect the
+> post-rewire state.
+>
 > **Reachability tokens (grep-able):** `REAL_VIEW` · `NOT_YET_AVAILABLE` ·
 > `PLACEHOLDER` · `NO_ROUTE`.
 > - `REAL_VIEW` — case renders a concrete feature view (e.g.
@@ -31,19 +39,19 @@
 
 | Platform | Route cases | `REAL_VIEW` | `NOT_YET_AVAILABLE` funnel | Orphans (inbound 0) | Dead screens |
 |---|---:|---:|---:|---:|---:|
-| iOS | 163 (Hub 81 · You 75 · Inbox 3 · Nearby 4) | 160 | 3 (`.placeholder` ×3 tabs) | 9 | 2 |
+| iOS | 176 (Hub 84 · You 84 · Inbox 3 · Nearby 5) | 173 | 3 (`.placeholder` ×3 tabs) | 9 | 2 |
 | Android | 121 composables (4 tab + 117 child) | 120 | 1 (`PLACEHOLDER`) | 3 | 4 |
 
 - **No route on either platform is reachable only through a
   `NOT_YET_AVAILABLE` body** except the dedicated placeholder funnels — every
   other case renders a real view.
-- **Placeholder labels still wired:** 40 distinct (iOS) / 33 (Android). This
-  exceeds the "<25" expectation — **investigated in Section 5**: ~16 are
-  *stale* (the target screen shipped in a wave but the call site was never
-  re-pointed), and the remainder are intentional `DEFER`s (payments,
-  membership/broadcast management, moderation — none of which are screens in
-  the 8 design packs). **`BUILD` = 0**: every designed pack screen is already
-  shipped, consistent with `docs/screen-parity-inventory.md`.
+- **Placeholder labels still wired:** **23 distinct (iOS) / 24 (Android)** —
+  both under the `<25` sanity bar after the stale-rewire pass. Every
+  remaining label is an intentional `DEFER` (payments, membership/broadcast
+  management, moderation, business management, identity sub-details — none
+  of which are screens in the 8 design packs). **`BUILD` = 0**: every
+  designed pack screen is shipped, consistent with
+  `docs/screen-parity-inventory.md`.
 
 ---
 
@@ -52,7 +60,7 @@
 Legend: **T** = destination type (`R`=`REAL_VIEW`, `N`=`NOT_YET_AVAILABLE`),
 **In** = inbound count. Root screen = the tab body (not a route case).
 
-### Hub tab — root `HubView` · `HubRoute` (81 cases)
+### Hub tab — root `HubView` · `HubRoute` (84 cases)
 
 | Route case | T | In | Notes |
 |---|---|---:|---|
@@ -82,7 +90,7 @@ Legend: **T** = destination type (`R`=`REAL_VIEW`, `N`=`NOT_YET_AVAILABLE`),
 | `maintenanceDetail(homeId:,taskId:)` | R | 2 | |
 | `editMaintenance(homeId:,taskId:)` | R | 1 | |
 | `homeMembers(homeId:)` | R | 1 | |
-| `publicProfile(userId:)` | R | 3 | |
+| `publicProfile(userId:)` | R | 4 | |
 | `businessProfile(businessId:)` | R | 3 | |
 | `pulsePost(postId:)` | R | 4 | |
 | `homeBills(homeId:)` | R | 1 | |
@@ -105,7 +113,7 @@ Legend: **T** = destination type (`R`=`REAL_VIEW`, `N`=`NOT_YET_AVAILABLE`),
 | `quickPostGig(category:)` | R | 1 | |
 | `marketplace` | R | 2 | |
 | `listingDetail(listingId:)` | R | 6 | |
-| `composeListing` | R | 1 | |
+| `composeListing` | R | 2 | |
 | `editListing(listingId:,jumpToStep:)` | R | 2 | |
 | `invoiceDetail(invoiceId:)` | R | 0 | **ORPHAN** — deferred (wallet/payments not shipped) |
 | `notifications` | R | 1 | |
@@ -126,7 +134,7 @@ Legend: **T** = destination type (`R`=`REAL_VIEW`, `N`=`NOT_YET_AVAILABLE`),
 | `menu` | R | 1 | → `SettingsView` |
 | `editProfile` | R | 1 | |
 | `mailboxSearch` | R | 1 | |
-| `placeholder(label:)` | **N** | 16 | generic funnel → `NotYetAvailableView`; labels in §5 |
+| `placeholder(label:)` | **N** | 12 | generic funnel → `NotYetAvailableView`; labels in §5 |
 | `todayDetail` | R | 1 | |
 | `propertyDetails(homeId:)` | R | 1 | |
 | `addGuest(homeId:)` | R | 1 | full-screen modal |
@@ -134,11 +142,14 @@ Legend: **T** = destination type (`R`=`REAL_VIEW`, `N`=`NOT_YET_AVAILABLE`),
 | `explore` | R | 1 | |
 | `mailboxRoot` | R | 3 | |
 | `mailboxMap` | R | 1 | |
+| `accessCodes(homeId:,homeName:)` | R | 1 | added in rewire (mirror of `YouRoute.accessCodes`) |
+| `editAccessCode(homeId:,secretId:,…)` | R | 3 | added in rewire |
+| `searchAccessCodes(homeId:)` | R | 1 | added in rewire |
 | `tokenGallery` | R | 1 | DEBUG (5-tap) |
 | `iconGallery` | R | 0 | DEBUG · **ORPHAN** (no trigger wired) |
 | `componentGallery` | R | 0 | DEBUG · **ORPHAN** (no trigger wired) |
 
-### You tab — root `MeView` · `YouRoute` (75 cases)
+### You tab — root `MeView` · `YouRoute` (84 cases)
 
 | Route case | T | In | Notes |
 |---|---|---:|---|
@@ -148,11 +159,11 @@ Legend: **T** = destination type (`R`=`REAL_VIEW`, `N`=`NOT_YET_AVAILABLE`),
 | `mailItemDetail(mailId:)` | R | 2 | |
 | `mailboxSearch` | R | 1 | |
 | `settings` | R | 1 | |
-| `placeholder(label:)` | **N** | 43 | generic funnel → `NotYetAvailableView`; labels in §5 |
+| `placeholder(label:)` | **N** | 31 | generic funnel → `NotYetAvailableView`; labels in §5 |
 | `offers` | R | 2 | |
 | `myBids` | R | 2 | |
 | `myTasks` | R | 2 | |
-| `composeTask` | R | 2 | |
+| `composeTask` | R | 4 | |
 | `myPosts` | R | 2 | |
 | `editPost(postId:)` | R | 1 | |
 | `connections` | R | 2 | |
@@ -202,17 +213,26 @@ Legend: **T** = destination type (`R`=`REAL_VIEW`, `N`=`NOT_YET_AVAILABLE`),
 | `homeOwners(homeId:)` | R | 1 | |
 | `homeMembers(homeId:)` | R | 3 | |
 | `listingOffers(listingId:,title:)` | R | 1 | |
-| `gigDetail(gigId:)` | R | 8 | |
-| `listingDetail(listingId:)` | R | 1 | |
+| `gigDetail(gigId:)` | R | 9 | |
+| `listingDetail(listingId:)` | R | 3 | |
 | `chatConversation(dest)` | R | 4 | |
 | `editListing(listingId:,jumpToStep:)` | R | 2 | |
 | `membershipDetail(personaId:)` | R | 1 | |
 | `professionalProfile` | R | 1 | |
 | `editPersona(personaId:)` | R | 1 | |
 | `composeBroadcast(personaId:)` | R | 1 | |
-| `publicProfile(userId:)` | R | 2 | DEBUG |
+| `publicProfile(userId:)` | R | 3 | promoted from DEBUG in rewire |
+| `pulsePost(postId:)` | R | 2 | promoted from DEBUG in rewire |
+| `composePost(intent:)` | R | 1 | added in rewire |
+| `billDetail(homeId:,billId:)` | R | 2 | added in rewire |
+| `addBill(homeId:,billId:)` | R | 2 | added in rewire |
+| `gigsFeed` | R | 2 | added in rewire (Browse tasks/gigs from You) |
+| `marketplace` | R | 1 | added in rewire (Browse listings from You) |
+| `composeListing` | R | 2 | added in rewire (List something) |
+| `addHome` | R | 2 | added in rewire (Claim a home) |
+| `claimOwnership(homeId:)` | R | 1 | added in rewire |
+| `myClaims` | R | 2 | added in rewire |
 | `businessProfile(businessId:)` | R | 0 | DEBUG · **ORPHAN** (declared, never pushed even in debug) |
-| `pulsePost(postId:)` | R | 1 | DEBUG |
 | `privacyHandshake(personaHandle:)` | R | 2 | DEBUG |
 | `statusWaiting` | R | 1 | DEBUG |
 | `ceremonialMail` | R | 2 | DEBUG |
@@ -226,14 +246,15 @@ Legend: **T** = destination type (`R`=`REAL_VIEW`, `N`=`NOT_YET_AVAILABLE`),
 | `compose` | R | 1 | → `NewMessageView` |
 | `search` | R | 1 | → `ChatSearchView` |
 
-### Nearby tab — root `NearbyMapView` · `NearbyRoute` (4 cases)
+### Nearby tab — root `NearbyMapView` · `NearbyRoute` (5 cases)
 
 | Route case | T | In | Notes |
 |---|---|---:|---|
 | `entityDetail(kind:,id:)` | R | 1 | → Gig/Listing detail by `MapEntityKind` |
-| `placeholder(label:)` | **N** | 2 | generic funnel → `NotYetAvailableView`; labels in §5 |
+| `placeholder(label:)` | **N** | 1 | generic funnel → `NotYetAvailableView`; labels in §5 |
 | `listingOffers(listingId:,title:)` | R | 1 | |
 | `editListing(listingId:,jumpToStep:)` | R | 2 | |
+| `publicProfile(userId:)` | R | 1 | added in rewire (Buyer profile from `ListingOffersView`) |
 
 ---
 
@@ -444,44 +465,48 @@ sink — iOS `case .placeholder(label:) → NotYetAvailableView(tabName: label)`
 (present in Hub/You/Nearby), Android
 `ChildRoutes.PLACEHOLDER → NotYetAvailableView(tabName = label)`. The
 distinct **labels** pushed into that sink are the real catalog of missing
-destinations: **40 distinct on iOS, 33 on Android.**
+destinations.
 
-> **Acceptance check — count exceeds 25, so investigated.** The overage is
-> **not** un-shipped pack screens. **`BUILD` = 0**: every screen in the 8
-> design packs is already shipped (see `docs/screen-parity-inventory.md`).
-> Instead, ~16 labels are **stale** — the target screen *did* ship in a wave,
-> but the pushing call site was never re-pointed off `.placeholder(...)` (the
-> "did a wave PR forget to swap its destination?" case the brief predicts).
-> The rest are genuine **`DEFER`s** for features with no pack screen
-> (payments, membership/broadcast management, moderation, business
-> management). Disposition key: **REMOVE** = stale, rewire to the shipped
-> screen; **DEFER** = intentionally parked.
+**Post-rewire totals: 23 distinct (iOS) · 24 distinct (Android)** — both
+under the `<25` sanity bar. **`BUILD` = 0**: every screen in the 8 design
+packs is shipped (see `docs/screen-parity-inventory.md`). Every remaining
+label is an intentional **`DEFER`** for a feature with no pack screen
+(payments, membership/broadcast management, moderation, business management,
+identity sub-details, etc.).
 
-### Group A — STALE (target screen shipped; **REMOVE** placeholder, rewire call site)
+### Group A — STALE (RESOLVED in rewire pass)
 
-| Label | Platform | Pushed from | Rewire to (shipped screen) |
-|---|---|---|---|
-| `Access codes` | iOS | `HomeDashboardView` access-codes tile (Hub) | `accessCodes` → `AccessCodesView`/`Screen` |
-| `Bill detail` | iOS | `BillsListView` row tap (You) | `billDetail` → `BillDetailView` |
-| `Add a bill` | iOS | `BillsListView` add (You) | `addBill` → `AddBillWizardView` |
-| `Gig detail` | iOS | `route(forDiscovery: .gig)` (Hub discovery card) | `gigDetail` → `GigDetailView` (discovery gig cards currently dead-end) |
-| `Buyer profile` | iOS·Android | `ListingOffersView` buyer row | `publicProfile` → `PublicProfile{View,Screen}` |
-| `Post detail` | iOS·Android | `MyPostsView` row tap | `pulsePost` → `PulsePostDetail{View,Screen}` |
-| `Write a post` | iOS·Android | `MyPostsView` compose | `composePost` → `PulseCompose{View,Screen}` |
-| `Snap & sell` | iOS | Hub `.snapAndSell` action chip | `composeListing` → `ListingComposeWizardView` |
-| `List something` | iOS·Android | `MyListingsView` compose | `composeListing` → `ListingComposeWizardView` |
-| `Post a task` | iOS | `OffersView` empty CTA | `composeTask`/`quickPostGig` → `GigCompose…`/`PostGigV1View` |
-| `Browse tasks` | iOS | `MyBidsView` empty CTA | `gigsFeed` → `GigsFeedView` |
-| `Browse listings` | iOS·Android | `OffersView` empty CTA | `marketplace` → `MarketplaceScreen` |
-| `Browse gigs` | iOS | `MailboxRootView` (You) browse-gigs | `gigsFeed` → `GigsFeedView` (Hub already wires this correctly) |
-| `Claim a home` | iOS | `MyHomesListView` add (You) | `addHome` → `AddHomeWizardView` — *You stack lacks the route* |
-| `Claim ownership` | iOS | `HomeDashboardView` (You) | `claimOwnership` → `ClaimOwnershipWizardView` — *You stack lacks the route* |
-| `My claims` | iOS | `HomeDashboardView` (You) | `myClaims` → `MyClaimsListView` — *You stack lacks the route* |
+All 16 originally-identified stale call sites have been rewired off
+`.placeholder(...)` to the shipped screen. The structural ones (the You
+stack lacking `addHome` / `claimOwnership` / `myClaims` / `marketplace` /
+`gigsFeed` / `pulsePost` / `composePost` / `composeListing` / `billDetail` /
+`addBill` / `publicProfile` cases) were fixed by adding the missing cases
+to `YouRoute`; Hub gained `accessCodes` / `editAccessCode` /
+`searchAccessCodes` to wire the home-dashboard tile; `Nearby` gained
+`publicProfile` for the buyer row. `Snap & sell` and `Gig detail` were
+rewired on Android too (they had the same stale pattern). The two
+`Share business` / `Share membership` placeholders now invoke the system
+share sheet (iOS `systemSheet = .share`, Android `appContext.shareText`).
 
-> Note: the last three are structural — the **You** `NavigationStack` never
-> declared `addHome` / `claimOwnership` / `myClaims` cases (Hub has them), so
-> those You call sites fall through to the placeholder. Fix = add the cases to
-> `YouRoute` (or route through Hub).
+| Original stale label | Fix |
+|---|---|
+| `Access codes` (iOS Hub) | `HubRoute.accessCodes` (+ `editAccessCode`/`searchAccessCodes`) added; `HomeDashboardView.onOpenAccessCodes` rewired |
+| `Bill detail`, `Add a bill` (iOS You) | `YouRoute.billDetail`/`.addBill` added; `BillsListView` callbacks rewired |
+| `Gig detail` (iOS Hub, Android) | `route(forDiscovery: .gig)` / `DiscoveryKind.Gig` → real `gigDetail(id)` |
+| `Buyer profile` (iOS Hub/You/Nearby, Android) | `ListingOffersView.onOpenBuyer` → `.publicProfile(userId: buyer.id)`; `NearbyRoute.publicProfile` and release `YouRoute.publicProfile` added |
+| `Post detail` (iOS You, Android) | `MyPostsView.onOpenPost` → `.pulsePost(postId: dto.id)`; `YouRoute.pulsePost` promoted out of `#if DEBUG` |
+| `Write a post` (iOS You, Android) | `MyPostsView.onCompose` → `.composePost(intent: "")`; `YouRoute.composePost` added |
+| `Snap & sell` (iOS Hub, Android) | Hub `.snapAndSell` / `ActionChipContent.Kind.SnapAndSell` → `.composeListing` / `COMPOSE_LISTING` |
+| `List something` (iOS You, Android) | `MyListingsView.onCompose` → `.composeListing` / `COMPOSE_LISTING`; `YouRoute.composeListing` added |
+| `Post a task` (iOS You) | `OffersView.onPostTask` → `.composeTask` (existing case) |
+| `Browse tasks` (iOS You) | `MyBidsView.onBrowseTasks` → `.gigsFeed`; `YouRoute.gigsFeed` added |
+| `Browse listings` (iOS You, Android) | `OffersView.onBrowseListings` → `.marketplace` / `MARKETPLACE`; `YouRoute.marketplace` added |
+| `Browse gigs` (iOS You) | `MailboxRootView.onBrowseGigs` (You) → `.gigsFeed` |
+| `Claim a home` (iOS You) | `MyHomesListView.onAddHome` → `.addHome`; `YouRoute.addHome` added |
+| `Claim ownership` (iOS You) | `HomeDashboardView.onClaimOwnership` → `.claimOwnership(homeId:)`; `YouRoute.claimOwnership` added |
+| `My claims` (iOS You) | `HomeDashboardView.onOpenClaimsList` → `.myClaims`; `YouRoute.myClaims` added |
+| `Share business` (iOS Hub, Android) | now invokes system share sheet (`systemSheet = .share` / `appContext.shareText`) |
+| `Share membership` (Android) | now invokes `appContext.shareText` |
 
 ### Group B — DEFER (no pack screen; intentionally parked)
 
@@ -524,6 +549,6 @@ empty/edge states, not wiring gaps.
 | Orphan routes → REMOVE | 5 | 2 |
 | Orphan routes → KEEP (deferred/debug) | 4 | 1 |
 | Dead screens → REMOVE | 2 | 4 |
-| Placeholder labels → REMOVE (stale, rewire) | 16 | ~12 |
-| Placeholder labels → DEFER | ~24 | ~21 |
+| Placeholder labels → REMOVE (stale, rewire) — *done* | 0 (was 16) | 0 (was ~14) |
+| Placeholder labels → DEFER | 23 | 24 |
 | Placeholder labels → BUILD | 0 | 0 |

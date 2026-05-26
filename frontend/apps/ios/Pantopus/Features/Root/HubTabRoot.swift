@@ -211,6 +211,14 @@ public enum HubRoute: Hashable {
     case mailboxRoot
     /// A.x — Mailbox map.
     case mailboxMap
+    /// T6.4a — Access codes per-home. Reached from the Hub home-dashboard
+    /// Access tile. Mirrors `YouRoute.accessCodes`.
+    case accessCodes(homeId: String, homeName: String?)
+    /// P3.1 — Add (no secretId) / Edit (with secretId) access code. Mirror
+    /// of `YouRoute.editAccessCode`.
+    case editAccessCode(homeId: String, secretId: String?, categoryRaw: String?)
+    /// P4.6 — Access codes search. Mirror of `YouRoute.searchAccessCodes`.
+    case searchAccessCodes(homeId: String)
     #if DEBUG
     case tokenGallery
     case iconGallery
@@ -337,7 +345,7 @@ public struct HubTabRoot: View {
             case .action(.addHome): path.append(.addHome)
             case .action(.scanMail): path.append(.mailboxRoot)
             case .action(.postTask): path.append(.quickPostGig(category: GigsCategory.all.rawValue))
-            case .action(.snapAndSell): path.append(.placeholder(label: "Snap & sell"))
+            case .action(.snapAndSell): path.append(.composeListing)
             case .pillar(.mail): path.append(.mailboxRoot)
             case .pillar(.pulse): path.append(.pulseFeed)
             case .pillar(.gigs): path.append(.gigsFeed)
@@ -394,7 +402,7 @@ public struct HubTabRoot: View {
         switch item.kind {
         case .post: .pulsePost(postId: item.id)
         case .person: .publicProfile(userId: item.id)
-        case .gig: .placeholder(label: "Gig detail")
+        case .gig: .gigDetail(gigId: item.id)
         case .business: .businessProfile(businessId: item.id)
         case .unknown: .placeholder(label: item.title)
         }
@@ -507,8 +515,8 @@ public struct HubTabRoot: View {
                 onOpenPackages: { id in
                     Task { @MainActor in push(.homePackages(homeId: id)) }
                 },
-                onOpenAccessCodes: { _, _ in
-                    Task { @MainActor in push(.placeholder(label: "Access codes")) }
+                onOpenAccessCodes: { id, name in
+                    Task { @MainActor in push(.accessCodes(homeId: id, homeName: name)) }
                 },
                 onOpenTasks: { id in
                     Task { @MainActor in push(.homeTasks(homeId: id)) }
@@ -914,7 +922,11 @@ public struct HubTabRoot: View {
                 businessId: businessId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
-                onShare: { Task { @MainActor in push(.placeholder(label: "Share business")) } },
+                onShare: {
+                    systemSheet = .share(
+                        items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"]
+                    )
+                },
                 onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } }
             )
         case let .pulsePost(postId):
@@ -1102,8 +1114,8 @@ public struct HubTabRoot: View {
                             items: ["Check out \(name) on Pantopus — \(InviteLinks.downloadURLString)"]
                         )
                     },
-                    onOpenBuyer: { _ in
-                        Task { @MainActor in push(.placeholder(label: "Buyer profile")) }
+                    onOpenBuyer: { buyer in
+                        Task { @MainActor in push(.publicProfile(userId: buyer.id)) }
                     },
                     onOpenTransaction: { _ in
                         Task { @MainActor in push(.placeholder(label: "Transaction detail")) }
@@ -1426,6 +1438,56 @@ public struct HubTabRoot: View {
             )
         case .mailboxMap:
             MailboxMapView { pop() }
+        case let .accessCodes(homeId, homeName):
+            AccessCodesView(
+                viewModel: AccessCodesViewModel(
+                    homeId: homeId,
+                    homeName: homeName
+                ) { target in
+                    Task { @MainActor in
+                        switch target {
+                        case let .addCode(homeId: targetHomeId, category: category):
+                            push(.editAccessCode(
+                                homeId: targetHomeId,
+                                secretId: nil,
+                                categoryRaw: category?.rawValue
+                            ))
+                        case let .editCode(homeId: targetHomeId, secretId: secretId):
+                            push(.editAccessCode(
+                                homeId: targetHomeId,
+                                secretId: secretId,
+                                categoryRaw: nil
+                            ))
+                        case let .search(homeId: targetHomeId):
+                            push(.searchAccessCodes(homeId: targetHomeId))
+                        }
+                    }
+                }
+            )
+        case let .searchAccessCodes(homeId):
+            AccessCodesSearchView(
+                viewModel: AccessCodesSearchViewModel(
+                    homeId: homeId,
+                    onOpenCode: { secretId in
+                        Task { @MainActor in
+                            push(.editAccessCode(
+                                homeId: homeId,
+                                secretId: secretId,
+                                categoryRaw: nil
+                            ))
+                        }
+                    },
+                    onCancel: { if !path.isEmpty { path.removeLast() } }
+                )
+            )
+        case let .editAccessCode(homeId, secretId, categoryRaw):
+            EditAccessCodeFormView(
+                homeId: homeId,
+                secretId: secretId,
+                initialCategory: categoryRaw.flatMap { AccessCategory(rawValue: $0) }
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to
