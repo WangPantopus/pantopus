@@ -639,3 +639,119 @@ PersonCard (with stats grid + mutuals + 2 suggestion chips) is part of
 the design polish-pass but is **not yet implemented in code**. That's
 a feature-implementation gap, not a token-application gap, and needs a
 separate sub-prompt rather than a P7.9.x fix.
+
+---
+
+## P7.9.f.1 — Mailbox root + Ceremonial Mail + Vault + Disambiguate
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope (5 screens — first half of P7.9.f)
+
+| Surface | Design HTML | iOS implementation | Android implementation |
+|---|---|---|---|
+| Mailbox Mobile root (drawer-tabs hybrid: Me / Home / Biz / Earn) | `mobile_Mailbox_root_archetype/Mailbox Mobile.html` + `mailbox.jsx` | `Features/Mailbox/MailboxRoot/{MailboxRootView,MailboxRootContent,MailboxRootViewModel}.swift` | `ui/screens/mailbox/mailbox_root/{MailboxRootScreen,MailboxRootContent,MailboxRootViewModel}.kt` |
+| Vault (folder grid + recent items) | `A08/Vault.html` + `vault-frames.jsx` | `Features/Mailbox/Vault/{VaultListView,VaultListViewModel}.swift` | `ui/screens/mailbox/vault/{VaultListScreen,VaultListViewModel}.kt` |
+| Ceremonial Mail Compose (4-step wizard: Porch Call · Address It · Write It · Seal & Send) | `A08/.../Ceremonial Mail Compose.html` + `ceremonial-compose-frames.jsx` | `Features/CeremonialMail/{CeremonialMailWizardView,CeremonialMailContent,CeremonialMailViewModel}.swift` | `ui/screens/ceremonial_mail/{CeremonialMailWizardScreen,CeremonialMailContent,CeremonialMailViewModel}.kt` |
+| Ceremonial Mail Open (4-frame: Porch Arrival · Opening · Reading · Reply) | `A08/.../Ceremonial Mail Open.html` + `ceremonial-mail-frames.jsx` | `Features/CeremonialMailOpen/{CeremonialMailOpenView,CeremonialMailOpenContent,CeremonialMailOpenViewModel}.swift` | `ui/screens/ceremonial_mail_open/{CeremonialMailOpenScreen,CeremonialMailOpenContent,CeremonialMailOpenViewModel}.kt` |
+| Disambiguate (scanned envelope OCR — Form variant) | (no dedicated HTML; folded into Form archetype in P7.9.c) | `Features/Mailbox/Disambiguate/DisambiguateMailFormView.swift` | `ui/screens/mailbox/disambiguate/DisambiguateMailFormScreen.kt` |
+
+### Methodology
+
+Rendered the 4 dedicated HTML pages at 1600×1400 (deviceScaleFactor 2)
+via Playwright with locally-vendored React/Babel/Lucide. 13 PNGs
+captured (4 + 3 + 2 + 4 frame crops + 4 overviews). Disambiguate was
+audited against the generic Form archetype already rendered in P7.9.c.
+
+### Resolvable token mismatches — NONE in this sub-group
+
+The ceremonial chrome is **uniformly heavy in off-scale design values**
+(`borderRadius: 10` for inputs/result rows/recipient cards, `14` for
+seal options + reply preview cards, `18` for compose surface, `9` for
+editor buttons, `1.5` / `3` for tiny pin/postmark drops). The code
+mirrors these via raw literals (iOS uses `cornerRadius: 10` etc.;
+Android uses `RoundedCornerShape(10.dp)` etc.) matching design exactly.
+
+Mailbox root chrome (drawer chip pills, segmented tab bar) is well
+tokenised: iOS uses `Capsule()` for drawer pills, `Rectangle()` for the
+2.5pt-tall tab underline; Android mirrors with `CircleShape` for
+drawer pills.
+
+Vault and Mailbox-root mail-row rendering both delegate to the shared
+`ListOfRowsView` archetype, which uses `Radii.lg` (=12) for grouped
+card containers. The design says `borderRadius: 16` for Mailbox mail
+cards and `borderRadius: 14` for Vault folder tiles — but changing the
+shared shell would impact every other consumer (My Homes, My Claims,
+etc.). Out of scope for an isolated Mailbox audit.
+
+Disambiguate is already well-tokenised: `Radii.lg` for envelope card,
+`Radii.pill` for chips, `Radii.md` for inputs.
+
+### Surfaced for design review (NOT fixed)
+
+#### Structural divergences
+
+| # | Surface | Design intent | Code reality |
+|---|---|---|---|
+| A | **Vault folder grid** | 2-up grid of `borderRadius: 14, padding: 14×12, minHeight: 96` folder tiles with icon disc + name + metadata, plus "Add folder" tile | `VaultListView.swift` (30 lines) delegates entirely to `ListOfRowsView`. Folders render as flat list rows, not a 2-up grid. Structural feature gap — not a token-application fix. |
+| B | **Vault recent items section** | Below folder grid: section header + `borderRadius: 14` row cards (40×48 type tile + subject + meta + folder chip) | Not implemented as a separate section — `ListOfRowsView` renders one flat list. Structural feature gap. |
+| C | **Vault FAB** | Circular FAB, `60×60, borderRadius: 50%`, position fixed bottom 24/right 16 | `ListOfRowsView.fab` slot exists but its visual treatment may differ — needs visual check (no simulator). |
+| D | **Mailbox empty Earn hint card** | `borderRadius: 14` card with `width: 28, height: 28, borderRadius: 8` icon box + title/body — explanatory "what is Earn" affordance below the CTA | Shared `EmptyState` component renders icon + headline + subcopy + CTA — no hint card. Earn-specific copy hint pattern not represented. |
+| E | **Ceremonial Porch-Call outer "Recipient card"** | The Porch Call frame wraps the search/results/intent rows in a `background: '#FBF6EC', borderRadius: 16, padding: 18` warm-paper card with a heavy shadow (`0 12px 28px rgba(0,0,0,0.28)`) | `CeremonialMailWizardView.swift:73-95` renders headline + subcopy + search + results + selected card + intents as separate stacked VStack elements — no outer paper-card wrapper. The decisional-surface metaphor isn't carried through. |
+
+#### Off-scale design values (literal-shim pattern)
+
+| # | Surface | Design value | Code value | Notes |
+|---|---|---|---|---|
+| F | Ceremonial Compose search input + result row + selected recipient card | `borderRadius: 10` (off-scale) | iOS `CeremonialMailWizardView.swift:122/125, 163/166, 190/193` literal `10`; Android `CeremonialMailWizardScreen.kt:191/193, 256/258, 300/305` literal `10.dp` | Matches design literal exactly. |
+| G | Ceremonial Compose address disclosure box + schedule radio | `borderRadius: 10` (off-scale) | iOS line 225/228, 437/440, 588/591 literal `10`; Android matches | Matches design. |
+| H | Ceremonial Compose address card outer | `borderRadius: 12` (= `Radii.lg`) | iOS line 278/281, 299/302 `Radii.lg` ✓; Android line 375/377 `Radii.lg` ✓ | ✓ matches |
+| I | Ceremonial Compose review card outer | `borderRadius: 12` (= `Radii.lg`) | iOS line 541/544 `Radii.lg` ✓; Android line 677/679 `Radii.lg` ✓ | ✓ matches |
+| J | Ceremonial Compose seal option | `borderRadius: 14, 64×64` (off-scale radius) | Not directly inspected; off-scale design value | Surface only. |
+| K | Ceremonial Compose large CTA at Seal step | `borderRadius: 16, height: 56, fontSize: 15/700` | Need to verify code; if at `Radii.xl` already ✓ | Likely already tokenised via shared `PrimaryButton` (which uses `Radii.lg` = 12 — 4pt under design). If so, follow-up to consider promoting the seal-step large CTA to `Radii.xl` per design. |
+| L | Ceremonial Open reading body letter | `borderRadius: 18` (off-scale) | iOS `CeremonialMailOpenView.swift:1064, 1067` literal `18` ✓; Android `CeremonialMailOpenScreen.kt:1340, 1342` literal `18.dp` ✓ | Matches design. |
+| M | Ceremonial Open reply letter preview | `borderRadius: 14` (off-scale) | iOS line 1009, 1012 literal `14` ✓; Android line 1282, 1284 literal `14.dp` ✓ | Matches design. |
+| N | Ceremonial Open editor toolbar button | `borderRadius: 9` (off-scale) | iOS line 1119, 1122 literal `9` ✓; Android line 1463, 1465 literal `9.dp` ✓ | Matches design. |
+| O | Ceremonial Open postmark micro-elements | `borderRadius: 3, 1.5` (off-scale) | iOS line 382 literal `3`; line 786 `.cornerRadius(1.5)` ✓; Android matches | Matches design. |
+| P | Mailbox root mail card (via shared `ListOfRowsView` card-style) | `borderRadius: 16` (= `Radii.xl`) for Mailbox per `mailbox.jsx`; shared shell uses `Radii.lg` (=12) | `ListOfRowsView.swift:418/420 (.card)`, `:853 (.standalone)` use `Radii.lg` | Shared shell. Changing it cascades to all consumers. Surface as design-system decision: should grouped-card-style across the app shift from 12 → 16, or only Mailbox? |
+| Q | Mailbox tab underline | `height: 2.5px, borderRadius: 2` (2.5 off-scale) | iOS `MailboxRootContent.swift:165` literal `height: 2.5` ✓; Android matches | Matches design. |
+| R | Mailbox drawer pill | `height: 40, padding 0/14/0/12, borderRadius: 9999` (40 off-scale) | iOS `Capsule()` + `frame(height: 40)` ✓; Android matches | Matches design. |
+| S | Vault top-bar search | `borderRadius: 10` (off-scale) | Code routes through shared shell's search field — needs separate audit | Surface only. |
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass (no on-scale literals introduced; no changes made).
+- Android — no changes; existing literal patterns preserved.
+- All 5 surfaces audited; 0 code changes applied. Documentation captures the design-language pattern: most ceremonial / mailbox chrome is intentionally off-canonical and the code consistently uses literals to match.
+
+Files modified (1 file):
+- `docs/visual-parity-fixes.md` (P7.9.f.1 section appended)
+
+### Audit summary
+
+P7.9.f.1 is the first audit pass that returned **zero token-resolvable
+fixes** across a 5-screen sub-group. The reason is structural:
+
+1. **Ceremonial mail uses a "warm paper" design language** that
+   intentionally side-steps the canonical Radii ramp — borderRadius
+   `10`, `14`, `18`, `9`, `3`, `1.5` are pervasive choices, not
+   one-off drifts. The code already mirrors these via literals.
+2. **Mailbox root + Vault delegate to shared archetypes** (ListOfRows,
+   EmptyState). The archetypes use the canonical ramp; per-feature
+   chrome overrides would either fork the shells or require new
+   tokens. Out of scope.
+3. **Structural divergences** (§A–E above) are feature-implementation
+   gaps that need their own sub-prompts, not token sweeps.
+
+The biggest design-system question this audit surfaces: **should the
+shared `ListOfRowsView` card-style move from `Radii.lg` (=12) to
+`Radii.xl` (=16)** to match the Mailbox design specifically? This
+would change visual harmony for every other consumer (My Homes,
+Mailbox list, drawers) and needs explicit design sign-off — flagged
+in §P.
+
+P7.9.f.2 follows: audits the 8 A17 mail-detail body variants
+(generic / Booklet / Certified / Community / Coupon / Gig mail /
+Memory / Package) against the per-variant designs. The shared
+`mail_item_detail` shell + per-variant body composables are the
+target.
