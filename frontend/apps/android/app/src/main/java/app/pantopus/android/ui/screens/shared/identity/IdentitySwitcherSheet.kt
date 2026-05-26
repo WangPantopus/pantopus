@@ -36,6 +36,8 @@ import app.pantopus.android.ui.screens.identity_center.IdentityKind
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 /** Render-only switcher card. Pairs with [IdentitySwitcherSheet]. */
 @Immutable

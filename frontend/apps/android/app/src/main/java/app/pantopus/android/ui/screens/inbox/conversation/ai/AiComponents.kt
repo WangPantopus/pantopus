@@ -34,6 +34,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 /**
  * The Pantopus AI mark: a flat indigo-violet (`magic`) rounded square

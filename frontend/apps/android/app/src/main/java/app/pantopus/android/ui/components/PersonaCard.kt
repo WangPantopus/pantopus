@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 /** Identity pillar styling for [PersonaCard]. Mirrors the iOS `IdentityPillar`. */
 enum class PersonaPillar(

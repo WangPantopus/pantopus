@@ -57,6 +57,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 /**
  * A11.1 Tasks map — the Gigs-only mode of the MapListHybrid archetype.

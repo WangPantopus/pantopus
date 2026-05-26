@@ -48,6 +48,8 @@ import app.pantopus.android.ui.screens.audience_profile.tierColor
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 @Composable
 fun BroadcastDetailScreen(

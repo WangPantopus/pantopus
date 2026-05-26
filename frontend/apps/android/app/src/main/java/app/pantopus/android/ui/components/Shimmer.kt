@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.pantopus.android.ui.theme.Radii
 
 private val ShimmerBase = Color(0xFFEEF0F3)
 private val ShimmerHighlight = Color(0xFFF6F7F9)
