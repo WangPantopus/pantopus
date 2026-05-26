@@ -699,6 +699,20 @@ public struct YouTabRoot: View {
         if !path.isEmpty { path.removeLast() }
     }
 
+    /// Called by `ListingComposeWizardView` on success. Pops the wizard and
+    /// pushes the new listing's detail so Back returns to My Listings, not
+    /// the success step. Defined as a method (not a closure literal at the
+    /// call site) so SwiftLint's `trailing_closure` rule doesn't try to
+    /// convert the call — the trailing-closure form would bind to
+    /// `onListingUpdated` (the last function-typed init param) instead of
+    /// `onOpenListingDetail`.
+    private func handleListingCreated(_ listingId: String) {
+        Task { @MainActor in
+            pop()
+            path.append(.listingDetail(listingId: listingId))
+        }
+    }
+
     /// No-op overlay slot — we previously routed debug affordances via
     /// a 5-tap gesture, but the designed DEBUG section in `MeView` now
     /// surfaces them directly.
@@ -1359,7 +1373,7 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.billDetail(homeId: homeId, billId: billId)) }
                     },
                     onAddBill: {
-                        Task { @MainActor in path.append(.addBill(homeId: homeId)) }
+                        Task { @MainActor in path.append(.addBill(homeId: homeId, billId: nil)) }
                     }
                 )
             )
@@ -1856,7 +1870,9 @@ public struct YouTabRoot: View {
                     Task { @MainActor in path.append(.placeholder(label: "Messages")) }
                 },
                 onShare: {
-                    systemSheet = .share(items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"])
+                    systemSheet = .share(
+                        items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"]
+                    )
                 },
                 onOpenReport: {
                     Task { @MainActor in path.append(.placeholder(label: "Report business")) }

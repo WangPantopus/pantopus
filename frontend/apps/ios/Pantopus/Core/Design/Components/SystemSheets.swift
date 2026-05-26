@@ -119,7 +119,7 @@ public struct MailComposeSheet: UIViewControllerRepresentable {
         Coordinator(onFinish: onFinish)
     }
 
-    @MainActor public final class Coordinator: NSObject, @MainActor MFMailComposeViewControllerDelegate {
+    public final class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
         private let onFinish: @MainActor @Sendable () -> Void
 
         init(onFinish: @escaping @MainActor @Sendable () -> Void) {
@@ -131,8 +131,11 @@ public struct MailComposeSheet: UIViewControllerRepresentable {
             didFinishWith _: MFMailComposeResult,
             error _: (any Error)?
         ) {
-            controller.dismiss(animated: true)
-            onFinish()
+            let onFinish = onFinish
+            Task { @MainActor in
+                controller.dismiss(animated: true)
+                onFinish()
+            }
         }
     }
 }

@@ -1,633 +1,554 @@
-# Navigation graph closure check
+# Navigation-graph closure — iOS & Android (post-Wave-D)
 
-> Generated 2026-05-18. Read-only audit. Walks every navigation entry
-> point on both platforms and surfaces orphan routes, dead screens, and
-> the placeholder backlog with proposed dispositions.
-
-## Scope and method
-
-**iOS:** start from `Features/Root/RootTabView.swift` (4 tabs: Hub, Nearby,
-Inbox, You). Each tab owns a `…TabRoot.swift` containing a typed
-`…Route: Hashable` enum and a `destination(for:)` switch. For every
-route case we trace (a) what View it produces and (b) every call site
-that pushes it.
-
-**Android:** start from `screens/root/RootTabScreen.kt` (single
-NavHost). Every `composable(ChildRoutes.X)` block is a route; every
-`navController.navigate(ChildRoutes.X)` is a call site.
-
-## Section 1 — iOS route trees
-
-### HubRoute (47 cases)
-
-All cases below are declared in
-`frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` lines 13–123
-and matched in `destination(for:)`.
-
-| Case | Destination | Status | Reachable from |
-|---|---|---|---|
-| `.myHomes` | `MyHomesListView` | LIVE | `HubView` Homes pillar, `MeView` action grid (via You-tab) |
-| `.myClaims` | `MyClaimsListView` | LIVE | `HomeDashboardView.onOpenClaimsList`, `ClaimOwnershipWizardView.onCompletion` |
-| `.mailboxDrawers` | `MailboxDrawersView` | LIVE | `HubView` Scan-mail action, Mail pillar |
-| `.mailbox` | `MailboxListView` | LIVE | `HubView` Mail pillar, `jumpBackIn(/app/mailbox)`, `VaultListView.goToMailbox` |
-| `.mailItemDetail(mailId:)` | `MailDetailView` | LIVE | `MailboxListView.onOpenMail`, `VaultListView.onOpenItem` |
-| `.drawerDetail(drawer:)` | `NotYetAvailableView("Drawer · <drawer>")` | STUB | `MailboxDrawersView.onOpenDrawer` |
-| `.mailboxVault` | `VaultListView` | LIVE | `MailboxDrawersView.onOpenVault` |
-| `.addHome` | `AddHomeWizardView` | LIVE | `HubView` Add-home action, Setup banner, `MyHomesListView.onAddHome`, `MyClaimsListView.onStartNewClaim` |
-| `.claimOwnership(homeId:)` | `ClaimOwnershipWizardView` | LIVE | `HomeDashboardView.onClaimOwnership` |
-| `.homeDashboard(homeId:)` | `HomeDashboardView` | LIVE | `MyHomesListView.onOpenHome`, `jumpBackIn(/app/homes/:id/dashboard)`, `AddHomeWizardView.onSuccess` |
-| `.homePets(homeId:)` | `PetsListView` | LIVE | `HomeDashboardView.onOpenPets` |
-| `.homeEmergency(homeId:)` | `EmergencyInfoView` | LIVE | `HomeDashboardView.onOpenEmergency` |
-| `.homeDocs(homeId:)` | `DocumentsView` | LIVE | `HomeDashboardView.onOpenDocs` |
-| `.homePackages(homeId:)` | `PackagesListView` | LIVE | `HomeDashboardView.onOpenPackages` |
-| `.packageDetail(homeId:, packageId:)` | `PackageDetailView` | LIVE | `PackagesListView.onOpenPackage` |
-| `.logPackage(homeId:)` | `LogPackageSheetView` | LIVE | `PackagesListView.onLogPackage` |
-| `.homeTasks(homeId:)` | `HouseholdTasksListView` | LIVE | `HomeDashboardView.onOpenTasks` |
-| `.homeMaintenance(homeId:)` | `MaintenanceListView` | LIVE | `HomeDashboardView.onOpenMaintenance` |
-| `.homeMembers(homeId:)` | `MembersListView` | LIVE | `HomeDashboardView.onOpenMembers` |
-| `.publicProfile(userId:)` | `PublicProfileView` | LIVE | `MailDetailView.onOpenSenderProfile`, `PulsePostDetailView.onOpenProfile`, `DiscoverHubView.onSelect(person:)` |
-| `.pulsePost(postId:)` | `PulsePostDetailView` | LIVE | `FeedView.onOpenPost`, Hub discovery card (`kind: .post`) |
-| `.homeBills(homeId:)` | `BillsListView` | LIVE | `HomeDashboardView.onOpenBills` |
-| `.homeCalendar(homeId:)` | `HomeCalendarView` | LIVE | `HomeDashboardView.onOpenCalendar` |
-| `.billDetail(homeId:, billId:)` | `BillDetailView` | LIVE | `BillsListView.onOpenBill` |
-| `.addBill(homeId:)` | `AddBillWizardView` | LIVE | `BillsListView.onAddBill` |
-| `.homePolls(homeId:)` | `PollsListView` | LIVE | `HomeDashboardView.onOpenPolls` |
-| `.pollDetail(homeId:, pollId:)` | `PollDetailView` | LIVE | `PollsListView.onOpenPoll` |
-| `.pulseFeed` | `FeedView` | LIVE | `HubView` Pulse pillar |
-| `.composePost(intent:)` | `NotYetAvailableView("Compose · <intent>")` | STUB | `FeedView.onCompose` |
-| `.gigsFeed` | `GigsFeedView` | LIVE | `HubView` Gigs pillar, `jumpBackIn(/gigs)`, `MyBidsView.onBrowseTasks` |
-| `.gigDetail(gigId:)` | `GigDetailView` | LIVE | `GigsFeedView.onOpenGig`, `NearbyMapView.onOpenEntity(gig)`, `DiscoverHubView.onSelect(gig:)`, `MyBidsView` row taps |
-| `.nearbyMapForGigs(categoryKey:)` | `NearbyMapView` | LIVE | `GigsFeedView.onOpenMap` |
-| `.composeGig(category:)` | `NotYetAvailableView("Post a task · <category>")` | STUB | `GigsFeedView.onCompose`, `jumpBackIn(/gigs/new)` |
-| `.marketplace` | `MarketplaceView` | LIVE | `HubView` Marketplace pillar, `DiscoverHubView.onSelect(seeAllListings:)` |
-| `.listingDetail(listingId:)` | `ListingDetailView` | LIVE | `MarketplaceView.onOpenListing`, `NearbyMapView.onOpenEntity(listing)`, `DiscoverHubView.onSelect(listing:)` |
-| `.composeListing` | `NotYetAvailableView("Snap & sell")` | STUB | `MarketplaceView.onCompose` |
-| `.invoiceDetail(invoiceId:)` | `InvoiceDetailView` | **ORPHAN** | No inbound caller — intended for future wallet/payments integration (carries-over from T2.6 Transactional Detail shell scaffolding). |
-| `.notifications` | `NotificationsView` | LIVE | `HubView.onBellTap` |
-| `.connections` | `ConnectionsView` | LIVE | Deep link `pantopus://connections`, `DiscoverHubView.onSelect(seeAllPeople:)` |
-| `.supportTrains` | `SupportTrainsView` | LIVE | Deep link `pantopus://support-trains` |
-| `.reviewSignups(supportTrainId:)` | `ReviewSignupsView` | LIVE | Deep link `pantopus://support-trains/:id`, `SupportTrainsView.onOpenTrain` |
-| `.myBids` | `MyBidsView` | LIVE | (reached via `YouRoute.myBids` mirror; HubRoute case retained for future Hub-side bid surface) |
-| `.listingOffers(listingId:, title:)` | `ListingOffersView` | LIVE | `ListingDetailView.onViewOffers` |
-| `.discoverHub` | `DiscoverHubView` | LIVE | Deep link `pantopus://discover-hub`, `HubView.openDiscoverHub` |
-| `.discoverBusinesses` | `DiscoverBusinessesView` | LIVE | `DiscoverHubView.onSelect(business:)` / `(seeAllBusinesses:)` |
-| `.chatConversation(InboxConversationDestination)` | `ChatConversationView` | LIVE | `ConnectionsView.onMessage`, `MyBidsView.onMessageClient` |
-| `.menu` | `SettingsView` | LIVE | `HubView.onMenuTap` |
-| `.mailboxSearch` | `NotYetAvailableView("Mail search")` | STUB | `MailboxListView.onOpenSearch` |
-| `.placeholder(label:)` | `NotYetAvailableView(label)` | STUB | Catch-all for unbuilt affordances (~40 inbound pushes) |
-| `.tokenGallery` *(DEBUG)* | `TokenGalleryView` | LIVE (DEBUG) | 5-tap easter egg on Hub corner |
-| `.iconGallery` *(DEBUG)* | `IconGalleryView` | LIVE (DEBUG) | 5-tap easter egg on Hub corner |
-| `.componentGallery` *(DEBUG)* | `ComponentGalleryView` | LIVE (DEBUG) | 5-tap easter egg on Hub corner |
-
-### NearbyRoute (4 cases)
-
-Declared in `frontend/apps/ios/Pantopus/Features/Root/NearbyTabRoot.swift`.
-The Nearby tab roots at `NearbyMapView` (no NavigationStack entry —
-push happens from the map's callbacks).
-
-| Case | Destination | Status | Reachable from |
-|---|---|---|---|
-| `.entityDetail(kind: MapEntityKind, id:)` | `GigDetailView` (kind=.gig) / `ListingDetailView` (kind=.listing) | LIVE | `NearbyMapView.onOpenEntity` |
-| `.filters` | `NotYetAvailableView("Map filters")` | STUB | `NearbyMapView.onOpenFilters` |
-| `.placeholder(label:)` | `NotYetAvailableView(label)` | STUB | `ListingOffersView` callbacks (share/buyer/transaction/edit/sort) |
-| `.listingOffers(listingId:, title:)` | `ListingOffersView` | LIVE | `ListingDetailView.onViewOffers` (within Nearby tab stack) |
-
-### InboxRoute (4 cases)
-
-Declared in `frontend/apps/ios/Pantopus/Features/Root/InboxTabRoot.swift`. The Inbox tab roots at `ChatListView`.
-
-| Case | Destination | Status | Reachable from |
-|---|---|---|---|
-| `.conversation(InboxConversationDestination)` | `ChatConversationView` | LIVE | `ChatListView.onOpenConversation`, `NewMessageView.onSelect` (after dismiss) |
-| `.compose` | `NewMessageView` | LIVE | `ChatListView.onCompose` |
-| `.invite` | `NotYetAvailableView("Invite to Pantopus")` | STUB | `NewMessageView.onInvite` |
-| `.search` | `NotYetAvailableView("Chat search")` | STUB | `ChatListView.onOpenSearch` |
-
-### YouRoute (43 cases)
-
-Declared in `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift`
-lines 13–55 and matched in `destination(for:)`. The You tab roots at `MeView`.
-
-| Case | Destination | Status | Reachable from |
-|---|---|---|---|
-| `.signOutConfirm` | `EmptyView()` | **DEAD** | Declared in enum but never pushed; sign-out uses a separate `confirmationDialog` in `MeView`. Stale enum case — safe to remove. |
-| `.mailbox` | `MailboxListView` | LIVE | `handleAction(me.mail)` |
-| `.mailItemDetail(mailId:)` | `MailDetailView` | LIVE | `MailboxListView.onOpenMail` (You-tab stack) |
-| `.settings` | `SettingsView` | LIVE | `handleSection(me.settings)` |
-| `.placeholder(label:)` | `NotYetAvailableView(label)` | STUB | Catch-all (~80 inbound pushes from action grid / section taps) |
-| `.offers` | `OffersView` | LIVE | `handleAction(me.offers)`, `handleSection(me.offers)` |
-| `.myBids` | `MyBidsView` | LIVE | `handleAction(me.bids)`, `handleSection(me.bids)` |
-| `.myTasks` | `MyTasksView` | LIVE | `handleAction(me.gigs)`, `handleSection(me.gigs)` |
-| `.composeTask` | `NotYetAvailableView("Post a task")` | STUB | `MyTasksView.onPostTask`, `onRepost` |
-| `.myPosts` | `MyPostsView` | LIVE | `handleAction(me.posts)`, `handleSection(me.posts)` |
-| `.connections` | `ConnectionsView` | LIVE | `handleAction(me.connections)`, `handleSection(me.connections)` |
-| `.supportTrains` | `SupportTrainsView` | LIVE | `handleAction(me.supportTrains)`, `handleSection(me.supportTrains)` |
-| `.reviewSignups(supportTrainId:)` | `ReviewSignupsView` | LIVE | `SupportTrainsView.onOpenTrain` |
-| `.myHomes` | `MyHomesListView` | LIVE | `handleAction(me.homes)`, `handleSection(me.homes)` |
-| `.myListings` | `MyListingsView` | LIVE | `handleAction(me.listings)`, `handleSection(me.listings)` |
-| `.myBusinesses` | `MyBusinessesView` | LIVE | `handleAction(me.businesses)`, `handleSection(me.businesses)` |
-| `.homeDashboard(homeId:)` | `HomeDashboardView` | LIVE | `MyHomesListView.onOpenHome` (You-tab stack) |
-| `.identityCenter` | `IdentityCenterView` | LIVE | `handleSection(me.identityCenter)` |
-| `.audienceProfile` | `AudienceProfileView` | LIVE | `handleSection(me.audience)` |
-| `.homeBills(homeId:)` | `BillsListView` | LIVE | action/section handlers + `HomeDashboardView.onOpenBills` (You-tab) |
-| `.homePets(homeId:)` | `PetsListView` | LIVE | action handler + `HomeDashboardView.onOpenPets` (You-tab) |
-| `.homeCalendar(homeId:)` | `HomeCalendarView` | LIVE | action/section handlers + `HomeDashboardView.onOpenCalendar` (You-tab) |
-| `.homeEmergency(homeId:)` | `EmergencyInfoView` | LIVE | action/section handlers + `HomeDashboardView.onOpenEmergency` (You-tab) |
-| `.homeDocs(homeId:)` | `DocumentsView` | LIVE | action/section handlers + `HomeDashboardView.onOpenDocs` (You-tab) |
-| `.homePackages(homeId:)` | `PackagesListView` | LIVE | action/section handlers + `HomeDashboardView.onOpenPackages` (You-tab) |
-| `.packageDetail(homeId:, packageId:)` | `PackageDetailView` | LIVE | `PackagesListView.onOpenPackage` (You-tab stack) |
-| `.logPackage(homeId:)` | `LogPackageSheetView` | LIVE | `PackagesListView.onLogPackage` (You-tab stack) |
-| `.homePolls(homeId:)` | `PollsListView` | LIVE | action/section handlers + `HomeDashboardView.onOpenPolls` (You-tab) |
-| `.pollDetail(homeId:, pollId:)` | `PollDetailView` | LIVE | `PollsListView.onOpenPoll` (You-tab) |
-| `.accessCodes(homeId:, homeName:)` | `AccessCodesView` | LIVE | `handleSection(me.access)` |
-| `.homeTasks(homeId:)` | `HouseholdTasksListView` | LIVE | action/section handlers + `HomeDashboardView.onOpenTasks` (You-tab) |
-| `.homeMaintenance(homeId:)` | `MaintenanceListView` | LIVE | action/section handlers + `HomeDashboardView.onOpenMaintenance` (You-tab) |
-| `.homeOwners(homeId:)` | `OwnersListView` | LIVE | `handleSection(me.owners)` |
-| `.homeMembers(homeId:)` | `MembersListView` | LIVE | `handleSection(me.members)`, `HomeDashboardView.onOpenMembers` (You-tab) |
-| `.listingOffers(listingId:, title:)` | `ListingOffersView` | LIVE | `ListingDetailView.onViewOffers` (You-tab stack) |
-| `.gigDetail(gigId:)` | `GigDetailView` | LIVE | `OffersView.onOpenOfferDetail`, `MyBidsView.onOpenBid`, multiple `MyTasksView` callbacks |
-| `.listingDetail(listingId:)` | `ListingDetailView` | LIVE | `MyListingsView.onOpenListing` |
-| `.publicProfile(userId:)` *(DEBUG)* | `PublicProfileView` | LIVE (DEBUG) | DEBUG alert "Open profile" |
-| `.pulsePost(postId:)` *(DEBUG)* | `PulsePostDetailView` | LIVE (DEBUG) | DEBUG alert "Open post" |
-| `.privacyHandshake(personaHandle:)` *(DEBUG)* | `PrivacyHandshakeWizardView` | LIVE (DEBUG) | DEBUG alert |
-| `.statusWaiting` *(DEBUG)* | `StatusWaitingView` | LIVE (DEBUG) | `handleSection(me.debug.openStatusWaiting)` |
-| `.ceremonialMail` *(DEBUG)* | `CeremonialMailWizardView` | LIVE (DEBUG) | `handleSection(me.debug.openCeremonialMail)` |
-| `.ceremonialMailOpen(mailId:)` *(DEBUG)* | `CeremonialMailOpenView` | LIVE (DEBUG) | DEBUG alert + `CeremonialMailOpenView.onWriteBack` |
-
-## Section 2 — Android route graph
-
-Declared as `const val` inside the `ChildRoutes` object in
-`frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt`
-(constants on lines 169-330) and matched by `composable(ChildRoutes.X) { … }`
-blocks inside the same file (~lines 800–1880).
-
-| Constant | Pattern | Destination | Status | Reachable from |
-|---|---|---|---|---|
-| `MY_HOMES` | `homes/my-homes` | `MyHomesListScreen` | LIVE | `HubScreen` Homes pillar, `YouScreen.onOpenMyHomes`, `HomeDashboardScreen.onAddHome` |
-| `MY_CLAIMS` | `homes/my-claims` | `MyClaimsListScreen` | LIVE | `HomeDashboardScreen.onOpenClaimsList` |
-| `ADD_HOME` | `homes/add` | `AddHomeWizardScreen` | LIVE | `MyHomesListScreen.onAddHome`, `YouScreen.onAddHome`, Hub Setup banner |
-| `CLAIM_OWNERSHIP` | `homes/{homeId}/claim` | `ClaimOwnershipWizardScreen` | LIVE | `HomeDashboardScreen.onClaimOwnership` |
-| `MAILBOX_LIST` | `mailbox/list` | `MailboxListScreen` | LIVE | `MailboxDrawersScreen.onOpenMailbox`, `VaultListScreen` |
-| `MAILBOX_DRAWERS` | `mailbox/drawers` | `MailboxDrawersScreen` | LIVE | `HubScreen` Mail pillar |
-| `MAILBOX_SEARCH` | `mailbox/search` | `NotYetAvailableView("Mail search")` | STUB | `MailboxListScreen.onOpenSearch` |
-| `MAILBOX_ITEM_DETAIL` | `mailbox/item/{mailId}` | `MailDetailScreen` | LIVE | `MailboxListScreen.onOpenMail`, `VaultListScreen.onOpenItem`, `CeremonialMailWizardScreen.onOpenMail` |
-| `MAILBOX_VAULT` | `mailbox/vault` | `VaultListScreen` | LIVE | `MailboxDrawersScreen.onOpenVault` |
-| `HOME_DASHBOARD` | `homes/{homeId}` | `HomeDashboardScreen` | LIVE | `MyHomesListScreen.onOpenHome`, deep link `Destination.Home` |
-| `HOME_BILLS` | `homes/{homeId}/bills` | `BillsListScreen` | LIVE | `HomeDashboardScreen.onOpenBills` |
-| `BILL_DETAIL` | `homes/{homeId}/bills/{billId}` | `BillDetailScreen` | LIVE | `BillsListScreen.onOpenBill` |
-| `ADD_BILL` | `homes/{homeId}/bills/new` | `AddBillWizardScreen` | LIVE | `BillsListScreen.onAddBill` |
-| `HOME_PETS` | `homes/{homeId}/pets` | `PetsListScreen` | LIVE | `HomeDashboardScreen.onOpenPets` |
-| `HOME_CALENDAR` | `homes/{homeId}/calendar` | `HomeCalendarScreen` | LIVE | `HomeDashboardScreen.onOpenCalendar` |
-| `HOME_EMERGENCY` | `homes/{homeId}/emergency` | `EmergencyInfoScreen` | LIVE | `HomeDashboardScreen.onOpenEmergency` |
-| `HOME_DOCS` | `homes/{homeId}/docs` | `DocumentsScreen` | LIVE | `HomeDashboardScreen.onOpenDocs` |
-| `HOME_PACKAGES` | `homes/{homeId}/packages` | `PackagesListScreen` | LIVE | `HomeDashboardScreen.onOpenPackages` |
-| `PACKAGE_DETAIL` | `homes/{homeId}/packages/{packageId}` | `PackageDetailScreen` | LIVE | `PackagesListScreen.onOpenPackage` |
-| `LOG_PACKAGE` | `homes/{homeId}/packages/new` | `LogPackageScreen` | LIVE | `PackagesListScreen.onLogPackage` |
-| `HOME_POLLS` | `homes/{homeId}/polls` | `PollsListScreen` | LIVE | `HomeDashboardScreen.onOpenPolls` |
-| `POLL_DETAIL` | `homes/{homeId}/polls/{pollId}` | `PollDetailScreen` | LIVE | `PollsListScreen.onOpenPoll` |
-| `ACCESS_CODES` | `homes/{homeId}/access?homeName={…}` | `AccessCodesScreen` | LIVE | `HomeDashboardScreen.onOpenAccessCodes` |
-| `HOME_TASKS` | `homes/{homeId}/tasks` | `HouseholdTasksListScreen` | LIVE | `HomeDashboardScreen.onOpenTasks` |
-| `HOME_MAINTENANCE` | `homes/{homeId}/maintenance` | `MaintenanceListScreen` | LIVE | `HomeDashboardScreen.onOpenMaintenance` |
-| `HOME_OWNERS` | `homes/{homeId}/owners` | `OwnersListScreen` | LIVE | `YouScreen.onOpenHomeOwners` (RootTabScreen.kt:835 → YouScreen.kt:221) |
-| `HOME_MEMBERS` | `homes/{homeId}/members` | `MembersListScreen` | LIVE | `HomeDashboardScreen.onOpenMembers` |
-| `PUBLIC_PROFILE` | `users/{userId}` | `PublicProfileScreen` | LIVE | `MailDetailScreen.onOpenSenderProfile`, `PulsePostDetailScreen.onOpenProfile`, `DiscoverHubScreen.onSelect(Person)`, deep link |
-| `PULSE_POST` | `posts/{postId}` | `PulsePostDetailScreen` | LIVE | `FeedScreen.onOpenPost`, deep link, Hub discovery |
-| `INVITE_OWNER` | `homes/{homeId}/invite?email={…}` | `InviteOwnerFormScreen` | LIVE | `HomeDashboardScreen.onInviteOwner`, `OwnersListScreen.onOpenInvite` |
-| `DISAMBIGUATE_MAIL` | `mailbox/disambiguate/{mailId}` | `DisambiguateMailFormScreen` | LIVE | `MailboxListScreen.onDisambiguate` |
-| `NOTIFICATIONS` | `notifications` | `NotificationsScreen` | LIVE | Hub bell, deep link |
-| `CONNECTIONS` | `connections` | `ConnectionsScreen` | LIVE | `YouScreen.onOpenConnections`, Hub card, deep link |
-| `OFFERS` | `offers` | `OffersScreen` | LIVE | `YouScreen.onOpenOffers` |
-| `MY_BIDS` | `my-bids` | `MyBidsScreen` | LIVE | `YouScreen.onOpenMyBids` |
-| `MY_TASKS` | `my-tasks` | `MyTasksScreen` | LIVE | `YouScreen.onOpenMyTasks` |
-| `COMPOSE_TASK` | `compose-task` | `NotYetAvailableView("Post a task")` | STUB | `MyTasksScreen.onPostTask`, `onRepost` |
-| `MY_POSTS` | `my-posts` | `MyPostsScreen` | LIVE | `YouScreen.onOpenMyPosts` |
-| `DISCOVER_HUB` | `discover-hub` | `DiscoverHubScreen` | LIVE | Hub Discovery "See all", deep link |
-| `DISCOVER_BUSINESSES` | `discover-businesses` | `DiscoverBusinessesScreen` | LIVE | `DiscoverHubScreen.onSelect(Business)`, `SeeAllBusinesses` |
-| `MENU` | `settings` | `SettingsIndexScreen` | LIVE | Hub menu icon, You Settings |
-| `SETTINGS_NOTIFICATIONS` | `settings/notifications` | `NotificationSettingsScreen` | LIVE | `SettingsIndexScreen.onNavigate(.Notifications)` |
-| `SETTINGS_PRIVACY` | `settings/privacy` | `PrivacySettingsScreen` | LIVE | `SettingsIndexScreen.onNavigate(.Privacy)` |
-| `SETTINGS_BLOCKED_USERS` | `settings/blocks` | `BlockedUsersScreen` | LIVE | `SettingsIndexScreen.onNavigate(.Blocks)` |
-| `SETTINGS_PASSWORD` | `settings/password` | `PasswordChangeScreen` | LIVE | `SettingsIndexScreen.onNavigate(.Password)` |
-| `SETTINGS_VERIFICATION` | `settings/verification` | `VerificationCenterScreen` | LIVE | `SettingsIndexScreen.onNavigate(.Verification)` |
-| `SETTINGS_HELP` | `settings/help` | `HelpCenterScreen` | LIVE | `SettingsIndexScreen.onNavigate(.Help)` |
-| `SETTINGS_LEGAL` | `settings/legal` | `LegalIndexScreen` | LIVE | `SettingsIndexScreen.onNavigate(.Legal)` |
-| `SETTINGS_LEGAL_CONTENT` | `settings/legal/{doc}` | `LegalContentScreen` (known doc) / `NotYetAvailableView` (unknown) | PARTIAL | `LegalIndexScreen.onSelectDocument` |
-| `SETTINGS_ABOUT` | `settings/about` | `AboutScreen` | LIVE | `SettingsIndexScreen.onNavigate(.About)` |
-| `IDENTITY_CENTER` | `identity-center` | `IdentityCenterScreen` | LIVE | `SettingsIndexScreen.onNavigate(.IdentityCenter)`, You-tab |
-| `AUDIENCE_PROFILE` | `audience-profile` | `AudienceProfileScreen` | LIVE | `IdentityCenterScreen.onOpenIdentity(PublicProfile)` |
-| `CEREMONIAL_MAIL` | `mailbox/compose-letter` | `CeremonialMailWizardScreen` | LIVE | `CeremonialMailOpenScreen.onWriteBack` |
-| `CEREMONIAL_MAIL_OPEN` | `mailbox/letter/{mailId}` | `CeremonialMailOpenScreen` | LIVE | Mail detail tap for ceremonial-category mail |
-| `PRIVACY_HANDSHAKE` | `handshake/{personaHandle}` | `PrivacyHandshakeScreen` | LIVE | Beacon-profile follow CTA |
-| `TOKEN_ACCEPT` | `invite/{token}` | `TokenAcceptScreen` | LIVE | Deep link `Destination.Invite` |
-| `SUPPORT_TRAINS` | `support-trains` | `SupportTrainsScreen` | LIVE | `YouScreen.onOpenSupportTrains`, deep link |
-| `REVIEW_SIGNUPS` | `support-trains/{supportTrainId}/review` | `ReviewSignupsScreen` | LIVE | `SupportTrainsScreen.onOpenTrain` |
-| `PLACEHOLDER` | `_placeholder/generic?label={label}` | `NotYetAvailableView(label)` | STUB | Catch-all for ~50 unbuilt affordances |
-| `PULSE_FEED` | `feed/pulse` | `FeedScreen` | LIVE | Hub Pulse pillar, deep link |
-| `COMPOSE_POST` | `feed/compose?intent={intent}` | `NotYetAvailableView("Compose · <intent>")` | STUB | `FeedScreen.onCompose` |
-| `GIGS_FEED` | `gigs/feed` | `GigsFeedScreen` | LIVE | Hub Gigs pillar, `OffersScreen.onBrowseTasks`, `DiscoverHubScreen.SeeAllGigs` |
-| `GIG_DETAIL` | `gigs/{gigId}` | `GigDetailScreen` | LIVE | `GigsFeedScreen.onOpenGig`, `MyBidsScreen.onOpenBid`, `OffersScreen.onOpenOfferDetail`, deep link |
-| `COMPOSE_GIG` | `gigs/compose?category={category}` | `NotYetAvailableView("Post a task · <category>")` | STUB | `GigsFeedScreen.onCompose` |
-| `NEARBY_MAP_FOR_GIGS` | `gigs/map?category={category}` | `NearbyMapScreen` | LIVE | `GigsFeedScreen.onOpenMap` |
-| `MARKETPLACE` | `marketplace` | `MarketplaceScreen` | LIVE | Hub Marketplace pillar, `DiscoverHubScreen.SeeAllListings` |
-| `LISTING_DETAIL` | `listings/{listingId}` | `ListingDetailScreen` | LIVE | `MarketplaceScreen.onOpenListing`, `NearbyMapScreen.onOpenEntity(Listing)`, `DiscoverHubScreen.onSelect(listing)`, deep link |
-| `LISTING_OFFERS` | `listings/{listingId}/offers?listingTitle={…}` | `ListingOffersScreen` | LIVE | `ListingDetailScreen.onViewOffers` |
-| `COMPOSE_LISTING` | `listings/compose` | `NotYetAvailableView("Snap & sell")` | STUB | `MarketplaceScreen.onCompose`, `MyListingsScreen.onCompose` |
-| `MY_LISTINGS` | `listings/me` | `MyListingsScreen` | LIVE | `YouScreen.onOpenMyListings` |
-| `INVOICE_DETAIL` | `invoices/{invoiceId}` | `InvoiceDetailScreen` | **ORPHAN** | No inbound caller — same future-wallet integration story as iOS. |
-| `MY_BUSINESSES` | `businesses/me` | `MyBusinessesScreen` | LIVE | `YouScreen.onOpenMyBusinesses` |
-| `CHAT_CONVERSATION` | `chat/{kind}/{id}?…` | `ChatConversationHost` | LIVE | `ConnectionsScreen.onOpenChat`, `NewMessageScreen.onSelect` |
-| `NEW_MESSAGE` | `chat/new` | `NewMessageScreen` | LIVE | `ChatListScreen.onCompose` |
-| `TOKEN_GALLERY` *(DEBUG)* | `_debug/token-gallery` | `TokenGalleryScreen` | LIVE (DEBUG) | 5-tap easter egg on Hub corner |
-
-## Section 3 — Orphan routes
-
-Routes whose destination is a real View / Composable, but which have **zero** call sites pushing them. (Excluding intentional DEBUG-only easter-egg routes.)
-
-| Platform | Route | Destination | Disposition |
-|---|---|---|---|
-| iOS | `HubRoute.invoiceDetail(invoiceId:)` | `InvoiceDetailView` | Keep — future wallet/payments integration per T2.6 plan; remove only if wallet feature is descoped. |
-| Android | `ChildRoutes.INVOICE_DETAIL` | `InvoiceDetailScreen` | Keep — mirrors iOS. |
-
-The earlier iOS scan flagged `tokenGallery / iconGallery / componentGallery` as orphan — these are reached via a 5-tap easter egg gesture on the Hub corner, so they're intentionally non-discoverable rather than orphan. The earlier Android scan flagged `HOME_OWNERS` as orphan; that was a miss — it IS reached via `YouScreen.kt:221 → onOpenHomeOwners → RootTabScreen.kt:835 → ChildRoutes.homeOwners(homeId)`. Recorded LIVE in Section 2.
-
-**Dead-route cases (declared but neither pushed nor producing a real View):**
-
-| Platform | Route | Note |
-|---|---|---|
-| iOS | `YouRoute.signOutConfirm` | Maps to `EmptyView()`; never pushed. `MeView` uses a SwiftUI `confirmationDialog` for sign-out instead. Safe to remove in a follow-up cleanup. |
-
-## Section 4 — Dead screens
-
-Screens whose `View` / `@Composable` exists in `Features/` / `screens/`
-but is not referenced from any route or wired screen.
-
-| Platform | Screen | Note |
-|---|---|---|
-| iOS | (none) | All public View files under `Features/` reach a route destination, or are shared shells (`Shared/`, `_Internal/`, route hosts, content/header/CTA slots inside ContentDetail). |
-| Android | `screens/status/StatusWaitingScreen.kt` | Composable exists but **no `ChildRoutes` constant** references it and no `composable(…)` block invokes it. iOS at least has the `YouRoute.statusWaiting` DEBUG case; Android has no route — effectively dead until wired. **Disposition: wire it** (the screen is reachable through the home-claim happy path on the design pack's Status / Waiting.html). |
-| Android | `screens/mailbox/item_detail/MailboxItemDetailScreen.kt` (the T6.5a A17-shell consumer) | Exists alongside the older `MailDetailScreen.kt`. `MAILBOX_ITEM_DETAIL` route still resolves to `MailDetailScreen`. Not technically dead (it's wired in `MailboxItemDetailShell.kt` previews + future migration target), but **not reachable from production navigation today**. Same caveat applies to iOS `MailboxItemDetailView.swift`. |
-
-## Section 5 — Placeholder catalog with proposed dispositions
-
-96 unique placeholder labels with **96 distinct dispositions** spread
-across **305 call sites** (iOS 125, Android 81 generic + 7 typed +
-other contexts). Cross-referenced against `docs/screen-parity-inventory.md`
-and the `A08 — per-screen batch 1/` design pack to decide each
-disposition:
-
-- **BUILD** — the affordance corresponds to a screen already in the
-  design pack OR points to an existing View/Screen that just needs
-  routing wired up.
-- **DEFER** — post-MVP affordance (search/filter sheets, share/print/
-  export, edit flows, secondary identity surfaces). Acceptable to ship
-  v1 with the placeholder still in place.
-- **REMOVE** — stale call site with no path forward; affordance should
-  be deleted from the parent screen. *(None identified in this audit.)*
-
-### Per-label disposition summary
-
-### Unique labels — 96 total
-
-| Label | iOS sites | Android sites | Disposition |
-|---|---:|---:|---|
-| `Add a bill` | 1 | 0 | **BUILD** |
-| `Add a task` | 2 | 1 | **BUILD** |
-| `Add emergency info` | 2 | 1 | **BUILD** |
-| `Add event` | 2 | 1 | **BUILD** |
-| `Article body` | 1 | 0 | **DEFER** |
-| `Audience setup` | 1 | 0 | **BUILD** |
-| `Bill detail` | 1 | 0 | **BUILD** |
-| `Browse listings` | 1 | 1 | **BUILD** |
-| `Browse tasks` | 1 | 0 | **BUILD** |
-| `Business` | 1 | 1 | **DEFER** |
-| `Business dashboard` | 1 | 1 | **DEFER** |
-| `Business filters` | 1 | 1 | **DEFER** |
-| `Business header` | 1 | 0 | **DEFER** |
-| `Business: ${target.name} (${target.businessId})` | 0 | 1 | **BUILD** |
-| `Business: \(name) (\(businessId))` | 1 | 0 | **BUILD** |
-| `Buyer profile` | 3 | 1 | **DEFER** |
-| `Chat search` | 1 | 1 | **DEFER** |
-| `Claim a home` | 1 | 0 | **BUILD** |
-| `Claim ownership` | 1 | 0 | **BUILD** |
-| `Claim status` | 1 | 1 | **BUILD** |
-| `Compose · \(intent.capitalized)` | 1 | 0 | **DEFER** |
-| `Data export` | 1 | 1 | **DEFER** |
-| `Discovery filters` | 1 | 1 | **DEFER** |
-| `Document action` | 2 | 1 | **BUILD** |
-| `Document detail` | 2 | 1 | **BUILD** |
-| `Drawer · $drawer` | 0 | 1 | **BUILD** |
-| `Drawer · \(drawer)` | 1 | 0 | **BUILD** |
-| `Edit access code` | 1 | 1 | **BUILD** |
-| `Edit listing` | 3 | 0 | **DEFER** |
-| `Edit post` | 1 | 1 | **DEFER** |
-| `Edit profile` | 1 | 2 | **BUILD** |
-| `Edit recurring task` | 2 | 1 | **BUILD** |
-| `Edit signup · $reservationId` | 0 | 1 | **DEFER** |
-| `Edit signup · \(reservationId)` | 2 | 0 | **DEFER** |
-| `Emergency item` | 2 | 1 | **BUILD** |
-| `Event detail` | 2 | 1 | **BUILD** |
-| `Export documents` | 2 | 1 | **DEFER** |
-| `Filter bids` | 2 | 1 | **DEFER** |
-| `Filter posts` | 1 | 1 | **DEFER** |
-| `Filter tasks` | 1 | 1 | **DEFER** |
-| `Find people` | 2 | 1 | **BUILD** |
-| `Follower` | 1 | 0 | **DEFER** |
-| `Follower · ${row.displayName}` | 0 | 1 | **DEFER** |
-| `Gig detail` | 1 | 1 | **BUILD** |
-| `Gig filters` | 1 | 1 | **DEFER** |
-| `Gig search` | 1 | 1 | **DEFER** |
-| `Identity` | 1 | 0 | **BUILD** |
-| `Invite a business` | 1 | 1 | **DEFER** |
-| `Invite to Pantopus` | 1 | 1 | **DEFER** |
-| `Key/value body` | 1 | 0 | **DEFER** |
-| `Legal` | 0 | 1 | **DEFER** |
-| `List something` | 1 | 1 | **BUILD** |
-| `Local profile` | 0 | 1 | **DEFER** |
-| `Log maintenance` | 2 | 1 | **BUILD** |
-| `Mail search` | 2 | 1 | **DEFER** |
-| `Maintenance detail` | 2 | 1 | **BUILD** |
-| `Map filters` | 2 | 2 | **DEFER** |
-| `Media body` | 1 | 0 | **DEFER** |
-| `Member requests · ${pending.id}` | 0 | 1 | **DEFER** |
-| `Message helper` | 2 | 0 | **DEFER** |
-| `Message helper · $reservationId` | 0 | 1 | **DEFER** |
-| `Messages` | 6 | 4 | **BUILD** |
-| `My claims` | 1 | 0 | **DEFER** |
-| `Nearby` | 1 | 1 | **DEFER** |
-| `Offer filters` | 1 | 1 | **DEFER** |
-| `Payments & payouts` | 1 | 1 | **DEFER** |
-| `Personal` | 0 | 1 | **DEFER** |
-| `Post a gig` | 1 | 1 | **BUILD** |
-| `Post a task` | 2 | 2 | **BUILD** |
-| `Post a task · $label` | 0 | 1 | **DEFER** |
-| `Post a task · \(category.capitalized)` | 1 | 0 | **DEFER** |
-| `Post detail` | 1 | 1 | **BUILD** |
-| `Print emergency card` | 2 | 1 | **BUILD** |
-| `Professional` | 0 | 1 | **DEFER** |
-| `Register a business` | 1 | 1 | **DEFER** |
-| `Report` | 1 | 1 | **DEFER** |
-| `Search access codes` | 1 | 1 | **DEFER** |
-| `Search documents` | 2 | 1 | **DEFER** |
-| `Search support trains` | 2 | 1 | **DEFER** |
-| `Set home address` | 1 | 1 | **BUILD** |
-| `Set up Public Profile` | 0 | 1 | **BUILD** |
-| `Share emergency info` | 2 | 1 | **BUILD** |
-| `Share listing` | 3 | 1 | **DEFER** |
-| `Share train` | 2 | 1 | **DEFER** |
-| `Snap & sell` | 2 | 2 | **BUILD** |
-| `Sort offers` | 3 | 1 | **DEFER** |
-| `Start a poll` | 2 | 1 | **BUILD** |
-| `Start a support train` | 2 | 1 | **DEFER** |
-| `Task detail` | 2 | 1 | **BUILD** |
-| `Thread` | 1 | 0 | **BUILD** |
-| `Thread · ${row.displayName}` | 0 | 1 | **DEFER** |
-| `Today` | 0 | 1 | **BUILD** |
-| `Transaction detail` | 3 | 1 | **BUILD** |
-| `Upload document` | 2 | 1 | **BUILD** |
-| `Wallet header` | 1 | 0 | **DEFER** |
-| `Write a post` | 1 | 1 | **BUILD** |
-
-### Full per-call-site catalogs
-
-The per-call-site tables are large; included verbatim for grep-ability.
-
-
-### iOS placeholders — 125 call sites
-
-| Label | File | Line | Disposition | Reason |
-|---|---|---:|---|---|
-| `Add a bill` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 817 | **BUILD** | AddBillWizardView/Screen already exists; route wiring needed. |
-| `Add a task` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 528 | **BUILD** | Household task creation — needed for Household tasks.html FAB. |
-| `Add a task` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 1053 | **BUILD** | Household task creation — needed for Household tasks.html FAB. |
-| `Add emergency info` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 447 | **BUILD** | Emergency info FAB — Emergency info.html. |
-| `Add emergency info` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 850 | **BUILD** | Emergency info FAB — Emergency info.html. |
-| `Add event` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 429 | **BUILD** | Home calendar add — Home calendar.html FAB. |
-| `Add event` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 829 | **BUILD** | Home calendar add — Home calendar.html FAB. |
-| `Article body` | `frontend/apps/ios/Pantopus/Features/Shared/ContentDetail/Bodies.swift` | 131 | **DEFER** | Not in A08 design pack; treat as post-MVP affordance. |
-| `Audience setup` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 806 | **BUILD** | Public Beacon Profile.html FRAME 4 / Creator Audience setup. |
-| `Bill detail` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 814 | **BUILD** | BillDetailView/Screen already exists; route wiring needed. |
-| `Browse listings` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 592 | **BUILD** | Wire to existing MarketplaceView/Screen. |
-| `Browse tasks` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 680 | **BUILD** | Wire to existing GigsFeedView/Screen. |
-| `Business` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 260 | **DEFER** | Generic business profile — no specific design HTML. |
-| `Business dashboard` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 997 | **DEFER** | Business surface — post-MVP. |
-| `Business filters` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 826 | **DEFER** | Filter sheet — post-MVP polish on Discover Businesses. |
-| `Business header` | `frontend/apps/ios/Pantopus/Features/Shared/ContentDetail/Headers.swift` | 100 | **DEFER** | Not in A08 design pack; treat as post-MVP affordance. |
-| `Business: \(name) (\(businessId))` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 824 | **BUILD** | Business profile screen — partial design in Discover businesses.html. |
-| `Buyer profile` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 707 | **DEFER** | Marketplace buyer detail — post-MVP. |
-| `Buyer profile` | `frontend/apps/ios/Pantopus/Features/Root/NearbyTabRoot.swift` | 78 | **DEFER** | Marketplace buyer detail — post-MVP. |
-| `Buyer profile` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 629 | **DEFER** | Marketplace buyer detail — post-MVP. |
-| `Chat search` | `frontend/apps/ios/Pantopus/Features/Root/InboxTabRoot.swift` | 124 | **DEFER** | Inbox search — needs backend query support. |
-| `Claim a home` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 978 | **BUILD** | AddHomeWizard route exists; wire it. |
-| `Claim ownership` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 1009 | **BUILD** | ClaimOwnershipWizard route exists; wire it. |
-| `Claim status` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 334 | **BUILD** | Status Waiting.html FRAME 1 'Claim submitted' covers this state. |
-| `Compose · \(intent.capitalized)` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 639 | **DEFER** | Not in A08 design pack; treat as post-MVP affordance. |
-| `Data export` | `frontend/apps/ios/Pantopus/Features/Settings/SettingsView.swift` | 133 | **DEFER** | Privacy export — P8.5+ per code comment. |
-| `Discovery filters` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 810 | **DEFER** | Filter sheet — post-MVP polish on Discover Hub. |
-| `Document action` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 488 | **BUILD** | Documents.html row kebab — bulk actions. |
-| `Document action` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 891 | **BUILD** | Documents.html row kebab — bulk actions. |
-| `Document detail` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 468 | **BUILD** | Documents.html row tap. |
-| `Document detail` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 871 | **BUILD** | Documents.html row tap. |
-| `Drawer · \(drawer)` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 602 | **BUILD** | Mailbox drawer detail — Mailbox Mobile.html shows drawer composites. |
-| `Edit access code` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 964 | **BUILD** | Access codes row tap → edit form. |
-| `Edit listing` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 713 | **DEFER** | Listing edit — post-MVP. |
-| `Edit listing` | `frontend/apps/ios/Pantopus/Features/Root/NearbyTabRoot.swift` | 84 | **DEFER** | Listing edit — post-MVP. |
-| `Edit listing` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 639 | **DEFER** | Listing edit — post-MVP. |
-| `Edit post` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 662 | **DEFER** | Post edit — post-MVP. |
-| `Edit profile` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 890 | **BUILD** | Form.html FRAME 2 'Edit profile' design; EditProfileView already exists on iOS. |
-| `Edit recurring task` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 531 | **BUILD** | Household tasks edit affordance — designed in Household tasks.html row actions. |
-| `Edit recurring task` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 1056 | **BUILD** | Household tasks edit affordance — designed in Household tasks.html row actions. |
-| `Edit signup · \(reservationId)` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 780 | **DEFER** | Support train signup edit — post-MVP. |
-| `Edit signup · \(reservationId)` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 784 | **DEFER** | Support train signup edit — post-MVP. |
-| `Emergency item` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 442 | **BUILD** | Emergency info row detail — Emergency info.html row tap. |
-| `Emergency item` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 845 | **BUILD** | Emergency info row detail — Emergency info.html row tap. |
-| `Event detail` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 432 | **BUILD** | Home calendar event detail — Home calendar.html row tap. |
-| `Event detail` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 834 | **BUILD** | Home calendar event detail — Home calendar.html row tap. |
-| `Export documents` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 483 | **DEFER** | Bulk export — post-MVP. |
-| `Export documents` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 886 | **DEFER** | Bulk export — post-MVP. |
-| `Filter bids` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 846 | **DEFER** | Filter sheet — post-MVP polish on My bids. |
-| `Filter bids` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 677 | **DEFER** | Filter sheet — post-MVP polish on My bids. |
-| `Filter posts` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 656 | **DEFER** | Filter sheet — post-MVP polish on My posts. |
-| `Filter tasks` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 715 | **DEFER** | Filter sheet — post-MVP polish on My tasks. |
-| `Find people` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 745 | **BUILD** | Connections.html add-person CTA — ConnectionsView/Screen has the search affordance to wire. |
-| `Find people` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 749 | **BUILD** | Connections.html add-person CTA — ConnectionsView/Screen has the search affordance to wire. |
-| `Follower` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 800 | **DEFER** | Creator follower detail — post-MVP, secondary to Creator Audience tabs. |
-| `Gig detail` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 259 | **BUILD** | GigDetailView/Screen exists; route wiring. |
-| `Gig filters` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 652 | **DEFER** | Filter sheet — post-MVP polish on Gigs. |
-| `Gig search` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 651 | **DEFER** | Gigs search — needs backend query support. |
-| `Identity` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 793 | **BUILD** | IdentityCenterView/Screen exists; route just needs to push it. |
-| `Invite a business` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 830 | **DEFER** | Business invite flow — post-MVP. |
-| `Invite to Pantopus` | `frontend/apps/ios/Pantopus/Features/Root/InboxTabRoot.swift` | 122 | **DEFER** | User invite flow — post-MVP. |
-| `Key/value body` | `frontend/apps/ios/Pantopus/Features/Shared/ContentDetail/Bodies.swift` | 140 | **DEFER** | Not in A08 design pack; treat as post-MVP affordance. |
-| `List something` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 989 | **BUILD** | Marketplace compose flow (alternate label). |
-| `Log maintenance` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 381 | **BUILD** | Maintenance.html FAB. |
-| `Log maintenance` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 1068 | **BUILD** | Maintenance.html FAB. |
-| `Mail search` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 894 | **DEFER** | Mailbox search — needs backend query support. |
-| `Mail search` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 557 | **DEFER** | Mailbox search — needs backend query support. |
-| `Maintenance detail` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 378 | **BUILD** | Maintenance.html row tap. |
-| `Maintenance detail` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 1065 | **BUILD** | Maintenance.html row tap. |
-| `Map filters` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 676 | **DEFER** | Filter sheet — post-MVP polish on Map+List Hybrid. |
-| `Map filters` | `frontend/apps/ios/Pantopus/Features/Root/NearbyTabRoot.swift` | 66 | **DEFER** | Filter sheet — post-MVP polish on Map+List Hybrid. |
-| `Media body` | `frontend/apps/ios/Pantopus/Features/Shared/ContentDetail/Bodies.swift` | 149 | **DEFER** | Not in A08 design pack; treat as post-MVP affordance. |
-| `Message helper` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 776 | **DEFER** | Support train messaging — post-MVP. |
-| `Message helper` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 780 | **DEFER** | Support train messaging — post-MVP. |
-| `Messages` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 278 | **BUILD** | ChatConversationView/Screen already exists; route just needs to push it instead of placeholder. |
-| `Messages` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 577 | **BUILD** | ChatConversationView/Screen already exists; route just needs to push it instead of placeholder. |
-| `Messages` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 659 | **BUILD** | ChatConversationView/Screen already exists; route just needs to push it instead of placeholder. |
-| `Messages` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 691 | **BUILD** | ChatConversationView/Screen already exists; route just needs to push it instead of placeholder. |
-| `Messages` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 604 | **BUILD** | ChatConversationView/Screen already exists; route just needs to push it instead of placeholder. |
-| `Messages` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 746 | **BUILD** | ChatConversationView/Screen already exists; route just needs to push it instead of placeholder. |
-| `My claims` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 1012 | **DEFER** | MyClaimsListView exists but the claim detail screen does not — wire list, leave detail placeholder. |
-| `Nearby` | `frontend/apps/ios/Pantopus/Features/Root/NotYetAvailableView.swift` | 48 | **DEFER** | Not in A08 design pack; treat as post-MVP affordance. |
-| `Offer filters` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 589 | **DEFER** | Filter sheet — post-MVP. |
-| `Payments & payouts` | `frontend/apps/ios/Pantopus/Features/Settings/SettingsView.swift` | 135 | **DEFER** | Wallet — P8.5+ per code comment. |
-| `Post a gig` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 200 | **BUILD** | Same as Post a task — Gigs compose. |
-| `Post a task` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 595 | **BUILD** | Gigs compose flow — Gigs.html empty state CTA. |
-| `Post a task` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 741 | **BUILD** | Gigs compose flow — Gigs.html empty state CTA. |
-| `Post a task · \(category.capitalized)` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 662 | **DEFER** | Not in A08 design pack; treat as post-MVP affordance. |
-| `Post detail` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 653 | **BUILD** | PulsePostDetailView/Screen exists; route wiring. |
-| `Print emergency card` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 457 | **BUILD** | Emergency info.html CTA — Print fallback acceptable post-MVP but design exists. |
-| `Print emergency card` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 860 | **BUILD** | Emergency info.html CTA — Print fallback acceptable post-MVP but design exists. |
-| `Register a business` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 1000 | **DEFER** | Business onboarding — post-MVP, no design. |
-| `Report` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 578 | **DEFER** | Content/user report flow — post-MVP, not in A08. |
-| `Search access codes` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 966 | **DEFER** | Access codes search — post-MVP. |
-| `Search documents` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 478 | **DEFER** | Documents search — post-MVP. |
-| `Search documents` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 881 | **DEFER** | Documents search — post-MVP. |
-| `Search support trains` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 759 | **DEFER** | Support Trains search — post-MVP. |
-| `Search support trains` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 763 | **DEFER** | Support Trains search — post-MVP. |
-| `Set home address` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 828 | **BUILD** | AddHomeWizard handles this. |
-| `Share emergency info` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 452 | **BUILD** | Emergency info.html share CTA. |
-| `Share emergency info` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 855 | **BUILD** | Emergency info.html share CTA. |
-| `Share listing` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 704 | **DEFER** | Share sheet — post-MVP. |
-| `Share listing` | `frontend/apps/ios/Pantopus/Features/Root/NearbyTabRoot.swift` | 75 | **DEFER** | Share sheet — post-MVP. |
-| `Share listing` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 624 | **DEFER** | Share sheet — post-MVP. |
-| `Share train` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 768 | **DEFER** | Share sheet — post-MVP. |
-| `Share train` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 772 | **DEFER** | Share sheet — post-MVP. |
-| `Snap & sell` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 201 | **BUILD** | Marketplace compose flow — Marketplace.html shows the empty-state CTA; compose wizard is part of the marketplace surface. |
-| `Snap & sell` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 721 | **BUILD** | Marketplace compose flow — Marketplace.html shows the empty-state CTA; compose wizard is part of the marketplace surface. |
-| `Sort offers` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 716 | **DEFER** | Sort sheet — post-MVP polish. |
-| `Sort offers` | `frontend/apps/ios/Pantopus/Features/Root/NearbyTabRoot.swift` | 87 | **DEFER** | Sort sheet — post-MVP polish. |
-| `Sort offers` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 644 | **DEFER** | Sort sheet — post-MVP polish. |
-| `Start a poll` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 960 | **BUILD** | Polls.html FAB → create poll. |
-| `Start a poll` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 941 | **BUILD** | Polls.html FAB → create poll. |
-| `Start a support train` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 753 | **DEFER** | Support Train creation wizard — no specific design HTML; surface from Support trains.html. |
-| `Start a support train` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 757 | **DEFER** | Support Train creation wizard — no specific design HTML; surface from Support trains.html. |
-| `Task detail` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 525 | **BUILD** | Household task detail — implied by Household tasks.html row tap. |
-| `Task detail` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 1050 | **BUILD** | Household task detail — implied by Household tasks.html row tap. |
-| `Thread` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 803 | **BUILD** | ChatConversationView/Screen exists; route wiring. |
-| `Transaction detail` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 710 | **BUILD** | TransactionalDetailShell exists; route wiring. |
-| `Transaction detail` | `frontend/apps/ios/Pantopus/Features/Root/NearbyTabRoot.swift` | 81 | **BUILD** | TransactionalDetailShell exists; route wiring. |
-| `Transaction detail` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 634 | **BUILD** | TransactionalDetailShell exists; route wiring. |
-| `Upload document` | `frontend/apps/ios/Pantopus/Features/Root/HubTabRoot.swift` | 473 | **BUILD** | Documents.html FAB. |
-| `Upload document` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 876 | **BUILD** | Documents.html FAB. |
-| `Wallet header` | `frontend/apps/ios/Pantopus/Features/Shared/ContentDetail/Headers.swift` | 110 | **DEFER** | Not in A08 design pack; treat as post-MVP affordance. |
-| `Write a post` | `frontend/apps/ios/Pantopus/Features/Root/YouTabRoot.swift` | 659 | **BUILD** | Pulse compose flow — Pulse.html empty state CTA. |
-
-### Android placeholders — 81 call sites
-
-| Label | File | Line | Disposition | Reason |
-|---|---|---:|---|---|
-| `Add a task` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1084 | **BUILD** | Household task creation — needed for Household tasks.html FAB. |
-| `Add emergency info` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 982 | **BUILD** | Emergency info FAB — Emergency info.html. |
-| `Add event` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 967 | **BUILD** | Home calendar add — Home calendar.html FAB. |
-| `Browse listings` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1551 | **BUILD** | Wire to existing MarketplaceView/Screen. |
-| `Business` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1923 | **DEFER** | Generic business profile — no specific design HTML. |
-| `Business dashboard` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 859 | **DEFER** | Business surface — post-MVP. |
-| `Business filters` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1532 | **DEFER** | Filter sheet — post-MVP polish on Discover Businesses. |
-| `Business: ${target.name} (${target.businessId})` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1529 | **BUILD** | Same — Business profile screen. |
-| `Buyer profile` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1371 | **DEFER** | Marketplace buyer detail — post-MVP. |
-| `Chat search` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 774 | **DEFER** | Inbox search — needs backend query support. |
-| `Claim status` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1857 | **BUILD** | Status Waiting.html FRAME 1 'Claim submitted' covers this state. |
-| `Data export` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1625 | **DEFER** | Privacy export — P8.5+ per code comment. |
-| `Discovery filters` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1514 | **DEFER** | Filter sheet — post-MVP polish on Discover Hub. |
-| `Document action` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1032 | **BUILD** | Documents.html row kebab — bulk actions. |
-| `Document detail` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1026 | **BUILD** | Documents.html row tap. |
-| `Drawer · $drawer` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1215 | **BUILD** | Same. |
-| `Edit access code` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1067 | **BUILD** | Access codes row tap → edit form. |
-| `Edit post` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1609 | **DEFER** | Post edit — post-MVP. |
-| `Edit profile` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 805 | **BUILD** | Form.html FRAME 2 'Edit profile' design; EditProfileView already exists on iOS. |
-| `Edit profile` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1620 | **BUILD** | Form.html FRAME 2 'Edit profile' design; EditProfileView already exists on iOS. |
-| `Edit recurring task` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1087 | **BUILD** | Household tasks edit affordance — designed in Household tasks.html row actions. |
-| `Edit signup · $reservationId` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1810 | **DEFER** | Same — post-MVP. |
-| `Emergency item` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 980 | **BUILD** | Emergency info row detail — Emergency info.html row tap. |
-| `Event detail` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 969 | **BUILD** | Home calendar event detail — Home calendar.html row tap. |
-| `Export documents` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1030 | **DEFER** | Bulk export — post-MVP. |
-| `Filter bids` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1564 | **DEFER** | Filter sheet — post-MVP polish on My bids. |
-| `Filter posts` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1607 | **DEFER** | Filter sheet — post-MVP polish on My posts. |
-| `Filter tasks` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1591 | **DEFER** | Filter sheet — post-MVP polish on My tasks. |
-| `Find people` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1485 | **BUILD** | Connections.html add-person CTA — ConnectionsView/Screen has the search affordance to wire. |
-| `Follower · ${row.displayName}` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1748 | **DEFER** | Same. |
-| `Gig detail` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1922 | **BUILD** | GigDetailView/Screen exists; route wiring. |
-| `Gig filters` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1391 | **DEFER** | Filter sheet — post-MVP polish on Gigs. |
-| `Gig search` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1390 | **DEFER** | Gigs search — needs backend query support. |
-| `Invite a business` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1536 | **DEFER** | Business invite flow — post-MVP. |
-| `Invite to Pantopus` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1328 | **DEFER** | User invite flow — post-MVP. |
-| `Legal` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1687 | **DEFER** | Not in A08 design pack; treat as post-MVP affordance. |
-| `List something` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 853 | **BUILD** | Marketplace compose flow (alternate label). |
-| `Local profile` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1766 | **DEFER** | Public Beacon Profile FRAME 3 variant — same screen, identity switch. |
-| `Log maintenance` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1101 | **BUILD** | Maintenance.html FAB. |
-| `Mail search` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1779 | **DEFER** | Mailbox search — needs backend query support. |
-| `Maintenance detail` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1098 | **BUILD** | Maintenance.html row tap. |
-| `Map filters` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 765 | **DEFER** | Filter sheet — post-MVP polish on Map+List Hybrid. |
-| `Map filters` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1423 | **DEFER** | Filter sheet — post-MVP polish on Map+List Hybrid. |
-| `Member requests · ${pending.id}` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 676 | **DEFER** | Member request handling — post-MVP. |
-| `Message helper · $reservationId` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1813 | **DEFER** | Same — post-MVP. |
-| `Messages` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1178 | **BUILD** | ChatConversationView/Screen already exists; route just needs to push it instead of placeholder. |
-| `Messages` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1351 | **BUILD** | ChatConversationView/Screen already exists; route just needs to push it instead of placeholder. |
-| `Messages` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1401 | **BUILD** | ChatConversationView/Screen already exists; route just needs to push it instead of placeholder. |
-| `Messages` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1937 | **BUILD** | ChatConversationView/Screen already exists; route just needs to push it instead of placeholder. |
-| `Nearby` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/NotYetAvailableView.kt` | 49 | **DEFER** | Not in A08 design pack; treat as post-MVP affordance. |
-| `Offer filters` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1550 | **DEFER** | Filter sheet — post-MVP. |
-| `Payments & payouts` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1627 | **DEFER** | Wallet — P8.5+ per code comment. |
-| `Personal` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1768 | **DEFER** | Identity Center switcher action — Identity Center.html shows but switching action is post-MVP. |
-| `Post a gig` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 730 | **BUILD** | Same as Post a task — Gigs compose. |
-| `Post a task` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1552 | **BUILD** | Gigs compose flow — Gigs.html empty state CTA. |
-| `Post a task` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1601 | **BUILD** | Gigs compose flow — Gigs.html empty state CTA. |
-| `Post a task · $label` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1441 | **DEFER** | Not in A08 design pack; treat as post-MVP affordance. |
-| `Post detail` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1606 | **BUILD** | PulsePostDetailView/Screen exists; route wiring. |
-| `Print emergency card` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 985 | **BUILD** | Emergency info.html CTA — Print fallback acceptable post-MVP but design exists. |
-| `Professional` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1770 | **DEFER** | Same — Identity Center. |
-| `Register a business` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 860 | **DEFER** | Business onboarding — post-MVP, no design. |
-| `Report` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1179 | **DEFER** | Content/user report flow — post-MVP, not in A08. |
-| `Search access codes` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1070 | **DEFER** | Access codes search — post-MVP. |
-| `Search documents` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1029 | **DEFER** | Documents search — post-MVP. |
-| `Search support trains` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1791 | **DEFER** | Support Trains search — post-MVP. |
-| `Set home address` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1534 | **BUILD** | AddHomeWizard handles this. |
-| `Set up Public Profile` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1754 | **BUILD** | Public Beacon Profile.html FRAME 4 first-run flow. |
-| `Share emergency info` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 983 | **BUILD** | Emergency info.html share CTA. |
-| `Share listing` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1370 | **DEFER** | Share sheet — post-MVP. |
-| `Share train` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1807 | **DEFER** | Share sheet — post-MVP. |
-| `Snap & sell` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 732 | **BUILD** | Marketplace compose flow — Marketplace.html shows the empty-state CTA; compose wizard is part of the marketplace surface. |
-| `Snap & sell` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1383 | **BUILD** | Marketplace compose flow — Marketplace.html shows the empty-state CTA; compose wizard is part of the marketplace surface. |
-| `Sort offers` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1373 | **DEFER** | Sort sheet — post-MVP polish. |
-| `Start a poll` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1015 | **BUILD** | Polls.html FAB → create poll. |
-| `Start a support train` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1788 | **DEFER** | Support Train creation wizard — no specific design HTML; surface from Support trains.html. |
-| `Task detail` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1081 | **BUILD** | Household task detail — implied by Household tasks.html row tap. |
-| `Thread · ${row.displayName}` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1751 | **DEFER** | AudienceProfile thread row tap — wire to ChatConversation. |
-| `Today` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 752 | **BUILD** | Hub Today rail context — Hub.html FRAME 1 implies a Today section. |
-| `Transaction detail` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1372 | **BUILD** | TransactionalDetailShell exists; route wiring. |
-| `Upload document` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1028 | **BUILD** | Documents.html FAB. |
-| `Write a post` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/root/RootTabScreen.kt` | 1608 | **BUILD** | Pulse compose flow — Pulse.html empty state CTA. |
-
-
-
+> **Method.** Walked both signed-in navigation graphs from their roots:
+> iOS `Features/Root/RootTabView.swift` → the four `…TabRoot.swift` stacks
+> (`HubRoute` / `YouRoute` / `InboxRoute` / `NearbyRoute`); Android
+> `ui/screens/root/RootTabScreen.kt` (`PantopusRoute` tabs + the flat
+> `ChildRoutes` NavHost). Every route case was classified by what its
+> `destination(for:)` / `composable{}` body renders, and inbound references
+> were counted by grepping the actual navigation verbs (`push(.x)` /
+> `path.append(.x)` / `return .x` on iOS; multiline-aware
+> `navigate(ChildRoutes.x)` on Android) across the whole app tree.
+>
+> **Generated:** 2026-05-26. Supersedes the 2026-05-18 pre-wave audit (which
+> predated the Wave B mailbox rework and the Wave A `…Detail`/map screens —
+> e.g. the old `.mailboxDrawers` / `.mailbox` / `.drawerDetail` routes are
+> gone, replaced by `.mailboxRoot`).
+>
+> **Post-rewire update (2026-05-26):** the 16 stale call sites called out in
+> the original Section 5 Group A — plus the iOS `Snap & sell` / `Gig detail`
+> equivalents on Android and the two `Share business` / `Share membership`
+> placeholders that should have always been system share sheets — have been
+> rewired. Placeholder labels dropped **iOS 40 → 23**, **Android 33 → 24**
+> (both clear the `<25` sanity bar). Counts and tables below reflect the
+> post-rewire state.
+>
+> **Reachability tokens (grep-able):** `REAL_VIEW` · `NOT_YET_AVAILABLE` ·
+> `PLACEHOLDER` · `NO_ROUTE`.
+> - `REAL_VIEW` — case renders a concrete feature view (e.g.
+>   `TodayDetailView()`, `MembershipDetailScreen(...)`).
+> - `NOT_YET_AVAILABLE` — renders `NotYetAvailableView(tabName:)`.
+> - `PLACEHOLDER` — the route case/constant is itself the generic
+>   `.placeholder(label:)` / `ChildRoutes.PLACEHOLDER` funnel (it renders
+>   `NOT_YET_AVAILABLE`). Listed once per platform; the labels pushed into it
+>   are catalogued in **Section 5**.
+> - **inbound = N** — number of distinct navigation call sites that reach the
+>   case. `inbound = 0` ⇒ orphan (**Section 3**).
 
 ## Closure summary
 
+| Platform | Route cases | `REAL_VIEW` | `NOT_YET_AVAILABLE` funnel | Orphans (inbound 0) | Dead screens |
+|---|---:|---:|---:|---:|---:|
+| iOS | 176 (Hub 84 · You 84 · Inbox 3 · Nearby 5) | 173 | 3 (`.placeholder` ×3 tabs) | 9 | 2 |
+| Android | 121 composables (4 tab + 117 child) | 120 | 1 (`PLACEHOLDER`) | 3 | 4 |
+
+- **No route on either platform is reachable only through a
+  `NOT_YET_AVAILABLE` body** except the dedicated placeholder funnels — every
+  other case renders a real view.
+- **Placeholder labels still wired:** **23 distinct (iOS) / 24 (Android)** —
+  both under the `<25` sanity bar after the stale-rewire pass. Every
+  remaining label is an intentional `DEFER` (payments, membership/broadcast
+  management, moderation, business management, identity sub-details — none
+  of which are screens in the 8 design packs). **`BUILD` = 0**: every
+  designed pack screen is shipped, consistent with
+  `docs/screen-parity-inventory.md`.
+
+---
+
+## Section 1 — iOS routes per tab
+
+Legend: **T** = destination type (`R`=`REAL_VIEW`, `N`=`NOT_YET_AVAILABLE`),
+**In** = inbound count. Root screen = the tab body (not a route case).
+
+### Hub tab — root `HubView` · `HubRoute` (84 cases)
+
+| Route case | T | In | Notes |
+|---|---|---:|---|
+| `myHomes` | R | 0 | **ORPHAN** — duplicated in You tab; dead in Hub |
+| `myClaims` | R | 2 | |
+| `mailItemDetail(mailId:)` | R | 4 | |
+| `mailboxVault` | R | 0 | **ORPHAN** — vestigial after Wave B mailbox rework |
+| `addHome` | R | 5 | |
+| `claimOwnership(homeId:)` | R | 1 | |
+| `homeDashboard(homeId:)` | R | 4 | |
+| `homePets(homeId:)` | R | 1 | |
+| `homeEmergency(homeId:)` | R | 1 | |
+| `addEmergencyInfo(homeId:)` | R | 1 | |
+| `emergencyItem(homeId:,emergencyId:)` | R | 1 | |
+| `homeDocs(homeId:)` | R | 1 | |
+| `uploadDocument(homeId:)` | R | 2 | |
+| `documentDetail(homeId:,documentId:)` | R | 4 | |
+| `documentSearch(homeId:)` | R | 1 | |
+| `homePackages(homeId:)` | R | 1 | |
+| `packageDetail(homeId:,packageId:)` | R | 2 | |
+| `logPackage(homeId:)` | R | 1 | |
+| `homeTasks(homeId:)` | R | 1 | |
+| `addHouseholdTask(homeId:)` | R | 1 | |
+| `editHouseholdTask(homeId:,taskId:)` | R | 1 | |
+| `homeMaintenance(homeId:)` | R | 1 | |
+| `logMaintenance(homeId:)` | R | 1 | |
+| `maintenanceDetail(homeId:,taskId:)` | R | 2 | |
+| `editMaintenance(homeId:,taskId:)` | R | 1 | |
+| `homeMembers(homeId:)` | R | 1 | |
+| `publicProfile(userId:)` | R | 4 | |
+| `businessProfile(businessId:)` | R | 3 | |
+| `pulsePost(postId:)` | R | 4 | |
+| `homeBills(homeId:)` | R | 1 | |
+| `homeCalendar(homeId:)` | R | 1 | |
+| `addCalendarEvent(homeId:,eventId:,…)` | R | 2 | |
+| `calendarEventDetail(homeId:,eventId:)` | R | 3 | |
+| `billDetail(homeId:,billId:)` | R | 2 | |
+| `addBill(homeId:,billId:)` | R | 2 | |
+| `homePolls(homeId:)` | R | 1 | |
+| `pollDetail(homeId:,pollId:)` | R | 2 | |
+| `startPoll(homeId:)` | R | 2 | |
+| `pulseFeed` | R | 2 | |
+| `composePost(intent:)` | R | 1 | |
+| `editPost(postId:)` | R | 1 | |
+| `gigsFeed` | R | 4 | |
+| `gigSearch` | R | 1 | |
+| `gigDetail(gigId:)` | R | 10 | |
+| `nearbyMapForGigs(categoryKey:)` | R | 0 | **ORPHAN** — superseded by `tasksMap` (A11.1) |
+| `composeGig(category:)` | R | 3 | |
+| `quickPostGig(category:)` | R | 1 | |
+| `marketplace` | R | 2 | |
+| `listingDetail(listingId:)` | R | 6 | |
+| `composeListing` | R | 2 | |
+| `editListing(listingId:,jumpToStep:)` | R | 2 | |
+| `invoiceDetail(invoiceId:)` | R | 0 | **ORPHAN** — deferred (wallet/payments not shipped) |
+| `notifications` | R | 1 | |
+| `connections` | R | 2 | also deep-link `pantopus://connections` |
+| `supportTrains` | R | 1 | also deep-link `support-trains` |
+| `startSupportTrain` | R | 1 | |
+| `reviewSignups(supportTrainId:)` | R | 4 | |
+| `searchSupportTrains` | R | 1 | |
+| `editSignup(reservation:)` | R | 1 | |
+| `reviewClaims` | R | 1 | |
+| `reviewClaimDetail(claimId:)` | R | 1 | |
+| `myBids` | R | 0 | **ORPHAN** — duplicated in You tab; dead in Hub |
+| `listingOffers(listingId:,title:)` | R | 1 | |
+| `discoverHub` | R | 2 | also deep-link `discover-hub` |
+| `discoverBusinesses` | R | 1 | |
+| `chatConversation(dest)` | R | 5 | |
+| `recentActivity` | R | 1 | |
+| `menu` | R | 1 | → `SettingsView` |
+| `editProfile` | R | 1 | |
+| `mailboxSearch` | R | 1 | |
+| `placeholder(label:)` | **N** | 12 | generic funnel → `NotYetAvailableView`; labels in §5 |
+| `todayDetail` | R | 1 | |
+| `propertyDetails(homeId:)` | R | 1 | |
+| `addGuest(homeId:)` | R | 1 | full-screen modal |
+| `tasksMap(categoryKey:)` | R | 1 | |
+| `explore` | R | 1 | |
+| `mailboxRoot` | R | 3 | |
+| `mailboxMap` | R | 1 | |
+| `accessCodes(homeId:,homeName:)` | R | 1 | added in rewire (mirror of `YouRoute.accessCodes`) |
+| `editAccessCode(homeId:,secretId:,…)` | R | 3 | added in rewire |
+| `searchAccessCodes(homeId:)` | R | 1 | added in rewire |
+| `tokenGallery` | R | 1 | DEBUG (5-tap) |
+| `iconGallery` | R | 0 | DEBUG · **ORPHAN** (no trigger wired) |
+| `componentGallery` | R | 0 | DEBUG · **ORPHAN** (no trigger wired) |
+
+### You tab — root `MeView` · `YouRoute` (84 cases)
+
+| Route case | T | In | Notes |
+|---|---|---:|---|
+| `signOutConfirm` | R | 0 | **ORPHAN** — renders `EmptyView`; sign-out is a `confirmationDialog`. Vestigial |
+| `mailboxRoot` | R | 1 | |
+| `mailboxMap` | R | 1 | |
+| `mailItemDetail(mailId:)` | R | 2 | |
+| `mailboxSearch` | R | 1 | |
+| `settings` | R | 1 | |
+| `placeholder(label:)` | **N** | 31 | generic funnel → `NotYetAvailableView`; labels in §5 |
+| `offers` | R | 2 | |
+| `myBids` | R | 2 | |
+| `myTasks` | R | 2 | |
+| `composeTask` | R | 4 | |
+| `myPosts` | R | 2 | |
+| `editPost(postId:)` | R | 2 | MyPosts per-row edit + PulsePostDetail edit affordance |
+| `connections` | R | 2 | |
+| `supportTrains` | R | 2 | |
+| `startSupportTrain` | R | 1 | |
+| `reviewSignups(supportTrainId:)` | R | 3 | |
+| `searchSupportTrains` | R | 1 | |
+| `editSignup(reservation:)` | R | 1 | |
+| `myHomes` | R | 2 | |
+| `myListings` | R | 2 | |
+| `myBusinesses` | R | 2 | |
+| `businessWaitlist` | R | 1 | |
+| `homeDashboard(homeId:)` | R | 1 | |
+| `identityCenter` | R | 1 | |
+| `audienceProfile` | R | 3 | |
+| `broadcastDetail(broadcastId:,card:,…)` | R | 1 | |
+| `creatorInbox` | R | 3 | |
+| `creatorInboxConversation(dest)` | R | 1 | |
+| `homeBills(homeId:)` | R | 3 | |
+| `homePets(homeId:)` | R | 2 | |
+| `homeCalendar(homeId:)` | R | 1 | |
+| `addCalendarEvent(homeId:,eventId:,…)` | R | 2 | |
+| `calendarEventDetail(homeId:,eventId:)` | R | 3 | |
+| `homeEmergency(homeId:)` | R | 3 | |
+| `addEmergencyInfo(homeId:)` | R | 1 | |
+| `emergencyItem(homeId:,emergencyId:)` | R | 1 | |
+| `homeDocs(homeId:)` | R | 3 | |
+| `uploadDocument(homeId:)` | R | 2 | |
+| `documentDetail(homeId:,documentId:)` | R | 3 | |
+| `documentSearch(homeId:)` | R | 1 | |
+| `homePackages(homeId:)` | R | 3 | |
+| `packageDetail(homeId:,packageId:)` | R | 2 | |
+| `logPackage(homeId:)` | R | 1 | |
+| `homePolls(homeId:)` | R | 3 | |
+| `pollDetail(homeId:,pollId:)` | R | 1 | |
+| `startPoll(homeId:)` | R | 1 | |
+| `accessCodes(homeId:,homeName:)` | R | 2 | |
+| `editAccessCode(homeId:,secretId:,…)` | R | 3 | |
+| `searchAccessCodes(homeId:)` | R | 1 | |
+| `homeTasks(homeId:)` | R | 3 | |
+| `addHouseholdTask(homeId:)` | R | 1 | |
+| `editHouseholdTask(homeId:,taskId:)` | R | 1 | |
+| `homeMaintenance(homeId:)` | R | 3 | |
+| `logMaintenance(homeId:)` | R | 1 | |
+| `maintenanceDetail(homeId:,taskId:)` | R | 2 | |
+| `editMaintenance(homeId:,taskId:)` | R | 1 | |
+| `homeOwners(homeId:)` | R | 1 | |
+| `homeMembers(homeId:)` | R | 3 | |
+| `listingOffers(listingId:,title:)` | R | 1 | |
+| `gigDetail(gigId:)` | R | 9 | |
+| `listingDetail(listingId:)` | R | 3 | |
+| `chatConversation(dest)` | R | 4 | |
+| `editListing(listingId:,jumpToStep:)` | R | 2 | |
+| `membershipDetail(personaId:)` | R | 1 | |
+| `professionalProfile` | R | 1 | |
+| `editPersona(personaId:)` | R | 1 | |
+| `composeBroadcast(personaId:)` | R | 1 | |
+| `publicProfile(userId:)` | R | 3 | promoted from DEBUG in rewire |
+| `pulsePost(postId:)` | R | 2 | promoted from DEBUG in rewire |
+| `composePost(intent:)` | R | 1 | added in rewire |
+| `billDetail(homeId:,billId:)` | R | 2 | added in rewire |
+| `addBill(homeId:,billId:)` | R | 2 | added in rewire |
+| `gigsFeed` | R | 2 | added in rewire (Browse tasks/gigs from You) |
+| `marketplace` | R | 1 | added in rewire (Browse listings from You) |
+| `composeListing` | R | 2 | added in rewire (List something) |
+| `addHome` | R | 2 | added in rewire (Claim a home) |
+| `claimOwnership(homeId:)` | R | 1 | added in rewire |
+| `myClaims` | R | 2 | added in rewire |
+| `businessProfile(businessId:)` | R | 0 | DEBUG · **ORPHAN** (declared, never pushed even in debug) |
+| `privacyHandshake(personaHandle:)` | R | 2 | DEBUG |
+| `statusWaiting` | R | 1 | DEBUG |
+| `ceremonialMail` | R | 2 | DEBUG |
+| `ceremonialMailOpen(mailId:)` | R | 1 | DEBUG |
+
+### Inbox tab — root `ChatListView` · `InboxRoute` (3 cases)
+
+| Route case | T | In | Notes |
+|---|---|---:|---|
+| `conversation(dest)` | R | 3 | from row tap, compose pick, search result |
+| `compose` | R | 1 | → `NewMessageView` |
+| `search` | R | 1 | → `ChatSearchView` |
+
+### Nearby tab — root `NearbyMapView` · `NearbyRoute` (5 cases)
+
+| Route case | T | In | Notes |
+|---|---|---:|---|
+| `entityDetail(kind:,id:)` | R | 1 | → Gig/Listing detail by `MapEntityKind` |
+| `placeholder(label:)` | **N** | 1 | generic funnel → `NotYetAvailableView`; labels in §5 |
+| `listingOffers(listingId:,title:)` | R | 1 | |
+| `editListing(listingId:,jumpToStep:)` | R | 2 | |
+| `publicProfile(userId:)` | R | 1 | added in rewire (Buyer profile from `ListingOffersView`) |
+
+---
+
+## Section 2 — Android routes (per tab + flat child graph)
+
+Android uses a **single flat `NavHost`** rooted in `RootTabScreen.kt`: the 4
+`PantopusRoute` tabs plus all `ChildRoutes` destinations hang off one graph
+(any child is reachable from whichever tab is active — there are no per-tab
+back-stacks like iOS). All 121 `composable(...)` blocks below are `REAL_VIEW`
+except the single `PLACEHOLDER` funnel.
+
+### Tab roots (`PantopusRoute`, bottom bar)
+
+| Composable route | Renders | T | In |
+|---|---|---|---:|
+| `Hub.path` (`root/hub`) | `HubScreen` | R | bar + 1 deep-link |
+| `Nearby.path` (`root/nearby`) | `NearbyMapScreen` | R | bar |
+| `Inbox.path` (`root/inbox`) | `InboxScreen` | R | bar + 1 deep-link |
+| `You.path` (`root/you`) | `YouScreen` | R | bar |
+
+### Child destinations (`ChildRoutes`, in NavHost source order)
+
+| Composable route | Renders | T | In | Notes |
+|---|---|---|---:|---|
+| `MY_HOMES` | `MyHomesListScreen` | R | 1 | |
+| `MY_LISTINGS` | `MyListingsScreen` | R | 1 | |
+| `MY_BUSINESSES` | `MyBusinessesScreen` | R | 1 | |
+| `HOME_DASHBOARD` | `HomeDashboardScreen` | R | 5 | |
+| `HOME_BILLS` | `BillsListScreen` | R | 2 | |
+| `BILL_DETAIL` | `BillDetailScreen` | R | 2 | |
+| `ADD_BILL` | `AddBillWizardScreen` | R | 1 | |
+| `EDIT_BILL` | `AddBillWizardScreen` | R | 1 | |
+| `HOME_PETS` | `PetsListScreen` | R | 2 | |
+| `HOME_CALENDAR` | `HomeCalendarScreen` | R | 2 | |
+| `ADD_CALENDAR_EVENT` | `AddEventFormScreen` | R | 2 | |
+| `CALENDAR_EVENT_DETAIL` | `EventDetailScreen` | R | 3 | |
+| `HOME_EMERGENCY` | `EmergencyInfoScreen` | R | 1 | |
+| `ADD_EMERGENCY_INFO` | `AddEmergencyInfoFormScreen` | R | 1 | |
+| `EDIT_EMERGENCY_INFO` | `AddEmergencyInfoFormScreen` | R | 1 | |
+| `EMERGENCY_ITEM` | `EmergencyInfoDetailScreen` | R | 1 | |
+| `HOME_PACKAGES` | `PackagesListScreen` | R | 2 | |
+| `HOME_POLLS` | `PollsListScreen` | R | 2 | |
+| `START_POLL` | `StartPollFormScreen` | R | 1 | |
+| `HOME_DOCS` | `DocumentsScreen` | R | 1 | |
+| `DOCUMENT_SEARCH` | `DocumentSearchScreen` | R | 1 | |
+| `UPLOAD_DOCUMENT` | `UploadDocumentFormScreen` | R | 2 | |
+| `DOCUMENT_DETAIL` | `DocumentDetailScreen` | R | 3 | |
+| `POLL_DETAIL` | `PollDetailScreen` | R | 1 | |
+| `ACCESS_CODES` | `AccessCodesScreen` | R | 2 | |
+| `ACCESS_CODES_SEARCH` | `AccessCodesSearchScreen` | R | 1 | |
+| `EDIT_ACCESS_CODE` | `EditAccessCodeFormScreen` | R | 3 | |
+| `HOME_TASKS` | `HouseholdTasksListScreen` | R | 2 | |
+| `ADD_HOUSEHOLD_TASK` | `AddHouseholdTaskFormScreen` | R | 1 | |
+| `EDIT_HOUSEHOLD_TASK` | `AddHouseholdTaskFormScreen` | R | 1 | |
+| `HOME_MAINTENANCE` | `MaintenanceListScreen` | R | 2 | |
+| `LOG_MAINTENANCE` | `LogMaintenanceFormScreen` | R | 1 | |
+| `EDIT_MAINTENANCE` | `LogMaintenanceFormScreen` | R | 1 | |
+| `MAINTENANCE_DETAIL` | `MaintenanceDetailScreen` | R | 2 | |
+| `HOME_OWNERS` | `OwnersListScreen` | R | 1 | |
+| `PACKAGE_DETAIL` | `PackageDetailScreen` | R | 2 | |
+| `LOG_PACKAGE` | `LogPackageScreen` | R | 1 | |
+| `HOME_MEMBERS` | `MembersListScreen` | R | 2 | |
+| `MAILBOX_ITEM_DETAIL` | `MailDetailScreen` | R | 5 | |
+| `PUBLIC_PROFILE` | `PublicProfileScreen` | R | 5 | |
+| `BUSINESS_PROFILE` | `BusinessProfileScreen` | R | 3 | |
+| `PULSE_POST` | `PulsePostDetailScreen` | R | 6 | |
+| `INVITE_OWNER` | `InviteOwnerFormScreen` | R | 3 | |
+| `DISAMBIGUATE_MAIL` | `DisambiguateMailFormScreen` | R | 1 | |
+| `MAILBOX_VAULT` | `VaultListScreen` | R | 0 | **ORPHAN** — vestigial after Wave B |
+| `CHAT_CONVERSATION` | `ChatConversationHost` | R | 8 | row/picker/creator/search |
+| `CHAT_SEARCH` | `ChatSearchScreen` | R | 1 | |
+| `NEW_MESSAGE` | `NewMessageScreen` | R | 1 | |
+| `PULSE_FEED` | `FeedScreen` | R | 3 | |
+| `MARKETPLACE` | `MarketplaceScreen` | R | 2 | |
+| `LISTING_DETAIL` | `ListingDetailScreen` | R | 9 | |
+| `LISTING_OFFERS` | `ListingOffersScreen` | R | 1 | |
+| `INVOICE_DETAIL` | `InvoiceDetailScreen` | R | 0 | **ORPHAN** — deferred (payments) |
+| `COMPOSE_LISTING` | `ListingComposeWizardScreen` | R | 1 | |
+| `EDIT_LISTING` | `ListingComposeWizardScreen` | R | 2 | |
+| `GIGS_FEED` | `GigsFeedScreen` | R | 4 | |
+| `GIG_SEARCH` | `GigSearchScreen` | R | 1 | |
+| `GIG_DETAIL` | `GigDetailScreen` | R | 20 | |
+| `NEARBY_MAP_FOR_GIGS` | `NearbyMapScreen` | R | 0 | **ORPHAN** — superseded by `TASKS_MAP` |
+| `QUICK_POST_GIG` | `PostGigV1Screen` | R | 1 | |
+| `COMPOSE_GIG` | `GigComposeWizardScreen` | R | 2 | |
+| `COMPOSE_POST` | `PulseComposeScreen` | R | 1 | |
+| `EDIT_POST` | `PulseComposeScreen` | R | 2 | |
+| `NOTIFICATIONS` | `NotificationsScreen` | R | 2 | |
+| `RECENT_ACTIVITY` | `RecentActivityScreen` | R | 1 | |
+| `CONNECTIONS` | `ConnectionsScreen` | R | 3 | |
+| `DISCOVER_HUB` | `DiscoverHubScreen` | R | 2 | |
+| `DISCOVER_BUSINESSES` | `DiscoverBusinessesScreen` | R | 1 | |
+| `OFFERS` | `OffersScreen` | R | 1 | |
+| `MY_BIDS` | `MyBidsScreen` | R | 1 | |
+| `MY_TASKS` | `MyTasksScreen` | R | 1 | |
+| `COMPOSE_TASK` | `GigComposeWizardScreen` | R | 3 | |
+| `MY_POSTS` | `MyPostsScreen` | R | 1 | |
+| `MENU` | `SettingsIndexScreen` | R | 2 | |
+| `EDIT_PROFILE` | `EditProfileScreen` | R | 2 | |
+| `SETTINGS_NOTIFICATIONS` | `NotificationSettingsScreen` | R | 1 | |
+| `SETTINGS_PRIVACY` | `PrivacySettingsScreen` | R | 1 | |
+| `SETTINGS_BLOCKED_USERS` | `BlockedUsersScreen` | R | 1 | |
+| `SETTINGS_PASSWORD` | `PasswordChangeScreen` | R | 1 | |
+| `SETTINGS_VERIFICATION` | `VerificationCenterScreen` | R | 1 | |
+| `SETTINGS_HELP` | `HelpCenterScreen` | R | 1 | |
+| `SETTINGS_LEGAL` | `LegalIndexScreen` | R | 1 | |
+| `SETTINGS_LEGAL_CONTENT` | `LegalContentScreen` | R | 1 | `NotYetAvailableView("Legal")` only as a defensive fallback for an unknown `doc` param |
+| `SETTINGS_ABOUT` | `AboutScreen` | R | 1 | |
+| `PRIVACY_HANDSHAKE` | `PrivacyHandshakeScreen` | R | 2 | |
+| `TOKEN_ACCEPT` | `TokenAcceptScreen` | R | 2 | + invite deep-link |
+| `CEREMONIAL_MAIL` | `CeremonialMailWizardScreen` | R | 2 | |
+| `CEREMONIAL_MAIL_OPEN` | `CeremonialMailOpenScreen` | R | 1 | |
+| `AUDIENCE_PROFILE` | `AudienceProfileScreen` | R | 5 | |
+| `BROADCAST_DETAIL` | `BroadcastDetailScreen` | R | 1 | |
+| `CREATOR_INBOX` | `CreatorInboxScreen` | R | 3 | |
+| `IDENTITY_CENTER` | `IdentityCenterScreen` | R | 2 | |
+| `MAILBOX_SEARCH` | `MailboxSearchScreen` | R | 1 | |
+| `SUPPORT_TRAINS` | `SupportTrainsScreen` | R | 2 | |
+| `SUPPORT_TRAINS_SEARCH` | `SupportTrainsSearchScreen` | R | 1 | |
+| `START_SUPPORT_TRAIN` | `StartSupportTrainWizardScreen` | R | 1 | |
+| `REVIEW_SIGNUPS` | `ReviewSignupsScreen` | R | 3 | |
+| `EDIT_SIGNUP` | `EditSignupFormScreen` | R | 1 | |
+| `REVIEW_CLAIMS` | `ReviewClaimsScreen` | R | 1 | |
+| `REVIEW_CLAIM_DETAIL` | `ReviewClaimDetailScreen` | R | 1 | |
+| `PLACEHOLDER` | `NotYetAvailableView(label)` | **N** | 36 | generic funnel; labels in §5 |
+| `TODAY_DETAIL` | `TodayDetailScreen` | R | 1 | |
+| `PROPERTY_DETAILS` | `PropertyDetailsScreen` | R | 1 | |
+| `ADD_GUEST` | `AddGuestFormScreen` | R | 1 | |
+| `TASKS_MAP` | `TasksMapScreen` | R | 1 | |
+| `EXPLORE` | `ExploreMapScreen` | R | 1 | |
+| `MAILBOX_ROOT` | `MailboxRootScreen` | R | 5 | |
+| `MAILBOX_MAP` | `MailboxMapScreen` | R | 1 | |
+| `MEMBERSHIP_DETAIL` | `MembershipDetailScreen` | R | 1 | |
+| `PROFESSIONAL_PROFILE` | `ProfessionalProfileScreen` | R | 1 | |
+| `EDIT_PERSONA` | `EditPersonaScreen` | R | 1 | |
+| `COMPOSE_BROADCAST` | `ComposeBroadcastScreen` | R | 1 | |
+| `ADD_HOME` | `AddHomeWizardScreen` | R | 5 | |
+| `BUSINESS_WAITLIST` | `BusinessWaitlistScreen` | R | 1 | |
+| `CLAIM_OWNERSHIP` | `ClaimOwnershipWizardScreen` | R | 1 | |
+| `MY_CLAIMS` | `MyClaimsListScreen` | R | 2 | |
+| `TOKEN_GALLERY` | `TokenGalleryScreen` | R | 1 | DEBUG (`BuildConfig.DEBUG`, 5-tap) |
+
+---
+
+## Section 3 — Orphans (zero inbound)
+
+### iOS
+
+| Tab · case | Disposition |
+|---|---|
+| Hub · `mailboxVault` | **REMOVE** — vestigial after Wave B mailbox rework. The Vault is now a surface inside `MailboxRootView`; nothing pushes `.mailboxVault`. Removing it also orphans `VaultListView` (see §4). |
+| Hub · `nearbyMapForGigs(categoryKey:)` | **REMOVE** — superseded by `tasksMap` (A11.1, Wave A). The Gigs-feed map toggle pushes `.tasksMap`; `.nearbyMapForGigs` is the pre-Wave-A path. |
+| Hub · `invoiceDetail(invoiceId:)` | **KEEP (deferred)** — wallet/payments surfaces that would push it aren't shipped. Currently the only door to `InvoiceDetailView`. |
+| Hub · `myHomes` | **REMOVE** — exact duplicate of `YouRoute.myHomes` (inbound 2). My Homes is reached from the You tab; the Hub copy is dead. |
+| Hub · `myBids` | **REMOVE** — duplicate of `YouRoute.myBids` (inbound 2). The doc-comment claims a "Hub marketplace pillar shelf" entry that was never wired. |
+| Hub · `iconGallery` (DEBUG) | **KEEP (debug)** — gallery handler exists but no trigger is wired (only `tokenGallery` is on the 5-tap). Wire-on-demand; harmless (DEBUG-gated). |
+| Hub · `componentGallery` (DEBUG) | **KEEP (debug)** — same as `iconGallery`. |
+| You · `signOutConfirm` | **REMOVE** — renders `EmptyView()`; the real sign-out is the `confirmationDialog` bound to `showsSignOutConfirm`. Pure vestige. |
+| You · `businessProfile(businessId:)` (DEBUG) | **REMOVE** — declared "for debug parity" but no debug affordance pushes it. The live Business Profile entry points are on `HubRoute`. |
+
+### Android
+
+| Route | Disposition |
+|---|---|
+| `MAILBOX_VAULT` | **REMOVE** — vestigial after Wave B (mirrors iOS). No `navigate(MAILBOX_VAULT)` / `mailboxVault()` call site; removing it orphans `VaultListScreen` (see §4). |
+| `NEARBY_MAP_FOR_GIGS` | **REMOVE** — superseded by `TASKS_MAP` (mirrors iOS). |
+| `INVOICE_DETAIL` | **KEEP (deferred)** — payments not shipped (mirrors iOS). |
+
+> The three cross-platform orphans (`mailboxVault`, `nearbyMapForGigs`,
+> `invoiceDetail`) are consistent on both platforms. The extra iOS orphans
+> (`myHomes`, `myBids`, `signOutConfirm`, debug `businessProfile`/galleries)
+> are artifacts of iOS having **per-tab** route enums where Hub re-declares
+> cases that live in You; Android's single flat graph declares each once.
+
+---
+
+## Section 4 — Dead screens (no route reaches them)
+
+### iOS (`*View.swift` instantiated by no route and consumed by no parent)
+
+| Screen file | Disposition |
+|---|---|
+| `Homes/AddHome/AddHomeFindStepView.swift` | **REMOVE** — vestigial. The Add-Home flow is the consolidated `AddHomeWizardView` (routed via `.addHome`); the standalone find-step view is superseded (A12.1 "Find your home" is now step 1 inside the wizard). |
+| `Mailbox/ItemDetail/MailboxItemDetailView.swift` | **REMOVE** — vestigial after Wave B. The routed mail-detail host is `MailDetailView` (`.mailItemDetail`); this parallel host is instantiated nowhere. (Its `ItemDetail/Bodies/*Body.swift` are still consumed by `MailDetailView`, so only this host file is dead.) |
+
+Reachable **only via an orphan route** (transitively dead until §3 is
+resolved): `VaultListView` (only `Hub.mailboxVault`) and `InvoiceDetailView`
+(only `Hub.invoiceDetail`).
+
+### Android (`fun *Screen(` defined but invoked by no `composable`/parent)
+
+| Screen composable · file | Disposition |
+|---|---|
+| `InviteOwnerWizardScreen` · `homes/invite_owner/InviteOwnerFormScreen.kt` | **REMOVE** — the routed invite-owner destination is `InviteOwnerFormScreen` (single-page form); the wizard variant in the same file is never called. |
+| `MailboxItemDetailScreen` · `mailbox/item_detail/MailboxItemDetailScreen.kt` | **REMOVE** — vestigial after Wave B (mirrors iOS `MailboxItemDetailView`); routed host is `MailDetailScreen`. |
+| `MailboxDrawersScreen` · `mailbox/MailboxDrawersScreen.kt` | **REMOVE** — vestigial after Wave B; superseded by `MailboxRootScreen`. (Divergence: iOS keeps `MailboxDrawersView` as a live subcomponent of `MailboxRootView`; the Android composable is dead.) |
+| `MailboxListScreen` · `mailbox/MailboxListScreen.kt` | **REMOVE** — vestigial after Wave B; superseded by `MailboxRootScreen`. (Same iOS/Android divergence as above.) |
+
+Reachable **only via an orphan route**: `VaultListScreen` (only
+`MAILBOX_VAULT`) and `InvoiceDetailScreen` (only `INVOICE_DETAIL`).
+
+---
+
+## Section 5 — Placeholder catalog
+
+Both platforms funnel every not-yet-built destination through one generic
+sink — iOS `case .placeholder(label:) → NotYetAvailableView(tabName: label)`
+(present in Hub/You/Nearby), Android
+`ChildRoutes.PLACEHOLDER → NotYetAvailableView(tabName = label)`. The
+distinct **labels** pushed into that sink are the real catalog of missing
+destinations.
+
+**Post-rewire totals: 23 distinct (iOS) · 24 distinct (Android)** — both
+under the `<25` sanity bar. **`BUILD` = 0**: every screen in the 8 design
+packs is shipped (see `docs/screen-parity-inventory.md`). Every remaining
+label is an intentional **`DEFER`** for a feature with no pack screen
+(payments, membership/broadcast management, moderation, business management,
+identity sub-details, etc.).
+
+### Group A — STALE (RESOLVED in rewire pass)
+
+All 16 originally-identified stale call sites have been rewired off
+`.placeholder(...)` to the shipped screen. The structural ones (the You
+stack lacking `addHome` / `claimOwnership` / `myClaims` / `marketplace` /
+`gigsFeed` / `pulsePost` / `composePost` / `composeListing` / `billDetail` /
+`addBill` / `publicProfile` cases) were fixed by adding the missing cases
+to `YouRoute`; Hub gained `accessCodes` / `editAccessCode` /
+`searchAccessCodes` to wire the home-dashboard tile; `Nearby` gained
+`publicProfile` for the buyer row. `Snap & sell` and `Gig detail` were
+rewired on Android too (they had the same stale pattern). The two
+`Share business` / `Share membership` placeholders now invoke the system
+share sheet (iOS `systemSheet = .share`, Android `appContext.shareText`).
+
+| Original stale label | Fix |
+|---|---|
+| `Access codes` (iOS Hub) | `HubRoute.accessCodes` (+ `editAccessCode`/`searchAccessCodes`) added; `HomeDashboardView.onOpenAccessCodes` rewired |
+| `Bill detail`, `Add a bill` (iOS You) | `YouRoute.billDetail`/`.addBill` added; `BillsListView` callbacks rewired |
+| `Gig detail` (iOS Hub, Android) | `route(forDiscovery: .gig)` / `DiscoveryKind.Gig` → real `gigDetail(id)` |
+| `Buyer profile` (iOS Hub/You/Nearby, Android) | `ListingOffersView.onOpenBuyer` → `.publicProfile(userId: buyer.id)`; `NearbyRoute.publicProfile` and release `YouRoute.publicProfile` added |
+| `Post detail` (iOS You, Android) | `MyPostsView.onOpenPost` → `.pulsePost(postId: dto.id)`; `YouRoute.pulsePost` promoted out of `#if DEBUG` |
+| `Write a post` (iOS You, Android) | `MyPostsView.onCompose` → `.composePost(intent: "")`; `YouRoute.composePost` added |
+| `Snap & sell` (iOS Hub, Android) | Hub `.snapAndSell` / `ActionChipContent.Kind.SnapAndSell` → `.composeListing` / `COMPOSE_LISTING` |
+| `List something` (iOS You, Android) | `MyListingsView.onCompose` → `.composeListing` / `COMPOSE_LISTING`; `YouRoute.composeListing` added |
+| `Post a task` (iOS You) | `OffersView.onPostTask` → `.composeTask` (existing case) |
+| `Browse tasks` (iOS You) | `MyBidsView.onBrowseTasks` → `.gigsFeed`; `YouRoute.gigsFeed` added |
+| `Browse listings` (iOS You, Android) | `OffersView.onBrowseListings` → `.marketplace` / `MARKETPLACE`; `YouRoute.marketplace` added |
+| `Browse gigs` (iOS You) | `MailboxRootView.onBrowseGigs` (You) → `.gigsFeed` |
+| `Claim a home` (iOS You) | `MyHomesListView.onAddHome` → `.addHome`; `YouRoute.addHome` added |
+| `Claim ownership` (iOS You) | `HomeDashboardView.onClaimOwnership` → `.claimOwnership(homeId:)`; `YouRoute.claimOwnership` added |
+| `My claims` (iOS You) | `HomeDashboardView.onOpenClaimsList` → `.myClaims`; `YouRoute.myClaims` added |
+| `Share business` (iOS Hub, Android) | now invokes system share sheet (`systemSheet = .share` / `appContext.shareText`) |
+| `Share membership` (Android) | now invokes `appContext.shareText` |
+
+### Group B — DEFER (no pack screen; intentionally parked)
+
+| Label(s) | Platform | Pushed from | Why deferred |
+|---|---|---|---|
+| `Payments & payouts` | iOS·Android | Settings / Me | Payments stack not built (canonical defer) |
+| `Transaction detail` | iOS·Android | `ListingOffersView` | Payments |
+| `Update payment`, `Change tier`, `Request refund`, `Membership cancelled` | iOS·Android | `MembershipDetailView` actions | Membership/billing management — payments |
+| `Broadcast actions`, `Reply to broadcast`, `Boost broadcast`, `Pin broadcast` | iOS·Android | `BroadcastDetailView` actions | Creator broadcast management (action sheets, not screens) |
+| `Business dashboard` | iOS·Android | `MyBusinessesView` row | Business management — Phase 9 (`businessWaitlist` is the live stub) |
+| `Data export` | iOS·Android | Settings | GDPR export flow |
+| `Export documents` | iOS·Android | `DocumentsView` export | Bulk export action |
+| `Inbox settings` | iOS·Android | `CreatorInboxView` | Creator inbox preferences |
+| `Request correction` | iOS·Android | `PropertyDetailsView` | Property-correction request flow |
+| `Follower` (`Follower · …`) | iOS·Android | `AudienceProfileView` | Follower detail |
+| `Creator profile` | iOS | `MembershipDetailView` open-persona | Persona public-profile entry (persona·owner state is a known parity gap) |
+| `Identity` / `Local profile` / `Personal` | iOS·Android | `IdentityCenterView` non-professional cards | Identity sub-detail screens |
+| `Task detail` | iOS·Android | `HouseholdTasksListView` row | No household-task detail screen designed (list + edit only) |
+| `Claim status` | iOS·Android | `MyClaimsListView` row | No claim-status detail designed (`StatusWaitingView` covers submit) |
+| `Messages` | iOS·Android | `BusinessProfileView`, `jumpBackIn /app/chat` | Business→DM not wired (chat shell exists) |
+| `Message helper` (`Message helper · …`) | iOS·Android | `ReviewSignupsView` | Helper DM not wired (chat shell exists) |
+| `Report business` | iOS·Android | `BusinessProfileView` | Moderation/report flow |
+| `Share business` / `Share membership` | iOS·Android | `BusinessProfileView` / membership | Should route to the system share sheet, not a screen |
+| `Member requests · …` | Android | home members | Member-requests screen (iOS `homeMemberRequests` deep-link also unresolved) |
+
+### Group C — dynamic fall-through (defensive, not a missing screen)
+
+`tile.label` / `row.label` (×~15, You/Me action grid), `item.title` (Hub
+discovery unknown), and `label` pass-throughs render the placeholder only at
+runtime when a home-context tile has no resolved primary `homeId` or a
+discovery item is `.unknown`. **KEEP** — these are defensive fallbacks for
+empty/edge states, not wiring gaps.
+
+---
+
+## Disposition rollup
+
 | | iOS | Android |
-|---|---|---|
-| Total declared routes | 98 (HubRoute 47 + NearbyRoute 4 + InboxRoute 4 + YouRoute 43) | 79 ChildRoutes constants wired to composables |
-| LIVE (reachable + real destination) | 81 | 70 |
-| STUB (routed to placeholder/NotYetAvailableView) | 13 | 6 |
-| DEBUG-only LIVE | 6 (galleries + handshake/status/ceremonial) | 1 (TokenGallery) |
-| ORPHAN (real destination, no caller) | 1 (`invoiceDetail`) | 1 (`INVOICE_DETAIL`) |
-| DEAD (case declared but no destination) | 1 (`signOutConfirm`) | 0 |
-| Dead screens (View exists but no route reaches it) | 0 | 2 (`StatusWaitingScreen` + the A17 `MailboxItemDetailScreen` consumer) |
-
-## Follow-up signal for downstream prompts
-
-1. **Wire `InvoiceDetail` and the A17 `MailboxItemDetail` shell consumer** — both exist on both platforms but live behind unused route cases. P1 task.
-2. **Remove `YouRoute.signOutConfirm`** — stale enum case that always resolves to `EmptyView()`. Safe one-line cleanup.
-3. **Wire Android `StatusWaitingScreen`** — Status / Waiting.html design exists; the iOS analogue is DEBUG-only too, so the right move is to (a) add the route, and (b) thread it onto the claim/submission happy paths on both platforms.
-4. **40+ "BUILD" placeholders** point to screens that exist but aren't routed — these are the cheapest wins (Bill detail, Add a bill, Document detail, Maintenance detail, etc.). A single P1 sweep can close them.
-5. **The catch-all `.placeholder(label:)` / `ChildRoutes.PLACEHOLDER` pattern is fine to keep** — it's the safe-by-default behavior when a new affordance lands and a destination is still in design.
-
+|---|---:|---:|
+| Orphan routes → REMOVE | 5 | 2 |
+| Orphan routes → KEEP (deferred/debug) | 4 | 1 |
+| Dead screens → REMOVE | 2 | 4 |
+| Placeholder labels → REMOVE (stale, rewire) — *done* | 0 (was 16) | 0 (was ~14) |
+| Placeholder labels → DEFER | 23 | 24 |
+| Placeholder labels → BUILD | 0 | 0 |

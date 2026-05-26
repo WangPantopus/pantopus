@@ -183,10 +183,10 @@ private struct OwnershipSummaryCard: View {
             let separator = index < summary.owners.count - 1 ? Text(" · ") : Text("")
             result = result
                 + Text(owner.name)
-                    .foregroundColor(Theme.Color.appText)
-                    .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(Theme.Color.appText)
+                .font(.system(size: 11, weight: .semibold))
                 + Text(" \(owner.sharePercent)%")
-                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                .font(.system(size: 11, weight: .regular, design: .monospaced))
                 + separator
         }
         return result

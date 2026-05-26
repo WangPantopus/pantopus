@@ -1018,7 +1018,9 @@ public struct HubTabRoot: View {
                 onBack: { Task { @MainActor in pop() } },
                 onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
                 onShare: {
-                    systemSheet = .share(items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"])
+                    systemSheet = .share(
+                        items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"]
+                    )
                 },
                 onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } }
             )
