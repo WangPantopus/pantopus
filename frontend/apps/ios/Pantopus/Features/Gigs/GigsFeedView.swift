@@ -358,10 +358,10 @@ struct GigRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
     }
 }
 

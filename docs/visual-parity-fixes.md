@@ -327,3 +327,95 @@ Deferred — no simulator / emulator available in this sandbox. CI on merge will
 Files modified (8 lines across 4 files):
 - iOS: `Features/Feed/Pulse/PulsePostCard.swift` (2 lines), `Features/Shared/Feed/FeedComponents.swift` (2 lines)
 - Android: `ui/screens/feed/pulse/PulsePostCard.kt` (2 lines), `ui/screens/shared/feed/FeedComponents.kt` (2 lines)
+
+---
+
+## P7.9.c — Marketplace + Gigs + compose wizards visual parity
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope
+
+| Surface | Design HTML | iOS implementation | Android implementation |
+|---|---|---|---|
+| Marketplace (Populated · Empty · Loading) | `A08/uploads/Pantopus-design/Marketplace.html` + `marketplace-frames.jsx` | `Features/Marketplace/MarketplaceView.swift` + `MarketplaceContent.swift` | `ui/screens/marketplace/MarketplaceScreen.kt` + `MarketplaceContent.kt` |
+| Gigs feed (Populated · Empty · Loading) | `A08/.../Gigs.html` + `gigs-frames.jsx` | `Features/Gigs/GigsFeedView.swift` + `GigsContent.swift` + `GigsCategoryChipRow.swift` | `ui/screens/gigs/GigsFeedScreen.kt` + `GigsContent.kt` |
+| Snap-and-sell wizard (camera capture + AI review) | `Wizard__multi-step_form_/A12.9 List an Item.html` + `listing-create-frames.jsx` | `Features/Compose/ListingCompose/*` | `ui/screens/compose/listing/*` |
+| Magic Task wizard (AI describe + manual category picker) | `Wizard__multi-step_form_/A12.8 Post a Task.html` + `post-task-frames.jsx` | `Features/Compose/GigCompose/*` (`GigComposeMagic.swift` is the AI-describe step) | `ui/screens/compose/gig/*` |
+| Post Gig V1 (legacy single-screen form) | `A13___Form__single_screen_/Post Gig V1.html` + `post-gig-v1-frames.jsx` | `Features/Gigs/QuickPost/PostGigV1View.swift` + `PostGigV1SupportViews.swift` | `ui/screens/gigs/quickpost/PostGigV1Screen.kt` |
+
+### Methodology
+
+Rendered the 5 design HTML pages at 1600×1200 (deviceScaleFactor 2) via
+Playwright with locally-vendored React/Babel/Lucide. 17 PNGs captured:
+
+- `Marketplace-overview.png` + 3 frame crops (Populated · Empty · Loading)
+- `Gigs-overview.png` + 3 frame crops (Populated · Empty · Loading)
+- `PostATask-overview.png` + 2 frame crops (Populated · Manual-path)
+- `ListAnItem-overview.png` + 2 frame crops (Populated · Camera-capture)
+- `PostGigV1-overview.png` + 2 frame crops (Populated · Validation-errors)
+
+Diffed CSS dimensions in `marketplace-frames.jsx`, `gigs-frames.jsx`,
+`listing-create-frames.jsx`, `post-task-frames.jsx`, `post-gig-v1-frames.jsx`
+against `Radii.*` / `Spacing.*` references in code.
+
+### Resolvable token mismatches — FIXED
+
+#### 1. `GigRow` card outer corner radius — **FIXED** (iOS + Android)
+
+| Side | Before | After |
+|---|---|---|
+| Design (`gigs-frames.jsx` L216 + L419 SkeletonGig) | `GigRow { borderRadius: 16, padding: 16 }` and matching skeleton | n/a |
+| iOS `GigsFeedView.swift:GigRow` (lines 361, 364) | `Radii.lg` (=12) | `Radii.xl` (=16) |
+| Android `GigsFeedScreen.kt:GigRow` (lines 569, 571) | `Radii.lg` (=12) | `Radii.xl` (=16) |
+
+The Gigs feed loading skeleton was **already correct** — it reuses
+`FeedSkeletonCard` (the shared shimmer card), which P7.9.b already moved
+from `Radii.lg → Radii.xl`. So both the populated and loading frames now
+agree at `Radii.xl` (16) matching the design — shimmer-shape parity
+(P7.6b) preserved.
+
+### Surfaced for design review (NOT fixed — off-scale design values or out-of-scope)
+
+| # | Surface | Design value | Code value | Notes |
+|---|---|---|---|---|
+| A | Marketplace listing card outer corner radius | `borderRadius: 14` (`marketplace-frames.jsx` L186) | iOS `RoundedRectangle(cornerRadius: 14, …)` literals on `MarketplaceView.swift:335, 338, 403, 406`; Android `RoundedCornerShape(14.dp)` literals on `MarketplaceScreen.kt:467, 469, 565, 567` | Code already uses the literal `14` matching design exactly. 14 is OFF the canonical Radii ramp ({4,6,8,12,16,20,24,9999}). The repo's `verify-tokens` guard allows off-scale literals through (it only rejects on-scale literals). Surface as: either extend the radii ramp to include `Radii.lg2` (=14), or accept the off-scale literal as a deliberate visual choice for this card archetype. |
+| B | Marketplace listing image height | 104pt (`marketplace-frames.jsx` L159) | iOS `Shimmer(height: 104)`; Android matches | 104 is off-scale (closest standard image heights 96/100/120). Design call. |
+| C | Marketplace listing title | `fontSize: 11.5, fontWeight: 600, lineHeight: 14, maxLines: 2, minHeight: 28` | iOS `.font(.system(size: 11.5, weight: .semibold))` and matching maxLines/minHeight; Android matches | 11.5pt off-scale (P7.4 drift already documented). |
+| D | Marketplace listing meta | `fontSize: 9.5` (L199) | iOS `.font(.system(size: 9.5))`; Android matches | Far off-scale (9.5pt isn't on the canonical type ramp). Documented in P7.4 typography drift. |
+| E | Marketplace empty-state hint pill | `borderRadius: 10` (L334) | iOS `Radii.md` (=8); Android same | 10 off-scale. Same `borderRadius:10` pattern as Pulse Empty (§P7.9.b A). |
+| F | Marketplace category chip | `height: 28, padding: 0 14px, borderRadius: 9999, fontSize: 12.5/600` (L141) | iOS+Android match height 28 and padding `Spacing.s3` (=12) ≠ 14 design | 14pt design padding off-scale. |
+| G | Gigs feed `SortFilterRow` filter pill | `padding: 4px 10px 4px 8px, borderRadius: 9999, fontSize: 11.5/700` | iOS `GigsFilterButton` uses `padding(.horizontal, 10)` + `Spacing.s1` vertical; Android `padding(horizontal = 10.dp, vertical = 4.dp)` matches. | 10pt literal padding ≈ matches design; mostly aligned. |
+| H | Gigs feed `GigRow` body font | `fontSize: 12, lineHeight: 17, maxLines: 2` (`gigs-frames.jsx` L230) | iOS+Android `fontSize: 12` matches but lineHeight inlined as `.lineSpacing(5)` vs `lineHeight = 17.sp` | 17pt line-height on 12pt font is off-scale (P7.4 drift). |
+| I | Gigs feed `BidsPill` / `BeTheFirstPill` | `padding: 2px 8px, borderRadius: 9999, fontSize: 10/700, fontWeight: 700, letterSpacing: 0.04` | iOS+Android use `Radii.pill`, `Spacing.s2` (=8) horizontal, `fontSize: 10, fontWeight: .bold` | ✓ matches |
+| J | Gigs `CategoryChip` (intent chip in card header) | `padding: 2px 8px, borderRadius: 9999, fontSize: 10, fontWeight: 700, textTransform: uppercase, color: 12% tint of category accent` | iOS+Android match | ✓ |
+| K | Listing camera capture step (A12.9 Frame 2) | photo strip hero tile `borderRadius: 14`, thumb tiles `borderRadius: 12`, add-photo tile `borderRadius: 12` (`listing-create-frames.jsx` L268, L282, L288, L294, L300) | iOS `ListingComposePhotoStep.swift` uses `Radii.xl` (=16) for the camera viewfinder outer (line 58); the captured-angles strip uses `Radii.lg` (=12) — matches thumb but not hero | Hero off by 2pt (14 design vs 12 code if a hero tile is drawn). The decorative sofa silhouette inside the viewfinder uses literal `14, 18, 28` — these are drawing primitives, not surface chrome, leave as-is. |
+| L | Listing review step (A12.9 Frame 1) AI suggestions banner | `borderRadius: 12, padding: 10px 12px, background: magicBg` (L317) | iOS `SuggestionsBanner.swift` exists — uses `Radii.lg` (=12) ✓; Android matches | ✓ |
+| M | Listing review FieldShell | `borderRadius: 12, minHeight: 44` (L365–366) | iOS+Android use `Radii.lg` (=12), `height: 44` | ✓ |
+| N | Listing review PriceField outer | `borderRadius: 12, padding: 12` (L434) | iOS+Android `Radii.lg` (=12) | ✓ |
+| O | Listing review Condition pills | `borderRadius: 10` (L496) | iOS+Android use `Radii.md` (=8) or `Radii.lg` (=12) | 10 off-scale; closest tokens 8 / 12. |
+| P | Magic Task `DescribeCard` outer | `borderRadius: 16` (A12.8 `post-task-frames.jsx` L231) | iOS `GigComposeMagic.swift:355, 358` `Radii.xl` (=16); Android `GigComposeMagic.kt:194` matches | ✓ matches |
+| Q | Magic Task `DescribeCard` magic-icon tile | `borderRadius: 7` (L241) | iOS `Radii.sm` (=6) or close; Android matches | 7 off-scale; closest token 6 / 8. |
+| R | Magic Task manual-path archetype cards | `borderRadius: 12, padding: 14` | iOS+Android use `Radii.lg` (=12) | ✓ matches radius; 14pt padding off-scale. |
+| S | Post Gig V1 form fields (SelectField, DateField, PriceField) | `borderRadius: 8, height: 44` (`post-gig-v1-frames.jsx` L35, 81, 121) | iOS+Android `Radii.md` (=8), `height: 44` | ✓ matches (Form archetype tokenisation). |
+| T | Post Gig V1 photo grid tile | `borderRadius: 10` (L152, L164) | iOS+Android use `Radii.md` (=8) | 10 off-scale; closest tokens 8 / 12. |
+| U | Post Gig V1 error banner | `borderRadius: 10` (L211) | iOS+Android use `Radii.md` (=8) | 10 off-scale. |
+
+### Snapshot tests
+
+Re-record needed for:
+- iOS `PantopusTests/Features/Gigs/GigsFeedViewTests` (populated frame now has 16pt card radius)
+- Android `PulseFeedSnapshotTest` (carry-over from P7.9.b is unaffected; this is Gigs)
+- Android `GigsFeedSnapshotTest` (the equivalent — needs re-record)
+
+Deferred — no simulator / emulator. CI will fail snapshot verification until baselines are re-recorded.
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass.
+- Android — manual grep on `frontend/apps/android/.../gigs/`, `marketplace/`, `compose/listing/`, `compose/gig/`, `gigs/quickpost/` returns 0 on-scale literals.
+- Both platforms compile against `Radii.xl` (16) — existing canonical token. No new tokens introduced.
+
+Files modified (4 lines across 2 files):
+- iOS: `Features/Gigs/GigsFeedView.swift` (2 lines)
+- Android: `ui/screens/gigs/GigsFeedScreen.kt` (2 lines)
