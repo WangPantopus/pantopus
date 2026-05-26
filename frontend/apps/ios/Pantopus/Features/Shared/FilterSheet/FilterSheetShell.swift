@@ -81,7 +81,7 @@ public struct FilterSheetShell: View {
         .background(Theme.Color.appSurface)
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: working)
+        .pantopusAnimation(.componentState, value: working)
         .accessibilityIdentifier("filterSheet")
     }
 

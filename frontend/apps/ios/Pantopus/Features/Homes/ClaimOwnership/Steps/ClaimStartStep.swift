@@ -174,11 +174,12 @@ private struct ClaimantChip: View {
 
 private struct WhyWeAskSection: View {
     @Binding var isExpanded: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             Button {
-                withAnimation(.snappy(duration: 0.2)) {
+                withPantopusAnimation(.componentState, reduceMotion: reduceMotion) {
                     isExpanded.toggle()
                 }
             } label: {

@@ -52,7 +52,7 @@ public struct AddGuestFormView: View {
                     .accessibilityIdentifier("addGuestToast")
             }
         }
-        .animation(.easeOut(duration: 0.2), value: viewModel.toast)
+        .pantopusAnimation(.componentState, value: viewModel.toast)
         .onChange(of: viewModel.duration) { _, newValue in
             guard newValue == AddGuestSampleData.durationCustomId else { return }
             customStart = viewModel.customStart ?? Date()

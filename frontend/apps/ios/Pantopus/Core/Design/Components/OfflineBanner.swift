@@ -63,8 +63,8 @@ private struct OfflineBannerModifier: ViewModifier {
             }
             content
         }
-        .animation(.easeInOut(duration: 0.2), value: isOffline)
-        .animation(.easeInOut(duration: 0.2), value: dismissed)
+        .pantopusAnimation(.componentState, value: isOffline)
+        .pantopusAnimation(.componentState, value: dismissed)
         .onChange(of: isOffline) { _, online in
             // Reset the dismiss flag whenever connectivity flips back so
             // the banner re-appears on the next offline transition.

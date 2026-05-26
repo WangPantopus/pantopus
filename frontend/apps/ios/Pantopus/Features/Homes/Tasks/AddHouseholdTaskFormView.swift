@@ -69,7 +69,7 @@ public struct AddHouseholdTaskFormView: View {
                     .accessibilityIdentifier("addHouseholdTaskToast")
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: viewModel.toast)
+        .pantopusAnimation(.componentState, value: viewModel.toast)
         .onChange(of: viewModel.shouldDismiss) { _, newValue in
             guard newValue else { return }
             viewModel.acknowledgeDismiss()

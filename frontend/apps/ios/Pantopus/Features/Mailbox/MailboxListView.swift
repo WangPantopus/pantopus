@@ -29,7 +29,7 @@ struct MailboxListView: View {
                         .transition(.opacity)
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: viewModel.toast)
+            .pantopusAnimation(.componentState, value: viewModel.toast)
     }
 }
 

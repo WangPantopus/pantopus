@@ -33,12 +33,14 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.FabTint
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
+import app.pantopus.android.ui.theme.MotionTokens
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import app.pantopus.android.ui.theme.rememberReduceMotion
 
 /**
  * T6.4a — Access codes screen. Thin wrapper around [ListOfRowsScreen]
@@ -112,10 +114,11 @@ fun AccessCodesScreen(
             chipStrip = chipStrip,
         )
 
+        val reduceMotion = rememberReduceMotion()
         AnimatedVisibility(
             visible = toast != null,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(animationSpec = MotionTokens.componentState(reduceMotion)),
+            exit = fadeOut(animationSpec = MotionTokens.componentState(reduceMotion)),
             modifier =
                 Modifier
                     .align(Alignment.BottomCenter)

@@ -54,7 +54,7 @@ public struct MailDetailView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: viewModel.toast)
+        .pantopusAnimation(.componentState, value: viewModel.toast)
         .confirmationDialog(
             "Save to vault",
             isPresented: Binding(

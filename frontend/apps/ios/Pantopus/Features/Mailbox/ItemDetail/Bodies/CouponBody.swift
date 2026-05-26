@@ -129,11 +129,12 @@ private struct StoreBarcodeCard: View {
     let code: String
     let merchant: String
     @Binding var isExpanded: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             Button {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                withPantopusAnimation(.componentState, reduceMotion: reduceMotion) {
                     isExpanded.toggle()
                 }
             } label: {

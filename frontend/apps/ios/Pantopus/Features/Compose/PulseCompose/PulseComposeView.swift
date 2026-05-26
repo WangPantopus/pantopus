@@ -83,7 +83,7 @@ public struct PulseComposeView: View {
                     .accessibilityIdentifier("composePulseToast")
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: viewModel.toast)
+        .pantopusAnimation(.componentState, value: viewModel.toast)
         .task {
             if viewModel.isEditing, case .loading = viewModel.prefillState {
                 await viewModel.loadForEdit()

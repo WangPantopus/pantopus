@@ -55,7 +55,7 @@ public struct EditProfileView: View {
                     .accessibilityIdentifier("editProfileToast")
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: viewModel.toast)
+        .pantopusAnimation(.componentState, value: viewModel.toast)
         .onChange(of: viewModel.shouldDismiss) { _, newValue in
             // Hold the success toast visible briefly before popping so the
             // user actually sees the confirmation.

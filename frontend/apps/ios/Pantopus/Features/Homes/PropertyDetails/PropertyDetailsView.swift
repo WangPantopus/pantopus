@@ -308,10 +308,11 @@ private struct RowDivider: View {
 private struct MismatchBanner: View {
     let data: MismatchBannerData
     @State private var expanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button {
-            withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
+            withPantopusAnimation(.componentState, reduceMotion: reduceMotion) { expanded.toggle() }
         } label: {
             HStack(alignment: .top, spacing: Spacing.s2) {
                 ZStack {

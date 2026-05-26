@@ -3,6 +3,10 @@
 package app.pantopus.android.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,12 +29,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import app.pantopus.android.ui.theme.MotionTokens
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import app.pantopus.android.ui.theme.rememberReduceMotion
 
 /** Test tag applied to the OfflineBanner container. */
 const val OFFLINE_BANNER_TAG = "offlineBanner"
@@ -114,7 +120,14 @@ fun OfflineBannerHost(
     }
 
     Column(modifier = modifier) {
-        AnimatedVisibility(visible = isOffline && !dismissed) {
+        val reduceMotion = rememberReduceMotion()
+        AnimatedVisibility(
+            visible = isOffline && !dismissed,
+            enter = fadeIn(animationSpec = MotionTokens.componentState(reduceMotion)) +
+                expandVertically(animationSpec = MotionTokens.componentState(reduceMotion)),
+            exit = fadeOut(animationSpec = MotionTokens.componentState(reduceMotion)) +
+                shrinkVertically(animationSpec = MotionTokens.componentState(reduceMotion)),
+        ) {
             OfflineBanner(onDismiss = { dismissed = true })
         }
         content()
