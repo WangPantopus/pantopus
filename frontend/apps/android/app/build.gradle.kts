@@ -153,8 +153,11 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    // DataStore
+    // DataStore (legacy auth-token store — kept for one-shot v1 → v2 migration)
     implementation(libs.androidx.datastore.preferences)
+
+    // EncryptedSharedPreferences + MasterKey (Android Keystore-backed)
+    implementation(libs.androidx.security.crypto)
 
     // Hilt
     implementation(libs.hilt.android)
