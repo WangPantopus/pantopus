@@ -20,6 +20,8 @@ public enum NearbyRoute: Hashable {
     /// overflow ("Edit listing") for the owner, or from the listing-
     /// offers panel's "Edit price" affordance.
     case editListing(listingId: String, jumpToStep: ListingComposeStep?)
+    /// Public profile. Reached from `ListingOffersView.onOpenBuyer`.
+    case publicProfile(userId: String)
 }
 
 /// NavigationStack wrapper for the Nearby tab.
@@ -98,8 +100,8 @@ public struct NearbyTabRoot: View {
                             items: ["Check out \(name) on Pantopus — \(InviteLinks.downloadURLString)"]
                         )
                     },
-                    onOpenBuyer: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Buyer profile")) }
+                    onOpenBuyer: { buyer in
+                        Task { @MainActor in path.append(.publicProfile(userId: buyer.id)) }
                     },
                     onOpenTransaction: { _ in
                         Task { @MainActor in path.append(.placeholder(label: "Transaction detail")) }
@@ -116,6 +118,10 @@ public struct NearbyTabRoot: View {
                 mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
                 onListingUpdated: popAfterListingUpdate
             )
+        case let .publicProfile(userId):
+            PublicProfileView(
+                userId: userId
+            ) { if !path.isEmpty { path.removeLast() } }
         }
     }
 }

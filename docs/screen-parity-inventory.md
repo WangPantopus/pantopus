@@ -1,193 +1,297 @@
-# Screen parity inventory — A08 per-screen batch 1
+# Screen parity inventory — all 8 design packs
 
-> **Source of truth:** every `.html` file in `A08 — per-screen batch 1/` at
-> the repo root (61 designed screens). Each row pairs the designed screen
-> with its iOS and Android implementation file, marks whether the route
-> stack reaches a real View / `@Composable` (not `NotYetAvailableView` /
-> `placeholder`), and lists which designed frames the current code does
-> not render.
+> **Source of truth:** every `.html` file across the **eight** design packs at
+> the repo root. Each row pairs a designed screen with its iOS and Android
+> implementation file, marks whether the navigation stack reaches a real
+> `View` / `@Composable` (not `NotYetAvailableView` / `placeholder(...)`), and
+> lists which designed frames the current code does not render.
 >
-> **Generated:** 2026-05-18. Hand-audited by walking every screen's
-> implementation files against the design pack's `label-num` /
-> `label-title` (or `DCArtboard label="…"` for A17 mail variants).
+> **Generated:** 2026-05-26. Produced by parsing each pack's HTML
+> (`<title>`, `<b>Archetype</b>`, `label-num` / `data-screen-label` /
+> `DCArtboard label=` frame markers) and auditing every implementation file
+> against the iOS tab-root route enums (`Hub/You/Inbox/NearbyTabRoot.swift`,
+> `RootTabView.swift`, `AuthRouter.swift`) and the Android
+> `RootTabScreen.kt` / `MailboxDrawersScreen.kt` / `AuthRoute.kt` wiring.
+> **Every non-`MISSING` path in this document was confirmed to exist on disk.**
+>
+> **Path roots (table cells are relative to these):**
+> - iOS — `frontend/apps/ios/Pantopus/Features/`
+> - Android — `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/`
+>
+> **Reachability tokens (grep-able):** `REAL_VIEW` · `NOT_YET_AVAILABLE` ·
+> `PLACEHOLDER` · `NO_ROUTE` · `MISSING`.
+
+---
 
 ## Summary
 
-The inventory has **66 rows** covering all **61 designed `.html` files** —
-some HTMLs map to multiple rows (e.g. `Content Detail.html` describes a
-shell plus Pulse-post / Public-Beacon-profile / Home-dashboard concrete
-screens; `Transactional Detail.html` covers a shell plus Gig / Listing /
-Invoice). Six rows are shared shells (`List of Rows`, `Content Detail`,
-`Form`, `Wizard`, `Transactional Detail`, `Map+List Hybrid (print)`)
-which are not directly navigable; their reachability columns are `n/a`.
+**Total screens designed: 94** (in-scope `.html` files across the 8 packs).
 
-| Status (per platform) | iOS | Android |
+Out of scope, excluded from the 94: the 54-file `A08 — per-screen batch
+1/uploads/.../Pantopus Design System (1)/` component kit (foundations /
+buttons / cards / colours / iconography galleries + hashed & print
+duplicates — design tokens, not app screens), and `Map List Hybrid-print.html`
+(a print variant of `Map List Hybrid.html`).
+
+### Per pack
+
+| # | Pack | Screens |
+|---|------|--------:|
+| 1 | A08 — per-screen batch 1 | 55 |
+| 2 | A10 — Detail: Content | 6 |
+| 3 | A13 — Form (single screen) | 7 |
+| 4 | Chat conversation (A15) | 5 |
+| 5 | Creator Audience hub (A22) | 2 |
+| 6 | Full-bleed map + sheet (A11) | 4 |
+| 7 | Wizard (multi-step form) (A12) | 6 |
+| 8 | mobile Mailbox root archetype (A17) | 9 |
+| | **Total** | **94** |
+
+A08 breaks down as **30** per-screen "list of rows" screens + **25**
+archetype-root demos.
+
+### Build status per platform
+
+| Status | iOS | Android |
 |---|---:|---:|
-| Fully shipped (reachable + all designed frames rendered) | 48 | 51 |
-| Partially shipped (reachable, ≥1 designed frame missing or wrong target) | 6 | 6 |
-| Reachable only in DEBUG (not production-routable) | 4 | 0 |
-| Missing (no implementation or wired to `NotYetAvailableView`) | 2 | 3 |
-| Shared shells / documentation rows (n/a) | 6 | 6 |
-| **Total rows** | **66** | **66** |
+| **Built** — `REAL_VIEW`, all designed frames render | 82 | 82 |
+| **Partial** — `REAL_VIEW`, ≥1 designed frame missing | 5 | 5 |
+| **Missing** — no implementation file | 0 | 0 |
+| **Archetype shell** — `NO_ROUTE`, shared shell (n/a) | 7 | 7 |
+| **Total** | **94** | **94** |
 
-Notes on the deltas:
+### Routes reaching real views vs placeholders
 
-- **iOS DEBUG-only reachability (4):** `Ceremonial Mail Compose`,
-  `Ceremonial Mail Open`, `Privacy Handshake`, `Status / Waiting` exist
-  as `View`s and compile, but the `YouRoute` cases that push them are
-  fenced inside `#if DEBUG`. Android wires the first three as
-  production routes (`CEREMONIAL_MAIL`, `CEREMONIAL_MAIL_OPEN`,
-  `PRIVACY_HANDSHAKE`); `Status / Waiting` is the lone outlier — its
-  composable exists but is not referenced from `RootTabScreen.kt`, so
-  it is **missing** on Android.
-- **Partially shipped (both platforms, same six rows):**
-  - `Mailbox Item Detail` (A17 archetype) — newer A17 shell consumer
-    exists but the `.mailItemDetail` route still resolves to the older
-    `MailDetailView` / `MailDetailScreen`; `Coupon` body is unused.
-  - `A17.1 Mail item (generic)` — minor: acknowledged-state visual
-    treatment lacks the "porch" treatment from the design.
-  - `A17.2 Booklet` — minor: grid view lacks the page-jump shortcut.
-  - `Chat Conversation` — `FRAME 3 · AI ASSISTANT` is not rendered on
-    either platform (the `aiAssistant` mode is declared in
-    `ChatThreadMode` but has no UI entry point; backend SSE wiring
-    `/api/ai/chat` is also pending).
-  - `Creator Audience` — `FRAME 4 · BROADCAST DETAIL` is missing on
-    both platforms (no `BroadcastDetailView` / `BroadcastDetailScreen`
-    and no `/identity/broadcast/:id` route).
-  - `Legal Static` — Android's `SETTINGS_LEGAL_CONTENT` falls back to
-    `NotYetAvailableView` when a document key doesn't match an enum
-    case (rather than a graceful "not found" state).
-- **Missing on both (2):** `Creator inbox` and `Review claims` are
-  designed but unbuilt; the existing `Creator Audience` Threads tab
-  partially overlaps the former but does not implement the dedicated
-  archetype, and `MyClaims` covers the claimant — not reviewer —
-  perspective.
-- **Android-only missing (1):** `Status / Waiting` — composable exists
-  but no `ChildRoutes` constant references it; iOS at least has the
-  DEBUG route.
+| Reachability | iOS | Android |
+|---|---:|---:|
+| `REAL_VIEW` | 87 | 87 |
+| `NOT_YET_AVAILABLE` | 0 | 0 |
+| `PLACEHOLDER` | 0 | 0 |
+| `NO_ROUTE` (archetype shells) | 7 | 7 |
 
-Frame-coverage gaps (rendered in the "Missing states" column) call out
-either:
+Every concrete designed screen is wired to its real view on both platforms —
+there are **no** screens reachable only through `NotYetAvailableView` /
+`placeholder(...)`. The 7 `NO_ROUTE` rows are the generic shared-shell
+archetype demonstrations (Content Detail, Form, List of Rows, Mailbox Item
+Detail, Map List Hybrid, Transactional Detail, Wizard); the shells exist and
+are reused by concrete routed screens, but the archetype demo itself is not a
+navigable destination.
 
-1. A **designed variant** (e.g. Chat Conversation FRAME 3 · AI ASSISTANT,
-   Creator Audience FRAME 4 · BROADCAST DETAIL) that the code has no
-   render path for, OR
-2. A **state the Definition of Done requires** (loading / empty / error)
-   that the screen's `state` enum visibly omits.
+### The 5 partial screens (state-coverage gaps — symmetric on both platforms)
 
-Where the design pack only documents `POPULATED` + `EMPTY` but the
-implementation also renders the four required DoD states (loading,
-empty, populated, error), the "Missing states" cell is empty (the
-implementation is a superset of the design).
+| Screen | Pack | Missing designed state(s) |
+|---|---|---|
+| A10.4 Post | A10 | **Empty** — `PulsePostDetailView`/`…Screen` has loading/loaded/error only; no zero-content state. |
+| Identity Center | A08 | **First run** — `IdentityCenterUiState` is Loading/Loaded/Error; no no-identities onboarding frame. |
+| Public Beacon Profile | A08 | **Persona·owner** (no owner-vs-visitor chrome swap) and **Empty state** (no zero-content profile). |
+| A15.4 Creator thread | Chat | **Secondary (quota-exhausted lock)** — quota meter fills but composer never locks at `used ≥ total`. |
+| A17.2 Booklet | Mailbox | **Grid view** — only the page-by-page swiper renders; no thumbnail-grid toggle. |
 
-## Inventory
+### Caveats / quality notes (not counted as missing frames)
 
-Sorted by archetype, then by screen name.
+- **iOS `EditProfileView`** uses `ProgressView("Loading profile…")` for its
+  loading frame instead of a shimmer skeleton (Android uses
+  `EditProfileSkeleton()`). Violates the "never a spinner-as-screen" state
+  rule — loading-frame quality/parity nit.
+- **Android `Me`** lives at `you/me/MeView.kt` (not `MeScreen.kt`); the
+  composable is `MeScreen` and is wired `REAL_VIEW`. Naming-convention nit.
+- **A13.11 Professional profile** — `.pending` is modelled as a
+  dirty/unsaved-edits state. If the design's "Pending verification" frame is
+  meant to be an *admin-review-in-progress* state (already submitted, awaiting
+  approval), that distinct state is not represented. Ambiguous — flag for
+  design.
+- **Mailbox A17 has two parallel detail hosts**: `MailboxItemDetailView`
+  (dispatches all category bodies under `ItemDetail/Bodies/`) and
+  `MailDetailView` (dispatches `Variants/` for booklet/certified/community,
+  else a generic layout). Rows below cite the most specific body/variant file
+  per category. Consolidating onto one host is a future cleanup.
 
-| Screen | Archetype | Designed states | iOS path | iOS reachable | Android path | Android reachable | Missing states |
-|---|---|---|---|---|---|---|---|
-| Hub | A02 — Hub tab archetype | FRAME 1 POPULATED · FRAME 2 FIRST-RUN · FRAME 3 SKELETON | `frontend/apps/ios/Pantopus/Features/Hub/HubView.swift` | YES (Hub tab root) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/hub/HubScreen.kt` | YES (Hub tab root) | — |
-| Auth | A05 — Auth archetype | FRAME 1 LOG IN · FRAME 2 CREATE ACCOUNT · FRAME 3 FORGOT PASSWORD · FRAME 4 RESET PASSWORD · FRAME 5 VERIFY EMAIL · FRAME 6 INPUT ERROR | `frontend/apps/ios/Pantopus/Features/Auth/LoginView.swift` + `Auth/Screens/{SignUpView,ForgotPasswordView,ResetPasswordView,VerifyEmailView,AuthErrorView}.swift` | YES (`AuthRouter.swift` pre-sign-in stack) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/auth/LoginScreen.kt` + `auth/{sign_up,forgot_password,reset_password,verify_email,auth_error}/…Screen.kt` | YES (`AuthNavHost.kt` pre-sign-in graph) | — |
-| List of Rows (shell) | A08 — List-of-rows archetype | FRAME 1 PRIMARY · FRAME 2 VARIANT (category-grouped) · FRAME 3 VARIANT (avatar-first) · FRAME 4 EMPTY | `frontend/apps/ios/Pantopus/Features/Shared/ListOfRows/ListOfRowsView.swift` | n/a (shared shell, not a navigable screen) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/shared/list_of_rows/ListOfRowsScreen.kt` | n/a (shared shell) | — |
-| Access codes | A08 — List of rows | FRAME 1 POPULATED · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/AccessCodes/AccessCodesView.swift` | YES (`YouRoute.accessCodes(homeId:homeName:)`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/accesscodes/AccessCodesScreen.kt` | YES (`ChildRoutes.ACCESS_CODES`) | — |
-| Bills | A08 — List of rows | FRAME 1 POPULATED · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/Bills/BillsListView.swift` | YES (`HubRoute.homeBills` / `YouRoute.homeBills`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/bills/BillsListScreen.kt` | YES (`ChildRoutes.HOME_BILLS`) | — |
-| Chat List | A08 — List of rows | FRAME 1 POPULATED · FRAME 2 EMPTY (verified-only) · FRAME 3 LOADING | `frontend/apps/ios/Pantopus/Features/Chat/ChatListView.swift` | YES (Inbox tab root) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/inbox/chat/ChatListScreen.kt` | YES (Inbox tab via `InboxScreen.kt`) | — |
-| Connections | A08 — List of rows | FRAME 1 POPULATED (All tab · 5) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Connections/ConnectionsView.swift` | YES (`HubRoute.connections` / `YouRoute.connections`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/connections/ConnectionsScreen.kt` | YES (`ChildRoutes.CONNECTIONS`) | — |
-| Creator inbox | A08 — List of rows | FRAME 1 POPULATED (7 threads · 3 unread · 2 flagged) · FRAME 2 EMPTY | MISSING | NO | MISSING | NO | All frames — no `CreatorInbox` view/screen exists; the AudienceProfile Threads tab partially overlaps but does not implement the dedicated creator inbox archetype. |
-| Discover businesses | A08 — List of rows | FRAME 1 POPULATED (3 categories · 7 businesses) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/DiscoverBusinesses/DiscoverBusinessesView.swift` | YES (`HubRoute.discoverBusinesses`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/discoverbusinesses/DiscoverBusinessesScreen.kt` | YES (`ChildRoutes.DISCOVER_BUSINESSES`) | — |
-| Discover hub | A08 — List of rows | FRAME 1 POPULATED (4 sections) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/DiscoverHub/DiscoverHubView.swift` | YES (`HubRoute.discoverHub`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/discoverhub/DiscoverHubScreen.kt` | YES (`ChildRoutes.DISCOVER_HUB`) | — |
-| Documents | A08 — List of rows | FRAME 1 POPULATED (All · 14 docs) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/Documents/DocumentsView.swift` | YES (`HubRoute.homeDocs` / `YouRoute.homeDocs`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/documents/DocumentsScreen.kt` | YES (`ChildRoutes.HOME_DOCS`) | — |
-| Emergency info | A08 — List of rows | FRAME 1 POPULATED (17 items · 1 needs review) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/Emergency/EmergencyInfoView.swift` | YES (`HubRoute.homeEmergency` / `YouRoute.homeEmergency`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/emergency/EmergencyInfoScreen.kt` | YES (`ChildRoutes.HOME_EMERGENCY`) | — |
-| Gigs | A08 — List of rows | FRAME 1 POPULATED (four-row category mix) · FRAME 2 EMPTY · FRAME 3 LOADING | `frontend/apps/ios/Pantopus/Features/Gigs/GigsFeedView.swift` | YES (`HubRoute.gigsFeed`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/gigs/GigsFeedScreen.kt` | YES (`ChildRoutes.GIGS_FEED`) | — |
-| Home calendar | A08 — List of rows | FRAME 1 POPULATED (Week of Oct 12 · 10 events) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/Calendar/HomeCalendarView.swift` | YES (`HubRoute.homeCalendar` / `YouRoute.homeCalendar`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/calendar/HomeCalendarScreen.kt` | YES (`ChildRoutes.HOME_CALENDAR`) | — |
-| Household tasks | A08 — List of rows | FRAME 1 POPULATED (Active tab · 6 chores, day-grouped) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/Tasks/HouseholdTasksListView.swift` | YES (`HubRoute.homeTasks` / `YouRoute.homeTasks`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/tasks/HouseholdTasksListScreen.kt` | YES (`ChildRoutes.HOME_TASKS`) | — |
-| Listing offers | A08 — List of rows | FRAME 1 POPULATED (Credenza · 5 offers, leading $240) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/ListingOffers/ListingOffersView.swift` | YES (`HubRoute.listingOffers` / `YouRoute.listingOffers`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/listing_offers/ListingOffersScreen.kt` | YES (`ChildRoutes.LISTING_OFFERS`) | — |
-| Mailbox Mobile | A08 — List of rows | FRAME 01 ME DRAWER (Incoming) · FRAME 02 BIZ DRAWER (Counter) · FRAME 03 EARN DRAWER (Empty) | `frontend/apps/ios/Pantopus/Features/Mailbox/MailboxDrawersView.swift` + `Mailbox/MailboxListView.swift` | YES (`HubRoute.mailboxDrawers` / `HubRoute.mailbox`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/mailbox/MailboxDrawersScreen.kt` + `mailbox/MailboxListScreen.kt` | YES (`ChildRoutes.MAILBOX_DRAWERS` / `MAILBOX_LIST`) | — |
-| Maintenance | A08 — List of rows | FRAME 1 POPULATED (Scheduled tab · 6 tasks) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/Maintenance/MaintenanceListView.swift` | YES (`HubRoute.homeMaintenance` / `YouRoute.homeMaintenance`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/maintenance/MaintenanceListScreen.kt` | YES (`ChildRoutes.HOME_MAINTENANCE`) | — |
-| Marketplace | A08 — List of rows | FRAME 1 POPULATED (6-card 2-col grid) · FRAME 2 EMPTY · FRAME 3 LOADING | `frontend/apps/ios/Pantopus/Features/Marketplace/MarketplaceView.swift` | YES (`HubRoute.marketplace`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/marketplace/MarketplaceScreen.kt` | YES (`ChildRoutes.MARKETPLACE`) | — |
-| Members | A08 — List of rows | FRAME 1 POPULATED (Members tab · 5 verified, 2 pending) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/Members/MembersListView.swift` | YES (`HubRoute.homeMembers` / `YouRoute.homeMembers`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/members/MembersListScreen.kt` | YES (`ChildRoutes.HOME_MEMBERS`) | — |
-| My bids | A08 — List of rows | FRAME 1 POPULATED (Active · 5 bids) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/MyBids/MyBidsView.swift` | YES (`HubRoute.myBids` / `YouRoute.myBids`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/my_bids/MyBidsScreen.kt` | YES (`ChildRoutes.MY_BIDS`) | — |
-| My businesses | A08 — List of rows | FRAME 1 POPULATED (4 businesses · 1 primary · 1 pending) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Businesses/MyBusinessesView.swift` | YES (`YouRoute.myBusinesses`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/businesses/MyBusinessesScreen.kt` | YES (`ChildRoutes.MY_BUSINESSES`) | — |
-| My homes | A08 — List of rows | FRAME 1 POPULATED (4 homes across role spectrum) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/MyHomesListView.swift` | YES (`HubRoute.myHomes` / `YouRoute.myHomes`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/MyHomesListScreen.kt` | YES (`ChildRoutes.MY_HOMES`) | — |
-| My listings | A08 — List of rows | FRAME 1 POPULATED (Active · 5 listings) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Listings/MyListingsView.swift` | YES (`YouRoute.myListings`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/listings/MyListingsScreen.kt` | YES (`ChildRoutes.MY_LISTINGS`) | — |
-| My posts | A08 — List of rows | FRAME 1 POPULATED (Active · 4 posts) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/MyPosts/MyPostsView.swift` | YES (`YouRoute.myPosts`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/my_posts/MyPostsScreen.kt` | YES (`ChildRoutes.MY_POSTS`) | — |
-| My tasks | A08 — List of rows | FRAME 1 POPULATED (Open · 5 tasks) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/MyTasks/MyTasksView.swift` | YES (`YouRoute.myTasks`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/my_tasks/MyTasksScreen.kt` | YES (`ChildRoutes.MY_TASKS`) | — |
-| New message | A08 — List of rows | FRAME 1 POPULATED (3 sections · 215 contacts) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Chat/NewMessage/NewMessageView.swift` | YES (`InboxRoute.compose`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/inbox/newmessage/NewMessageScreen.kt` | YES (`ChildRoutes.NEW_MESSAGE`) | — |
-| Notifications | A08 — List of rows | FRAME 1 POPULATED (All · 4 unread, 3 earlier) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Notifications/NotificationsView.swift` | YES (`HubRoute.notifications`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/notifications/NotificationsScreen.kt` | YES (`ChildRoutes.NOTIFICATIONS`) | — |
-| Offers | A08 — List of rows | FRAME 1 POPULATED (Received · 5 offers) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Offers/OffersView.swift` | YES (`YouRoute.offers`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/offers/OffersScreen.kt` | YES (`ChildRoutes.OFFERS`) | — |
-| Owners | A08 — List of rows | FRAME 1 POPULATED (3 owners · 80% verified) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/Owners/OwnersListView.swift` | YES (`YouRoute.homeOwners`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/owners/OwnersListScreen.kt` | YES (`ChildRoutes.HOME_OWNERS`) | — |
-| Packages | A08 — List of rows | FRAME 1 POPULATED (Expected · 6 packages) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/Packages/PackagesListView.swift` | YES (`HubRoute.homePackages` / `YouRoute.homePackages`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/packages/PackagesListScreen.kt` | YES (`ChildRoutes.HOME_PACKAGES`) | — |
-| Pets | A08 — List of rows | FRAME 1 POPULATED (3 pets · dog/cat/bird) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/Pets/PetsListView.swift` | YES (`HubRoute.homePets` / `YouRoute.homePets`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/pets/PetsListScreen.kt` | YES (`ChildRoutes.HOME_PETS`) | — |
-| Polls | A08 — List of rows | FRAME 1 POPULATED (Active · 4 polls) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Homes/Polls/PollsListView.swift` | YES (`HubRoute.homePolls` / `YouRoute.homePolls`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/polls/PollsListScreen.kt` | YES (`ChildRoutes.HOME_POLLS`) | — |
-| Pulse | A08 — List of rows | FRAME 1 POPULATED (mixed-intent feed) · FRAME 2 EMPTY · FRAME 3 LOADING | `frontend/apps/ios/Pantopus/Features/Feed/FeedView.swift` | YES (`HubRoute.pulseFeed`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/feed/FeedScreen.kt` | YES (`ChildRoutes.PULSE_FEED`) | — |
-| Review claims | A08 — List of rows | FRAME 1 POPULATED (Pending · 4 claims) · FRAME 2 EMPTY | MISSING (only `MyClaimsListView.swift` exists — that is the *claimant* perspective; the *reviewer* queue is not built) | NO | MISSING (only `MyClaimsListScreen.kt` exists; no reviewer composable) | NO | All frames — needs a new HOA/board reviewer queue using ListOfRows. |
-| Review signups | A08 — List of rows | FRAME 1 POPULATED (Chen meal train · 14 of 18 · 3 awaiting review) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/ReviewSignups/ReviewSignupsView.swift` | YES (`HubRoute.reviewSignups` / `YouRoute.reviewSignups` + deep link) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/review_signups/ReviewSignupsScreen.kt` | YES (`ChildRoutes.REVIEW_SIGNUPS`) | — |
-| Support trains | A08 — List of rows | FRAME 1 POPULATED (My trains · 4 trains) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/SupportTrains/SupportTrainsView.swift` | YES (`HubRoute.supportTrains` / `YouRoute.supportTrains` + deep link) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/support_trains/SupportTrainsScreen.kt` | YES (`ChildRoutes.SUPPORT_TRAINS`) | — |
-| Vault | A08 — List of rows | FRAME 1 POPULATED (5 folders · 38 items) · FRAME 2 EMPTY | `frontend/apps/ios/Pantopus/Features/Mailbox/Vault/VaultListView.swift` | YES (`HubRoute.mailboxVault`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/mailbox/vault/VaultListScreen.kt` | YES (`ChildRoutes.MAILBOX_VAULT`) | — |
-| Content Detail (shell) | A10 — Content Detail archetype | FRAME 1 POST DETAIL · FRAME 2 PUBLIC PROFILE · FRAME 3 HOME DASHBOARD | `frontend/apps/ios/Pantopus/Features/Shared/ContentDetail/` (shell + Bodies/CTAs/Headers slots) | n/a (shared shell) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/shared/content_detail/` (matching layout) | n/a (shared shell) | — |
-| Public Beacon Profile | A10 — Content Detail | FRAME 1 PERSONA · VISITOR · FRAME 2 PERSONA · OWNER · FRAME 3 LOCAL · VISITOR · FRAME 4 EMPTY (new persona) | `frontend/apps/ios/Pantopus/Features/Profile/PublicProfileView.swift` | YES (`HubRoute.publicProfile(userId:)` + DEBUG entry in YouRoute) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/profile/PublicProfileScreen.kt` | YES (`ChildRoutes.PUBLIC_PROFILE`) | — |
-| Pulse post (Content Detail · post) | A10 — Content Detail | (covered as Content Detail FRAME 1) | `frontend/apps/ios/Pantopus/Features/Posts/PulsePostDetailView.swift` | YES (`HubRoute.pulsePost(postId:)`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/posts/PulsePostDetailScreen.kt` | YES (`ChildRoutes.PULSE_POST`) | — |
-| Home dashboard (Content Detail · home) | A10 — Content Detail | (covered as Content Detail FRAME 3) | `frontend/apps/ios/Pantopus/Features/Homes/HomeDashboardView.swift` | YES (`HubRoute.homeDashboard(homeId:)` / `YouRoute.homeDashboard`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/homes/HomeDashboardScreen.kt` | YES (`ChildRoutes.HOME_DASHBOARD`) | — |
-| Mailbox Item Detail (archetype) | A17 — Mail Item Detail | FRAME 1 PACKAGE · FRAME 2 COUPON · FRAME 3 BOOKLET · FRAME 4 CERTIFIED | `frontend/apps/ios/Pantopus/Features/Shared/MailItemDetail/MailItemDetailShell.swift` + `Features/Mailbox/ItemDetail/MailboxItemDetailView.swift` (uses shell; **not yet wired** into `.mailItemDetail` routes — the older `MailDetailView` still owns the route) | PARTIAL — shell + consumer exist but route still points at the older `Features/Mailbox/MailDetail/MailDetailView.swift`. Switching the route is required to use the A17 shell. | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/shared/mail_item_detail/MailItemDetailShell.kt` + `screens/mailbox/item_detail/MailboxItemDetailScreen.kt` (same status as iOS) | PARTIAL — same: shell exists, A17 consumer composable exists, but `ChildRoutes.MAILBOX_ITEM_DETAIL` still resolves to `MailDetailScreen.kt`. | Coupon body (`CouponBody.swift` / `CouponBody.kt`) is implemented but not exercised by the live route. Switching `.mailItemDetail` to `MailboxItemDetailView` unblocks all 4 frames. |
-| A17.1 Mail item (generic) | A17 — Mail Item Detail variant | 01 OPEN (pre-acknowledgment) · 02 ACKNOWLEDGED (post-action) | `frontend/apps/ios/Pantopus/Features/Mailbox/MailDetail/MailDetailView.swift` (default generic body) | YES (`HubRoute.mailItemDetail` / `YouRoute.mailItemDetail`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/mailbox/mail_detail/MailDetailScreen.kt` | YES (`ChildRoutes.MAILBOX_ITEM_DETAIL`) | Acknowledged-state post-action affordance is rendered but lacks the distinct "porch" visual treatment from the design. |
-| A17.2 Booklet | A17 — Mail Item Detail variant | 01 PAGE VIEW (cover, p.1 of 28) · 02 GRID VIEW (jump to page) | `frontend/apps/ios/Pantopus/Features/Mailbox/MailDetail/Variants/BookletDetailLayout.swift` + `Components/BookletPager.swift` | YES (mail detail route, category=booklet) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/mailbox/mail_detail/variants/BookletDetailLayout.kt` + `components/BookletPager.kt` | YES (mail detail route, category=booklet) | Grid view (FRAME 02) is rendered but lacks the page-jump shortcut affordance the design specifies. |
-| A17.3 Certified mail | A17 — Mail Item Detail variant | 01 OPEN · 02 ACKNOWLEDGED (receipt added to chain) | `frontend/apps/ios/Pantopus/Features/Mailbox/MailDetail/Variants/CertifiedDetailLayout.swift` + `Components/CertifiedStampBadge.swift` | YES (mail detail route, category=certified) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/mailbox/mail_detail/variants/CertifiedDetailLayout.kt` + `components/CertifiedComponents.kt` | YES (mail detail route, category=certified) | — |
-| A17.4 Community mail | A17 — Mail Item Detail variant | 01 OPEN (pre-RSVP) · 02 YOU'RE GOING (post-RSVP) | `frontend/apps/ios/Pantopus/Features/Mailbox/MailDetail/Variants/CommunityDetailLayout.swift` | YES (mail detail route, category=community) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/mailbox/mail_detail/variants/CommunityDetailLayout.kt` | YES (mail detail route, category=community) | — |
-| Chat Conversation | Bespoke (Chat) | FRAME 1 POPULATED DM · FRAME 2 EMPTY (3 quick-start chips) · FRAME 3 AI ASSISTANT (Ask Pantopus · Beta) | `frontend/apps/ios/Pantopus/Features/Chat/Conversation/ChatConversationView.swift` (`ChatConversationViewModel` exposes a `ChatThreadMode.aiAssistant` case) | PARTIAL — DM mode reachable from Inbox tab; `aiAssistant` mode declared but no UI entry point or render path | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/inbox/conversation/ChatConversationScreen.kt` | PARTIAL — same as iOS; DM mode reachable, AI assistant mode unimplemented | FRAME 3 · AI ASSISTANT (no rendering on either platform — backend SSE wiring `/api/ai/chat` is also deferred per code comment) |
-| Creator Audience | Bespoke (Profile tabs) | FRAME 1 UPDATES TAB · FRAME 2 FANS TAB · FRAME 3 INBOX TAB · FRAME 4 BROADCAST DETAIL | `frontend/apps/ios/Pantopus/Features/AudienceProfile/AudienceProfileView.swift` (3 tabs: Updates / Followers / Threads) | PARTIAL — top-3 tabs render; broadcast-detail sub-route not implemented | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/audience_profile/AudienceProfileScreen.kt` (3 tabs) | PARTIAL — same as iOS | FRAME 4 · BROADCAST DETAIL (no `BroadcastDetailView` / `BroadcastDetailScreen`; no `/identity/broadcast/:id` route) |
-| Ceremonial Mail Compose | Wizard | FRAME 1 PORCH CALL · FRAME 2 ADDRESS IT · FRAME 3 WRITE IT · FRAME 4 SEAL & SEND | `frontend/apps/ios/Pantopus/Features/CeremonialMail/CeremonialMailWizardView.swift` | DEBUG-only on iOS (`YouRoute.ceremonialMail` lives behind `#if DEBUG`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/ceremonial_mail/CeremonialMailWizardScreen.kt` | YES (`ChildRoutes.CEREMONIAL_MAIL`) | iOS: not production-routable. |
-| Ceremonial Mail Open | Wizard (animated) | FRAME 1 PORCH ARRIVAL · FRAME 2 OPENING · FRAME 3 READING · FRAME 4 REPLY | `frontend/apps/ios/Pantopus/Features/CeremonialMailOpen/CeremonialMailOpenView.swift` | DEBUG-only (`YouRoute.ceremonialMailOpen(mailId:)` is `#if DEBUG`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/ceremonial_mail_open/CeremonialMailOpenScreen.kt` | YES (`ChildRoutes.CEREMONIAL_MAIL_OPEN`) | iOS: not production-routable. |
-| Form (shell) | Form archetype | FRAME 1 SIMPLE (Send invite) · FRAME 2 MULTI-SECTION (Edit profile) · FRAME 3 FIELD-HEAVY (Disambiguate mail) | `frontend/apps/ios/Pantopus/Features/Shared/Form/FormShell.swift` + `FormState.swift` | n/a (shared shell) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/shared/form/` | n/a (shared shell) | — |
-| Identity Center | Form / hub composite | FRAME 1 POPULATED (all four identities) · FRAME 2 FIRST RUN · FRAME 3 SWITCHER (bottom sheet) | `frontend/apps/ios/Pantopus/Features/IdentityCenter/IdentityCenterView.swift` | YES (`YouRoute.identityCenter`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/identity_center/IdentityCenterScreen.kt` | YES (`ChildRoutes.IDENTITY_CENTER`) | — |
-| Me | Bespoke (You tab) | FRAME 1 PERSONAL (default) · FRAME 2 HOME (identity-switched — 412 Birch Ln) | `frontend/apps/ios/Pantopus/Features/Me/MeView.swift` | YES (You tab root) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/you/YouScreen.kt` | YES (You tab root) | — |
-| Settings | Grouped list | FRAME 1 MAIN INDEX · FRAME 2 TOGGLES (Notification prefs) · FRAME 3 MIXED (Privacy controls) | `frontend/apps/ios/Pantopus/Features/Settings/SettingsView.swift` + `Settings/SettingsViewModels.swift` (notification + privacy panels inline) | YES (`HubRoute.menu` / `YouRoute.settings`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/settings/SettingsScreens.kt` + per-screen Composables (Notifications, Privacy, Blocked, Password, Verification, Help, Legal, About) | YES (`ChildRoutes.MENU` + the `SETTINGS_*` children) | — |
-| Legal Static | Static content | FRAME 1 LONG-FORM LEGAL DOC (Privacy Policy v3.2) | `frontend/apps/ios/Pantopus/Features/Settings/Legal/LegalContentView.swift` + `Legal/LegalIndexView.swift` | YES (reached from Settings → Legal) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/settings/legal/LegalScreens.kt` | YES (`ChildRoutes.SETTINGS_LEGAL` + `SETTINGS_LEGAL_CONTENT`) — note: `SETTINGS_LEGAL_CONTENT` falls back to `NotYetAvailableView` when the document key doesn't match an enum case | Doc-key fallback path on Android is `NotYetAvailableView` rather than a graceful "not found" state — acceptable but worth noting. |
-| Map+List Hybrid | Map+List Hybrid archetype | FRAME 1 DEFAULT 40% (Rail) · FRAME 2 COLLAPSED 20% (Peek) · FRAME 3 EXPANDED 70% (List) | `frontend/apps/ios/Pantopus/Features/Shared/MapListHybrid/` (shared shell) + `Features/Nearby/NearbyMapView.swift` (consumer) | YES (`HubRoute.nearbyMapForGigs(categoryKey:)`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/shared/map_list_hybrid/` + `screens/nearby/map/NearbyMapScreen.kt` | YES (`ChildRoutes.NEARBY_MAP_FOR_GIGS`) | — |
-| Map+List Hybrid (print) | Print variant | Same three sheet positions | (same files as above; print is a documentation variant for the design pack) | n/a (documentation only) | (same files as above) | n/a (documentation only) | — |
-| Privacy Handshake | Wizard | FRAME 1 CHOOSE HANDLE · FRAME 2 TIER SELECT · FRAME 3 STRIPE HANDOFF · FRAME 4 ALREADY FOLLOWING | `frontend/apps/ios/Pantopus/Features/PrivacyHandshake/PrivacyHandshakeWizardView.swift` | DEBUG-only on iOS (`YouRoute.privacyHandshake(personaHandle:)` is `#if DEBUG`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/handshake/PrivacyHandshakeScreen.kt` | YES (`ChildRoutes.PRIVACY_HANDSHAKE`) | iOS: not production-routable from a normal tab. |
-| Status / Waiting | Status archetype | FRAME 1 POST-SUBMIT (Claim submitted) · FRAME 2 PERSISTENT WAITING (Under review) · FRAME 3 VERIFY EMAIL | `frontend/apps/ios/Pantopus/Features/Status/StatusWaitingView.swift` | DEBUG-only (`YouRoute.statusWaiting` is `#if DEBUG`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/status/StatusWaitingScreen.kt` (the composable exists but **no `ChildRoutes` constant references it**, so it is not navigable from `RootTabScreen.kt`) | NO | iOS: not production-routable. Android: composable exists but no NavHost wiring. |
-| Token / Accept | Token Accept archetype | FRAME 1 HOME INVITE · FRAME 2 BUSINESS SEAT · FRAME 3 GUEST PASS | `frontend/apps/ios/Pantopus/Features/TokenAccept/TokenAcceptView.swift` | YES — surfaced via `RootTabView.swift` fullScreenCover on deep-link `pantopus://invite/:token` | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/token_accept/TokenAcceptScreen.kt` | YES (`ChildRoutes.TOKEN_ACCEPT`) | — |
-| Transactional Detail (shell) | Transactional Detail archetype | FRAME 1 GIG DETAIL · FRAME 2 LISTING DETAIL · FRAME 3 INVOICE DETAIL | `frontend/apps/ios/Pantopus/Features/ContentDetail/ContentDetailShell.swift` (T2.6 bespoke shell) | n/a (shared shell) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/contentdetail/` | n/a (shared shell) | — |
-| Gig detail (Transactional · gig) | Transactional Detail | (covered as TX FRAME 1) | `frontend/apps/ios/Pantopus/Features/ContentDetail/GigDetailView.swift` | YES (`HubRoute.gigDetail(gigId:)` / `YouRoute.gigDetail`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/contentdetail/GigDetailScreen.kt` | YES (`ChildRoutes.GIG_DETAIL`) | — |
-| Listing detail (Transactional · listing) | Transactional Detail | (covered as TX FRAME 2) | `frontend/apps/ios/Pantopus/Features/ContentDetail/ListingDetailView.swift` | YES (`HubRoute.listingDetail(listingId:)` / `YouRoute.listingDetail`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/contentdetail/ListingDetailScreen.kt` | YES (`ChildRoutes.LISTING_DETAIL`) | — |
-| Invoice detail (Transactional · invoice) | Transactional Detail | (covered as TX FRAME 3) | `frontend/apps/ios/Pantopus/Features/ContentDetail/InvoiceDetailView.swift` | YES (`HubRoute.invoiceDetail(invoiceId:)`) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/contentdetail/InvoiceDetailScreen.kt` | YES (`ChildRoutes.INVOICE_DETAIL`) | — |
-| Wizard (shell) | Wizard archetype | FRAME 1 STEP 1 OF 3 · FRAME 2 STEP 2 OF 3 · FRAME 3 SUCCESS | `frontend/apps/ios/Pantopus/Features/Shared/Wizard/WizardShell.swift` + `Wizard/Blocks/` | n/a (shared shell) | `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/screens/shared/wizard/` (+ `wizard/blocks/`) | n/a (shared shell) | — |
+---
 
-## Spot-check audit notes
+## 1. A08 — per-screen batch 1
 
-The following rows were opened and manually confirmed during the audit:
+### 1a. List-of-rows per-screen batch (30)
 
-1. **Hub** — `frontend/apps/ios/Pantopus/Features/Hub/HubView.swift`
-   exists; `HubTabRoot.swift` line 192 calls `HubView { intent in … }`
-   and dispatches every action shown in `mobile-wiring-audit.md` §2.
-   Android `HubScreen.kt` imported into `RootTabScreen.kt` line ~640.
-2. **My homes** — both files exist; the iOS `MyHomesListView.swift`
-   uses `ListOfRowsView` via `MyHomesDataSource`; reached from
-   `HubRoute.myHomes` and `YouRoute.myHomes` (post T6.3f / P14).
-3. **Mailbox Item Detail (A17 archetype)** — both the older
-   `MailDetailView.swift` (wired into `.mailItemDetail`) and the newer
-   `MailboxItemDetailView.swift` (T6.5a P19 shell consumer) exist.
-   Route currently resolves to the older view; switching is required
-   to use the A17 shell variants.
-4. **Token / Accept** — `TokenAcceptView.swift` is mounted via
-   `RootTabView.swift` line 91 as a `fullScreenCover` keyed on
-   `pendingInviteToken`. Android wires it via
-   `ChildRoutes.TOKEN_ACCEPT`.
-5. **Chat Conversation** — `ChatConversationViewModel.swift` line ~23
-   declares `enum ChatThreadMode { case room(id:); case aiAssistant }`
-   with a code comment noting "no backend wiring today — SSE
-   streaming via `/api/ai/chat` lands later". No View case renders
-   `aiAssistant`; confirmed missing on both platforms.
+| Pack | Screen | Archetype | Designed states | iOS path | iOS reachable | Android path | Android reachable | Missing states |
+|---|---|---|---|---|---|---|---|---|
+| A08 | Access codes | A08 List of Rows | Populated, Empty | `Homes/AccessCodes/AccessCodesView.swift` | REAL_VIEW | `homes/accesscodes/AccessCodesScreen.kt` | REAL_VIEW | none |
+| A08 | Bills | A08 List of Rows | Populated, Empty | `Homes/Bills/BillsListView.swift` | REAL_VIEW | `homes/bills/BillsListScreen.kt` | REAL_VIEW | none |
+| A08 | Connections | A08 List of Rows | Populated, Empty | `Connections/ConnectionsView.swift` | REAL_VIEW | `connections/ConnectionsScreen.kt` | REAL_VIEW | none |
+| A08 | Creator inbox | A08 List of Rows | Populated, Empty | `CreatorInbox/CreatorInboxView.swift` | REAL_VIEW | `creator_inbox/CreatorInboxScreen.kt` | REAL_VIEW | none |
+| A08 | Discover businesses | A08 List of Rows | Populated, Empty | `DiscoverBusinesses/DiscoverBusinessesView.swift` | REAL_VIEW | `discoverbusinesses/DiscoverBusinessesScreen.kt` | REAL_VIEW | none |
+| A08 | Discover hub | A08 List of Rows | Populated, Empty | `DiscoverHub/DiscoverHubView.swift` | REAL_VIEW | `discoverhub/DiscoverHubScreen.kt` | REAL_VIEW | none |
+| A08 | Documents | A08 List of Rows | Populated, Empty | `Homes/Documents/DocumentsView.swift` | REAL_VIEW | `homes/documents/DocumentsScreen.kt` | REAL_VIEW | none |
+| A08 | Emergency info | A08 List of Rows | Populated, Empty | `Homes/Emergency/EmergencyInfoView.swift` | REAL_VIEW | `homes/emergency/EmergencyInfoScreen.kt` | REAL_VIEW | none |
+| A08 | Home calendar | A08 List of Rows | Populated, Empty | `Homes/Calendar/HomeCalendarView.swift` | REAL_VIEW | `homes/calendar/HomeCalendarScreen.kt` | REAL_VIEW | none |
+| A08 | Listing offers | A08 List of Rows | Populated, Empty | `ListingOffers/ListingOffersView.swift` | REAL_VIEW | `listing_offers/ListingOffersScreen.kt` | REAL_VIEW | none |
+| A08 | Maintenance | A08 List of Rows | Populated, Empty | `Homes/Maintenance/MaintenanceListView.swift` | REAL_VIEW | `homes/maintenance/MaintenanceListScreen.kt` | REAL_VIEW | none |
+| A08 | Members | A08 List of Rows | Populated, Empty | `Homes/Members/MembersListView.swift` | REAL_VIEW | `homes/members/MembersListScreen.kt` | REAL_VIEW | none |
+| A08 | My bids | A08 List of Rows | Populated, Empty | `MyBids/MyBidsView.swift` | REAL_VIEW | `my_bids/MyBidsScreen.kt` | REAL_VIEW | none |
+| A08 | My businesses | A08 List of Rows | Populated, Empty | `Businesses/MyBusinessesView.swift` | REAL_VIEW | `businesses/MyBusinessesScreen.kt` | REAL_VIEW | none |
+| A08 | My homes | A08 List of Rows | Populated, Empty | `Homes/MyHomesListView.swift` | REAL_VIEW | `homes/MyHomesListScreen.kt` | REAL_VIEW | none |
+| A08 | My listings | A08 List of Rows | Populated, Empty | `Listings/MyListingsView.swift` | REAL_VIEW | `listings/MyListingsScreen.kt` | REAL_VIEW | none |
+| A08 | My posts | A08 List of Rows | Populated, Empty | `MyPosts/MyPostsView.swift` | REAL_VIEW | `my_posts/MyPostsScreen.kt` | REAL_VIEW | none |
+| A08 | My tasks | A08 List of Rows | Populated, Empty | `MyTasks/MyTasksView.swift` | REAL_VIEW | `my_tasks/MyTasksScreen.kt` | REAL_VIEW | none |
+| A08 | New message | A08 List of Rows | Populated, Empty | `Chat/NewMessage/NewMessageView.swift` | REAL_VIEW | `inbox/newmessage/NewMessageScreen.kt` | REAL_VIEW | none |
+| A08 | Notifications | A08 List of Rows | Populated, Empty | `Notifications/NotificationsView.swift` | REAL_VIEW | `notifications/NotificationsScreen.kt` | REAL_VIEW | none |
+| A08 | Offers | A08 List of Rows | Populated, Empty | `Offers/OffersView.swift` | REAL_VIEW | `offers/OffersScreen.kt` | REAL_VIEW | none |
+| A08 | Owners | A08 List of Rows | Populated, Empty | `Homes/Owners/OwnersListView.swift` | REAL_VIEW | `homes/owners/OwnersListScreen.kt` | REAL_VIEW | none |
+| A08 | Packages | A08 List of Rows | Populated, Empty | `Homes/Packages/PackagesListView.swift` | REAL_VIEW | `homes/packages/PackagesListScreen.kt` | REAL_VIEW | none |
+| A08 | Pets | A08 List of Rows | Populated, Empty | `Homes/Pets/PetsListView.swift` | REAL_VIEW | `homes/pets/PetsListScreen.kt` | REAL_VIEW | none |
+| A08 | Polls | A08 List of Rows | Populated, Empty | `Homes/Polls/PollsListView.swift` | REAL_VIEW | `homes/polls/PollsListScreen.kt` | REAL_VIEW | none |
+| A08 | Review claims | A08 List of Rows | Populated, Empty | `ReviewClaims/ReviewClaimsView.swift` | REAL_VIEW | `review_claims/ReviewClaimsScreen.kt` | REAL_VIEW | none |
+| A08 | Review signups | A08 List of Rows | Populated, Empty | `ReviewSignups/ReviewSignupsView.swift` | REAL_VIEW | `review_signups/ReviewSignupsScreen.kt` | REAL_VIEW | none |
+| A08 | Support trains | A08 List of Rows | Populated, Empty | `SupportTrains/SupportTrainsView.swift` | REAL_VIEW | `support_trains/SupportTrainsScreen.kt` | REAL_VIEW | none |
+| A08 | Tasks (household) | A08 List of Rows | Populated, Empty | `Homes/Tasks/HouseholdTasksListView.swift` | REAL_VIEW | `homes/tasks/HouseholdTasksListScreen.kt` | REAL_VIEW | none |
+| A08 | Vault | A08 List of Rows | Populated, Empty | `Mailbox/Vault/VaultListView.swift` | REAL_VIEW | `mailbox/vault/VaultListScreen.kt` | REAL_VIEW | none |
 
-## How to maintain this doc
+### 1b. Archetype-root demos (25)
 
-When a new screen lands:
+| Pack | Screen | Archetype | Designed states | iOS path | iOS reachable | Android path | Android reachable | Missing states |
+|---|---|---|---|---|---|---|---|---|
+| A08 | Auth | Auth archetype | Log in, Create account, Forgot password, Reset password, Verify email, Input error | `Auth/LoginView.swift` | REAL_VIEW | `auth/LoginScreen.kt` | REAL_VIEW | none |
+| A08 | Ceremonial Mail Compose | Ceremonial archetype | Porch call, Address it, Write it, Seal & send | `CeremonialMail/CeremonialMailWizardView.swift` | REAL_VIEW | `ceremonial_mail/CeremonialMailWizardScreen.kt` | REAL_VIEW | none |
+| A08 | Ceremonial Mail Open | Ceremonial archetype | Porch arrival, Opening, Reading, Reply | `CeremonialMailOpen/CeremonialMailOpenView.swift` | REAL_VIEW | `ceremonial_mail_open/CeremonialMailOpenScreen.kt` | REAL_VIEW | none |
+| A08 | Chat Conversation | A15 Chat conversation (archetype) | Populated DM, Empty, AI assistant | `Chat/Conversation/ChatConversationView.swift` | REAL_VIEW | `inbox/conversation/ChatConversationScreen.kt` | REAL_VIEW | none |
+| A08 | Chat List | A08 List of Rows (Chat) | Populated, Empty, Loading | `Chat/ChatListView.swift` | REAL_VIEW | `inbox/chat/ChatListScreen.kt` | REAL_VIEW | none |
+| A08 | Content Detail | A10 Detail: Content (archetype) | Post detail, Public profile, Home dashboard | `Shared/ContentDetail/ContentDetailShell.swift` | NO_ROUTE | `shared/content_detail/ContentDetailShell.kt` | NO_ROUTE | n/a (archetype shell) |
+| A08 | Creator Audience | A22 Creator audience surface | Updates tab, Fans tab, Inbox tab, Broadcast detail | `AudienceProfile/AudienceProfileView.swift` | REAL_VIEW | `audience_profile/AudienceProfileScreen.kt` | REAL_VIEW | none |
+| A08 | Form | A13 Form (archetype) | Simple, Multi-section, Field-heavy | `Shared/Form/FormShell.swift` | NO_ROUTE | `shared/form/FormShell.kt` | NO_ROUTE | n/a (archetype shell) |
+| A08 | Gigs | A08 List of Rows (Gigs) | Populated, Empty, Loading | `Gigs/GigsFeedView.swift` | REAL_VIEW | `gigs/GigsFeedScreen.kt` | REAL_VIEW | none |
+| A08 | Hub | A02 Hub tab | Populated, First-run, Skeleton | `Hub/HubView.swift` | REAL_VIEW | `hub/HubScreen.kt` | REAL_VIEW | none |
+| A08 | Identity Center | Identity archetype | Populated, First run, Switcher | `IdentityCenter/IdentityCenterView.swift` | REAL_VIEW | `identity_center/IdentityCenterScreen.kt` | REAL_VIEW | First run |
+| A08 | Legal Static | Legal / Static | Long-form legal doc | `Settings/Legal/LegalContentView.swift` | REAL_VIEW | `settings/legal/LegalScreens.kt` | REAL_VIEW | none |
+| A08 | List of Rows | A08 List of Rows (archetype) | Primary, Variant, Variant, State | `Shared/ListOfRows/ListOfRowsView.swift` | NO_ROUTE | `shared/list_of_rows/ListOfRowsScreen.kt` | NO_ROUTE | n/a (archetype shell) |
+| A08 | Mailbox Item Detail | A17 Mail item detail (archetype) | Package, Coupon, Booklet, Certified | `Shared/MailItemDetail/MailItemDetailShell.swift` | NO_ROUTE | `shared/mail_item_detail/MailItemDetailShell.kt` | NO_ROUTE | n/a (archetype shell) |
+| A08 | Map List Hybrid | A11 Full-bleed Map + Sheet (archetype) | Default (40%), Collapsed (20%), Expanded (70%) | `Shared/MapListHybrid/MapListHybridShell.swift` | NO_ROUTE | `shared/map_list_hybrid/MapListHybridShell.kt` | NO_ROUTE | n/a (archetype shell) |
+| A08 | Marketplace | A08 List of Rows (Marketplace) | Populated, Empty, Loading | `Marketplace/MarketplaceView.swift` | REAL_VIEW | `marketplace/MarketplaceScreen.kt` | REAL_VIEW | none |
+| A08 | Me | Me tab | Personal, Home | `Me/MeView.swift` | REAL_VIEW | `you/me/MeView.kt` | REAL_VIEW | none |
+| A08 | Privacy Handshake | Privacy archetype | Choose handle, Tier select, Stripe handoff, Already following | `PrivacyHandshake/PrivacyHandshakeWizardView.swift` | REAL_VIEW | `handshake/PrivacyHandshakeScreen.kt` | REAL_VIEW | none |
+| A08 | Public Beacon Profile | A10 Public profile | Persona·visitor, Persona·owner, Local·visitor, Empty | `Profile/PublicProfileView.swift` | REAL_VIEW | `profile/PublicProfileScreen.kt` | REAL_VIEW | Persona·owner, Empty state |
+| A08 | Pulse | A08 List of Rows (Pulse) | Populated, Empty, Loading | `Feed/FeedView.swift` | REAL_VIEW | `feed/FeedScreen.kt` | REAL_VIEW | none |
+| A08 | Settings | Settings archetype | Main index, Toggles, Mixed | `Settings/SettingsView.swift` | REAL_VIEW | `settings/SettingsScreens.kt` | REAL_VIEW | none |
+| A08 | Status Waiting | Status / Waiting | Post-submit, Persistent waiting, Verify email | `Status/StatusWaitingView.swift` | REAL_VIEW | `status/StatusWaitingScreen.kt` | REAL_VIEW | none |
+| A08 | Token Accept | Token / Accept | Home invite, Business seat, Guest pass | `TokenAccept/TokenAcceptView.swift` | REAL_VIEW | `token_accept/TokenAcceptScreen.kt` | REAL_VIEW | none |
+| A08 | Transactional Detail | A10 Transactional Detail (archetype) | Gig detail, Listing detail, Invoice detail | `ContentDetail/TransactionalDetailShell.swift` | NO_ROUTE | `contentdetail/ContentDetailShell.kt` | NO_ROUTE | n/a (archetype shell) |
+| A08 | Wizard | A12 Wizard (archetype) | Step 1 of 3, Step 2 of 3, Success | `Shared/Wizard/WizardShell.swift` | NO_ROUTE | `shared/wizard/WizardShell.kt` | NO_ROUTE | n/a (archetype shell) |
 
-1. Add a row matching the design HTML's archetype.
-2. Set iOS / Android paths to the new files.
-3. Update `iOS reachable` / `Android reachable` based on whether the
-   route enum / `ChildRoutes` reaches a real View / Composable (not
-   `NotYetAvailableView`).
-4. Recount the four summary numbers.
-5. Cross-check `docs/mobile-wiring-audit.md` and
-   `docs/mobile-parity-audit.md` so the three documents stay in sync.
+---
+
+## 2. A10 — Detail: Content
+
+| Pack | Screen | Archetype | Designed states | iOS path | iOS reachable | Android path | Android reachable | Missing states |
+|---|---|---|---|---|---|---|---|---|
+| A10 | A10.1 Home | A10 Detail: Content | Populated, Empty | `Homes/HomeDashboardView.swift` | REAL_VIEW | `homes/HomeDashboardScreen.kt` | REAL_VIEW | none |
+| A10 | A10.2 Home (alt) | A10 Detail: Content | Populated, Needs attention | `Homes/HomeDashboardView.swift` | REAL_VIEW | `homes/HomeDashboardScreen.kt` | REAL_VIEW | none |
+| A10 | A10.3 Today | A10 Detail: Content | Populated, Advisory | `Hub/Today/TodayDetailView.swift` | REAL_VIEW | `hub/today/TodayDetailScreen.kt` | REAL_VIEW | none |
+| A10 | A10.4 Post | A10 Detail: Content | Populated, Empty | `Posts/PulsePostDetailView.swift` | REAL_VIEW | `posts/PulsePostDetailScreen.kt` | REAL_VIEW | Empty |
+| A10 | A10.5 User | A10 Detail: Content | Populated, Secondary·New neighbor | `Profile/PublicProfileView.swift` | REAL_VIEW | `profile/PublicProfileScreen.kt` | REAL_VIEW | none |
+| A10 | A10.8 Membership | A10 Detail: Content | Populated, Secondary·SLA missed | `Membership/MembershipDetailView.swift` | REAL_VIEW | `membership/MembershipDetailScreen.kt` | REAL_VIEW | none |
+
+> A10.2 is the same `HomeDashboardView`/`…Screen` as A10.1 — "Needs attention"
+> is a `HomeDashboardState.needsAttention` case, not a separate file.
+
+---
+
+## 3. A13 — Form (single screen)
+
+| Pack | Screen | Archetype | Designed states | iOS path | iOS reachable | Android path | Android reachable | Missing states |
+|---|---|---|---|---|---|---|---|---|
+| A13 | A13.1 Add guest | A13 Form (single screen) | Populated, Initial | `Homes/Guests/AddGuestFormView.swift` | REAL_VIEW | `homes/guests/AddGuestFormScreen.kt` | REAL_VIEW | none |
+| A13 | A13.2 Invite owner | A13 Form (single screen) | Populated, Ownership conflict | `Homes/InviteOwner/InviteOwnerFormView.swift` | REAL_VIEW | `homes/invite_owner/InviteOwnerFormScreen.kt` | REAL_VIEW | none |
+| A13 | A13.5 Property details | A13 Form (single screen) | Clean, Mismatch | `Homes/PropertyDetails/PropertyDetailsView.swift` | REAL_VIEW | `homes/property_details/PropertyDetailsScreen.kt` | REAL_VIEW | none |
+| A13 | A13.8 Post gig (V1) | A13 Form (single screen) | Populated, Validation errors | `Gigs/QuickPost/PostGigV1View.swift` | REAL_VIEW | `gigs/quickpost/PostGigV1Screen.kt` | REAL_VIEW | none |
+| A13 | A13.9 Edit profile | A13 Form (single screen) | Clean (last-saved), Dirty (unsaved edits) | `Profile/EditProfileView.swift` | REAL_VIEW | `profile/EditProfileScreen.kt` | REAL_VIEW | none |
+| A13 | A13.11 Professional profile | A13 Form (single screen) | Verified (published), Pending verification | `Profile/Professional/ProfessionalProfileView.swift` | REAL_VIEW | `profile/professional/ProfessionalProfileScreen.kt` | REAL_VIEW | none |
+| A13 | A13.12 Edit persona | A13 Form (single screen) | Live (published), Mid-setup (draft) | `AudienceProfile/EditPersona/EditPersonaView.swift` | REAL_VIEW | `audience_profile/edit_persona/EditPersonaScreen.kt` | REAL_VIEW | none |
+
+---
+
+## 4. Chat conversation (A15)
+
+All five A15 variants are one `ChatConversationView`/`…Screen`, mode-switched
+via `ChatConversationMode { .dm, .aiAssistant, .creatorThread, .fanThread }`.
+
+| Pack | Screen | Archetype | Designed states | iOS path | iOS reachable | Android path | Android reachable | Missing states |
+|---|---|---|---|---|---|---|---|---|
+| Chat (A15) | A15 Chat conversation | A15 Chat conversation | Populated, Empty | `Chat/Conversation/ChatConversationView.swift` | REAL_VIEW | `inbox/conversation/ChatConversationScreen.kt` | REAL_VIEW | none |
+| Chat (A15) | A15.2 Conversation | A15 Chat conversation | Populated, Empty | `Chat/Conversation/ChatConversationView.swift` | REAL_VIEW | `inbox/conversation/ChatConversationScreen.kt` | REAL_VIEW | none |
+| Chat (A15) | A15.3 AI Assistant | A15 Chat conversation | Populated, Empty | `Chat/Conversation/ChatConversationView.swift` | REAL_VIEW | `inbox/conversation/ChatConversationScreen.kt` | REAL_VIEW | none |
+| Chat (A15) | A15.4 Creator thread | A15 Chat conversation | Populated, Secondary (quota exhausted) | `Chat/Conversation/ChatConversationView.swift` | REAL_VIEW | `inbox/conversation/ChatConversationScreen.kt` | REAL_VIEW | Secondary (quota-exhausted lock) |
+| Chat (A15) | A15.5 Fan thread | A15 Chat conversation | Populated, Empty | `Chat/Conversation/ChatConversationView.swift` | REAL_VIEW | `inbox/conversation/ChatConversationScreen.kt` | REAL_VIEW | none |
+
+---
+
+## 5. Creator Audience hub (A22)
+
+| Pack | Screen | Archetype | Designed states | iOS path | iOS reachable | Android path | Android reachable | Missing states |
+|---|---|---|---|---|---|---|---|---|
+| A22 | A22.1 Audience | A22 Creator audience surface | Populated, Empty | `AudienceProfile/AudienceProfileView.swift` | REAL_VIEW | `audience_profile/AudienceProfileScreen.kt` | REAL_VIEW | none |
+| A22 | A22.2 Compose broadcast | A22 Creator audience surface | Populated, Empty | `AudienceProfile/ComposeBroadcast/ComposeBroadcastView.swift` | REAL_VIEW | `audience_profile/compose_broadcast/ComposeBroadcastScreen.kt` | REAL_VIEW | none |
+
+---
+
+## 6. Full-bleed map + sheet (A11)
+
+| Pack | Screen | Archetype | Designed states | iOS path | iOS reachable | Android path | Android reachable | Missing states |
+|---|---|---|---|---|---|---|---|---|
+| A11 | A11.1 Tasks map | A11 Full-bleed Map + Sheet | Populated, Empty | `Gigs/TasksMap/TasksMapView.swift` | REAL_VIEW | `gigs/tasks_map/TasksMapScreen.kt` | REAL_VIEW | none |
+| A11 | A11.2 Explore | A11 Full-bleed Map + Sheet | Populated, Empty | `Explore/ExploreMapView.swift` | REAL_VIEW | `explore/ExploreMapScreen.kt` | REAL_VIEW | none |
+| A11 | A11.3 Discover | A11 Full-bleed Map + Sheet | Populated, Empty | `DiscoverHub/DiscoverHubView.swift` | REAL_VIEW | `discoverhub/DiscoverHubScreen.kt` | REAL_VIEW | none |
+| A11 | A11.4 Mailbox map | A11 Full-bleed Map + Sheet | Populated, Pin detail | `Mailbox/MailboxMap/MailboxMapView.swift` | REAL_VIEW | `mailbox/mailbox_map/MailboxMapScreen.kt` | REAL_VIEW | none |
+
+> A11.3 "Discover" is the `DiscoverHubView` magazine surface (compact map
+> strip + rails), distinct from A11.2 `ExploreMapView` (full-bleed map).
+
+---
+
+## 7. Wizard (multi-step form) (A12)
+
+| Pack | Screen | Archetype | Designed states | iOS path | iOS reachable | Android path | Android reachable | Missing states |
+|---|---|---|---|---|---|---|---|---|
+| A12 | A12.1 Find your home | A12 Wizard (multi-step form) | Populated, Secondary·Searching | `Homes/AddHome/AddHomeWizardView.swift` | REAL_VIEW | `homes/add_home/AddHomeWizardScreen.kt` | REAL_VIEW | none |
+| A12 | A12.2 Add home | A12 Wizard (multi-step form) | Populated, Secondary·Needs review | `Homes/AddHome/AddHomeWizardView.swift` | REAL_VIEW | `homes/add_home/AddHomeWizardScreen.kt` | REAL_VIEW | none |
+| A12 | A12.3 Claim ownership — Start | A12 Wizard (multi-step form) | Populated, Secondary·Contested | `Homes/ClaimOwnership/ClaimOwnershipWizardView.swift` | REAL_VIEW | `homes/claim_ownership/ClaimOwnershipWizardScreen.kt` | REAL_VIEW | none |
+| A12 | A12.8 Post a task | A12 Wizard (multi-step form) | Populated, Secondary·Manual path | `Compose/GigCompose/GigComposeWizardView.swift` | REAL_VIEW | `compose/gig/GigComposeWizardScreen.kt` | REAL_VIEW | none |
+| A12 | A12.9 List an item | A12 Wizard (multi-step form) | Populated, Secondary·Camera capture | `Compose/ListingCompose/ListingComposeWizardView.swift` | REAL_VIEW | `compose/listing/ListingComposeWizardScreen.kt` | REAL_VIEW | none |
+| A12 | A12.11 Start a support train | A12 Wizard (multi-step form) | Populated, Secondary·Not on Pantopus | `SupportTrains/StartTrain/StartSupportTrainWizardView.swift` | REAL_VIEW | `support_trains/start_train/StartSupportTrainWizardScreen.kt` | REAL_VIEW | none |
+
+> A12.1 "Find your home" is step 1 (`AddressStep`) of the Add Home wizard —
+> the same file as A12.2, not a standalone screen.
+
+---
+
+## 8. mobile Mailbox root archetype (A17)
+
+| Pack | Screen | Archetype | Designed states | iOS path | iOS reachable | Android path | Android reachable | Missing states |
+|---|---|---|---|---|---|---|---|---|
+| A17 | A17.1 Mail item (generic) | A17 Mail item detail | Open, Acknowledged | `Mailbox/MailDetail/MailDetailView.swift` | REAL_VIEW | `mailbox/mail_detail/MailDetailScreen.kt` | REAL_VIEW | none |
+| A17 | A17.2 Booklet | A17 Mail item detail | Page view, Grid view | `Mailbox/MailDetail/Variants/BookletDetailLayout.swift` | REAL_VIEW | `mailbox/mail_detail/variants/BookletDetailLayout.kt` | REAL_VIEW | Grid view |
+| A17 | A17.3 Certified mail | A17 Mail item detail | Open, Acknowledged | `Mailbox/MailDetail/Variants/CertifiedDetailLayout.swift` | REAL_VIEW | `mailbox/mail_detail/variants/CertifiedDetailLayout.kt` | REAL_VIEW | none |
+| A17 | A17.4 Community mail | A17 Mail item detail | Open, Going | `Mailbox/MailDetail/Variants/CommunityDetailLayout.swift` | REAL_VIEW | `mailbox/mail_detail/variants/CommunityDetailLayout.kt` | REAL_VIEW | none |
+| A17 | A17.5 Coupon | A17 Mail item detail | Open, Added | `Mailbox/ItemDetail/Bodies/CouponBody.swift` | REAL_VIEW | `mailbox/item_detail/bodies/CouponBody.kt` | REAL_VIEW | none |
+| A17 | A17.6 Gig mail | A17 Mail item detail | Received, Accepted | `Mailbox/ItemDetail/Bodies/GigBody.swift` | REAL_VIEW | `mailbox/item_detail/bodies/GigBody.kt` | REAL_VIEW | none |
+| A17 | A17.7 Memory | A17 Mail item detail | Fresh, Saved | `Mailbox/ItemDetail/Bodies/MemoryBody.swift` | REAL_VIEW | `mailbox/item_detail/bodies/MemoryBody.kt` | REAL_VIEW | none |
+| A17 | A17.8 Package | A17 Mail item detail | Delivered, In transit | `Mailbox/ItemDetail/Bodies/CategoryBodies.swift` | REAL_VIEW | `mailbox/item_detail/bodies/CategoryBodies.kt` | REAL_VIEW | none |
+| A17 | Mailbox Mobile | A17 Mailbox root (drawer-tabs) | Me incoming, Biz counter, Earn empty | `Mailbox/MailboxRoot/MailboxRootView.swift` | REAL_VIEW | `mailbox/mailbox_root/MailboxRootScreen.kt` | REAL_VIEW | none |
+
+---
+
+## Methodology & verification
+
+- **Pack inventory** — all 8 packs confirmed present on disk; 94 in-scope
+  `.html` files enumerated (excludes the design-system component kit + print
+  duplicate, see Summary).
+- **Frame states** — extracted from each HTML's `label-num` / `FRAME` markers,
+  `data-screen-label`, and (A15/A17 packs) `DCArtboard label=` / `dataLabel=`
+  / `state=` props.
+- **Path existence** — every iOS path under `Features/` and Android path under
+  `screens/` in this document was verified to exist with a filesystem check
+  (`test -f`); **0 cited paths missing**.
+- **Reachability** — derived from the concrete `View`/`@Composable`
+  instantiations inside the iOS tab-root `destination(for:)` switches +
+  `RootTabView`/`AuthRouter`, and the Android `composable(){ … }` blocks in
+  `RootTabScreen.kt` / `MailboxDrawersScreen.kt` / `AuthRoute.kt`.
+- **State coverage** — each implementation's state enum + view body was read
+  and compared against the designed frames; only genuine non-rendered frames
+  are listed under "Missing states".

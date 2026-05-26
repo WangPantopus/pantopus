@@ -1225,7 +1225,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     ActionChipContent.Kind.PostTask ->
                                         navController.navigate(ChildRoutes.quickPostGig(GigsCategory.All.key))
                                     ActionChipContent.Kind.SnapAndSell ->
-                                        navController.navigate(ChildRoutes.placeholder("Snap & sell"))
+                                        navController.navigate(ChildRoutes.COMPOSE_LISTING)
                                 }
                             is HubNavigationIntent.PillarTapped ->
                                 when (intent.pillar) {
@@ -1348,7 +1348,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(ChildRoutes.MY_LISTINGS) {
                 MyListingsScreen(
                     onOpenListing = { listingId -> navController.navigate(ChildRoutes.listingDetail(listingId)) },
-                    onCompose = { navController.navigate(ChildRoutes.placeholder("List something")) },
+                    onCompose = { navController.navigate(ChildRoutes.COMPOSE_LISTING) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -2007,7 +2007,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 BusinessProfileScreen(
                     onBack = { navController.popBackStack() },
                     onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
-                    onShare = { navController.navigate(ChildRoutes.placeholder("Share business")) },
+                    onShare = {
+                        appContext.shareText(
+                            "Check out this business on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                            "Share business",
+                        )
+                    },
                     onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report business")) },
                     onOpenWebsite = { uri -> runCatching { uriHandler.openUri(uri) } },
                 )
@@ -2273,7 +2278,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             "Share listing",
                         )
                     },
-                    onOpenBuyer = { navController.navigate(ChildRoutes.placeholder("Buyer profile")) },
+                    onOpenBuyer = { buyer -> navController.navigate(ChildRoutes.publicProfile(buyer.id)) },
                     onOpenTransaction = { navController.navigate(ChildRoutes.placeholder("Transaction detail")) },
                     onEditPrice = {
                         navController.navigate(
@@ -2555,7 +2560,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.navigate(ChildRoutes.gigDetail(gigId))
                         }
                     },
-                    onBrowseListings = { navController.navigate(ChildRoutes.placeholder("Browse listings")) },
+                    onBrowseListings = { navController.navigate(ChildRoutes.MARKETPLACE) },
                     onPostTask = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
                 )
             }
@@ -2605,8 +2610,8 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             composable(ChildRoutes.MY_POSTS) {
                 MyPostsScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenPost = { navController.navigate(ChildRoutes.placeholder("Post detail")) },
-                    onCompose = { navController.navigate(ChildRoutes.placeholder("Write a post")) },
+                    onOpenPost = { dto -> navController.navigate(ChildRoutes.pulsePost(dto.id)) },
+                    onCompose = { navController.navigate(ChildRoutes.composePost("")) },
                     onEditPost = { dto -> navController.navigate(ChildRoutes.editPost(dto.id)) },
                 )
             }
@@ -3027,7 +3032,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 MembershipDetailScreen(
                     onBack = { navController.popBackStack() },
                     onShare = {
-                        navController.navigate(ChildRoutes.placeholder("Share membership"))
+                        appContext.shareText(
+                            "Check out this membership on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                            "Share membership",
+                        )
                     },
                     onOpenPersona = {
                         navController.navigate(ChildRoutes.AUDIENCE_PROFILE)
@@ -3163,7 +3171,7 @@ private fun routeForDiscovery(item: DiscoveryCardContent): String =
     when (item.kind) {
         DiscoveryKind.Post -> ChildRoutes.pulsePost(item.id)
         DiscoveryKind.Person -> ChildRoutes.publicProfile(item.id)
-        DiscoveryKind.Gig -> ChildRoutes.placeholder("Gig detail")
+        DiscoveryKind.Gig -> ChildRoutes.gigDetail(item.id)
         DiscoveryKind.Business -> ChildRoutes.businessProfile(item.id)
         DiscoveryKind.Unknown -> ChildRoutes.placeholder(item.title)
     }
