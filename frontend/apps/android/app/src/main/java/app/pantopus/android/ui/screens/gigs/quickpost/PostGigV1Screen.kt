@@ -873,7 +873,12 @@ private fun PostGigV1FatalError(
                 tint = PantopusColors.error,
             )
         }
-        Text(text = "Quick post unavailable", style = PantopusTextStyle.h3, color = PantopusColors.appText)
+        Text(
+            text = "Quick post unavailable",
+            style = PantopusTextStyle.h3,
+            color = PantopusColors.appText,
+            modifier = Modifier.semantics { heading() },
+        )
         Text(text = message, style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary)
         Text(
             text = "Retry",

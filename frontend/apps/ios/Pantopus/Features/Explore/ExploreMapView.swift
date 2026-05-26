@@ -188,6 +188,7 @@ public struct ExploreMapView: View {
             Text("Explore")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
+                .accessibilityAddTraits(.isHeader)
             Spacer(minLength: Spacing.s1)
             filterButton
         }

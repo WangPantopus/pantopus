@@ -122,6 +122,7 @@ private struct PropertyHero: View {
                 Text(address.line1)
                     .pantopusTextStyle(.h3)
                     .foregroundStyle(Theme.Color.appText)
+                    .accessibilityAddTraits(.isHeader)
                 Text(address.line2)
                     .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.appTextSecondary)

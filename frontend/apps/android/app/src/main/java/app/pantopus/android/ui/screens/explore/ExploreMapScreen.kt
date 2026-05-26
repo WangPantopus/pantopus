@@ -504,7 +504,7 @@ private fun ExploreFloatingPill(
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).semantics { heading() },
             textAlign = TextAlign.Center,
         )
         Box(

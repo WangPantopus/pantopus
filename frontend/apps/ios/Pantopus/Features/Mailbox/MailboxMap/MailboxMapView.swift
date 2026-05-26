@@ -205,6 +205,8 @@ public struct MailboxMapView: View {
                     .foregroundStyle(Theme.Color.appText)
                 Icon(.chevronDown, size: 14, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
             Spacer(minLength: Spacing.s1)
             Color.clear.frame(width: 32, height: 32)
         }
