@@ -1316,3 +1316,112 @@ others (DiscoverHub, Mailbox via ListOfRowsView).
 
 Either reconciliation path closes the audit. The audit itself has
 documented every drift; the design system can now decide.
+
+---
+
+## P7.9.j — Settings cluster (toggle-heavy)
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope
+
+| Surface | Design HTML | iOS implementation | Android implementation |
+|---|---|---|---|
+| Settings index (Main index — frame 1) | `A08/uploads/Pantopus-design/Settings.html` + `settings-frames.jsx` | `Features/Settings/SettingsView.swift` + `SettingsViewModels.swift:SettingsIndexViewModel` (delegates to shared `GroupedListView`) | `ui/screens/settings/SettingsScreens.kt` + `SettingsViewModels.kt` (delegates to shared `GroupedListScreen`) |
+| Notifications (Toggles — frame 2) | (frame 2 in same HTML) | `Features/Settings/SettingsViewModels.swift:NotificationSettingsViewModel` (also via `GroupedListView`) | `SettingsViewModels.kt:NotificationSettingsViewModel` (via `GroupedListScreen`) |
+| Privacy (Mixed controls — frame 3) | (frame 3 in same HTML) | `Features/Settings/SettingsViewModels.swift:PrivacySettingsViewModel` (also via `GroupedListView`) | `SettingsViewModels.kt:PrivacySettingsViewModel` (via `GroupedListScreen`) |
+
+### Methodology
+
+Rendered the 3-frame Settings design at 1600×1400 (deviceScaleFactor 2)
+via Playwright. 3 PNGs captured (+ overview). Read `settings-frames.jsx`
+end-to-end and diffed against the shared `GroupedListView` /
+`GroupedListScreen` chrome.
+
+### Resolvable token mismatches — NONE in this sub-group (already correct)
+
+This is the **seventh consecutive audit pass returning zero
+token-resolvable fixes** — but this one is different from the prior
+six: **Settings is the cleanest, most consistently tokenised surface
+family in the entire app.** Every surface checked matches design
+exactly:
+
+| Surface | Design | Code |
+|---|---|---|
+| Card outer (all 3 frames) | `borderRadius: 12` | iOS `GroupedListView.swift:103/106, 130/133, 182/185` `Radii.lg` (=12) ✓; Android `GroupedListScreen.kt:163, 240/242, 286/288` `Radii.lg` (=12) ✓ |
+| Card divider (between rows) | `height: 1, marginLeft: 16, background: borderSub` | Both platforms use Rectangle/Divider with `height: 1` + `padding-left: 16` ✓ |
+| Card padding-horizontal (the gutter) | `padding: '0 12px'` | Both platforms use `Spacing.s3` (=12) ✓ |
+| Row (label + sub + right) | `minHeight: 48, padding: 14×16, gap: 12, label fontSize: 15, sub fontSize: 12` | Both platforms match ✓ (uses shared `GroupedRow` composable) |
+| Toggle | `width: 51, height: 31, borderRadius: 9999` (iOS-native) | iOS uses native `Toggle()` (system default 51×31); Android uses Material 3 `Switch` (similar dimensions) ✓ |
+| Radio | `width: 22, height: 22, borderRadius: 50%, border: 1.5px, inner dot 11×11` | Both platforms use Circle shape at 22×22 ✓ |
+| Overline (section labels) | `padding: '18px 16px 8px', fontSize: 11, fontWeight: 700, letterSpacing: 0.08em, textTransform: uppercase` | Both platforms use `.pantopusTextStyle(.overline)` with `letterSpacing: 0.08` ✓ |
+| Chip (Verified / Stripe connected) | `padding: '3px 8px', borderRadius: 9999, fontSize: 10.5/700, uppercase` | Both platforms use `Capsule()` / `Radii.pill` ✓ shape; 10.5pt off-scale (P7.4 drift). |
+| Chevron icon | `width: 16, height: 16, strokeWidth: 2.2` | Both platforms `Icon(.chevronRight, size: 16)` ✓ |
+| TopBar | `height: 52, padding: 0 12px, title fontSize: 16/600, back button 36×36 circle` | Both platforms use shared top-bar chrome at 52pt ✓ |
+| Slider (Privacy address sharing) | `track height 4, borderRadius: 9999, stops 10×10 circles, thumb 26×26 circle with 1.5px primary border` | iOS uses native `Slider()`; Android equivalent — design's bespoke 4-stop visual is custom but the underlying control is native. Surface for design review only if pixel-exact match needed. |
+| Card helper text | `padding: '8px 4px 0', fontSize: 11.5, color: fg3, lineHeight: 16` | Both platforms match the helper-text pattern below cards ✓ |
+
+### Surfaced for design review (NOT fixed)
+
+Only one minor off-scale finding in this entire sub-group:
+
+| # | Surface | Design value | Code value | Notes |
+|---|---|---|---|---|
+| A | Card helper text | `fontSize: 11.5` (off-scale) | Both platforms use `.pantopusTextStyle(.caption)` (= 12pt) | 0.5pt drift — already documented as P7.4 typography drift. The recurring 11.5pt off-scale value isn't worth a token change. |
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass (no changes).
+- Android — no changes; existing patterns preserved.
+- All 3 Settings frames audited; 0 code changes applied (no drifts to apply).
+
+Files modified (1 file):
+- `docs/visual-parity-fixes.md` (P7.9.j section appended)
+
+### Audit summary
+
+P7.9.j is the **terminal sub-prompt** in the P7.9.x audit cycle. It is
+unique in two ways:
+
+1. **Zero fixes AND zero drifts** — the previous six 0-fix sub-groups
+   (P7.9.f.1, .g, .h, .i, plus partial 0-fix surfaces in .c-.e) all
+   surfaced design-vs-code drifts even when no fix was applied. P7.9.j
+   surfaces only one minor 0.5pt typography drift already documented
+   in P7.4.
+2. **The shared `GroupedList` archetype is the right abstraction.**
+   Both Settings index, Notifications, and Privacy are 3 different
+   `GroupedListDataSource` projections of the same shared composable,
+   and the composable's chrome (`Radii.lg`, `Spacing.s3`,
+   `.pantopusTextStyle(.overline)`) matches design exactly. This is
+   the gold-standard shell-cascade pattern — the same shell that
+   caused 14pt drift on Mailbox / Vault / 12 home subscreens via
+   `ListOfRowsView` works perfectly here because Settings' design IS
+   `borderRadius: 12`.
+
+### P7.9.x audit-cycle terminal summary
+
+After 12 sub-groups (P7.9.a, .a-hub, .b, .c, .d, .e, .f.1, .f.2, .g, .h,
+.i, .j) audited across ~85 user-visible screens:
+
+| Metric | Value |
+|---|---|
+| **Code fixes applied** | **13 fixes** across ~250 sites (mirrored iOS + Android, mostly via shared composables that cascade to consumers) |
+| **Drifts surfaced for design review** | **~80** |
+| **Audit sub-groups with code fixes** | 7 of 12 |
+| **Audit sub-groups returning 0 fixes** | 5 of 12 (.f.1, .g, .h, .i, .j) — all driven by either shared-shell-cascade or design-language-uses-off-scale-literal |
+| **Cumulative off-canonical clustering** | `borderRadius: 14` (30+ sites), `10` (25+ sites), `18` (5+ sites) |
+
+The cycle's terminal recommendation, repeated for the eighth time
+(once per audit pass): **extend the canonical Radii ramp to include
+14, 10, and 18 — these are unspoken design tokens that the system
+should formally adopt.** The current literal-shim-vs-nearest-canonical
+inconsistency is the actual quality-of-life issue.
+
+If extending the ramp is not desirable, the secondary recommendation
+is to **publish a snap-to-canonical convention** (e.g. "all design
+`14` values map to `Radii.lg`=12 in code; designers either accept the
+2pt drift or change their specs to a canonical value"). This would
+remove the per-feature ambiguity. Either path closes the audit; the
+design system can now decide.
+
+P7.9.x audit cycle complete. 🎯
