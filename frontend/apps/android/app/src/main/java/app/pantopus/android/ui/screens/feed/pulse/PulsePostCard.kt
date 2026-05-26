@@ -77,8 +77,8 @@ fun PulsePostCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .clip(RoundedCornerShape(Radii.xl))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
                 .clickable(onClick = onTap)
                 .padding(Spacing.s3)

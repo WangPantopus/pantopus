@@ -146,9 +146,9 @@ public struct FeedSkeletonCard: View {
         }
         .padding(Spacing.s3)
         .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .accessibilityHidden(true)

@@ -151,8 +151,8 @@ fun FeedSkeletonCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .clip(RoundedCornerShape(Radii.xl))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
                 .padding(Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),

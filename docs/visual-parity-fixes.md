@@ -224,3 +224,106 @@ iOS `make verify-tokens` ✅ pass; Android equivalent grep (manual) returns 0 on
 Files modified (6 lines across 6 files):
 - iOS: `Core/Design/Components/ActionChip.swift` (2 lines), `Features/Hub/Sections/HubSections.swift` (1 line), `Features/Hub/Today/TodayDetailView.swift` (1 line)
 - Android: `ui/components/ActionChip.kt` (3 lines via `replace_all`), `ui/screens/hub/sections/HubSections.kt` (1 line), `ui/screens/hub/today/TodayDetailScreen.kt` (1 line)
+
+---
+
+## P7.9.b — Pulse + post detail visual parity
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope
+
+Hub tab parity (P7.9.a) covered Hub / Me / Today / Recent Activity surfaces.
+This prompt covers the **Pulse tab** + the **post-detail content shell**:
+
+| Surface | Design HTML | iOS implementation | Android implementation |
+|---|---|---|---|
+| Pulse feed (Populated · Empty · Loading) | `A08 — per-screen batch 1/uploads/Pantopus-design/Pulse.html` + `pulse-frames.jsx` | `Features/Feed/FeedView.swift` + `Features/Feed/Pulse/PulsePostCard.swift` + `Features/Shared/Feed/FeedComponents.swift` | `ui/screens/feed/FeedScreen.kt` + `ui/screens/feed/pulse/PulsePostCard.kt` + `ui/screens/shared/feed/FeedComponents.kt` |
+| Pulse post detail (Populated thread · Just-posted empty) | `A10___Detail__Content/A10.4 Post.html` + `post-frames.jsx` | `Features/Posts/PulsePostDetailView.swift` + `Features/Shared/ContentDetail/{Headers,Bodies,CTAs}/*` | `ui/screens/posts/PulsePostDetailScreen.kt` + `ui/screens/shared/content_detail/**` |
+| Pulse compose (5 intent variants — Ask, Recommend, Event, Lost, Announce) | `Form.html` archetype + `form-frames.jsx` (generic — design treats Pulse Compose as one Form instance, not a bespoke page) | `Features/Compose/PulseCompose/PulseComposeContent.swift` + `PulseComposeView.swift` | `ui/screens/compose/pulse/PulseComposeScreen.kt` |
+
+### Methodology
+
+Rendered the three design HTML pages at 1600×1200 (deviceScaleFactor 2) via
+Playwright after patching `unpkg.com` script tags to use locally-vendored
+React/Babel/Lucide (`/tmp/p79b-pulse/served/`). 11 PNGs captured:
+
+- `Pulse-overview.png` + 3 frame crops (Populated · Empty · Loading)
+- `PostDetail-overview.png` + 2 frame crops (Populated · Empty)
+- `Form-overview.png` + 3 frame crops (Simple · Multi-section · Field-heavy)
+
+Diffed CSS dimensions in the JSX frame files (`pulse-frames.jsx`,
+`post-frames.jsx`, `form-frames.jsx`) against `Radii.*` / `Spacing.*` /
+`PantopusTextStyle.*` references in code.
+
+### Resolvable token mismatches — FIXED
+
+#### 1. `PulsePostCard` outer container corner radius — **FIXED** (iOS + Android)
+
+| Side | Before | After |
+|---|---|---|
+| Design (`pulse-frames.jsx` L229) | `PostCard { borderRadius: 16, padding: 12 }` | n/a |
+| iOS `PulsePostCard.swift:body` | `Radii.lg` (=12) | `Radii.xl` (=16) |
+| Android `PulsePostCard.kt` | `Radii.lg` (=12) | `Radii.xl` (=16) |
+
+#### 2. `FeedSkeletonCard` outer container corner radius — **FIXED** (iOS + Android)
+
+The shimmer card now matches the populated card geometry (P7.6b parity requirement).
+
+| Side | Before | After |
+|---|---|---|
+| Design (`pulse-frames.jsx` L489–522, `SkeletonCard`) | `borderRadius: 16, padding: 12` — same as populated | n/a |
+| iOS `FeedComponents.swift:FeedSkeletonCard` | `Radii.lg` (=12) | `Radii.xl` (=16) |
+| Android `FeedComponents.kt:FeedSkeletonCard` | `Radii.lg` (=12) | `Radii.xl` (=16) |
+
+### Surfaced for design review (NOT fixed — off-scale design values, or out-of-scope)
+
+The 12–14pt typography gap and "off the canonical radii ramp" pattern from
+P7.4/P7.9.a recurs here. Pulse is heavy on 10.5/11.5/12.5/13.5 — these are
+already documented in `docs/token-drift-typography.md`. P7.9.b only surfaces
+items that emerge specifically from rendering these three packs:
+
+| # | Surface | Design value | Code value | Notes |
+|---|---|---|---|---|
+| A | Pulse feed filter-hint pill (Empty state) | `borderRadius: 10` (`pulse-frames.jsx` L458) | iOS `Radii.md` (=8); Android same | 10 off-scale. Closest tokens 8 / 12. |
+| B | Pulse feed chip-row chip height | `height: 28, padding: 0 14px, fontSize: 12.5/semibold` | iOS+Android match height 28 and padding 14, but font is off-scale (already P7.4). | The 14pt horizontal padding off-scale; closest 12 / 16. |
+| C | Pulse Event-card RSVP chip | `height: 26, padding: 0 12px, borderRadius: 9999, fontSize: 11/bold` | iOS+Android use `height: 26, Spacing.s3 (=12), Radii.pill` — matches | 26 height is off-scale on the design side, but code matches design exactly. |
+| D | Pulse intent chip (card header) | `padding: 2px 8px 2px 6px, borderRadius: 9999, fontSize: 10, fontWeight: 700, letterSpacing: 0.04, textTransform: uppercase` | iOS+Android: `Spacing.s2` (=8) horizontal, vertical 2pt, `Radii.pill`, `.font(.system(size: 10, weight: .bold))` | Asymmetric 6pt-leading vs 8pt-trailing padding can't be expressed without a half-step token. Visual delta is tiny — only icon offset. |
+| E | Pulse author avatar size | `size: 32` (card header) | iOS+Android `size: 32` | ✓ matches |
+| F | Pulse empty-state icon container | `width: 72, height: 72, borderRadius: 50%, background: primary-50` | iOS+Android `size: 72, Circle` | ✓ matches (72 itself is off-scale for arbitrary boxes, but here it's just a circle's diameter). |
+| G | Pulse FAB | `width: 52, height: 52, borderRadius: 50%, primary-600` | iOS+Android `52x52 Circle` | ✓ matches |
+| H | Post-detail TopBar height | `height: 48` (`post-frames.jsx` L93) | iOS uses `ContentDetailTopBar` (height 56); Android same | A 8pt over-height in code — but `ContentDetailTopBar` is shared with non-Pulse detail surfaces and Apple HIG recommends 44–56 navigation bar height. Out of scope for Pulse-only audit. |
+| I | Post-detail body font | `fontSize: 15, lineHeight: 22, color: fg1` (`post-frames.jsx` L248) | iOS `.font(.system(size: 15, weight: .regular))` with `.lineSpacing(7)`; Android `fontSize: 15.sp` | 15 off-scale; already P7.4 drift. |
+| J | Post-detail media grid corner radius | `borderRadius: 14, gap: 6` (`post-frames.jsx` L260) | iOS+Android `Radii.lg` (=12) | 14 off-scale; closest tokens 12 / 16. |
+| K | Post-detail composer | `height: 40, borderRadius: 9999` | iOS `height: 40, Radii.pill`; Android `height: 44, Radii.pill` | iOS matches; Android uses 44pt for tap-target (a11y rule). Design vs a11y trade-off — keep code. |
+| L | Post-detail composer send button | `width: 28, height: 28, borderRadius: 50%` | iOS+Android `40x40 Circle` | 12pt larger than design — Apple HIG / WCAG ≥44 (iOS) / Material ≥48 (Android) tap-target rules override design's 28pt. Surfacing as design-side question: should design loosen to match the canonical tap-target?
+| M | Post-detail comment bubble | `borderRadius: 12, padding: 8px 12px` | iOS+Android `Radii.lg, Spacing.s3 (=12), Spacing.s2 (=8)` | ✓ matches |
+| N | Post-detail comment avatar (top-level / nested) | `size: 28 / 24` | iOS+Android same | ✓ matches |
+| O | Post-detail comment nested indent | `marginLeft: 36` | iOS `Spacer().frame(width: indentLevel * 36)`; Android same | 36 off-scale but matches design — keep. |
+| P | Post-detail empty-thread card outer radius | `borderRadius: 14` (`post-frames.jsx` L407) | iOS+Android `Radii.lg` (=12) | 14 off-scale. |
+| Q | Post-detail empty-thread icon container | `width: 48, height: 48, borderRadius: 14` | iOS+Android `48x48, Radii.lg` (=12) | Size matches; radius 14 off-scale. Closest token = `Radii.xl` (=16) — visually slightly rounder but on-scale. |
+| R | Post-detail quick-reply chip | `padding: 6px 10px, borderRadius: 9999, fontSize: 11.5/semibold` | iOS+Android `Radii.pill, Spacing.s3 (=12), fontSize: 11.5` | 10pt design padding vs 12pt code is 2pt over; font matches. |
+| S | Pulse Compose form fields | `height: 44, padding: 0 12px, borderRadius: 8, fontSize: 14` | iOS+Android `Radii.md` (=8), `height: 44`, `fontSize: 14` | ✓ matches (Form archetype is well-tokenised). |
+| T | Pulse Compose top-bar right action | `height: 32, padding: 0 12px, borderRadius: 9` (`form-frames.jsx` L104) | iOS `WizardChrome` button uses `Radii.md` (=8); Android same | 9 off-scale; 8 is the nearest token. |
+| U | `Radii.lg` used as `PantopusIconImage(size = Radii.lg)` on Android `PulsePostCard.kt:254, 294` | n/a | Misuse: `Radii.lg` is a corner-radius constant being used as a 12dp icon size. | Cleanup-only — visually correct (12dp = `Radii.lg` evaluates the same number), but should use a numeric `12.dp` literal or a proper icon-size token. Out of scope for token-parity audit. |
+
+### Snapshot tests
+
+Re-record needed for:
+- iOS `PantopusTests/Features/Feed/PulseFeedSnapshotTest` (populated + loading frames now have 16pt card radius)
+- iOS `PantopusTests/Features/Posts/PulsePostDetailViewTests` (unaffected — radii unchanged on detail)
+- Android equivalents:
+  - `PulseFeedSnapshotTest` (4 fixtures: populated, empty, loading, error)
+  - `PulsePostDetailSnapshotTest` (unaffected)
+
+Deferred — no simulator / emulator available in this sandbox. CI on merge will fail snapshot verification until baselines are re-recorded.
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass (no on-scale literals introduced; all swapped values come from the canonical `Radii.*` ramp).
+- Android — manual grep `frontend/apps/android/.../feed/` ✅ no on-scale literals (the remaining `Radii.lg` references on `PulsePostCard.kt:254, 294` are icon `size:` parameters, not radius arguments — flagged in §U above).
+- Both platforms compile against `Radii.xl` (16) which is an existing canonical token from `Radii.kt` / `Radii.swift`. No new tokens introduced.
+
+Files modified (8 lines across 4 files):
+- iOS: `Features/Feed/Pulse/PulsePostCard.swift` (2 lines), `Features/Shared/Feed/FeedComponents.swift` (2 lines)
+- Android: `ui/screens/feed/pulse/PulsePostCard.kt` (2 lines), `ui/screens/shared/feed/FeedComponents.kt` (2 lines)
