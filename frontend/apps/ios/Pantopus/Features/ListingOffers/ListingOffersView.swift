@@ -70,7 +70,7 @@ private struct CounterOfferSheet: View {
                         .foregroundStyle(Theme.Color.appText)
                     TextField("Amount", text: $amountText)
                         .keyboardType(.decimalPad)
-                        .pantopusTextStyle(.body)
+                        .font(Theme.Font.body)
                         .foregroundStyle(Theme.Color.appText)
                         .accessibilityIdentifier("counter-amount")
                 }
@@ -87,7 +87,7 @@ private struct CounterOfferSheet: View {
                     .foregroundStyle(Theme.Color.appText)
                 TextField("Add a note (optional)", text: $messageText, axis: .vertical)
                     .lineLimit(1...3)
-                    .pantopusTextStyle(.small)
+                    .font(Theme.Font.small)
                     .foregroundStyle(Theme.Color.appText)
                     .padding(Spacing.s3)
                     .background(

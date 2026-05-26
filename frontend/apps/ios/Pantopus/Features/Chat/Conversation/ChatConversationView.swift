@@ -1857,7 +1857,7 @@ private struct ChatComposer: View {
 
             HStack(alignment: .bottom, spacing: Spacing.s2) {
                 TextField(placeholder, text: $text, axis: .vertical)
-                    .pantopusTextStyle(.small)
+                    .font(Theme.Font.small)
                     .foregroundStyle(Theme.Color.appText)
                     .lineLimit(1...4)
                     .submitLabel(.send)

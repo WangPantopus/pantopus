@@ -53,8 +53,8 @@ import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemSampleData
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.BarcodeView
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CouponHero
-import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.MotionTokens
+import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
@@ -261,10 +261,12 @@ private fun StoreBarcodeCard(
         val reduceMotion = rememberReduceMotion()
         AnimatedVisibility(
             visible = isExpanded,
-            enter = fadeIn(animationSpec = MotionTokens.componentState(reduceMotion)) +
-                slideInVertically(animationSpec = MotionTokens.componentState(reduceMotion)) { -it / 3 },
-            exit = fadeOut(animationSpec = MotionTokens.componentState(reduceMotion)) +
-                slideOutVertically(animationSpec = MotionTokens.componentState(reduceMotion)) { -it / 3 },
+            enter =
+                fadeIn(animationSpec = MotionTokens.componentState(reduceMotion)) +
+                    slideInVertically(animationSpec = MotionTokens.componentState(reduceMotion)) { -it / 3 },
+            exit =
+                fadeOut(animationSpec = MotionTokens.componentState(reduceMotion)) +
+                    slideOutVertically(animationSpec = MotionTokens.componentState(reduceMotion)) { -it / 3 },
         ) {
             Text(
                 text = "Show this screen to $merchant. Staff can scan the barcode or key in the code.",

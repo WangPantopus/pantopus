@@ -207,7 +207,7 @@ private fun ErrorShell(
     ContentDetailShell(
         title = "Document",
         onBack = onBack,
-        header = { Spacer(NoneModifier.height(Spacing.s0)) },
+        header = { Spacer(Modifier.height(Spacing.s0)) },
         body = {
             Column(
                 modifier =

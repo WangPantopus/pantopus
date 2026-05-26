@@ -143,7 +143,7 @@ private fun MonthRow(
             tag = "homeCalendar_prevMonth",
             onClick = onPrev,
         )
-        Spacer(NoneModifier.width(Spacing.s1))
+        Spacer(Modifier.width(Spacing.s1))
         ChevronButton(
             icon = PantopusIcon.ChevronRight,
             contentDescription = "Next month",

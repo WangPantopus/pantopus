@@ -66,11 +66,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.R
 import app.pantopus.android.data.location.UserCoordinate
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
-import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import com.google.android.gms.maps.model.CameraPosition

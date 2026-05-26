@@ -213,7 +213,7 @@ private fun PageIndicator(
                     color = PantopusColors.appText,
                     modifier = Modifier.testTag("bookletPager_pageLabel"),
                 )
-                Spacer(NoneModifier.width(Spacing.s1))
+                Spacer(Modifier.width(Spacing.s1))
                 Text(
                     text = "of $totalPages",
                     fontSize = 13.sp,

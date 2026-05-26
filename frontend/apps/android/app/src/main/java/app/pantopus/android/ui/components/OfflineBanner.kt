@@ -123,10 +123,12 @@ fun OfflineBannerHost(
         val reduceMotion = rememberReduceMotion()
         AnimatedVisibility(
             visible = isOffline && !dismissed,
-            enter = fadeIn(animationSpec = MotionTokens.componentState(reduceMotion)) +
-                expandVertically(animationSpec = MotionTokens.componentState(reduceMotion)),
-            exit = fadeOut(animationSpec = MotionTokens.componentState(reduceMotion)) +
-                shrinkVertically(animationSpec = MotionTokens.componentState(reduceMotion)),
+            enter =
+                fadeIn(animationSpec = MotionTokens.componentState(reduceMotion)) +
+                    expandVertically(animationSpec = MotionTokens.componentState(reduceMotion)),
+            exit =
+                fadeOut(animationSpec = MotionTokens.componentState(reduceMotion)) +
+                    shrinkVertically(animationSpec = MotionTokens.componentState(reduceMotion)),
         ) {
             OfflineBanner(onDismiss = { dismissed = true })
         }

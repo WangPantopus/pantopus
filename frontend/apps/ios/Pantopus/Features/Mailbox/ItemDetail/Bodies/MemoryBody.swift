@@ -99,7 +99,7 @@ private struct MemorySavedBanner: View {
             Text("Kept in your Vault").fontWeight(.bold).foregroundStyle(Theme.Color.success)
                 + Text(" · only you can see it").foregroundStyle(Theme.Color.appTextSecondary)
         }
-        .pantopusTextStyle(.caption)
+        .font(Theme.Font.caption)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s2)

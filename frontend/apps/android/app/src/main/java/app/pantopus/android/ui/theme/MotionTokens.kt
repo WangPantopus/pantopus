@@ -6,7 +6,6 @@ import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -75,7 +74,6 @@ fun systemReduceMotion(context: Context): Boolean {
  * read the current reduce-motion state. Memoised on the context.
  */
 @Composable
-@ReadOnlyComposable
 fun rememberReduceMotion(): Boolean {
     if (LocalInspectionMode.current) return false
     val context = LocalContext.current

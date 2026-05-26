@@ -761,7 +761,10 @@ private fun ModuleView(module: ContentDetailModule) {
                                     fontWeight = FontWeight.SemiBold,
                                     color = PantopusColors.appText,
                                 )
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                                ) {
                                     PantopusIconImage(
                                         icon = PantopusIcon.Star,
                                         contentDescription = null,

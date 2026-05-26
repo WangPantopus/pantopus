@@ -127,7 +127,7 @@ public struct PrivacyHandshakeWizardView: View {
                     get: { content.handle.value },
                     set: { viewModel.setHandle($0) }
                 ))
-                .pantopusTextStyle(.small)
+                .font(Theme.Font.small)
                 .foregroundStyle(Theme.Color.appText)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)

@@ -67,7 +67,7 @@ public extension View {
     /// .pantopusAnimation(.componentState, value: viewModel.toast)
     /// .pantopusAnimation(.screenTransition, value: isPresented)
     /// ```
-    func pantopusAnimation<V: Equatable>(_ kind: PantopusMotion, value: V) -> some View {
+    func pantopusAnimation(_ kind: PantopusMotion, value: some Equatable) -> some View {
         modifier(_PantopusAnimation(kind: kind, value: value))
     }
 }

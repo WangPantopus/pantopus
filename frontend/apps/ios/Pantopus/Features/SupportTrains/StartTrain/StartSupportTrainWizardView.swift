@@ -159,7 +159,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                 get: { viewModel.beneficiaryQuery },
                 set: { viewModel.updateBeneficiaryQuery($0) }
             ))
-            .pantopusTextStyle(.small)
+            .font(Theme.Font.small)
             .accessibilityIdentifier("startSupportTrainBeneficiaryField")
             if viewModel.isSearchingBeneficiary {
                 ProgressView().scaleEffect(0.7)

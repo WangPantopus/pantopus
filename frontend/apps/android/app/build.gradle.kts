@@ -370,20 +370,21 @@ abstract class VerifyPantopusTokensTask : DefaultTask() {
         if (hexViolations.isNotEmpty()) {
             messages +=
                 "feature code must use PantopusColors.<token> instead of a hex literal:\n" +
-                    hexViolations.joinToString("\n") +
-                    "\n\n  If this is a new bespoke palette module, add it to hexExempt in app/build.gradle.kts and surface to design review."
+                hexViolations.joinToString("\n") +
+                "\n\n  If this is a new bespoke palette module, add it to hexExempt in " +
+                "app/build.gradle.kts and surface to design review."
         }
         if (spacingViolations.isNotEmpty()) {
             messages +=
                 "feature code must use Spacing.s<N> for on-scale layout spacing " +
-                    "(0→s0  4→s1  8→s2  12→s3  16→s4  20→s5  24→s6  32→s8  40→s10  48→s12  64→s16):\n" +
-                    spacingViolations.joinToString("\n")
+                "(0→s0  4→s1  8→s2  12→s3  16→s4  20→s5  24→s6  32→s8  40→s10  48→s12  64→s16):\n" +
+                spacingViolations.joinToString("\n")
         }
         if (radiiViolations.isNotEmpty()) {
             messages +=
                 "feature code must use Radii.<name> for on-scale corner radii " +
-                    "(4→xs  6→sm  8→md  12→lg  16→xl  20→xl2  24→xl3  9999→pill):\n" +
-                    radiiViolations.joinToString("\n")
+                "(4→xs  6→sm  8→md  12→lg  16→xl  20→xl2  24→xl3  9999→pill):\n" +
+                radiiViolations.joinToString("\n")
         }
 
         if (messages.isNotEmpty()) {

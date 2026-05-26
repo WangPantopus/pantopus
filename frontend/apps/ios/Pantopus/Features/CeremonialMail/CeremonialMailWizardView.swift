@@ -109,7 +109,7 @@ public struct CeremonialMailWizardView: View {
                     get: { viewModel.recipientQuery },
                     set: { viewModel.updateRecipientQuery($0) }
                 ))
-                .pantopusTextStyle(.small)
+                .font(Theme.Font.small)
                 .accessibilityIdentifier("ceremonialRecipientField")
                 if viewModel.isSearchingRecipients {
                     ProgressView().scaleEffect(0.7)
