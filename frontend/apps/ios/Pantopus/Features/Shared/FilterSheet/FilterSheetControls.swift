@@ -289,7 +289,7 @@ struct FilterStepSliderControl: View {
             .accessibilityValue(currentStop?.label ?? "")
             HStack {
                 Text(stops.first?.label ?? "")
-                    .font(.system(size: 12, weight: .regular))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 Spacer()
                 Text(currentStop?.label ?? "")
@@ -298,7 +298,7 @@ struct FilterStepSliderControl: View {
                     .accessibilityIdentifier("filterStepSliderValue_\(sectionId)")
                 Spacer()
                 Text(stops.last?.label ?? "")
-                    .font(.system(size: 12, weight: .regular))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }

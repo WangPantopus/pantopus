@@ -99,7 +99,7 @@ private struct MemorySavedBanner: View {
             Text("Kept in your Vault").fontWeight(.bold).foregroundStyle(Theme.Color.success)
                 + Text(" · only you can see it").foregroundStyle(Theme.Color.appTextSecondary)
         }
-        .font(.system(size: 12))
+        .pantopusTextStyle(.caption)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s2)
@@ -166,7 +166,7 @@ private struct MemoryElfCard: View {
 
             (Text(bullet.label).fontWeight(.bold).foregroundStyle(Theme.Color.appText)
                 + Text(" — \(bullet.text)").foregroundStyle(Theme.Color.appTextSecondary))
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

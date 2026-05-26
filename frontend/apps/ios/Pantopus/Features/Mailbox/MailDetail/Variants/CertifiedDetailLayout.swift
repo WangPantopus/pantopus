@@ -525,7 +525,7 @@ private struct HeroCard: View {
                 Text("Acknowledged").bold()
                     + Text(" · receipt on file").foregroundColor(Theme.Color.success.opacity(0.85))
             )
-            .font(.system(size: 12))
+            .pantopusTextStyle(.caption)
             .foregroundColor(Theme.Color.success)
             Spacer(minLength: Spacing.s0)
         }

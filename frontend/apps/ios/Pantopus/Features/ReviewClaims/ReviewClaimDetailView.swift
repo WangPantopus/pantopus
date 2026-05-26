@@ -231,7 +231,7 @@ private struct HomeCard: View {
                     .compactMap { $0?.isEmpty == false ? $0 : nil }
                 if !extras.isEmpty {
                     Text(extras.joined(separator: ", "))
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(2)
                 }
@@ -270,7 +270,7 @@ private struct ClaimantCard: View {
                     .lineLimit(1)
                 if let email = claimant?.email, !email.isEmpty {
                     Text(email)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(1)
                 }

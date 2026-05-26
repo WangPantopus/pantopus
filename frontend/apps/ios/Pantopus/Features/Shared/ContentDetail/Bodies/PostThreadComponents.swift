@@ -114,7 +114,7 @@ struct CommentRow: View {
                             .foregroundStyle(Theme.Color.appTextMuted)
                     }
                     Text(comment.body)
-                        .font(.system(size: 12, weight: .regular))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextStrong)
                         .lineSpacing(3)
                 }

@@ -218,7 +218,7 @@ public struct MembershipDetailView: View {
                         .font(.system(size: 13.5, weight: .bold))
                         .foregroundStyle(Theme.Color.warning)
                     Text(alert.message)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextStrong)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -387,7 +387,7 @@ public struct MembershipDetailView: View {
                 .overlay { Icon(row.icon, size: 15, color: row.iconForeground) }
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.label)
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 Text(row.value)
                     .font(.system(size: 13, weight: .semibold))

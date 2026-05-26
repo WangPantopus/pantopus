@@ -1351,7 +1351,7 @@ private struct ChatBubbleRow: View {
 
     private func textBody(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 14))
+            .pantopusTextStyle(.small)
             .lineSpacing(5)
             .frame(maxWidth: 260, alignment: .leading)
     }
@@ -1494,7 +1494,7 @@ private struct ChatBubbleRow: View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             aiTag
             Text(text)
-                .font(.system(size: 14))
+                .pantopusTextStyle(.small)
                 .lineSpacing(5)
                 .foregroundStyle(Theme.Color.appText)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1845,7 +1845,7 @@ private struct ChatComposer: View {
 
             HStack(alignment: .bottom, spacing: Spacing.s2) {
                 TextField(placeholder, text: $text, axis: .vertical)
-                    .font(.system(size: 14))
+                    .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.appText)
                     .lineLimit(1...4)
                     .submitLabel(.send)

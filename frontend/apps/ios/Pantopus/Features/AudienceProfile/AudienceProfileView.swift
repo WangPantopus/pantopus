@@ -349,7 +349,7 @@ public struct AudienceProfileView: View {
                     .foregroundStyle(Theme.Color.success)
             } else {
                 Text("Invite to grow")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
             Spacer(minLength: Spacing.s0)
@@ -555,7 +555,7 @@ public struct AudienceProfileView: View {
             ZStack(alignment: .topLeading) {
                 if viewModel.composer.text.isEmpty {
                     Text("Share an update with your followers")
-                        .font(.system(size: 14))
+                        .pantopusTextStyle(.small)
                         .foregroundStyle(Theme.Color.appTextMuted)
                         .padding(.top, 6)
                         .padding(.leading, Spacing.s1)
@@ -918,7 +918,7 @@ public struct AudienceProfileView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
             Text("Try a different name or handle.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
         }
@@ -1095,7 +1095,7 @@ public struct AudienceProfileView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
             Text("Share your Public Profile to start building your audience.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
         }
@@ -1248,7 +1248,7 @@ public struct AudienceProfileView: View {
                         }
                     }
                     Text(row.preview)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(2)
                 }
@@ -1276,7 +1276,7 @@ public struct AudienceProfileView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
             Text("Tier 2+ followers can open a thread with you.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
         }
@@ -1292,7 +1292,7 @@ public struct AudienceProfileView: View {
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
             Text("Try another filter to see the rest of your inbox.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
         }

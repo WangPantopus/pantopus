@@ -582,7 +582,7 @@ private struct PersonaTextDisplay: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 14))
+            .pantopusTextStyle(.small)
             .foregroundStyle(Theme.Color.appText)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(minHeight: minHeight, alignment: .topLeading)

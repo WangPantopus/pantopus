@@ -80,7 +80,7 @@ public struct StatusWaitingView: View {
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("statusHeadline")
             Text(content.subcopy)
-                .font(.system(size: 14))
+                .pantopusTextStyle(.small)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .accessibilityIdentifier("statusSubcopy")
         }
@@ -134,7 +134,7 @@ public struct StatusWaitingView: View {
                     .foregroundStyle(Theme.Color.appText)
                 if let subtitle = card.subtitle {
                     Text(subtitle)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
             }

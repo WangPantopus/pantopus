@@ -637,7 +637,7 @@ struct HubRecentActivity: View {
                         }
                         .frame(width: 30, height: 30)
                         Text(entry.title)
-                            .font(.system(size: 12))
+                            .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextStrong)
                             .lineLimit(2)
                         Spacer()

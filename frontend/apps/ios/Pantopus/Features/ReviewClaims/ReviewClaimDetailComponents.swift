@@ -18,7 +18,7 @@ struct ReviewClaimEvidenceList: View {
             HStack(spacing: Spacing.s2) {
                 Icon(.alertCircle, size: 20, color: Theme.Color.warning)
                 Text("No documents uploaded yet")
-                    .font(.system(size: 14))
+                    .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.warning)
                 Spacer(minLength: Spacing.s0)
             }
@@ -53,7 +53,7 @@ private struct ReviewClaimEvidenceRow: View {
                     .lineLimit(1)
                 if let name = item.fileName, !name.isEmpty {
                     Text(name)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(1)
                 }
@@ -211,7 +211,7 @@ struct ReviewClaimNoteCaptureSheet: View {
                 .accessibilityLabel("Close")
             }
             Text(prompt)
-                .font(.system(size: 14))
+                .pantopusTextStyle(.small)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             TextEditor(text: $note)
                 .frame(minHeight: 120)

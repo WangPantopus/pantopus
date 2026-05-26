@@ -131,6 +131,43 @@ if [[ -n "$radii_violations" ]]; then
   status=1
 fi
 
+# --- 4. Typography: exact-scale .font(.system(...)) -------------------
+#
+# Reject only EXACT on-scale (size, weight) pairs — what P7.4 Pass 2
+# cleaned up. Off-scale combinations (e.g. 14/.bold, 11/.bold, 9/.bold,
+# 13/.semibold, non-integer 11.5/12.5/etc.) are explicit design choices
+# documented in docs/token-drift-typography.md and stay in code untouched
+# until design decides to extend the scale or snap them to canonical.
+#
+# (11, .semibold) is INTENTIONALLY NOT FLAGGED — Pass 2 skipped it
+# because .pantopusTextStyle(.overline) ALSO applies UPPERCASE + 0.06em
+# tracking. Auto-replacing would mutate rendering. Manual review per
+# call site.
+typography_pairs=(
+  "size: 30, weight: \.bold"
+  "size: 24, weight: \.semibold"
+  "size: 20, weight: \.semibold"
+  "size: 16, weight: \.regular"
+  "size: 14, weight: \.regular"
+  "size: 12, weight: \.regular"
+)
+typography_with_weight=$(IFS='|'; echo "${typography_pairs[*]}")
+# Also catch the no-weight default-regular forms for body/small/caption.
+typography_no_weight="size: (16|14|12)\\)"
+
+typography_violations=$(grep -rnE "\\.font\\(\\.system\\(($typography_with_weight|$typography_no_weight)\\)" \
+  "$FEATURES" "$COMPONENTS" "$APP" \
+  --include='*.swift' "${EXCLUDE_DESIGN[@]}" 2>/dev/null || true)
+
+if [[ -n "$typography_violations" ]]; then
+  echo "✗ verify-tokens: feature code must use .pantopusTextStyle(.<role>) for exact-scale typography:" >&2
+  echo "$typography_violations" >&2
+  echo "" >&2
+  echo "  Mapping: 30/.bold→.h1  24/.semibold→.h2  20/.semibold→.h3  16/.regular→.body  14/.regular→.small  12/.regular→.caption" >&2
+  echo "  (no-weight forms default to .regular: size: 16→.body  size: 14→.small  size: 12→.caption)" >&2
+  status=1
+fi
+
 if [[ "$status" -eq 0 ]]; then
   echo "✓ verify-tokens: no untokenised on-scale literals in feature code."
 fi

@@ -159,7 +159,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                 get: { viewModel.beneficiaryQuery },
                 set: { viewModel.updateBeneficiaryQuery($0) }
             ))
-            .font(.system(size: 14))
+            .pantopusTextStyle(.small)
             .accessibilityIdentifier("startSupportTrainBeneficiaryField")
             if viewModel.isSearchingBeneficiary {
                 ProgressView().scaleEffect(0.7)
@@ -940,7 +940,7 @@ private struct StartSupportTrainReviewStep: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
                 Text("Helpers can leave a note when they sign up.")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
@@ -993,7 +993,7 @@ private struct StartSupportTrainReviewStep: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                     Text(option.subtitle)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 Spacer()

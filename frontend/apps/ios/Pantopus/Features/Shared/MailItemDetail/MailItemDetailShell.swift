@@ -390,7 +390,7 @@ private struct AIElfBulletRow: View {
                 Text(bullet.label).font(.system(size: 12, weight: .bold))
                     .foregroundColor(Theme.Color.appText)
                     + Text(bullet.text.map { " — \($0)" } ?? "")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundColor(Theme.Color.appTextStrong)
             )
             .fixedSize(horizontal: false, vertical: true)

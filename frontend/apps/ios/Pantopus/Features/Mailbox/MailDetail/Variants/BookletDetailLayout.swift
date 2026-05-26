@@ -310,7 +310,7 @@ private struct SenderCard: View {
                         .foregroundStyle(Theme.Color.appText)
                     if let meta = content.senderMeta {
                         Text(meta)
-                            .font(.system(size: 12))
+                            .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }

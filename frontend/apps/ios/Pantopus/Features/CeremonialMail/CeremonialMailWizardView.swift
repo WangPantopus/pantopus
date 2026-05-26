@@ -109,7 +109,7 @@ public struct CeremonialMailWizardView: View {
                     get: { viewModel.recipientQuery },
                     set: { viewModel.updateRecipientQuery($0) }
                 ))
-                .font(.system(size: 14))
+                .pantopusTextStyle(.small)
                 .accessibilityIdentifier("ceremonialRecipientField")
                 if viewModel.isSearchingRecipients {
                     ProgressView().scaleEffect(0.7)
@@ -178,7 +178,7 @@ public struct CeremonialMailWizardView: View {
                     .foregroundStyle(Theme.Color.appText)
                 if let address = recipient.homeAddress {
                     Text(address)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
             }
@@ -214,7 +214,7 @@ public struct CeremonialMailWizardView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                     Text(intent.subtitle)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 Spacer()
@@ -267,7 +267,7 @@ public struct CeremonialMailWizardView: View {
                 .foregroundStyle(Theme.Color.appText)
             if let count = ctx.memberCount {
                 Text("\(count) household member\(count == 1 ? "" : "s")")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
@@ -317,7 +317,7 @@ public struct CeremonialMailWizardView: View {
                     .foregroundStyle(Theme.Color.appText)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
             }
@@ -418,7 +418,7 @@ public struct CeremonialMailWizardView: View {
             ZStack(alignment: .topLeading) {
                 if viewModel.bodyText.isEmpty {
                     Text("Dear friend,")
-                        .font(.system(size: 14))
+                        .pantopusTextStyle(.small)
                         .foregroundStyle(Theme.Color.appTextMuted)
                         .padding(.top, Spacing.s2)
                         .padding(.leading, Spacing.s1)
@@ -577,7 +577,7 @@ public struct CeremonialMailWizardView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                     Text(timing.subtitle)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 Spacer()

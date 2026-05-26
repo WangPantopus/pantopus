@@ -329,7 +329,7 @@ struct GigRow: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
             Text(content.body)
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)

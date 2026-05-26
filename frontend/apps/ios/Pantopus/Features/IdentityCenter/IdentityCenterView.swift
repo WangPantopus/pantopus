@@ -221,7 +221,7 @@ public struct IdentityCenterView: View {
                             .foregroundStyle(Theme.Color.appText)
                         if let subtext = row.subtext {
                             Text(subtext)
-                                .font(.system(size: 12))
+                                .pantopusTextStyle(.caption)
                                 .foregroundStyle(Theme.Color.appTextSecondary)
                         }
                     }
@@ -265,7 +265,7 @@ public struct IdentityCenterView: View {
                             .foregroundStyle(Theme.Color.appText)
                         if let subtext = row.subtext {
                             Text(subtext)
-                                .font(.system(size: 12))
+                                .pantopusTextStyle(.caption)
                                 .foregroundStyle(Theme.Color.appTextSecondary)
                         }
                     }

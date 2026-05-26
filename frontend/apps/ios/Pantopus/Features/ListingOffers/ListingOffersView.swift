@@ -51,11 +51,11 @@ private struct CounterOfferSheet: View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 Text("Counter \(target.buyerName)'s offer")
-                    .font(.system(size: 20, weight: .semibold))
+                    .pantopusTextStyle(.h3)
                     .foregroundStyle(Theme.Color.appText)
                 if let original = target.originalAmount {
                     Text("Original offer: \(ListingOffersViewModel.formatPrice(original))")
-                        .font(.system(size: 14, weight: .regular))
+                        .pantopusTextStyle(.small)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
             }
@@ -70,7 +70,7 @@ private struct CounterOfferSheet: View {
                         .foregroundStyle(Theme.Color.appText)
                     TextField("Amount", text: $amountText)
                         .keyboardType(.decimalPad)
-                        .font(.system(size: 16, weight: .regular))
+                        .pantopusTextStyle(.body)
                         .foregroundStyle(Theme.Color.appText)
                         .accessibilityIdentifier("counter-amount")
                 }
@@ -87,7 +87,7 @@ private struct CounterOfferSheet: View {
                     .foregroundStyle(Theme.Color.appText)
                 TextField("Add a note (optional)", text: $messageText, axis: .vertical)
                     .lineLimit(1...3)
-                    .font(.system(size: 14, weight: .regular))
+                    .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.appText)
                     .padding(Spacing.s3)
                     .background(

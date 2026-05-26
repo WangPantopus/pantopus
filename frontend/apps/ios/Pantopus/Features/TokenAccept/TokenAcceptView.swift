@@ -201,7 +201,7 @@ public struct TokenAcceptView: View {
             Icon(band.icon, size: 16, color: Theme.Color.primary600)
                 .padding(.top, 1)
             Text(band.text)
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }

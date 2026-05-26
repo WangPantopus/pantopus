@@ -341,7 +341,7 @@ public struct ComposeBroadcastView: View {
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
             Text("Stats — reach, read, reactions, replies — show here after you send.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 240)

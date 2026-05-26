@@ -176,7 +176,7 @@ public struct NewMessageView: View {
                 .clipShape(Circle())
             VStack(spacing: Spacing.s2) {
                 Text(viewModel.emptyHeadline)
-                    .font(.system(size: 20, weight: .semibold))
+                    .pantopusTextStyle(.h3)
                     .foregroundStyle(Theme.Color.appText)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 280)

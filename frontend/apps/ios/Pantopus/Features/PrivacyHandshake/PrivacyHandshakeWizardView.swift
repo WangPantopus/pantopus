@@ -76,14 +76,14 @@ public struct PrivacyHandshakeWizardView: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
                 Text("@\(persona.handle)")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 Text("\(persona.followerCount) \(persona.audienceLabel.lowercased())")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 if let bio = persona.bio, !bio.isEmpty {
                     Text(bio)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .padding(.top, Spacing.s1)
                         .lineLimit(3)
@@ -127,7 +127,7 @@ public struct PrivacyHandshakeWizardView: View {
                     get: { content.handle.value },
                     set: { viewModel.setHandle($0) }
                 ))
-                .font(.system(size: 14))
+                .pantopusTextStyle(.small)
                 .foregroundStyle(Theme.Color.appText)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
@@ -257,7 +257,7 @@ public struct PrivacyHandshakeWizardView: View {
                     }
                     if let desc = tier.description, !desc.isEmpty {
                         Text(desc)
-                            .font(.system(size: 12))
+                            .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
@@ -283,7 +283,7 @@ public struct PrivacyHandshakeWizardView: View {
         HStack(spacing: Spacing.s2) {
             Icon(.userPlus, size: 16, color: Theme.Color.primary600)
             Text("Following as ")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             Text("@\(content.handle.value)")
                 .font(.system(size: 12, weight: .semibold))
@@ -304,7 +304,7 @@ public struct PrivacyHandshakeWizardView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
             Text("Finish your subscription in the browser, then come back here.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
         }

@@ -266,7 +266,7 @@ public struct BroadcastDetailView: View {
                 .accessibilityAddTraits(.isHeader)
             if breakdown.segments.isEmpty {
                 Text("Per-tier breakdown will appear once reads roll in.")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             } else {
                 tierStackedBar(breakdown)
@@ -321,7 +321,7 @@ public struct BroadcastDetailView: View {
                         .fill(AudienceProfileView.tierColor(rank: segment.rank))
                         .frame(width: 8, height: 8)
                     Text(segment.name)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextStrong)
                     Spacer(minLength: Spacing.s0)
                     Text("\(segment.count)")
@@ -386,7 +386,7 @@ public struct BroadcastDetailView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
             Text("Reply first — your followers will see your message under this broadcast.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
         }

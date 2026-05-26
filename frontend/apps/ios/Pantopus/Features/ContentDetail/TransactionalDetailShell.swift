@@ -659,7 +659,7 @@ public struct TransactionalDetailShell: View {
                         .foregroundStyle(Theme.Color.appText)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text(row.qty)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .frame(width: 36, alignment: .center)
                     Text(row.unit)

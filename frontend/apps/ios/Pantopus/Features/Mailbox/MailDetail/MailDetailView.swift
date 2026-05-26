@@ -253,7 +253,7 @@ private struct MailHeaderCard: View {
                         .lineLimit(1)
                     if let handle = content.senderMeta, !handle.isEmpty {
                         Text(handle)
-                            .font(.system(size: 12))
+                            .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
                             .lineLimit(1)
                     }

@@ -205,7 +205,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                     .foregroundStyle(row.destructive ? Theme.Color.error : Theme.Color.appText)
                 if let subtext = row.subtext {
                     Text(subtext)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 if case let .slider(stops, index) = activeControl {

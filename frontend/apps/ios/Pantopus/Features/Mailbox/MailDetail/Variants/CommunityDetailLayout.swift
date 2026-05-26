@@ -244,7 +244,7 @@ private struct CommunityHeroCard: View {
                 .fixedSize(horizontal: false, vertical: true)
             if let excerpt = content.excerpt, !excerpt.isEmpty {
                 Text(excerpt)
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
             if community.rsvp == .going {
@@ -330,7 +330,7 @@ private struct CommunityBadgeCard: View {
                 }
                 if let tagline = community.group.tagline {
                     Text(tagline)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(2)
                 }
@@ -445,7 +445,7 @@ private struct CommunityEventCard: View {
                     .foregroundStyle(Theme.Color.appText)
                 if let range = event.timeRange {
                     Text(range)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
             }
@@ -466,7 +466,7 @@ private struct CommunityEventCard: View {
                     .foregroundStyle(Theme.Color.appText)
                 if let note = event.locationNote {
                     Text(note)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 if let distance = event.distanceLabel {
@@ -522,7 +522,7 @@ private struct CommunityEventCard: View {
                     .foregroundColor(Theme.Color.primary800)
             }
             Text(summary)
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundColor(Theme.Color.primary700)
             Spacer(minLength: Spacing.s0)
         }
@@ -794,7 +794,7 @@ private struct CommunityBodyCard: View {
             }
             ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
                 Text(paragraph)
-                    .font(.system(size: 14))
+                    .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.appText)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -833,7 +833,7 @@ private struct CommunityPulseThreadCard: View {
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
             Text(metaLine)
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             if let preview = thread.lastReplyPreview, let author = thread.lastReplyAuthor {
                 HStack(alignment: .top, spacing: Spacing.s2) {
@@ -846,7 +846,7 @@ private struct CommunityPulseThreadCard: View {
                     (
                         Text(author).bold() + Text(" \(preview)")
                     )
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundColor(Theme.Color.appTextStrong)
                     .fixedSize(horizontal: false, vertical: true)
                     Spacer()
@@ -919,7 +919,7 @@ private struct CommunitySenderCard: View {
                         .foregroundStyle(Theme.Color.appText)
                     if let meta = content.senderMeta {
                         Text(meta)
-                            .font(.system(size: 12))
+                            .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                     HStack(spacing: Spacing.s1) {

@@ -108,7 +108,7 @@ public struct CertifiedTermsSummaryCard: View {
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
                     Text("A high-stakes item needs a signed delivery receipt before Pantopus marks it complete.")
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -156,7 +156,7 @@ public struct CertifiedTermsSummaryCard: View {
                     .frame(width: 18, height: 18)
                     .accessibilityHidden(true)
                 Text(text)
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextStrong)
                     .fixedSize(horizontal: false, vertical: true)
             }

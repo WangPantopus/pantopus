@@ -313,7 +313,7 @@ public struct CreatorInboxView: View {
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
             Text("Try another filter to see the rest of your inbox.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
             Spacer()
