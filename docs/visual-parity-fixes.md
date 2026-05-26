@@ -120,3 +120,107 @@ Files modified:
 
 Design renders saved to `/tmp/p79a-audit/shots/` (15 PNG files: 5
 overviews + 10 per-artboard crops) and sent to the user.
+
+---
+
+## P7.9.a — Hub tab core surfaces
+
+### Design source
+
+| File | Pack | Frames audited |
+|---|---|---|
+| `A08 — per-screen batch 1/uploads/Pantopus-design/Hub.html` (+ `hub-frames.jsx`) | A08 archetype | FRAME 1 Populated, FRAME 2 First-run, FRAME 3 Skeleton |
+| `A08 — per-screen batch 1/uploads/Pantopus-design/Me.html` (+ `me-frames.jsx`) | A08 archetype | FRAME 1 Personal, FRAME 2 Home |
+| `A10___Detail__Content/A10.3 Today.html` (+ `today-frames.jsx`) | A10 detail | FRAME 1 Populated, FRAME 2 Advisory |
+| `A08 — per-screen batch 1/uploads/Pantopus-design/List of Rows.html` (+ `frames.jsx`) | A08 archetype (Recent Activity inherits) | FRAME 1 Primary, FRAME 2-3 Variant, FRAME 4 Empty |
+
+Renders saved to `/tmp/p79b-hub/shots/` and sent to user.
+
+### Implementation files audited
+
+| Surface | iOS | Android |
+|---|---|---|
+| Hub action chips | `Core/Design/Components/ActionChip.swift` (shared component) + `Features/Hub/Sections/HubSections.swift:HubActionStrip` | `ui/components/ActionChip.kt` + `ui/screens/hub/sections/HubSections.kt` |
+| Hub pillar tiles | `Features/Hub/Sections/HubSections.swift:PillarTileBody` | `ui/screens/hub/sections/HubSections.kt:PillarTileView` |
+| Hub Today card | `Features/Hub/Sections/HubSections.swift:HubTodayCard` | `ui/screens/hub/sections/HubSections.kt` |
+| Me identity / stats / grid | `Features/Me/MeView.swift` | `ui/screens/you/me/MeView.kt` |
+| Today detail hero | `Features/Hub/Today/TodayDetailView.swift:TodayHero` | `ui/screens/hub/today/TodayDetailScreen.kt:TodayHero` |
+| Recent Activity (List-of-Rows) | `Features/RecentActivity/RecentActivityView.swift` (thin wrapper around `ListOfRowsView`) | mirror |
+
+### Mismatches and fixes
+
+#### 1. `ActionChip` corner radius — **FIXED** (iOS + Android, shared component)
+
+| Side | Before | After |
+|---|---|---|
+| Design (hub-frames.jsx L248) | `borderRadius: 12` on the action chip surface | n/a |
+| iOS | `RoundedRectangle(cornerRadius: Radii.pill, …)` (=9999, capsule) | `Radii.lg` (=12) |
+| Android | `RoundedCornerShape(Radii.pill)` (3 occurrences in ActionChip.kt L62/63/69) | `Radii.lg` |
+
+The Hub design renders action chips as rounded-rectangles, not pills.
+Visible delta in screenshots: the "Post task" / "Snap & sell" / "Scan
+mail" trio currently looks capsule-shaped on both platforms.
+
+Knock-on: `MailItemDetailShell.swift:303` and `:306` also use
+`ActionChip` for the mail-item primary/secondary CTAs. The Mailbox
+design (mail-detail.jsx L470) specifies `borderRadius: 12` for the
+secondary CTA grid — matches the new ActionChip radius. The Mailbox
+primary CTA is a separate `borderRadius: 14` full-width button (not
+the shared `ActionChip`), so no regression.
+
+#### 2. `PillarTile` icon container corner radius — **FIXED** (iOS + Android)
+
+| Side | Before | After |
+|---|---|---|
+| Design (hub-frames.jsx L366) | inner icon container `width: 32, height: 32, borderRadius: 8` | n/a |
+| iOS `Features/Hub/Sections/HubSections.swift:PillarTileBody` | `Radii.sm` (=6) on the icon container | `Radii.md` (=8) |
+| Android `ui/screens/hub/sections/HubSections.kt:PillarTileView` | `Radii.sm` (=6) | `Radii.md` (=8) |
+
+#### 3. `TodayHero` weather-glyph container corner radius — **FIXED** (iOS + Android)
+
+| Side | Before | After |
+|---|---|---|
+| Design (today-frames.jsx L188) | `width: 56, height: 56, borderRadius: 16` for the glyph disc | n/a |
+| iOS `TodayDetailView.swift:TodayHero` | `Radii.lg` (=12) | `Radii.xl` (=16) |
+| Android `TodayDetailScreen.kt:TodayHero` | `Radii.lg` (=12) | `Radii.xl` (=16) |
+
+### Mismatches surfaced for design review (NOT fixed — off-scale design values)
+
+The audit's "don't invent tokens" rule means design values not on the
+canonical 4/6/8/12/16/20/24/9999 ramp can't be auto-fixed. Each entry
+below is a real visual delta the audit found but can't resolve without
+either (a) extending the token scale or (b) design accepting the
+nearest-on-scale approximation.
+
+| # | Surface | Design value | Code value | Notes |
+|---|---|---|---|---|
+| A | Hub action chip inner horizontal padding | `padding: 0 14px` (line 248) | iOS+Android `Spacing.s3` (=12) | 14pt off-scale on the design side. Either accept the 2pt under-padding, or design adds `s_14` / changes the design to 12. |
+| B | Hub action chip icon size | 15 | iOS 16, Android `Radii.xl2`/effective 20 | Design's 15pt is off-scale; nearest token = 16. |
+| C | Hub action chip font | `fontSize: 12.5, fontWeight: 600` | iOS `.pantopusTextStyle(.small)` (= 14/regular), Android same | The 12.5/semibold combination isn't in the type-ramp; already P7.4 drift. |
+| D | Hub `Today` card outer corner radius | `borderRadius: 14` (line 315) | iOS+Android `Radii.lg` (=12) | 14 off-scale. |
+| E | Hub `Today` card horizontal padding | `padding: 12px 14px` → 14 horizontal | iOS `Spacing.s3` (=12) | 14 off-scale. Closest tokens 12 or 16. |
+| F | Hub `Today` card weather-icon container border-radius | `borderRadius: 10` (L322) | iOS+Android `Radii.md` (=8) | 10 off-scale. |
+| G | Hub `Today` card weather icon size | 22 | iOS+Android 20 | Off by 2; no 22pt icon token. |
+| H | Hub `Today` card temperature font | `fontSize: 20, fontWeight: 700, letterSpacing: -0.4, lineHeight: 22` | iOS `.font(.system(size: 20, weight: .bold))`, Android same | Size 20 matches; weight 700 ≈ .bold matches; tracking and line-height not tokenised — already P7.4 drift. |
+| I | Hub pillar tile caption font | `fontSize: 10.5` | iOS+Android `size: 11` | 10.5 off-scale. |
+| J | Me stats-row outer corner radius | `borderRadius: 14` (me-frames.jsx L174) | iOS+Android `Radii.lg` (=12) | 14 off-scale. |
+| K | Me identity-row pill segment height | `height: 30` (L140) | iOS `IdentitySwitcherPillRow` — not directly inspected; relies on the segmented control's implicit height | Spec value 30 is off-scale (closest token Spacing.s8 = 32). |
+| L | Today detail hero — design uses a blue gradient surface | `background: gradient, color: #fff` (hero L146) | iOS+Android use `Theme.Color.appSurface` (flat white surface) — **INTENTIONAL DEVIATION** | Per the project's "no gradients on mobile shells" rule (codified in `Features/Hub/Today/TodayDetailView.swift:7` comment). Surfaced as design-side question: should the no-gradient-on-mobile rule be relaxed for the Today hero? |
+| M | Today detail temperature display font | design `fontSize: 40, fontWeight: 800` | iOS `.pantopusTextStyle(.h1)` (=30/bold), Android same | A 10-point delta — design's 40pt is off the 30/24/20/16/14/12/11 ramp. The largest scale entry is `.h1` (30). Either extend the ramp (`.h0`?) or accept the smaller-than-design hero number. |
+| N | Recent Activity row geometry | inherits `ListOfRows` archetype frames (Bills/Docs/Members) | uses the same shared shell with the same geometry | No bespoke divergence to flag; matches the archetype. The ListOfRows shell's own row dimensions were not re-audited in this prompt — covered separately when the archetype itself is audited. |
+
+### Snapshot tests
+
+Re-record needed for:
+- iOS `PantopusTests/Features/Hub/HubViewTests` populated snapshot (ActionChip + pillar tile icon background)
+- iOS `PantopusTests/Features/Mailbox/ItemDetail/MailboxItemDetailViewTests` (the ActionChip CTA shelf radius)
+- iOS `PantopusTests/Features/Hub/Today/TodayDetailViewTests` populated snapshot (hero glyph radius)
+- Android equivalents for the same three screens
+
+### Verification
+
+iOS `make verify-tokens` ✅ pass; Android equivalent grep (manual) returns 0 on-scale literals. All changes use canonical tokens (`Radii.lg`, `Radii.md`, `Radii.xl`). No new tokens introduced.
+
+Files modified (6 lines across 6 files):
+- iOS: `Core/Design/Components/ActionChip.swift` (2 lines), `Features/Hub/Sections/HubSections.swift` (1 line), `Features/Hub/Today/TodayDetailView.swift` (1 line)
+- Android: `ui/components/ActionChip.kt` (3 lines via `replace_all`), `ui/screens/hub/sections/HubSections.kt` (1 line), `ui/screens/hub/today/TodayDetailScreen.kt` (1 line)

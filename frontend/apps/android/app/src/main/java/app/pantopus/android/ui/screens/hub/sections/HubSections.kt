@@ -518,7 +518,7 @@ private fun PillarTileView(
                 modifier =
                     Modifier
                         .size(32.dp)
-                        .clip(RoundedCornerShape(Radii.sm))
+                        .clip(RoundedCornerShape(Radii.md))
                         .background(iconBg),
                 contentAlignment = Alignment.Center,
             ) {

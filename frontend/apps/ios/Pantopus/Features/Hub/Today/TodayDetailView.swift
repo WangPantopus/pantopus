@@ -220,7 +220,7 @@ private struct TodayHero: View {
                 }
                 Spacer(minLength: Spacing.s2)
                 ZStack {
-                    RoundedRectangle(cornerRadius: Radii.lg)
+                    RoundedRectangle(cornerRadius: Radii.xl)
                         .fill(Theme.Color.appSurfaceSunken)
                     Icon(content.glyph, size: 30, color: Theme.Color.primary600)
                 }

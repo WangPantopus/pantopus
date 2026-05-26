@@ -350,7 +350,7 @@ private struct PillarTileBody: View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(alignment: .center) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
                         .fill(tile.chipSetupState
                             ? Theme.Color.appSurfaceSunken
                             : tile.tint.backgroundColor)

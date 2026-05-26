@@ -320,7 +320,7 @@ private fun TodayHero(content: TodayDetailContent) {
                 modifier =
                     Modifier
                         .size(56.dp)
-                        .clip(RoundedCornerShape(Radii.lg))
+                        .clip(RoundedCornerShape(Radii.xl))
                         .background(PantopusColors.appSurfaceSunken),
                 contentAlignment = Alignment.Center,
             ) {

@@ -46,10 +46,10 @@ public struct ActionChip: View {
             .frame(minHeight: 36)
             .background(background)
             .overlay(
-                RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(isActive ? .clear : Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             .pantopusShadow(isActive ? .primary : .sm)
         }
         .buttonStyle(.plain)
