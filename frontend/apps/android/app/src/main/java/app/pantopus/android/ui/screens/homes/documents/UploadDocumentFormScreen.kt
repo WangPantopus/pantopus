@@ -302,7 +302,7 @@ private fun PickedFileCard(
                 PantopusIconImage(
                     icon = PantopusIcon.RefreshCw,
                     contentDescription = null,
-                    size = 12.dp,
+                    size = Radii.lg,
                     tint = PantopusColors.primary600,
                 )
                 Text(
@@ -325,7 +325,7 @@ private fun PickedFileCard(
             PantopusIconImage(
                 icon = PantopusIcon.X,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextSecondary,
             )
         }
@@ -415,7 +415,7 @@ private fun CategoryChip(
         PantopusIconImage(
             icon = category.palette.icon,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = foreground,
         )
         Text(
@@ -488,7 +488,7 @@ private fun TagsSection(
                 PantopusIconImage(
                     icon = PantopusIcon.PlusCircle,
                     contentDescription = null,
-                    size = 20.dp,
+                    size = Radii.xl2,
                     tint =
                         if (draft.trim().isEmpty()) {
                             PantopusColors.appTextMuted
@@ -562,7 +562,7 @@ private fun LinkedSection(
                 PantopusIconImage(
                     icon = link.kind.icon,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.home,
                 )
                 Column(
@@ -593,7 +593,7 @@ private fun LinkedSection(
                     PantopusIconImage(
                         icon = PantopusIcon.X,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         tint = PantopusColors.appTextSecondary,
                     )
                 }
@@ -616,7 +616,7 @@ private fun LinkedSection(
                 PantopusIconImage(
                     icon = PantopusIcon.Link,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.primary600,
                 )
                 Text(
@@ -628,7 +628,7 @@ private fun LinkedSection(
                 PantopusIconImage(
                     icon = PantopusIcon.ChevronRight,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.appTextSecondary,
                 )
             }
@@ -697,7 +697,7 @@ private fun VisibilityRow(
         PantopusIconImage(
             icon = icon,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.home,
         )
         Column(
@@ -923,7 +923,7 @@ private fun LinkOptionsList(
                     PantopusIconImage(
                         icon = option.kind.icon,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         tint = PantopusColors.home,
                     )
                     Column(modifier = Modifier.weight(1f)) {
@@ -944,7 +944,7 @@ private fun LinkOptionsList(
                     PantopusIconImage(
                         icon = PantopusIcon.ChevronRight,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         tint = PantopusColors.appTextSecondary,
                     )
                 }

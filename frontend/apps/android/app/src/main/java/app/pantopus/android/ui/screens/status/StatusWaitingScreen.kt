@@ -152,7 +152,7 @@ private fun EtaChip(text: String) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.warningBg)
                 .padding(horizontal = 10.dp, vertical = 6.dp)
                 .testTag("statusEtaChip"),
@@ -162,7 +162,7 @@ private fun EtaChip(text: String) {
         PantopusIconImage(
             icon = PantopusIcon.AlertCircle,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             strokeWidth = 2f,
             tint = PantopusColors.warning,
         )
@@ -184,9 +184,9 @@ private fun ActionCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onTap)
                 .padding(Spacing.s3)
                 .testTag("statusActionCard_${card.id}"),
@@ -219,7 +219,7 @@ private fun ActionCard(
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2f,
             tint = PantopusColors.appTextSecondary,
         )
@@ -232,9 +232,9 @@ private fun ExplainerBlock(bullets: List<String>) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(14.dp)
                 .testTag("statusExplainer"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),

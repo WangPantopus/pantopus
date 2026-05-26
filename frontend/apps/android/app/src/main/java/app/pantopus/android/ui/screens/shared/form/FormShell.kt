@@ -370,7 +370,7 @@ private fun FormBottomCTA(
                             PantopusIconImage(
                                 icon = icon,
                                 contentDescription = null,
-                                size = 16.dp,
+                                size = Radii.xl,
                                 tint = PantopusColors.appTextInverse,
                             )
                         }

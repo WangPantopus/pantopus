@@ -194,7 +194,7 @@ private fun SearchBar(
             PantopusIconImage(
                 icon = PantopusIcon.Search,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextSecondary,
             )
             Box(modifier = Modifier.weight(1f)) {
@@ -286,9 +286,9 @@ private fun SectionSkeleton() {
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(Radii.xl))
                     .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(16.dp)),
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl)),
         ) {
             repeat(3) { idx ->
                 Row(
@@ -545,9 +545,9 @@ private fun SectionCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(Radii.xl))
                     .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(16.dp)),
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl)),
         ) {
             section.rows.forEachIndexed { index, row ->
                 ContactRow(row = row, onTap = onTap)
@@ -648,7 +648,7 @@ private fun ContactRow(
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.appTextMuted,
         )
     }
@@ -691,7 +691,7 @@ private fun AvatarWithBadge(row: NewMessageContactRow) {
                 PantopusIconImage(
                     icon = PantopusIcon.Check,
                     contentDescription = null,
-                    size = 8.dp,
+                    size = Radii.md,
                     strokeWidth = 4f,
                     tint = PantopusColors.appTextInverse,
                 )

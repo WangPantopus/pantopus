@@ -154,7 +154,7 @@ private fun TopBar(
                 PantopusIconImage(
                     icon = PantopusIcon.Share,
                     contentDescription = "Share membership",
-                    size = 20.dp,
+                    size = Radii.xl2,
                     strokeWidth = 2f,
                     tint = PantopusColors.appText,
                 )
@@ -177,10 +177,10 @@ internal fun LoadingFrame() {
                 .testTag("membershipDetailLoading"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
-        Shimmer(width = 360.dp, height = 64.dp, cornerRadius = 12.dp)
-        Shimmer(width = 360.dp, height = 184.dp, cornerRadius = 16.dp)
-        Shimmer(width = 360.dp, height = 176.dp, cornerRadius = 12.dp)
-        Shimmer(width = 360.dp, height = 50.dp, cornerRadius = 12.dp)
+        Shimmer(width = 360.dp, height = 64.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 360.dp, height = 184.dp, cornerRadius = Radii.xl)
+        Shimmer(width = 360.dp, height = 176.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 360.dp, height = 50.dp, cornerRadius = Radii.lg)
     }
 }
 
@@ -308,9 +308,9 @@ private fun SlaBanner(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.warningBg)
-                .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.lg))
                 .padding(Spacing.s3)
                 .testTag("membershipDetailSLABanner"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -320,7 +320,7 @@ private fun SlaBanner(
                 modifier =
                     Modifier
                         .size(32.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(Radii.md))
                         .background(PantopusColors.warning),
                 contentAlignment = Alignment.Center,
             ) {
@@ -352,7 +352,7 @@ private fun SlaBanner(
                     Modifier
                         .weight(1f)
                         .height(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(Radii.md))
                         .background(PantopusColors.error)
                         .clickable(onClick = onRequestRefund)
                         .testTag("membershipDetailRefundButton")
@@ -383,8 +383,8 @@ private fun SlaBanner(
                     Modifier
                         .weight(1f)
                         .height(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(1.dp, PantopusColors.warning, RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(Radii.md))
+                        .border(1.dp, PantopusColors.warning, RoundedCornerShape(Radii.md))
                         .clickable(onClick = onDismiss)
                         .testTag("membershipDetailSnoozeButton")
                         .semantics { contentDescription = alert.dismissCtaLabel },
@@ -413,9 +413,9 @@ private fun TierCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(16.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .testTag("membershipDetailTierCard"),
     ) {
         TierStrip(content)
@@ -506,9 +506,9 @@ private fun LadderPill(tier: MembershipTier) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(999.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                 .padding(horizontal = Spacing.s2, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -556,7 +556,7 @@ private fun TierInfoRow(
             modifier =
                 Modifier
                     .size(30.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(Radii.md))
                     .background(iconBackground),
             contentAlignment = Alignment.Center,
         ) {
@@ -598,9 +598,9 @@ private fun BenefitsCard(benefits: List<MembershipBenefit>) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .testTag("membershipDetailBenefits"),
     ) {
         benefits.forEachIndexed { index, benefit ->
@@ -645,7 +645,7 @@ private fun BenefitRow(benefit: MembershipBenefit) {
             modifier =
                 Modifier
                     .size(26.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(Radii.sm))
                     .background(PantopusColors.successBg),
             contentAlignment = Alignment.Center,
         ) {
@@ -691,7 +691,7 @@ private fun ChangeTierButton(onClick: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .height(50.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.primary600)
                 .clickable(onClick = onClick)
                 .testTag("membershipDetailChangeTier")

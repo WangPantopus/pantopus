@@ -147,7 +147,7 @@ private fun StepMarker(
                         PantopusIconImage(
                             icon = PantopusIcon.Check,
                             contentDescription = null,
-                            size = 12.dp,
+                            size = Radii.lg,
                             tint = PantopusColors.appTextInverse,
                         )
                     }

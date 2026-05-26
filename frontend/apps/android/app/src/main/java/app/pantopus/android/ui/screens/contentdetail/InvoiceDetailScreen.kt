@@ -98,7 +98,7 @@ private fun PaySheetStub(onDismiss: () -> Unit) {
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(PantopusColors.primary600)
                     .clickable(onClick = onDismiss)
                     .heightIn(min = 48.dp),

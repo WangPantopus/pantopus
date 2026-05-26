@@ -750,7 +750,7 @@ private fun DatePickerRow(
             PantopusIconImage(
                 icon = PantopusIcon.Calendar,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextSecondary,
             )
             Spacer(modifier = Modifier.width(Spacing.s2))
@@ -925,7 +925,7 @@ private fun PhotoTile(
                 PantopusIconImage(
                     icon = PantopusIcon.Camera,
                     contentDescription = "Add photo",
-                    size = 20.dp,
+                    size = Radii.xl2,
                     tint = PantopusColors.appTextSecondary,
                 )
                 Text(

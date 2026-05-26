@@ -239,7 +239,7 @@ private fun PasswordField(
             PantopusIconImage(
                 icon = PantopusIcon.Lock,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextSecondary,
             )
             BasicTextField(
@@ -293,7 +293,7 @@ private fun PasswordStrengthRow(
                     Modifier
                         .weight(1f)
                         .height(5.dp)
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(RoundedCornerShape(Radii.pill))
                         .background(if (index < score) color else PantopusColors.appSurfaceSunken),
             )
         }

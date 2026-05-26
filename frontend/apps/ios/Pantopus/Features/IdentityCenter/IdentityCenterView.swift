@@ -92,7 +92,7 @@ public struct IdentityCenterView: View {
         ScrollView {
             VStack(spacing: Spacing.s3) {
                 ForEach(0..<4, id: \.self) { _ in
-                    Shimmer(height: 110, cornerRadius: 16)
+                    Shimmer(height: 110, cornerRadius: Radii.xl)
                         .padding(.horizontal, Spacing.s4)
                 }
             }
@@ -205,10 +205,10 @@ public struct IdentityCenterView: View {
             LinearGradient(colors: [card.kind.accentBgSoft, Theme.Color.appSurface], startPoint: .top, endPoint: .bottom)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
     }
 
     private func bridgesCard(_ rows: [IdentityBridgeRow]) -> some View {
@@ -247,10 +247,10 @@ public struct IdentityCenterView: View {
         }
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private func rowsCard(_ rows: [IdentityRowContent], idPrefix: String) -> some View {
@@ -290,10 +290,10 @@ public struct IdentityCenterView: View {
         }
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private func sectionOverline(_ text: String) -> some View {

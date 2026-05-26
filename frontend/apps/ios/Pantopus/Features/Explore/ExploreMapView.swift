@@ -536,10 +536,10 @@ public struct ExploreMapView: View {
     private var emptyBody: some View {
         VStack(spacing: Spacing.s0) {
             ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                     .fill(Theme.Color.primary50)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                             .stroke(Theme.Color.primary100, lineWidth: 1)
                     )
                     .frame(width: 56, height: 56)
@@ -614,7 +614,7 @@ private struct ExploreTypedPin: View {
 
     private var shape: AnyShape {
         entity.kind.isSquarePin
-            ? AnyShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            ? AnyShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
             : AnyShape(Circle())
     }
 
@@ -869,13 +869,13 @@ private struct ExploreSkeletonRail: View {
                             .fill(Theme.Color.appSurfaceSunken)
                             .frame(width: 48, height: 48)
                         VStack(alignment: .leading, spacing: 6) {
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                                 .fill(Theme.Color.appSurfaceSunken)
                                 .frame(width: 44, height: 10)
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                                 .fill(Theme.Color.appSurfaceSunken)
                                 .frame(height: 12)
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                                 .fill(Theme.Color.appSurfaceSunken)
                                 .frame(width: 90, height: 10)
                         }

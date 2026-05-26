@@ -477,7 +477,7 @@ private fun FloatingTopPill(
             PantopusIconImage(
                 icon = PantopusIcon.SlidersHorizontal,
                 contentDescription = "Filters",
-                size = 16.dp,
+                size = Radii.xl,
                 strokeWidth = 2.2f,
                 tint = PantopusColors.appText,
             )
@@ -582,7 +582,7 @@ private fun MapControlButton(
                 .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 16.dp, tint = PantopusColors.appText)
+        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.xl, tint = PantopusColors.appText)
     }
 }
 
@@ -724,7 +724,7 @@ private fun DragHandle() {
                 Modifier
                     .width(40.dp)
                     .height(4.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(Radii.xs))
                     .background(PantopusColors.appBorderStrong),
         )
     }
@@ -773,7 +773,7 @@ private fun SheetHeader(
                 PantopusIconImage(
                     icon = PantopusIcon.ChevronDown,
                     contentDescription = null,
-                    size = 12.dp,
+                    size = Radii.lg,
                     strokeWidth = 2.4f,
                     tint = PantopusColors.appTextStrong,
                 )
@@ -1052,7 +1052,7 @@ private fun NearbyEntityRow(
             PantopusIconImage(
                 icon = iconFor(category = entity.category, kind = entity.kind),
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = Color.White,
             )
         }

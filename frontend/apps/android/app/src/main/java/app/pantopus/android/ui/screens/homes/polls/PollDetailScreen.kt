@@ -232,7 +232,7 @@ private fun PollHeader(
             PantopusIconImage(
                 icon = projection.kind.icon,
                 contentDescription = null,
-                size = 24.dp,
+                size = Radii.xl3,
                 tint = projection.kind.foreground,
             )
         }

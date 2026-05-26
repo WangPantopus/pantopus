@@ -235,7 +235,7 @@ private fun CategoryTile(
             PantopusIconImage(
                 icon = category.icon,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = category.palette.foreground,
             )
         }
@@ -334,7 +334,7 @@ private fun SeverityChipButton(
         PantopusIconImage(
             icon = severity.icon,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = severity.foreground,
         )
         Text(
@@ -413,7 +413,7 @@ private fun VerifiedBySection(
             PantopusIconImage(
                 icon = PantopusIcon.UserRound,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextSecondary,
             )
             Text(
@@ -426,7 +426,7 @@ private fun VerifiedBySection(
             PantopusIconImage(
                 icon = PantopusIcon.ChevronRight,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextMuted,
             )
         }
@@ -466,7 +466,7 @@ private fun MemberPickerDialog(
                         PantopusIconImage(
                             icon = PantopusIcon.X,
                             contentDescription = null,
-                            size = 16.dp,
+                            size = Radii.xl,
                             tint = PantopusColors.appTextSecondary,
                         )
                         Text("Clear selection", style = PantopusTextStyle.body)
@@ -493,7 +493,7 @@ private fun MemberPickerDialog(
                             PantopusIconImage(
                                 icon = PantopusIcon.UserRound,
                                 contentDescription = null,
-                                size = 16.dp,
+                                size = Radii.xl,
                                 tint = PantopusColors.appTextSecondary,
                             )
                             Text(
@@ -505,7 +505,7 @@ private fun MemberPickerDialog(
                                 PantopusIconImage(
                                     icon = PantopusIcon.Check,
                                     contentDescription = null,
-                                    size = 16.dp,
+                                    size = Radii.xl,
                                     tint = PantopusColors.primary600,
                                 )
                             }

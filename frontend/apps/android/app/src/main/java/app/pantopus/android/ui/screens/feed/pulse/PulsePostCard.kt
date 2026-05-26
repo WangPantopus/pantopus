@@ -251,7 +251,7 @@ private fun ReactionStrip(
             PantopusIconImage(
                 icon = PantopusIcon.Send,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = PantopusColors.appTextSecondary,
             )
             Text(
@@ -291,7 +291,7 @@ private fun ReactionPill(
         PantopusIconImage(
             icon = reaction.icon,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = tint,
         )
         if (reaction.label.isNotEmpty()) {

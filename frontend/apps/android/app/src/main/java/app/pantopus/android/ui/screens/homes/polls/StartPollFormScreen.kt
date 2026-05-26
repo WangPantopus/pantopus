@@ -277,7 +277,7 @@ private fun KindRow(
             PantopusIconImage(
                 icon = PantopusIcon.CheckCircle,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = PantopusColors.primary600,
             )
         } else {
@@ -389,7 +389,7 @@ private fun OptionRow(
                 PantopusIconImage(
                     icon = PantopusIcon.Lock,
                     contentDescription = "Locked option",
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.appTextMuted,
                 )
             }
@@ -416,7 +416,7 @@ private fun OptionRow(
                     PantopusIconImage(
                         icon = PantopusIcon.X,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         tint = PantopusColors.appTextSecondary,
                     )
                 }
@@ -510,7 +510,7 @@ private fun AudienceAllRow(
             PantopusIconImage(
                 icon = PantopusIcon.CheckCircle,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = PantopusColors.primary600,
             )
         } else {
@@ -568,7 +568,7 @@ private fun MemberToggleRow(
             PantopusIconImage(
                 icon = PantopusIcon.CheckCircle,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = PantopusColors.primary600,
             )
         } else {

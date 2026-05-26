@@ -114,7 +114,7 @@ public struct ListingDetailView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
                     .background(Theme.Color.primary600)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             }
             .buttonStyle(.plain)
             .disabled(offerMessage.isEmpty)

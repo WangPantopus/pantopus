@@ -144,7 +144,7 @@ private fun OfferSheetContent(onSubmit: (Double?, String) -> Unit) {
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(if (canSubmit) PantopusColors.primary600 else PantopusColors.appBorder)
                     .clickable(enabled = canSubmit) {
                         onSubmit(amountField.text.toDoubleOrNull(), messageField.text)

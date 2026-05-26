@@ -310,7 +310,7 @@ public struct AIElfStripView: View {
                 Icon(.sparkles, size: 13, color: Theme.Color.appTextInverse)
                     .frame(width: 24, height: 24)
                     .background(Theme.Color.primary600)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md))
                 Text(content.headline)
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Theme.Color.primary800)
@@ -381,10 +381,10 @@ private struct AIElfBulletRow: View {
                 .frame(width: 16, height: 16)
                 .background(Theme.Color.appSurface)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: Radii.xs)
                         .stroke(Theme.Color.primary100, lineWidth: 1)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .clipShape(RoundedRectangle(cornerRadius: Radii.xs))
                 .padding(.top, 1)
             (
                 Text(bullet.label).font(.system(size: 12, weight: .bold))
@@ -486,10 +486,10 @@ private struct AttachmentRow: View {
             .frame(width: 36, height: 44)
             .background(tokens.background)
             .overlay(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: Radii.sm)
                     .stroke(tokens.border, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.sm))
     }
 }
 

@@ -92,7 +92,7 @@ private fun LoadingBody() {
     ) {
         Shimmer(width = 360.dp, height = 72.dp, cornerRadius = 14.dp)
         Shimmer(width = 360.dp, height = 44.dp, cornerRadius = 10.dp)
-        Shimmer(width = 360.dp, height = 88.dp, cornerRadius = 12.dp)
+        Shimmer(width = 360.dp, height = 88.dp, cornerRadius = Radii.lg)
     }
 }
 
@@ -123,7 +123,7 @@ private fun ErrorBody(
         Box(
             modifier =
                 Modifier
-                    .clip(RoundedCornerShape(999.dp))
+                    .clip(RoundedCornerShape(Radii.pill))
                     .background(PantopusColors.primary600)
                     .clickable(onClick = onRetry)
                     .padding(horizontal = Spacing.s4)
@@ -296,12 +296,12 @@ private fun UsernameAckRow(
             modifier =
                 Modifier
                     .size(18.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(Radii.xs))
                     .background(if (handle.acknowledgedUsingUsername) PantopusColors.primary600 else PantopusColors.appSurface)
                     .border(
                         2.dp,
                         if (handle.acknowledgedUsingUsername) PantopusColors.primary600 else PantopusColors.appBorderStrong,
-                        RoundedCornerShape(4.dp),
+                        RoundedCornerShape(Radii.xs),
                     ),
             contentAlignment = Alignment.Center,
         ) {
@@ -309,7 +309,7 @@ private fun UsernameAckRow(
                 PantopusIconImage(
                     icon = PantopusIcon.Check,
                     contentDescription = null,
-                    size = 12.dp,
+                    size = Radii.lg,
                     strokeWidth = 2f,
                     tint = PantopusColors.appTextInverse,
                 )
@@ -346,7 +346,7 @@ private fun PlatformTrustNote() {
         PantopusIconImage(
             icon = PantopusIcon.Lock,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2f,
             tint = PantopusColors.primary600,
         )
@@ -406,12 +406,12 @@ private fun TierRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(if (isSelected) PantopusColors.primary50 else PantopusColors.appSurface)
                 .border(
                     width = if (isSelected) 2.dp else 1.dp,
                     color = if (isSelected) PantopusColors.primary600 else PantopusColors.appBorder,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(Radii.lg),
                 )
                 .clickable(onClick = onSelect)
                 .padding(14.dp)
@@ -464,7 +464,7 @@ private fun HandleEchoCard(handleValue: String) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurfaceSunken)
                 .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -473,7 +473,7 @@ private fun HandleEchoCard(handleValue: String) {
         PantopusIconImage(
             icon = PantopusIcon.UserPlus,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2f,
             tint = PantopusColors.primary600,
         )

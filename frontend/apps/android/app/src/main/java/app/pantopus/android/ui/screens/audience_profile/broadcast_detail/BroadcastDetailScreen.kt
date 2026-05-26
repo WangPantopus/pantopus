@@ -159,10 +159,10 @@ internal fun LoadingFrame() {
                 .testTag("broadcastDetailLoading"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Shimmer(width = 360.dp, height = 180.dp, cornerRadius = 16.dp)
-        Shimmer(width = 360.dp, height = 72.dp, cornerRadius = 12.dp)
-        Shimmer(width = 360.dp, height = 96.dp, cornerRadius = 12.dp)
-        repeat(3) { Shimmer(width = 360.dp, height = 72.dp, cornerRadius = 12.dp) }
+        Shimmer(width = 360.dp, height = 180.dp, cornerRadius = Radii.xl)
+        Shimmer(width = 360.dp, height = 72.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 360.dp, height = 96.dp, cornerRadius = Radii.lg)
+        repeat(3) { Shimmer(width = 360.dp, height = 72.dp, cornerRadius = Radii.lg) }
     }
 }
 
@@ -249,9 +249,9 @@ private fun HeroCard(hero: BroadcastDetailHero) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(16.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .testTag("broadcastDetailHero"),
     ) {
         Column(
@@ -310,7 +310,7 @@ private fun VisibilityChip(hero: BroadcastDetailHero) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.primary50)
                 .padding(horizontal = 7.dp, vertical = 2.dp)
                 .testTag("broadcastDetailVisibilityChip"),
@@ -367,7 +367,7 @@ private fun AnalyticsCell(
     Column(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurfaceSunken)
                 .padding(Spacing.s3)
                 .testTag("broadcastDetailCell_${cell.id}"),
@@ -407,9 +407,9 @@ private fun TierBreakdownCard(breakdown: BroadcastTierBreakdown) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(Spacing.s3)
                 .testTag("broadcastDetailTierBreakdown"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -443,7 +443,7 @@ private fun TierStackedBar(breakdown: BroadcastTierBreakdown) {
             Modifier
                 .fillMaxWidth()
                 .height(10.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(Radii.sm))
                 .semantics { contentDescription = summary }
                 .testTag("broadcastDetailTierBar"),
     ) {
@@ -563,9 +563,9 @@ private fun RepliesSection(loaded: BroadcastDetailLoaded) {
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
             ) {
                 loaded.replies.forEachIndexed { index, reply ->
                     ReplyRow(reply)
@@ -590,9 +590,9 @@ private fun EmptyRepliesCard() {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(Spacing.s5)
                 .testTag("broadcastDetailEmptyReplies"),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -682,7 +682,7 @@ private fun TierChip(
     Box(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(color.copy(alpha = 0.12f))
                 .padding(horizontal = 6.dp, vertical = 1.dp),
     ) {
@@ -732,7 +732,7 @@ private fun StickyFooter(
                     Modifier
                         .weight(1f)
                         .heightIn(min = 44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.primary600)
                         .clickable(onClick = onReply)
                         .padding(horizontal = Spacing.s4)
@@ -775,9 +775,9 @@ private fun SecondaryFooterButton(
             modifier
                 .widthIn(min = 88.dp)
                 .heightIn(min = 44.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onClick)
                 .padding(horizontal = Spacing.s3)
                 .semantics { contentDescription = label },

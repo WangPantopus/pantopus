@@ -290,7 +290,7 @@ internal fun ChatHeader(
             PantopusIconImage(
                 icon = PantopusIcon.ChevronLeft,
                 contentDescription = "Back",
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = PantopusColors.appText,
             )
         }
@@ -478,7 +478,7 @@ internal fun CreatorAudienceStrip(
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = "Open audience profile",
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2.4f,
             tint = PantopusColors.business,
         )
@@ -533,7 +533,7 @@ internal fun CreatorQuotaMeter(quota: ChatCreatorQuota) {
                 Modifier
                     .fillMaxWidth()
                     .height(4.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(Radii.xs))
                     .background(PantopusColors.appSurfaceSunken),
         ) {
             Box(
@@ -541,7 +541,7 @@ internal fun CreatorQuotaMeter(quota: ChatCreatorQuota) {
                     Modifier
                         .fillMaxWidth(progress)
                         .height(4.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(RoundedCornerShape(Radii.xs))
                         .background(PantopusColors.primary600),
             )
         }
@@ -1240,7 +1240,7 @@ private fun EncryptionPill() {
         PantopusIconImage(
             icon = PantopusIcon.ShieldCheck,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = PantopusColors.primary600,
         )
         Text(
@@ -1582,8 +1582,8 @@ private fun BubbleContainer(
 ) {
     val shape =
         RoundedCornerShape(
-            topStart = 16.dp,
-            topEnd = 16.dp,
+            topStart = Radii.xl,
+            topEnd = Radii.xl,
             bottomEnd = if (isOut && hasTail) 4.dp else 16.dp,
             bottomStart = if (!isOut && hasTail) 4.dp else 16.dp,
         )
@@ -1642,7 +1642,7 @@ private fun LockedPaywallOverlay(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 12.dp, tint = PantopusColors.primary600)
+            PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = Radii.lg, tint = PantopusColors.primary600)
             Text(
                 text = "Upgrade to read",
                 fontSize = 12.sp,
@@ -1720,8 +1720,8 @@ private fun PhotoBubble(
 ) {
     val shape =
         RoundedCornerShape(
-            topStart = 16.dp,
-            topEnd = 16.dp,
+            topStart = Radii.xl,
+            topEnd = Radii.xl,
             bottomEnd = if (isOut && hasTail) 4.dp else 16.dp,
             bottomStart = if (!isOut && hasTail) 4.dp else 16.dp,
         )
@@ -1809,9 +1809,9 @@ private fun AiReplyBubble(
                 .widthIn(max = 300.dp)
                 .clip(
                     RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomEnd = 16.dp,
+                        topStart = Radii.xl,
+                        topEnd = Radii.xl,
+                        bottomEnd = Radii.xl,
                         bottomStart = if (hasTail) 4.dp else 16.dp,
                     ),
                 )
@@ -1885,7 +1885,7 @@ private fun SystemLinkPill(body: ChatBubbleBody.SystemLink) {
             PantopusIconImage(
                 icon = PantopusIcon.Info,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = PantopusColors.appTextInverse,
             )
         }
@@ -2001,7 +2001,7 @@ private fun ReadReceipt(timestamp: String) {
         PantopusIconImage(
             icon = PantopusIcon.CheckCheck,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             strokeWidth = 2.5f,
             tint = PantopusColors.primary600,
         )
@@ -2026,10 +2026,10 @@ internal fun TypingIndicator(initials: String) {
                 Modifier
                     .clip(
                         RoundedCornerShape(
-                            topStart = 16.dp,
-                            topEnd = 16.dp,
-                            bottomEnd = 16.dp,
-                            bottomStart = 4.dp,
+                            topStart = Radii.xl,
+                            topEnd = Radii.xl,
+                            bottomEnd = Radii.xl,
+                            bottomStart = Radii.xs,
                         ),
                     )
                     .background(PantopusColors.appSurfaceSunken)
@@ -2037,10 +2037,10 @@ internal fun TypingIndicator(initials: String) {
                         1.dp,
                         PantopusColors.appBorder,
                         RoundedCornerShape(
-                            topStart = 16.dp,
-                            topEnd = 16.dp,
-                            bottomEnd = 16.dp,
-                            bottomStart = 4.dp,
+                            topStart = Radii.xl,
+                            topEnd = Radii.xl,
+                            bottomEnd = Radii.xl,
+                            bottomStart = Radii.xs,
                         ),
                     )
                     .padding(horizontal = Spacing.s3, vertical = 10.dp),
@@ -2350,7 +2350,7 @@ internal fun FanTierUpgradePromptSheet(entitlement: ChatFanEntitlement) {
                 modifier = Modifier.size(44.dp).clip(CircleShape).background(PantopusColors.primary50),
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 20.dp, tint = PantopusColors.primary600)
+                PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = Radii.xl2, tint = PantopusColors.primary600)
             }
             Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
                 Text(

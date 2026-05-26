@@ -109,7 +109,7 @@ fun HubTopBar(
                 PantopusIconImage(
                     icon = PantopusIcon.Bell,
                     contentDescription = null,
-                    size = 20.dp,
+                    size = Radii.xl2,
                     tint = PantopusColors.appText,
                 )
                 if (content.unreadCount > 0) {
@@ -137,7 +137,7 @@ fun HubTopBar(
                 PantopusIconImage(
                     icon = PantopusIcon.Menu,
                     contentDescription = null,
-                    size = 20.dp,
+                    size = Radii.xl2,
                     tint = PantopusColors.appText,
                 )
             }
@@ -204,7 +204,7 @@ fun HubSetupBanner(
             PantopusIconImage(
                 icon = PantopusIcon.ShieldCheck,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.warning,
             )
         }
@@ -414,7 +414,7 @@ fun HubTodayCard(
             PantopusIconImage(
                 icon = PantopusIcon.Sun,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = Color.White,
             )
         }
@@ -453,7 +453,7 @@ fun HubTodayCard(
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.appTextMuted,
         )
     }
@@ -1044,7 +1044,7 @@ fun HubSkeleton() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            Shimmer(width = 40.dp, height = 40.dp, cornerRadius = 20.dp)
+            Shimmer(width = 40.dp, height = 40.dp, cornerRadius = Radii.xl2)
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                 Shimmer(width = 80.dp, height = 11.dp)
                 Shimmer(width = 160.dp, height = 16.dp)

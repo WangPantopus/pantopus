@@ -57,7 +57,7 @@ fun VerifiedBadge(
 private fun VerifiedBadgePreview() {
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.background(Color.White)) {
         VerifiedBadge()
-        VerifiedBadge(size = 20.dp)
+        VerifiedBadge(size = Radii.xl2)
         VerifiedBadge(size = 28.dp)
     }
 }

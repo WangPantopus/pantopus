@@ -254,7 +254,7 @@ private fun StatusCircle(event: ChainOfCustodyEvent) {
         PantopusIconImage(
             icon = event.icon,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = glyphColor,
         )
     }

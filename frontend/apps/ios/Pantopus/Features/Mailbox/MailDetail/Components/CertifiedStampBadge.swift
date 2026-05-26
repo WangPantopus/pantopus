@@ -44,10 +44,10 @@ public struct CertifiedStampBadge: View {
         .padding(.vertical, 6)
         .background(stampBackground)
         .overlay(
-            RoundedRectangle(cornerRadius: 4)
+            RoundedRectangle(cornerRadius: Radii.xs)
                 .stroke(stampForeground, lineWidth: 1.5)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xs))
         .rotationEffect(.degrees(-1.5))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("USPS Certified Mail · tracking \(displayTracking)")

@@ -162,7 +162,7 @@ private fun LazyListScope.verifiedBadgeSection() {
     item {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
             VerifiedBadge()
-            VerifiedBadge(size = 20.dp)
+            VerifiedBadge(size = Radii.xl2)
             VerifiedBadge(size = 28.dp)
         }
     }

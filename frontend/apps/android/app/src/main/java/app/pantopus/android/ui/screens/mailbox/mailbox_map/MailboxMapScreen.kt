@@ -992,7 +992,7 @@ private fun KindTile(
         PantopusIconImage(
             icon = kind.glyph,
             contentDescription = null,
-            size = 20.dp,
+            size = Radii.xl2,
             strokeWidth = 2f,
             tint = PantopusColors.appTextInverse,
         )
@@ -1025,7 +1025,7 @@ private fun DirectionGlyphButton(
         PantopusIconImage(
             icon = PantopusIcon.Navigation,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2.2f,
             tint = if (active) PantopusColors.appTextInverse else PantopusColors.primary700,
         )
@@ -1295,7 +1295,7 @@ private fun MailboxDetailPanel(
                 PantopusIconImage(
                     icon = PantopusIcon.Navigation,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     strokeWidth = 2.4f,
                     tint = PantopusColors.appTextInverse,
                 )

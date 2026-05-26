@@ -309,10 +309,10 @@ public struct TasksMapView: View {
     private var emptyBody: some View {
         VStack(spacing: Spacing.s0) {
             ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                     .fill(Theme.Color.primary50)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                             .stroke(Theme.Color.primary100, lineWidth: 1)
                     )
                 Icon(.mapPin, size: 24, color: Theme.Color.primary600)

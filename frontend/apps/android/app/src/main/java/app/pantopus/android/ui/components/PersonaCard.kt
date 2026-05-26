@@ -73,9 +73,9 @@ fun PersonaCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(pillar.backgroundColor)
-                .border(1.dp, pillar.color.copy(alpha = 0.18f), RoundedCornerShape(12.dp))
+                .border(1.dp, pillar.color.copy(alpha = 0.18f), RoundedCornerShape(Radii.lg))
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
@@ -112,7 +112,7 @@ fun PersonaCard(
             PantopusIconImage(
                 icon = PantopusIcon.ChevronRight,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 strokeWidth = 2f,
                 tint = PantopusColors.appTextMuted,
             )
@@ -156,7 +156,7 @@ private fun Avatar(
                 PantopusIconImage(
                     icon = PantopusIcon.Check,
                     contentDescription = null,
-                    size = 8.dp,
+                    size = Radii.md,
                     strokeWidth = 4f,
                     tint = PantopusColors.appTextInverse,
                 )
@@ -173,7 +173,7 @@ private fun PillarChip(
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.appSurface)
                 .padding(horizontal = 6.dp, vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically,

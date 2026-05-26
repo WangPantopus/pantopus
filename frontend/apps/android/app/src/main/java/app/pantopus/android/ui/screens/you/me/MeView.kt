@@ -414,7 +414,7 @@ private fun ActionTile(
             PantopusIconImage(
                 icon = tile.icon,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = if (isUnbound) PantopusColors.appTextMuted else accent,
             )
             Text(

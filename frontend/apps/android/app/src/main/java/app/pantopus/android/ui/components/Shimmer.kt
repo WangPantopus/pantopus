@@ -138,6 +138,6 @@ private fun ShimmerPreview() {
                 .spacedBy(8.dp),
     ) {
         Shimmer(width = 160.dp, height = 16.dp)
-        Shimmer(width = 120.dp, height = 12.dp, cornerRadius = 4.dp)
+        Shimmer(width = 120.dp, height = 12.dp, cornerRadius = Radii.xs)
     }
 }

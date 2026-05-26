@@ -245,7 +245,7 @@ private fun PageIndicator(
                 PantopusIconImage(
                     icon = PantopusIcon.FileType,
                     contentDescription = null,
-                    size = 12.dp,
+                    size = Radii.lg,
                     tint = PantopusColors.primary600,
                 )
                 Text(
@@ -399,7 +399,7 @@ private fun GridMode(
                 PantopusIconImage(
                     icon = PantopusIcon.ChevronLeft,
                     contentDescription = null,
-                    size = 12.dp,
+                    size = Radii.lg,
                     tint = PantopusColors.primary600,
                 )
                 Text(
@@ -449,11 +449,11 @@ private fun ThumbnailCell(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(3f / 4f)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(Radii.sm))
                 .border(
                     width = if (isCurrent) 2.5.dp else 1.dp,
                     color = if (isCurrent) PantopusColors.primary600 else PantopusColors.appBorder,
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(Radii.sm),
                 )
                 .clickable(onClick = onClick)
                 .testTag("bookletPager_thumb_${page - 1}")
@@ -463,7 +463,7 @@ private fun ThumbnailCell(
             modifier = Modifier.matchParentSize(),
             hasNextPage = hasNextPage,
             foldSize = Spacing.s4,
-            cornerRadius = 6.dp,
+            cornerRadius = Radii.sm,
         ) {
             AsyncImage(
                 model = url,

@@ -384,10 +384,10 @@ struct CertifiedDetailLayout: View {
             .padding(.vertical, 11)
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: Radii.lg)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -672,7 +672,7 @@ private struct CertifiedKeyFactsCard: View {
                 Icon(row.icon, size: row.isEmphasis ? 15 : 13, color: tintForeground)
                     .frame(width: row.isEmphasis ? 28 : 24, height: row.isEmphasis ? 28 : 24)
                     .background(tintBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.sm))
                 VStack(alignment: .leading, spacing: row.isEmphasis ? 2 : 1) {
                     Text(row.label.uppercased())
                         .font(.system(size: 11, weight: .semibold))

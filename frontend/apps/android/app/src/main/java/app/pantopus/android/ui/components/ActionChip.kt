@@ -78,7 +78,7 @@ fun ActionChip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 16.dp, tint = fg)
+        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.xl, tint = fg)
         Text(text = label, style = PantopusTextStyle.small, color = fg)
     }
 }

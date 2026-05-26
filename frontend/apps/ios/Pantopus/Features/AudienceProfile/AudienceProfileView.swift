@@ -118,7 +118,7 @@ public struct AudienceProfileView: View {
     private var loadingFrame: some View {
         ScrollView {
             VStack(spacing: Spacing.s3) {
-                Shimmer(height: 90, cornerRadius: 16)
+                Shimmer(height: 90, cornerRadius: Radii.xl)
                 Shimmer(height: 44, cornerRadius: 22)
                 ForEach(0..<3, id: \.self) { _ in
                     Shimmer(height: 88, cornerRadius: 14)
@@ -636,10 +636,10 @@ public struct AudienceProfileView: View {
             .frame(maxWidth: .infinity)
             .background(Theme.Color.primary50.opacity(0.5))
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(Theme.Color.primary100, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Compose a broadcast")
@@ -982,10 +982,10 @@ public struct AudienceProfileView: View {
         .padding(Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("tierStackedBar")
     }
 
@@ -1079,10 +1079,10 @@ public struct AudienceProfileView: View {
             .padding(Spacing.s3)
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("followerRow_\(row.id)")
@@ -1260,10 +1260,10 @@ public struct AudienceProfileView: View {
             .padding(Spacing.s3)
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("threadRow_\(row.id)")

@@ -116,8 +116,8 @@ private fun LoadingFrame() {
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Shimmer(width = 360.dp, height = 130.dp, cornerRadius = 14.dp)
-        Shimmer(width = 360.dp, height = 80.dp, cornerRadius = 12.dp)
-        Shimmer(width = 360.dp, height = 120.dp, cornerRadius = 12.dp)
+        Shimmer(width = 360.dp, height = 80.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 360.dp, height = 120.dp, cornerRadius = Radii.lg)
     }
 }
 
@@ -199,7 +199,7 @@ private fun InviteTypeChip(type: InviteType) {
     Box(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(bg)
                 .padding(horizontal = Spacing.s2, vertical = 3.dp)
                 .testTag("tokenAcceptTypeChip"),
@@ -219,7 +219,7 @@ private fun IdentityChip(chip: IdentityChipContent) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.primary50)
                 .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .testTag("tokenAcceptIdentityChip"),
@@ -229,7 +229,7 @@ private fun IdentityChip(chip: IdentityChipContent) {
         PantopusIconImage(
             icon = PantopusIcon.User,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             strokeWidth = 2f,
             tint = PantopusColors.primary600,
         )
@@ -248,9 +248,9 @@ private fun RoleCard(offer: TokenAcceptOffer) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(14.dp)
                 .testTag("tokenAcceptRoleCard"),
         verticalAlignment = Alignment.CenterVertically,
@@ -267,7 +267,7 @@ private fun RoleCard(offer: TokenAcceptOffer) {
             PantopusIconImage(
                 icon = PantopusIcon.UserPlus,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 strokeWidth = 2f,
                 tint = PantopusColors.primary600,
             )
@@ -296,9 +296,9 @@ private fun BenefitsCard(offer: TokenAcceptOffer) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(14.dp)
                 .testTag("tokenAcceptBenefits"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -349,7 +349,7 @@ private fun SafetyBandRow(band: SafetyBand) {
         PantopusIconImage(
             icon = band.icon,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2f,
             tint = PantopusColors.primary600,
             modifier = Modifier.padding(top = 1.dp),
@@ -363,7 +363,7 @@ private fun ExpiryPill(text: String) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.warningBg)
                 .padding(horizontal = 10.dp, vertical = 6.dp)
                 .testTag("tokenAcceptExpiry"),
@@ -590,7 +590,7 @@ private fun ErrorFrame(
             Box(
                 modifier =
                     Modifier
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appSurfaceSunken)
                         .clickable(onClick = onDone)
                         .padding(horizontal = Spacing.s4)
@@ -602,7 +602,7 @@ private fun ErrorFrame(
             Box(
                 modifier =
                     Modifier
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.primary600)
                         .clickable(onClick = onRetry)
                         .padding(horizontal = Spacing.s4)
@@ -626,7 +626,7 @@ private fun DoneButton(onDone: () -> Unit) {
     Box(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.primary600)
                 .clickable(onClick = onDone)
                 .padding(horizontal = 22.dp)

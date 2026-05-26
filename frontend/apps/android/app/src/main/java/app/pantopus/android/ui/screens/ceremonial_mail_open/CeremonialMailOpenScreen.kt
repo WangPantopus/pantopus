@@ -243,7 +243,7 @@ private fun ErrorFrame(
             Box(
                 modifier =
                     Modifier
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.primary600)
                         .clickable(onClick = onRetry)
                         .padding(horizontal = Spacing.s4)
@@ -487,13 +487,13 @@ private fun EnvelopeShape(
             Modifier
                 .fillMaxSize()
                 .offset(y = liftDp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(letter.stationery.paperColor, letter.stationery.paperEdgeColor),
                     ),
                 )
-                .border(1.dp, Color.Black.copy(alpha = 0.22f), RoundedCornerShape(8.dp)),
+                .border(1.dp, Color.Black.copy(alpha = 0.22f), RoundedCornerShape(Radii.md)),
     ) {
         // Letter peeking up in breaking phase
         if (phase == CeremonialMailPhase.Breaking) {
@@ -550,9 +550,9 @@ private fun SenderStamp(letter: CeremonialMailLetter) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(Color.White.copy(alpha = 0.14f))
-                .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(Radii.pill))
                 .padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -601,7 +601,7 @@ private fun OpenEnvelopeCta(onTap: () -> Unit) {
         modifier =
             Modifier
                 .padding(top = Spacing.s2)
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(Color(0xFFF6ECD8).copy(alpha = 0.96f))
                 .clickable(onClick = onTap)
                 .padding(horizontal = 28.dp, vertical = 14.dp)
@@ -923,7 +923,7 @@ private fun SenderRow(letter: CeremonialMailLetter) {
                 PantopusIconImage(
                     icon = PantopusIcon.Check,
                     contentDescription = null,
-                    size = 8.dp,
+                    size = Radii.md,
                     tint = Color.White,
                 )
             }
@@ -1039,9 +1039,9 @@ private fun VoicePostscriptCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(999.dp))
+                    .clip(RoundedCornerShape(Radii.pill))
                     .background(letter.stationery.paperColor.copy(alpha = 0.7f))
-                    .border(1.dp, letter.ink.color.copy(alpha = 0.13f), RoundedCornerShape(999.dp))
+                    .border(1.dp, letter.ink.color.copy(alpha = 0.13f), RoundedCornerShape(Radii.pill))
                     .clickable(onClick = onToggle)
                     .padding(horizontal = 14.dp, vertical = 6.dp)
                     .testTag("ceremonialMailVoicePostscript")
@@ -1136,7 +1136,7 @@ private fun StickyBottomBar(
             modifier =
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(999.dp))
+                    .clip(RoundedCornerShape(Radii.pill))
                     .background(PantopusColors.primary600)
                     .clickable(onClick = onReply)
                     .padding(vertical = Spacing.s3)
@@ -1151,9 +1151,9 @@ private fun StickyBottomBar(
         Row(
             modifier =
                 Modifier
-                    .clip(RoundedCornerShape(999.dp))
+                    .clip(RoundedCornerShape(Radii.pill))
                     .background(Color.White.copy(alpha = 0.65f))
-                    .border(1.dp, letter.ink.color.copy(alpha = 0.13f), RoundedCornerShape(999.dp))
+                    .border(1.dp, letter.ink.color.copy(alpha = 0.13f), RoundedCornerShape(Radii.pill))
                     .clickable(onClick = onSave)
                     .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
                     .testTag("ceremonialMailOutcome_save"),
@@ -1257,7 +1257,7 @@ private fun ReplyTopBar(
         Box(
             modifier =
                 Modifier
-                    .clip(RoundedCornerShape(999.dp))
+                    .clip(RoundedCornerShape(Radii.pill))
                     .background(PantopusColors.primary600)
                     .clickable(onClick = onContinue)
                     .padding(horizontal = Spacing.s3)

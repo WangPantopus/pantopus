@@ -104,7 +104,7 @@ public struct CombinedSenderCarrierCard: View {
                     .foregroundStyle(Theme.Color.appTextInverse)
                     .frame(width: 40, height: 40)
                     .background(senderAvatarTint)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
                 Icon(.check, size: 9, color: Theme.Color.appTextInverse)
                     .frame(width: 15, height: 15)
                     .background(Theme.Color.success)
@@ -162,10 +162,10 @@ public struct CombinedSenderCarrierCard: View {
             .frame(width: 40, height: 40)
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: Radii.lg)
                     .stroke(stampForeground, lineWidth: 1.5)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
             VStack(alignment: .leading, spacing: 2) {
                 eyebrow("DELIVERED VIA")
                 Text(carrier.service)

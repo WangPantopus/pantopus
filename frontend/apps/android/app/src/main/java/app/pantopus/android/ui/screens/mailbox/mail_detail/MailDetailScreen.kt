@@ -414,7 +414,7 @@ private fun SenderAvatar(content: MailDetailContent) {
             modifier =
                 Modifier
                     .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(content.category.accent),
             contentAlignment = Alignment.Center,
         ) {
@@ -599,7 +599,7 @@ private fun KeyFactsCard(rows: List<MailDetailKeyFact>) {
                     modifier =
                         Modifier
                             .size(24.dp)
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(Radii.sm))
                             .background(PantopusColors.appSurfaceSunken),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -734,7 +734,7 @@ private fun AcknowledgeButton(
                     PantopusIcon.Check
                 },
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = fg,
         )
         Spacer(Modifier.width(Spacing.s2))
@@ -763,9 +763,9 @@ private fun SecondaryTile(
     Column(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onClick)
                 .padding(vertical = 10.dp)
                 .semantics { contentDescription = label }

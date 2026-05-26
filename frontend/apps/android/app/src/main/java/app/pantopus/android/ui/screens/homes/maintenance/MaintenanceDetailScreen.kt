@@ -280,7 +280,7 @@ private fun MaintenanceHeader(projection: MaintenanceRowProjection) {
                 PantopusIconImage(
                     icon = category.icon,
                     contentDescription = null,
-                    size = 24.dp,
+                    size = Radii.xl3,
                     tint = category.foreground,
                 )
             }
@@ -521,7 +521,7 @@ private fun DetailActions(
             PantopusIconImage(
                 icon = PantopusIcon.Pencil,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.primary600,
             )
             Spacer(modifier = Modifier.width(Spacing.s2))
@@ -547,7 +547,7 @@ private fun DetailActions(
             PantopusIconImage(
                 icon = PantopusIcon.Trash2,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.error,
             )
             Spacer(modifier = Modifier.width(Spacing.s2))

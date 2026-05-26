@@ -161,10 +161,10 @@ public struct TokenAcceptView: View {
         .padding(14)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("tokenAcceptRoleCard")
     }
 
@@ -189,10 +189,10 @@ public struct TokenAcceptView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("tokenAcceptBenefits")
     }
 
@@ -274,8 +274,8 @@ public struct TokenAcceptView: View {
         ScrollView {
             VStack(spacing: Spacing.s3) {
                 Shimmer(height: 130, cornerRadius: 14)
-                Shimmer(height: 80, cornerRadius: 12)
-                Shimmer(height: 120, cornerRadius: 12)
+                Shimmer(height: 80, cornerRadius: Radii.lg)
+                Shimmer(height: 120, cornerRadius: Radii.lg)
             }
             .padding(Spacing.s4)
         }

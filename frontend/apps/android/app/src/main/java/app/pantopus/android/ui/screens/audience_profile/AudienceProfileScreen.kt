@@ -181,7 +181,7 @@ private fun MemberFooter(onOpenMembership: (String) -> Unit) {
         PantopusIconImage(
             icon = PantopusIcon.Crown,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2.3f,
             tint = PantopusColors.primary600,
         )
@@ -268,7 +268,7 @@ private fun TopBar(
                 PantopusIconImage(
                     icon = PantopusIcon.Pencil,
                     contentDescription = null,
-                    size = 20.dp,
+                    size = Radii.xl2,
                     strokeWidth = 2f,
                     tint = PantopusColors.appText,
                 )
@@ -291,7 +291,7 @@ internal fun LoadingFrame() {
                 .testTag("audienceProfileLoading"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Shimmer(width = 360.dp, height = 90.dp, cornerRadius = 16.dp)
+        Shimmer(width = 360.dp, height = 90.dp, cornerRadius = Radii.xl)
         Shimmer(width = 360.dp, height = 44.dp, cornerRadius = 22.dp)
         repeat(3) { Shimmer(width = 360.dp, height = 88.dp, cornerRadius = 14.dp) }
     }
@@ -618,7 +618,7 @@ private fun HeaderCard(header: AudienceHeaderContent) {
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             strokeWidth = 2f,
             tint = PantopusColors.primary600,
         )
@@ -874,7 +874,7 @@ private fun SectionHeader(
             PantopusIconImage(
                 icon = PantopusIcon.ChevronRight,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 strokeWidth = 2f,
                 tint = PantopusColors.primary600,
             )
@@ -892,9 +892,9 @@ private fun FullComposerEntry(onClick: () -> Unit) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.primary50.copy(alpha = 0.5f))
-                .border(1.dp, PantopusColors.primary100, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.primary100, RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onClick)
                 .padding(10.dp)
                 .testTag("audienceProfileComposeBroadcast")
@@ -909,7 +909,7 @@ private fun FullComposerEntry(onClick: () -> Unit) {
             PantopusIconImage(
                 icon = PantopusIcon.Megaphone,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 strokeWidth = 2f,
                 tint = PantopusColors.primary600,
             )
@@ -995,7 +995,7 @@ private fun ComposerCard(
             Box(
                 modifier =
                     Modifier
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(RoundedCornerShape(Radii.pill))
                         .background(if (canSubmit) PantopusColors.primary600 else PantopusColors.appBorderStrong)
                         .clickable(enabled = canSubmit) { onSubmit() }
                         .padding(horizontal = Spacing.s4)
@@ -1034,7 +1034,7 @@ private fun VisibilityPicker(
         Row(
             modifier =
                 Modifier
-                    .clip(RoundedCornerShape(999.dp))
+                    .clip(RoundedCornerShape(Radii.pill))
                     .background(PantopusColors.primary50)
                     .clickable { expanded = true }
                     .padding(horizontal = 10.dp, vertical = 5.dp)
@@ -1051,7 +1051,7 @@ private fun VisibilityPicker(
             PantopusIconImage(
                 icon = PantopusIcon.ChevronDown,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 strokeWidth = 2f,
                 tint = PantopusColors.primary700,
             )
@@ -1198,7 +1198,7 @@ private fun VisibilityChip(card: UpdateCardContent) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(visibilityBackground(card))
                 .padding(horizontal = 7.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1229,7 +1229,7 @@ private fun MetricLabel(
         PantopusIconImage(
             icon = icon,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             strokeWidth = 2f,
             tint = PantopusColors.appTextSecondary,
         )
@@ -1503,9 +1503,9 @@ private fun TierStackedBar(breakdown: TierBreakdownContent) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(Spacing.s3)
                 .testTag("tierStackedBar"),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -1574,12 +1574,12 @@ private fun TierChipRow(
             Box(
                 modifier =
                     Modifier
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(RoundedCornerShape(Radii.pill))
                         .background(if (isActive) PantopusColors.primary600 else PantopusColors.appSurface)
                         .border(
                             1.dp,
                             if (isActive) PantopusColors.primary600 else PantopusColors.appBorder,
-                            RoundedCornerShape(999.dp),
+                            RoundedCornerShape(Radii.pill),
                         )
                         .clickable { onSelect(chip.rank) }
                         .padding(horizontal = 10.dp)
@@ -1607,9 +1607,9 @@ private fun FollowerRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onOpen)
                 .padding(Spacing.s3)
                 .testTag("followerRow_${row.id}"),
@@ -1639,7 +1639,7 @@ private fun FollowerRow(
                     PantopusIconImage(
                         icon = PantopusIcon.ShieldCheck,
                         contentDescription = "Verified neighbor",
-                        size = 12.dp,
+                        size = Radii.lg,
                         strokeWidth = 2f,
                         tint = PantopusColors.success,
                     )
@@ -1774,9 +1774,9 @@ private fun ThreadsFilterChip(
         modifier =
             Modifier
                 .heightIn(min = 28.dp)
-                .clip(RoundedCornerShape(9999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(bg)
-                .border(width = 1.dp, color = border, shape = RoundedCornerShape(9999.dp))
+                .border(width = 1.dp, color = border, shape = RoundedCornerShape(Radii.pill))
                 .clickable { onSelect(chip.filter) }
                 .padding(horizontal = 11.dp, vertical = 5.dp)
                 .testTag("threadsFilterChip_${chip.id}")
@@ -1840,9 +1840,9 @@ private fun ViewAllMessagesCTA(onClick: () -> Unit) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.primary50)
-                .border(1.dp, PantopusColors.primary100, RoundedCornerShape(8.dp))
+                .border(1.dp, PantopusColors.primary100, RoundedCornerShape(Radii.md))
                 .clickable(onClick = onClick)
                 .heightIn(min = 44.dp)
                 .padding(horizontal = Spacing.s3, vertical = 10.dp)
@@ -1868,7 +1868,7 @@ private fun ViewAllMessagesCTA(onClick: () -> Unit) {
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             strokeWidth = 2f,
             tint = PantopusColors.primary600,
         )
@@ -1884,9 +1884,9 @@ private fun ThreadRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onOpen)
                 .padding(Spacing.s3)
                 .testTag("threadRow_${row.id}"),
@@ -1910,7 +1910,7 @@ private fun ThreadRow(
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)
-                            .clip(RoundedCornerShape(999.dp))
+                            .clip(RoundedCornerShape(Radii.pill))
                             .background(PantopusColors.error)
                             .padding(horizontal = Spacing.s1)
                             .widthIn(min = 16.dp)
@@ -1938,7 +1938,7 @@ private fun ThreadRow(
                     Box(
                         modifier =
                             Modifier
-                                .clip(RoundedCornerShape(999.dp))
+                                .clip(RoundedCornerShape(Radii.pill))
                                 .background(PantopusColors.primary50)
                                 .padding(horizontal = 5.dp, vertical = 1.dp),
                     ) {

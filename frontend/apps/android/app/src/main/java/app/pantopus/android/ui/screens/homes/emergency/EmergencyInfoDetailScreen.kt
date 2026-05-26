@@ -232,7 +232,7 @@ private fun DetailHeader(
                 PantopusIconImage(
                     icon = draft.category.icon,
                     contentDescription = null,
-                    size = 24.dp,
+                    size = Radii.xl3,
                     tint = draft.category.palette.foreground,
                 )
             }
@@ -276,7 +276,7 @@ fun SeverityChip(severity: EmergencySeverity) {
         PantopusIconImage(
             icon = severity.icon,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = severity.foreground,
         )
         Text(
@@ -386,7 +386,7 @@ private fun ActionsRow(
             PantopusIconImage(
                 icon = PantopusIcon.Pencil,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextInverse,
             )
             Text(
@@ -413,7 +413,7 @@ private fun ActionsRow(
             PantopusIconImage(
                 icon = PantopusIcon.Trash2,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.error,
             )
             Text(

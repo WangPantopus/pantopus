@@ -193,7 +193,7 @@ private fun QuickActionTileView(
                 PantopusIconImage(
                     icon = action.icon,
                     contentDescription = null,
-                    size = 20.dp,
+                    size = Radii.xl2,
                     tint = if (action.isMuted) PantopusColors.appTextMuted else action.tone.color,
                 )
             }

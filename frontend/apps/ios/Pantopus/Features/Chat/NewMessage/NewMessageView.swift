@@ -160,10 +160,10 @@ public struct NewMessageView: View {
             }
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
         }
     }
 
@@ -299,10 +299,10 @@ public struct NewMessageView: View {
             }
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
         }
     }
 

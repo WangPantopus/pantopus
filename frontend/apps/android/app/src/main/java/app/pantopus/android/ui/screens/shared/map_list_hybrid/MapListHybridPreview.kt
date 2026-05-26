@@ -205,7 +205,7 @@ private fun PreviewTopPill() {
             PantopusIconImage(
                 icon = PantopusIcon.SlidersHorizontal,
                 contentDescription = "Filters",
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appText,
             )
         }
@@ -290,7 +290,7 @@ private fun PreviewControlButton(
         PantopusIconImage(
             icon = icon,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.appText,
         )
     }
@@ -332,7 +332,7 @@ private fun PreviewSheetHeader(pinCount: Int) {
             PantopusIconImage(
                 icon = PantopusIcon.ChevronDown,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = PantopusColors.appTextStrong,
             )
         }
@@ -491,7 +491,7 @@ private fun PreviewRow(
             PantopusIconImage(
                 icon = PantopusIcon.Hammer,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = Color.White,
             )
         }

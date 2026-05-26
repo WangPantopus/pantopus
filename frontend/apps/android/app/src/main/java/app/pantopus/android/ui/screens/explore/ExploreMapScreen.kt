@@ -337,7 +337,7 @@ internal fun ExploreTypedPin(
     entity: ExploreEntity,
     isActive: Boolean,
 ) {
-    val shape: Shape = if (entity.kind.isSquarePin) RoundedCornerShape(8.dp) else CircleShape
+    val shape: Shape = if (entity.kind.isSquarePin) RoundedCornerShape(Radii.md) else CircleShape
     Box(
         modifier =
             Modifier
@@ -717,7 +717,7 @@ private fun ExploreMapControlButton(
                     .shadow(elevation = 4.dp, shape = CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = icon, contentDescription = null, size = 16.dp, tint = PantopusColors.appText)
+            PantopusIconImage(icon = icon, contentDescription = null, size = Radii.xl, tint = PantopusColors.appText)
         }
     }
 }
@@ -847,7 +847,7 @@ private fun ExploreDragHandle() {
                 Modifier
                     .width(40.dp)
                     .height(4.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(Radii.xs))
                     .background(PantopusColors.appBorderStrong),
         )
     }
@@ -914,7 +914,7 @@ private fun ExploreSheetHeader(
                 PantopusIconImage(
                     icon = PantopusIcon.ChevronDown,
                     contentDescription = null,
-                    size = 12.dp,
+                    size = Radii.lg,
                     strokeWidth = 2.4f,
                     tint = PantopusColors.appTextStrong,
                 )
@@ -1279,7 +1279,7 @@ internal fun ExploreEmptyBody(
             PantopusIconImage(
                 icon = PantopusIcon.Compass,
                 contentDescription = null,
-                size = 24.dp,
+                size = Radii.xl3,
                 tint = PantopusColors.primary600,
             )
         }

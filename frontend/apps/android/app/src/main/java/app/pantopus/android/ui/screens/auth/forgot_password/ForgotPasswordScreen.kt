@@ -212,7 +212,7 @@ private fun EmailField(
             PantopusIconImage(
                 icon = PantopusIcon.AtSign,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextSecondary,
             )
             BasicTextField(

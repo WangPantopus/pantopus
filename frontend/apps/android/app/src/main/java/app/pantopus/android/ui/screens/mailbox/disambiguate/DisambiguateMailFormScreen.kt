@@ -234,7 +234,7 @@ private fun ConfidencePill(confidence: Double) {
         PantopusIconImage(
             icon = PantopusIcon.Info,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = foreground,
         )
         Text(

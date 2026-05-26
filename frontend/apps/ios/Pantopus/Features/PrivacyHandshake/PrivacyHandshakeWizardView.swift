@@ -163,7 +163,7 @@ public struct PrivacyHandshakeWizardView: View {
     private func usernameAcknowledgementRow(_ content: HandshakeReadyContent) -> some View {
         HStack(alignment: .top, spacing: 10) {
             ZStack {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                     .stroke(
                         content.handle.acknowledgedUsingUsername
                             ? Theme.Color.primary600
@@ -172,7 +172,7 @@ public struct PrivacyHandshakeWizardView: View {
                     )
                     .frame(width: 18, height: 18)
                 if content.handle.acknowledgedUsingUsername {
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                         .fill(Theme.Color.primary600)
                         .frame(width: 18, height: 18)
                     Icon(.check, size: 12, color: Theme.Color.appTextInverse)
@@ -266,13 +266,13 @@ public struct PrivacyHandshakeWizardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(isSelected ? Theme.Color.primary50 : Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(
                         isSelected ? Theme.Color.primary600 : Theme.Color.appBorder,
                         lineWidth: isSelected ? 2 : 1
                     )
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("privacyHandshakeTier_\(tier.rank)")
@@ -292,7 +292,7 @@ public struct PrivacyHandshakeWizardView: View {
         }
         .padding(10)
         .background(Theme.Color.appSurfaceSunken)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
     }
 
     // MARK: - Terminal states
@@ -359,7 +359,7 @@ public struct PrivacyHandshakeWizardView: View {
         VStack(spacing: Spacing.s3) {
             Shimmer(height: 72, cornerRadius: 14)
             Shimmer(height: 44, cornerRadius: 10)
-            Shimmer(height: 88, cornerRadius: 12)
+            Shimmer(height: 88, cornerRadius: Radii.lg)
         }
         .accessibilityIdentifier("privacyHandshakeLoading")
     }

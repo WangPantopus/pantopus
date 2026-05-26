@@ -440,7 +440,7 @@ private fun EngagementModeControl(
                     PantopusIconImage(
                         icon = option.icon,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         strokeWidth = 2.2f,
                         tint = if (active) PantopusColors.primary600 else PantopusColors.appTextSecondary,
                     )

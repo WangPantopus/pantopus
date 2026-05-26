@@ -720,7 +720,7 @@ private fun DiscoverTaskRailCard(
             modifier = Modifier.size(42.dp).clip(RoundedCornerShape(Radii.lg)).background(DiscoverHubMapKind.Task.color),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(PantopusIcon.Hammer, contentDescription = null, size = 20.dp, tint = PantopusColors.appTextInverse)
+            PantopusIconImage(PantopusIcon.Hammer, contentDescription = null, size = Radii.xl2, tint = PantopusColors.appTextInverse)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(

@@ -374,7 +374,7 @@ private fun HomeCard(
             PantopusIconImage(
                 icon = PantopusIcon.MapPin,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = PantopusColors.business,
             )
         }
@@ -591,7 +591,7 @@ private fun EvidenceList(
             PantopusIconImage(
                 icon = PantopusIcon.AlertCircle,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = PantopusColors.warning,
             )
             Text(
@@ -642,7 +642,7 @@ private fun EvidenceRow(item: AdminClaimEvidenceDto) {
             PantopusIconImage(
                 icon = icon,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = PantopusColors.business,
             )
         }
@@ -700,7 +700,7 @@ private fun TerminalStateBanner(
         PantopusIconImage(
             icon = PantopusIcon.Info,
             contentDescription = null,
-            size = 20.dp,
+            size = Radii.xl2,
             tint = PantopusColors.appTextSecondary,
         )
         Text(
@@ -859,7 +859,7 @@ private fun FooterSecondaryButton(
         PantopusIconImage(
             icon = icon,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = tintFg,
         )
         Text(

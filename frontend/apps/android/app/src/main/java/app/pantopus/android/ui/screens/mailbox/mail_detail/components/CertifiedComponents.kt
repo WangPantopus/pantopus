@@ -69,9 +69,9 @@ fun CertifiedStampBadge(
         modifier =
             modifier
                 .rotate(-1.5f)
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(Radii.xs))
                 .background(StampBg)
-                .border(width = 1.5.dp, color = StampInk, shape = RoundedCornerShape(4.dp))
+                .border(width = 1.5.dp, color = StampInk, shape = RoundedCornerShape(Radii.xs))
                 .padding(horizontal = 9.dp, vertical = 6.dp)
                 .testTag(CERTIFIED_STAMP_BADGE_TAG)
                 .semantics { contentDescription = "USPS Certified Mail · tracking $pretty" },
@@ -260,7 +260,7 @@ private fun SenderAvatar(
                 Modifier
                     .size(40.dp)
                     .align(Alignment.TopStart)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(tint),
             contentAlignment = Alignment.Center,
         ) {
@@ -306,9 +306,9 @@ private fun CarrierRow(carrier: MailCarrierInfo) {
             modifier =
                 Modifier
                     .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(PantopusColors.appSurface)
-                    .border(width = 1.5.dp, color = StampInk, shape = RoundedCornerShape(12.dp)),
+                    .border(width = 1.5.dp, color = StampInk, shape = RoundedCornerShape(Radii.lg)),
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(

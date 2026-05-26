@@ -177,7 +177,7 @@ private fun LoadedShell(
                         PantopusIconImage(
                             icon = PantopusIcon.Trash2,
                             contentDescription = null,
-                            size = 16.dp,
+                            size = Radii.xl,
                             tint = PantopusColors.error,
                         )
                         Text(

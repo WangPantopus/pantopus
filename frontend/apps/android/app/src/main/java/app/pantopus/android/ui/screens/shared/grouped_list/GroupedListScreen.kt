@@ -159,7 +159,7 @@ internal fun LoadingFrame() {
                         .fillMaxWidth()
                         .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
                         .height(140.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.appSurfaceSunken),
             )
         }
@@ -236,9 +236,9 @@ internal fun LoadedFrame(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(start = Spacing.s3, end = Spacing.s3, top = 18.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(Radii.lg))
                                 .background(PantopusColors.appSurface)
-                                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                                 .testTag("groupedListDestructive_${row.id}"),
                     ) {
                         RowItem(
@@ -282,9 +282,9 @@ private fun Card(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.s3)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .testTag("groupedListCard_${group.id}"),
     ) {
         rows.forEachIndexed { index, row ->
@@ -405,7 +405,7 @@ private fun ChevronGlyph() {
     PantopusIconImage(
         icon = PantopusIcon.ChevronRight,
         contentDescription = null,
-        size = 16.dp,
+        size = Radii.xl,
         strokeWidth = 2.2f,
         tint = PantopusColors.appTextSecondary,
     )

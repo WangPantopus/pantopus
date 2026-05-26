@@ -188,7 +188,7 @@ private fun SwitcherCardBody(
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2f,
             tint = PantopusColors.appTextSecondary,
         )
@@ -200,7 +200,7 @@ private fun ActivePill(accent: Color) {
     Box(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(accent)
                 .padding(horizontal = 6.dp, vertical = 1.dp),
     ) {

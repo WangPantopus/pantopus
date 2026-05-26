@@ -536,7 +536,7 @@ private fun CompanyField(company: CompanyClaim) {
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.appTextMuted,
         )
     }
@@ -583,7 +583,7 @@ private fun ProSkillChip(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
-            PantopusIconImage(icon = skill.icon, contentDescription = null, size = 12.dp, tint = foreground)
+            PantopusIconImage(icon = skill.icon, contentDescription = null, size = Radii.lg, tint = foreground)
             Text(text = skill.label, style = PantopusTextStyle.caption, color = foreground, fontWeight = FontWeight.SemiBold)
             Box(
                 modifier =
@@ -597,7 +597,7 @@ private fun ProSkillChip(
                         },
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(icon = PantopusIcon.X, contentDescription = null, size = 12.dp, tint = foreground)
+                PantopusIconImage(icon = PantopusIcon.X, contentDescription = null, size = Radii.lg, tint = foreground)
             }
         }
         if (skill.isFresh) FreshDot(Modifier.align(Alignment.TopEnd).offset(x = 1.dp, y = (-1).dp))
@@ -622,7 +622,7 @@ private fun AddSkillChip(onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        PantopusIconImage(PantopusIcon.Plus, contentDescription = null, size = 12.dp, tint = PantopusColors.appTextSecondary)
+        PantopusIconImage(PantopusIcon.Plus, contentDescription = null, size = Radii.lg, tint = PantopusColors.appTextSecondary)
         Text("Add", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary, fontWeight = FontWeight.Medium)
     }
 }
@@ -697,7 +697,7 @@ private fun CertCard(
                     },
             contentAlignment = Alignment.TopEnd,
         ) {
-            PantopusIconImage(PantopusIcon.MoreHorizontal, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextMuted)
+            PantopusIconImage(PantopusIcon.MoreHorizontal, contentDescription = null, size = Radii.xl, tint = PantopusColors.appTextMuted)
         }
     }
 }
@@ -780,7 +780,7 @@ private fun LinkCard(link: PortfolioLink) {
                 PantopusIconImage(
                     icon = link.icon,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = if (link.state == PortfolioLinkState.Error) PantopusColors.error else PantopusColors.appTextStrong,
                 )
             }

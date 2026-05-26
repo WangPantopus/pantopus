@@ -365,7 +365,7 @@ public struct TransactionalDetailShell: View {
         }
         .padding(10)
         .background(Theme.Color.appSurfaceSunken)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("contentDetailStatStrip")
     }
 
@@ -434,7 +434,7 @@ public struct TransactionalDetailShell: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
         .background(bg)
-        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
     }
 
     // MARK: - Modules
@@ -597,10 +597,10 @@ public struct TransactionalDetailShell: View {
         }
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private func partyCard(_ party: ContentDetailParty) -> some View {
@@ -628,10 +628,10 @@ public struct TransactionalDetailShell: View {
         .padding(Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private func lineItemsTable(_ rows: [ContentDetailLineItem]) -> some View {
@@ -680,10 +680,10 @@ public struct TransactionalDetailShell: View {
         }
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private func summaryCard(_ summary: ContentDetailSummary) -> some View {
@@ -714,10 +714,10 @@ public struct TransactionalDetailShell: View {
         .padding(.vertical, Spacing.s3)
         .background(Theme.Color.appSurfaceSunken)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     // MARK: - Trust capsules
@@ -748,10 +748,10 @@ public struct TransactionalDetailShell: View {
                     .frame(height: 48)
                     .background(Theme.Color.appSurface)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                             .stroke(Theme.Color.appBorder, lineWidth: 1)
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("contentDetailDockSecondary")
@@ -768,7 +768,7 @@ public struct TransactionalDetailShell: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
                 .background(Theme.Color.primary600)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                 .shadow(color: Theme.Color.primary600.opacity(0.30), radius: 8, x: 0, y: 6)
             }
             .buttonStyle(.plain)

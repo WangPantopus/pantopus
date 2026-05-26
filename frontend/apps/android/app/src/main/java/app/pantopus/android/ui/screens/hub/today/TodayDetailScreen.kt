@@ -293,7 +293,7 @@ private fun TodayHero(content: TodayDetailContent) {
             PantopusIconImage(
                 icon = if (content.isAlert) PantopusIcon.AlertTriangle else PantopusIcon.MapPin,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = kickerColor,
             )
             Text(
@@ -352,7 +352,7 @@ private fun TodayRibbon(ribbon: TodayAlertRibbon) {
                 .testTag("todayDetailRibbon"),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        PantopusIconImage(PantopusIcon.AlertTriangle, null, size = 16.dp, tint = PantopusColors.error)
+        PantopusIconImage(PantopusIcon.AlertTriangle, null, size = Radii.xl, tint = PantopusColors.error)
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 ribbon.title,
@@ -377,7 +377,7 @@ private fun HeroChip(chip: TodayHeroChip) {
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         chip.dotTone?.let { Dot(it.foreground(), 7.dp) }
-        PantopusIconImage(chip.icon, null, size = 12.dp, tint = PantopusColors.appTextStrong)
+        PantopusIconImage(chip.icon, null, size = Radii.lg, tint = PantopusColors.appTextStrong)
         Text(chip.label.uppercase(Locale.getDefault()), style = PantopusTextStyle.overline, color = PantopusColors.appTextSecondary)
         Text(
             chip.value,

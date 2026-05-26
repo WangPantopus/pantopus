@@ -498,7 +498,7 @@ private fun AiCoachPill(text: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        PantopusIconImage(icon = PantopusIcon.Sparkles, contentDescription = null, size = 12.dp, tint = Color.White)
+        PantopusIconImage(icon = PantopusIcon.Sparkles, contentDescription = null, size = Radii.lg, tint = Color.White)
         Text(text, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = Color.White)
     }
 }
@@ -577,7 +577,7 @@ private fun BottomTipPill() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        PantopusIconImage(icon = PantopusIcon.Lightbulb, contentDescription = null, size = 12.dp, tint = Color.White.copy(alpha = 0.9f))
+        PantopusIconImage(icon = PantopusIcon.Lightbulb, contentDescription = null, size = Radii.lg, tint = Color.White.copy(alpha = 0.9f))
         Text(
             text = "Daylight · clutter-free background = better price",
             style = PantopusTextStyle.caption,

@@ -164,10 +164,10 @@ struct BookletDetailLayout: View {
                 .padding(.vertical, 10)
                 .background(Theme.Color.appSurface)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: Radii.lg)
                         .stroke(Theme.Color.appBorder, lineWidth: 1)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(label)
@@ -258,7 +258,7 @@ private struct KeyFactsCard: View {
                     Icon(row.icon, size: 13, color: Theme.Color.appTextStrong)
                         .frame(width: 24, height: 24)
                         .background(Theme.Color.appSurfaceSunken)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.sm))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(row.label.uppercased())
                             .font(.system(size: 11, weight: .semibold))
@@ -303,7 +303,7 @@ private struct SenderCard: View {
                     .foregroundStyle(Theme.Color.appTextInverse)
                     .frame(width: 44, height: 44)
                     .background(content.category.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(content.senderDisplayName)
                         .font(.system(size: 14, weight: .bold))

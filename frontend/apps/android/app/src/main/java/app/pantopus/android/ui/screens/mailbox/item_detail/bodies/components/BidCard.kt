@@ -98,7 +98,7 @@ private fun AmountRow(
                 PantopusIconImage(
                     icon = PantopusIcon.Clock,
                     contentDescription = null,
-                    size = 12.dp,
+                    size = Radii.lg,
                     tint = PantopusColors.handyman,
                 )
                 Text(bid.eta, style = PantopusTextStyle.caption, color = PantopusColors.appText)

@@ -470,7 +470,7 @@ internal fun NeighborStatStrip(stats: List<NeighborStat>) {
                         horizontalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
                         stat.icon?.let {
-                            PantopusIconImage(icon = it, contentDescription = null, size = 12.dp, tint = stat.iconColor)
+                            PantopusIconImage(icon = it, contentDescription = null, size = Radii.lg, tint = stat.iconColor)
                         }
                         Text(stat.value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = stat.valueColor)
                     }
@@ -622,7 +622,7 @@ internal fun NeighborVerificationLedger(items: List<NeighborVerification>) {
                             PantopusIconImage(
                                 icon = PantopusIcon.Check,
                                 contentDescription = "Verified",
-                                size = 12.dp,
+                                size = Radii.lg,
                                 tint = PantopusColors.appTextInverse,
                             )
                         }
@@ -688,7 +688,7 @@ internal fun NeighborReviewCard(card: ProfileReviewCard) {
                     PantopusIconImage(
                         icon = PantopusIcon.Star,
                         contentDescription = null,
-                        size = 12.dp,
+                        size = Radii.lg,
                         tint = if (idx < card.rating) PantopusColors.warning else PantopusColors.appTextMuted,
                     )
                 }
@@ -769,7 +769,7 @@ internal fun NeighborMutualsStrip(mutuals: NeighborMutuals) {
             )
             Text(mutuals.names, fontSize = 10.5.sp, color = PantopusColors.appTextSecondary, maxLines = 1)
         }
-        PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextMuted)
+        PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = Radii.xl, tint = PantopusColors.appTextMuted)
     }
 }
 
@@ -792,7 +792,7 @@ internal fun NeighborWelcomeCard(welcome: NeighborWelcome) {
             modifier = Modifier.size(32.dp).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.primary600),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = PantopusIcon.Hand, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextInverse)
+            PantopusIconImage(icon = PantopusIcon.Hand, contentDescription = null, size = Radii.xl, tint = PantopusColors.appTextInverse)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(welcome.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PantopusColors.primary700)
@@ -866,7 +866,7 @@ internal fun NeighborActionBar(
             PantopusIconImage(
                 icon = if (connected) PantopusIcon.Check else PantopusIcon.UserPlus,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appText,
             )
             Text(
@@ -891,7 +891,7 @@ internal fun NeighborActionBar(
             PantopusIconImage(
                 icon = PantopusIcon.MessageCircle,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextInverse,
             )
             Text(primaryLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)

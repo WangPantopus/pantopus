@@ -351,7 +351,7 @@ private struct PorchFrame: View {
 
     private var envelope: some View {
         ZStack(alignment: .bottom) {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [letter.stationery.paperColor, letter.stationery.paperEdgeColor],
@@ -361,7 +361,7 @@ private struct PorchFrame: View {
                 )
                 .frame(width: 240, height: 158)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: Radii.md)
                         .stroke(Color.black.opacity(0.22), lineWidth: 1)
                 )
             // Flap triangle (closed: pointing down)

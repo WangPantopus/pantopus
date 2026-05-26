@@ -600,7 +600,7 @@ public struct MailboxMapView: View {
                         Icon(service.icon, size: 13, strokeWidth: 2.2, color: Theme.Color.primary700)
                             .frame(width: 24, height: 24)
                             .background(Theme.Color.primary50)
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
                         Text(service.label)
                             .font(.system(size: 11.5, weight: .semibold))
                             .foregroundStyle(Theme.Color.appTextStrong)
@@ -640,10 +640,10 @@ public struct MailboxMapView: View {
                     .padding(.vertical, 7)
                     .background(isToday ? Theme.Color.primary50 : Theme.Color.appSurfaceMuted)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
                             .stroke(isToday ? Theme.Color.primary200 : Theme.Color.appBorderSubtle, lineWidth: 1)
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("\(weekdayName(day.weekday)): \(day.hours)\(isToday ? ", today" : "")")
                 }
@@ -738,7 +738,7 @@ private struct MailboxMapPin: View {
     var body: some View {
         ZStack {
             if pulsing && !reduceMotion {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .fill(kind.color.opacity(0.22))
                     .frame(width: 54, height: 54)
                     .scaleEffect(pulse ? 1.5 : 0.7)
@@ -900,7 +900,7 @@ private func mailboxStatusBadge(isOpen: Bool) -> some View {
         .padding(.horizontal, 5)
         .padding(.vertical, 1)
         .background(isOpen ? Theme.Color.successBg : Theme.Color.errorBg)
-        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
 }
 
 private struct MailboxServiceChipRow: View {
@@ -918,10 +918,10 @@ private struct MailboxServiceChipRow: View {
                     .padding(.vertical, 1)
                     .background(Theme.Color.appSurfaceMuted)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                             .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
             }
         }
     }

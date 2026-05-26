@@ -47,7 +47,7 @@ fun FileTypeTile(
             PantopusIconImage(
                 icon = fileType.icon,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = fileType.foreground,
             )
         }

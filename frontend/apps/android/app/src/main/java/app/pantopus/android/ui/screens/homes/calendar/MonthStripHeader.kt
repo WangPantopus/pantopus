@@ -132,7 +132,7 @@ private fun MonthRow(
             PantopusIconImage(
                 icon = PantopusIcon.ChevronDown,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = PantopusColors.appTextSecondary,
             )
         }

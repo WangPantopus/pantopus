@@ -1065,9 +1065,9 @@ private struct ChatCreatorQuotaMeter: View {
             }
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                         .fill(Theme.Color.appSurfaceSunken)
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                         .fill(Theme.Color.primary600)
                         .frame(width: proxy.size.width * progress)
                 }
@@ -1524,10 +1524,10 @@ private struct ChatBubbleRow: View {
 
     private var aiBubbleShape: some Shape {
         UnevenRoundedRectangle(
-            topLeadingRadius: 16,
+            topLeadingRadius: Radii.xl,
             bottomLeadingRadius: content.hasTail ? 4 : 16,
-            bottomTrailingRadius: 16,
-            topTrailingRadius: 16
+            bottomTrailingRadius: Radii.xl,
+            topTrailingRadius: Radii.xl
         )
     }
 
@@ -1589,10 +1589,10 @@ private struct ChatBubbleRow: View {
 
     private var bubbleShape: some Shape {
         UnevenRoundedRectangle(
-            topLeadingRadius: 16,
+            topLeadingRadius: Radii.xl,
             bottomLeadingRadius: content.side == .incoming && content.hasTail ? 4 : 16,
             bottomTrailingRadius: content.side == .outgoing && content.hasTail ? 4 : 16,
-            topTrailingRadius: 16
+            topTrailingRadius: Radii.xl
         )
     }
 
@@ -1712,19 +1712,19 @@ private struct ChatTypingIndicator: View {
             .background(Theme.Color.appSurfaceSunken)
             .overlay(
                 UnevenRoundedRectangle(
-                    topLeadingRadius: 16,
-                    bottomLeadingRadius: 4,
-                    bottomTrailingRadius: 16,
-                    topTrailingRadius: 16
+                    topLeadingRadius: Radii.xl,
+                    bottomLeadingRadius: Radii.xs,
+                    bottomTrailingRadius: Radii.xl,
+                    topTrailingRadius: Radii.xl
                 )
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
             .clipShape(
                 UnevenRoundedRectangle(
-                    topLeadingRadius: 16,
-                    bottomLeadingRadius: 4,
-                    bottomTrailingRadius: 16,
-                    topTrailingRadius: 16
+                    topLeadingRadius: Radii.xl,
+                    bottomLeadingRadius: Radii.xs,
+                    bottomTrailingRadius: Radii.xl,
+                    topTrailingRadius: Radii.xl
                 )
             )
             Spacer()

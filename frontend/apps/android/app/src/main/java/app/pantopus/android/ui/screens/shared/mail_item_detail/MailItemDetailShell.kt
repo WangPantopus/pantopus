@@ -332,7 +332,7 @@ private fun OverflowMenu(items: List<MailOverflowItem>) {
                         PantopusIconImage(
                             icon = item.icon,
                             contentDescription = null,
-                            size = 16.dp,
+                            size = Radii.xl,
                             tint =
                                 if (item.isDestructive) {
                                     PantopusColors.error
@@ -387,7 +387,7 @@ fun AIElfStripView(content: AIElfStripContent) {
                 modifier =
                     Modifier
                         .size(24.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(Radii.md))
                         .background(PantopusColors.primary600),
                 contentAlignment = Alignment.Center,
             ) {
@@ -474,12 +474,12 @@ private fun AIElfBulletRow(bullet: AIElfBullet) {
                 Modifier
                     .padding(top = 1.dp)
                     .size(16.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(Radii.xs))
                     .background(PantopusColors.appSurface)
                     .border(
                         width = 1.dp,
                         color = PantopusColors.primary100,
-                        shape = RoundedCornerShape(4.dp),
+                        shape = RoundedCornerShape(Radii.xs),
                     ),
             contentAlignment = Alignment.Center,
         ) {
@@ -619,12 +619,12 @@ private fun AttachmentTile(kind: AttachmentKind) {
         modifier =
             Modifier
                 .size(width = 36.dp, height = 44.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(Radii.sm))
                 .background(tokens.background)
                 .border(
                     width = 1.dp,
                     color = tokens.border,
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(Radii.sm),
                 ),
         contentAlignment = Alignment.Center,
     ) {

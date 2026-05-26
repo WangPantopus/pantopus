@@ -213,7 +213,7 @@ private fun CommunityBodyBadgeCard(community: CommunityDetailDto) {
                 }
                 Text(text = communityMetaLine(community), style = PantopusTextStyle.caption, color = PantopusColors.appTextStrong)
             }
-            PantopusIconImage(PantopusIcon.ChevronRight, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextMuted)
+            PantopusIconImage(PantopusIcon.ChevronRight, contentDescription = null, size = Radii.xl, tint = PantopusColors.appTextMuted)
         }
     }
 }
@@ -366,7 +366,7 @@ private fun EventRow(
                     .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon, contentDescription = null, size = 20.dp, tint = accent)
+            PantopusIconImage(icon, contentDescription = null, size = Radii.xl2, tint = accent)
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(text = overline, style = PantopusTextStyle.overline, color = PantopusColors.appTextSecondary)
@@ -390,7 +390,7 @@ private fun BringList(items: List<String>) {
         Text(text = "Bring if you can", style = PantopusTextStyle.overline, color = PantopusColors.appTextSecondary)
         items.forEach { item ->
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), verticalAlignment = Alignment.Top) {
-                PantopusIconImage(PantopusIcon.Check, contentDescription = null, size = 12.dp, tint = PantopusColors.success)
+                PantopusIconImage(PantopusIcon.Check, contentDescription = null, size = Radii.lg, tint = PantopusColors.success)
                 Text(text = item, style = PantopusTextStyle.caption, color = PantopusColors.appTextStrong)
             }
         }
@@ -508,7 +508,7 @@ private fun PollOptionRow(
             PantopusIconImage(
                 icon = if (selected) PantopusIcon.CheckCircle else PantopusIcon.Circle,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = if (selected) PantopusColors.primary600 else PantopusColors.appTextMuted,
             )
             Text(
@@ -554,7 +554,7 @@ private fun CommunityBodyUpdateCard(update: CommunityUpdateInfo) {
                 }
                 update.items.forEach { item ->
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), verticalAlignment = Alignment.Top) {
-                        PantopusIconImage(PantopusIcon.Check, contentDescription = null, size = 12.dp, tint = PantopusColors.success)
+                        PantopusIconImage(PantopusIcon.Check, contentDescription = null, size = Radii.lg, tint = PantopusColors.success)
                         Text(text = item, style = PantopusTextStyle.caption, color = PantopusColors.appTextStrong)
                     }
                 }
@@ -850,7 +850,7 @@ private fun CommunityBodyActions(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
             ) {
-                PantopusIconImage(PantopusIcon.CheckCircle, contentDescription = null, size = 16.dp, tint = PantopusColors.success)
+                PantopusIconImage(PantopusIcon.CheckCircle, contentDescription = null, size = Radii.xl, tint = PantopusColors.success)
                 Spacer(Modifier.width(Spacing.s2))
                 Text(
                     text = "You're going - tap to change",
@@ -939,7 +939,7 @@ private fun ActionChip(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        PantopusIconImage(icon, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextStrong)
+        PantopusIconImage(icon, contentDescription = null, size = Radii.xl, tint = PantopusColors.appTextStrong)
         Text(
             text = label,
             style = PantopusTextStyle.caption.copy(fontWeight = FontWeight.SemiBold),

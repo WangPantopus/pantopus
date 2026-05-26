@@ -81,7 +81,7 @@ fun OfflineBanner(
                 PantopusIconImage(
                     icon = PantopusIcon.X,
                     contentDescription = "Dismiss offline banner",
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.appTextSecondary,
                 )
             }

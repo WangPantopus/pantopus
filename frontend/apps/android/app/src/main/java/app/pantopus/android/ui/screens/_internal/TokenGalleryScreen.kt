@@ -100,7 +100,7 @@ private fun IconRow(icon: PantopusIcon) {
         PantopusIconImage(
             icon = icon,
             contentDescription = icon.lucideName,
-            size = 24.dp,
+            size = Radii.xl3,
             tint = PantopusColors.appText,
         )
         androidx.compose.foundation.layout

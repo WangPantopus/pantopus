@@ -38,7 +38,7 @@ public struct CeremonialMailWizardView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Theme.Color.errorBg)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
                 .accessibilityIdentifier("ceremonialSubmitError")
             }
         }
@@ -275,10 +275,10 @@ public struct CeremonialMailWizardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("ceremonialAddressCard")
     }
 
@@ -296,10 +296,10 @@ public struct CeremonialMailWizardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("ceremonialAddressCard")
     }
 
@@ -538,10 +538,10 @@ public struct CeremonialMailWizardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("ceremonialReviewCard")
     }
 

@@ -1089,7 +1089,7 @@ private fun CommunityPulseThreadCard(
                 modifier =
                     Modifier
                         .size(24.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(Radii.sm))
                         .background(PantopusColors.primary100),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1226,7 +1226,7 @@ private fun CommunitySenderCard(
                 modifier =
                     Modifier
                         .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(content.category.accent),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1319,7 +1319,7 @@ private fun GoingPill(
         PantopusIconImage(
             icon = PantopusIcon.CheckCircle,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.success,
         )
         Spacer(Modifier.width(Spacing.s2))
@@ -1383,13 +1383,13 @@ private fun RsvpChip(
     Row(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(bg)
                 .then(
                     if (isPrimary) {
                         Modifier
                     } else {
-                        Modifier.border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                        Modifier.border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                     },
                 )
                 .clickable(enabled = !inFlight) { onSelect(status) }
@@ -1440,9 +1440,9 @@ private fun SecondaryChip(
     Column(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable {}
                 .padding(vertical = 10.dp)
                 .semantics { contentDescription = label }
@@ -1450,7 +1450,7 @@ private fun SecondaryChip(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextStrong)
+        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.xl, tint = PantopusColors.appTextStrong)
         Text(
             text = label,
             fontSize = 10.5.sp,

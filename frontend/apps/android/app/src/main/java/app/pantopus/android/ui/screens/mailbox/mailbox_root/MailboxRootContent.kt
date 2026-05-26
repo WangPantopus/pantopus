@@ -138,7 +138,7 @@ private fun DrawerChip(
             PantopusIconImage(
                 icon = drawer.icon,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = foreground,
             )
             Text(

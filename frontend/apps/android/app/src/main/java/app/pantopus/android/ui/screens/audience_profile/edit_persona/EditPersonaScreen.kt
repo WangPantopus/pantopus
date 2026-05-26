@@ -146,10 +146,10 @@ private fun LoadingFrame() {
         modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4).testTag("editPersonaLoading"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s5),
     ) {
-        Shimmer(width = 360.dp, height = 120.dp, cornerRadius = 12.dp)
-        Shimmer(width = 360.dp, height = 160.dp, cornerRadius = 12.dp)
-        Shimmer(width = 360.dp, height = 200.dp, cornerRadius = 12.dp)
-        Shimmer(width = 360.dp, height = 120.dp, cornerRadius = 12.dp)
+        Shimmer(width = 360.dp, height = 120.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 360.dp, height = 160.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 360.dp, height = 200.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 360.dp, height = 120.dp, cornerRadius = Radii.lg)
     }
 }
 
@@ -273,7 +273,7 @@ private fun LiveHero(content: EditPersonaContent) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.primary600)
                 .padding(Spacing.s3)
                 .semantics {
@@ -289,7 +289,7 @@ private fun LiveHero(content: EditPersonaContent) {
                 modifier =
                     Modifier
                         .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.appTextInverse.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -321,7 +321,7 @@ private fun LiveHero(content: EditPersonaContent) {
                 color = PantopusColors.appTextInverse,
                 modifier =
                     Modifier
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(RoundedCornerShape(Radii.xs))
                         .background(PantopusColors.appTextInverse.copy(alpha = 0.22f))
                         .padding(horizontal = 7.dp, vertical = 3.dp),
             )
@@ -343,7 +343,7 @@ private fun StatTile(
     Column(
         modifier =
             modifier
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appTextInverse.copy(alpha = 0.14f))
                 .padding(horizontal = Spacing.s2, vertical = Spacing.s2),
         verticalArrangement = Arrangement.spacedBy(1.dp),
@@ -368,9 +368,9 @@ private fun SetupHero(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.primary50)
-                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.lg))
                 .padding(Spacing.s3)
                 .testTag("editPersonaSetupHero"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -380,7 +380,7 @@ private fun SetupHero(
                 modifier =
                     Modifier
                         .size(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(Radii.md))
                         .background(PantopusColors.primary600),
                 contentAlignment = Alignment.Center,
             ) {
@@ -413,7 +413,7 @@ private fun SetupHero(
                 color = PantopusColors.appTextInverse,
                 modifier =
                     Modifier
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(RoundedCornerShape(Radii.xs))
                         .background(PantopusColors.primary600)
                         .padding(horizontal = 7.dp, vertical = 3.dp),
             )
@@ -456,7 +456,7 @@ private fun ChecklistRow(step: PersonaChecklistStep) {
             PantopusIconImage(
                 icon = PantopusIcon.CheckCircle,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 strokeWidth = 2f,
                 tint = PantopusColors.success,
             )
@@ -555,9 +555,9 @@ private fun HandleField(
             Modifier
                 .fillMaxWidth()
                 .height(44.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurface)
-                .border(1.5.dp, borderColor, RoundedCornerShape(8.dp))
+                .border(1.5.dp, borderColor, RoundedCornerShape(Radii.md))
                 .padding(horizontal = Spacing.s3)
                 .testTag("editPersonaHandle"),
         verticalAlignment = Alignment.CenterVertically,
@@ -610,9 +610,9 @@ private fun TextDisplay(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = minHeight)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(8.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
                 .testTag(testTag),
     )
@@ -663,12 +663,12 @@ private fun PolicyRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(if (isAllow) PantopusColors.successBg else PantopusColors.appSurfaceSunken)
                 .border(
                     1.dp,
                     if (isAllow) PantopusColors.successLight else PantopusColors.appBorder,
-                    RoundedCornerShape(12.dp),
+                    RoundedCornerShape(Radii.lg),
                 )
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                 .testTag("editPersonaPolicyRow_${if (isAllow) "allow" else "off"}"),
@@ -719,19 +719,19 @@ private fun CatChip(
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(if (isAllow) PantopusColors.primary50 else PantopusColors.appSurfaceSunken)
                 .border(
                     1.dp,
                     if (isAllow) PantopusColors.primary200 else PantopusColors.appBorder,
-                    RoundedCornerShape(999.dp),
+                    RoundedCornerShape(Radii.pill),
                 )
                 .padding(horizontal = Spacing.s3, vertical = 6.dp)
                 .semantics { contentDescription = if (isAllow) chip.label else "${chip.label}, off-topic" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        PantopusIconImage(icon = chip.icon, contentDescription = null, size = 12.dp, strokeWidth = 2f, tint = fg)
+        PantopusIconImage(icon = chip.icon, contentDescription = null, size = Radii.lg, strokeWidth = 2f, tint = fg)
         Text(
             text = chip.label,
             fontSize = 12.sp,
@@ -761,13 +761,13 @@ private fun TierCardView(tier: PersonaTierCard) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .alpha(if (tier.kind == PersonaTierCard.Kind.PaidLocked) 0.6f else 1f)
                 .background(PantopusColors.appSurface)
                 .border(
                     1.dp,
                     if (tier.isFresh) PantopusColors.primary200 else PantopusColors.appBorder,
-                    RoundedCornerShape(12.dp),
+                    RoundedCornerShape(Radii.lg),
                 )
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                 .testTag("editPersonaTier_${tier.id}"),
@@ -778,7 +778,7 @@ private fun TierCardView(tier: PersonaTierCard) {
                 modifier =
                     Modifier
                         .size(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(Radii.md))
                         .background(
                             if (tier.kind == PersonaTierCard.Kind.Free) {
                                 PantopusColors.appSurfaceSunken
@@ -791,7 +791,7 @@ private fun TierCardView(tier: PersonaTierCard) {
                 PantopusIconImage(
                     icon = tierIcon(tier.kind),
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     strokeWidth = 2f,
                     tint =
                         if (tier.kind == PersonaTierCard.Kind.Free) {
@@ -825,7 +825,7 @@ private fun TierCardView(tier: PersonaTierCard) {
                         PantopusIconImage(
                             icon = PantopusIcon.Check,
                             contentDescription = null,
-                            size = 12.dp,
+                            size = Radii.lg,
                             strokeWidth = 2f,
                             tint = PantopusColors.primary600,
                         )
@@ -876,7 +876,7 @@ private fun TierStripeFooter(state: PersonaTierCard.StripeState) {
         }
     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 12.dp, strokeWidth = 2f, tint = color)
+        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.lg, strokeWidth = 2f, tint = color)
         Text(text = text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color)
     }
 }
@@ -895,11 +895,11 @@ private fun AddTierRow(disabled: Boolean) {
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 44.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .border(
                     1.5.dp,
                     if (disabled) PantopusColors.appBorder else PantopusColors.primary200,
-                    RoundedCornerShape(12.dp),
+                    RoundedCornerShape(Radii.lg),
                 )
                 .then(if (disabled) Modifier else Modifier.clickable {})
                 .padding(horizontal = 14.dp, vertical = 11.dp)
@@ -942,9 +942,9 @@ private fun StripeConnectedCard(account: String) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.successBg)
-                .border(1.dp, PantopusColors.successLight, RoundedCornerShape(8.dp))
+                .border(1.dp, PantopusColors.successLight, RoundedCornerShape(Radii.md))
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                 .testTag("editPersonaStripeConnected"),
         verticalAlignment = Alignment.CenterVertically,
@@ -984,9 +984,9 @@ private fun StripeNotConnectedCard() {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.primary50)
-                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(8.dp))
+                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.md))
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                 .testTag("editPersonaStripeCard"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -1012,7 +1012,7 @@ private fun StripeNotConnectedCard() {
                 Modifier
                     .fillMaxWidth()
                     .height(44.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(Radii.md))
                     .background(PantopusColors.primary600)
                     .clickable {}
                     .testTag("editPersonaStripeConnect")
@@ -1045,7 +1045,7 @@ private fun StripeBadge() {
         modifier =
             Modifier
                 .size(width = 32.dp, height = 22.dp)
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(Radii.xs))
                 .background(PantopusColors.primary600),
         contentAlignment = Alignment.Center,
     ) {
@@ -1083,9 +1083,9 @@ private fun CapSelector(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurfaceSunken)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(8.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
                 .padding(3.dp)
                 .testTag("editPersonaCapSelector"),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s0),
@@ -1097,7 +1097,7 @@ private fun CapSelector(
                     Modifier
                         .weight(1f)
                         .height(32.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(Radii.sm))
                         .background(if (isOn) PantopusColors.appSurface else Color.Transparent)
                         .clickable { onSelect(option) }
                         .testTag("editPersonaCap_${option.label}"),
@@ -1124,9 +1124,9 @@ private fun QuietHoursRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(8.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -1134,7 +1134,7 @@ private fun QuietHoursRow(
         PantopusIconImage(
             icon = PantopusIcon.Clock,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2f,
             tint = PantopusColors.appTextSecondary,
         )
@@ -1178,9 +1178,9 @@ private fun ShareCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(Spacing.s3)
                 .testTag("editPersonaShareCard"),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -1203,9 +1203,9 @@ private fun ShareCard(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(Radii.sm))
                         .background(PantopusColors.appSurfaceMuted)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(6.dp))
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.sm))
                         .padding(horizontal = Spacing.s2, vertical = 6.dp),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1223,9 +1223,9 @@ private fun QrStamp(isPublic: Boolean) {
         modifier =
             Modifier
                 .size(84.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(if (isPublic) PantopusColors.appSurface else PantopusColors.appSurfaceSunken)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(8.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
                 .padding(6.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -1239,14 +1239,14 @@ private fun QrStamp(isPublic: Boolean) {
             modifier =
                 Modifier
                     .size(22.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(Radii.sm))
                     .background(glyph),
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
                 icon = PantopusIcon.Radio,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 strokeWidth = 2f,
                 tint = PantopusColors.appTextInverse,
             )
@@ -1275,9 +1275,9 @@ private fun ShareButton(
         modifier =
             modifier
                 .height(30.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(Radii.sm))
                 .background(if (enabled) PantopusColors.appSurface else PantopusColors.appSurfaceSunken)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(6.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.sm))
                 .then(if (enabled) Modifier.clickable {} else Modifier)
                 .testTag(testTag)
                 .semantics { contentDescription = label },
@@ -1285,7 +1285,7 @@ private fun ShareButton(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Spacer(modifier = Modifier.weight(1f))
-        PantopusIconImage(icon = icon, contentDescription = null, size = 12.dp, strokeWidth = 2f, tint = tint)
+        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.lg, strokeWidth = 2f, tint = tint)
         Text(text = label, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = tint)
         Spacer(modifier = Modifier.weight(1f))
     }
@@ -1304,9 +1304,9 @@ private fun AnalyticsSection(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                     .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                     .testTag("editPersonaAnalyticsRow"),
             verticalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -1316,14 +1316,14 @@ private fun AnalyticsSection(
                     modifier =
                         Modifier
                             .size(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(Radii.md))
                             .background(if (isOn) PantopusColors.primary50 else PantopusColors.appSurfaceSunken),
                     contentAlignment = Alignment.Center,
                 ) {
                     PantopusIconImage(
                         icon = PantopusIcon.ArrowUpRight,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         strokeWidth = 2f,
                         tint = if (isOn) PantopusColors.primary600 else PantopusColors.appTextMuted,
                     )
@@ -1369,9 +1369,9 @@ private fun ScopeChip(label: String) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.primary50)
-                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(999.dp))
+                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.pill))
                 .padding(horizontal = 9.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
@@ -1417,7 +1417,7 @@ private fun LiveStickyBar() {
             modifier =
                 Modifier
                     .height(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .clickable {}
                     .padding(horizontal = Spacing.s3)
                     .testTag("editPersonaPreview")
@@ -1438,7 +1438,7 @@ private fun LiveStickyBar() {
             modifier =
                 Modifier
                     .height(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(PantopusColors.appBorder)
                     .padding(horizontal = Spacing.s5)
                     .testTag("editPersonaSave")
@@ -1460,9 +1460,9 @@ private fun SetupStickyBar(onDiscard: () -> Unit) {
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(Radii.md))
                     .background(PantopusColors.primary50)
-                    .border(1.dp, PantopusColors.primary200, RoundedCornerShape(8.dp))
+                    .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.md))
                     .padding(horizontal = Spacing.s2, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -1485,9 +1485,9 @@ private fun SetupStickyBar(onDiscard: () -> Unit) {
             Row(
                 modifier =
                     Modifier
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.warningBg)
-                        .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(999.dp))
+                        .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.pill))
                         .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1500,7 +1500,7 @@ private fun SetupStickyBar(onDiscard: () -> Unit) {
                 modifier =
                     Modifier
                         .height(42.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .clickable(onClick = onDiscard)
                         .padding(horizontal = Spacing.s3)
                         .testTag("editPersonaDiscard")
@@ -1513,7 +1513,7 @@ private fun SetupStickyBar(onDiscard: () -> Unit) {
                 modifier =
                     Modifier
                         .height(42.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.primary600)
                         .clickable {}
                         .padding(horizontal = Spacing.s5)

@@ -100,10 +100,10 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                     }
                     .background(Theme.Color.appSurface)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                             .stroke(Theme.Color.appBorder, lineWidth: 1)
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                     .padding(.horizontal, Spacing.s3)
                     .padding(.top, Spacing.s2)
                 }
@@ -127,10 +127,10 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                         }
                         .background(Theme.Color.appSurface)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                                 .stroke(Theme.Color.appBorder, lineWidth: 1)
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                         .padding(.horizontal, Spacing.s3)
                         .padding(.top, 18)
                         .accessibilityIdentifier("groupedListDestructive_\(row.id)")
@@ -179,10 +179,10 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         }
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .padding(.horizontal, Spacing.s3)
         if let helper = group.helper {
             Text(helper)

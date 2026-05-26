@@ -122,7 +122,7 @@ public struct FeedSkeletonCard: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(spacing: 9) {
-                Shimmer(width: 32, height: 32, cornerRadius: 16)
+                Shimmer(width: 32, height: 32, cornerRadius: Radii.xl)
                 VStack(alignment: .leading, spacing: 5) {
                     Shimmer(width: 110, height: 10, cornerRadius: Radii.xs)
                     Shimmer(width: 70, height: 8, cornerRadius: Radii.xs)

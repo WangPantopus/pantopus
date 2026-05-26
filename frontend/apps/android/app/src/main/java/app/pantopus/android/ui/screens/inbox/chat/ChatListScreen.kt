@@ -120,7 +120,7 @@ private fun TopBar(onCompose: () -> Unit) {
             PantopusIconImage(
                 icon = PantopusIcon.Edit2,
                 contentDescription = "New message",
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = PantopusColors.appText,
             )
         }
@@ -183,7 +183,7 @@ internal fun FilterTabs(
         Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
             if (skeleton) {
                 repeat(4) {
-                    Shimmer(width = 48.dp, height = 14.dp, cornerRadius = 4.dp)
+                    Shimmer(width = 48.dp, height = 14.dp, cornerRadius = Radii.xs)
                     Spacer(modifier = Modifier.size(24.dp))
                 }
             } else {
@@ -285,10 +285,10 @@ private fun SkeletonRow() {
     ) {
         Shimmer(width = 44.dp, height = 44.dp, cornerRadius = 22.dp)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Shimmer(width = 140.dp, height = 12.dp, cornerRadius = 4.dp)
-            Shimmer(width = 220.dp, height = 10.dp, cornerRadius = 4.dp)
+            Shimmer(width = 140.dp, height = 12.dp, cornerRadius = Radii.xs)
+            Shimmer(width = 220.dp, height = 10.dp, cornerRadius = Radii.xs)
         }
-        Shimmer(width = 26.dp, height = 9.dp, cornerRadius = 4.dp)
+        Shimmer(width = 26.dp, height = 9.dp, cornerRadius = Radii.xs)
     }
 }
 

@@ -130,7 +130,7 @@ private fun UploadTile(
                 PantopusIconImage(
                     icon = PantopusIcon.X,
                     contentDescription = "Remove ${slot.title}",
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.appTextInverse,
                 )
             }

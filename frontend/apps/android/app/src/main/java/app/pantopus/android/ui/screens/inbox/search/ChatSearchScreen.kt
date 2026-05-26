@@ -178,7 +178,7 @@ private fun ResultAvatar(
                 PantopusIconImage(
                     icon = PantopusIcon.Check,
                     contentDescription = null,
-                    size = 8.dp,
+                    size = Radii.md,
                     strokeWidth = 3.5f,
                     tint = PantopusColors.appTextInverse,
                 )
@@ -207,7 +207,7 @@ private fun IdentityChip(chip: ConversationIdentityChip) {
         PantopusIconImage(
             icon = icon,
             contentDescription = null,
-            size = 8.dp,
+            size = Radii.md,
             strokeWidth = 2.6f,
             tint = foreground,
         )

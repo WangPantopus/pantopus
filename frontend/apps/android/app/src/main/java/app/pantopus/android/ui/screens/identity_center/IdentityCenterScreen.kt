@@ -173,7 +173,7 @@ private fun TopBar(
                 PantopusIconImage(
                     icon = PantopusIcon.Menu,
                     contentDescription = "Open identity switcher",
-                    size = 20.dp,
+                    size = Radii.xl2,
                     strokeWidth = 2f,
                     tint = PantopusColors.appText,
                 )
@@ -204,7 +204,7 @@ internal fun LoadingFrame() {
             Shimmer(
                 width = 360.dp,
                 height = 110.dp,
-                cornerRadius = 16.dp,
+                cornerRadius = Radii.xl,
                 modifier = Modifier.padding(horizontal = Spacing.s4),
             )
         }
@@ -263,13 +263,13 @@ private fun IdentityCardRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(card.kind.accentBg.copy(alpha = 0.5f), PantopusColors.appSurface),
                     ),
                 )
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(16.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .clickable(onClick = onTap)
                 .padding(14.dp)
                 .testTag("identityCard_${card.kind.key}"),
@@ -355,7 +355,7 @@ private fun IdentityCardRow(
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2f,
             tint = PantopusColors.appTextSecondary,
         )
@@ -370,7 +370,7 @@ private fun SetupPill(
     Box(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(accent)
                 .padding(horizontal = 6.dp, vertical = 1.dp),
     ) {
@@ -396,7 +396,7 @@ private fun ChipPill(chip: IdentityChip) {
     Box(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(bg)
                 .padding(horizontal = 6.dp, vertical = 1.dp),
     ) {
@@ -419,9 +419,9 @@ private fun BridgesCard(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.s3)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
     ) {
         rows.forEachIndexed { index, row ->
             Row(
@@ -486,9 +486,9 @@ private fun RowsCard(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.s3)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
     ) {
         rows.forEachIndexed { index, row ->
             Row(
@@ -542,7 +542,7 @@ private fun RowsCard(
                 PantopusIconImage(
                     icon = PantopusIcon.ChevronRight,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     strokeWidth = 2f,
                     tint = PantopusColors.appTextSecondary,
                 )

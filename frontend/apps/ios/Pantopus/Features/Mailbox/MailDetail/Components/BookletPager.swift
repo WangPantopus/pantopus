@@ -298,7 +298,7 @@ private struct ThumbnailCell: View {
             BookletPaperPageChrome(
                 hasNextPage: hasNextPage,
                 foldSize: Spacing.s4,
-                cornerRadius: 6
+                cornerRadius: Radii.sm
             ) {
                 AsyncImage(url: url) { phase in
                     switch phase {
@@ -317,7 +317,7 @@ private struct ThumbnailCell: View {
                 }
             }
             .overlay(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: Radii.sm)
                     .stroke(
                         isCurrent ? Theme.Color.primary600 : Theme.Color.appBorder,
                         lineWidth: isCurrent ? 2.5 : 1

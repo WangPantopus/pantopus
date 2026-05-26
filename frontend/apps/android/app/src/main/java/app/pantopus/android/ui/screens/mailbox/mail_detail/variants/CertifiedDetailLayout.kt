@@ -364,7 +364,7 @@ private fun CertifiedKeyFactRow(row: CertifiedKeyFact) {
             modifier =
                 Modifier
                     .size(if (row.isEmphasis) 28.dp else 24.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(Radii.sm))
                     .background(tintBackground),
             contentAlignment = Alignment.Center,
         ) {
@@ -846,7 +846,7 @@ private fun AcknowledgeButton(
         PantopusIconImage(
             icon = if (completed) PantopusIcon.CheckCircle else PantopusIcon.Check,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = fg,
         )
         Spacer(Modifier.width(Spacing.s2))
@@ -873,9 +873,9 @@ private fun SecondaryTile(
     Row(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable {}
                 .padding(horizontal = Spacing.s2, vertical = 11.dp)
                 .semantics { contentDescription = label },

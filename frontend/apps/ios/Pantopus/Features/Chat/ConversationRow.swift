@@ -203,7 +203,7 @@ private struct IdentityDisclosureChip: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
         .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
     }
 
     private var icon: PantopusIcon {

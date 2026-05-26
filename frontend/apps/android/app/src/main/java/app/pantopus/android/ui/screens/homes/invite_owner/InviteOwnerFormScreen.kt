@@ -621,7 +621,7 @@ private fun ConflictAction(
             color = PantopusColors.error,
             fontWeight = FontWeight.SemiBold,
         )
-        PantopusIconImage(icon = icon, contentDescription = null, size = 12.dp, tint = PantopusColors.error)
+        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.lg, tint = PantopusColors.error)
     }
 }
 

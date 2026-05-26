@@ -205,7 +205,7 @@ private fun TierChip(label: String) {
         PantopusIconImage(
             icon = PantopusIcon.Crown,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = PantopusColors.warning,
         )
         Text(
@@ -238,7 +238,7 @@ private fun VerifiedNeighborChip() {
         PantopusIconImage(
             icon = PantopusIcon.ShieldCheck,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = PantopusColors.home,
         )
         Text(

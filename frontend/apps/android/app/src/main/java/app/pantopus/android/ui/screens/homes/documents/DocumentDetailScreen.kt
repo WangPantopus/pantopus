@@ -371,7 +371,7 @@ private fun CategoryBadge(category: DocumentCategory) {
         PantopusIconImage(
             icon = category.icon,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = category.foreground,
         )
         Text(
@@ -647,7 +647,7 @@ private fun LinkedToCard(
             PantopusIconImage(
                 icon = link.kind.icon,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.home,
             )
             Column {

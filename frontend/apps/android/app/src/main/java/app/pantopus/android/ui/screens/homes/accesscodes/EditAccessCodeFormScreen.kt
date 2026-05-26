@@ -311,7 +311,7 @@ private fun CategoryTile(
             PantopusIconImage(
                 icon = category.icon,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = category.foreground,
             )
         }
@@ -563,7 +563,7 @@ private fun MemberPreviewStrip(names: List<String>) {
         PantopusIconImage(
             icon = PantopusIcon.Users,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = PantopusColors.appTextSecondary,
         )
         Text(

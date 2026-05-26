@@ -228,7 +228,7 @@ private fun SupportTrainChip() {
         PantopusIconImage(
             icon = PantopusIcon.Heart,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = PantopusColors.warning,
         )
         Text(
@@ -253,7 +253,7 @@ private fun RecipientSearchField(
             PantopusIconImage(
                 icon = PantopusIcon.Search,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextSecondary,
             )
         },
@@ -426,7 +426,7 @@ private fun InviteRecipientCard(
                 PantopusIconImage(
                     icon = PantopusIcon.X,
                     contentDescription = "Clear recipient search",
-                    size = 12.dp,
+                    size = Radii.lg,
                     tint = PantopusColors.appTextSecondary,
                 )
             }
@@ -543,7 +543,7 @@ private fun InviteMethodRow(
         PantopusIconImage(
             icon = if (isSelected) PantopusIcon.CheckCircle else PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = if (isSelected) PantopusColors.primary600 else PantopusColors.appTextMuted,
         )
     }
@@ -887,7 +887,7 @@ private fun ResultList(
                 PantopusIconImage(
                     icon = PantopusIcon.User,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.primary600,
                 )
                 Spacer(modifier = Modifier.width(Spacing.s3))
@@ -1048,7 +1048,7 @@ private fun KindCell(
         PantopusIconImage(
             icon = kind.icon,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = if (isSelected) PantopusColors.primary700 else PantopusColors.appTextSecondary,
         )
         Text(
@@ -1278,7 +1278,7 @@ private fun SlotRow(slot: StartSupportTrainSlot) {
             PantopusIconImage(
                 icon = PantopusIcon.Calendar,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.primary600,
             )
         }
@@ -1393,7 +1393,7 @@ private fun VisibilityRow(
         PantopusIconImage(
             icon = option.icon,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = if (isSelected) PantopusColors.primary600 else PantopusColors.appTextSecondary,
         )
         Column(modifier = Modifier.weight(1f)) {

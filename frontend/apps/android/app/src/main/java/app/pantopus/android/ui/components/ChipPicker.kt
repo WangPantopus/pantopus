@@ -190,7 +190,7 @@ private fun ChipPickerChip(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         if (option.icon != null) {
-            PantopusIconImage(icon = option.icon, contentDescription = null, size = 16.dp, tint = iconColor)
+            PantopusIconImage(icon = option.icon, contentDescription = null, size = Radii.xl, tint = iconColor)
         }
         Text(text = option.label, style = PantopusTextStyle.small, color = textColor)
     }

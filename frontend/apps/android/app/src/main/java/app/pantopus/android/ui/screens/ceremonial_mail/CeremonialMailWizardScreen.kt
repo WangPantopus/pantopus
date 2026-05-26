@@ -121,7 +121,7 @@ private fun ErrorBanner(message: String) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.errorBg)
                 .padding(horizontal = 10.dp, vertical = 6.dp)
                 .testTag("ceremonialSubmitError"),
@@ -204,7 +204,7 @@ internal fun DecideStep(
                         PantopusIconImage(
                             icon = PantopusIcon.User,
                             contentDescription = null,
-                            size = 16.dp,
+                            size = Radii.xl,
                             strokeWidth = 2f,
                             tint = PantopusColors.primary600,
                         )
@@ -325,7 +325,7 @@ private fun IntentRow(
         PantopusIconImage(
             icon = intent.icon,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2f,
             tint = PantopusColors.primary600,
         )
@@ -370,9 +370,9 @@ internal fun VerifyStep(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                         .padding(14.dp)
                         .testTag("ceremonialAddressCard"),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -532,12 +532,12 @@ private fun PickerRow(
                 Box(
                     modifier =
                         Modifier
-                            .clip(RoundedCornerShape(999.dp))
+                            .clip(RoundedCornerShape(Radii.pill))
                             .background(if (isActive) PantopusColors.primary600 else PantopusColors.appSurface)
                             .border(
                                 1.dp,
                                 if (isActive) PantopusColors.primary600 else PantopusColors.appBorder,
-                                RoundedCornerShape(999.dp),
+                                RoundedCornerShape(Radii.pill),
                             )
                             .clickable { onSelect(wire) }
                             .padding(horizontal = Spacing.s3)
@@ -627,7 +627,7 @@ private fun VoiceChip(
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(if (accent) PantopusColors.primary600 else PantopusColors.primary50)
                 .clickable(onClick = onClick)
                 .padding(horizontal = Spacing.s3)
@@ -672,9 +672,9 @@ internal fun CommitStep(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                     .padding(14.dp)
                     .testTag("ceremonialReviewCard"),
             verticalArrangement = Arrangement.spacedBy(6.dp),

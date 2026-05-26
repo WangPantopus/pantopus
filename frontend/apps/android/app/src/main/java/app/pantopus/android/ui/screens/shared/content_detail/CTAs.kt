@@ -132,7 +132,7 @@ private fun FabSheetContent(
                     PantopusIconImage(
                         icon = action.icon,
                         contentDescription = null,
-                        size = 20.dp,
+                        size = Radii.xl2,
                         tint = PantopusColors.primary600,
                     )
                 }

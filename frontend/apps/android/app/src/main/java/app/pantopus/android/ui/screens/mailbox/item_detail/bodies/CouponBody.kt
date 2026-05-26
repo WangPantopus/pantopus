@@ -448,7 +448,7 @@ private fun InactiveCouponCard(
                     .background(PantopusColors.appSurface),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = icon, contentDescription = null, size = 20.dp, tint = tone.foreground)
+            PantopusIconImage(icon = icon, contentDescription = null, size = Radii.xl2, tint = tone.foreground)
         }
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             Text(title, style = PantopusTextStyle.small, color = PantopusColors.appText)

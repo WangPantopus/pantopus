@@ -200,7 +200,7 @@ internal fun TasksMapTopPill(
             PantopusIconImage(
                 icon = PantopusIcon.SlidersHorizontal,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 strokeWidth = 2.2f,
                 tint = PantopusColors.appText,
             )
@@ -341,7 +341,7 @@ private fun TasksMapControlButton(
         PantopusIconImage(
             icon = icon,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.appText,
         )
     }
@@ -390,7 +390,7 @@ internal fun TasksMapSheetHeader(
                 PantopusIconImage(
                     icon = PantopusIcon.ChevronDown,
                     contentDescription = null,
-                    size = 12.dp,
+                    size = Radii.lg,
                     strokeWidth = 2.4f,
                     tint = PantopusColors.appTextStrong,
                 )
@@ -642,15 +642,15 @@ internal fun TasksMapEmptyHero(
             modifier =
                 Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(Radii.xl))
                     .background(PantopusColors.primary50)
-                    .border(1.dp, PantopusColors.primary100, RoundedCornerShape(16.dp)),
+                    .border(1.dp, PantopusColors.primary100, RoundedCornerShape(Radii.xl)),
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
                 icon = PantopusIcon.MapPin,
                 contentDescription = null,
-                size = 24.dp,
+                size = Radii.xl3,
                 tint = PantopusColors.primary600,
             )
         }

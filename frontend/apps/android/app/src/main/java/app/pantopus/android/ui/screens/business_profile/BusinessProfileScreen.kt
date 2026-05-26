@@ -317,7 +317,7 @@ private fun IdentityCard(
                     modifier = Modifier.align(Alignment.TopStart),
                 )
                 if (header.isVerified) {
-                    VerifiedBadge(size = 24.dp)
+                    VerifiedBadge(size = Radii.xl3)
                 }
             }
             Column(
@@ -348,7 +348,7 @@ private fun IdentityCard(
                         PantopusIconImage(
                             icon = PantopusIcon.MapPin,
                             contentDescription = null,
-                            size = 12.dp,
+                            size = Radii.lg,
                             tint = PantopusColors.appTextSecondary,
                         )
                         Text(
@@ -807,7 +807,7 @@ private fun ReviewCard(card: BusinessReviewCard) {
                         PantopusIconImage(
                             icon = PantopusIcon.Star,
                             contentDescription = null,
-                            size = 12.dp,
+                            size = Radii.lg,
                             tint =
                                 if (idx < card.rating) {
                                     PantopusColors.warning
@@ -874,7 +874,7 @@ private fun ActionFooter(
             PantopusIconImage(
                 icon = PantopusIcon.MessageCircle,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextInverse,
             )
             Spacer(modifier = Modifier.width(Spacing.s1))
@@ -905,7 +905,7 @@ private fun ActionFooter(
             PantopusIconImage(
                 icon = if (saved) PantopusIcon.CheckCircle else PantopusIcon.Bookmark,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = if (saved) PantopusColors.business else PantopusColors.appText,
             )
             Spacer(modifier = Modifier.width(Spacing.s1))
@@ -934,7 +934,7 @@ private fun ActionFooter(
                 PantopusIconImage(
                     icon = PantopusIcon.Link,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.business,
                 )
                 Spacer(modifier = Modifier.width(Spacing.s1))

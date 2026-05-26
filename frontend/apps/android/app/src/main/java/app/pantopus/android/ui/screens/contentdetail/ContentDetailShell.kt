@@ -236,7 +236,7 @@ private fun TopNav(
             PantopusIconImage(
                 icon = PantopusIcon.ChevronLeft,
                 contentDescription = "Back",
-                size = 20.dp,
+                size = Radii.xl2,
                 strokeWidth = 2.2f,
                 tint = PantopusColors.appText,
             )
@@ -269,7 +269,7 @@ private fun OverflowMenu(
             PantopusIconImage(
                 icon = PantopusIcon.MoreVertical,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 strokeWidth = 2.2f,
                 tint = PantopusColors.appText,
             )
@@ -490,7 +490,7 @@ private fun StatStrip(stats: List<ContentDetailStat>) {
                 .padding(horizontal = Spacing.s5)
                 .padding(top = 18.dp)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurfaceSunken)
                 .padding(10.dp)
                 .testTag("contentDetailStatStrip"),
@@ -599,13 +599,13 @@ private fun IdentityChip(kind: String) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(Radii.xs))
                 .background(bg)
                 .padding(horizontal = 6.dp, vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 8.dp, strokeWidth = 2.6f, tint = fg)
+        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.md, strokeWidth = 2.6f, tint = fg)
         Text(text = label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = fg, letterSpacing = 0.6.sp)
     }
 }
@@ -676,7 +676,7 @@ private fun ModuleView(module: ContentDetailModule) {
                             PantopusIconImage(
                                 icon = tile.icon,
                                 contentDescription = null,
-                                size = 24.dp,
+                                size = Radii.xl3,
                                 strokeWidth = 1.8f,
                                 tint = Color.White.copy(alpha = 0.9f),
                             )
@@ -722,9 +722,9 @@ private fun ModuleView(module: ContentDetailModule) {
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(Radii.lg))
                             .background(PantopusColors.appSurface)
-                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
+                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
                 ) {
                     module.bids.forEachIndexed { index, bid ->
                         Row(
@@ -823,9 +823,9 @@ private fun PartyCard(
     Column(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(Spacing.s3),
     ) {
         Text(
@@ -851,9 +851,9 @@ private fun LineItemsTable(rows: List<ContentDetailLineItem>) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
     ) {
         Row(
             modifier =
@@ -945,9 +945,9 @@ private fun SummaryCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurfaceSunken)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(horizontal = 14.dp, vertical = Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
@@ -1005,9 +1005,9 @@ private fun StickyDock(
                 Row(
                     modifier =
                         Modifier
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(Radii.lg))
                             .background(PantopusColors.appSurface)
-                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                             .clickable { onSecondary?.invoke() }
                             .padding(horizontal = 18.dp)
                             .heightIn(min = 48.dp)
@@ -1031,9 +1031,9 @@ private fun StickyDock(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.primary600)
-                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(12.dp))
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(Radii.lg))
                         .clickable(onClick = onPrimary)
                         .heightIn(min = 48.dp)
                         .testTag("contentDetailDockPrimary"),
@@ -1044,7 +1044,7 @@ private fun StickyDock(
                     PantopusIconImage(
                         icon = it,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         strokeWidth = 2.2f,
                         tint = PantopusColors.appTextInverse,
                     )

@@ -699,7 +699,7 @@ private fun QuickReplyChip(
         PantopusIconImage(
             icon = prompt.icon,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = PantopusColors.appTextSecondary,
         )
         Text(

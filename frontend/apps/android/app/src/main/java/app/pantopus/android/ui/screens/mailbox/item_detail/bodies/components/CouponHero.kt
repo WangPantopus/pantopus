@@ -252,7 +252,7 @@ private fun StatusPill(isExpired: Boolean) {
         PantopusIconImage(
             icon = if (isExpired) PantopusIcon.AlertCircle else PantopusIcon.Clock,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = foreground,
         )
         Text(

@@ -823,7 +823,7 @@ private struct CommunityPulseThreadCard: View {
                 Icon(.users, size: 13, color: Theme.Color.primary700)
                     .frame(width: 24, height: 24)
                     .background(Theme.Color.primary100)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.sm))
                 Text("PULSE THREAD")
                     .font(.system(size: 11, weight: .bold))
                     .tracking(0.5)
@@ -912,7 +912,7 @@ private struct CommunitySenderCard: View {
                     .foregroundStyle(Theme.Color.appTextInverse)
                     .frame(width: 44, height: 44)
                     .background(content.category.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(content.senderDisplayName)
                         .font(.system(size: 14, weight: .bold))
@@ -1024,10 +1024,10 @@ struct CommunityRsvpActions: View {
             .padding(.vertical, Spacing.s3)
             .background(isPrimary ? Theme.Color.primary600 : Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: Radii.lg)
                     .stroke(isPrimary ? Color.clear : Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
             .opacity(inFlight ? 0.6 : 1)
         }
         .buttonStyle(.plain)
@@ -1057,10 +1057,10 @@ struct CommunityRsvpActions: View {
             .padding(.vertical, 10)
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: Radii.lg)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(id)

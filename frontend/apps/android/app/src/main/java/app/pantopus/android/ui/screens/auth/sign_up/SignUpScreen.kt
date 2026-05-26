@@ -467,7 +467,7 @@ fun PasswordField(
                 PantopusIconImage(
                     icon = PantopusIcon.Eye,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.appTextSecondary,
                 )
             }
@@ -680,7 +680,7 @@ fun ErrorBanner(
             PantopusIconImage(
                 icon = PantopusIcon.X,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.error,
             )
         }

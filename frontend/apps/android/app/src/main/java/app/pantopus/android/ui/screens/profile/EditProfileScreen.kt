@@ -494,7 +494,7 @@ private fun ReadOnlyEmailRow(
                 PantopusIconImage(
                     icon = PantopusIcon.Check,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.success,
                 )
             }

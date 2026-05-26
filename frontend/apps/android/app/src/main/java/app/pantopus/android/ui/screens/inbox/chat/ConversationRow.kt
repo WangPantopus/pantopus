@@ -248,13 +248,13 @@ private fun IdentityDisclosureChip(chip: ConversationIdentityChip) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(Radii.xs))
                 .background(bg)
                 .padding(horizontal = 6.dp, vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 8.dp, tint = fg)
+        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.md, tint = fg)
         Text(
             text = chip.label.uppercase(),
             fontSize = 9.sp,

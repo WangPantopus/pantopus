@@ -64,7 +64,7 @@ fun SourcePill(
             PantopusIconImage(
                 icon = icon,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = tone.foreground,
             )
         }

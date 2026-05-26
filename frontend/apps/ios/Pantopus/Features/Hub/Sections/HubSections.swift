@@ -737,7 +737,7 @@ struct HubSkeleton: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             HStack(spacing: Spacing.s3) {
-                Shimmer(width: 40, height: 40, cornerRadius: 20)
+                Shimmer(width: 40, height: 40, cornerRadius: Radii.xl2)
                 VStack(alignment: .leading, spacing: Spacing.s1) {
                     Shimmer(width: 80, height: 11)
                     Shimmer(width: 160, height: 16)

@@ -125,7 +125,7 @@ fun PostAuthorHeader(
                 Box(
                     modifier = Modifier.size(20.dp).offset(x = 28.dp, y = 28.dp),
                 ) {
-                    VerifiedBadge(size = 16.dp)
+                    VerifiedBadge(size = Radii.xl)
                 }
             }
         }
