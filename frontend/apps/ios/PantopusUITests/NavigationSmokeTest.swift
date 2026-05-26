@@ -28,6 +28,7 @@
 
 import XCTest
 
+// swiftlint:disable type_body_length
 final class NavigationSmokeTest: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -35,7 +36,7 @@ final class NavigationSmokeTest: XCTestCase {
 
     // MARK: - Launch helpers
 
-    private func launchSignedIn(file: StaticString = #file, line: UInt = #line) -> XCUIApplication? {
+    private func launchSignedIn(file _: StaticString = #file, line _: UInt = #line) -> XCUIApplication? {
         let app = XCUIApplication()
         app.launchEnvironment["UI_TESTS_SIGNED_IN"] = "1"
         app.launchEnvironment["UI_TESTS_STUB_API"] = "1"
@@ -58,8 +59,7 @@ final class NavigationSmokeTest: XCTestCase {
     /// Some destinations carry the identifier on the screen-level scroll
     /// view, others on a header label.
     private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
-        let any = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
-        return any
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
 
     private func assertReaches(
@@ -439,3 +439,5 @@ final class NavigationSmokeTest: XCTestCase {
         assertReaches("nearbyMap", in: app, timeout: 2)
     }
 }
+
+// swiftlint:enable type_body_length
