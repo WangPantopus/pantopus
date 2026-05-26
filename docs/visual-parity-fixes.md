@@ -419,3 +419,117 @@ Deferred — no simulator / emulator. CI will fail snapshot verification until b
 Files modified (4 lines across 2 files):
 - iOS: `Features/Gigs/GigsFeedView.swift` (2 lines)
 - Android: `ui/screens/gigs/GigsFeedScreen.kt` (2 lines)
+
+---
+
+## P7.9.d — Map surfaces visual parity
+
+**Date:** 2026-05-26 · **Branch:** `claude/loving-hamilton-OI30q` · **Commit:** appended this prompt
+
+### Scope
+
+| Surface | Design HTML | iOS implementation | Android implementation |
+|---|---|---|---|
+| Map List Hybrid archetype (3 detents: collapsed 20%, default 40%, expanded 70%) | `A08/uploads/Pantopus-design/Map List Hybrid.html` + `map-frames.jsx` | `Features/Shared/MapListHybrid/MapListHybridShell.swift` + `MapListHybridContent.swift` + `Features/Nearby/NearbyMapView.swift` (consumer) | `ui/screens/shared/map_list_hybrid/MapListHybridShell.kt` + `Content.kt` + `ui/screens/nearby/map/NearbyMapScreen.kt` |
+| Tasks Map (A11.1 — populated + empty) | `Full-bleed_map.../Tasks Map.html` + `gigs-map-frames.jsx` | `Features/Gigs/TasksMap/TasksMapView.swift` + `TasksMapContent.swift` | `ui/screens/gigs/tasks_map/TasksMapScreen.kt` + `TasksMapContent.kt` |
+| Explore Map (A11.2 — populated + empty) | `Full-bleed_map.../Explore.html` + `explore-map-frames.jsx` | `Features/Explore/ExploreMapView.swift` + `ExploreMapContent.swift` | `ui/screens/explore/ExploreMapScreen.kt` + `ExploreMapContent.kt` |
+| Mailbox Map (A11.4 — populated + pin-detail) | `Full-bleed_map.../Mailbox Map.html` + `mailbox-map-frames.jsx` | `Features/Mailbox/MailboxMap/MailboxMapView.swift` + `MailboxMapContent.swift` | `ui/screens/mailbox/mailbox_map/MailboxMapScreen.kt` + `MailboxMapContent.kt` |
+| Discover Hub refinement (A11.3 — populated + empty) | `Full-bleed_map.../Discover.html` + `discover-frames.jsx` | `Features/DiscoverHub/DiscoverHubView.swift` | `ui/screens/discoverhub/DiscoverHubScreen.kt` |
+
+### Methodology
+
+Rendered the 5 design HTML pages at 1600×1200 (deviceScaleFactor 2) via
+Playwright with locally-vendored React/Babel/Lucide. 17 PNGs captured
+(3 + 2 + 2 + 2 + 2 frame crops + 5 overviews).
+
+Diffed CSS dimensions in `map-frames.jsx`, `gigs-map-frames.jsx`,
+`explore-map-frames.jsx`, `mailbox-map-frames.jsx`, `discover-frames.jsx`
+against `Radii.*` / `Spacing.*` references in code.
+
+### Resolvable cross-platform parity fix — APPLIED
+
+#### 1. Android `MailboxSpotCard` outer corner radius — **FIXED** (Android only)
+
+The iOS Mailbox map card already uses literal `cornerRadius: 14`
+matching design's `borderRadius: 14`. Android was the lone outlier
+using `Radii.xl` (=16), creating a 2pt cross-platform radius drift
+on the same surface. Fix is Android-only — iOS already matches design.
+
+| Side | Before | After |
+|---|---|---|
+| Design (`mailbox-map-frames.jsx` L160) | `MailCard { borderRadius: 14, padding: 11/12, border: 1px (or 2px when active) }` | n/a |
+| iOS `MailboxMapView.swift:668, 887, 981` | `cornerRadius: 14` (literal) | unchanged ✓ already at design |
+| Android `MailboxMapScreen.kt:872, 877, 881` (populated `MailboxSpotCard`) | `Radii.xl` (=16) | `14.dp` (literal, matches iOS + design) |
+| Android `MailboxMapScreen.kt:1154, 1156` (loading skeleton card) | `Radii.xl` (=16) | `14.dp` (preserves shimmer-shape parity per P7.6b) |
+
+This fix swaps a canonical token (`Radii.xl`) for a raw off-scale
+literal (`14.dp`). Per the audit rule "do not invent tokens", we
+cannot add a `Radii.lg2` (=14) entry. The literal pattern is the
+established convention on the iOS side and in 2/3 other Android map
+files (`ExploreMapScreen.kt`, `NearbyMapScreen.kt` already use
+`14.dp` literals); this brings the 4th map file into line.
+
+### Surfaced for design review (NOT fixed — off-scale design values or out-of-scope)
+
+The map surfaces are unusually heavy in off-scale design values.
+Surfacing the most consequential ones below; the per-frame audit
+contains many more 9.5/10.5/11.5/12.5pt typography hits already
+documented in P7.4 typography drift.
+
+| # | Surface | Design value | Code value | Notes |
+|---|---|---|---|---|
+| A | Bottom-sheet outer corner radius | `borderRadius: 22 22 0 0` (top corners; all 5 frames agree) | iOS `NearbyMapView`, `ExploreMapView`, `MailboxMapView` use literal `22`; iOS `DiscoverHubView.swift:176` uses **`Radii.xl2` (=20)** (outlier); Android `MailListHybridShell.kt:319`, `ExploreMapScreen.kt:763`, `MailboxMapScreen.kt:677`, `NearbyMapScreen.kt:621` use literal `22.dp`; Android `DiscoverHubScreen.kt:161` uses **`Radii.xl2` (=20)** (outlier) | 22pt is off-scale (between `Radii.xl2`=20 and `Radii.xl3`=24). DiscoverHub on both platforms drifts 2pt from design + the other 3 map surfaces. Recommend reconciling: either accept the 2pt DiscoverHub drift OR switch to literal `22.dp` everywhere OR add `Radii.xl2_5` (=22) — the last option requires the "do not invent tokens" rule to be relaxed. |
+| B | DiscoverHub card outer corner radius (`DiscoverTaskCard`, `DiscoverMarketplaceRailCard`, `DiscoverPostCard`) | `borderRadius: 14` (`discover-frames.jsx` L37, L94, L137) | iOS `DiscoverHubView.swift:614/617, 673/676, 728/731` use `Radii.lg` (=12); Android `DiscoverHubScreen.kt:708/711, 758/761, 825/828` use `Radii.lg` (=12) | Both platforms internally consistent at `Radii.lg` (12), but design says 14. 2pt drift. Resolution requires design call (accept 2pt under, or add 14 to the ramp). |
+| C | Map-card icon-tile corner radius | `borderRadius: 10` across all 5 frames (`map-frames.jsx` L196, `explore-map-frames.jsx` L82, `mailbox-map-frames.jsx` L93, `discover-frames.jsx` L86) | iOS uses literal `10` consistently across all 4 map files; Android `MailboxMapScreen.kt:1013/1018, 1389/1391` uses literal `10.dp`; other Android map files use literal `10.dp` consistently | 10 off-scale (between `Radii.md`=8 and `Radii.lg`=12). Code matches design exactly via literal but breaks tokens-only spirit. |
+| D | Empty-state icon container | TasksMap: `borderRadius: 16, 56×56` (`gigs-map-frames.jsx`); ExploreMap not explicitly specified; DiscoverHub: `borderRadius: 14, 52×52` (`discover-frames.jsx`) | iOS TasksMap `Radii.xl` ✓; iOS ExploreMap `Radii.xl` (16, 56×56); iOS DiscoverHub doesn't expose an empty hero icon container (different empty layout); Android matches | TasksMap + ExploreMap correctly use `Radii.xl` (16). DiscoverHub empty state would drift if it had the same icon — surface for design unification. |
+| E | Pulse-style chips throughout map sheets (CategoryChip, ExplorePill, MailboxMap chips) | `height: 28, padding: 0 12px, borderRadius: 9999, fontSize: 11.5/600` | iOS+Android use `Radii.pill`, `height: 28`, `padding(.horizontal, Spacing.s3)` (=12), `fontSize: 11.5` | 11.5pt off-scale (P7.4 drift). Otherwise ✓. |
+| F | MailboxMap pin (square envelope) | `width: 26, height: 26, borderRadius: 8` (`mailbox-map-frames.jsx`) | iOS `MailboxMapView.swift:741, 760, 764` uses `Radii.lg` (=12) on the outer container, `Radii.sm` (=6) on inner squares — not a 1:1 match with design's 8 (=`Radii.md`); Android `MailboxMapScreen.kt:476/478/479` uses `Radii.sm` (=6) | Pin design says 8pt; code uses 6 or 12. 2pt difference either direction. Surface for design or accept. |
+| G | Active MailCard border-width | design `border: 2px (active)`, `1px (inactive)` | iOS `MailboxMapView.swift:626` uses `lineWidth: selected ? 2 : 1` ✓; Android `MailboxMapScreen.kt:875` uses `width = if (active) 2.dp else 1.dp` ✓ | ✓ matches |
+| H | Bottom-sheet handle pill | `width: 40, height: 4, borderRadius: 4` | iOS uses `Capsule()` at `40×4`; Android matches | ✓ matches |
+| I | DiscoverHub item-card image strip | `height: 104, borderRadius: 0` (square-cornered photo strip at top of card) | iOS `Shimmer(height: 104, cornerRadius: 0)` ✓; Android matches | ✓ matches |
+| J | Map controls (zoom +, locate, layers buttons) | `width: 38, height: 38, borderRadius: 50%` | iOS+Android use `Circle` shape at 38×38 | ✓ matches |
+| K | Cluster pin | `width: 38, height: 38, borderRadius: 50%, border: 3px, fontSize: 13/700` | iOS+Android match | ✓ |
+| L | TypedPin (Explore + Discover) | `width: 26, height: 26, borderRadius: 50% or 8 (square for item-kind)` | iOS `ExploreMapView.swift:755, 809` uses `Radii.md` (=8) for square; iOS `DiscoverHubScreen.kt:307` uses `Radii.sm` (=6) for square — INCONSISTENCY between Explore and Discover treatments of the same pin shape | Explore uses 8 (matches design); Discover uses 6. Surface for design unification. |
+| M | Filter button in ExploreMap (`Filter • 2`) | `height: 32, padding: 0 10px 0 11px, borderRadius: 9999` | iOS+Android use `Radii.pill` ✓ | ✓ (asymmetric padding minor) |
+| N | MapHeader on Discover | `height: 190, with embedded MiniPins` | iOS+Android match | ✓ |
+| O | DiscoverHub Discover sheet section icon | `width: 24, height: 24, borderRadius: 6` | iOS+Android use `Radii.sm` (=6) | ✓ matches |
+| P | TasksMap PostTaskFAB | `height: 48, padding: 0 18px 0 14px, borderRadius: 9999, fontSize: 14/700` | iOS+Android use `Radii.pill`, `height: 48` ✓ | Padding 18/14 asymmetric — off-scale on the design side. |
+| Q | Carousel page dots (in map-frames sheet) | `width: 16/5 height: 5, borderRadius: 5` | Not directly inspected; pagination dot pattern shared across many surfaces | Surfacing only — minor element. |
+| R | You-are-here pin | `width: 14, height: 14, borderRadius: 50%, border: 3px` | iOS+Android Circle implementations | ✓ matches |
+
+### Snapshot tests
+
+Re-record needed for:
+- Android `MailboxMapSnapshotTest` (the card radius change applies to all populated + selected + loading frames)
+- iOS Mailbox map snapshots unaffected (radius unchanged on iOS)
+
+Deferred — no simulator / emulator. CI will fail snapshot verification until baselines are re-recorded.
+
+### Verification
+
+- iOS `make verify-tokens` ✅ pass (no on-scale literals introduced).
+- Android — the existing literal-radii pattern (`14.dp`, `10.dp`, `22.dp`) was extended to one more site for cross-platform parity. The repo's CI guard rejects on-scale raw literals (e.g., a raw `8.dp` when `Radii.md` exists) but allows off-scale literals through as a deliberate carve-out for matching off-scale design values.
+
+Files modified (2 sites in 1 file):
+- Android: `ui/screens/mailbox/mailbox_map/MailboxMapScreen.kt` (5 lines across the populated `MailboxSpotCard` outer + loading skeleton card outer; iOS already matched design via literal `14`)
+
+### Audit summary
+
+P7.9.d found that map surfaces use the off-scale `borderRadius: 14`
+pattern more heavily than any other surface family audited so far.
+Most code sites are already either (a) using literal `14.dp` / `14`
+to match design exactly, or (b) using the nearest canonical token
+(`Radii.lg`=12 or `Radii.xl`=16). The cross-platform parity break on
+`MailboxSpotCard` was the only resolvable issue — the rest are
+design-system questions about whether to:
+1. Extend the `Radii` ramp to include 14 (and 22 for sheets, and 10
+   for icon tiles) — would resolve A, B, C, F, L at once but breaks
+   the "do not invent tokens" rule;
+2. Snap all off-scale design values to the nearest canonical token —
+   accepts 2pt visual drift across many surfaces;
+3. Continue the existing literal-shim pattern (most map files already
+   do this) — keeps visual parity but tolerates off-scale literals.
+
+Option 3 is the de-facto status quo and the safest no-change choice.
+Recommendation: log a design-system ticket to settle (1) vs (2) vs (3)
+before the next audit pass, so future map work has a clear convention.

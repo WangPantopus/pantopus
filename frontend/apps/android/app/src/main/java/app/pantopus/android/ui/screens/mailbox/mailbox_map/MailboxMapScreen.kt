@@ -869,16 +869,16 @@ private fun MailboxSpotCard(
         modifier =
             Modifier
                 .width(266.dp)
-                .clip(RoundedCornerShape(Radii.xl))
+                .clip(RoundedCornerShape(14.dp))
                 .background(PantopusColors.appSurface)
                 .border(
                     width = if (active) 2.dp else 1.dp,
                     color = if (active) PantopusColors.primary600 else PantopusColors.appBorder,
-                    shape = RoundedCornerShape(Radii.xl),
+                    shape = RoundedCornerShape(14.dp),
                 )
                 .shadow(
                     elevation = if (active) 6.dp else 2.dp,
-                    shape = RoundedCornerShape(Radii.xl),
+                    shape = RoundedCornerShape(14.dp),
                 )
                 .clickable(onClick = onTap)
                 .padding(Spacing.s3)
@@ -1151,9 +1151,9 @@ private fun LoadingRail() {
                 modifier =
                     Modifier
                         .width(266.dp)
-                        .clip(RoundedCornerShape(Radii.xl))
+                        .clip(RoundedCornerShape(14.dp))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(14.dp))
                         .padding(Spacing.s3),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
