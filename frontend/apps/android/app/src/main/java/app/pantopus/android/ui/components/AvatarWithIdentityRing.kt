@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
@@ -18,6 +19,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -26,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Spacing
+import coil.compose.SubcomposeAsyncImage
 
 /** Identity pillar tint for the progress ring. */
 enum class IdentityPillar(
@@ -40,10 +43,12 @@ enum class IdentityPillar(
 /**
  * Avatar with an identity-tinted progress ring.
  *
- * @param name Display name — initials are shown when [imageUrl] is null.
- * @param imageUrl Optional avatar URL (fetched via Coil in production;
- *     this composable renders the initials fallback and exposes the URL
- *     so the caller can layer AsyncImage on top if needed).
+ * @param name Display name — initials are shown when [imageUrl] is null
+ *     or while the image is loading / failed.
+ * @param imageUrl Optional avatar URL. Rendered via Coil
+ *     [SubcomposeAsyncImage]; falls back to initials on null / loading
+ *     / error to mirror iOS `AsyncImage` phase handling
+ *     (`Core/Design/Components/AvatarWithIdentityRing.swift:80-91`).
  * @param identity Ring tint (personal / home / business).
  * @param ringProgress 0..1 — clamped.
  * @param size Outer diameter; defaults to 40dp.
@@ -105,17 +110,39 @@ fun AvatarWithIdentityRing(
                     .background(identity.backgroundColor),
             contentAlignment = Alignment.Center,
         ) {
-            // TODO(images): swap for Coil AsyncImage once profile-photo
-            // upload pipeline lands. `imageUrl` is accepted on the API
-            // today so call sites don't need to restructure later.
-            @Suppress("UNUSED_EXPRESSION")
-            imageUrl
-            Text(
-                text = initials(name),
-                style = PantopusTextStyle.small,
-                color = identity.color,
-            )
+            if (imageUrl.isNullOrBlank()) {
+                AvatarInitials(name = name, identity = identity)
+            } else {
+                SubcomposeAsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    loading = { AvatarInitials(name = name, identity = identity) },
+                    error = { AvatarInitials(name = name, identity = identity) },
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun AvatarInitials(
+    name: String,
+    identity: IdentityPillar,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(identity.backgroundColor),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = initials(name),
+            style = PantopusTextStyle.small,
+            color = identity.color,
+        )
     }
 }
 

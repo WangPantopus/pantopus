@@ -25,7 +25,7 @@ Automated coverage lives in `app/src/androidTest/java/app/pantopus/android/a11y/
 | `MailboxDrawersScreen` | ✅ | ✅ | ✅ | n/a | ✅ | File-chevron rows use `mergeDescendants = true`. |
 | `MailboxItemDetailScreen` | ✅ | ✅ | ✅ | ✅ | ✅ | Trust pill + accent strip both accessible; sticky CTA shelf 48 dp. |
 | `HomeDashboardScreen` | ✅ | ✅ | ✅ | ✅ | ✅ | `HomeHeroHeader` address now carries `heading()` (fixed in this PR). |
-| `EditProfileScreen` (planned, ships in iOS only this round) | n/a | n/a | n/a | n/a | n/a | Edit Profile is iOS-only this milestone — see `frontend/apps/android/README.md` and `iOS/Pantopus/docs/a11y_audit.md`. |
+| `EditProfileScreen` | ✅ | ✅ | ✅ | ✅ | ✅ | Sticky save bar buttons 42 dp tall + 4 dp ripple bleed; `formShakeOnChange` honors `ANIMATOR_DURATION_SCALE` (`FirstInvalidShake.kt`). |
 | `AddHomeWizardScreen` | ✅ | ✅ | ✅ | ✅ | ✅ | RoleRow uses `Role.RadioButton`; AddressVerdictRow now merges descendants with a combined contentDescription (fixed in this PR). |
 
 ## Check-by-check
@@ -77,6 +77,10 @@ Every icon-only control surfaces a non-null `contentDescription`:
 - HubTopBar bell / menu — labelled in `HubSections.kt`
 - `KeyFactsPanel` copy button — labelled in `KeyFactsPanel.kt`
 - AvatarWithIdentityRing — exposes the avatar's identity + ring %.
+  The Coil `SubcomposeAsyncImage` passes `contentDescription = null` so the
+  profile photo is treated as decorative; the surrounding tile owns the
+  combined "$name, $progress% profile complete" label, so TalkBack reads
+  the identity once instead of announcing the image and the name twice.
 
 `A11yLabelAudit.kt` enumerates every node with `Role.Button` semantic
 on each route and asserts a non-empty `contentDescription`.
@@ -87,7 +91,7 @@ on each route and asserts a non-empty `contentDescription`.
 |---|---|
 | `Shimmer` | ✅ flat fill when `ANIMATOR_DURATION_SCALE == 0` (`Shimmer.kt:125`) |
 | `TimelineStepper` pulse-ring | ✅ static halo when reduced (`TimelineStepper.kt:209`) |
-| Form-field error shake (iOS-only this milestone) | n/a |
+| Form-field error shake (`formShakeOnChange`) | ✅ no-op when `ANIMATOR_DURATION_SCALE == 0` (`FirstInvalidShake.kt:29-45`) |
 
 ### 7. Switch Access / hardware D-pad
 
@@ -113,7 +117,11 @@ Compose uses `semantics { heading() }` on H1/H2/H3 text. Verified:
 
 ### 9. Form errors
 
-- `EditProfileScreen` is iOS-only this milestone.
+- `EditProfileScreen` — invalid submits surface a toast
+  (`testTag("editProfileToast")`) plus a one-shot horizontal shake on the
+  form node (`testTag("editProfileShake")`); per-field errors render
+  inline beneath the field with the message text as the
+  `contentDescription`. Shake honours reduced motion.
 - `AddHomeWizardScreen` — `errorMessage` rendered as a banner with
   `testTag("addHomeErrorBanner")` and `contentDescription` derived
   from the message text.
