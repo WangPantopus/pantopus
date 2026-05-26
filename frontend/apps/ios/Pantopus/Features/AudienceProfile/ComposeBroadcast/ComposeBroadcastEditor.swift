@@ -109,7 +109,7 @@ struct ComposeBroadcastEditor: View {
                 .font(bodyFont)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 5)
-                .padding(.vertical, 8)
+                .padding(.vertical, Spacing.s2)
                 .background(
                     GeometryReader { proxy in
                         Color.clear.preference(key: EditorHeightKey.self, value: proxy.size.height)
@@ -122,7 +122,7 @@ struct ComposeBroadcastEditor: View {
                     .font(bodyFont)
                     .foregroundStyle(Theme.Color.appTextMuted)
                     .padding(.horizontal, 5)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, Spacing.s2)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
@@ -200,7 +200,7 @@ struct ComposeBroadcastEditor: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(Color.black.opacity(0.45))
         .clipShape(Capsule())
         .padding(Spacing.s2)

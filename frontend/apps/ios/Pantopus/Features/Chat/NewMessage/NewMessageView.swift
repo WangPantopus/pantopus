@@ -21,7 +21,7 @@ public struct NewMessageView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             topBar
             searchBar
             content
@@ -35,29 +35,29 @@ public struct NewMessageView: View {
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack(alignment: .center, spacing: 0) {
+        HStack(alignment: .center, spacing: Spacing.s0) {
             Button { viewModel.tapCancel() } label: {
                 Text("Cancel")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Theme.Color.primary600)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, Spacing.s2)
                     .frame(height: 36)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Cancel")
             .accessibilityIdentifier("newMessageCancel")
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Text("New message")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("newMessageTitle")
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             // Spacer to balance the Cancel button's width and keep
             // the title visually centered.
             Color.clear.frame(width: 60, height: 36)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 52)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
@@ -69,7 +69,7 @@ public struct NewMessageView: View {
 
     private var searchBar: some View {
         let hasText = !viewModel.searchText.isEmpty
-        return HStack(spacing: 8) {
+        return HStack(spacing: Spacing.s2) {
             Icon(.search, size: 16, color: searchFocused ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
             TextField(
                 "Search by name or neighborhood",
@@ -94,7 +94,7 @@ public struct NewMessageView: View {
                 .accessibilityIdentifier("newMessageSearchClear")
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .padding(.vertical, 9)
         .background(Theme.Color.appSurfaceSunken)
         .overlay(
@@ -105,8 +105,8 @@ public struct NewMessageView: View {
                 )
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
@@ -131,8 +131,8 @@ public struct NewMessageView: View {
                     sectionSkeleton
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.top, Spacing.s3)
         }
         .accessibilityIdentifier("newMessageLoading")
     }
@@ -140,8 +140,8 @@ public struct NewMessageView: View {
     private var sectionSkeleton: some View {
         VStack(alignment: .leading, spacing: 10) {
             Shimmer(width: 100, height: 11, cornerRadius: Radii.xs)
-                .padding(.leading, 4)
-            VStack(spacing: 0) {
+                .padding(.leading, Spacing.s1)
+            VStack(spacing: Spacing.s0) {
                 ForEach(0..<3, id: \.self) { idx in
                     HStack(spacing: 11) {
                         Shimmer(width: 38, height: 38, cornerRadius: 19)
@@ -149,7 +149,7 @@ public struct NewMessageView: View {
                             Shimmer(width: 140, height: 12, cornerRadius: Radii.xs)
                             Shimmer(width: 100, height: 10, cornerRadius: Radii.xs)
                         }
-                        Spacer(minLength: 0)
+                        Spacer(minLength: Spacing.s0)
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
@@ -160,10 +160,10 @@ public struct NewMessageView: View {
             }
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
         }
     }
 
@@ -174,9 +174,9 @@ public struct NewMessageView: View {
                 .frame(width: 72, height: 72)
                 .background(Theme.Color.primary50)
                 .clipShape(Circle())
-            VStack(spacing: 8) {
+            VStack(spacing: Spacing.s2) {
                 Text(viewModel.emptyHeadline)
-                    .font(.system(size: 20, weight: .semibold))
+                    .pantopusTextStyle(.h3)
                     .foregroundStyle(Theme.Color.appText)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 280)
@@ -189,7 +189,7 @@ public struct NewMessageView: View {
             }
             HStack(spacing: 6) {
                 ForEach(viewModel.emptySearchHints, id: \.self) { hint in
-                    HStack(spacing: 4) {
+                    HStack(spacing: Spacing.s1) {
                         Icon(.search, size: 10, color: Theme.Color.appTextMuted)
                         Text(hint)
                             .font(.system(size: 11.5, weight: .medium))
@@ -206,26 +206,26 @@ public struct NewMessageView: View {
                 }
             }
             Button { viewModel.tapInvite() } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     Icon(.userPlus, size: 15, color: Theme.Color.appText)
                     Text("Invite someone to Pantopus")
                         .font(.system(size: 13.5, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(.horizontal, Spacing.s5)
+                .padding(.vertical, Spacing.s3)
                 .background(Theme.Color.appSurface)
                 .overlay(
-                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                         .stroke(Theme.Color.appBorder, lineWidth: 1)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("newMessageInvite")
             Spacer()
         }
-        .padding(.horizontal, 32)
+        .padding(.horizontal, Spacing.s8)
         .padding(.bottom, 60)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("newMessageEmpty")
@@ -241,9 +241,9 @@ public struct NewMessageView: View {
                     searchEmptyState
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 24)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.top, Spacing.s3)
+            .padding(.bottom, Spacing.s6)
         }
         .refreshable { await viewModel.refresh() }
         .accessibilityIdentifier("newMessageContent")
@@ -252,7 +252,7 @@ public struct NewMessageView: View {
     /// Pivot used when search is active but no rows match. Distinct
     /// from the full empty frame so the search bar stays addressable.
     private var searchEmptyState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.s3) {
             Icon(.search, size: 28, strokeWidth: 1.8, color: Theme.Color.primary600)
                 .frame(width: 56, height: 56)
                 .background(Theme.Color.primary50)
@@ -264,14 +264,14 @@ public struct NewMessageView: View {
                 .font(.system(size: 12.5))
                 .foregroundStyle(Theme.Color.appTextSecondary)
         }
-        .padding(.top, 40)
+        .padding(.top, Spacing.s10)
         .frame(maxWidth: .infinity)
         .accessibilityIdentifier("newMessageNoMatches")
     }
 
     private func sectionCard(_ section: NewMessageSection) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {
                 Text(section.label.uppercased())
                     .font(.system(size: 11, weight: .bold))
                     .kerning(0.88)
@@ -280,13 +280,13 @@ public struct NewMessageView: View {
                     .font(.system(size: 11, weight: .medium))
                     .kerning(0.44)
                     .foregroundStyle(Theme.Color.appTextMuted)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
-            .padding(.horizontal, 4)
-            .padding(.top, 4)
+            .padding(.horizontal, Spacing.s1)
+            .padding(.top, Spacing.s1)
             .padding(.bottom, 10)
             .accessibilityIdentifier("newMessageSection_\(section.id.rawValue)")
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
                     NewMessageContactRowView(row: row) { viewModel.tap(row: row) }
                     if index < section.rows.count - 1 {
@@ -299,10 +299,10 @@ public struct NewMessageView: View {
             }
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
         }
     }
 
@@ -330,7 +330,7 @@ public struct NewMessageView: View {
             .accessibilityIdentifier("newMessageRetry")
             Spacer()
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, Spacing.s6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("newMessageError")
     }
@@ -352,7 +352,7 @@ private struct NewMessageContactRowView: View {
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(1)
                     if let locality = row.locality {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Spacing.s1) {
                             Icon(.mapPin, size: 10, color: Theme.Color.appTextSecondary)
                             Text(locality)
                                 .font(.system(size: 11.5))
@@ -361,7 +361,7 @@ private struct NewMessageContactRowView: View {
                         }
                     }
                     if let sub = row.sub {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Spacing.s1) {
                             if let icon = row.subIcon {
                                 Icon(icon, size: 10, color: Theme.Color.appTextMuted)
                             }
@@ -372,7 +372,7 @@ private struct NewMessageContactRowView: View {
                         }
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
             }
             .padding(.horizontal, 14)

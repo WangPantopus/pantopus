@@ -226,7 +226,7 @@ private fun ConfidencePill(confidence: Double) {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(background)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .semantics { contentDescription = "AI confidence $percent percent" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
@@ -234,7 +234,7 @@ private fun ConfidencePill(confidence: Double) {
         PantopusIconImage(
             icon = PantopusIcon.Info,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = foreground,
         )
         Text(

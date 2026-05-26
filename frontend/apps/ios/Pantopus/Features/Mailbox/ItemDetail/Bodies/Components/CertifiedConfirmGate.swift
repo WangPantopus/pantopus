@@ -61,7 +61,7 @@ public struct CertifiedConfirmGate: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: Spacing.s0) {
                 SummaryRow(label: "From", value: senderName, icon: .landmark)
                 Divider().background(Theme.Color.appBorderSubtle)
                 SummaryRow(label: "Tracking", value: referenceNumber, icon: .hash, isCode: true)
@@ -139,7 +139,7 @@ public struct CertifiedConfirmGate: View {
                         .foregroundStyle(Theme.Color.appText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .padding(.horizontal, Spacing.s3)
             .padding(.vertical, Spacing.s2)

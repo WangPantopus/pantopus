@@ -77,8 +77,8 @@ fun PulsePostCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .clip(RoundedCornerShape(Radii.xl))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
                 .clickable(onClick = onTap)
                 .padding(Spacing.s3)
@@ -205,10 +205,10 @@ private fun AttendeeStrip(
                             .clip(RoundedCornerShape(Radii.pill))
                             .background(PantopusColors.businessBg)
                             .clickable(onClick = onRSVP)
-                            .padding(horizontal = 12.dp)
+                            .padding(horizontal = Spacing.s3)
                             .testTag("pulseRSVP_$postId"),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     PantopusIconImage(
                         icon = if (attendees.userIsGoing) PantopusIcon.Check else PantopusIcon.PlusCircle,
@@ -247,11 +247,11 @@ private fun ReactionStrip(
             )
         }
         Spacer(modifier = Modifier.weight(1f))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             PantopusIconImage(
                 icon = PantopusIcon.Send,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = PantopusColors.appTextSecondary,
             )
             Text(
@@ -286,12 +286,12 @@ private fun ReactionPill(
     Row(
         modifier = withClick,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = reaction.icon,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = tint,
         )
         if (reaction.label.isNotEmpty()) {
@@ -322,10 +322,10 @@ fun PulseIntentChip(intent: PulseIntent) {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(bg)
-                .padding(horizontal = 8.dp, vertical = 2.dp)
+                .padding(horizontal = Spacing.s2, vertical = 2.dp)
                 .semantics { contentDescription = "${intent.label} post" },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = intent.icon,

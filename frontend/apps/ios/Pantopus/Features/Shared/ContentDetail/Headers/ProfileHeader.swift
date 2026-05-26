@@ -206,7 +206,7 @@ private struct TierChip: View {
                 .foregroundStyle(Theme.Color.warning)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(Theme.Color.warningBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
         .accessibilityElement()
@@ -226,7 +226,7 @@ private struct VerifiedNeighborChip: View {
                 .foregroundStyle(Theme.Color.home)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(Theme.Color.homeBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
         .accessibilityElement()

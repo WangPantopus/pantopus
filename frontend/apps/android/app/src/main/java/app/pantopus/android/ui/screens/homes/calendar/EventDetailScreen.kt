@@ -211,7 +211,7 @@ private fun LoadedShell(
                     PantopusIconImage(
                         icon = PantopusIcon.Trash2,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         tint = PantopusColors.error,
                     )
                     Text(
@@ -281,7 +281,7 @@ private fun EventHeader(
                 PantopusIconImage(
                     icon = category.icon,
                     contentDescription = null,
-                    size = 24.dp,
+                    size = Radii.xl3,
                     tint = category.foreground,
                 )
             }
@@ -309,12 +309,12 @@ private fun EventHeader(
             if (location.isNotEmpty()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     PantopusIconImage(
                         icon = PantopusIcon.MapPin,
                         contentDescription = null,
-                        size = 12.dp,
+                        size = Radii.lg,
                         tint = PantopusColors.appTextSecondary,
                     )
                     Text(
@@ -333,12 +333,12 @@ private fun EventHeader(
 private fun CategoryPill(category: CalendarEventCategory) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         modifier =
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(category.background)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
     ) {
         PantopusIconImage(
             icon = category.icon,
@@ -422,7 +422,7 @@ private fun AttendeesSection(
             PantopusIconImage(
                 icon = PantopusIcon.UsersRound,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.home,
             )
             Text(
@@ -493,7 +493,7 @@ private fun NotesSection(text: String) {
             PantopusIconImage(
                 icon = PantopusIcon.FileText,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.primary600,
             )
             Text(

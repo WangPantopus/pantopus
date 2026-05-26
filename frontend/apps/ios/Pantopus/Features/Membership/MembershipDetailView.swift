@@ -45,7 +45,7 @@ public struct MembershipDetailView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             topBar
             content
         }
@@ -58,7 +58,7 @@ public struct MembershipDetailView: View {
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             Button(action: onBack) {
                 Icon(.chevronLeft, size: 22, color: Theme.Color.appText)
                     .frame(width: 44, height: 44)
@@ -218,7 +218,7 @@ public struct MembershipDetailView: View {
                         .font(.system(size: 13.5, weight: .bold))
                         .foregroundStyle(Theme.Color.warning)
                     Text(alert.message)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextStrong)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -272,7 +272,7 @@ public struct MembershipDetailView: View {
     // MARK: - Tier card
 
     private func tierCard(_ loaded: MembershipDetailContent, slaMissed: Bool) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             tierStrip(loaded)
             renewalRow(loaded, slaMissed: slaMissed)
             Rectangle()
@@ -305,7 +305,7 @@ public struct MembershipDetailView: View {
                 }
             }
             Spacer(minLength: Spacing.s2)
-            VStack(alignment: .trailing, spacing: 0) {
+            VStack(alignment: .trailing, spacing: Spacing.s0) {
                 Text(loaded.priceLabel)
                     .font(.system(size: 22, weight: .heavy))
                     .foregroundStyle(Theme.Color.appText)
@@ -387,7 +387,7 @@ public struct MembershipDetailView: View {
                 .overlay { Icon(row.icon, size: 15, color: row.iconForeground) }
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.label)
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 Text(row.value)
                     .font(.system(size: 13, weight: .semibold))
@@ -409,7 +409,7 @@ public struct MembershipDetailView: View {
     // MARK: - Benefits
 
     private func benefitsCard(_ benefits: [MembershipBenefit]) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(Array(benefits.enumerated()), id: \.element.id) { offset, benefit in
                 benefitRow(benefit)
                 if offset < benefits.count - 1 {
@@ -451,7 +451,7 @@ public struct MembershipDetailView: View {
                     .font(.system(size: 10.5))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s3)

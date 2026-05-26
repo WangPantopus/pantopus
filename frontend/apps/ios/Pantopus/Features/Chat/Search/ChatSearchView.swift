@@ -59,7 +59,7 @@ private struct ChatSearchResultRow: View {
                         if let chip = result.identityChip {
                             SearchIdentityChip(chip: chip)
                         }
-                        Spacer(minLength: 0)
+                        Spacer(minLength: Spacing.s0)
                     }
                     Text(ChatSearchText.highlighted(result.snippet, query: result.query))
                         .font(.system(size: 12.5))
@@ -67,10 +67,10 @@ private struct ChatSearchResultRow: View {
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .padding(.horizontal, Spacing.s4)
-            .padding(.vertical, 12)
+            .padding(.vertical, Spacing.s3)
             .frame(minHeight: 56)
             .background(Theme.Color.appSurface)
             .overlay(alignment: .bottom) {

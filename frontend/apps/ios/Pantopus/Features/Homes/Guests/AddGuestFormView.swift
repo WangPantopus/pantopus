@@ -52,7 +52,7 @@ public struct AddGuestFormView: View {
                     .accessibilityIdentifier("addGuestToast")
             }
         }
-        .animation(.easeOut(duration: 0.2), value: viewModel.toast)
+        .pantopusAnimation(.componentState, value: viewModel.toast)
         .onChange(of: viewModel.duration) { _, newValue in
             guard newValue == AddGuestSampleData.durationCustomId else { return }
             customStart = viewModel.customStart ?? Date()
@@ -100,7 +100,7 @@ private struct GuestDateRangeSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             HStack {
                 Text("Custom range")
                     .pantopusTextStyle(.h3)
@@ -131,7 +131,7 @@ private struct GuestDateRangeSheet: View {
             }
             .padding(Spacing.s4)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
 
             Button(action: onDone) {
                 Text("Use these dates")

@@ -55,7 +55,7 @@ struct SettingsTopBar: View {
                 Spacer().frame(width: 36, height: 36)
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 52)
         .background(Theme.Color.appBg)
         .overlay(alignment: .bottom) {

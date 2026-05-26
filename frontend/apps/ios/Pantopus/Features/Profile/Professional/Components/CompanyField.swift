@@ -34,7 +34,7 @@ struct CompanyField: View {
                     ProVerifyBadge(status: company.status)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
         }
         .padding(.horizontal, Spacing.s2)

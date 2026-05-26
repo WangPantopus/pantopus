@@ -59,7 +59,7 @@ fun StatusChip(
             modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(variant.background)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .semantics { contentDescription = "$text, ${variant.a11yWord}" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),

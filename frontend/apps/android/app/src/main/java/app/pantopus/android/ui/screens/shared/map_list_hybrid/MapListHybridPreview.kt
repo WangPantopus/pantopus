@@ -38,6 +38,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 /**
  * T6.6a (P24) — static, render-only preview of the [MapListHybridShell]
@@ -86,7 +87,7 @@ fun MapListHybridShellStaticPreview(
         Box(
             modifier =
                 Modifier
-                    .padding(top = 20.dp, start = 14.dp, end = 14.dp)
+                    .padding(top = Spacing.s5, start = 14.dp, end = 14.dp)
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .testTag("mapListHybridTopPill"),
@@ -97,7 +98,7 @@ fun MapListHybridShellStaticPreview(
         Box(
             modifier =
                 Modifier
-                    .padding(top = 64.dp)
+                    .padding(top = Spacing.s16)
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .testTag("mapListHybridChips"),
@@ -174,7 +175,7 @@ private fun PreviewTopPill() {
                 .background(Color.White.copy(alpha = 0.96f))
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                 .shadow(elevation = 8.dp, shape = RoundedCornerShape(Radii.pill))
-                .padding(start = 6.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
+                .padding(start = 6.dp, end = Spacing.s2, top = Spacing.s2, bottom = Spacing.s2)
                 .fillMaxWidth()
                 .testTag("mapListHybridPreviewTopPill"),
         verticalAlignment = Alignment.CenterVertically,
@@ -205,7 +206,7 @@ private fun PreviewTopPill() {
             PantopusIconImage(
                 icon = PantopusIcon.SlidersHorizontal,
                 contentDescription = "Filters",
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appText,
             )
         }
@@ -237,7 +238,7 @@ private fun PreviewCategoryChips() {
                             shape = RoundedCornerShape(Radii.pill),
                         )
                         .shadow(elevation = 4.dp, shape = RoundedCornerShape(Radii.pill))
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = Spacing.s3)
                         .height(28.dp)
                         .testTag("mapListHybridPreviewChip_$key"),
                 verticalAlignment = Alignment.CenterVertically,
@@ -265,7 +266,7 @@ private fun PreviewCategoryChips() {
 
 @Composable
 private fun PreviewMapControls() {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         PreviewControlButton(PantopusIcon.MapPin, "Locate me")
         PreviewControlButton(PantopusIcon.Map, "Layers")
     }
@@ -290,7 +291,7 @@ private fun PreviewControlButton(
         PantopusIconImage(
             icon = icon,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.appText,
         )
     }
@@ -302,7 +303,7 @@ private fun PreviewSheetHeader(pinCount: Int) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 12.dp),
+                .padding(start = 18.dp, end = 18.dp, top = Spacing.s1, bottom = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -314,7 +315,7 @@ private fun PreviewSheetHeader(pinCount: Int) {
         Spacer(modifier = Modifier.weight(1f))
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             modifier = Modifier.testTag("mapListHybridPreviewSort"),
         ) {
             Text(
@@ -332,7 +333,7 @@ private fun PreviewSheetHeader(pinCount: Int) {
             PantopusIconImage(
                 icon = PantopusIcon.ChevronDown,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = PantopusColors.appTextStrong,
             )
         }
@@ -357,14 +358,14 @@ private fun PreviewCollapsedBody() {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s1)
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.appSurfaceSunken)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
                 .testTag("mapListHybridPreviewCollapsedPrompt"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.ChevronUp,
@@ -388,7 +389,7 @@ private fun PreviewStandardBody(pinCount: Int) {
         modifier =
             Modifier
                 .horizontalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s1)
                 .testTag("mapListHybridPreviewRail"),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -430,7 +431,7 @@ private fun PreviewCard(
                     shape = RoundedCornerShape(14.dp),
                 )
                 .shadow(elevation = 2.dp, shape = RoundedCornerShape(14.dp))
-                .padding(12.dp),
+                .padding(Spacing.s3),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -477,8 +478,8 @@ private fun PreviewRow(
             Modifier
                 .fillMaxWidth()
                 .background(if (selected) color.copy(alpha = 0.06f) else PantopusColors.appSurface)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier =
@@ -491,7 +492,7 @@ private fun PreviewRow(
             PantopusIconImage(
                 icon = PantopusIcon.Hammer,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = Color.White,
             )
         }

@@ -175,7 +175,7 @@ private fun DetailsStep(
                 PantopusIconImage(
                     icon = PantopusIcon.DollarSign,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.appTextSecondary,
                 )
                 BasicTextField(
@@ -287,7 +287,7 @@ private fun ScheduleStep(viewModel: AddBillWizardViewModel) {
                         PantopusIconImage(
                             icon = PantopusIcon.CheckCircle,
                             contentDescription = null,
-                            size = 20.dp,
+                            size = Radii.xl2,
                             tint = PantopusColors.primary600,
                         )
                     } else {

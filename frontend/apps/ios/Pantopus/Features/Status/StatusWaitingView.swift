@@ -32,7 +32,7 @@ public struct StatusWaitingView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s5) {
                     illustration
@@ -41,9 +41,9 @@ public struct StatusWaitingView: View {
                     if !content.timeline.isEmpty { timelineBlock }
                     if !content.actionCards.isEmpty { actionCards }
                     if !content.explainerBullets.isEmpty { explainerBlock }
-                    Spacer(minLength: 24)
+                    Spacer(minLength: Spacing.s6)
                 }
-                .padding(16)
+                .padding(Spacing.s4)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             if content.primaryCta != nil || content.secondaryCta != nil {
@@ -80,7 +80,7 @@ public struct StatusWaitingView: View {
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("statusHeadline")
             Text(content.subcopy)
-                .font(.system(size: 14))
+                .pantopusTextStyle(.small)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .accessibilityIdentifier("statusSubcopy")
         }
@@ -123,7 +123,7 @@ public struct StatusWaitingView: View {
     }
 
     private func actionCardBody(_ card: StatusActionCard) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.s3) {
             ZStack {
                 Circle().fill(Theme.Color.primary50).frame(width: 36, height: 36)
                 Icon(card.icon, size: 18, color: Theme.Color.primary600)
@@ -134,31 +134,31 @@ public struct StatusWaitingView: View {
                     .foregroundStyle(Theme.Color.appText)
                 if let subtitle = card.subtitle {
                     Text(subtitle)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Icon(.chevronRight, size: 16, color: Theme.Color.appTextSecondary)
         }
-        .padding(12)
+        .padding(Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private var explainerBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
             Text("WHAT HAPPENS NEXT")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .kerning(0.6)
             ForEach(content.explainerBullets, id: \.self) { bullet in
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: Spacing.s2) {
                     Icon(.check, size: 14, color: Theme.Color.success)
                         .padding(.top, 2)
                     Text(bullet)
@@ -172,17 +172,17 @@ public struct StatusWaitingView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("statusExplainer")
     }
 
     private var stickyCTAs: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 if let secondary = content.secondaryCta {
                     Button {
                         onSecondary(secondary)
@@ -214,7 +214,7 @@ public struct StatusWaitingView: View {
                     .accessibilityIdentifier("statusPrimaryCta")
                 }
             }
-            .padding(16)
+            .padding(Spacing.s4)
             .background(Theme.Color.appSurface)
         }
     }

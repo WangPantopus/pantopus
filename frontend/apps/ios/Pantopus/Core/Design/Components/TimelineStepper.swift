@@ -44,7 +44,7 @@ public struct TimelineStepper: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             ForEach(Array(steps.enumerated()), id: \.element.id) { offset, step in
                 HStack(alignment: .top, spacing: Spacing.s3) {
                     TimelineMarker(state: step.state, isLast: offset == steps.count - 1)
@@ -91,7 +91,7 @@ private struct TimelineMarker: View {
     @State private var pulse = false
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ZStack {
                 switch state {
                 case .done:

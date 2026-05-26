@@ -213,7 +213,7 @@ private fun PageIndicator(
                     color = PantopusColors.appText,
                     modifier = Modifier.testTag("bookletPager_pageLabel"),
                 )
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(Spacing.s1))
                 Text(
                     text = "of $totalPages",
                     fontSize = 13.sp,
@@ -240,12 +240,12 @@ private fun PageIndicator(
                         .testTag("bookletPager_toggleGrid")
                         .semantics { contentDescription = "View all pages" },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 PantopusIconImage(
                     icon = PantopusIcon.FileType,
                     contentDescription = null,
-                    size = 12.dp,
+                    size = Radii.lg,
                     tint = PantopusColors.primary600,
                 )
                 Text(
@@ -357,7 +357,7 @@ private fun GridMode(
                     Modifier
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appSurfaceSunken)
-                        .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.appTextStrong,
@@ -394,12 +394,12 @@ private fun GridMode(
                         .testTag("bookletPager_togglePage")
                         .semantics { contentDescription = "Back to reader" },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 PantopusIconImage(
                     icon = PantopusIcon.ChevronLeft,
                     contentDescription = null,
-                    size = 12.dp,
+                    size = Radii.lg,
                     tint = PantopusColors.primary600,
                 )
                 Text(
@@ -449,11 +449,11 @@ private fun ThumbnailCell(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(3f / 4f)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(Radii.sm))
                 .border(
                     width = if (isCurrent) 2.5.dp else 1.dp,
                     color = if (isCurrent) PantopusColors.primary600 else PantopusColors.appBorder,
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(Radii.sm),
                 )
                 .clickable(onClick = onClick)
                 .testTag("bookletPager_thumb_${page - 1}")
@@ -463,7 +463,7 @@ private fun ThumbnailCell(
             modifier = Modifier.matchParentSize(),
             hasNextPage = hasNextPage,
             foldSize = Spacing.s4,
-            cornerRadius = 6.dp,
+            cornerRadius = Radii.sm,
         ) {
             AsyncImage(
                 model = url,
@@ -476,7 +476,7 @@ private fun ThumbnailCell(
             Box(
                 modifier =
                     Modifier
-                        .padding(4.dp)
+                        .padding(Spacing.s1)
                         .size(18.dp)
                         .clip(CircleShape)
                         .background(PantopusColors.primary600)
@@ -496,7 +496,7 @@ private fun ThumbnailCell(
             modifier =
                 Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 4.dp),
+                    .padding(bottom = Spacing.s1),
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             fontStyle = FontStyle.Italic,

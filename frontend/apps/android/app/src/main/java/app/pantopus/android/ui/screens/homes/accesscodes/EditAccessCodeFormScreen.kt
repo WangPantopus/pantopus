@@ -52,12 +52,14 @@ import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
 import app.pantopus.android.ui.screens.shared.form.FormShell
+import app.pantopus.android.ui.theme.MotionTokens
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import app.pantopus.android.ui.theme.rememberReduceMotion
 
 /**
  * Stable test tags (mirror naming with iOS accessibilityIdentifier).
@@ -191,10 +193,11 @@ internal fun EditAccessCodeFormContent(
             }
         }
 
+        val reduceMotion = rememberReduceMotion()
         AnimatedVisibility(
             visible = state.toast != null,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(animationSpec = MotionTokens.componentState(reduceMotion)),
+            exit = fadeOut(animationSpec = MotionTokens.componentState(reduceMotion)),
             modifier =
                 Modifier
                     .align(Alignment.BottomCenter)
@@ -311,7 +314,7 @@ private fun CategoryTile(
             PantopusIconImage(
                 icon = category.icon,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = category.foreground,
             )
         }
@@ -563,7 +566,7 @@ private fun MemberPreviewStrip(names: List<String>) {
         PantopusIconImage(
             icon = PantopusIcon.Users,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = PantopusColors.appTextSecondary,
         )
         Text(

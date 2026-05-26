@@ -378,16 +378,16 @@ struct CertifiedDetailLayout: View {
                 Text(label)
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .padding(.horizontal, Spacing.s2)
             .padding(.vertical, 11)
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: Radii.lg)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -480,7 +480,7 @@ private struct HeroCard: View {
                 }
             }
             HStack(alignment: .top, spacing: Spacing.s3) {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
                     Text(content.senderDisplayName.uppercased())
                         .font(.system(size: 11, weight: .semibold))
                         .tracking(0.6)
@@ -492,7 +492,7 @@ private struct HeroCard: View {
                     Text(certified.referenceNumber)
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(Theme.Color.appTextSecondary)
-                        .padding(.top, 4)
+                        .padding(.top, Spacing.s1)
                 }
                 CertifiedStampBadge(trackingId: certified.referenceNumber)
             }
@@ -525,12 +525,12 @@ private struct HeroCard: View {
                 Text("Acknowledged").bold()
                     + Text(" · receipt on file").foregroundColor(Theme.Color.success.opacity(0.85))
             )
-            .font(.system(size: 12))
+            .pantopusTextStyle(.caption)
             .foregroundColor(Theme.Color.success)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, 9)
-        .padding(.vertical, 8)
+        .padding(.vertical, Spacing.s2)
         .background(Theme.Color.successBg)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
@@ -549,10 +549,10 @@ private struct HeroCard: View {
             Text("Archived · saved with certified receipt")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.Color.appTextSecondary)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, 9)
-        .padding(.vertical, 8)
+        .padding(.vertical, Spacing.s2)
         .background(Theme.Color.appSurfaceSunken)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
@@ -565,7 +565,7 @@ private struct HeroCard: View {
 
 private struct TrustBadge: View {
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(.shieldCheck, size: 11, color: Theme.Color.success)
             Text("Verified")
                 .font(.system(size: 10, weight: .bold))
@@ -584,7 +584,7 @@ private struct CategoryBadge: View {
     let category: MailItemCategory
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(category.icon, size: 11, color: category.accent)
             Text(category.label)
                 .font(.system(size: 10, weight: .bold))
@@ -638,7 +638,7 @@ private struct CertifiedKeyFactsCard: View {
     let rows: [CertifiedKeyFact]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             Text("KEY FACTS")
                 .font(.system(size: 11, weight: .bold))
                 .tracking(0.5)
@@ -672,7 +672,7 @@ private struct CertifiedKeyFactsCard: View {
                 Icon(row.icon, size: row.isEmphasis ? 15 : 13, color: tintForeground)
                     .frame(width: row.isEmphasis ? 28 : 24, height: row.isEmphasis ? 28 : 24)
                     .background(tintBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.sm))
                 VStack(alignment: .leading, spacing: row.isEmphasis ? 2 : 1) {
                     Text(row.label.uppercased())
                         .font(.system(size: 11, weight: .semibold))
@@ -687,7 +687,7 @@ private struct CertifiedKeyFactsCard: View {
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 if let tag = row.tag {
                     Text(tag.text)
                         .font(.system(size: 10, weight: .bold))

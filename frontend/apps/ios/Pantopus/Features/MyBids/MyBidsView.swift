@@ -102,10 +102,10 @@ private struct WithdrawBidSheet: View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 Text("Withdraw bid")
-                    .font(.system(size: 20, weight: .semibold))
+                    .pantopusTextStyle(.h3)
                     .foregroundStyle(Theme.Color.appText)
                 Text("Why are you withdrawing your bid on \(target.gigTitle)?")
-                    .font(.system(size: 14, weight: .regular))
+                    .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
 

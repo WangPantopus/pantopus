@@ -48,6 +48,8 @@ import app.pantopus.android.ui.screens.audience_profile.tierColor
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 @Composable
 fun BroadcastDetailScreen(
@@ -95,7 +97,7 @@ private fun TopBar(
                 Modifier
                     .fillMaxWidth()
                     .height(52.dp)
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = Spacing.s2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -155,14 +157,14 @@ internal fun LoadingFrame() {
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(Spacing.s4)
                 .testTag("broadcastDetailLoading"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Shimmer(width = 360.dp, height = 180.dp, cornerRadius = 16.dp)
-        Shimmer(width = 360.dp, height = 72.dp, cornerRadius = 12.dp)
-        Shimmer(width = 360.dp, height = 96.dp, cornerRadius = 12.dp)
-        repeat(3) { Shimmer(width = 360.dp, height = 72.dp, cornerRadius = 12.dp) }
+        Shimmer(width = 360.dp, height = 180.dp, cornerRadius = Radii.xl)
+        Shimmer(width = 360.dp, height = 72.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 360.dp, height = 96.dp, cornerRadius = Radii.lg)
+        repeat(3) { Shimmer(width = 360.dp, height = 72.dp, cornerRadius = Radii.lg) }
     }
 }
 
@@ -175,7 +177,7 @@ private fun ErrorFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(Spacing.s5)
                 .testTag("broadcastDetailError"),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -187,7 +189,7 @@ private fun ErrorFrame(
             strokeWidth = 2f,
             tint = PantopusColors.error,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Spacing.s3))
         Text(
             text = "Couldn't load broadcast",
             fontSize = 18.sp,
@@ -195,13 +197,13 @@ private fun ErrorFrame(
             color = PantopusColors.appText,
             modifier = Modifier.semantics { heading() },
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         Text(
             text = message,
             fontSize = 13.5.sp,
             color = PantopusColors.appTextSecondary,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.s4))
         PrimaryButton(
             title = "Try again",
             onClick = onRetry,
@@ -230,8 +232,8 @@ internal fun LoadedFrame(
                     .fillMaxSize()
                     .padding(inner)
                     .verticalScroll(rememberScrollState())
-                    .padding(PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp)),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(PaddingValues(start = Spacing.s4, end = Spacing.s4, top = Spacing.s4, bottom = Spacing.s4)),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
         ) {
             HeroCard(loaded.hero)
             AnalyticsGrid(loaded.analyticsCells)
@@ -249,18 +251,18 @@ private fun HeroCard(hero: BroadcastDetailHero) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(16.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .testTag("broadcastDetailHero"),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(Spacing.s3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 VisibilityChip(hero)
                 Text(
@@ -310,7 +312,7 @@ private fun VisibilityChip(hero: BroadcastDetailHero) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.primary50)
                 .padding(horizontal = 7.dp, vertical = 2.dp)
                 .testTag("broadcastDetailVisibilityChip"),
@@ -340,11 +342,11 @@ private fun VisibilityChip(hero: BroadcastDetailHero) {
 private fun AnalyticsGrid(cells: List<BroadcastAnalyticsCell>) {
     Column(
         modifier = Modifier.fillMaxWidth().testTag("broadcastDetailAnalytics"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         // 2x2 grid: render in pairs of two.
         cells.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 row.forEach { cell ->
                     AnalyticsCell(
                         cell = cell,
@@ -367,9 +369,9 @@ private fun AnalyticsCell(
     Column(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurfaceSunken)
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("broadcastDetailCell_${cell.id}"),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -380,7 +382,7 @@ private fun AnalyticsCell(
             color = PantopusColors.appTextSecondary,
             letterSpacing = 0.6.sp,
         )
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             Text(
                 text = cell.value,
                 fontSize = 20.sp,
@@ -407,12 +409,12 @@ private fun TierBreakdownCard(breakdown: BroadcastTierBreakdown) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
-                .padding(12.dp)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3)
                 .testTag("broadcastDetailTierBreakdown"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Text(
             text = "READ BY TIER",
@@ -443,7 +445,7 @@ private fun TierStackedBar(breakdown: BroadcastTierBreakdown) {
             Modifier
                 .fillMaxWidth()
                 .height(10.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(Radii.sm))
                 .semantics { contentDescription = summary }
                 .testTag("broadcastDetailTierBar"),
     ) {
@@ -457,7 +459,7 @@ private fun TierStackedBar(breakdown: BroadcastTierBreakdown) {
                         .background(PantopusColors.appBorder),
             )
         } else {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.s0)) {
                 breakdown.segments.forEach { seg ->
                     val proportion = seg.count.toFloat() / breakdown.total.toFloat()
                     val width = totalWidth * proportion
@@ -477,9 +479,9 @@ private fun TierStackedBar(breakdown: BroadcastTierBreakdown) {
 
 @Composable
 private fun TierLegend(breakdown: BroadcastTierBreakdown) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         breakdown.segments.chunked(2).forEach { rowSegments ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
                 rowSegments.forEach { seg ->
                     LegendEntry(seg, breakdown.total, modifier = Modifier.weight(1f))
                 }
@@ -502,7 +504,7 @@ private fun LegendEntry(
             modifier
                 .testTag("broadcastDetailTierLegend_${segment.id}"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         Box(
             modifier =
@@ -546,7 +548,7 @@ private fun tierBarSummary(breakdown: BroadcastTierBreakdown): String {
 private fun RepliesSection(loaded: BroadcastDetailLoaded) {
     Column(
         modifier = Modifier.fillMaxWidth().testTag("broadcastDetailRepliesSection"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Text(
             text = "REPLIES · ${loaded.totalReplies}",
@@ -563,9 +565,9 @@ private fun RepliesSection(loaded: BroadcastDetailLoaded) {
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
             ) {
                 loaded.replies.forEachIndexed { index, reply ->
                     ReplyRow(reply)
@@ -590,13 +592,13 @@ private fun EmptyRepliesCard() {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
-                .padding(20.dp)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s5)
                 .testTag("broadcastDetailEmptyReplies"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.MessageCircle,
@@ -625,10 +627,10 @@ private fun ReplyRow(reply: BroadcastReplyRow) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                 .testTag("broadcastDetailReply_${reply.id}"),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Box(
             modifier =
@@ -648,7 +650,7 @@ private fun ReplyRow(reply: BroadcastReplyRow) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 Text(
                     text = reply.handle,
@@ -682,7 +684,7 @@ private fun TierChip(
     Box(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(color.copy(alpha = 0.12f))
                 .padding(horizontal = 6.dp, vertical = 1.dp),
     ) {
@@ -711,9 +713,9 @@ private fun StickyFooter(
                 Modifier
                     .fillMaxWidth()
                     .background(PantopusColors.appSurface)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             SecondaryFooterButton(
                 icon = PantopusIcon.Rocket,
@@ -732,17 +734,17 @@ private fun StickyFooter(
                     Modifier
                         .weight(1f)
                         .heightIn(min = 44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.primary600)
                         .clickable(onClick = onReply)
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = Spacing.s4)
                         .testTag("broadcastDetailReply")
                         .semantics { contentDescription = "Reply to broadcast" },
                 contentAlignment = Alignment.Center,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     PantopusIconImage(
                         icon = PantopusIcon.Reply,
@@ -775,14 +777,14 @@ private fun SecondaryFooterButton(
             modifier
                 .widthIn(min = 88.dp)
                 .heightIn(min = 44.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onClick)
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = Spacing.s3)
                 .semantics { contentDescription = label },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = icon,

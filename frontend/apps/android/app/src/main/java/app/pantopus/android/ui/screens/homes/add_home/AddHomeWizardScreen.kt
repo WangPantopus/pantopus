@@ -374,14 +374,14 @@ private fun ConfirmationField(
                     PantopusIconImage(
                         icon = PantopusIcon.Check,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         tint = PantopusColors.success,
                     )
                 ConfirmationFieldState.Error ->
                     PantopusIconImage(
                         icon = PantopusIcon.AlertCircle,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         tint = PantopusColors.error,
                     )
                 ConfirmationFieldState.Default -> Unit
@@ -658,7 +658,7 @@ private fun GeocodeMapStrip(address: AddHomeGeocodedAddress) {
             PantopusIconImage(
                 icon = PantopusIcon.MapPin,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextInverse,
             )
         }
@@ -712,7 +712,7 @@ private fun AddressRecognizedRow(address: AddHomeGeocodedAddress) {
             PantopusIconImage(
                 icon = PantopusIcon.Check,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = PantopusColors.appTextInverse,
             )
         }
@@ -845,7 +845,7 @@ private fun UseCurrentLocationPill(onClick: () -> Unit) {
         PantopusIconImage(
             icon = PantopusIcon.MapPin,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.primary700,
         )
         Text(
@@ -872,7 +872,7 @@ private fun NearbyHomesSection(
             PantopusIconImage(
                 icon = PantopusIcon.MapPin,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = PantopusColors.appTextSecondary,
             )
             Text(
@@ -970,7 +970,7 @@ private fun NearbyHomeRow(
             PantopusIconImage(
                 icon = PantopusIcon.Check,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.primary600,
             )
         }
@@ -1192,7 +1192,7 @@ private fun ManualFallbackRow(onClick: () -> Unit) {
             PantopusIconImage(
                 icon = PantopusIcon.Plus,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.primary600,
             )
         }
@@ -1212,7 +1212,7 @@ private fun ManualFallbackRow(onClick: () -> Unit) {
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.primary600,
         )
     }
@@ -1276,7 +1276,7 @@ private fun AddressVerdictRow(check: app.pantopus.android.data.api.models.homes.
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PantopusIconImage(icon = verdict.icon, contentDescription = null, size = 20.dp, tint = verdict.color)
+        PantopusIconImage(icon = verdict.icon, contentDescription = null, size = Radii.xl2, tint = verdict.color)
         Column(modifier = Modifier.weight(1f)) {
             Text(text = verdict.headline, style = PantopusTextStyle.body, color = PantopusColors.appText)
             Text(

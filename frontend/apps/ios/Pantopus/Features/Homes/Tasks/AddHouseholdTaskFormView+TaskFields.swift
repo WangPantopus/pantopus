@@ -59,7 +59,7 @@ extension AddHouseholdTaskFormView {
                             categoryChip(category)
                         }
                         if rows[idx].count < 3 {
-                            Spacer(minLength: 0)
+                            Spacer(minLength: Spacing.s0)
                         }
                     }
                 }

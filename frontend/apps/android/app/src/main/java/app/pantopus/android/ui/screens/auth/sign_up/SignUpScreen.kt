@@ -333,7 +333,7 @@ private fun AccountTypePicker(
                     shape = RoundedCornerShape(Radii.md),
                 ).padding(Spacing.s1)
                 .testTag(SignUpScreenTags.ACCOUNT_TYPE),
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s0),
     ) {
         SignUpAccountTypeChoice.values().forEach { choice ->
             val isSelected = choice == selection
@@ -467,7 +467,7 @@ fun PasswordField(
                 PantopusIconImage(
                     icon = PantopusIcon.Eye,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.appTextSecondary,
                 )
             }
@@ -680,7 +680,7 @@ fun ErrorBanner(
             PantopusIconImage(
                 icon = PantopusIcon.X,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.error,
             )
         }

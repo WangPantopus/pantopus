@@ -69,9 +69,9 @@ fun CertifiedStampBadge(
         modifier =
             modifier
                 .rotate(-1.5f)
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(Radii.xs))
                 .background(StampBg)
-                .border(width = 1.5.dp, color = StampInk, shape = RoundedCornerShape(4.dp))
+                .border(width = 1.5.dp, color = StampInk, shape = RoundedCornerShape(Radii.xs))
                 .padding(horizontal = 9.dp, vertical = 6.dp)
                 .testTag(CERTIFIED_STAMP_BADGE_TAG)
                 .semantics { contentDescription = "USPS Certified Mail · tracking $pretty" },
@@ -92,7 +92,7 @@ fun CertifiedStampBadge(
             color = StampInk,
         )
         Row(
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = Spacing.s1),
             horizontalArrangement = Arrangement.spacedBy(1.dp),
         ) {
             // Same bar widths as iOS / web for a consistent stamp profile.
@@ -221,8 +221,8 @@ private fun SenderRow(
                 Text(text = it, fontSize = 11.5.sp, color = PantopusColors.appTextSecondary)
             }
             Row(
-                modifier = Modifier.padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(top = Spacing.s1),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 Pill(
                     icon = PantopusIcon.Landmark,
@@ -260,7 +260,7 @@ private fun SenderAvatar(
                 Modifier
                     .size(40.dp)
                     .align(Alignment.TopStart)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(tint),
             contentAlignment = Alignment.Center,
         ) {
@@ -306,9 +306,9 @@ private fun CarrierRow(carrier: MailCarrierInfo) {
             modifier =
                 Modifier
                     .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(PantopusColors.appSurface)
-                    .border(width = 1.5.dp, color = StampInk, shape = RoundedCornerShape(12.dp)),
+                    .border(width = 1.5.dp, color = StampInk, shape = RoundedCornerShape(Radii.lg)),
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
@@ -335,8 +335,8 @@ private fun CarrierRow(carrier: MailCarrierInfo) {
                 )
             }
             Row(
-                modifier = Modifier.padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(top = Spacing.s1),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 if (carrier.signatureRequired) {
                     Pill(

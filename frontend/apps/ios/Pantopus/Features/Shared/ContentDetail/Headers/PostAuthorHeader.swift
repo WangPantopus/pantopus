@@ -116,7 +116,7 @@ public struct PostAuthorHeader: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
                 Text(timeAndLocality)
-                    .font(.system(size: 12, weight: .regular))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
             Spacer()

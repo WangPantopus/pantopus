@@ -64,7 +64,7 @@ public struct PrivacyHandshakeWizardView: View {
     // MARK: - Persona preview
 
     private func personaPreview(_ persona: HandshakePersonaPreview) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: Spacing.s3) {
             ZStack {
                 Circle().fill(Theme.Color.primary50).frame(width: 52, height: 52)
                 Text(persona.displayName.prefix(1).uppercased())
@@ -76,20 +76,20 @@ public struct PrivacyHandshakeWizardView: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
                 Text("@\(persona.handle)")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 Text("\(persona.followerCount) \(persona.audienceLabel.lowercased())")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 if let bio = persona.bio, !bio.isEmpty {
                     Text(bio)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
-                        .padding(.top, 4)
+                        .padding(.top, Spacing.s1)
                         .lineLimit(3)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(14)
         .background(Theme.Color.appSurface)
@@ -118,7 +118,7 @@ public struct PrivacyHandshakeWizardView: View {
     }
 
     private func handleField(_ content: HandshakeReadyContent) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
             HStack {
                 Text("@")
                     .font(.system(size: 14, weight: .semibold))
@@ -127,7 +127,7 @@ public struct PrivacyHandshakeWizardView: View {
                     get: { content.handle.value },
                     set: { viewModel.setHandle($0) }
                 ))
-                .font(.system(size: 14))
+                .font(Theme.Font.small)
                 .foregroundStyle(Theme.Color.appText)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
@@ -137,7 +137,7 @@ public struct PrivacyHandshakeWizardView: View {
                     Icon(.lock, size: 14, color: Theme.Color.appTextSecondary)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.s3)
             .frame(height: 44)
             .background(content.handle.locked ? Theme.Color.appSurfaceSunken : Theme.Color.appSurface)
             .overlay(
@@ -163,7 +163,7 @@ public struct PrivacyHandshakeWizardView: View {
     private func usernameAcknowledgementRow(_ content: HandshakeReadyContent) -> some View {
         HStack(alignment: .top, spacing: 10) {
             ZStack {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                     .stroke(
                         content.handle.acknowledgedUsingUsername
                             ? Theme.Color.primary600
@@ -172,7 +172,7 @@ public struct PrivacyHandshakeWizardView: View {
                     )
                     .frame(width: 18, height: 18)
                 if content.handle.acknowledgedUsingUsername {
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                         .fill(Theme.Color.primary600)
                         .frame(width: 18, height: 18)
                     Icon(.check, size: 12, color: Theme.Color.appTextInverse)
@@ -187,7 +187,7 @@ public struct PrivacyHandshakeWizardView: View {
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -209,7 +209,7 @@ public struct PrivacyHandshakeWizardView: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
-        .padding(12)
+        .padding(Spacing.s3)
         .background(Theme.Color.primary50)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
@@ -235,7 +235,7 @@ public struct PrivacyHandshakeWizardView: View {
         Button {
             viewModel.selectTier(rank: tier.rank)
         } label: {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: Spacing.s3) {
                 ZStack {
                     Circle()
                         .stroke(isSelected ? Theme.Color.primary600 : Theme.Color.appBorderStrong, lineWidth: 2)
@@ -257,7 +257,7 @@ public struct PrivacyHandshakeWizardView: View {
                     }
                     if let desc = tier.description, !desc.isEmpty {
                         Text(desc)
-                            .font(.system(size: 12))
+                            .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
@@ -266,13 +266,13 @@ public struct PrivacyHandshakeWizardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(isSelected ? Theme.Color.primary50 : Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                     .stroke(
                         isSelected ? Theme.Color.primary600 : Theme.Color.appBorder,
                         lineWidth: isSelected ? 2 : 1
                     )
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("privacyHandshakeTier_\(tier.rank)")
@@ -280,10 +280,10 @@ public struct PrivacyHandshakeWizardView: View {
     }
 
     private func handleEchoCard(_ content: HandshakeReadyContent) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Icon(.userPlus, size: 16, color: Theme.Color.primary600)
             Text("Following as ")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             Text("@\(content.handle.value)")
                 .font(.system(size: 12, weight: .semibold))
@@ -292,29 +292,29 @@ public struct PrivacyHandshakeWizardView: View {
         }
         .padding(10)
         .background(Theme.Color.appSurfaceSunken)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
     }
 
     // MARK: - Terminal states
 
     private func opensCheckoutBody(_: HandshakeReadyContent) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Spacing.s4) {
             ProgressView().tint(Theme.Color.primary600).scaleEffect(1.4)
             Text("Opening Stripe Checkout…")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
             Text("Finish your subscription in the browser, then come back here.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        .padding(.vertical, Spacing.s10)
         .accessibilityIdentifier("privacyHandshakeCheckout")
     }
 
     private func completedFreeBody(_ content: HandshakeReadyContent) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.s3) {
             Icon(.check, size: 36, color: Theme.Color.success)
                 .frame(width: 64, height: 64)
                 .background(Theme.Color.successBg)
@@ -329,12 +329,12 @@ public struct PrivacyHandshakeWizardView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.vertical, Spacing.s6)
         .accessibilityIdentifier("privacyHandshakeSuccess")
     }
 
     private func alreadyMemberBody(_ content: HandshakeReadyContent) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.s3) {
             Icon(.star, size: 36, color: Theme.Color.primary600)
                 .frame(width: 64, height: 64)
                 .background(Theme.Color.primary50)
@@ -349,17 +349,17 @@ public struct PrivacyHandshakeWizardView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.vertical, Spacing.s6)
         .accessibilityIdentifier("privacyHandshakeAlreadyMember")
     }
 
     // MARK: - Loading + error
 
     private var loadingFrame: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.s3) {
             Shimmer(height: 72, cornerRadius: 14)
             Shimmer(height: 44, cornerRadius: 10)
-            Shimmer(height: 88, cornerRadius: 12)
+            Shimmer(height: 88, cornerRadius: Radii.lg)
         }
         .accessibilityIdentifier("privacyHandshakeLoading")
     }
@@ -380,7 +380,7 @@ public struct PrivacyHandshakeWizardView: View {
                 Text("Try again")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextInverse)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Spacing.s4)
                     .frame(height: 36)
                     .background(Theme.Color.primary600)
                     .clipShape(Capsule())
@@ -389,7 +389,7 @@ public struct PrivacyHandshakeWizardView: View {
             .accessibilityIdentifier("privacyHandshakeRetry")
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.vertical, Spacing.s6)
         .accessibilityIdentifier("privacyHandshakeError")
     }
 

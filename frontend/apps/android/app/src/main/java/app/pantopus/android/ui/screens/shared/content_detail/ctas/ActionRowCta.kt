@@ -98,7 +98,7 @@ private fun PersonaFollowFooter(
                 PantopusIconImage(
                     icon = if (isFollowing) PantopusIcon.Check else PantopusIcon.Plus,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.appTextInverse,
                 )
                 Box(modifier = Modifier.padding(start = Spacing.s2)) {
@@ -158,7 +158,7 @@ private fun LocalMessageConnectFooter(
                 PantopusIconImage(
                     icon = if (isConnectRequested) PantopusIcon.Check else PantopusIcon.UserPlus,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.appText,
                 )
                 Box(modifier = Modifier.padding(start = Spacing.s2)) {
@@ -188,7 +188,7 @@ private fun LocalMessageConnectFooter(
                 PantopusIconImage(
                     icon = PantopusIcon.MessageSquare,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.appTextInverse,
                 )
                 Box(modifier = Modifier.padding(start = Spacing.s2)) {

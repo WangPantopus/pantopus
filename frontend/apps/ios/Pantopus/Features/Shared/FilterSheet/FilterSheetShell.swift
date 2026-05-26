@@ -62,7 +62,7 @@ public struct FilterSheetShell: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s6) {
@@ -81,7 +81,7 @@ public struct FilterSheetShell: View {
         .background(Theme.Color.appSurface)
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: working)
+        .pantopusAnimation(.componentState, value: working)
         .accessibilityIdentifier("filterSheet")
     }
 

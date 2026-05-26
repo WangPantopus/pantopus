@@ -32,7 +32,7 @@ struct ListingComposeSnapReviewStep: View {
 
 private struct ListingComposeIdentityChip: View {
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(.user, size: 11, color: Theme.Color.personal)
             Text("Personal · You")
         }
@@ -57,7 +57,7 @@ private struct ListingComposePhotoStrip: View {
                     .pantopusTextStyle(.overline)
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 Spacer()
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Icon(.sparkles, size: 11, color: Theme.Color.success)
                     Text("Good lighting")
                         .font(.system(size: 10.5, weight: .semibold))
@@ -156,7 +156,7 @@ private struct PhotoStripTile: View {
 
 private struct SofaThumbMark: View {
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(.white.opacity(0.24))
                 .frame(height: 26)
@@ -204,7 +204,7 @@ struct SuggestionsBanner: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, 10)
@@ -289,7 +289,7 @@ private struct SuggestedPriceField: View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             SuggestedLabel(label: "Price")
             VStack(alignment: .leading, spacing: Spacing.s3) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.s1) {
                     Text("$")
                         .font(.system(size: 22, weight: .bold))
                     TextField(
@@ -363,7 +363,7 @@ private struct SuggestedConditionControl: View {
             Text("Condition")
                 .pantopusTextStyle(.overline)
                 .foregroundStyle(Theme.Color.appTextSecondary)
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 ForEach(ListingComposeCondition.allCases, id: \.self) { condition in
                     Button {
                         viewModel.setCondition(condition)
@@ -412,7 +412,7 @@ private struct PickupDeliveryPanel: View {
             Text("Pickup & delivery")
                 .pantopusTextStyle(.overline)
                 .foregroundStyle(Theme.Color.appTextSecondary)
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 HStack(spacing: Spacing.s3) {
                     ZStack {
                         RoundedRectangle(cornerRadius: Radii.md, style: .continuous)

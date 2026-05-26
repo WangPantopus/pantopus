@@ -31,6 +31,7 @@ import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.components.VerifiedBadge
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /**
@@ -125,7 +126,7 @@ fun PostAuthorHeader(
                 Box(
                     modifier = Modifier.size(20.dp).offset(x = 28.dp, y = 28.dp),
                 ) {
-                    VerifiedBadge(size = 16.dp)
+                    VerifiedBadge(size = Radii.xl)
                 }
             }
         }

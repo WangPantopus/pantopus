@@ -337,7 +337,7 @@ private struct PollHeader: View {
                     .foregroundStyle(Theme.Color.appText)
                 StatusChip(projection.chipText, variant: projection.chipVariant, icon: projection.chipIcon)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s4)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -355,7 +355,7 @@ private struct PollMetaGrid: View {
     let projection: PollRowProjection
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             row(label: "Status", value: projection.chipText)
             divider
             row(label: "Votes cast", value: "\(poll.voteCount)")

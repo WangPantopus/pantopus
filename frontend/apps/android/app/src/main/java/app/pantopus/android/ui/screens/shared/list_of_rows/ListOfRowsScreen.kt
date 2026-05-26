@@ -308,7 +308,7 @@ private fun SearchBarRow(config: SearchBarConfig) {
             PantopusIconImage(
                 icon = PantopusIcon.Search,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextSecondary,
             )
             BasicTextField(
@@ -369,7 +369,7 @@ private fun ChipStripRow(config: ChipStripConfig) {
                     PantopusIconImage(
                         icon = chip.icon,
                         contentDescription = null,
-                        size = 12.dp,
+                        size = Radii.lg,
                         tint = fg,
                     )
                 }
@@ -453,7 +453,7 @@ private fun BannerCard(config: BannerConfig) {
                 PantopusIconImage(
                     icon = config.icon,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = tokens.foreground,
                 )
             }
@@ -712,12 +712,12 @@ private fun ListingContextSortStrip(
 private fun SortLabelContent(sortLabel: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.ArrowsRepeat,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = PantopusColors.appTextSecondary,
         )
         Text(
@@ -728,7 +728,7 @@ private fun SortLabelContent(sortLabel: String) {
         PantopusIconImage(
             icon = PantopusIcon.ChevronDown,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = PantopusColors.appTextSecondary,
         )
     }
@@ -768,7 +768,7 @@ private fun ListingContextSortMenu(
                                 PantopusIconImage(
                                     icon = PantopusIcon.Check,
                                     contentDescription = "Selected",
-                                    size = 16.dp,
+                                    size = Radii.xl,
                                     tint = PantopusColors.primary600,
                                 )
                             }
@@ -801,7 +801,7 @@ private fun LoadingRows() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
             ) {
-                Shimmer(width = 40.dp, height = 40.dp, cornerRadius = 20.dp)
+                Shimmer(width = 40.dp, height = 40.dp, cornerRadius = Radii.xl2)
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                     Shimmer(width = 180.dp, height = 14.dp)
                     Shimmer(width = 120.dp, height = 12.dp)
@@ -912,7 +912,7 @@ private fun SectionHeaderRow(section: RowSection) {
                 PantopusIconImage(
                     icon = PantopusIcon.ChevronRight,
                     contentDescription = null,
-                    size = 12.dp,
+                    size = Radii.lg,
                     tint = PantopusColors.primary600,
                 )
             }
@@ -1216,7 +1216,7 @@ private fun LeadingView(leading: RowLeading) {
                 PantopusIconImage(
                     icon = leading.icon,
                     contentDescription = null,
-                    size = 20.dp,
+                    size = Radii.xl2,
                     tint = leading.tint,
                 )
             }
@@ -1259,7 +1259,7 @@ private fun LeadingView(leading: RowLeading) {
                 PantopusIconImage(
                     icon = leading.icon,
                     contentDescription = null,
-                    size = 20.dp,
+                    size = Radii.xl2,
                     tint = PantopusColors.appTextInverse,
                 )
             }
@@ -1356,7 +1356,7 @@ private fun AvatarWithBadgeView(leading: RowLeading.AvatarWithBadge) {
                         .align(Alignment.BottomEnd)
                         .offset(x = 2.dp, y = 2.dp),
             ) {
-                VerifiedBadge(size = 16.dp)
+                VerifiedBadge(size = Radii.xl)
             }
         }
     }
@@ -1501,14 +1501,14 @@ private fun TrailingView(
                     PantopusIconImage(
                         icon = PantopusIcon.MoreHorizontal,
                         contentDescription = null,
-                        size = 20.dp,
+                        size = Radii.xl2,
                         tint = PantopusColors.appTextSecondary,
                     )
                 }
             }
         }
         is RowTrailing.AmountWithChip ->
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                 Text(
                     text = trailing.amount,
                     style = PantopusTextStyle.body,
@@ -1914,7 +1914,7 @@ private fun EngagementStrip(engagement: RowEngagement) {
             engagement.items.forEach { item ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     PantopusIconImage(
                         icon = item.icon,
@@ -1940,13 +1940,13 @@ private fun EngagementStrip(engagement: RowEngagement) {
                             .testTag("rowEngagementCTA")
                             .semantics { contentDescription = cta.accessibilityLabel },
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     if (cta.icon != null) {
                         PantopusIconImage(
                             icon = cta.icon,
                             contentDescription = null,
-                            size = 12.dp,
+                            size = Radii.lg,
                             tint = PantopusColors.primary600,
                         )
                     }
@@ -2043,7 +2043,7 @@ private fun TopBarActionButton(action: TopBarAction) {
                             .sizeIn(minWidth = 16.dp, minHeight = 16.dp)
                             .clip(CircleShape)
                             .background(PantopusColors.primary600)
-                            .padding(horizontal = 4.dp)
+                            .padding(horizontal = Spacing.s1)
                             .testTag("listOfRowsTopBarActionBadge"),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -2081,7 +2081,7 @@ private fun FabComposable(fab: FabAction) {
                 PantopusIconImage(
                     icon = fab.icon,
                     contentDescription = null,
-                    size = 24.dp,
+                    size = Radii.xl3,
                     tint = PantopusColors.appTextInverse,
                 )
             }

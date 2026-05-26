@@ -29,7 +29,7 @@ public struct IdentityCenterView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             topBar
             content
         }
@@ -73,7 +73,7 @@ public struct IdentityCenterView: View {
             .accessibilityLabel("Open identity switcher")
             .accessibilityIdentifier("identityCenterSwitcherButton")
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 52)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
@@ -90,33 +90,33 @@ public struct IdentityCenterView: View {
 
     private var loadingFrame: some View {
         ScrollView {
-            VStack(spacing: 12) {
+            VStack(spacing: Spacing.s3) {
                 ForEach(0..<4, id: \.self) { _ in
-                    Shimmer(height: 110, cornerRadius: 16)
-                        .padding(.horizontal, 16)
+                    Shimmer(height: 110, cornerRadius: Radii.xl)
+                        .padding(.horizontal, Spacing.s4)
                 }
             }
-            .padding(.vertical, 16)
+            .padding(.vertical, Spacing.s4)
         }
         .accessibilityIdentifier("identityCenterLoading")
     }
 
     private func loadedFrame(_ loaded: IdentityCenterLoaded) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: Spacing.s0) {
                 identityCards(loaded.identities)
                 if !loaded.bridges.isEmpty {
                     sectionOverline("Profile links")
                     bridgesCard(loaded.bridges)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, Spacing.s3)
                 }
                 sectionOverline("Privacy")
                 rowsCard(loaded.privacyRows, idPrefix: "privacy")
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, Spacing.s3)
                 sectionOverline("Identities")
                 rowsCard(loaded.disclosureRows, idPrefix: "disclosure")
-                    .padding(.horizontal, 12)
-                Spacer(minLength: 24)
+                    .padding(.horizontal, Spacing.s3)
+                Spacer(minLength: Spacing.s6)
             }
         }
         .accessibilityIdentifier("identityCenterContent")
@@ -134,7 +134,7 @@ public struct IdentityCenterView: View {
                 .accessibilityIdentifier("identityCard_\(card.kind.rawValue)")
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .padding(.top, 14)
     }
 
@@ -146,7 +146,7 @@ public struct IdentityCenterView: View {
                     .frame(width: 44, height: 44)
                 Icon(card.kind.icon, size: 22, strokeWidth: 2, color: card.kind.accent)
             }
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
                 HStack(spacing: 6) {
                     Text(card.overline.uppercased())
                         .font(.system(size: 10, weight: .bold))
@@ -197,7 +197,7 @@ public struct IdentityCenterView: View {
                         .padding(.top, 2)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Icon(.chevronRight, size: 16, color: Theme.Color.appTextSecondary)
         }
         .padding(14)
@@ -205,27 +205,27 @@ public struct IdentityCenterView: View {
             LinearGradient(colors: [card.kind.accentBgSoft, Theme.Color.appSurface], startPoint: .top, endPoint: .bottom)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
     }
 
     private func bridgesCard(_ rows: [IdentityBridgeRow]) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .top, spacing: Spacing.s3) {
+                    VStack(alignment: .leading, spacing: Spacing.s1) {
                         Text(row.label)
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(Theme.Color.appText)
                         if let subtext = row.subtext {
                             Text(subtext)
-                                .font(.system(size: 12))
+                                .pantopusTextStyle(.caption)
                                 .foregroundStyle(Theme.Color.appTextSecondary)
                         }
                     }
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                     Toggle("", isOn: Binding(
                         get: { row.isOn },
                         set: { newValue in
@@ -236,27 +236,27 @@ public struct IdentityCenterView: View {
                     .tint(Theme.Color.primary600)
                     .accessibilityIdentifier("identityCenterBridge_\(row.id)")
                 }
-                .padding(16)
+                .padding(Spacing.s4)
                 if index < rows.count - 1 {
                     Rectangle()
                         .fill(Theme.Color.appBorder.opacity(0.6))
                         .frame(height: 1)
-                        .padding(.leading, 16)
+                        .padding(.leading, Spacing.s4)
                 }
             }
         }
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private func rowsCard(_ rows: [IdentityRowContent], idPrefix: String) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                HStack(spacing: 12) {
+                HStack(spacing: Spacing.s3) {
                     Icon(row.icon, size: 18, color: Theme.Color.primary600)
                         .frame(width: 24, height: 24)
                     VStack(alignment: .leading, spacing: 2) {
@@ -265,11 +265,11 @@ public struct IdentityCenterView: View {
                             .foregroundStyle(Theme.Color.appText)
                         if let subtext = row.subtext {
                             Text(subtext)
-                                .font(.system(size: 12))
+                                .pantopusTextStyle(.caption)
                                 .foregroundStyle(Theme.Color.appTextSecondary)
                         }
                     }
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                     if let trailing = row.trailing {
                         Text(trailing)
                             .font(.system(size: 12, weight: .semibold))
@@ -277,23 +277,23 @@ public struct IdentityCenterView: View {
                     }
                     Icon(.chevronRight, size: 16, color: Theme.Color.appTextSecondary)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Spacing.s4)
                 .padding(.vertical, 14)
                 .accessibilityIdentifier("\(idPrefix)Row_\(row.id)")
                 if index < rows.count - 1 {
                     Rectangle()
                         .fill(Theme.Color.appBorder.opacity(0.6))
                         .frame(height: 1)
-                        .padding(.leading, 16)
+                        .padding(.leading, Spacing.s4)
                 }
             }
         }
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private func sectionOverline(_ text: String) -> some View {
@@ -301,14 +301,14 @@ public struct IdentityCenterView: View {
             .font(.system(size: 11, weight: .bold))
             .foregroundStyle(Theme.Color.appTextSecondary)
             .kerning(0.9)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Spacing.s4)
             .padding(.top, 18)
-            .padding(.bottom, 8)
+            .padding(.bottom, Spacing.s2)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func errorFrame(message: String) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.s3) {
             Spacer()
             Icon(.alertCircle, size: 40, color: Theme.Color.error)
             Text("Couldn't load Profiles & Privacy")
@@ -333,7 +333,7 @@ public struct IdentityCenterView: View {
             .accessibilityIdentifier("identityCenterRetry")
             Spacer()
         }
-        .padding(20)
+        .padding(Spacing.s5)
         .accessibilityIdentifier("identityCenterError")
     }
 

@@ -207,7 +207,7 @@ private fun ErrorShell(
     ContentDetailShell(
         title = "Document",
         onBack = onBack,
-        header = { Spacer(Modifier.height(0.dp)) },
+        header = { Spacer(Modifier.height(Spacing.s0)) },
         body = {
             Column(
                 modifier =
@@ -363,15 +363,15 @@ private fun CategoryBadge(category: DocumentCategory) {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(category.background)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .semantics { contentDescription = "Category ${category.label}" },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = category.icon,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = category.foreground,
         )
         Text(
@@ -612,7 +612,7 @@ private fun TagsRow(
                             .clip(RoundedCornerShape(Radii.pill))
                             .background(PantopusColors.appSurface)
                             .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
-                            .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                            .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
                 )
             }
         }
@@ -647,7 +647,7 @@ private fun LinkedToCard(
             PantopusIconImage(
                 icon = link.kind.icon,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.home,
             )
             Column {
@@ -750,7 +750,7 @@ private fun FooterButton(
                 .semantics { contentDescription = contentDesc }
                 .padding(vertical = Spacing.s2),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = icon,

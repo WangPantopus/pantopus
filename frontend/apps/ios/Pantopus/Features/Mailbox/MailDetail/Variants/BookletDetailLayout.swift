@@ -154,7 +154,7 @@ struct BookletDetailLayout: View {
 
         private func secondary(icon: PantopusIcon, label: String) -> some View {
             Button(action: {}) {
-                VStack(spacing: 4) {
+                VStack(spacing: Spacing.s1) {
                     Icon(icon, size: 17, color: Theme.Color.appTextStrong)
                     Text(label)
                         .font(.system(size: 10.5, weight: .semibold))
@@ -164,10 +164,10 @@ struct BookletDetailLayout: View {
                 .padding(.vertical, 10)
                 .background(Theme.Color.appSurface)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: Radii.lg)
                         .stroke(Theme.Color.appBorder, lineWidth: 1)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(label)
@@ -224,7 +224,7 @@ private struct CategoryBadge: View {
     let category: MailItemCategory
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(category.icon, size: 11, color: category.accent)
             Text(category.label)
                 .font(.system(size: 10, weight: .bold))
@@ -242,7 +242,7 @@ private struct KeyFactsCard: View {
     let rows: [MailDetailKeyFact]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             Text("KEY FACTS")
                 .font(.system(size: 11, weight: .bold))
                 .tracking(0.5)
@@ -258,7 +258,7 @@ private struct KeyFactsCard: View {
                     Icon(row.icon, size: 13, color: Theme.Color.appTextStrong)
                         .frame(width: 24, height: 24)
                         .background(Theme.Color.appSurfaceSunken)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.sm))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(row.label.uppercased())
                             .font(.system(size: 11, weight: .semibold))
@@ -268,7 +268,7 @@ private struct KeyFactsCard: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Theme.Color.appText)
                     }
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                 }
                 .padding(.horizontal, Spacing.s3)
                 .padding(.vertical, Spacing.s2)
@@ -303,18 +303,18 @@ private struct SenderCard: View {
                     .foregroundStyle(Theme.Color.appTextInverse)
                     .frame(width: 44, height: 44)
                     .background(content.category.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(content.senderDisplayName)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
                     if let meta = content.senderMeta {
                         Text(meta)
-                            .font(.system(size: 12))
+                            .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 if onOpenProfile != nil, content.senderUserId != nil {
                     Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
                 }

@@ -105,7 +105,7 @@ private fun BodyRow(post: GigDetailDto.Post) {
         Thumbnail(post.categoryLabel)
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             Text(post.title, style = PantopusTextStyle.body, color = PantopusColors.appText)
             val meta = listOf(post.posted, post.expires).filter { it.isNotEmpty() }.joinToString(" · ")
@@ -146,7 +146,7 @@ private fun Thumbnail(category: String) {
             modifier =
                 Modifier
                     .align(Alignment.TopStart)
-                    .padding(4.dp)
+                    .padding(Spacing.s1)
                     .clip(RoundedCornerShape(Radii.sm))
                     .background(PantopusColors.appSurface)
                     .padding(horizontal = 5.dp, vertical = 2.dp),

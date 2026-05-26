@@ -94,11 +94,11 @@ fun VerifyEmailScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.s5),
         ) {
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(Spacing.s10))
             Illustration()
             HeadlineBlock(email = state.email)
             BannerLine(state = state)
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(Spacing.s10))
         }
 
         ActionStack(

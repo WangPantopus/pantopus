@@ -30,7 +30,7 @@ struct PostGigV1ErrorBanner: View {
                     }
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s2 + 2)
@@ -132,6 +132,7 @@ struct PostGigV1EmptyView: View {
             Text("No quick-post draft")
                 .pantopusTextStyle(.h3)
                 .foregroundStyle(Theme.Color.appText)
+                .accessibilityAddTraits(.isHeader)
             Text("Start with the V1 form when you already know the title, price, and time.")
                 .pantopusTextStyle(.small)
                 .foregroundStyle(Theme.Color.appTextSecondary)
@@ -167,6 +168,7 @@ struct PostGigV1FatalErrorView: View {
             Text("Quick post unavailable")
                 .pantopusTextStyle(.h3)
                 .foregroundStyle(Theme.Color.appText)
+                .accessibilityAddTraits(.isHeader)
             Text(message)
                 .pantopusTextStyle(.small)
                 .foregroundStyle(Theme.Color.appTextSecondary)

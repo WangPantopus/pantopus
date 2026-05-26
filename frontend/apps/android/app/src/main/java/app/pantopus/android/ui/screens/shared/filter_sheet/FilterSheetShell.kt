@@ -209,7 +209,7 @@ private fun FilterSheetHeader(
                 PantopusIconImage(
                     icon = PantopusIcon.X,
                     contentDescription = null,
-                    size = 20.dp,
+                    size = Radii.xl2,
                     tint = PantopusColors.appTextSecondary,
                 )
             }
@@ -472,7 +472,7 @@ private fun RadioControl(
                 HorizontalDivider(
                     color = PantopusColors.appBorderSubtle,
                     thickness = 1.dp,
-                    modifier = Modifier.padding(start = 32.dp),
+                    modifier = Modifier.padding(start = Spacing.s8),
                 )
             }
         }
@@ -548,7 +548,7 @@ private fun MultiSelectControl(
                 HorizontalDivider(
                     color = PantopusColors.appBorderSubtle,
                     thickness = 1.dp,
-                    modifier = Modifier.padding(start = 32.dp),
+                    modifier = Modifier.padding(start = Spacing.s8),
                 )
             }
         }
@@ -574,7 +574,7 @@ private fun CheckboxGlyph(isOn: Boolean) {
             PantopusIconImage(
                 icon = PantopusIcon.Check,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = PantopusColors.appTextInverse,
             )
         }

@@ -98,7 +98,7 @@ public struct MonthStripHeader: View {
         }
         .padding(.horizontal, Spacing.s4)
         .padding(.top, 10)
-        .padding(.bottom, 12)
+        .padding(.bottom, Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
@@ -111,7 +111,7 @@ public struct MonthStripHeader: View {
 
     private var monthRow: some View {
         HStack(spacing: Spacing.s1) {
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 Text(state.monthLabel)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
@@ -144,7 +144,7 @@ public struct MonthStripHeader: View {
     }
 
     private var weekRow: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             ForEach(state.days) { day in
                 dayCell(day)
                     .frame(maxWidth: .infinity)

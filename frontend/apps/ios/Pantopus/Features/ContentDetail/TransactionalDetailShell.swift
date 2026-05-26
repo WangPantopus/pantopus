@@ -85,12 +85,27 @@ public struct TransactionalDetailShell: View {
     // MARK: - Frames
 
     private var loadingFrame: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             topNav(trailing: trailingOverflow(transparent: false), transparent: false)
-            Spacer()
-            ProgressView()
-            Spacer()
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.s4) {
+                    Shimmer(height: 200, cornerRadius: Radii.lg)
+                    Shimmer(width: 240, height: 20, cornerRadius: Radii.sm)
+                    Shimmer(width: 160, height: 14, cornerRadius: Radii.xs)
+                    VStack(alignment: .leading, spacing: Spacing.s2) {
+                        ForEach(0..<4, id: \.self) { _ in
+                            Shimmer(height: 14, cornerRadius: Radii.xs)
+                        }
+                    }
+                    .padding(.top, Spacing.s2)
+                }
+                .padding(Spacing.s4)
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.Color.appBg)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading detail")
         .accessibilityIdentifier("contentDetailLoading")
     }
 
@@ -126,7 +141,7 @@ public struct TransactionalDetailShell: View {
     private func loadedFrame(_ content: ContentDetailContent) -> some View {
         ZStack(alignment: .bottom) {
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(spacing: Spacing.s0) {
                     if let cover = content.cover {
                         coverView(cover)
                     }
@@ -158,16 +173,16 @@ public struct TransactionalDetailShell: View {
     }
 
     private func contentBody(_ content: ContentDetailContent) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             heroBlock(content)
             if !content.statStrip.isEmpty {
                 statStrip(content.statStrip)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, Spacing.s5)
                     .padding(.top, 18)
             }
             if let counterparty = content.counterparty {
                 counterpartyCard(counterparty)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, Spacing.s5)
                     .padding(.top, 18)
             }
             ForEach(content.modules) { module in
@@ -176,8 +191,8 @@ public struct TransactionalDetailShell: View {
             }
             if !content.trustCapsules.isEmpty {
                 trustCapsuleWrap(content.trustCapsules)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
+                    .padding(.horizontal, Spacing.s5)
+                    .padding(.top, Spacing.s5)
             }
         }
     }
@@ -198,8 +213,8 @@ public struct TransactionalDetailShell: View {
             Spacer()
             if let trailing { trailing }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
         .background(transparent ? Color.clear : Theme.Color.appSurface)
     }
 
@@ -246,33 +261,33 @@ public struct TransactionalDetailShell: View {
     // MARK: - Hero
 
     private func heroBlock(_ content: ContentDetailContent) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             if let pill = content.statusPill {
                 statusPillView(pill)
-                    .padding(.top, 4)
-                    .padding(.leading, 20)
+                    .padding(.top, Spacing.s1)
+                    .padding(.leading, Spacing.s5)
             }
             if let monoId = content.hero.monoId {
                 Text(monoId)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(Theme.Color.appTextSecondary)
-                    .padding(.leading, 20)
+                    .padding(.leading, Spacing.s5)
                     .padding(.top, 10)
             }
             Text(content.hero.title)
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
                 .lineLimit(3)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, Spacing.s5)
                 .padding(.top, content.hero.monoId == nil ? 4 : 6)
                 .accessibilityAddTraits(.isHeader)
             if content.hero.categoryChip != nil || content.hero.meta != nil {
                 heroSubtitle(content.hero)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, Spacing.s5)
                     .padding(.top, 10)
             }
             if let priceLine = content.hero.priceLine {
-                HStack(alignment: .lastTextBaseline, spacing: 8) {
+                HStack(alignment: .lastTextBaseline, spacing: Spacing.s2) {
                     Text(priceLine)
                         .font(.system(size: 32, weight: .heavy))
                         .foregroundStyle(content.kind == .listing ? Theme.Color.primary600 : Theme.Color.appText)
@@ -282,19 +297,19 @@ public struct TransactionalDetailShell: View {
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, Spacing.s5)
                 .padding(.top, 18)
             }
         }
     }
 
     private func heroSubtitle(_ hero: ContentDetailHero) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             if let chip = hero.categoryChip {
                 Text(chip.label.uppercased())
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(chip.category.color)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, Spacing.s2)
                     .padding(.vertical, 2)
                     .background(chip.category.color.opacity(0.12))
                     .clipShape(Capsule())
@@ -317,7 +332,7 @@ public struct TransactionalDetailShell: View {
                 .foregroundStyle(pillForeground(pill.tone))
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(pillBackground(pill.tone))
         .clipShape(Capsule())
     }
@@ -345,7 +360,7 @@ public struct TransactionalDetailShell: View {
     // MARK: - Stat strip
 
     private func statStrip(_ stats: [ContentDetailStat]) -> some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             ForEach(Array(stats.enumerated()), id: \.element.id) { index, stat in
                 VStack(spacing: 2) {
                     Text(stat.top)
@@ -365,14 +380,14 @@ public struct TransactionalDetailShell: View {
         }
         .padding(10)
         .background(Theme.Color.appSurfaceSunken)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("contentDetailStatStrip")
     }
 
     // MARK: - Counterparty
 
     private func counterpartyCard(_ party: ContentDetailCounterparty) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.s3) {
             AvatarView(initials: party.initials, verified: party.verified, size: 44)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -383,7 +398,7 @@ public struct TransactionalDetailShell: View {
                         identityChip(kind)
                     }
                 }
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     if let rating = party.rating {
                         Icon(.star, size: 10, color: Theme.Color.warning)
                         Text(String(format: "%.1f", rating))
@@ -397,7 +412,7 @@ public struct TransactionalDetailShell: View {
                     }
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             if party.showsMessageButton, let onMessage = onMessageCounterparty {
                 Button(action: onMessage) {
                     Icon(.send, size: 14, strokeWidth: 2.2, color: Theme.Color.appTextStrong)
@@ -411,7 +426,7 @@ public struct TransactionalDetailShell: View {
                 .accessibilityIdentifier("contentDetailCounterpartyMessage")
             }
         }
-        .padding(12)
+        .padding(Spacing.s3)
         .background(Theme.Color.appSurfaceSunken)
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -434,7 +449,7 @@ public struct TransactionalDetailShell: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
         .background(bg)
-        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
     }
 
     // MARK: - Modules
@@ -452,7 +467,7 @@ public struct TransactionalDetailShell: View {
             }
         case let .detailRow(m):
             sectionCard(title: m.title, icon: m.sectionIcon) {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     Icon(m.rowIcon, size: 14, color: Theme.Color.primary600)
                     Text(m.label)
                         .font(.system(size: 12.5, weight: .semibold))
@@ -464,7 +479,7 @@ public struct TransactionalDetailShell: View {
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, Spacing.s3)
                 .padding(.vertical, 10)
                 .background(Theme.Color.appSurfaceSunken)
                 .overlay(
@@ -482,7 +497,7 @@ public struct TransactionalDetailShell: View {
             }
         case let .photoStrip(m):
             sectionCard(title: m.title, icon: m.icon, sub: m.countLabel) {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     ForEach(m.tiles) { tile in
                         ZStack {
                             LinearGradient(
@@ -528,18 +543,18 @@ public struct TransactionalDetailShell: View {
                 bidsTable(m.bids)
             }
         case let .fromTo(m):
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 partyCard(m.from)
                 partyCard(m.to)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, Spacing.s5)
         case let .lineItems(m):
             sectionCard(title: m.title, icon: m.icon) {
                 lineItemsTable(m.rows)
             }
         case let .summary(m):
             summaryCard(m)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, Spacing.s5)
         }
     }
 
@@ -549,7 +564,7 @@ public struct TransactionalDetailShell: View {
         sub: String? = nil,
         @ViewBuilder content: () -> some View
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(spacing: 6) {
                 if let icon { Icon(icon, size: 13, color: Theme.Color.appTextSecondary) }
                 Text(title.uppercased())
@@ -564,11 +579,11 @@ public struct TransactionalDetailShell: View {
             }
             content()
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, Spacing.s5)
     }
 
     private func bidsTable(_ rows: [ContentDetailBidRow]) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, bid in
                 HStack(spacing: 10) {
                     AvatarView(initials: bid.initials, verified: bid.verified, size: 36)
@@ -576,7 +591,7 @@ public struct TransactionalDetailShell: View {
                         Text(bid.displayName)
                             .font(.system(size: 12.5, weight: .semibold))
                             .foregroundStyle(Theme.Color.appText)
-                        HStack(spacing: 4) {
+                        HStack(spacing: Spacing.s1) {
                             Icon(.star, size: 9, color: Theme.Color.warning)
                             Text(bid.ratingLine)
                                 .font(.system(size: 10.5, weight: .medium))
@@ -588,7 +603,7 @@ public struct TransactionalDetailShell: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Theme.Color.primary600)
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, Spacing.s3)
                 .padding(.vertical, 10)
                 if index < rows.count - 1 {
                     Divider().background(Theme.Color.appBorder.opacity(0.5))
@@ -597,10 +612,10 @@ public struct TransactionalDetailShell: View {
         }
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private func partyCard(_ party: ContentDetailParty) -> some View {
@@ -625,17 +640,17 @@ public struct TransactionalDetailShell: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
+        .padding(Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private func lineItemsTable(_ rows: [ContentDetailLineItem]) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             HStack {
                 Text("Item")
                 Text("Qty")
@@ -648,18 +663,18 @@ public struct TransactionalDetailShell: View {
             .font(.system(size: 9, weight: .bold))
             .foregroundStyle(Theme.Color.appTextMuted)
             .kerning(0.8)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, Spacing.s2)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.Color.appSurfaceSunken)
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                HStack(spacing: 0) {
+                HStack(spacing: Spacing.s0) {
                     Text(row.item)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Theme.Color.appText)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text(row.qty)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .frame(width: 36, alignment: .center)
                     Text(row.unit)
@@ -671,7 +686,7 @@ public struct TransactionalDetailShell: View {
                         .foregroundStyle(Theme.Color.appText)
                         .frame(width: 60, alignment: .trailing)
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, Spacing.s3)
                 .padding(.vertical, 10)
                 if index < rows.count - 1 {
                     Divider().background(Theme.Color.appBorder.opacity(0.5))
@@ -680,14 +695,14 @@ public struct TransactionalDetailShell: View {
         }
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private func summaryCard(_ summary: ContentDetailSummary) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
             ForEach(summary.rows) { row in
                 HStack {
                     Text(row.label)
@@ -711,13 +726,13 @@ public struct TransactionalDetailShell: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, Spacing.s3)
         .background(Theme.Color.appSurfaceSunken)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     // MARK: - Trust capsules
@@ -748,10 +763,10 @@ public struct TransactionalDetailShell: View {
                     .frame(height: 48)
                     .background(Theme.Color.appSurface)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                             .stroke(Theme.Color.appBorder, lineWidth: 1)
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("contentDetailDockSecondary")
@@ -768,15 +783,15 @@ public struct TransactionalDetailShell: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
                 .background(Theme.Color.primary600)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                 .shadow(color: Theme.Color.primary600.opacity(0.30), radius: 8, x: 0, y: 6)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("contentDetailDockPrimary")
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 24)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, Spacing.s3)
+        .padding(.bottom, Spacing.s6)
         .frame(maxWidth: .infinity)
         .background(.ultraThinMaterial)
         .overlay(alignment: .top) {

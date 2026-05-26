@@ -337,7 +337,7 @@ private fun ReactionsRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             PantopusIconImage(
                 icon = leadingIcon,
                 contentDescription = null,
@@ -346,7 +346,7 @@ private fun ReactionsRow(
             )
             Text("${post.reactions}", fontSize = 12.sp, color = PantopusColors.appTextSecondary)
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             PantopusIconImage(
                 icon = PantopusIcon.MessageCircle,
                 contentDescription = null,

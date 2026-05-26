@@ -24,7 +24,7 @@ public struct PostSummaryCard: View {
     public var body: some View {
         Button(action: { onOpenGig() }) {
             GigCard(padded: false) {
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: Spacing.s0) {
                     header
                     bodyRow
                     if !post.details.isEmpty {
@@ -63,7 +63,7 @@ public struct PostSummaryCard: View {
     private var bodyRow: some View {
         HStack(alignment: .top, spacing: Spacing.s3) {
             thumbnail
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
                 Text(post.title)
                     .pantopusTextStyle(.body)
                     .foregroundStyle(Theme.Color.appText)
@@ -76,7 +76,7 @@ public struct PostSummaryCard: View {
                     if !post.schedule.isEmpty { summaryChip(icon: .calendarDays, text: post.schedule) }
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.bottom, Spacing.s2)
@@ -108,7 +108,7 @@ public struct PostSummaryCard: View {
                 .padding(.vertical, 2)
                 .background(Theme.Color.appSurface)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.sm))
-                .padding(4)
+                .padding(Spacing.s1)
             }
             .accessibilityHidden(true)
     }
@@ -133,7 +133,7 @@ public struct PostSummaryCard: View {
             Text("\(post.bidCount) bids received")
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appText)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -25,7 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -51,10 +50,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 import coil.compose.AsyncImage
 
 /**
@@ -106,10 +107,30 @@ private fun LoadingFrame(
     onBack: () -> Unit,
     overflowItems: List<ContentDetailOverflowItem>,
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(PantopusColors.appBg)
+                .semantics { contentDescription = "Loading detail" }
+                .testTag("contentDetailLoading"),
+    ) {
         TopNav(onBack = onBack, transparent = false, overflowItems = overflowItems)
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = PantopusColors.primary600)
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+        ) {
+            Shimmer(width = 360.dp, height = 200.dp, cornerRadius = Radii.lg)
+            Shimmer(width = 240.dp, height = 20.dp, cornerRadius = Radii.sm)
+            Shimmer(width = 160.dp, height = 14.dp, cornerRadius = Radii.xs)
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                repeat(4) {
+                    Shimmer(width = 320.dp, height = 14.dp, cornerRadius = Radii.xs)
+                }
+            }
         }
     }
 }
@@ -124,12 +145,12 @@ private fun ErrorFrame(
     Column(modifier = Modifier.fillMaxSize().testTag("contentDetailError")) {
         TopNav(onBack = onBack, transparent = false, overflowItems = overflowItems)
         Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+            modifier = Modifier.fillMaxSize().padding(Spacing.s6),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             PantopusIconImage(icon = PantopusIcon.AlertCircle, contentDescription = null, size = 40.dp, tint = PantopusColors.error)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(Spacing.s3))
             Text(
                 text = "Couldn't load detail",
                 fontSize = 18.sp,
@@ -138,7 +159,7 @@ private fun ErrorFrame(
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(text = message, fontSize = 13.5.sp, color = PantopusColors.appTextSecondary, textAlign = TextAlign.Center)
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Spacing.s4))
             Box(
                 modifier =
                     Modifier
@@ -190,7 +211,7 @@ private fun LoadedFrame(
                 ModuleView(module = module)
             }
             if (content.trustCapsules.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(Spacing.s5))
                 TrustCapsuleWrap(content.trustCapsules)
             }
             Spacer(modifier = Modifier.height(120.dp))
@@ -220,7 +241,7 @@ private fun TopNav(
             Modifier
                 .fillMaxWidth()
                 .background(if (transparent) Color.Transparent else PantopusColors.appSurface)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -236,7 +257,7 @@ private fun TopNav(
             PantopusIconImage(
                 icon = PantopusIcon.ChevronLeft,
                 contentDescription = "Back",
-                size = 20.dp,
+                size = Radii.xl2,
                 strokeWidth = 2.2f,
                 tint = PantopusColors.appText,
             )
@@ -269,7 +290,7 @@ private fun OverflowMenu(
             PantopusIconImage(
                 icon = PantopusIcon.MoreVertical,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 strokeWidth = 2.2f,
                 tint = PantopusColors.appText,
             )
@@ -352,7 +373,7 @@ private fun HeroBlock(content: ContentDetailContent) {
     Column(modifier = Modifier.fillMaxWidth()) {
         content.statusPill?.let {
             Row(
-                modifier = Modifier.padding(start = 20.dp, top = 4.dp),
+                modifier = Modifier.padding(start = Spacing.s5, top = Spacing.s1),
                 verticalAlignment = Alignment.CenterVertically,
             ) { PillView(it) }
         }
@@ -362,7 +383,7 @@ private fun HeroBlock(content: ContentDetailContent) {
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
                 color = PantopusColors.appTextSecondary,
-                modifier = Modifier.padding(start = 20.dp, top = 10.dp),
+                modifier = Modifier.padding(start = Spacing.s5, top = 10.dp),
             )
         }
         Text(
@@ -374,15 +395,15 @@ private fun HeroBlock(content: ContentDetailContent) {
             overflow = TextOverflow.Ellipsis,
             modifier =
                 Modifier
-                    .padding(horizontal = 20.dp)
+                    .padding(horizontal = Spacing.s5)
                     .padding(top = if (content.hero.monoId == null) 4.dp else 6.dp)
                     .semantics { heading() },
         )
         if (content.hero.categoryChip != null || content.hero.meta != null) {
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = Spacing.s5, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 content.hero.categoryChip?.let { chip ->
                     Box(
@@ -390,7 +411,7 @@ private fun HeroBlock(content: ContentDetailContent) {
                             Modifier
                                 .clip(RoundedCornerShape(Radii.pill))
                                 .background(chip.category.color.copy(alpha = 0.12f))
-                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                                .padding(horizontal = Spacing.s2, vertical = 2.dp),
                     ) {
                         Text(
                             text = chip.label.uppercase(),
@@ -413,9 +434,9 @@ private fun HeroBlock(content: ContentDetailContent) {
         }
         content.hero.priceLine?.let { price ->
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = Spacing.s5, vertical = Spacing.s2),
                 verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 Text(
                     text = price,
@@ -464,7 +485,7 @@ private fun PillView(pill: ContentDetailPill) {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(bg)
-                .padding(horizontal = 10.dp, vertical = 4.dp),
+                .padding(horizontal = 10.dp, vertical = Spacing.s1),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
@@ -487,10 +508,10 @@ private fun StatStrip(stats: List<ContentDetailStat>) {
     Row(
         modifier =
             Modifier
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = Spacing.s5)
                 .padding(top = 18.dp)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurfaceSunken)
                 .padding(10.dp)
                 .testTag("contentDetailStatStrip"),
@@ -528,15 +549,15 @@ private fun CounterpartyCard(
     Row(
         modifier =
             Modifier
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = Spacing.s5)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
                 .background(PantopusColors.appSurfaceSunken)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(14.dp))
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("contentDetailCounterparty"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         AvatarView(initials = party.initials, verified = party.verified, size = 44.dp)
         Column(modifier = Modifier.weight(1f)) {
@@ -549,7 +570,7 @@ private fun CounterpartyCard(
                 )
                 party.identityKind?.let { IdentityChip(it) }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                 party.rating?.let {
                     PantopusIconImage(icon = PantopusIcon.Star, contentDescription = null, size = 10.dp, tint = PantopusColors.warning)
                     Text(
@@ -599,13 +620,13 @@ private fun IdentityChip(kind: String) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(Radii.xs))
                 .background(bg)
                 .padding(horizontal = 6.dp, vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 8.dp, strokeWidth = 2.6f, tint = fg)
+        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.md, strokeWidth = 2.6f, tint = fg)
         Text(text = label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = fg, letterSpacing = 0.6.sp)
     }
 }
@@ -634,9 +655,9 @@ private fun ModuleView(module: ContentDetailModule) {
                             .clip(RoundedCornerShape(10.dp))
                             .background(PantopusColors.appSurfaceSunken)
                             .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp))
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                            .padding(horizontal = Spacing.s3, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
                 ) {
                     PantopusIconImage(icon = module.rowIcon, contentDescription = null, size = 14.dp, tint = PantopusColors.primary600)
                     Text(text = module.label, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
@@ -659,7 +680,7 @@ private fun ModuleView(module: ContentDetailModule) {
             SectionCard(title = module.title, icon = module.icon, sub = module.countLabel) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
                 ) {
                     module.tiles.forEach { tile ->
                         Box(
@@ -676,7 +697,7 @@ private fun ModuleView(module: ContentDetailModule) {
                             PantopusIconImage(
                                 icon = tile.icon,
                                 contentDescription = null,
-                                size = 24.dp,
+                                size = Radii.xl3,
                                 strokeWidth = 1.8f,
                                 tint = Color.White.copy(alpha = 0.9f),
                             )
@@ -722,13 +743,13 @@ private fun ModuleView(module: ContentDetailModule) {
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(Radii.lg))
                             .background(PantopusColors.appSurface)
-                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
+                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
                 ) {
                     module.bids.forEachIndexed { index, bid ->
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
@@ -740,7 +761,10 @@ private fun ModuleView(module: ContentDetailModule) {
                                     fontWeight = FontWeight.SemiBold,
                                     color = PantopusColors.appText,
                                 )
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                                ) {
                                     PantopusIconImage(
                                         icon = PantopusIcon.Star,
                                         contentDescription = null,
@@ -770,8 +794,8 @@ private fun ModuleView(module: ContentDetailModule) {
             }
         is ContentDetailModule.FromTo ->
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = Spacing.s5).fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 PartyCard(party = module.from, modifier = Modifier.weight(1f))
                 PartyCard(party = module.to, modifier = Modifier.weight(1f))
@@ -781,7 +805,7 @@ private fun ModuleView(module: ContentDetailModule) {
                 LineItemsTable(rows = module.rows)
             }
         is ContentDetailModule.Summary ->
-            SummaryCard(summary = module, modifier = Modifier.padding(horizontal = 20.dp))
+            SummaryCard(summary = module, modifier = Modifier.padding(horizontal = Spacing.s5))
     }
 }
 
@@ -792,7 +816,7 @@ private fun SectionCard(
     sub: String? = null,
     content: @Composable () -> Unit,
 ) {
-    Column(modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth()) {
+    Column(modifier = Modifier.padding(horizontal = Spacing.s5).fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             icon?.let { PantopusIconImage(icon = it, contentDescription = null, size = 13.dp, tint = PantopusColors.appTextSecondary) }
             Text(
@@ -804,7 +828,7 @@ private fun SectionCard(
             )
             sub?.let { Text(text = "· $it", fontSize = 10.sp, color = PantopusColors.appTextMuted) }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         content()
     }
 }
@@ -823,10 +847,10 @@ private fun PartyCard(
     Column(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
-                .padding(12.dp),
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3),
     ) {
         Text(
             text = party.label.uppercase(),
@@ -837,7 +861,7 @@ private fun PartyCard(
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(text = party.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(Spacing.s1))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(accent))
             Text(text = party.sub, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = accent)
@@ -851,16 +875,16 @@ private fun LineItemsTable(rows: List<ContentDetailLineItem>) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
     ) {
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .background(PantopusColors.appSurfaceSunken)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         ) {
             Text(
                 text = "ITEM",
@@ -896,7 +920,7 @@ private fun LineItemsTable(rows: List<ContentDetailLineItem>) {
         }
         rows.forEachIndexed { index, row ->
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -945,11 +969,11 @@ private fun SummaryCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurfaceSunken)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(horizontal = 14.dp, vertical = Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         summary.rows.forEach { row ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -973,7 +997,7 @@ private fun TrustCapsuleWrap(capsules: List<ContentDetailPill>) {
     Row(
         modifier =
             Modifier
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = Spacing.s5)
                 .horizontalScroll(scrollState),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -997,7 +1021,7 @@ private fun StickyDock(
     ) {
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s3, bottom = Spacing.s6),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -1005,9 +1029,9 @@ private fun StickyDock(
                 Row(
                     modifier =
                         Modifier
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(Radii.lg))
                             .background(PantopusColors.appSurface)
-                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                             .clickable { onSecondary?.invoke() }
                             .padding(horizontal = 18.dp)
                             .heightIn(min = 48.dp)
@@ -1031,9 +1055,9 @@ private fun StickyDock(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.primary600)
-                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(12.dp))
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(Radii.lg))
                         .clickable(onClick = onPrimary)
                         .heightIn(min = 48.dp)
                         .testTag("contentDetailDockPrimary"),
@@ -1044,7 +1068,7 @@ private fun StickyDock(
                     PantopusIconImage(
                         icon = it,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         strokeWidth = 2.2f,
                         tint = PantopusColors.appTextInverse,
                     )

@@ -13,17 +13,34 @@
 >
 > **Generated:** 2026-05-26.
 >
-> **Dominance (real usage counts across feature code):**
+> **Dominance (real usage counts in feature code).** Scope:
+> `frontend/apps/ios/Pantopus/**/*.swift` minus `Core/Design/`, and
+> `frontend/apps/android/app/src/main/java/app/pantopus/android/ui/**/*.kt`
+> minus `ui/theme/`. Counts are line-occurrences (`grep -rE … | wc -l`), so
+> a line with two references contributes 1.
 >
 > | Pattern | iOS usage | Android usage |
 > |---|---:|---:|
-> | `Theme.Color.*` (iOS) / `PantopusColors.*` (Android) | 6072 | 6201 |
-> | `Spacing.s*` | 2540 | 2423 |
-> | `Radii.*` | 1229 | 1340 |
-> | `.pantopusTextStyle(.X)` (iOS) / `PantopusTextStyle.*` (Android) | 757 | 1072 |
-> | `Icon(.X)` (iOS) / `PantopusIconImage(icon = …)` (Android) | 646 | (rendered, not counted) |
+> | `Theme.Color.*` (iOS) / `PantopusColors.*` (Android) | 5554 | 5758 |
+> | `Spacing.s*` | 2523 | 2217 |
+> | `Radii.*` | 1222 | 1346 |
+> | `.pantopusTextStyle(.X)` (iOS) / `PantopusTextStyle.*` (Android) | 757 | 1098 |
+> | `Icon(.X)` (iOS) / `PantopusIconImage(icon = …)` (Android) | 650 | 874 |
+> | `PantopusElevations.*` (Android) | n/a | 30 |
 > | **`PantopusTheme.tokens.*` (Android themed bag)** | n/a | **0** |
 > | **`LocalPantopusTokens.current.*` (Android CompositionLocal)** | n/a | **0** |
+>
+> **Recompute** (any future P7 prompt that wants fresh dominance numbers):
+>
+> ```bash
+> # iOS — Theme.Color.* in feature code
+> grep -rE "Theme\.Color\." frontend/apps/ios/Pantopus/ --include="*.swift" \
+>   | grep -v "/Core/Design/" | wc -l
+> # Android — PantopusColors.* in feature code
+> grep -rE "PantopusColors\." \
+>   frontend/apps/android/app/src/main/java/app/pantopus/android/ui/ \
+>   --include="*.kt" | grep -v "/ui/theme/" | wc -l
+> ```
 
 ---
 

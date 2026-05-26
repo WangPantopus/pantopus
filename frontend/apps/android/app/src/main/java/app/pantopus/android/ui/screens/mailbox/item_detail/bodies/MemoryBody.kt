@@ -456,7 +456,7 @@ private fun CrumbChip(crumb: MemoryVaultCrumb) {
             Modifier.clip(RoundedCornerShape(Radii.pill))
         }
     Row(
-        modifier = chipModifier.padding(horizontal = Spacing.s2, vertical = 4.dp),
+        modifier = chipModifier.padding(horizontal = Spacing.s2, vertical = Spacing.s1),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {

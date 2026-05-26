@@ -309,12 +309,12 @@ private struct EventHeader: View {
                         .pantopusTextStyle(.body)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             HStack(spacing: Spacing.s2) {
                 CategoryPill(category: category)
                 if let location = event.locationNotes, !location.isEmpty {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Spacing.s1) {
                         Icon(.mapPin, size: 12, color: Theme.Color.appTextSecondary)
                         Text(location)
                             .pantopusTextStyle(.caption)
@@ -376,14 +376,14 @@ private struct CategoryPill: View {
     let category: CalendarEventCategory
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(category.icon, size: 10, color: category.foreground)
             Text(category.label)
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(category.foreground)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(category.background)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
     }
@@ -394,7 +394,7 @@ private struct DetailGrid: View {
     let category: CalendarEventCategory
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             row(label: "Type", value: category.label)
             if let recurrence = recurrenceLabel(event.recurrenceRule) {
                 divider
@@ -462,7 +462,7 @@ private struct AttendeesSection: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.Color.appText)
             }
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(Array(ids.enumerated()), id: \.element) { index, id in
                     let name = nameLookup[id] ?? "Member"
                     AttendeeRow(name: name, initials: initials(for: name))

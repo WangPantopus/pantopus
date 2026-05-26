@@ -138,7 +138,7 @@ private fun GigsTopBar(
             Modifier
                 .fillMaxWidth()
                 .background(PantopusColors.appBg)
-                .padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 4.dp)
+                .padding(start = Spacing.s4, end = Spacing.s2, top = 10.dp, bottom = Spacing.s1)
                 .testTag("gigsTopBar"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -207,7 +207,7 @@ private fun GigsViewModeSegment(
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(if (active) PantopusColors.primary600 else Color.Transparent)
                 .clickable(onClick = onClick)
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = Spacing.s3)
                 .height(32.dp)
                 .testTag("gigsViewMode_${label.lowercase()}")
                 .semantics { contentDescription = if (active) "$label view, selected" else "$label view" },
@@ -236,7 +236,7 @@ private fun GigsSearchBar(onOpenSearch: () -> Unit) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s1)
                 .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurfaceSunken)
                 .clickable(onClick = onOpenSearch)
@@ -272,9 +272,9 @@ internal fun GigsCategoryChipRow(
             Modifier
                 .fillMaxWidth()
                 .horizontalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
                 .testTag("gigsChipRow"),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         GigsCategory.entries.forEach { category ->
@@ -318,7 +318,7 @@ private fun GigsSortFilterRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp)
+                .padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s1, bottom = 10.dp)
                 .testTag("gigsSortFilterRow"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -427,7 +427,7 @@ internal fun EmptyFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(Spacing.s6)
                 .testTag("gigsFeedEmpty"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -473,7 +473,7 @@ internal fun EmptyFrame(
                     .heightIn(min = 44.dp)
                     .testTag("gigsEmptyPostTask"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             PantopusIconImage(
                 icon = PantopusIcon.Pencil,
@@ -511,7 +511,7 @@ private fun RadiusHintPill(radiusMiles: Double) {
                 .padding(horizontal = 14.dp, vertical = 10.dp)
                 .testTag("gigsEmptyRadiusPill"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.MapPin,
@@ -548,8 +548,8 @@ internal fun PopulatedFrame(
             Modifier
                 .fillMaxSize()
                 .testTag("gigsFeedList"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 110.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(start = Spacing.s4, end = Spacing.s4, top = Spacing.s1, bottom = 110.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         items(items = rows, key = { it.id }) { row ->
             GigRow(content = row, onTap = { onOpenGig(row.id) })
@@ -566,17 +566,17 @@ internal fun GigRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .clickable(onClick = onTap)
-                .padding(16.dp)
+                .padding(Spacing.s4)
                 .testTag("gigsRow_${content.id}"),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             CategoryChip(category = content.category)
             if (content.metaLine.isNotEmpty()) {
@@ -655,7 +655,7 @@ private fun CategoryChip(category: GigsCategory) {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(category.color.copy(alpha = 0.12f))
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .padding(horizontal = Spacing.s2, vertical = 2.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -675,9 +675,9 @@ private fun BidPill(count: Int) {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.warningBg)
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .padding(horizontal = Spacing.s2, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.Gavel,
@@ -702,7 +702,7 @@ private fun BeTheFirstPill() {
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.primary50)
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .padding(horizontal = Spacing.s2, vertical = 2.dp),
     ) {
         Text(
             text = "Be the first",
@@ -722,7 +722,7 @@ private fun ErrorFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(Spacing.s6)
                 .testTag("gigsFeedError"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

@@ -185,7 +185,7 @@ fun LoginScreen(
                     PantopusIconImage(
                         icon = PantopusIcon.ArrowRight,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         tint = PantopusColors.appTextInverse,
                     )
                 }
@@ -287,7 +287,7 @@ private fun EmailField(
             PantopusIconImage(
                 icon = PantopusIcon.AtSign,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextSecondary,
             )
             BasicTextField(
@@ -363,7 +363,7 @@ private fun PasswordFieldWithForgot(
             PantopusIconImage(
                 icon = PantopusIcon.Lock,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextSecondary,
             )
             BasicTextField(
@@ -405,7 +405,7 @@ private fun PasswordFieldWithForgot(
                 PantopusIconImage(
                     icon = PantopusIcon.Eye,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.appTextSecondary,
                 )
             }
@@ -423,7 +423,7 @@ fun AuthTrustFooter() {
         PantopusIconImage(
             icon = PantopusIcon.ShieldCheck,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = PantopusColors.appTextSecondary,
         )
         Text(

@@ -359,7 +359,7 @@ private fun EmptyBookletPageSwiper(modifier: Modifier = Modifier) {
             PantopusIconImage(
                 icon = PantopusIcon.FileText,
                 contentDescription = null,
-                size = 24.dp,
+                size = Radii.xl3,
                 tint = PantopusColors.appTextMuted,
             )
             Text(

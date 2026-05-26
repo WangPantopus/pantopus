@@ -29,7 +29,7 @@ public struct WizardShell<Content: View>: View {
 
     public var body: some View {
         let chrome = model.chrome
-        return VStack(spacing: 0) {
+        return VStack(spacing: Spacing.s0) {
             WizardTopBar(
                 title: chrome.title,
                 leading: chrome.leading,
@@ -70,7 +70,7 @@ public struct WizardShell<Content: View>: View {
     }
 
     private func stickyCTA(chrome: WizardChrome) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
             HStack(spacing: Spacing.s3) {
                 if let secondary = chrome.secondaryCTA {

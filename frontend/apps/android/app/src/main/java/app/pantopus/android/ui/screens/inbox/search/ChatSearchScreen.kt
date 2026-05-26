@@ -102,7 +102,7 @@ internal fun ChatSearchResultRow(
                     .fillMaxWidth()
                     .heightIn(min = 56.dp)
                     .background(PantopusColors.appSurface)
-                    .padding(horizontal = Spacing.s4, vertical = 12.dp),
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
@@ -178,7 +178,7 @@ private fun ResultAvatar(
                 PantopusIconImage(
                     icon = PantopusIcon.Check,
                     contentDescription = null,
-                    size = 8.dp,
+                    size = Radii.md,
                     strokeWidth = 3.5f,
                     tint = PantopusColors.appTextInverse,
                 )
@@ -207,7 +207,7 @@ private fun IdentityChip(chip: ConversationIdentityChip) {
         PantopusIconImage(
             icon = icon,
             contentDescription = null,
-            size = 8.dp,
+            size = Radii.md,
             strokeWidth = 2.6f,
             tint = foreground,
         )

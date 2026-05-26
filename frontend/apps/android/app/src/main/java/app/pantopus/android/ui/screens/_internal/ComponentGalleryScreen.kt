@@ -44,6 +44,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.PantopusTheme
+import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /** Test tag on the root gallery container — used by Paparazzi / UI tests. */
@@ -162,7 +163,7 @@ private fun LazyListScope.verifiedBadgeSection() {
     item {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
             VerifiedBadge()
-            VerifiedBadge(size = 20.dp)
+            VerifiedBadge(size = Radii.xl2)
             VerifiedBadge(size = 28.dp)
         }
     }

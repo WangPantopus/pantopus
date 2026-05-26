@@ -83,7 +83,7 @@ public struct ListingDetailView: View {
     }
 
     private var offerSheet: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Spacing.s4) {
             Text("Make an offer")
                 .font(.system(size: 18, weight: .bold))
             Text("Send the seller a message with your offer. Pickup details get worked out in chat.")
@@ -114,13 +114,13 @@ public struct ListingDetailView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
                     .background(Theme.Color.primary600)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             }
             .buttonStyle(.plain)
             .disabled(offerMessage.isEmpty)
             .accessibilityIdentifier("listingDetailSendOffer")
         }
-        .padding(20)
+        .padding(Spacing.s5)
         .presentationDetents([.medium])
     }
 }

@@ -349,7 +349,7 @@ public struct PulseComposeContent: View {
             Text("Type")
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
-            HStack(spacing: 0) {
+            HStack(spacing: Spacing.s0) {
                 ForEach(PulseLostFoundKind.allCases, id: \.rawValue) { kind in
                     Button { actions.onSelectLostFoundKind(kind) } label: {
                         Text(kind.rawValue.capitalized)

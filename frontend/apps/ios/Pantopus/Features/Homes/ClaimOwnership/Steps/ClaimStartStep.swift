@@ -174,11 +174,12 @@ private struct ClaimantChip: View {
 
 private struct WhyWeAskSection: View {
     @Binding var isExpanded: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             Button {
-                withAnimation(.snappy(duration: 0.2)) {
+                withPantopusAnimation(.componentState, reduceMotion: reduceMotion) {
                     isExpanded.toggle()
                 }
             } label: {
@@ -197,7 +198,7 @@ private struct WhyWeAskSection: View {
                             .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                     Icon(
                         isExpanded ? .chevronUp : .chevronDown,
                         size: 16,
@@ -218,7 +219,7 @@ private struct WhyWeAskSection: View {
                 )
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextStrong)
-                .padding(.leading, 40)
+                .padding(.leading, Spacing.s10)
                 .accessibilityIdentifier("claimOwnershipWhyWeAskDetail")
             }
         }

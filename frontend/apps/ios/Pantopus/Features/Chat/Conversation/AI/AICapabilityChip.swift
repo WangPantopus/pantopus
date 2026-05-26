@@ -29,7 +29,7 @@ public struct AICapabilityChip: View {
                     .foregroundStyle(Theme.Color.appTextStrong)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .padding(.horizontal, 10)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)

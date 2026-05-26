@@ -286,7 +286,7 @@ private fun CategoryPicker(
                             onClick = { onSelect(category) },
                         )
                     }
-                    if (row.size < 3) Spacer(modifier = Modifier.width(0.dp))
+                    if (row.size < 3) Spacer(modifier = Modifier.width(Spacing.s0))
                 }
             }
         }

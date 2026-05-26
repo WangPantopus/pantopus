@@ -18,9 +18,9 @@ struct ReviewClaimEvidenceList: View {
             HStack(spacing: Spacing.s2) {
                 Icon(.alertCircle, size: 20, color: Theme.Color.warning)
                 Text("No documents uploaded yet")
-                    .font(.system(size: 14))
+                    .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.warning)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .padding(Spacing.s3)
             .background(Theme.Color.warningBg)
@@ -53,7 +53,7 @@ private struct ReviewClaimEvidenceRow: View {
                     .lineLimit(1)
                 if let name = item.fileName, !name.isEmpty {
                     Text(name)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(1)
                 }
@@ -61,7 +61,7 @@ private struct ReviewClaimEvidenceRow: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextMuted)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             if let urlString = item.fileURL, let url = URL(string: urlString) {
                 Link(destination: url) {
                     Text("View")
@@ -203,7 +203,7 @@ struct ReviewClaimNoteCaptureSheet: View {
                 Text(title)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Button(action: onCancel) {
                     Icon(.x, size: 22, color: Theme.Color.appTextSecondary)
                 }
@@ -211,7 +211,7 @@ struct ReviewClaimNoteCaptureSheet: View {
                 .accessibilityLabel("Close")
             }
             Text(prompt)
-                .font(.system(size: 14))
+                .pantopusTextStyle(.small)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             TextEditor(text: $note)
                 .frame(minHeight: 120)

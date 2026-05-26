@@ -231,12 +231,12 @@ private struct HomeCard: View {
                     .compactMap { $0?.isEmpty == false ? $0 : nil }
                 if !extras.isEmpty {
                     Text(extras.joined(separator: ", "))
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(2)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s4)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -270,7 +270,7 @@ private struct ClaimantCard: View {
                     .lineLimit(1)
                 if let email = claimant?.email, !email.isEmpty {
                     Text(email)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(1)
                 }
@@ -280,7 +280,7 @@ private struct ClaimantCard: View {
                         .foregroundStyle(Theme.Color.appTextMuted)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s4)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -397,7 +397,7 @@ private struct GridTile: View {
     let danger: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
             Text(label)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.Color.appTextMuted)
@@ -428,7 +428,7 @@ private struct TerminalStateBanner: View {
             Text(message)
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.Color.appTextSecondary)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s3)
         .background(Theme.Color.appSurfaceSunken)

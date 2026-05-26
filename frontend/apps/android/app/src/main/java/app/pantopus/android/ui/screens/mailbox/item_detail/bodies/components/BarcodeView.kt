@@ -50,7 +50,7 @@ fun BarcodeView(
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
                 .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
                 .semantics { invisibleToUser() },
-        verticalArrangement = Arrangement.spacedBy(0.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s0),
     ) {
         Canvas(modifier = Modifier.fillMaxWidth().height(height)) {
             val totalUnits = widths.sum().toFloat().coerceAtLeast(1f)

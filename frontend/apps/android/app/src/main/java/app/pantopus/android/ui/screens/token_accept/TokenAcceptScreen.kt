@@ -39,6 +39,8 @@ import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 @Composable
 fun TokenAcceptScreen(
@@ -90,7 +92,7 @@ fun TokenAcceptScreen(
 private fun TopBar() {
     Column(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 12.dp),
+            modifier = Modifier.fillMaxWidth().height(52.dp).padding(horizontal = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Spacer(modifier = Modifier.size(36.dp))
@@ -112,12 +114,12 @@ private fun TopBar() {
 @Composable
 private fun LoadingFrame() {
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp).testTag("tokenAcceptLoading"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize().padding(Spacing.s4).testTag("tokenAcceptLoading"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Shimmer(width = 360.dp, height = 130.dp, cornerRadius = 14.dp)
-        Shimmer(width = 360.dp, height = 80.dp, cornerRadius = 12.dp)
-        Shimmer(width = 360.dp, height = 120.dp, cornerRadius = 12.dp)
+        Shimmer(width = 360.dp, height = 80.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 360.dp, height = 120.dp, cornerRadius = Radii.lg)
     }
 }
 
@@ -135,15 +137,15 @@ internal fun OfferBody(
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
         ) {
             HeaderCard(offer)
             RoleCard(offer)
             if (offer.benefits.isNotEmpty()) BenefitsCard(offer)
             SafetyBandRow(offer.safetyBand)
             offer.expiry?.let { ExpiryPill(text = it) }
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(Spacing.s8))
         }
         StickyCtas(offer = offer, submitting = submitting, onAccept = onAccept, onDecline = onDecline)
     }
@@ -158,8 +160,8 @@ private fun HeaderCard(offer: TokenAcceptOffer) {
                 .clip(RoundedCornerShape(14.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(14.dp))
-                .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(Spacing.s4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         InviteTypeChip(offer.inviteType)
         Text(
@@ -199,9 +201,9 @@ private fun InviteTypeChip(type: InviteType) {
     Box(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(bg)
-                .padding(horizontal = 8.dp, vertical = 3.dp)
+                .padding(horizontal = Spacing.s2, vertical = 3.dp)
                 .testTag("tokenAcceptTypeChip"),
     ) {
         Text(
@@ -219,9 +221,9 @@ private fun IdentityChip(chip: IdentityChipContent) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.primary50)
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .testTag("tokenAcceptIdentityChip"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -229,7 +231,7 @@ private fun IdentityChip(chip: IdentityChipContent) {
         PantopusIconImage(
             icon = PantopusIcon.User,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             strokeWidth = 2f,
             tint = PantopusColors.primary600,
         )
@@ -248,13 +250,13 @@ private fun RoleCard(offer: TokenAcceptOffer) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(14.dp)
                 .testTag("tokenAcceptRoleCard"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier =
@@ -267,7 +269,7 @@ private fun RoleCard(offer: TokenAcceptOffer) {
             PantopusIconImage(
                 icon = PantopusIcon.UserPlus,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 strokeWidth = 2f,
                 tint = PantopusColors.primary600,
             )
@@ -296,12 +298,12 @@ private fun BenefitsCard(offer: TokenAcceptOffer) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(14.dp)
                 .testTag("tokenAcceptBenefits"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Text(
             text = "WHAT YOU GET",
@@ -313,7 +315,7 @@ private fun BenefitsCard(offer: TokenAcceptOffer) {
         offer.benefits.forEach { benefit ->
             Row(
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 PantopusIconImage(
                     icon = PantopusIcon.Check,
@@ -341,7 +343,7 @@ private fun SafetyBandRow(band: SafetyBand) {
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
                 .background(PantopusColors.primary50)
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("tokenAcceptSafetyBand"),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -349,7 +351,7 @@ private fun SafetyBandRow(band: SafetyBand) {
         PantopusIconImage(
             icon = band.icon,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2f,
             tint = PantopusColors.primary600,
             modifier = Modifier.padding(top = 1.dp),
@@ -363,12 +365,12 @@ private fun ExpiryPill(text: String) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.warningBg)
                 .padding(horizontal = 10.dp, vertical = 6.dp)
                 .testTag("tokenAcceptExpiry"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.AlertCircle,
@@ -400,8 +402,8 @@ private fun StickyCtas(
                 Modifier
                     .fillMaxWidth()
                     .background(PantopusColors.appSurface)
-                    .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(Spacing.s4),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             Box(
                 modifier =
@@ -461,7 +463,7 @@ private fun AcceptedFrame(
     onDone: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp).testTag("tokenAcceptAccepted"),
+        modifier = Modifier.fillMaxSize().padding(Spacing.s5).testTag("tokenAcceptAccepted"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -477,7 +479,7 @@ private fun AcceptedFrame(
                 tint = PantopusColors.success,
             )
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Spacing.s3))
         Text(
             text = "You're in",
             fontSize = 20.sp,
@@ -490,7 +492,7 @@ private fun AcceptedFrame(
             fontSize = 13.5.sp,
             color = PantopusColors.appTextSecondary,
         )
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(Spacing.s5))
         DoneButton(onDone = onDone)
     }
 }
@@ -498,7 +500,7 @@ private fun AcceptedFrame(
 @Composable
 private fun DeclinedFrame(onDone: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp).testTag("tokenAcceptDeclined"),
+        modifier = Modifier.fillMaxSize().padding(Spacing.s5).testTag("tokenAcceptDeclined"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -509,7 +511,7 @@ private fun DeclinedFrame(onDone: () -> Unit) {
             strokeWidth = 2f,
             tint = PantopusColors.appTextSecondary,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         Text(
             text = "Invitation declined",
             fontSize = 18.sp,
@@ -522,7 +524,7 @@ private fun DeclinedFrame(onDone: () -> Unit) {
             fontSize = 13.sp,
             color = PantopusColors.appTextSecondary,
         )
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(Spacing.s5))
         DoneButton(onDone = onDone)
     }
 }
@@ -533,7 +535,7 @@ private fun ExpiredFrame(
     onDone: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp).testTag("tokenAcceptExpiredFrame"),
+        modifier = Modifier.fillMaxSize().padding(Spacing.s5).testTag("tokenAcceptExpiredFrame"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -544,7 +546,7 @@ private fun ExpiredFrame(
             strokeWidth = 2f,
             tint = PantopusColors.warning,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         Text(
             text = "Link no longer valid",
             fontSize = 18.sp,
@@ -553,7 +555,7 @@ private fun ExpiredFrame(
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(text = message, fontSize = 13.sp, color = PantopusColors.appTextSecondary)
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(Spacing.s5))
         DoneButton(onDone = onDone)
     }
 }
@@ -565,7 +567,7 @@ private fun ErrorFrame(
     onDone: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp).testTag("tokenAcceptError"),
+        modifier = Modifier.fillMaxSize().padding(Spacing.s5).testTag("tokenAcceptError"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -576,7 +578,7 @@ private fun ErrorFrame(
             strokeWidth = 2f,
             tint = PantopusColors.error,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         Text(
             text = "Couldn't load this invite",
             fontSize = 18.sp,
@@ -585,15 +587,15 @@ private fun ErrorFrame(
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(text = message, fontSize = 13.sp, color = PantopusColors.appTextSecondary)
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.s4))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(
                 modifier =
                     Modifier
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appSurfaceSunken)
                         .clickable(onClick = onDone)
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = Spacing.s4)
                         .height(36.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -602,10 +604,10 @@ private fun ErrorFrame(
             Box(
                 modifier =
                     Modifier
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.primary600)
                         .clickable(onClick = onRetry)
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = Spacing.s4)
                         .height(36.dp)
                         .testTag("tokenAcceptRetry"),
                 contentAlignment = Alignment.Center,
@@ -626,7 +628,7 @@ private fun DoneButton(onDone: () -> Unit) {
     Box(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.primary600)
                 .clickable(onClick = onDone)
                 .padding(horizontal = 22.dp)

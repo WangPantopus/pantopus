@@ -521,7 +521,7 @@ private fun MailboxMapTopPill(onBack: () -> Unit) {
                 .background(Color.White.copy(alpha = 0.96f))
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                 .shadow(elevation = 8.dp, shape = RoundedCornerShape(Radii.pill))
-                .padding(start = 6.dp, end = 8.dp, top = Spacing.s2, bottom = Spacing.s2)
+                .padding(start = 6.dp, end = Spacing.s2, top = Spacing.s2, bottom = Spacing.s2)
                 .testTag("mailboxMapPill"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -562,7 +562,7 @@ private fun MailboxMapTopPill(onBack: () -> Unit) {
                 tint = PantopusColors.appTextSecondary,
             )
         }
-        Spacer(modifier = Modifier.width(32.dp))
+        Spacer(modifier = Modifier.width(Spacing.s8))
     }
 }
 
@@ -869,16 +869,16 @@ private fun MailboxSpotCard(
         modifier =
             Modifier
                 .width(266.dp)
-                .clip(RoundedCornerShape(Radii.xl))
+                .clip(RoundedCornerShape(14.dp))
                 .background(PantopusColors.appSurface)
                 .border(
                     width = if (active) 2.dp else 1.dp,
                     color = if (active) PantopusColors.primary600 else PantopusColors.appBorder,
-                    shape = RoundedCornerShape(Radii.xl),
+                    shape = RoundedCornerShape(14.dp),
                 )
                 .shadow(
                     elevation = if (active) 6.dp else 2.dp,
-                    shape = RoundedCornerShape(Radii.xl),
+                    shape = RoundedCornerShape(14.dp),
                 )
                 .clickable(onClick = onTap)
                 .padding(Spacing.s3)
@@ -992,7 +992,7 @@ private fun KindTile(
         PantopusIconImage(
             icon = kind.glyph,
             contentDescription = null,
-            size = 20.dp,
+            size = Radii.xl2,
             strokeWidth = 2f,
             tint = PantopusColors.appTextInverse,
         )
@@ -1025,7 +1025,7 @@ private fun DirectionGlyphButton(
         PantopusIconImage(
             icon = PantopusIcon.Navigation,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2.2f,
             tint = if (active) PantopusColors.appTextInverse else PantopusColors.primary700,
         )
@@ -1151,9 +1151,9 @@ private fun LoadingRail() {
                 modifier =
                     Modifier
                         .width(266.dp)
-                        .clip(RoundedCornerShape(Radii.xl))
+                        .clip(RoundedCornerShape(14.dp))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(14.dp))
                         .padding(Spacing.s3),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1295,7 +1295,7 @@ private fun MailboxDetailPanel(
                 PantopusIconImage(
                     icon = PantopusIcon.Navigation,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     strokeWidth = 2.4f,
                     tint = PantopusColors.appTextInverse,
                 )

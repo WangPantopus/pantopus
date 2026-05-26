@@ -344,7 +344,7 @@ private struct BillHeader: View {
                         .fontWeight(.bold)
                         .foregroundStyle(Theme.Color.appText)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             StatusChip(chipText, variant: chipVariant, icon: chipIcon)
         }
@@ -364,7 +364,7 @@ private struct DetailGrid: View {
 
     var body: some View {
         let category = UtilityCategory.from(payee: bill.providerName)
-        return VStack(spacing: 0) {
+        return VStack(spacing: Spacing.s0) {
             row(label: "Category", value: category.label)
             divider
             row(label: "Status", value: bill.status.capitalized)
@@ -425,7 +425,7 @@ private struct SplitsSection: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.Color.appText)
             }
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(Array(splits.enumerated()), id: \.element.id) { index, split in
                     splitRow(split: split)
                     if index < splits.count - 1 {

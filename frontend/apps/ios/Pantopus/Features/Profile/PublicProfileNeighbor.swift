@@ -265,7 +265,7 @@ struct NeighborProfileLayout: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ContentDetailTopBar(
                     title: nil,
                     onBack: onBack,
@@ -275,7 +275,7 @@ struct NeighborProfileLayout: View {
                     ) { Task { @MainActor in onOverflow() } }
                 )
                 ScrollView {
-                    VStack(spacing: 0) {
+                    VStack(spacing: Spacing.s0) {
                         NeighborHeroCard(hero: content.hero)
                         NeighborStatStrip(stats: content.stats)
                         NeighborTabBar(tabs: content.tabs, selected: $selectedTab)
@@ -312,7 +312,7 @@ struct NeighborProfileLayout: View {
     // MARK: About
 
     private var aboutTab: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             NeighborSectionTitle("Bio")
             Text(content.bio ?? "No bio yet")
                 .font(.system(size: PantopusTextStyle.body.size))
@@ -339,7 +339,7 @@ struct NeighborProfileLayout: View {
 
     @ViewBuilder private var reviewsTab: some View {
         if content.reviews.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: Spacing.s0) {
                 NeighborReviewsEmptyCard(name: content.hero.name)
                     .padding(.top, Spacing.s3)
 
@@ -367,7 +367,7 @@ struct NeighborProfileLayout: View {
     // MARK: Verifications
 
     private var verificationsTab: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             NeighborSectionTitle("Verified attributes")
             NeighborVerificationLedger(items: content.verifications)
         }
@@ -401,7 +401,7 @@ struct NeighborHeroCard: View {
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.s3) {
             NeighborAvatar(initials: hero.initials, size: 72, isVerified: hero.isVerified)
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: Spacing.s0) {
                 Text(hero.name)
                     .font(.system(size: PantopusTextStyle.h3.size, weight: .bold))
                     .tracking(-0.4)
@@ -409,7 +409,7 @@ struct NeighborHeroCard: View {
                     .lineLimit(2)
                     .accessibilityAddTraits(.isHeader)
                 if let locality = hero.locality, !locality.isEmpty {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Spacing.s1) {
                         Icon(.mapPin, size: 11, color: Theme.Color.appTextSecondary)
                         Text(locality)
                             .font(.system(size: PantopusTextStyle.caption.size))
@@ -425,7 +425,7 @@ struct NeighborHeroCard: View {
                 }
                 .padding(.top, Spacing.s2)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, Spacing.s4)
         .padding(.top, Spacing.s4)
@@ -478,14 +478,14 @@ private struct NeighborIdentityChip: View {
     let identity: NeighborIdentity
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(.shieldCheck, size: 11, color: identity.foreground)
             Text(identity.label)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(identity.foreground)
         }
         .padding(.horizontal, 9)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(identity.background)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
         .accessibilityElement()
@@ -503,7 +503,7 @@ private struct NeighborKickerChip: View {
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(Theme.Color.appTextStrong)
             .padding(.horizontal, 9)
-            .padding(.vertical, 4)
+            .padding(.vertical, Spacing.s1)
             .background(Theme.Color.appSurfaceSunken)
             .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
             .accessibilityIdentifier("publicProfileNeighborKicker")
@@ -517,7 +517,7 @@ struct NeighborStatStrip: View {
     let stats: [NeighborStat]
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             ForEach(Array(stats.enumerated()), id: \.element.id) { index, stat in
                 if index > 0 {
                     Rectangle().fill(Theme.Color.appBorderSubtle).frame(width: 1, height: 32)
@@ -561,11 +561,11 @@ struct NeighborTabBar: View {
     @Binding var selected: NeighborProfileTab
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             ForEach(tabs, id: \.tab) { entry in
                 let isActive = entry.tab == selected
                 Button { selected = entry.tab } label: {
-                    VStack(spacing: 0) {
+                    VStack(spacing: Spacing.s0) {
                         HStack(spacing: 5) {
                             Text(entry.tab.label)
                                 .font(.system(size: 12.5, weight: isActive ? .bold : .semibold))
@@ -641,7 +641,7 @@ struct NeighborVerificationLedger: View {
     let items: [NeighborVerification]
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 HStack(spacing: Spacing.s3) {
                     Icon(item.icon, size: 14, color: tileForeground(item.tile))
@@ -656,7 +656,7 @@ struct NeighborVerificationLedger: View {
                             .font(.system(size: 10.5))
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                     trailing(item.trailing)
                 }
                 .padding(.horizontal, Spacing.s3)
@@ -748,7 +748,7 @@ struct NeighborReviewCard: View {
                         .font(.system(size: 10.5))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 HStack(spacing: 2) {
                     ForEach(0..<5) { idx in
                         Icon(.star, size: 12, color: idx < card.rating ? Theme.Color.warning : Theme.Color.appTextMuted)
@@ -841,7 +841,7 @@ struct NeighborMutualsStrip: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .lineLimit(1)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
         }
         .padding(Spacing.s3)
@@ -878,7 +878,7 @@ struct NeighborWelcomeCard: View {
                     .foregroundStyle(Theme.Color.appTextStrong)
                     .lineSpacing(2)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s3)
         .background(Theme.Color.primary50)
@@ -902,7 +902,7 @@ struct NeighborReportBlockRow: View {
     var body: some View {
         HStack(spacing: Spacing.s5) {
             Button(action: onReport) {
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Icon(.flag, size: 11, color: Theme.Color.appTextMuted)
                     Text("Report")
                         .font(.system(size: 11))
@@ -912,7 +912,7 @@ struct NeighborReportBlockRow: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("publicProfileNeighborReport")
             Button(action: onBlock) {
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Icon(.ban, size: 11, color: Theme.Color.appTextMuted)
                     Text("Block")
                         .font(.system(size: 11))

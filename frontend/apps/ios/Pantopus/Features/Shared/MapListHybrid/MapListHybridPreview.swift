@@ -49,7 +49,7 @@ public struct MapListHybridPreviewHost: View {
     private static let anchor = MapAnchor(latitude: 40.7484, longitude: -73.9857)
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             detentPicker
             MapListHybridShell(
                 pins: Self.samplePins,
@@ -102,7 +102,7 @@ public struct MapListHybridPreviewHost: View {
                     Text(label(for: stop))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(stop == detent ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, Spacing.s3)
                         .frame(height: 28)
                         .background(stop == detent ? Theme.Color.primary600 : Theme.Color.appSurface)
                         .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
@@ -134,19 +134,19 @@ public struct MapListHybridPreviewHost: View {
 
 private struct PreviewTopPill: View {
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             Button {} label: {
                 Icon(.chevronLeft, size: 18, strokeWidth: 2.2, color: Theme.Color.appText)
                     .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Back")
-            Spacer(minLength: 4)
+            Spacer(minLength: Spacing.s1)
             Text("Gigs")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 4)
+            Spacer(minLength: Spacing.s1)
             Button {} label: {
                 Icon(.slidersHorizontal, size: 16, strokeWidth: 2.2, color: Theme.Color.appText)
                     .frame(width: 32, height: 32)
@@ -155,7 +155,7 @@ private struct PreviewTopPill: View {
             .accessibilityLabel("Filters")
         }
         .padding(.horizontal, 6)
-        .padding(.vertical, 8)
+        .padding(.vertical, Spacing.s2)
         .background(.ultraThinMaterial)
         .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
         .clipShape(Capsule())
@@ -196,7 +196,7 @@ private struct PreviewCategoryChips: View {
                             .font(.system(size: 11.5, weight: .semibold))
                             .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, Spacing.s3)
                     .frame(height: 28)
                     .background(active ? entry.color : Color.white.opacity(0.96))
                     .overlay(Capsule().stroke(active ? .clear : Theme.Color.appBorder, lineWidth: 1))
@@ -212,7 +212,7 @@ private struct PreviewCategoryChips: View {
 
 private struct PreviewMapControls: View {
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s2) {
             controlButton(icon: .mapPin, label: "Locate me")
             controlButton(icon: .map, label: "Layers")
         }
@@ -242,7 +242,7 @@ private struct PreviewSheetHeader: View {
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 Text("Sort:")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.Color.appTextSecondary)
@@ -254,8 +254,8 @@ private struct PreviewSheetHeader: View {
             .accessibilityIdentifier("mapListHybridPreviewSort")
         }
         .padding(.horizontal, 18)
-        .padding(.top, 4)
-        .padding(.bottom, 12)
+        .padding(.top, Spacing.s1)
+        .padding(.bottom, Spacing.s3)
     }
 }
 
@@ -269,19 +269,19 @@ private struct PreviewSheetBody: View {
     var body: some View {
         switch detent {
         case .collapsed:
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 Icon(.chevronUp, size: 13, strokeWidth: 2.4, color: Theme.Color.appTextSecondary)
                 Text("Drag up to see the list")
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.s3)
             .frame(height: 36)
             .background(Theme.Color.appSurfaceSunken)
             .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             .clipShape(Capsule())
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.bottom, Spacing.s3)
             .contentShape(Rectangle())
             .onTapGesture { onExpand() }
             .accessibilityIdentifier("mapListHybridPreviewCollapsedPrompt")
@@ -296,12 +296,12 @@ private struct PreviewSheetBody: View {
                         .accessibilityIdentifier("mapListHybridPreviewCard_\(pin.id)")
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.bottom, Spacing.s3)
             }
         case .expanded:
             ScrollView {
-                LazyVStack(spacing: 0) {
+                LazyVStack(spacing: Spacing.s0) {
                     ForEach(pins) { pin in
                         Button { onSelect(pin.id) } label: {
                             PreviewRow(pin: pin, selected: pin.id == selectedPinId)
@@ -328,7 +328,7 @@ private struct PreviewCard: View {
                 Icon(.hammer, size: 22, color: .white)
             }
             .frame(width: 48, height: 48)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
                 Text("Sample task for pin \(pin.id)")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
@@ -339,7 +339,7 @@ private struct PreviewCard: View {
                     .foregroundStyle(Theme.Color.primary600)
             }
         }
-        .padding(12)
+        .padding(Spacing.s3)
         .frame(width: 240, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(
@@ -356,14 +356,14 @@ private struct PreviewRow: View {
     let selected: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.s3) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(LinearGradient(colors: [pin.color, pin.color.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing))
                 Icon(.hammer, size: 20, color: .white)
             }
             .frame(width: 44, height: 44)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
                 Text("Sample task for pin \(pin.id)")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
@@ -373,10 +373,10 @@ private struct PreviewRow: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.Color.primary600)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, Spacing.s3)
         .background(selected ? pin.color.opacity(0.06) : Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)

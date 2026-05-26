@@ -13,7 +13,7 @@ endif
 ENV_FILE        := .env
 SECRETS_XCCONFIG := Config/Secrets.xcconfig
 
-.PHONY: help bootstrap open build test lint format clean beta release validate-env env-to-xcconfig verify-icons
+.PHONY: help bootstrap open build test lint format clean beta release validate-env env-to-xcconfig verify-icons verify-tokens
 
 help:
 	@echo "Pantopus iOS — available targets:"
@@ -83,7 +83,7 @@ test: bootstrap
 		-configuration Debug \
 		test
 
-lint: verify-icons
+lint: verify-icons verify-tokens
 	@command -v swiftlint >/dev/null 2>&1 || { echo >&2 "Install SwiftLint: brew install swiftlint"; exit 1; }
 	swiftlint lint
 
@@ -91,6 +91,13 @@ lint: verify-icons
 # Lucide icon name outside the PantopusIcon enum. Wired into `make lint`.
 verify-icons:
 	@bash Pantopus/scripts/verify-icons.sh
+
+# Fails the build if feature code uses a raw hex color or an on-scale
+# spacing / radius literal instead of the design-system token. Off-scale
+# literals are NOT flagged — those are explicit design decisions logged
+# in docs/token-drift-{color,spacing,radii}.md. Wired into `make lint`.
+verify-tokens:
+	@bash Pantopus/scripts/verify-tokens.sh
 
 format:
 	@command -v swiftformat >/dev/null 2>&1 || { echo >&2 "Install SwiftFormat: brew install swiftformat"; exit 1; }

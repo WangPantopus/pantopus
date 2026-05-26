@@ -59,14 +59,14 @@ fun ActionChip(
                 .heightIn(min = 36.dp)
                 .pantopusShadow(
                     if (isActive) PantopusElevations.primary else PantopusElevations.sm,
-                    shape = RoundedCornerShape(Radii.pill),
-                ).clip(RoundedCornerShape(Radii.pill))
+                    shape = RoundedCornerShape(Radii.lg),
+                ).clip(RoundedCornerShape(Radii.lg))
                 .background(bg)
                 .then(
                     if (border == Color.Transparent) {
                         Modifier
                     } else {
-                        Modifier.border(1.dp, border, RoundedCornerShape(Radii.pill))
+                        Modifier.border(1.dp, border, RoundedCornerShape(Radii.lg))
                     },
                 ).clickable(onClick = onClick)
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s1)
@@ -78,7 +78,7 @@ fun ActionChip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 16.dp, tint = fg)
+        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.xl, tint = fg)
         Text(text = label, style = PantopusTextStyle.small, color = fg)
     }
 }

@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 @Composable
 fun ListingDetailScreen(
@@ -112,8 +114,8 @@ private fun OfferSheetContent(onSubmit: (Double?, String) -> Unit) {
     var amountField by remember { mutableStateOf(TextFieldValue("")) }
     var messageField by remember { mutableStateOf(TextFieldValue("")) }
     Column(
-        modifier = Modifier.fillMaxWidth().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(Spacing.s5),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Text(text = "Make an offer", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
         Text(
@@ -138,13 +140,13 @@ private fun OfferSheetContent(onSubmit: (Double?, String) -> Unit) {
             maxLines = 4,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(Spacing.s1))
         val canSubmit = messageField.text.isNotEmpty()
         Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(if (canSubmit) PantopusColors.primary600 else PantopusColors.appBorder)
                     .clickable(enabled = canSubmit) {
                         onSubmit(amountField.text.toDoubleOrNull(), messageField.text)
@@ -154,6 +156,6 @@ private fun OfferSheetContent(onSubmit: (Double?, String) -> Unit) {
         ) {
             Text(text = "Send", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)
         }
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(Spacing.s5))
     }
 }

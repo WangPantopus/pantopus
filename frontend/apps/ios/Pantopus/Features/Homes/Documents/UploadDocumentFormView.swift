@@ -437,7 +437,7 @@ private struct TagChip: View {
     let onRemove: () -> Void
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Text(tag)
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appText)
@@ -447,7 +447,7 @@ private struct TagChip: View {
             .accessibilityLabel("Remove tag \(tag)")
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(Theme.Color.appSurface)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
         .overlay(
@@ -542,7 +542,7 @@ private struct LinkedEntityPickerSheet: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             HStack {
                 Text("Link to…")
                     .pantopusTextStyle(.h3)

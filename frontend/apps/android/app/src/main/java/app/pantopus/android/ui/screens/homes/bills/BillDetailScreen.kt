@@ -200,7 +200,7 @@ private fun LoadedShell(
                     PantopusIconImage(
                         icon = PantopusIcon.Pencil,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         tint = PantopusColors.primary600,
                     )
                     Text(
@@ -221,7 +221,7 @@ private fun LoadedShell(
                     PantopusIconImage(
                         icon = PantopusIcon.Trash2,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         tint = PantopusColors.error,
                     )
                     Text(
@@ -288,7 +288,7 @@ private fun BillHeader(
                 PantopusIconImage(
                     icon = model.category.icon,
                     contentDescription = null,
-                    size = 24.dp,
+                    size = Radii.xl3,
                     tint = model.category.foreground,
                 )
             }
@@ -394,7 +394,7 @@ private fun SplitsSection(splits: List<BillSplitDto>) {
             PantopusIconImage(
                 icon = PantopusIcon.Users,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.primary600,
             )
             Text(

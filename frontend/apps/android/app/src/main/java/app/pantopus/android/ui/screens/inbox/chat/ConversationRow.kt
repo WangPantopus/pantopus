@@ -36,6 +36,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 @Composable
 fun ConversationRow(
@@ -51,7 +52,7 @@ fun ConversationRow(
                     if (content.pinned) PantopusColors.primary50.copy(alpha = 0.5f) else PantopusColors.appSurface,
                 )
                 .clickable(onClick = onTap)
-                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .padding(horizontal = Spacing.s4, vertical = 14.dp)
                 .semantics(mergeDescendants = true) {
                     contentDescription = buildA11yLabel(content)
                 }
@@ -70,7 +71,7 @@ fun ConversationRow(
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             Avatar(content)
             Middle(content, modifier = Modifier.weight(1f))
@@ -248,13 +249,13 @@ private fun IdentityDisclosureChip(chip: ConversationIdentityChip) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(Radii.xs))
                 .background(bg)
                 .padding(horizontal = 6.dp, vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 8.dp, tint = fg)
+        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.md, tint = fg)
         Text(
             text = chip.label.uppercase(),
             fontSize = 9.sp,

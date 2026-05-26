@@ -29,7 +29,7 @@ struct PublicProfileBanner: View {
     let kind: PublicProfileKind
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle()
                 .fill(fillColor)
                 .frame(height: Spacing.s16)
@@ -110,25 +110,25 @@ struct PublicProfileBroadcastCard: View {
             if let visibility = post.visibility {
                 VisibilityChip(visibility: visibility)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
     }
 
     private var reactionsRow: some View {
         HStack(spacing: Spacing.s3) {
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 Icon(.heart, size: 13, color: Theme.Color.appTextSecondary)
                 Text("\(post.reactions)")
                     .font(.system(size: PantopusTextStyle.caption.size))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 Icon(.messageCircle, size: 13, color: Theme.Color.appTextSecondary)
                 Text("\(post.replies)")
                     .font(.system(size: PantopusTextStyle.caption.size))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Icon(.bookmark, size: 13, color: Theme.Color.appTextSecondary)
         }
         .padding(.top, Spacing.s1)
@@ -283,7 +283,7 @@ struct PublicProfileLocalPostCard: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             if let intent = post.intent {
                 IntentChip(intent: intent)
             }
@@ -292,19 +292,19 @@ struct PublicProfileLocalPostCard: View {
 
     private var reactionsRow: some View {
         HStack(spacing: Spacing.s3) {
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 Icon(.lightbulb, size: 13, color: Theme.Color.appTextSecondary)
                 Text("\(post.reactions)")
                     .font(.system(size: PantopusTextStyle.caption.size))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 Icon(.messageCircle, size: 13, color: Theme.Color.appTextSecondary)
                 Text("\(post.replies)")
                     .font(.system(size: PantopusTextStyle.caption.size))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Icon(.share, size: 13, color: Theme.Color.appTextSecondary)
         }
         .padding(.top, Spacing.s1)

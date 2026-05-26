@@ -66,7 +66,7 @@ private struct StartSupportTrainErrorBanner: View {
     let message: String
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Icon(.alertCircle, size: 14, color: Theme.Color.error)
             Text(message)
                 .font(.system(size: 12, weight: .medium))
@@ -153,19 +153,19 @@ private struct StartSupportTrainWhoAndWhyStep: View {
     }
 
     private var searchField: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Icon(.search, size: 14, color: Theme.Color.appTextSecondary)
             TextField("Search by name or username", text: Binding(
                 get: { viewModel.beneficiaryQuery },
                 set: { viewModel.updateBeneficiaryQuery($0) }
             ))
-            .font(.system(size: 14))
+            .font(Theme.Font.small)
             .accessibilityIdentifier("startSupportTrainBeneficiaryField")
             if viewModel.isSearchingBeneficiary {
                 ProgressView().scaleEffect(0.7)
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 44)
         .background(Theme.Color.appSurface)
         .overlay(
@@ -176,7 +176,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
     }
 
     private var resultList: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ForEach(Array(viewModel.beneficiaryResults.enumerated()), id: \.element.id) { index, recipient in
                 Button {
                     viewModel.selectBeneficiary(recipient)
@@ -197,7 +197,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                         Spacer()
                         Icon(.chevronRight, size: 14, color: Theme.Color.appTextSecondary)
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, Spacing.s3)
                     .padding(.vertical, 10)
                 }
                 .buttonStyle(.plain)
@@ -206,7 +206,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                     Rectangle()
                         .fill(Theme.Color.appBorder)
                         .frame(height: 1)
-                        .padding(.leading, 12)
+                        .padding(.leading, Spacing.s3)
                 }
             }
         }
@@ -219,7 +219,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
     }
 
     private func verifiedRecipientCard(_ recipient: MailRecipientDTO) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.s3) {
             ZStack {
                 Circle()
                     .fill(Theme.Color.personalBg)
@@ -252,7 +252,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                 Text(recipient.homeAddress ?? "Verified neighbor")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextSecondary)
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Icon(.users, size: 10, color: Theme.Color.appTextMuted)
                     Text("3 mutual friends on your block")
                         .font(.system(size: 10))
@@ -271,7 +271,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
             .accessibilityLabel("Change recipient")
             .accessibilityIdentifier("startSupportTrainChangeRecipient")
         }
-        .padding(12)
+        .padding(Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
@@ -282,7 +282,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
     }
 
     private var inviteRecipientCard: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             HStack(spacing: 10) {
                 Icon(.search, size: 14, color: Theme.Color.appTextMuted)
                 Text(viewModel.beneficiaryQuery)
@@ -298,8 +298,8 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                 .accessibilityLabel("Clear recipient search")
                 .accessibilityIdentifier("startSupportTrainClearInviteSearch")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, Spacing.s2)
 
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
 
@@ -318,7 +318,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.Color.warningBg)
 
@@ -375,7 +375,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                     color: viewModel.inviteMethod == method ? Theme.Color.primary600 : Theme.Color.appTextMuted
                 )
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.plain)
@@ -419,7 +419,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                     .foregroundStyle(isSelected ? Theme.Color.warning : Theme.Color.appText)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .frame(minHeight: 56)
             .background(isSelected ? Theme.Color.warningBg : Theme.Color.appSurface)
             .overlay(
@@ -434,14 +434,14 @@ private struct StartSupportTrainWhoAndWhyStep: View {
 
     private var contextNoteSection: some View {
         LabeledField("SHORT NOTE") {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Spacing.s2) {
                 ZStack(alignment: .topLeading) {
                     if viewModel.reason.isEmpty {
                         Text("Add a few details so neighbors know what kind of help fits.")
                             .font(.system(size: 13))
                             .foregroundStyle(Theme.Color.appTextMuted)
-                            .padding(.top, 8)
-                            .padding(.leading, 4)
+                            .padding(.top, Spacing.s2)
+                            .padding(.leading, Spacing.s1)
                     }
                     TextEditor(text: Binding(
                         get: { viewModel.reason },
@@ -451,7 +451,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                     .scrollContentBackground(.hidden)
                     .accessibilityIdentifier("startSupportTrainReasonField")
                 }
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Icon(.lock, size: 10, color: Theme.Color.appTextMuted)
                     Text("Shared only with people you invite")
                         .font(.system(size: 10))
@@ -463,7 +463,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                         .accessibilityIdentifier("startSupportTrainReasonRemaining")
                 }
             }
-            .padding(8)
+            .padding(Spacing.s2)
             .background(Theme.Color.appSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
@@ -474,7 +474,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
     }
 
     private var privacySection: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             privacyToggleRow(
                 icon: .usersRound,
                 title: "Invite only",
@@ -539,7 +539,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
                 .accessibilityLabel(title)
                 .accessibilityIdentifier(identifier)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .padding(.vertical, 10)
     }
 
@@ -555,7 +555,7 @@ private struct StartSupportTrainWhoAndWhyStep: View {
             .foregroundStyle(Theme.Color.appTextStrong)
             .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(12)
+        .padding(Spacing.s3)
         .background(Theme.Color.appSurfaceSunken)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("startSupportTrainInvitePrivacyHint")
@@ -580,7 +580,7 @@ private struct SupportTrainChip: View {
                 .kerning(0.4)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(Theme.Color.warningBg)
         .clipShape(Capsule())
         .accessibilityIdentifier("startSupportTrainChip")
@@ -601,9 +601,9 @@ private struct SupportTrainStepRail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             OverlineLabel(text: "YOU'RE ON STEP \(current) OF 5")
-            HStack(alignment: .top, spacing: 4) {
+            HStack(alignment: .top, spacing: Spacing.s1) {
                 ForEach(Array(steps.enumerated()), id: \.element.0) { index, step in
-                    VStack(spacing: 4) {
+                    VStack(spacing: Spacing.s1) {
                         ZStack {
                             Circle()
                                 .fill(step.0 <= current ? Theme.Color.warning : Theme.Color.appSurfaceSunken)
@@ -630,7 +630,7 @@ private struct SupportTrainStepRail: View {
                     }
                 }
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .background(Theme.Color.appSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
@@ -680,7 +680,7 @@ private struct StartSupportTrainWhatAndWhenStep: View {
         return Button {
             viewModel.selectKind(value)
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 Icon(
                     value.icon,
                     size: 16,
@@ -691,7 +691,7 @@ private struct StartSupportTrainWhatAndWhenStep: View {
                     .foregroundStyle(isSelected ? Theme.Color.primary700 : Theme.Color.appText)
                 Spacer()
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.s3)
             .frame(height: 44)
             .background(isSelected ? Theme.Color.primary50 : Theme.Color.appSurface)
             .overlay(
@@ -709,7 +709,7 @@ private struct StartSupportTrainWhatAndWhenStep: View {
 
     private var dateRangeSection: some View {
         LabeledField("DATES") {
-            VStack(spacing: 8) {
+            VStack(spacing: Spacing.s2) {
                 dateRow(
                     label: "Starts",
                     date: Binding(
@@ -761,7 +761,7 @@ private struct StartSupportTrainWhatAndWhenStep: View {
             .labelsHidden()
             .accessibilityIdentifier(identifier)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 48)
         .background(Theme.Color.appSurface)
         .overlay(
@@ -774,7 +774,7 @@ private struct StartSupportTrainWhatAndWhenStep: View {
     private var slotDurationSection: some View {
         LabeledField("SLOT LENGTH") {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     ForEach(StartSupportTrainSlotDuration.allCases) { option in
                         let isActive = viewModel.slotDuration == option
                         Button {
@@ -785,7 +785,7 @@ private struct StartSupportTrainWhatAndWhenStep: View {
                                 .foregroundStyle(
                                     isActive ? Theme.Color.appTextInverse : Theme.Color.appTextStrong
                                 )
-                                .padding(.horizontal, 12)
+                                .padding(.horizontal, Spacing.s3)
                                 .frame(height: 32)
                                 .background(isActive ? Theme.Color.primary600 : Theme.Color.appSurface)
                                 .overlay(
@@ -864,7 +864,7 @@ private struct StartSupportTrainReviewStep: View {
 
     private var slotGridSection: some View {
         LabeledField("SLOT GRID") {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 if viewModel.generatedSlots.isEmpty {
                     Text("Pick a date range to generate slots.")
                         .font(.system(size: 13))
@@ -894,7 +894,7 @@ private struct StartSupportTrainReviewStep: View {
     }
 
     private func slotRow(_ slot: StartSupportTrainSlot) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.s3) {
             ZStack {
                 RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
                     .fill(Theme.Color.primary50)
@@ -914,7 +914,7 @@ private struct StartSupportTrainReviewStep: View {
                 .font(.system(size: 10, weight: .bold))
                 .kerning(0.4)
                 .foregroundStyle(Theme.Color.appTextSecondary)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Spacing.s2)
                 .padding(.vertical, 3)
                 .background(Theme.Color.appSurfaceSunken)
                 .clipShape(Capsule())
@@ -940,12 +940,12 @@ private struct StartSupportTrainReviewStep: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
                 Text("Helpers can leave a note when they sign up.")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
         .tint(Theme.Color.primary600)
-        .padding(12)
+        .padding(Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
@@ -958,7 +958,7 @@ private struct StartSupportTrainReviewStep: View {
     private var visibilitySection: some View {
         VStack(alignment: .leading, spacing: 6) {
             OverlineLabel(text: "VISIBILITY")
-            VStack(spacing: 8) {
+            VStack(spacing: Spacing.s2) {
                 ForEach(StartSupportTrainVisibility.allCases) { option in
                     visibilityRow(option)
                 }
@@ -971,7 +971,7 @@ private struct StartSupportTrainReviewStep: View {
         return Button {
             viewModel.selectVisibility(option)
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 ZStack {
                     Circle()
                         .stroke(
@@ -993,12 +993,12 @@ private struct StartSupportTrainReviewStep: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                     Text(option.subtitle)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 Spacer()
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .background(isSelected ? Theme.Color.primary50 : Theme.Color.appSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.md, style: .continuous)

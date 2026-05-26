@@ -253,7 +253,7 @@ private fun CategoryField(
                 PantopusIconImage(
                     icon = PantopusIcon.ChevronDown,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.appTextSecondary,
                 )
             }
@@ -474,7 +474,7 @@ private fun DateField(
             PantopusIconImage(
                 icon = PantopusIcon.Calendar,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextSecondary,
             )
             Text(
@@ -622,7 +622,7 @@ private fun PhotoTile(
         PantopusIconImage(
             icon = PantopusIcon.Image,
             contentDescription = null,
-            size = 20.dp,
+            size = Radii.xl2,
             tint = PantopusColors.appTextSecondary,
             modifier = Modifier.align(Alignment.Center),
         )
@@ -656,7 +656,7 @@ private fun PhotoTile(
             PantopusIconImage(
                 icon = PantopusIcon.X,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = PantopusColors.appTextInverse,
             )
         }
@@ -873,7 +873,12 @@ private fun PostGigV1FatalError(
                 tint = PantopusColors.error,
             )
         }
-        Text(text = "Quick post unavailable", style = PantopusTextStyle.h3, color = PantopusColors.appText)
+        Text(
+            text = "Quick post unavailable",
+            style = PantopusTextStyle.h3,
+            color = PantopusColors.appText,
+            modifier = Modifier.semantics { heading() },
+        )
         Text(text = message, style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary)
         Text(
             text = "Retry",

@@ -132,7 +132,7 @@ fun FeedComposeFAB(
         PantopusIconImage(
             icon = PantopusIcon.Pencil,
             contentDescription = null,
-            size = 20.dp,
+            size = Radii.xl2,
             tint = PantopusColors.appTextInverse,
         )
     }
@@ -151,30 +151,30 @@ fun FeedSkeletonCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .clip(RoundedCornerShape(Radii.xl))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
                 .padding(Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            Shimmer(width = 32.dp, height = 32.dp, cornerRadius = 16.dp)
+            Shimmer(width = 32.dp, height = 32.dp, cornerRadius = Radii.xl)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Shimmer(width = 110.dp, height = 10.dp, cornerRadius = 4.dp)
-                Shimmer(width = 70.dp, height = 8.dp, cornerRadius = 4.dp)
+                Shimmer(width = 110.dp, height = 10.dp, cornerRadius = Radii.xs)
+                Shimmer(width = 70.dp, height = 8.dp, cornerRadius = Radii.xs)
             }
             Shimmer(width = 42.dp, height = 16.dp, cornerRadius = Radii.pill)
         }
         if (withTitle) {
-            Shimmer(width = 200.dp, height = 11.dp, cornerRadius = 4.dp)
+            Shimmer(width = 200.dp, height = 11.dp, cornerRadius = Radii.xs)
         }
-        Shimmer(width = 320.dp, height = 9.dp, cornerRadius = 4.dp)
-        Shimmer(width = 280.dp, height = 9.dp, cornerRadius = 4.dp)
+        Shimmer(width = 320.dp, height = 9.dp, cornerRadius = Radii.xs)
+        Shimmer(width = 280.dp, height = 9.dp, cornerRadius = Radii.xs)
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Shimmer(width = 56.dp, height = 10.dp, cornerRadius = 4.dp)
-            Shimmer(width = 56.dp, height = 10.dp, cornerRadius = 4.dp)
+            Shimmer(width = 56.dp, height = 10.dp, cornerRadius = Radii.xs)
+            Shimmer(width = 56.dp, height = 10.dp, cornerRadius = Radii.xs)
             Spacer(modifier = Modifier.weight(1f))
-            Shimmer(width = 42.dp, height = 10.dp, cornerRadius = 4.dp)
+            Shimmer(width = 42.dp, height = 10.dp, cornerRadius = Radii.xs)
         }
     }
 }

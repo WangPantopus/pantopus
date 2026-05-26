@@ -121,7 +121,7 @@ private fun AcceptedBanner() {
             PantopusIconImage(
                 icon = PantopusIcon.Check,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = PantopusColors.appTextInverse,
             )
         }

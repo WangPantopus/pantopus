@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 /**
  * Small green-check badge pinned to an avatar corner.
@@ -55,9 +57,9 @@ fun VerifiedBadge(
 @Preview(showBackground = true, widthDp = 200, heightDp = 60)
 @Composable
 private fun VerifiedBadgePreview() {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.background(Color.White)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.background(Color.White)) {
         VerifiedBadge()
-        VerifiedBadge(size = 20.dp)
+        VerifiedBadge(size = Radii.xl2)
         VerifiedBadge(size = 28.dp)
     }
 }

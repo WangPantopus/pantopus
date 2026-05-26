@@ -26,7 +26,7 @@ struct AuthErrorView: View {
     var body: some View {
         let copy = AuthErrorViewModel.copy(for: error)
         VStack(spacing: Spacing.s5) {
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Icon(.alertCircle, size: 56, color: Theme.Color.error)
                 .padding(.bottom, Spacing.s2)
                 .accessibilityHidden(true)
@@ -44,7 +44,7 @@ struct AuthErrorView: View {
                     .padding(.horizontal, Spacing.s5)
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
 
             VStack(spacing: Spacing.s2) {
                 if let onRetry, viewModel.isRetryable(error) {

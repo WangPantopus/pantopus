@@ -115,7 +115,7 @@ fun PantopusTextField(
                 Box(
                     modifier =
                         Modifier
-                            .padding(start = 4.dp)
+                            .padding(start = Spacing.s1)
                             .size(6.dp)
                             .background(PantopusColors.warning, CircleShape),
                 )

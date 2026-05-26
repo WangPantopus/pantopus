@@ -262,6 +262,156 @@ tasks.register<VerifyPantopusIconsTask>("verifyPantopusIcons") {
 }
 tasks.named("check") { dependsOn("verifyPantopusIcons") }
 
+/**
+ * Fail the build when feature code uses an untokenised literal that has
+ * a design-system equivalent — catches the three regression categories
+ * the P7.* audits cleaned up:
+ *
+ *   1. Hex `Color(0x…)` in `ui/screens/` or `ui/components/`, except in
+ *      palette modules (per docs/token-drift-color.md DESIGN REVIEW list).
+ *   2. On-scale `.padding(N.dp)`, `<edge> = N.dp`, `Arrangement.spacedBy(N.dp)`,
+ *      and `Spacer(Modifier.height|width(N.dp))` where Spacing.s<N> exists
+ *      (N ∈ 0/4/8/12/16/20/24/32/40/48/64).
+ *   3. On-scale `RoundedCornerShape(N.dp)`, per-corner `<corner> = N.dp`,
+ *      and custom `cornerRadius = N.dp` where Radii.<name> exists
+ *      (N ∈ 4/6/8/12/16/20/24/999/9999).
+ *
+ * Off-scale literals are NOT flagged — those are intentional design
+ * decisions tracked in docs/token-drift-{color,spacing,radii}.md.
+ */
+abstract class VerifyPantopusTokensTask : DefaultTask() {
+    @get:InputFiles
+    abstract val sources: ConfigurableFileCollection
+
+    @get:Internal
+    abstract val rootDirectory: DirectoryProperty
+
+    @TaskAction
+    fun verify() {
+        // Palette modules whose entire purpose is centralising a bespoke
+        // per-category swatch. Keep this list short — every addition is
+        // a hex-literal escape hatch.
+        val hexExempt =
+            setOf(
+                "ui/components/Shimmer.kt",
+                "ui/screens/ceremonial_mail_open/CeremonialMailOpenContent.kt",
+                "ui/screens/ceremonial_mail_open/CeremonialMailOpenScreen.kt",
+                "ui/screens/compose/listing/ListingComposeWizardScreen.kt",
+                "ui/screens/gigs/GigsContent.kt",
+                "ui/screens/homes/accesscodes/AccessCategoryPalette.kt",
+                "ui/screens/homes/bills/UtilityCategoryPalette.kt",
+                "ui/screens/homes/calendar/CalendarEventCategory.kt",
+                "ui/screens/homes/documents/DocumentCategoryPalette.kt",
+                "ui/screens/homes/documents/DocumentFileTypePalette.kt",
+                "ui/screens/homes/emergency/EmergencyCategoryPalette.kt",
+                "ui/screens/homes/maintenance/MaintenanceCategoryPalette.kt",
+                "ui/screens/homes/packages/CourierPalette.kt",
+                "ui/screens/homes/polls/PollKindPalette.kt",
+                "ui/screens/homes/tasks/HouseholdTaskCategoryPalette.kt",
+                "ui/screens/identity_center/IdentityCenterContent.kt",
+                "ui/screens/mailbox/mail_detail/components/CertifiedComponents.kt",
+                "ui/screens/mailbox/mailbox_map/MailboxSpotKind.kt",
+                "ui/screens/marketplace/MarketplaceContent.kt",
+                "ui/screens/membership/MembershipDetailContent.kt",
+                "ui/screens/shared/mail_item_detail/MailItemDetailShell.kt",
+                "ui/screens/shared/map_list_hybrid/MapListHybridPreview.kt",
+            )
+
+        val hexPattern = Regex("""Color\(0x[0-9A-Fa-f]+\)""")
+
+        val spacingVals = "(0|4|8|12|16|20|24|32|40|48|64)"
+        val spacingPatterns =
+            listOf(
+                Regex("""\.padding\($spacingVals\.dp\)"""),
+                Regex("""\b(horizontal|vertical|top|bottom|start|end)\s*=\s*$spacingVals\.dp"""),
+                Regex("""Arrangement\.spacedBy\($spacingVals\.dp\)"""),
+                Regex("""Spacer\((?:modifier\s*=\s*)?Modifier\.(?:height|width)\($spacingVals\.dp\)\)"""),
+            )
+
+        val radiiVals = "(4|6|8|12|16|20|24|999|9999)"
+        val radiiPatterns =
+            listOf(
+                Regex("""RoundedCornerShape\($radiiVals\.dp\)"""),
+                Regex("""\b(topStart|topEnd|bottomStart|bottomEnd|size)\s*=\s*$radiiVals\.dp"""),
+                Regex("""\bcornerRadius\s*=\s*$radiiVals\.dp"""),
+            )
+
+        val root = rootDirectory.get().asFile.toPath()
+        val themeRel = "ui/theme/" // never flag the token-defining files themselves
+
+        val hexViolations = mutableListOf<String>()
+        val spacingViolations = mutableListOf<String>()
+        val radiiViolations = mutableListOf<String>()
+
+        sources.forEach { file ->
+            val rel = root.relativize(file.toPath()).toString().replace('\\', '/')
+            val relInsideAndroid = rel.substringAfter("app/src/main/java/app/pantopus/android/", rel)
+            if (relInsideAndroid.startsWith(themeRel)) return@forEach
+            val exemptFromHex = hexExempt.any { relInsideAndroid.endsWith(it) }
+            file.readLines().forEachIndexed { index, line ->
+                val location = "$rel:${index + 1}"
+                if (!exemptFromHex && hexPattern.containsMatchIn(line)) {
+                    hexViolations += "$location: ${line.trim()}"
+                }
+                spacingPatterns.forEach { pat ->
+                    if (pat.containsMatchIn(line)) {
+                        spacingViolations += "$location: ${line.trim()}"
+                    }
+                }
+                radiiPatterns.forEach { pat ->
+                    if (pat.containsMatchIn(line)) {
+                        radiiViolations += "$location: ${line.trim()}"
+                    }
+                }
+            }
+        }
+
+        val messages = mutableListOf<String>()
+        if (hexViolations.isNotEmpty()) {
+            messages +=
+                "feature code must use PantopusColors.<token> instead of a hex literal:\n" +
+                hexViolations.joinToString("\n") +
+                "\n\n  If this is a new bespoke palette module, add it to hexExempt in " +
+                "app/build.gradle.kts and surface to design review."
+        }
+        if (spacingViolations.isNotEmpty()) {
+            messages +=
+                "feature code must use Spacing.s<N> for on-scale layout spacing " +
+                "(0→s0  4→s1  8→s2  12→s3  16→s4  20→s5  24→s6  32→s8  40→s10  48→s12  64→s16):\n" +
+                spacingViolations.joinToString("\n")
+        }
+        if (radiiViolations.isNotEmpty()) {
+            messages +=
+                "feature code must use Radii.<name> for on-scale corner radii " +
+                "(4→xs  6→sm  8→md  12→lg  16→xl  20→xl2  24→xl3  9999→pill):\n" +
+                radiiViolations.joinToString("\n")
+        }
+
+        if (messages.isNotEmpty()) {
+            throw GradleException(
+                "verifyPantopusTokens failed:\n\n" + messages.joinToString("\n\n"),
+            )
+        }
+        logger.lifecycle("✓ verifyPantopusTokens: no untokenised on-scale literals in feature code.")
+    }
+}
+
+tasks.register<VerifyPantopusTokensTask>("verifyPantopusTokens") {
+    group = "verification"
+    description = "Reject untokenised hex colors and on-scale spacing/radii literals in feature code."
+    sources.from(
+        fileTree("src/main/java/app/pantopus/android") {
+            include("**/*.kt")
+            // Token definitions and the design-system module themselves are exempt;
+            // _internal galleries demonstrate raw tokens for the design team.
+            exclude("ui/theme/**")
+            exclude("ui/screens/_internal/**")
+        },
+    )
+    rootDirectory.set(rootProject.layout.projectDirectory)
+}
+tasks.named("check") { dependsOn("verifyPantopusTokens") }
+
 // Convenience alias so CI and the README can reference a single task name
 // regardless of which build variants exist. Delegates to the Paparazzi
 // plugin's per-variant verify task.

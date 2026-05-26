@@ -194,11 +194,11 @@ private struct EditPersonaEditor: View {
     private var identitySection: some View {
         PersonaSection("Identity") {
             VStack(alignment: .leading, spacing: Spacing.s4) {
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: Spacing.s0) {
                     PLabel("Handle", required: true, hint: "lowercase · 3–24 chars")
                     PersonaHandleField(handle: content.handle, status: content.handleStatus)
                     if let note = content.handleNote {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Spacing.s1) {
                             Icon(.checkCircle, size: 11, color: Theme.Color.success)
                             Text(note)
                                 .font(.system(size: 11, weight: .medium))
@@ -207,11 +207,11 @@ private struct EditPersonaEditor: View {
                         .padding(.top, Spacing.s2)
                     }
                 }
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: Spacing.s0) {
                     PLabel("Display name", required: true)
                     PersonaTextDisplay(text: content.displayName, identifier: "editPersonaDisplayName")
                 }
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: Spacing.s0) {
                     PLabel("Bio")
                     PersonaTextDisplay(
                         text: content.bio,
@@ -275,7 +275,7 @@ private struct EditPersonaEditor: View {
     private var broadcastSection: some View {
         PersonaSection("Broadcast") {
             VStack(alignment: .leading, spacing: Spacing.s4) {
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: Spacing.s0) {
                     PLabel("Posts per week", hint: "hard cap, not a target")
                     PersonaCapSelector(selection: $cap)
                 }
@@ -350,7 +350,7 @@ private struct PLabel: View {
                     .italic()
                     .foregroundStyle(Theme.Color.appTextMuted)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.bottom, Spacing.s2)
         .accessibilityElement(children: .combine)
@@ -451,7 +451,7 @@ private struct PersonaSetupHero: View {
                     .background(Theme.Color.primary600)
                     .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
             }
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 ForEach(0..<max(stepsTotal, 1), id: \.self) { index in
                     Capsule()
                         .fill(index < stepsDone ? Theme.Color.primary600 : Theme.Color.primary100)
@@ -459,7 +459,7 @@ private struct PersonaSetupHero: View {
                         .frame(maxWidth: .infinity)
                 }
             }
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
                 ForEach(content.checklist) { step in
                     checklistRow(step)
                 }
@@ -491,7 +491,7 @@ private struct PersonaSetupHero: View {
             Text(step.label)
                 .font(.system(size: 11.5, weight: step.isNext ? .semibold : .medium))
                 .foregroundStyle(stepColor(step))
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             if step.isNext {
                 Text("NEXT")
                     .font(.system(size: 9.5, weight: .bold))
@@ -582,7 +582,7 @@ private struct PersonaTextDisplay: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 14))
+            .pantopusTextStyle(.small)
             .foregroundStyle(Theme.Color.appText)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(minHeight: minHeight, alignment: .topLeading)
@@ -724,13 +724,13 @@ private struct PersonaTierCardView: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 if tier.kind != .paidLocked {
                     Icon(.slidersHorizontal, size: 15, color: Theme.Color.appTextMuted)
                 }
             }
             if !tier.perks.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
                     ForEach(tier.perks, id: \.self) { perk in
                         HStack(spacing: Spacing.s1) {
                             Icon(.check, size: 12, color: Theme.Color.primary600)
@@ -774,7 +774,7 @@ private struct PersonaTierCardView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.Color.appTextSecondary)
         case .paid, .paidLocked:
-            HStack(spacing: 0) {
+            HStack(spacing: Spacing.s0) {
                 Text("$\(tier.priceLabel ?? "—")")
                     .font(.system(size: 14, weight: .bold, design: .monospaced))
                     .foregroundStyle(tier.kind == .paidLocked ? Theme.Color.appTextMuted : Theme.Color.appText)
@@ -841,7 +841,7 @@ private struct PersonaAddTierRow: View {
                 Text("Add paid tier")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(disabled ? Theme.Color.appTextMuted : Theme.Color.primary700)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Text("up to 4")
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.Color.appTextMuted)
@@ -884,14 +884,14 @@ private struct PersonaStripeConnectCard: View {
                 Text("Connected · \(account)")
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Icon(.checkCircle, size: 10, color: Theme.Color.success)
                     Text("Charges enabled · payouts enabled")
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(Theme.Color.success)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Text("Manage")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.Color.primary600)
@@ -921,7 +921,7 @@ private struct PersonaStripeConnectCard: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             Button(action: personaNoOp) {
                 HStack(spacing: 7) {
@@ -968,7 +968,7 @@ private struct PersonaCapSelector: View {
     @Binding var selection: PersonaCapOption
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             ForEach(PersonaCapOption.allCases) { option in
                 let isOn = option == selection
                 Button {
@@ -1171,7 +1171,7 @@ private struct PersonaAnalyticsRow: View {
             if isOn, !scope.isEmpty {
                 FilterSheetFlowLayout(spacing: 6) {
                     ForEach(scope, id: \.self) { item in
-                        HStack(spacing: 4) {
+                        HStack(spacing: Spacing.s1) {
                             Icon(.check, size: 10, color: Theme.Color.primary700)
                             Text(item).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Theme.Color.primary700)
                         }
@@ -1204,7 +1204,7 @@ private struct PersonaStickyBar: View {
     let onDiscard: @MainActor () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
             Group {
                 switch variant {
@@ -1226,7 +1226,7 @@ private struct PersonaStickyBar: View {
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Button(action: personaNoOp) {
                 HStack(spacing: 5) {
                     Icon(.eye, size: 14, color: Theme.Color.appTextStrong)
@@ -1257,7 +1257,7 @@ private struct PersonaStickyBar: View {
                 Text("Save anytime — publish unlocks after Stripe + schedule")
                     .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(Theme.Color.primary700)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .padding(.horizontal, Spacing.s2)
             .padding(.vertical, 6)
@@ -1274,11 +1274,11 @@ private struct PersonaStickyBar: View {
                     Text("7 UNSAVED").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.Color.warning)
                 }
                 .padding(.horizontal, Spacing.s2)
-                .padding(.vertical, 4)
+                .padding(.vertical, Spacing.s1)
                 .background(Theme.Color.warningBg)
                 .overlay(Capsule().stroke(Theme.Color.warningLight, lineWidth: 1))
                 .clipShape(Capsule())
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Button(action: onDiscard) {
                     Text("Discard")
                         .font(.system(size: 13.5, weight: .semibold))

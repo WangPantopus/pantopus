@@ -32,7 +32,7 @@ public struct ChatAIAvatar: View {
 }
 
 #Preview {
-    HStack(spacing: 16) {
+    HStack(spacing: Spacing.s4) {
         ChatAIAvatar(size: 32)
         ChatAIAvatar(size: 44)
     }

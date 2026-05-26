@@ -29,7 +29,7 @@ struct AccessCodesView: View {
                         .accessibilityIdentifier(AccessCodesA11y.toast)
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: viewModel.toastMessage)
+            .pantopusAnimation(.componentState, value: viewModel.toastMessage)
     }
 }
 

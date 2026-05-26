@@ -129,11 +129,12 @@ private struct StoreBarcodeCard: View {
     let code: String
     let merchant: String
     @Binding var isExpanded: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             Button {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                withPantopusAnimation(.componentState, reduceMotion: reduceMotion) {
                     isExpanded.toggle()
                 }
             } label: {
@@ -217,7 +218,7 @@ private struct RedeemedRibbon: View {
     let expiresAt: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             HStack(spacing: Spacing.s2) {
                 Icon(.checkCircle, size: 18, color: Theme.Color.appTextInverse)
                 Text("Redeemed")

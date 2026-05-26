@@ -40,6 +40,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
+import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /** Lifecycle state of a single step. */
@@ -147,7 +148,7 @@ private fun StepMarker(
                         PantopusIconImage(
                             icon = PantopusIcon.Check,
                             contentDescription = null,
-                            size = 12.dp,
+                            size = Radii.lg,
                             tint = PantopusColors.appTextInverse,
                         )
                     }

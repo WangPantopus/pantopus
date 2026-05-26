@@ -99,7 +99,7 @@ public struct GigBody: View {
             Text("Bid accepted · funds held in escrow")
                 .pantopusTextStyle(.small)
                 .foregroundStyle(Theme.Color.success)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(Spacing.s2)
         .frame(maxWidth: .infinity, alignment: .leading)

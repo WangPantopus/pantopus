@@ -357,7 +357,7 @@ private fun WhyWeAskSection() {
             PantopusIconImage(
                 icon = if (expanded) PantopusIcon.ChevronUp else PantopusIcon.ChevronDown,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.primary600,
             )
         }
@@ -370,7 +370,7 @@ private fun WhyWeAskSection() {
                 color = PantopusColors.appTextStrong,
                 modifier =
                     Modifier
-                        .padding(start = 40.dp)
+                        .padding(start = Spacing.s10)
                         .testTag("claimOwnershipWhyWeAskDetail"),
             )
         }

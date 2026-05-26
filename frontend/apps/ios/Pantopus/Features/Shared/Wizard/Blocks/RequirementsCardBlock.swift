@@ -72,7 +72,7 @@ public struct RequirementsCardBlock: View {
                             .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(row.title). \(row.subcopy)")

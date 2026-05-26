@@ -310,7 +310,7 @@ private fun GoingChip() {
                 .clip(RoundedCornerShape(10.dp))
                 .background(PantopusColors.successBg)
                 .border(1.dp, PantopusColors.successLight, RoundedCornerShape(10.dp))
-                .padding(horizontal = Spacing.s2, vertical = 8.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s2)
                 .testTag("mailDetail_community_goingChip"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -348,7 +348,7 @@ private fun CategoryBadge(category: MailItemCategory) {
                 .background(category.rowBackground)
                 .padding(horizontal = Spacing.s2, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = category.icon,
@@ -423,7 +423,7 @@ private fun CommunityBadgeCard(community: CommunityDetailDto) {
                 }
             }
         }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
@@ -461,7 +461,7 @@ private fun CommunityBadgeCard(community: CommunityDetailDto) {
                 community.group.role?.let { role ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                     ) {
                         PantopusIconImage(
                             icon = PantopusIcon.ShieldCheck,
@@ -682,7 +682,7 @@ private fun WeatherStrip(
                 .clip(RoundedCornerShape(10.dp))
                 .background(PantopusColors.infoBg)
                 .border(1.dp, PantopusColors.infoLight, RoundedCornerShape(10.dp))
-                .padding(horizontal = Spacing.s3, vertical = 8.dp),
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
@@ -886,7 +886,7 @@ private fun AvatarBubble(attendee: CommunityAttendee) {
     Column(
         modifier = Modifier.width(44.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         Box(modifier = Modifier.size(36.dp)) {
             Box(
@@ -939,7 +939,7 @@ private fun YouAvatar() {
     Column(
         modifier = Modifier.width(44.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         Box(
             modifier =
@@ -975,7 +975,7 @@ private fun OverflowBubble(count: Int) {
     Column(
         modifier = Modifier.width(44.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         Box(
             modifier =
@@ -1089,7 +1089,7 @@ private fun CommunityPulseThreadCard(
                 modifier =
                     Modifier
                         .size(24.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(Radii.sm))
                         .background(PantopusColors.primary100),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1128,7 +1128,7 @@ private fun CommunityPulseThreadCard(
                     Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .background(PantopusColors.appSurfaceSunken)
-                        .padding(horizontal = Spacing.s2, vertical = 8.dp),
+                        .padding(horizontal = Spacing.s2, vertical = Spacing.s2),
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
@@ -1226,7 +1226,7 @@ private fun CommunitySenderCard(
                 modifier =
                     Modifier
                         .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(content.category.accent),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1250,7 +1250,7 @@ private fun CommunitySenderCard(
                 Row(
                     modifier = Modifier.padding(top = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     PantopusIconImage(
                         icon = PantopusIcon.ShieldCheck,
@@ -1319,7 +1319,7 @@ private fun GoingPill(
         PantopusIconImage(
             icon = PantopusIcon.CheckCircle,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.success,
         )
         Spacer(Modifier.width(Spacing.s2))
@@ -1383,17 +1383,17 @@ private fun RsvpChip(
     Row(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(bg)
                 .then(
                     if (isPrimary) {
                         Modifier
                     } else {
-                        Modifier.border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                        Modifier.border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                     },
                 )
                 .clickable(enabled = !inFlight) { onSelect(status) }
-                .padding(vertical = 12.dp)
+                .padding(vertical = Spacing.s3)
                 .alpha(if (inFlight) 0.6f else 1f)
                 .semantics { contentDescription = label }
                 .testTag("mailDetail_community_rsvp_${status.wire}"),
@@ -1440,17 +1440,17 @@ private fun SecondaryChip(
     Column(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable {}
                 .padding(vertical = 10.dp)
                 .semantics { contentDescription = label }
                 .testTag(id),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextStrong)
+        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.xl, tint = PantopusColors.appTextStrong)
         Text(
             text = label,
             fontSize = 10.5.sp,

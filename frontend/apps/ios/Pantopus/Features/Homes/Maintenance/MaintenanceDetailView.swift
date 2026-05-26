@@ -298,7 +298,7 @@ private struct MaintenanceHeader: View {
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Text(projection.amount)
                     .pantopusTextStyle(.h3)
                     .foregroundStyle(Theme.Color.appText)
@@ -321,7 +321,7 @@ private struct DetailGrid: View {
     let draft: MaintenanceDraft?
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             row(label: "Status", value: task.status.capitalized.replacingOccurrences(of: "_", with: " "))
             divider
             row(label: "Performed by", value: performedByValue)

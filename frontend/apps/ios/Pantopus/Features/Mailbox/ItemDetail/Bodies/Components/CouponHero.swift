@@ -44,8 +44,8 @@ public struct CouponHero: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 0) {
+        VStack(spacing: Spacing.s0) {
+            HStack(alignment: .top, spacing: Spacing.s0) {
                 VStack(alignment: .leading, spacing: Spacing.s3) {
                     HStack(alignment: .center, spacing: Spacing.s2) {
                         BrandChip(
@@ -152,7 +152,7 @@ private struct BrandTile: View {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case let .success(image):
-                        image.resizable().scaledToFit().padding(4)
+                        image.resizable().scaledToFit().padding(Spacing.s1)
                     default:
                         brandInitials
                     }
@@ -218,7 +218,7 @@ private struct CodeCapsule: View {
     let onCopyCode: (@MainActor () -> Void)?
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Code")
                     .pantopusTextStyle(.overline)

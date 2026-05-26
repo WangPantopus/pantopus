@@ -315,7 +315,7 @@ private fun HouseholdPill(modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        PantopusIconImage(icon = PantopusIcon.Home, contentDescription = null, size = 12.dp, tint = PantopusColors.home)
+        PantopusIconImage(icon = PantopusIcon.Home, contentDescription = null, size = Radii.lg, tint = PantopusColors.home)
         Text(text = "Household", style = PantopusTextStyle.overline, color = PantopusColors.home)
     }
 }
@@ -460,7 +460,7 @@ private fun MismatchBanner(data: MismatchBannerData) {
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.warning,
             modifier = Modifier.rotate(if (expanded) 90f else 0f),
         )
@@ -497,7 +497,7 @@ private fun StickyCorrectionButton(onRequestCorrection: () -> Unit) {
         PantopusIconImage(
             icon = PantopusIcon.ArrowRight,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = PantopusColors.appTextInverse,
         )
     }

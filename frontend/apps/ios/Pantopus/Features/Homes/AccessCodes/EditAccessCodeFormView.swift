@@ -378,7 +378,7 @@ private struct VisibilityRow: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .multilineTextAlignment(.leading)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             .padding(Spacing.s3)
             .background(
@@ -429,7 +429,7 @@ private struct MemberPreviewStrip: View {
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .lineLimit(2)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.top, Spacing.s1)
     }

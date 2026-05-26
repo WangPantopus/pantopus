@@ -488,7 +488,7 @@ private fun ClaimOwnershipBanner(
             PantopusIconImage(
                 icon = PantopusIcon.ShieldCheck,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = PantopusColors.primary600,
             )
             Text(
@@ -741,7 +741,7 @@ private fun TimelineRow(item: HomeDashboardTimelineItem) {
                     .background(item.tone.backgroundColor),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = item.icon, contentDescription = null, size = 16.dp, tint = item.tone.color)
+            PantopusIconImage(icon = item.icon, contentDescription = null, size = Radii.xl, tint = item.tone.color)
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             Text(
@@ -841,7 +841,7 @@ private fun EmergencyInfoRow(
                 PantopusIconImage(
                     icon = PantopusIcon.Siren,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = if (info.isConfigured) PantopusColors.error else PantopusColors.appTextMuted,
                 )
             }
@@ -854,7 +854,7 @@ private fun EmergencyInfoRow(
             PantopusIconImage(
                 icon = PantopusIcon.ChevronRight,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextMuted,
             )
         }
@@ -883,7 +883,7 @@ private fun PropertyDetailsRow(onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        PantopusIconImage(icon = PantopusIcon.Home, contentDescription = null, size = 20.dp, tint = PantopusColors.home)
+        PantopusIconImage(icon = PantopusIcon.Home, contentDescription = null, size = Radii.xl2, tint = PantopusColors.home)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             Text(
                 text = "Property details",

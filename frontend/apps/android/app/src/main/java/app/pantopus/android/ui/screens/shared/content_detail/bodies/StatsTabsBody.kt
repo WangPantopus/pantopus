@@ -236,7 +236,7 @@ private fun ActionRow(
             PantopusIconImage(
                 icon = PantopusIcon.MoreHorizontal,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = PantopusColors.appText,
             )
         }
@@ -405,7 +405,7 @@ private fun ReviewCardView(card: ProfileReviewCard) {
                         PantopusIconImage(
                             icon = PantopusIcon.Star,
                             contentDescription = null,
-                            size = 12.dp,
+                            size = Radii.lg,
                             tint = if (idx < card.rating) PantopusColors.warning else PantopusColors.appTextMuted,
                         )
                     }

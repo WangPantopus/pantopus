@@ -61,6 +61,8 @@ import app.pantopus.android.ui.screens.audience_profile.tierColor
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 import java.util.Calendar
 import java.util.Locale
 
@@ -147,9 +149,9 @@ internal fun ComposeBroadcastScaffold(
                             .fillMaxSize()
                             .padding(inner)
                             .verticalScroll(rememberScrollState())
-                            .padding(16.dp)
+                            .padding(Spacing.s4)
                             .testTag("composeBroadcastScroll"),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s4),
                 ) {
                     (uiState.phase as? ComposePhase.Error)?.let { ErrorBanner(it.message, onRetry) }
                     EditorCard(
@@ -203,7 +205,7 @@ private fun TopBar(
 ) {
     Column(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp),
+            modifier = Modifier.fillMaxWidth().height(52.dp).padding(horizontal = Spacing.s1),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -250,9 +252,9 @@ private fun TopBar(
                     Modifier
                         .heightIn(min = 44.dp)
                         .widthIn(min = 44.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(Radii.md))
                         .clickable(enabled = isDirty, onClick = onSaveDraft)
-                        .padding(horizontal = 8.dp)
+                        .padding(horizontal = Spacing.s2)
                         .testTag("composeBroadcastSaveTop")
                         .semantics { contentDescription = "Save draft" },
                 contentAlignment = Alignment.Center,
@@ -283,12 +285,12 @@ private fun EditorCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(16.dp))
-                .padding(12.dp)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                .padding(Spacing.s3)
                 .testTag("composeBroadcastEditor"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         PersonaRow(uiState.persona)
         BodyField(text = uiState.draft.body, onChange = onBodyChange)
@@ -307,7 +309,7 @@ private fun PersonaRow(persona: BroadcastPersona) {
     Row(
         modifier = Modifier.fillMaxWidth().testTag("composeBroadcastPersona"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Box(
             modifier = Modifier.size(36.dp).clip(CircleShape).background(persona.kind.accent),
@@ -336,7 +338,7 @@ private fun PersonaRow(persona: BroadcastPersona) {
         Box(
             modifier =
                 Modifier
-                    .clip(RoundedCornerShape(999.dp))
+                    .clip(RoundedCornerShape(Radii.pill))
                     .background(persona.kind.accent.copy(alpha = 0.12f))
                     .padding(horizontal = 7.dp, vertical = 2.dp),
         ) {
@@ -360,10 +362,10 @@ private fun BodyField(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurfaceMuted)
-                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(12.dp))
-                .padding(12.dp),
+                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3),
     ) {
         BasicTextField(
             value = text,
@@ -402,7 +404,7 @@ private fun MediaPreview(
             Modifier
                 .fillMaxWidth()
                 .height(160.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurfaceSunken)
                 .testTag("composeBroadcastMediaPreview")
                 .semantics { contentDescription = media.caption?.let { "Attached media: $it" } ?: "Attached media" },
@@ -419,7 +421,7 @@ private fun MediaPreview(
             modifier =
                 Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp)
+                    .padding(Spacing.s2)
                     .size(28.dp)
                     .clip(CircleShape)
                     .background(PantopusColors.appText.copy(alpha = 0.55f))
@@ -441,10 +443,10 @@ private fun MediaPreview(
                 modifier =
                     Modifier
                         .align(Alignment.BottomStart)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(999.dp))
+                        .padding(Spacing.s2)
+                        .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appText.copy(alpha = 0.45f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
@@ -475,13 +477,13 @@ private fun CounterRow(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Box(
             modifier =
                 Modifier
                     .size(44.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(Radii.md))
                     .clickable(onClick = onLaunchPhotoPicker)
                     .testTag("composeBroadcastAddMedia")
                     .semantics { contentDescription = "Add photo or video" },
@@ -490,7 +492,7 @@ private fun CounterRow(
             PantopusIconImage(
                 icon = PantopusIcon.Image,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 strokeWidth = 2f,
                 tint = PantopusColors.appTextStrong,
             )
@@ -522,10 +524,10 @@ private fun AudienceChip(
         modifier =
             Modifier
                 .heightIn(min = 44.dp)
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(accent.copy(alpha = 0.10f))
                 .clickable(onClick = onClick)
-                .padding(horizontal = 8.dp)
+                .padding(horizontal = Spacing.s2)
                 .testTag("composeBroadcastAudienceChip")
                 .semantics { contentDescription = "Audience: ${audience.title}. Tap to change." },
         verticalAlignment = Alignment.CenterVertically,
@@ -565,20 +567,20 @@ private fun ScheduleRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onClick)
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("composeBroadcastScheduleRow"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier =
                 Modifier
                     .size(30.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(Radii.md))
                     .background(if (scheduledLabel == null) PantopusColors.appSurfaceSunken else PantopusColors.primary50),
             contentAlignment = Alignment.Center,
         ) {
@@ -620,16 +622,16 @@ private fun RecentSection(recents: List<RecentBroadcastContent>) {
     if (recents.isNotEmpty()) {
         Column(
             modifier = Modifier.fillMaxWidth().testTag("composeBroadcastRecentSection"),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             SectionHeader("LAST ${recents.size} BROADCASTS")
             Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp)),
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
             ) {
                 recents.forEachIndexed { index, broadcast ->
                     RecentRow(broadcast)
@@ -642,7 +644,7 @@ private fun RecentSection(recents: List<RecentBroadcastContent>) {
     } else {
         Column(
             modifier = Modifier.fillMaxWidth().testTag("composeBroadcastEmptySection"),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             SectionHeader("PAST BROADCASTS")
             FirstBroadcastCard()
@@ -666,10 +668,10 @@ private fun SectionHeader(title: String) {
 @Composable
 private fun RecentRow(broadcast: RecentBroadcastContent) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(12.dp).testTag("composeBroadcastRecentRow_${broadcast.id}"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(Spacing.s3).testTag("composeBroadcastRecentRow_${broadcast.id}"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Text(
                 text = broadcast.timeLabel,
                 fontSize = 11.sp,
@@ -686,7 +688,7 @@ private fun RecentRow(broadcast: RecentBroadcastContent) {
                 tint = PantopusColors.appTextMuted,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Text(
                 text = broadcast.body,
                 fontSize = 13.sp,
@@ -699,14 +701,14 @@ private fun RecentRow(broadcast: RecentBroadcastContent) {
                     modifier =
                         Modifier
                             .size(54.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(Radii.md))
                             .background(PantopusColors.appSurfaceSunken),
                     contentAlignment = Alignment.Center,
                 ) {
                     PantopusIconImage(
                         icon = PantopusIcon.Image,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         strokeWidth = 2f,
                         tint = PantopusColors.appTextMuted,
                     )
@@ -722,7 +724,7 @@ private fun RecentStats(broadcast: RecentBroadcastContent) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         StatItem(icon = PantopusIcon.RadioTower, value = broadcast.reach)
         StatDot()
@@ -745,7 +747,7 @@ private fun RecentStats(broadcast: RecentBroadcastContent) {
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             strokeWidth = 2f,
             tint = PantopusColors.appTextMuted,
         )
@@ -780,7 +782,7 @@ private fun RecentTierChip(audience: BroadcastAudience) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(accent.copy(alpha = 0.12f))
                 .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -809,13 +811,13 @@ private fun FirstBroadcastCard() {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(12.dp))
-                .padding(horizontal = 16.dp, vertical = 20.dp)
+                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.lg))
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s5)
                 .testTag("composeBroadcastFirstBroadcastCard"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Box(
             modifier = Modifier.size(46.dp).clip(CircleShape).background(PantopusColors.primary50),
@@ -844,9 +846,9 @@ private fun EmptyAnalyticsStrip() {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurfaceSunken)
-                .padding(12.dp),
+                .padding(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         listOf("REACH", "READ", "REACT.", "REPLIES").forEachIndexed { index, label ->
@@ -886,20 +888,20 @@ private fun StickyActions(
                 Modifier
                     .fillMaxWidth()
                     .background(PantopusColors.appSurface)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             Box(
                 modifier =
                     Modifier
                         .widthIn(min = 96.dp)
                         .heightIn(min = 44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                         .clickable(enabled = uiState.isDirty, onClick = onSaveDraft)
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = Spacing.s3)
                         .testTag("composeBroadcastSaveDraft"),
                 contentAlignment = Alignment.Center,
             ) {
@@ -915,7 +917,7 @@ private fun StickyActions(
                     Modifier
                         .weight(1f)
                         .heightIn(min = 44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(if (uiState.canSend) PantopusColors.primary600 else PantopusColors.appBorderStrong)
                         .clickable(enabled = uiState.canSend, onClick = onSend)
                         .testTag("composeBroadcastSend")
@@ -964,11 +966,11 @@ private fun SendingOverlay() {
         Column(
             modifier =
                 Modifier
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(PantopusColors.appSurface)
-                    .padding(20.dp),
+                    .padding(Spacing.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             CircularProgressIndicator(color = PantopusColors.primary600, strokeWidth = 2.dp)
             Text(text = "Sending broadcast…", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
@@ -985,17 +987,17 @@ private fun ErrorBanner(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.errorBg)
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("composeBroadcastErrorBanner"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.AlertCircle,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2f,
             tint = PantopusColors.error,
         )
@@ -1034,14 +1036,14 @@ private fun AudienceSheet(
         containerColor = PantopusColors.appSurface,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp).testTag("composeBroadcastAudienceSheet"),
+            modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.s6).testTag("composeBroadcastAudienceSheet"),
         ) {
             Text(
                 text = "Who can see this?",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.appText,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).semantics { heading() },
+                modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s2).semantics { heading() },
             )
             BroadcastAudience.values().forEach { audience ->
                 AudienceOption(
@@ -1069,10 +1071,10 @@ private fun AudienceOption(
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
                 .heightIn(min = 56.dp)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = Spacing.s4)
                 .testTag("composeBroadcastAudienceOption_${audience.key}"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier = Modifier.size(32.dp).clip(CircleShape).background(accent.copy(alpha = 0.12f)),
@@ -1081,7 +1083,7 @@ private fun AudienceOption(
             PantopusIconImage(
                 icon = audience.icon,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 strokeWidth = 2f,
                 tint = accent,
             )
@@ -1130,9 +1132,9 @@ private fun ScheduleSheet(
                 Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
+                    .padding(Spacing.s4)
                     .testTag("composeBroadcastScheduleSheet"),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             Text(
                 text = "Schedule broadcast",
@@ -1148,7 +1150,7 @@ private fun ScheduleSheet(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.primary600)
                         .clickable {
                             val day = dateState.selectedDateMillis ?: seed

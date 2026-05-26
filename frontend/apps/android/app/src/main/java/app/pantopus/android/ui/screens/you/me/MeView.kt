@@ -109,7 +109,7 @@ private fun LoadingFrame() {
     ) {
         Shimmer(width = 320.dp, height = 200.dp, cornerRadius = Radii.lg)
         Shimmer(width = 320.dp, height = 70.dp, cornerRadius = Radii.lg)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Shimmer(width = 100.dp, height = 72.dp, cornerRadius = Radii.md)
             Shimmer(width = 100.dp, height = 72.dp, cornerRadius = Radii.md)
             Shimmer(width = 100.dp, height = 72.dp, cornerRadius = Radii.md)
@@ -223,7 +223,7 @@ private fun MeHeader(
                     maxLines = 1,
                 )
                 if (!content.locality.isNullOrEmpty()) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                         PantopusIconImage(
                             icon = PantopusIcon.MapPin,
                             contentDescription = null,
@@ -321,7 +321,7 @@ private fun MeStatsRow(
     ) {
         stats.forEachIndexed { index, stat ->
             Column(
-                modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+                modifier = Modifier.weight(1f).padding(vertical = Spacing.s3),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
@@ -361,10 +361,10 @@ private fun MeActionGrid(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         tiles.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 row.forEach { tile ->
                     ActionTile(
                         tile = tile,
@@ -414,7 +414,7 @@ private fun ActionTile(
             PantopusIconImage(
                 icon = tile.icon,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = if (isUnbound) PantopusColors.appTextMuted else accent,
             )
             Text(
@@ -477,10 +477,10 @@ private fun MeSectionGroup(
                             .fillMaxWidth()
                             .clickable { onTap(row) }
                             .heightIn(min = 48.dp)
-                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                            .padding(horizontal = 14.dp, vertical = Spacing.s3)
                             .testTag("meSectionRow_${section.id}_${row.id}"),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
                 ) {
                     PantopusIconImage(
                         icon = row.icon,
@@ -549,7 +549,7 @@ private fun MeDestructiveCard(
                 .padding(horizontal = 14.dp, vertical = 14.dp)
                 .testTag("meDestructiveCard_${identity.key}"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         PantopusIconImage(
             icon = icon,

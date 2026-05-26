@@ -494,7 +494,7 @@ private fun ReadOnlyEmailRow(
                 PantopusIconImage(
                     icon = PantopusIcon.Check,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.success,
                 )
             }
@@ -580,7 +580,7 @@ private fun DirtyFieldLabel(
             Box(
                 modifier =
                     Modifier
-                        .padding(start = 4.dp)
+                        .padding(start = Spacing.s1)
                         .size(6.dp)
                         .background(PantopusColors.warning, CircleShape),
             )

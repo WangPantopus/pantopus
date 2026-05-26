@@ -364,7 +364,7 @@ private fun CertifiedKeyFactRow(row: CertifiedKeyFact) {
             modifier =
                 Modifier
                     .size(if (row.isEmphasis) 28.dp else 24.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(Radii.sm))
                     .background(tintBackground),
             contentAlignment = Alignment.Center,
         ) {
@@ -451,7 +451,7 @@ private fun HeroCard(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
                 verticalAlignment = Alignment.Top,
             ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                     Text(
                         text = content.senderDisplayName.uppercase(),
                         fontSize = 11.sp,
@@ -494,7 +494,7 @@ private fun AcknowledgedBanner() {
                 .clip(RoundedCornerShape(10.dp))
                 .background(PantopusColors.successBg)
                 .border(1.dp, PantopusColors.successLight, RoundedCornerShape(10.dp))
-                .padding(horizontal = 9.dp, vertical = 8.dp),
+                .padding(horizontal = 9.dp, vertical = Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
@@ -531,7 +531,7 @@ private fun ArchivedBanner() {
                 .clip(RoundedCornerShape(10.dp))
                 .background(PantopusColors.appSurfaceSunken)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp))
-                .padding(horizontal = 9.dp, vertical = 8.dp),
+                .padding(horizontal = 9.dp, vertical = Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
@@ -569,7 +569,7 @@ private fun TrustBadge() {
                 .padding(horizontal = Spacing.s2, vertical = 3.dp)
                 .semantics { contentDescription = "Verified sender" },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.ShieldCheck,
@@ -596,7 +596,7 @@ private fun CategoryBadge(category: MailItemCategory) {
                 .background(category.rowBackground)
                 .padding(horizontal = Spacing.s2, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = category.icon,
@@ -846,7 +846,7 @@ private fun AcknowledgeButton(
         PantopusIconImage(
             icon = if (completed) PantopusIcon.CheckCircle else PantopusIcon.Check,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = fg,
         )
         Spacer(Modifier.width(Spacing.s2))
@@ -873,9 +873,9 @@ private fun SecondaryTile(
     Row(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable {}
                 .padding(horizontal = Spacing.s2, vertical = 11.dp)
                 .semantics { contentDescription = label },

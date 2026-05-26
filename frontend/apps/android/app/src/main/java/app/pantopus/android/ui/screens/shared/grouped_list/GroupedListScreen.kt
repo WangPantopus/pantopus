@@ -46,6 +46,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 /**
  * Callbacks the host view-model passes in. Mirror of the iOS
@@ -101,7 +102,7 @@ private fun TopBar(
                 .fillMaxWidth()
                 .height(52.dp)
                 .background(PantopusColors.appBg)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {
@@ -150,16 +151,16 @@ private fun TopBar(
 internal fun LoadingFrame() {
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("groupedListLoading"),
-        contentPadding = PaddingValues(vertical = 12.dp),
+        contentPadding = PaddingValues(vertical = Spacing.s3),
     ) {
         items(3) {
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
                         .height(140.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.appSurfaceSunken),
             )
         }
@@ -187,7 +188,7 @@ internal fun LoadedFrame(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("groupedListContent"),
-        contentPadding = PaddingValues(bottom = 24.dp),
+        contentPadding = PaddingValues(bottom = Spacing.s6),
     ) {
         groups.forEach { group ->
             val regular = group.rows.filter { !it.destructive }
@@ -204,7 +205,7 @@ internal fun LoadedFrame(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 8.dp)
+                                    .padding(start = Spacing.s4, end = Spacing.s4, top = 18.dp, bottom = Spacing.s2)
                                     .testTag("groupedListOverline_${group.id}"),
                         )
                     } else {
@@ -223,7 +224,7 @@ internal fun LoadedFrame(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(start = 16.dp, end = 16.dp, top = 8.dp)
+                                    .padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s2)
                                     .testTag("groupedListHelper_${group.id}"),
                         )
                     }
@@ -235,10 +236,10 @@ internal fun LoadedFrame(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(start = 12.dp, end = 12.dp, top = 18.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .padding(start = Spacing.s3, end = Spacing.s3, top = 18.dp)
+                                .clip(RoundedCornerShape(Radii.lg))
                                 .background(PantopusColors.appSurface)
-                                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                                 .testTag("groupedListDestructive_${row.id}"),
                     ) {
                         RowItem(
@@ -261,7 +262,7 @@ internal fun LoadedFrame(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(top = 18.dp, start = 16.dp, end = 16.dp)
+                            .padding(top = 18.dp, start = Spacing.s4, end = Spacing.s4)
                             .testTag("groupedListFooter"),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
@@ -281,10 +282,10 @@ private fun Card(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .padding(horizontal = Spacing.s3)
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .testTag("groupedListCard_${group.id}"),
     ) {
         rows.forEachIndexed { index, row ->
@@ -301,7 +302,7 @@ private fun Card(
                         Modifier
                             .fillMaxWidth()
                             .height(1.dp)
-                            .padding(start = 16.dp)
+                            .padding(start = Spacing.s4)
                             .background(PantopusColors.appBorder.copy(alpha = 0.6f)),
                 )
             }
@@ -336,10 +337,10 @@ private fun RowItem(
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
                 .clickable(onClick = onClickRow)
-                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .padding(horizontal = Spacing.s4, vertical = 14.dp)
                 .testTag("groupedListRow_${row.id}"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -389,7 +390,7 @@ private fun RowItem(
             is RowControl.Radio ->
                 RadioGlyph(isSelected = control.isSelected, modifier = Modifier.testTag("groupedListRadio_${row.id}"))
             is RowControl.ChipStatus -> {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                     ChipView(label = control.label, tone = control.tone, rowId = row.id)
                     if (control.includesChevron) ChevronGlyph()
                 }
@@ -405,7 +406,7 @@ private fun ChevronGlyph() {
     PantopusIconImage(
         icon = PantopusIcon.ChevronRight,
         contentDescription = null,
-        size = 16.dp,
+        size = Radii.xl,
         strokeWidth = 2.2f,
         tint = PantopusColors.appTextSecondary,
     )
@@ -464,7 +465,7 @@ private fun ChipView(
             Modifier
                 .clip(androidx.compose.foundation.shape.RoundedCornerShape(Radii.pill))
                 .background(bg)
-                .padding(horizontal = 8.dp, vertical = 3.dp)
+                .padding(horizontal = Spacing.s2, vertical = 3.dp)
                 .testTag("groupedListChip_$rowId"),
     ) {
         Text(
@@ -576,7 +577,7 @@ private fun ErrorFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(Spacing.s6)
                 .testTag("groupedListError"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

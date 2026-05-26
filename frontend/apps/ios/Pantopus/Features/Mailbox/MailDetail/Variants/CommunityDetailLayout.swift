@@ -244,7 +244,7 @@ private struct CommunityHeroCard: View {
                 .fixedSize(horizontal: false, vertical: true)
             if let excerpt = content.excerpt, !excerpt.isEmpty {
                 Text(excerpt)
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
             if community.rsvp == .going {
@@ -272,10 +272,10 @@ private struct CommunityHeroCard: View {
             Text("You're going")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(Theme.Color.success)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 8)
+        .padding(.vertical, Spacing.s2)
         .background(Theme.Color.successBg)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
@@ -291,7 +291,7 @@ private struct CategoryBadge: View {
     let category: MailItemCategory
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(category.icon, size: 11, color: category.accent)
             Text(category.label)
                 .font(.system(size: 10, weight: .bold))
@@ -313,7 +313,7 @@ private struct CommunityBadgeCard: View {
     var body: some View {
         HStack(spacing: Spacing.s3) {
             crest
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
                 HStack(spacing: Spacing.s1) {
                     Text(community.group.name)
                         .font(.system(size: 14.5, weight: .bold))
@@ -330,7 +330,7 @@ private struct CommunityBadgeCard: View {
                 }
                 if let tagline = community.group.tagline {
                     Text(tagline)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(2)
                 }
@@ -352,7 +352,7 @@ private struct CommunityBadgeCard: View {
                 }
                 .padding(.top, 2)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
         }
         .padding(Spacing.s3)
@@ -397,7 +397,7 @@ private struct CommunityEventCard: View {
     let accent: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             Text("EVENT DETAILS")
                 .font(.system(size: 11, weight: .bold))
                 .tracking(0.5)
@@ -445,11 +445,11 @@ private struct CommunityEventCard: View {
                     .foregroundStyle(Theme.Color.appText)
                 if let range = event.timeRange {
                     Text(range)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
     }
 
@@ -466,7 +466,7 @@ private struct CommunityEventCard: View {
                     .foregroundStyle(Theme.Color.appText)
                 if let note = event.locationNote {
                     Text(note)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 if let distance = event.distanceLabel {
@@ -479,7 +479,7 @@ private struct CommunityEventCard: View {
                     .padding(.top, 2)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
     }
 
@@ -489,7 +489,7 @@ private struct CommunityEventCard: View {
                 .font(.system(size: 11, weight: .bold))
                 .tracking(0.5)
                 .foregroundStyle(Theme.Color.appTextSecondary)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
                 ForEach(Array(event.bringItems.enumerated()), id: \.offset) { _, item in
                     HStack(alignment: .top, spacing: 6) {
                         Icon(.check, size: 11, color: Theme.Color.success)
@@ -498,7 +498,7 @@ private struct CommunityEventCard: View {
                             .font(.system(size: 12.5))
                             .foregroundStyle(Theme.Color.appTextStrong)
                             .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 0)
+                        Spacer(minLength: Spacing.s0)
                     }
                 }
             }
@@ -522,12 +522,12 @@ private struct CommunityEventCard: View {
                     .foregroundColor(Theme.Color.primary800)
             }
             Text(summary)
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundColor(Theme.Color.primary700)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, 8)
+        .padding(.vertical, Spacing.s2)
         .background(Theme.Color.infoBg)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
@@ -543,7 +543,7 @@ private struct DateChip: View {
     let accent: Color
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Text((monthAbbr ?? "").uppercased())
                 .font(.system(size: 9, weight: .bold))
                 .tracking(0.5)
@@ -592,7 +592,7 @@ private struct MapChip: View {
     var body: some View {
         ZStack {
             Theme.Color.successBg
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 Rectangle().fill(Theme.Color.appSurface).frame(height: 3).padding(.top, 17)
                 Spacer()
             }
@@ -618,7 +618,7 @@ private struct CommunityAttendeesStrip: View {
     private let visibleSlots = 6
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             HStack(alignment: .center, spacing: Spacing.s2) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(attendeeCount) going".uppercased())
@@ -677,7 +677,7 @@ private struct AvatarBubble: View {
     let attendee: CommunityAttendee
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: Spacing.s1) {
             ZStack(alignment: .bottomTrailing) {
                 Text(attendee.initials)
                     .font(.system(size: 11, weight: .bold))
@@ -721,7 +721,7 @@ private struct AvatarBubble: View {
 
 private struct YouAvatar: View {
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: Spacing.s1) {
             Text("You")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Theme.Color.appTextInverse)
@@ -747,7 +747,7 @@ private struct OverflowBubble: View {
     let count: Int
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: Spacing.s1) {
             Text("+\(count)")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Theme.Color.appTextStrong)
@@ -794,7 +794,7 @@ private struct CommunityBodyCard: View {
             }
             ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
                 Text(paragraph)
-                    .font(.system(size: 14))
+                    .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.appText)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -823,7 +823,7 @@ private struct CommunityPulseThreadCard: View {
                 Icon(.users, size: 13, color: Theme.Color.primary700)
                     .frame(width: 24, height: 24)
                     .background(Theme.Color.primary100)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.sm))
                 Text("PULSE THREAD")
                     .font(.system(size: 11, weight: .bold))
                     .tracking(0.5)
@@ -833,7 +833,7 @@ private struct CommunityPulseThreadCard: View {
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
             Text(metaLine)
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             if let preview = thread.lastReplyPreview, let author = thread.lastReplyAuthor {
                 HStack(alignment: .top, spacing: Spacing.s2) {
@@ -846,13 +846,13 @@ private struct CommunityPulseThreadCard: View {
                     (
                         Text(author).bold() + Text(" \(preview)")
                     )
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundColor(Theme.Color.appTextStrong)
                     .fixedSize(horizontal: false, vertical: true)
                     Spacer()
                 }
                 .padding(.horizontal, Spacing.s2)
-                .padding(.vertical, 8)
+                .padding(.vertical, Spacing.s2)
                 .background(Theme.Color.appSurfaceSunken)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             }
@@ -912,17 +912,17 @@ private struct CommunitySenderCard: View {
                     .foregroundStyle(Theme.Color.appTextInverse)
                     .frame(width: 44, height: 44)
                     .background(content.category.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(content.senderDisplayName)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
                     if let meta = content.senderMeta {
                         Text(meta)
-                            .font(.system(size: 12))
+                            .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
                     }
-                    HStack(spacing: 4) {
+                    HStack(spacing: Spacing.s1) {
                         Icon(.shieldCheck, size: 11, color: Theme.Color.success)
                         Text("Verified neighbor")
                             .font(.system(size: 10, weight: .bold))
@@ -930,7 +930,7 @@ private struct CommunitySenderCard: View {
                     }
                     .padding(.top, 2)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 if onOpenProfile != nil, content.senderUserId != nil {
                     Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
                 }
@@ -1021,13 +1021,13 @@ struct CommunityRsvpActions: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+            .padding(.vertical, Spacing.s3)
             .background(isPrimary ? Theme.Color.primary600 : Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: Radii.lg)
                     .stroke(isPrimary ? Color.clear : Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
             .opacity(inFlight ? 0.6 : 1)
         }
         .buttonStyle(.plain)
@@ -1045,7 +1045,7 @@ struct CommunityRsvpActions: View {
 
     private func secondaryChip(icon: PantopusIcon, label: String, id: String) -> some View {
         Button(action: {}) {
-            VStack(spacing: 4) {
+            VStack(spacing: Spacing.s1) {
                 Icon(icon, size: 16, color: Theme.Color.appTextStrong)
                 Text(label)
                     .font(.system(size: 10.5, weight: .semibold))
@@ -1057,10 +1057,10 @@ struct CommunityRsvpActions: View {
             .padding(.vertical, 10)
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: Radii.lg)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(id)

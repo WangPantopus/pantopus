@@ -26,9 +26,7 @@ public struct EditProfileView: View {
         Group {
             switch viewModel.state {
             case .loading:
-                ProgressView("Loading profile…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Theme.Color.appBg)
+                loadingFrame
             case .loaded:
                 loaded
             case let .error(message):
@@ -57,7 +55,7 @@ public struct EditProfileView: View {
                     .accessibilityIdentifier("editProfileToast")
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: viewModel.toast)
+        .pantopusAnimation(.componentState, value: viewModel.toast)
         .onChange(of: viewModel.shouldDismiss) { _, newValue in
             // Hold the success toast visible briefly before popping so the
             // user actually sees the confirmation.
@@ -68,6 +66,44 @@ public struct EditProfileView: View {
                 dismiss()
             }
         }
+    }
+
+    private var loadingFrame: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.s5) {
+                HStack {
+                    Spacer()
+                    Text("Edit profile")
+                        .pantopusTextStyle(.body)
+                        .foregroundStyle(Theme.Color.appText)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.horizontal, Spacing.s4)
+
+                ForEach(0..<3, id: \.self) { groupIndex in
+                    VStack(alignment: .leading, spacing: Spacing.s2) {
+                        Shimmer(width: 96, height: 12)
+                        VStack(spacing: Spacing.s3) {
+                            ForEach(0..<(groupIndex == 0 ? 4 : 2), id: \.self) { _ in
+                                Shimmer(height: 44, cornerRadius: Radii.md)
+                            }
+                        }
+                        .padding(Spacing.s4)
+                        .background(Theme.Color.appSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+                    }
+                    .padding(.horizontal, Spacing.s4)
+                }
+            }
+            .padding(.vertical, Spacing.s4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.Color.appBg)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading profile")
+        .accessibilityIdentifier("editProfileSkeleton")
     }
 
     private var loaded: some View {

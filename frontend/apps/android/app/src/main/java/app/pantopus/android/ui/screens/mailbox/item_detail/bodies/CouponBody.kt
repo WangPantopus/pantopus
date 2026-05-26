@@ -53,12 +53,14 @@ import app.pantopus.android.data.api.models.mailbox.v2.CouponDetailDto
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemSampleData
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.BarcodeView
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CouponHero
+import app.pantopus.android.ui.theme.MotionTokens
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import app.pantopus.android.ui.theme.rememberReduceMotion
 
 /**
  * A17.5 Coupon mailbox category body: ticket hero, fine print, and a
@@ -256,10 +258,15 @@ private fun StoreBarcodeCard(
             }
         }
 
+        val reduceMotion = rememberReduceMotion()
         AnimatedVisibility(
             visible = isExpanded,
-            enter = fadeIn() + slideInVertically { -it / 3 },
-            exit = fadeOut() + slideOutVertically { -it / 3 },
+            enter =
+                fadeIn(animationSpec = MotionTokens.componentState(reduceMotion)) +
+                    slideInVertically(animationSpec = MotionTokens.componentState(reduceMotion)) { -it / 3 },
+            exit =
+                fadeOut(animationSpec = MotionTokens.componentState(reduceMotion)) +
+                    slideOutVertically(animationSpec = MotionTokens.componentState(reduceMotion)) { -it / 3 },
         ) {
             Text(
                 text = "Show this screen to $merchant. Staff can scan the barcode or key in the code.",
@@ -448,7 +455,7 @@ private fun InactiveCouponCard(
                     .background(PantopusColors.appSurface),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = icon, contentDescription = null, size = 20.dp, tint = tone.foreground)
+            PantopusIconImage(icon = icon, contentDescription = null, size = Radii.xl2, tint = tone.foreground)
         }
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             Text(title, style = PantopusTextStyle.small, color = PantopusColors.appText)

@@ -35,6 +35,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 @Composable
 fun InvoiceDetailScreen(
@@ -69,7 +71,7 @@ fun InvoiceDetailScreen(
 @Composable
 private fun PaySheetStub(onDismiss: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(20.dp),
+        modifier = Modifier.fillMaxWidth().padding(Spacing.s5),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -93,12 +95,12 @@ private fun PaySheetStub(onDismiss: () -> Unit) {
             color = PantopusColors.appTextSecondary,
             textAlign = TextAlign.Center,
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(Spacing.s1))
         Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.lg))
                     .background(PantopusColors.primary600)
                     .clickable(onClick = onDismiss)
                     .heightIn(min = 48.dp),
@@ -106,6 +108,6 @@ private fun PaySheetStub(onDismiss: () -> Unit) {
         ) {
             Text(text = "Got it", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)
         }
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(Spacing.s5))
     }
 }

@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.pantopus.android.ui.theme.Radii
 
 private val ShimmerBase = Color(0xFFEEF0F3)
 private val ShimmerHighlight = Color(0xFFF6F7F9)
@@ -138,6 +139,6 @@ private fun ShimmerPreview() {
                 .spacedBy(8.dp),
     ) {
         Shimmer(width = 160.dp, height = 16.dp)
-        Shimmer(width = 120.dp, height = 12.dp, cornerRadius = 4.dp)
+        Shimmer(width = 120.dp, height = 12.dp, cornerRadius = Radii.xs)
     }
 }

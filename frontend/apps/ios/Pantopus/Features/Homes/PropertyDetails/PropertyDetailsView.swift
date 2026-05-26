@@ -103,7 +103,7 @@ private struct LoadedBody: View {
                 .padding(.horizontal, Spacing.s4)
             }
         )
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .safeAreaInset(edge: .bottom, spacing: Spacing.s0) {
             if isMismatch {
                 StickyCorrectionBar(onRequestCorrection: onRequestCorrection)
             }
@@ -122,6 +122,7 @@ private struct PropertyHero: View {
                 Text(address.line1)
                     .pantopusTextStyle(.h3)
                     .foregroundStyle(Theme.Color.appText)
+                    .accessibilityAddTraits(.isHeader)
                 Text(address.line2)
                     .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.appTextSecondary)
@@ -263,7 +264,7 @@ private struct VerificationRow: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.Color.appText)
                 SourcePill(source.pill.label, tone: source.pill.tone, icon: source.pill.icon)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             Text(source.detail)
                 .pantopusTextStyle(.caption)
@@ -284,7 +285,7 @@ private struct PropertyCard<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(spacing: 0) { content }
+        VStack(spacing: Spacing.s0) { content }
             .background(Theme.Color.appSurface)
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             .pantopusShadow(.sm)
@@ -308,10 +309,11 @@ private struct RowDivider: View {
 private struct MismatchBanner: View {
     let data: MismatchBannerData
     @State private var expanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button {
-            withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
+            withPantopusAnimation(.componentState, reduceMotion: reduceMotion) { expanded.toggle() }
         } label: {
             HStack(alignment: .top, spacing: Spacing.s2) {
                 ZStack {
@@ -358,7 +360,7 @@ private struct StickyCorrectionBar: View {
     let onRequestCorrection: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             RowDivider()
             Button(action: onRequestCorrection) {
                 HStack(spacing: Spacing.s2) {

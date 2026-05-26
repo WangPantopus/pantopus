@@ -145,7 +145,7 @@ public struct NearbyMapView: View {
     // MARK: - Floating pill
 
     private var floatingPill: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             Button {
                 onBack?()
             } label: {
@@ -156,11 +156,11 @@ public struct NearbyMapView: View {
             .accessibilityLabel("Back")
             .opacity(onBack == nil ? 0 : 1)
             .disabled(onBack == nil)
-            Spacer(minLength: 4)
+            Spacer(minLength: Spacing.s1)
             Text("Gigs")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
-            Spacer(minLength: 4)
+            Spacer(minLength: Spacing.s1)
             Button {
                 showFilterSheet = true
             } label: {
@@ -172,7 +172,7 @@ public struct NearbyMapView: View {
             .accessibilityIdentifier("mapFiltersButton")
         }
         .padding(.horizontal, 6)
-        .padding(.vertical, 8)
+        .padding(.vertical, Spacing.s2)
         .background(.ultraThinMaterial)
         .overlay(
             Capsule().stroke(Theme.Color.appBorder, lineWidth: 1)
@@ -203,7 +203,7 @@ public struct NearbyMapView: View {
                                 .font(.system(size: 11.5, weight: .semibold))
                                 .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
                         }
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, Spacing.s3)
                         .frame(height: 28)
                         .background(active ? category.color : Color.white.opacity(0.96))
                         .overlay(
@@ -224,7 +224,7 @@ public struct NearbyMapView: View {
     // MARK: - Map controls
 
     private func mapControls(bottomInset: CGFloat) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s2) {
             mapControlButton(icon: .mapPin, label: "Locate me") {
                 recenter(on: viewModel.userCoordinate)
             }
@@ -255,14 +255,14 @@ public struct NearbyMapView: View {
     // MARK: - Bottom sheet
 
     private func bottomSheet(height: CGFloat, screenHeight: CGFloat) -> some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
+            Spacer(minLength: Spacing.s0)
+            VStack(spacing: Spacing.s0) {
                 Capsule()
-                    .fill(Color(red: 209 / 255, green: 213 / 255, blue: 219 / 255))
+                    .fill(Theme.Color.appBorderStrong)
                     .frame(width: 40, height: 4)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
+                    .padding(.top, Spacing.s2)
+                    .padding(.bottom, Spacing.s1)
                     .accessibilityHidden(true)
                 sheetHeader
                 sheetBody
@@ -334,7 +334,7 @@ public struct NearbyMapView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Text("Sort:")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Theme.Color.appTextSecondary)
@@ -348,8 +348,8 @@ public struct NearbyMapView: View {
             .accessibilityIdentifier("nearbySheetSort")
         }
         .padding(.horizontal, 18)
-        .padding(.top, 4)
-        .padding(.bottom, 12)
+        .padding(.top, Spacing.s1)
+        .padding(.bottom, Spacing.s3)
     }
 
     private var headerCountLabel: String {
@@ -363,8 +363,7 @@ public struct NearbyMapView: View {
     @ViewBuilder private var sheetBody: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            loadingSheetBody
         case let .error(message):
             VStack(spacing: 10) {
                 Icon(.alertCircle, size: 28, color: Theme.Color.error)
@@ -377,7 +376,7 @@ public struct NearbyMapView: View {
                     Text("Try again")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(Theme.Color.appTextInverse)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, Spacing.s4)
                         .frame(height: 38)
                         .background(Theme.Color.primary600)
                         .clipShape(Capsule())
@@ -394,22 +393,43 @@ public struct NearbyMapView: View {
         }
     }
 
+    private var loadingSheetBody: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            ForEach(0..<5, id: \.self) { _ in
+                HStack(spacing: Spacing.s3) {
+                    Shimmer(width: 44, height: 44, cornerRadius: Radii.lg)
+                    VStack(alignment: .leading, spacing: Spacing.s2) {
+                        Shimmer(width: 180, height: 14)
+                        Shimmer(width: 120, height: 12)
+                    }
+                    Spacer(minLength: Spacing.s0)
+                }
+                .padding(.horizontal, Spacing.s4)
+            }
+        }
+        .padding(.top, Spacing.s3)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading nearby")
+        .accessibilityIdentifier("nearbyMapLoading")
+    }
+
     private var collapsedBody: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Icon(.chevronUp, size: 13, strokeWidth: 2.4, color: Theme.Color.appTextSecondary)
             Text("Drag up to see the list")
                 .font(.system(size: 11.5, weight: .medium))
                 .foregroundStyle(Theme.Color.appTextSecondary)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 36)
         .background(Theme.Color.appSurfaceSunken)
         .overlay(
             Capsule().stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(Capsule())
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.bottom, Spacing.s3)
         .accessibilityIdentifier("nearbySheetCollapsedPrompt")
         .onTapGesture {
             withAnimation(.interpolatingSpring(stiffness: 320, damping: 30)) {
@@ -419,7 +439,7 @@ public struct NearbyMapView: View {
     }
 
     private func standardBody(_ loaded: NearbyMapLoaded) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(loaded.entities.prefix(12)) { entity in
@@ -432,17 +452,17 @@ public struct NearbyMapView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Spacing.s4)
             }
             .accessibilityIdentifier("nearbySheetRail")
             PaginationDots(total: min(loaded.entities.count, 3), index: 0)
-                .padding(.vertical, 12)
+                .padding(.vertical, Spacing.s3)
         }
     }
 
     private func expandedBody(_ loaded: NearbyMapLoaded) -> some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(spacing: Spacing.s0) {
                 ForEach(loaded.entities) { entity in
                     NearbyEntityRow(
                         entity: entity,
@@ -568,7 +588,7 @@ private struct NearbyEntityCard: View {
                     Icon(iconFor(category: entity.category, kind: entity.kind), size: 22, color: .white)
                 }
                 .frame(width: 48, height: 48)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
                     Text(entity.title)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
@@ -585,7 +605,7 @@ private struct NearbyEntityCard: View {
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(Theme.Color.appTextSecondary)
                         }
-                        Spacer(minLength: 0)
+                        Spacer(minLength: Spacing.s0)
                         if entity.bidCount > 0 {
                             Text("\(entity.bidCount)")
                                 .font(.system(size: 9, weight: .bold))
@@ -598,7 +618,7 @@ private struct NearbyEntityCard: View {
                     }
                 }
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .frame(width: 240, alignment: .leading)
             .background(Theme.Color.appSurface)
             .overlay(
@@ -620,7 +640,7 @@ private struct NearbyEntityRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(
@@ -653,7 +673,7 @@ private struct NearbyEntityRow: View {
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.s2) {
                         if let price = entity.price {
                             Text(price)
                                 .font(.system(size: 13, weight: .bold))
@@ -670,10 +690,10 @@ private struct NearbyEntityRow: View {
                         }
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s3)
             .background(selected ? entity.category.color.opacity(0.06) : Theme.Color.appSurface)
             .overlay(
                 Rectangle()
@@ -695,7 +715,7 @@ private struct PaginationDots: View {
         HStack(spacing: 5) {
             ForEach(0..<max(total, 1), id: \.self) { i in
                 Capsule()
-                    .fill(i == index ? Theme.Color.primary600 : Color(red: 209 / 255, green: 213 / 255, blue: 219 / 255))
+                    .fill(i == index ? Theme.Color.primary600 : Theme.Color.appBorderStrong)
                     .frame(width: i == index ? 16 : 5, height: 5)
             }
         }

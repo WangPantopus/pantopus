@@ -276,7 +276,7 @@ private fun Header(
             PantopusIconImage(
                 icon = PantopusIcon.Search,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextSecondary,
             )
             Box(modifier = Modifier.weight(1f)) {
@@ -318,7 +318,7 @@ private fun Header(
                     PantopusIconImage(
                         icon = PantopusIcon.X,
                         contentDescription = null,
-                        size = 16.dp,
+                        size = Radii.xl,
                         tint = PantopusColors.appTextSecondary,
                     )
                 }
@@ -411,7 +411,7 @@ private fun ShimmerSection() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
             ) {
-                Shimmer(width = 40.dp, height = 40.dp, cornerRadius = 20.dp)
+                Shimmer(width = 40.dp, height = 40.dp, cornerRadius = Radii.xl2)
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                     Shimmer(width = 180.dp, height = 14.dp)
                     Shimmer(width = 120.dp, height = 12.dp)

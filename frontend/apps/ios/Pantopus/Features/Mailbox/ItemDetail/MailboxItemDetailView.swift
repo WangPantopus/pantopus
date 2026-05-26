@@ -193,7 +193,7 @@ struct MailboxItemDetailView: View {
             nil
         case .coupon:
             MailboxCTAShelfContent(
-                primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Added to wallet ✓" : "Add to wallet",
+                primaryTitle: viewModel.ctaFlags.primaryCompleted ? "Added to wallet" : "Add to wallet",
                 ghostTitle: "Save for later",
                 primaryLoading: viewModel.ctaFlags.primaryLoading,
                 ghostLoading: viewModel.ctaFlags.ghostLoading,
@@ -210,7 +210,7 @@ struct MailboxItemDetailView: View {
         case .certified:
             MailboxCTAShelfContent(
                 primaryTitle: viewModel.ctaFlags.primaryCompleted
-                    ? "Signed ✓"
+                    ? "Signed"
                     : "Sign for delivery",
                 ghostTitle: "View terms",
                 primaryLoading: viewModel.ctaFlags.primaryLoading,
@@ -270,7 +270,7 @@ private struct LoadingLayout: View {
     let onBack: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 4)
             ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
             VStack(spacing: Spacing.s3) {
@@ -292,7 +292,7 @@ private struct ErrorLayout: View {
     let onRetry: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.error).frame(height: 4)
             ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
             EmptyState(

@@ -55,7 +55,7 @@ public struct ContentDetailShell<HeaderView: View, BodyView: View, CTAView: View
 
     public var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ContentDetailTopBar(title: title, onBack: onBack, action: topBarAction)
                 ScrollView {
                     VStack(alignment: .leading, spacing: Spacing.s4) {

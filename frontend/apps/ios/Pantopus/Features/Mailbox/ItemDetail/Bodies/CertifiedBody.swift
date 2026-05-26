@@ -70,7 +70,7 @@ public struct CertifiedBody: View {
             }
             if certified.termsURL != nil {
                 Button(action: { onViewTerms() }) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Spacing.s1) {
                         Text("Show full terms")
                             .font(.system(size: 12, weight: .semibold))
                         Icon(.chevronDown, size: 13, color: Theme.Color.primary600)

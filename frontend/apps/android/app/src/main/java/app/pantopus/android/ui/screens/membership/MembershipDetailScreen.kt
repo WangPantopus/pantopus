@@ -47,6 +47,8 @@ import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 @Composable
 fun MembershipDetailScreen(
@@ -113,7 +115,7 @@ private fun TopBar(
                 Modifier
                     .fillMaxWidth()
                     .height(52.dp)
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = Spacing.s2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -154,7 +156,7 @@ private fun TopBar(
                 PantopusIconImage(
                     icon = PantopusIcon.Share,
                     contentDescription = "Share membership",
-                    size = 20.dp,
+                    size = Radii.xl2,
                     strokeWidth = 2f,
                     tint = PantopusColors.appText,
                 )
@@ -173,14 +175,14 @@ internal fun LoadingFrame() {
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(Spacing.s4)
                 .testTag("membershipDetailLoading"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
-        Shimmer(width = 360.dp, height = 64.dp, cornerRadius = 12.dp)
-        Shimmer(width = 360.dp, height = 184.dp, cornerRadius = 16.dp)
-        Shimmer(width = 360.dp, height = 176.dp, cornerRadius = 12.dp)
-        Shimmer(width = 360.dp, height = 50.dp, cornerRadius = 12.dp)
+        Shimmer(width = 360.dp, height = 64.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 360.dp, height = 184.dp, cornerRadius = Radii.xl)
+        Shimmer(width = 360.dp, height = 176.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 360.dp, height = 50.dp, cornerRadius = Radii.lg)
     }
 }
 
@@ -193,7 +195,7 @@ internal fun ErrorFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(Spacing.s5)
                 .testTag("membershipDetailError"),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -205,7 +207,7 @@ internal fun ErrorFrame(
             strokeWidth = 2f,
             tint = PantopusColors.error,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Spacing.s3))
         Text(
             text = "Couldn't load membership",
             fontSize = 18.sp,
@@ -213,13 +215,13 @@ internal fun ErrorFrame(
             color = PantopusColors.appText,
             modifier = Modifier.semantics { heading() },
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
         Text(
             text = message,
             fontSize = 13.5.sp,
             color = PantopusColors.appTextSecondary,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.s4))
         PrimaryButton(
             title = "Try again",
             onClick = onRetry,
@@ -246,9 +248,9 @@ internal fun MembershipLoadedContent(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(Spacing.s4)
                 .testTag("membershipDetailContent"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
         content.slaAlert?.let { alert ->
             SlaBanner(alert = alert, onRequestRefund = onRequestRefund, onDismiss = onDismissSla)
@@ -274,7 +276,7 @@ internal fun MembershipLoadedContent(
         ChangeTierButton(onClick = onChangeTier)
         CancelBlock(onCancel = onCancel)
         PolicyFootnote(text = content.policyFootnote)
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s2))
     }
 }
 
@@ -283,7 +285,7 @@ private fun LabeledSection(
     title: String,
     content: @Composable () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Text(
             text = title.uppercase(),
             fontSize = 10.5.sp,
@@ -308,19 +310,19 @@ private fun SlaBanner(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.warningBg)
-                .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(12.dp))
-                .padding(12.dp)
+                .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3)
                 .testTag("membershipDetailSLABanner"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3), verticalAlignment = Alignment.Top) {
             Box(
                 modifier =
                     Modifier
                         .size(32.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(Radii.md))
                         .background(PantopusColors.warning),
                 contentAlignment = Alignment.Center,
             ) {
@@ -346,13 +348,13 @@ private fun SlaBanner(
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Box(
                 modifier =
                     Modifier
                         .weight(1f)
                         .height(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(Radii.md))
                         .background(PantopusColors.error)
                         .clickable(onClick = onRequestRefund)
                         .testTag("membershipDetailRefundButton")
@@ -361,7 +363,7 @@ private fun SlaBanner(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     PantopusIconImage(
                         icon = PantopusIcon.HandCoins,
@@ -383,8 +385,8 @@ private fun SlaBanner(
                     Modifier
                         .weight(1f)
                         .height(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(1.dp, PantopusColors.warning, RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(Radii.md))
+                        .border(1.dp, PantopusColors.warning, RoundedCornerShape(Radii.md))
                         .clickable(onClick = onDismiss)
                         .testTag("membershipDetailSnoozeButton")
                         .semantics { contentDescription = alert.dismissCtaLabel },
@@ -413,9 +415,9 @@ private fun TierCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(16.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .testTag("membershipDetailTierCard"),
     ) {
         TierStrip(content)
@@ -432,7 +434,7 @@ private fun TierCard(
         Box(
             modifier =
                 Modifier
-                    .padding(start = 16.dp)
+                    .padding(start = Spacing.s4)
                     .fillMaxWidth()
                     .height(1.dp)
                     .background(PantopusColors.appBorderSubtle),
@@ -458,7 +460,7 @@ private fun TierStrip(content: MembershipDetailContent) {
             Modifier
                 .fillMaxWidth()
                 .background(content.tier.bgColor)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
                 .semantics {
                     contentDescription =
                         "Your tier ${content.tier.displayName}, " +
@@ -475,7 +477,7 @@ private fun TierStrip(content: MembershipDetailContent) {
                 color = PantopusColors.appTextSecondary,
                 letterSpacing = 0.6.sp,
             )
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 Text(
                     text = content.tier.displayName,
                     fontSize = 22.sp,
@@ -506,10 +508,10 @@ private fun LadderPill(tier: MembershipTier) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(999.dp))
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
+                .padding(horizontal = Spacing.s2, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
@@ -547,16 +549,16 @@ private fun TierInfoRow(
             Modifier
                 .fillMaxWidth()
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
                 .testTag(rowTestTag),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier =
                 Modifier
                     .size(30.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(Radii.md))
                     .background(iconBackground),
             contentAlignment = Alignment.Center,
         ) {
@@ -598,9 +600,9 @@ private fun BenefitsCard(benefits: List<MembershipBenefit>) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .testTag("membershipDetailBenefits"),
     ) {
         benefits.forEachIndexed { index, benefit ->
@@ -635,17 +637,17 @@ private fun BenefitRow(benefit: MembershipBenefit) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
                 .testTag("membershipDetailBenefit_${benefit.id}")
                 .semantics(mergeDescendants = true) { contentDescription = description },
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier =
                 Modifier
                     .size(26.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(Radii.sm))
                     .background(PantopusColors.successBg),
             contentAlignment = Alignment.Center,
         ) {
@@ -660,7 +662,7 @@ private fun BenefitRow(benefit: MembershipBenefit) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 PantopusIconImage(
                     icon = benefit.icon,
@@ -691,7 +693,7 @@ private fun ChangeTierButton(onClick: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .height(50.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.primary600)
                 .clickable(onClick = onClick)
                 .testTag("membershipDetailChangeTier")
@@ -700,7 +702,7 @@ private fun ChangeTierButton(onClick: () -> Unit) {
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             PantopusIconImage(
                 icon = PantopusIcon.ArrowDownUp,
@@ -724,7 +726,7 @@ private fun CancelBlock(onCancel: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         // Single-tap cancel by Pantopus policy — no confirm dialog, no
         // retention questions, no last-second offers.
@@ -736,7 +738,7 @@ private fun CancelBlock(onCancel: () -> Unit) {
                     .testTag("membershipDetailCancel")
                     .semantics { contentDescription = "Cancel membership" },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             PantopusIconImage(
                 icon = PantopusIcon.X,

@@ -128,7 +128,7 @@ public struct PublicProfileView: View {
             title: nil,
             onBack: onBack,
             header: {
-                VStack(spacing: 0) {
+                VStack(spacing: Spacing.s0) {
                     PublicProfileBanner(kind: payload.kind)
                     ProfileHeader(
                         displayName: payload.header.displayName,
@@ -192,7 +192,7 @@ private struct LoadingLayout: View {
     let onBack: @MainActor () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
             VStack(spacing: Spacing.s4) {
                 Shimmer(width: 72, height: 72, cornerRadius: 36)
@@ -216,7 +216,7 @@ private struct ErrorLayout: View {
     let onRetry: @MainActor () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             ContentDetailTopBar(title: nil, onBack: onBack, action: nil)
             EmptyState(
                 icon: .alertCircle,

@@ -37,7 +37,7 @@ public struct GigsFeedView: View {
 
     public var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 topBar
                 searchBar
                 categoryChipRow
@@ -66,7 +66,7 @@ public struct GigsFeedView: View {
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             if let onBack {
                 Button(action: onBack) {
                     Icon(.chevronLeft, size: 22, color: Theme.Color.appText)
@@ -198,7 +198,7 @@ public struct GigsFeedView: View {
             Button {
                 onCompose(viewModel.activeCategory)
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.s2) {
                     Icon(.pencil, size: 15, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
                     Text("Post a task")
                         .font(.system(size: 14, weight: .bold))
@@ -221,7 +221,7 @@ public struct GigsFeedView: View {
     }
 
     private func radiusHint(_ miles: Double) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Icon(.mapPin, size: 13, color: Theme.Color.appTextMuted)
             Group {
                 Text("Within ")
@@ -313,7 +313,7 @@ struct GigRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 CategoryChip(category: content.category)
                 if !content.metaLine.isEmpty {
                     Text(content.metaLine)
@@ -329,7 +329,7 @@ struct GigRow: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
             Text(content.body)
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
@@ -358,10 +358,10 @@ struct GigRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
     }
 }
 
@@ -386,7 +386,7 @@ private struct GigsFilterButton: View {
                     .foregroundStyle(active ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 4)
+            .padding(.vertical, Spacing.s1)
             .background(active ? Theme.Color.primary50 : Theme.Color.appSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
@@ -437,7 +437,7 @@ private struct GigsViewModeToggle: View {
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.s3)
             .frame(height: 32)
             .background(active ? Theme.Color.primary600 : Color.clear)
             .clipShape(Capsule())
@@ -455,7 +455,7 @@ private struct CategoryChip: View {
         Text(category.label.uppercased())
             .font(.system(size: 10, weight: .bold))
             .foregroundStyle(category.color)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, Spacing.s2)
             .padding(.vertical, 2)
             .background(category.color.opacity(0.12))
             .clipShape(Capsule())
@@ -466,13 +466,13 @@ private struct BidPill: View {
     let count: Int
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(.gavel, size: 9, strokeWidth: 2.5, color: Theme.Color.warning)
             Text("\(count) bids")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Theme.Color.warning)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Spacing.s2)
         .padding(.vertical, 2)
         .background(Theme.Color.warningBg)
         .clipShape(Capsule())
@@ -486,7 +486,7 @@ private struct BeTheFirstPill: View {
         Text("Be the first")
             .font(.system(size: 10, weight: .bold))
             .foregroundStyle(Theme.Color.primary700)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, Spacing.s2)
             .padding(.vertical, 2)
             .background(Theme.Color.primary50)
             .clipShape(Capsule())

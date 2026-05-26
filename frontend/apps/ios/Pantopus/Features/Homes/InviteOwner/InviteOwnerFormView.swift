@@ -42,7 +42,7 @@ public struct InviteOwnerFormView: View {
             .accessibilityIdentifier("inviteOwnerForm")
             .task { await viewModel.load() }
             .overlay(alignment: .bottom) { toastOverlay }
-            .animation(.easeOut(duration: 0.2), value: viewModel.toast)
+            .pantopusAnimation(.componentState, value: viewModel.toast)
             .onChange(of: viewModel.shouldDismiss) { _, dismiss in
                 guard dismiss else { return }
                 viewModel.acknowledgeDismiss()

@@ -194,7 +194,7 @@ private struct DetailHeader: View {
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             if let severity = draft.severity {
                 SeverityChip(severity: severity)
@@ -226,7 +226,7 @@ struct SeverityChip: View {
                 .foregroundStyle(severity.foreground)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.s1)
         .background(severity.background)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
         .accessibilityIdentifier("severityChip_\(severity.rawValue)")
@@ -266,7 +266,7 @@ private struct MetaCard: View {
     let draft: EmergencyFormDraft
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             if let verified = draft.verifiedByUserId, !verified.isEmpty {
                 row(label: "Verified by", value: verified, icon: .userRound)
                 Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)

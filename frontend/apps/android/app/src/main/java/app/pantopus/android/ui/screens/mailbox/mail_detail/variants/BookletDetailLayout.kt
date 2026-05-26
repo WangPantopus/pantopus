@@ -223,7 +223,7 @@ private fun CategoryBadge(category: MailItemCategory) {
                 .background(category.rowBackground)
                 .padding(horizontal = Spacing.s2, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = category.icon,
@@ -277,7 +277,7 @@ private fun KeyFactsCard(rows: List<MailDetailKeyFact>) {
                     modifier =
                         Modifier
                             .size(24.dp)
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(Radii.sm))
                             .background(PantopusColors.appSurfaceSunken),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -348,7 +348,7 @@ private fun SenderCard(
                 modifier =
                     Modifier
                         .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(Radii.lg))
                         .background(content.category.accent),
                 contentAlignment = Alignment.Center,
             ) {
@@ -401,7 +401,7 @@ private fun ActionsRow() {
             PantopusIconImage(
                 icon = PantopusIcon.Archive,
                 contentDescription = null,
-                size = 16.dp,
+                size = Radii.xl,
                 tint = PantopusColors.appTextInverse,
             )
             Spacer(Modifier.width(Spacing.s2))
@@ -437,14 +437,14 @@ private fun SecondaryTile(
     Column(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable {}
                 .padding(vertical = 10.dp)
                 .semantics { contentDescription = label },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
             icon = icon,

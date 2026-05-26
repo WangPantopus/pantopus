@@ -57,7 +57,7 @@ public struct AudienceProfileView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             topBar
             content
         }
@@ -89,7 +89,7 @@ public struct AudienceProfileView: View {
             .accessibilityLabel("Edit persona")
             .accessibilityIdentifier("audienceProfileEditPersonaButton")
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 52)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
@@ -117,21 +117,21 @@ public struct AudienceProfileView: View {
 
     private var loadingFrame: some View {
         ScrollView {
-            VStack(spacing: 12) {
-                Shimmer(height: 90, cornerRadius: 16)
+            VStack(spacing: Spacing.s3) {
+                Shimmer(height: 90, cornerRadius: Radii.xl)
                 Shimmer(height: 44, cornerRadius: 22)
                 ForEach(0..<3, id: \.self) { _ in
                     Shimmer(height: 88, cornerRadius: 14)
                 }
             }
-            .padding(16)
+            .padding(Spacing.s4)
         }
         .accessibilityIdentifier("audienceProfileLoading")
     }
 
     private func emptyFrame(message: String) -> some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: Spacing.s4) {
                 VStack(spacing: 14) {
                     ZStack {
                         Circle()
@@ -158,7 +158,7 @@ public struct AudienceProfileView: View {
                         Button {
                             onOpenSetup()
                         } label: {
-                            HStack(spacing: 8) {
+                            HStack(spacing: Spacing.s2) {
                                 Icon(.dollarSign, size: 15, color: Theme.Color.appTextInverse)
                                 Text("Set up payments")
                                     .font(.system(size: 14, weight: .bold))
@@ -176,7 +176,7 @@ public struct AudienceProfileView: View {
                         Button {
                             onComposeBroadcast(viewModel.personaId ?? "")
                         } label: {
-                            HStack(spacing: 8) {
+                            HStack(spacing: Spacing.s2) {
                                 Icon(.share, size: 15, color: Theme.Color.primary700)
                                 Text("Tell people you're here")
                                     .font(.system(size: 14, weight: .bold))
@@ -196,7 +196,7 @@ public struct AudienceProfileView: View {
                         .accessibilityIdentifier("audienceProfileTellPeopleButton")
                     }
                 }
-                .padding(20)
+                .padding(Spacing.s5)
                 .frame(maxWidth: .infinity)
                 .background(Theme.Color.appSurface)
                 .overlay(
@@ -206,15 +206,15 @@ public struct AudienceProfileView: View {
                 .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
 
                 onboardingCard
-                Spacer(minLength: 24)
+                Spacer(minLength: Spacing.s6)
             }
-            .padding(16)
+            .padding(Spacing.s4)
         }
         .accessibilityIdentifier("audienceProfileEmpty")
     }
 
     private var onboardingCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
             Text("Start in three steps")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
@@ -250,13 +250,13 @@ public struct AudienceProfileView: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .lineLimit(2)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .accessibilityElement(children: .combine)
     }
 
     private func errorFrame(message: String) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.s3) {
             Spacer()
             Icon(.alertCircle, size: 40, color: Theme.Color.error)
             Text("Couldn't load Public Profile")
@@ -281,12 +281,12 @@ public struct AudienceProfileView: View {
             .accessibilityIdentifier("audienceProfileRetry")
             Spacer()
         }
-        .padding(20)
+        .padding(Spacing.s5)
         .accessibilityIdentifier("audienceProfileError")
     }
 
     private func loadedFrame(_ loaded: AudienceProfileLoaded) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             statusLine(loaded.header)
             tabStrip
             tabContent(loaded)
@@ -314,13 +314,13 @@ public struct AudienceProfileView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Text("Manage")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.Color.primary700)
                 Icon(.chevronRight, size: 14, color: Theme.Color.primary600)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Spacing.s4)
             .padding(.vertical, 10)
             .frame(minHeight: 44)
             .background(Theme.Color.appSurface)
@@ -337,7 +337,7 @@ public struct AudienceProfileView: View {
     }
 
     private func statusLine(_ header: AudienceHeaderContent) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Icon(.radioTower, size: 15, color: Theme.Color.primary600)
                 .frame(width: 18, height: 18)
             Text("\(Self.formattedCount(header.followerCount)) followers")
@@ -349,16 +349,16 @@ public struct AudienceProfileView: View {
                     .foregroundStyle(Theme.Color.success)
             } else {
                 Text("Invite to grow")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Text("View")
                 .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(Theme.Color.primary600)
             Icon(.chevronRight, size: 12, color: Theme.Color.primary600)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Spacing.s4)
         .frame(height: 38)
         .background(Theme.Color.appSurfaceMuted)
         .overlay(alignment: .bottom) {
@@ -372,9 +372,9 @@ public struct AudienceProfileView: View {
             ForEach(AudienceProfileTab.allCases, id: \.self) { tab in
                 tabButton(tab)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Spacing.s4)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
@@ -386,12 +386,12 @@ public struct AudienceProfileView: View {
         return Button {
             viewModel.selectTab(tab)
         } label: {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 Text(tab.title)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(isActive ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
                     .padding(.top, 10)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, Spacing.s2)
                 Rectangle()
                     .fill(isActive ? Theme.Color.primary600 : SwiftUI.Color.clear)
                     .frame(height: 2)
@@ -416,7 +416,7 @@ public struct AudienceProfileView: View {
 
     private func updatesTab(_ loaded: AudienceProfileLoaded) -> some View {
         ScrollView {
-            VStack(spacing: 12) {
+            VStack(spacing: Spacing.s3) {
                 followerStackCard(header: loaded.header, breakdown: loaded.tierBreakdown, followers: loaded.followers)
                 composerCard(channelId: loaded.channelId)
                 sectionHeader(title: "Recent broadcasts", action: loaded.updates.isEmpty ? nil : "See all")
@@ -427,9 +427,9 @@ public struct AudienceProfileView: View {
                         updateCard(card, tierSegments: loaded.tierBreakdown.segments)
                     }
                 }
-                Spacer(minLength: 24)
+                Spacer(minLength: Spacing.s6)
             }
-            .padding(16)
+            .padding(Spacing.s4)
         }
         .accessibilityIdentifier("audienceProfileUpdatesList")
     }
@@ -439,14 +439,14 @@ public struct AudienceProfileView: View {
         breakdown: TierBreakdownContent,
         followers: [FollowerRowContent]
     ) -> some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: Spacing.s3) {
             VStack(alignment: .leading, spacing: 9) {
                 Text("Follower stack")
                     .font(.system(size: 10.5, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .kerning(0.8)
                     .textCase(.uppercase)
-                HStack(spacing: 0) {
+                HStack(spacing: Spacing.s0) {
                     ForEach(Array(followers.prefix(4).enumerated()), id: \.element.id) { index, follower in
                         tierAvatar(follower)
                             .offset(x: CGFloat(index) * -8)
@@ -467,7 +467,7 @@ public struct AudienceProfileView: View {
                 .padding(.leading, followers.isEmpty ? 0 : CGFloat(max(followers.prefix(4).count - 1, 0)) * 8)
                 HStack(spacing: 10) {
                     ForEach(breakdown.segments.prefix(3), id: \.id) { segment in
-                        HStack(spacing: 4) {
+                        HStack(spacing: Spacing.s1) {
                             Circle().fill(Self.tierColor(rank: segment.rank)).frame(width: 7, height: 7)
                             Text("\(segment.name) \(segment.count)")
                                 .font(.system(size: 10.5, weight: .medium))
@@ -477,7 +477,7 @@ public struct AudienceProfileView: View {
                     }
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             VStack(alignment: .trailing, spacing: 5) {
                 Text(Self.formattedCount(header.followerCount))
                     .font(.system(size: 24, weight: .bold))
@@ -524,7 +524,7 @@ public struct AudienceProfileView: View {
                 .font(.system(size: 10.5, weight: .bold))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .kerning(0.8)
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             if let action {
                 HStack(spacing: 2) {
                     Text(action)
@@ -555,10 +555,10 @@ public struct AudienceProfileView: View {
             ZStack(alignment: .topLeading) {
                 if viewModel.composer.text.isEmpty {
                     Text("Share an update with your followers")
-                        .font(.system(size: 14))
+                        .pantopusTextStyle(.small)
                         .foregroundStyle(Theme.Color.appTextMuted)
                         .padding(.top, 6)
-                        .padding(.leading, 4)
+                        .padding(.leading, Spacing.s1)
                 }
                 TextEditor(text: Binding(
                     get: { viewModel.composer.text },
@@ -586,7 +586,7 @@ public struct AudienceProfileView: View {
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(Theme.Color.appTextInverse)
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Spacing.s4)
                     .frame(height: 38)
                     .background(
                         viewModel.composer.canSubmit && channelId != nil
@@ -629,17 +629,17 @@ public struct AudienceProfileView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
             }
             .padding(10)
             .frame(maxWidth: .infinity)
             .background(Theme.Color.primary50.opacity(0.5))
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(Theme.Color.primary100, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Compose a broadcast")
@@ -663,7 +663,7 @@ public struct AudienceProfileView: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 Text("Visible to \(viewModel.composer.visibility.title)")
                     .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(Theme.Color.primary700)
@@ -678,7 +678,7 @@ public struct AudienceProfileView: View {
     }
 
     private var emptyUpdatesState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.s3) {
             ZStack {
                 Circle().fill(Theme.Color.primary50).frame(width: 52, height: 52)
                 Circle().stroke(Theme.Color.primary100, lineWidth: 1).frame(width: 52, height: 52)
@@ -709,7 +709,7 @@ public struct AudienceProfileView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("audienceProfileEmptyBroadcastCompose")
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, Spacing.s5)
         .padding(.vertical, 28)
         .frame(maxWidth: .infinity)
         .background(Theme.Color.appSurface)
@@ -727,8 +727,8 @@ public struct AudienceProfileView: View {
         Button {
             onOpenBroadcast(card, tierSegments)
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                HStack(spacing: Spacing.s2) {
                     Text(card.timeAgo)
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
@@ -736,7 +736,7 @@ public struct AudienceProfileView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextMuted)
                     visibilityChip(card)
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                     Icon(.moreHorizontal, size: 14, color: Theme.Color.appTextMuted)
                 }
                 Text(card.body)
@@ -749,15 +749,15 @@ public struct AudienceProfileView: View {
                     metricLabel(icon: .radioTower, value: Self.compactCount(card.deliveredCount))
                     metricLabel(icon: .eye, value: Self.compactCount(card.readCount))
                     metricLabel(icon: .heart, value: "\(max(0, card.readCount / 26))")
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Spacing.s0)
                     Icon(.chevronRight, size: 13, color: Theme.Color.appTextMuted)
                 }
-                .padding(.top, 8)
+                .padding(.top, Spacing.s2)
                 .overlay(alignment: .top) {
                     Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
                 }
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.Color.appSurface)
             .overlay(
@@ -803,7 +803,7 @@ public struct AudienceProfileView: View {
         let visible = viewModel.visibleFollowers
         let hasQuery = !viewModel.followerSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         return ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Spacing.s4) {
                 analyticsRow(loaded.analyticsCells)
                 tierStackedBar(loaded.tierBreakdown)
                 tierChipRow(loaded.tierChips)
@@ -816,21 +816,21 @@ public struct AudienceProfileView: View {
                         emptyFollowersState
                     }
                 } else {
-                    VStack(spacing: 8) {
+                    VStack(spacing: Spacing.s2) {
                         ForEach(visible) { follower in
                             followerRow(follower)
                         }
                     }
                 }
-                Spacer(minLength: 24)
+                Spacer(minLength: Spacing.s6)
             }
-            .padding(16)
+            .padding(Spacing.s4)
         }
         .accessibilityIdentifier("audienceProfileFollowersList")
     }
 
     private var followerSearchField: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             Icon(.search, size: 15, color: Theme.Color.appTextMuted)
             TextField(
                 "Search followers by name or handle",
@@ -857,7 +857,7 @@ public struct AudienceProfileView: View {
                 .accessibilityIdentifier("followerSearchClear")
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.s3)
         .frame(height: 40)
         .background(Theme.Color.appSurface)
         .overlay(
@@ -870,7 +870,7 @@ public struct AudienceProfileView: View {
 
     private var followerSortChipRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 ForEach(FollowerSort.allCases, id: \.self) { sort in
                     followerSortChip(sort)
                 }
@@ -886,7 +886,7 @@ public struct AudienceProfileView: View {
         return Button {
             viewModel.selectFollowerSort(sort)
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.s1) {
                 if isActive {
                     Icon(.check, size: 11, strokeWidth: 2.6, color: Theme.Color.appTextInverse)
                 }
@@ -894,7 +894,7 @@ public struct AudienceProfileView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(isActive ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.s3)
             .frame(height: 28)
             .background(isActive ? Theme.Color.primary600 : Theme.Color.appSurface)
             .overlay(
@@ -912,23 +912,23 @@ public struct AudienceProfileView: View {
     }
 
     private var emptyFollowerSearchState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s2) {
             Icon(.search, size: 32, color: Theme.Color.appTextMuted)
             Text("No followers match that search")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
             Text("Try a different name or handle.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
         }
-        .padding(20)
+        .padding(Spacing.s5)
         .frame(maxWidth: .infinity)
         .accessibilityIdentifier("followerSearchEmpty")
     }
 
     private func analyticsRow(_ cells: [AnalyticsCellContent]) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.s2) {
             ForEach(cells) { cell in
                 VStack(alignment: .leading, spacing: 2) {
                     Text(cell.label.uppercased())
@@ -973,19 +973,19 @@ public struct AudienceProfileView: View {
                 .frame(height: 14)
             }
             .frame(height: 14)
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 ForEach(segments, id: \.id) { segment in
                     tierLegendItem(segment)
                 }
             }
         }
-        .padding(12)
+        .padding(Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("tierStackedBar")
     }
 
@@ -1003,7 +1003,7 @@ public struct AudienceProfileView: View {
     }
 
     private func tierLegendItem(_ segment: TierBreakdownContent.TierSegment) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Circle().fill(Self.tierColor(rank: segment.rank)).frame(width: 8, height: 8)
             Text("\(segment.name) · \(segment.count)")
                 .font(.system(size: 10.5))
@@ -1013,7 +1013,7 @@ public struct AudienceProfileView: View {
 
     private func tierChipRow(_ chips: [TierChipContent]) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 ForEach(chips) { chip in
                     let isActive = viewModel.selectedTierRank == chip.rank
                     Button {
@@ -1044,7 +1044,7 @@ public struct AudienceProfileView: View {
         Button {
             onOpenFollower(row)
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 ZStack {
                     Circle().fill(Theme.Color.primary50).frame(width: 40, height: 40)
                     Text(row.displayName.prefix(1).uppercased())
@@ -1064,7 +1064,7 @@ public struct AudienceProfileView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(row.tierName)
                         .font(.system(size: 10, weight: .bold))
@@ -1076,37 +1076,37 @@ public struct AudienceProfileView: View {
                     }
                 }
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("followerRow_\(row.id)")
     }
 
     private var emptyFollowersState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s2) {
             Icon(.user, size: 32, color: Theme.Color.appTextMuted)
             Text("No followers in this tier yet")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
             Text("Share your Public Profile to start building your audience.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
         }
-        .padding(20)
+        .padding(Spacing.s5)
         .frame(maxWidth: .infinity)
     }
 
     // MARK: - Threads tab
 
     private func threadsTab(_ loaded: AudienceProfileLoaded) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             threadsFilterStrip(chips: loaded.threadsFilterChips)
             threadsListBody(loaded: loaded)
         }
@@ -1120,9 +1120,9 @@ public struct AudienceProfileView: View {
                     threadsFilterChip(chip)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Spacing.s4)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
@@ -1165,7 +1165,7 @@ public struct AudienceProfileView: View {
 
     private func threadsListBody(loaded: AudienceProfileLoaded) -> some View {
         ScrollView {
-            VStack(spacing: 8) {
+            VStack(spacing: Spacing.s2) {
                 if loaded.threads.isEmpty {
                     emptyThreadsState
                 } else {
@@ -1179,23 +1179,23 @@ public struct AudienceProfileView: View {
                         }
                     }
                 }
-                Spacer(minLength: 24)
+                Spacer(minLength: Spacing.s6)
             }
-            .padding(16)
+            .padding(Spacing.s4)
         }
     }
 
     private var viewAllMessagesCTA: some View {
         Button(action: onOpenCreatorInbox) {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.s2) {
                 Icon(.inbox, size: 14, color: Theme.Color.primary600)
                 Text("View all messages")
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(Theme.Color.primary700)
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Icon(.chevronRight, size: 12, color: Theme.Color.primary600)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Spacing.s3)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(minHeight: 44)
@@ -1215,7 +1215,7 @@ public struct AudienceProfileView: View {
         Button {
             onOpenThread(row)
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 ZStack {
                     Circle().fill(Theme.Color.primary50).frame(width: 40, height: 40)
                     Text(row.displayName.prefix(1).uppercased())
@@ -1225,7 +1225,7 @@ public struct AudienceProfileView: View {
                         Text("\(row.unreadCount)")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(Theme.Color.appTextInverse)
-                            .padding(.horizontal, 4)
+                            .padding(.horizontal, Spacing.s1)
                             .frame(minWidth: 16, minHeight: 16)
                             .background(Theme.Color.error)
                             .clipShape(Capsule())
@@ -1248,55 +1248,55 @@ public struct AudienceProfileView: View {
                         }
                     }
                     Text(row.preview)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(2)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Text(row.timeAgo)
                     .font(.system(size: 10.5))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
-            .padding(12)
+            .padding(Spacing.s3)
             .background(Theme.Color.appSurface)
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("threadRow_\(row.id)")
     }
 
     private var emptyThreadsState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s2) {
             Icon(.inbox, size: 32, color: Theme.Color.appTextMuted)
             Text("No threads yet")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
             Text("Tier 2+ followers can open a thread with you.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
         }
-        .padding(20)
+        .padding(Spacing.s5)
         .frame(maxWidth: .infinity)
     }
 
     private var emptyFilteredThreadsState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s2) {
             Icon(.inbox, size: 32, color: Theme.Color.appTextMuted)
             Text("No threads in this view")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
             Text("Try another filter to see the rest of your inbox.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
         }
-        .padding(20)
+        .padding(Spacing.s5)
         .frame(maxWidth: .infinity)
         .accessibilityIdentifier("audienceProfileThreadsFilteredEmpty")
     }

@@ -137,7 +137,7 @@ private fun PackageStatusCard(content: PackageBodyContent) {
                         },
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(PantopusIcon.Copy, contentDescription = null, size = 16.dp)
+                PantopusIconImage(PantopusIcon.Copy, contentDescription = null, size = Radii.xl)
             }
         }
         HorizontalDivider(color = PantopusColors.appBorderSubtle)
@@ -238,7 +238,7 @@ private fun CourierMark(carrier: String) {
         contentAlignment = Alignment.Center,
     ) {
         Box(modifier = Modifier.fillMaxWidth().heightIn(min = 3.dp).background(PantopusColors.error))
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             Text(carrierInitials(carrier), style = PantopusTextStyle.caption, color = PantopusColors.appTextInverse)
             Text("PRIORITY", style = PantopusTextStyle.overline, color = PantopusColors.appTextInverse.copy(alpha = 0.85f))
         }
@@ -306,7 +306,7 @@ private fun InsightBullet(
             modifier = Modifier.size(18.dp).clip(RoundedCornerShape(Radii.xs)).background(PantopusColors.appSurface),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon, contentDescription = null, size = 12.dp, tint = PantopusColors.primary700)
+            PantopusIconImage(icon, contentDescription = null, size = Radii.lg, tint = PantopusColors.primary700)
         }
         Text(text, style = PantopusTextStyle.caption, color = PantopusColors.appTextStrong)
     }
@@ -434,7 +434,7 @@ private fun PorchPhotoIllustration(photo: PackageDeliveryPhoto) {
                     .padding(Spacing.s3)
                     .clip(RoundedCornerShape(Radii.xs))
                     .background(PantopusColors.appText.copy(alpha = 0.55f))
-                    .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                    .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
         )
         Row(
             modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.s3),
@@ -451,7 +451,7 @@ private fun PorchPhotoIllustration(photo: PackageDeliveryPhoto) {
                         .padding(Spacing.s3)
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.success)
-                        .padding(horizontal = Spacing.s2, vertical = 4.dp),
+                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
@@ -606,7 +606,7 @@ private fun ReceiveButton(
                 PantopusIconImage(
                     icon = if (isReceived) PantopusIcon.CheckCircle else PantopusIcon.Package,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = foreground,
                 )
             }
@@ -641,7 +641,7 @@ private fun ActionChip(
         PantopusIconImage(
             icon = icon,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             tint = if (icon == PantopusIcon.AlertTriangle) PantopusColors.error else PantopusColors.appTextStrong,
         )
         Text(

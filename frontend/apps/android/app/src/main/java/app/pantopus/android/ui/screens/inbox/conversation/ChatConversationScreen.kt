@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -67,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.inbox.conversation.ai.AiCapabilityChip
 import app.pantopus.android.ui.screens.inbox.conversation.ai.AiEstimateCard
 import app.pantopus.android.ui.screens.inbox.conversation.ai.ChatAiAvatar
@@ -290,7 +292,7 @@ internal fun ChatHeader(
             PantopusIconImage(
                 icon = PantopusIcon.ChevronLeft,
                 contentDescription = "Back",
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = PantopusColors.appText,
             )
         }
@@ -432,12 +434,12 @@ internal fun CreatorAudienceStrip(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, top = 10.dp, end = 12.dp)
+                .padding(start = Spacing.s3, top = 10.dp, end = Spacing.s3)
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.businessBg)
                 .border(1.dp, PantopusColors.business.copy(alpha = 0.18f), RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onOpenAudienceProfile)
-                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .padding(horizontal = 10.dp, vertical = Spacing.s2)
                 .testTag("chatCreatorAudienceStrip"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -478,7 +480,7 @@ internal fun CreatorAudienceStrip(
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = "Open audience profile",
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2.4f,
             tint = PantopusColors.business,
         )
@@ -533,7 +535,7 @@ internal fun CreatorQuotaMeter(quota: ChatCreatorQuota) {
                 Modifier
                     .fillMaxWidth()
                     .height(4.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(Radii.xs))
                     .background(PantopusColors.appSurfaceSunken),
         ) {
             Box(
@@ -541,11 +543,11 @@ internal fun CreatorQuotaMeter(quota: ChatCreatorQuota) {
                     Modifier
                         .fillMaxWidth(progress)
                         .height(4.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(RoundedCornerShape(Radii.xs))
                         .background(PantopusColors.primary600),
             )
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             PantopusIconImage(
                 icon = PantopusIcon.RefreshCw,
                 contentDescription = null,
@@ -660,14 +662,14 @@ private fun HeaderAvatar(
     tierRank: Int? = null,
 ) {
     when {
-        isAi -> ChatAiAvatar(size = 32.dp)
-        isFanThread -> FanPersonaAvatar(initials = fanInitials(counterparty), size = 32.dp)
+        isAi -> ChatAiAvatar(size = 36.dp)
+        isFanThread -> FanPersonaAvatar(initials = fanInitials(counterparty), size = 36.dp)
         counterparty is ChatCounterparty.Person ->
             PersonAvatar(
                 initials = counterparty.initials,
                 verified = counterparty.verified,
                 online = counterparty.online,
-                size = 32.dp,
+                size = 36.dp,
                 ringColor = tierRank?.let(::creatorTierColor),
             )
         counterparty is ChatCounterparty.Group ->
@@ -675,10 +677,10 @@ private fun HeaderAvatar(
                 initials = counterparty.displayName.initials(),
                 verified = false,
                 online = false,
-                size = 32.dp,
+                size = 36.dp,
                 ringColor = tierRank?.let(::creatorTierColor),
             )
-        else -> ChatAiAvatar(size = 32.dp)
+        else -> ChatAiAvatar(size = 36.dp)
     }
 }
 
@@ -808,19 +810,19 @@ private fun FanMembershipStripe(
                 .fillMaxWidth()
                 .height(44.dp)
                 .background(PantopusColors.appSurface)
-                .padding(start = 14.dp, end = 8.dp)
+                .padding(start = 14.dp, end = Spacing.s2)
                 .testTag("chatFanMembershipStripe"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Row(
             modifier =
                 Modifier
                     .clip(RoundedCornerShape(Radii.pill))
                     .background(PantopusColors.warningBg)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             PantopusIconImage(icon = PantopusIcon.Crown, contentDescription = null, size = 10.dp, tint = PantopusColors.warning)
             Text(
@@ -871,10 +873,10 @@ private fun FanQuotaGate(
                 .fillMaxWidth()
                 .height(50.dp)
                 .background(if (entitlement.canReply) PantopusColors.appSurface else PantopusColors.warningBg)
-                .padding(start = 14.dp, end = 8.dp)
+                .padding(start = 14.dp, end = Spacing.s2)
                 .testTag("chatFanQuotaGate"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Row(
             modifier =
@@ -888,7 +890,7 @@ private fun FanQuotaGate(
                     )
                     .padding(horizontal = 9.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             PantopusIconImage(icon = PantopusIcon.MessageSquare, contentDescription = null, size = 11.dp, tint = gateColor)
             Text(
@@ -931,11 +933,28 @@ private fun FanQuotaGate(
 
 @Composable
 private fun LoadingFrame() {
-    Box(
-        modifier = Modifier.fillMaxSize().testTag("chatConversationLoading"),
-        contentAlignment = Alignment.Center,
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(Spacing.s4)
+                .semantics { contentDescription = "Loading conversation" }
+                .testTag("chatConversationLoading"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        CircularProgressIndicator(color = PantopusColors.primary600)
+        repeat(6) { index ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    if (index % 2 == 0) Arrangement.End else Arrangement.Start,
+            ) {
+                Shimmer(
+                    width = if (index % 2 == 0) 220.dp else 180.dp,
+                    height = if (index % 3 == 0) 60.dp else 40.dp,
+                    cornerRadius = Radii.xl,
+                )
+            }
+        }
     }
 }
 
@@ -984,7 +1003,7 @@ private fun PersonEmptyFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = Spacing.s6)
                 .testTag("chatConversationEmpty"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -1012,7 +1031,7 @@ private fun PersonEmptyFrame(
             color = PantopusColors.appTextSecondary,
         )
         Spacer(modifier = Modifier.size(18.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             chips.forEach { chip ->
                 QuickChip(chip = chip, onTap = onChipTap)
             }
@@ -1033,7 +1052,7 @@ private fun FanEmptyFrame(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(top = 14.dp, start = 14.dp, end = 14.dp, bottom = 16.dp)
+                .padding(top = 14.dp, start = 14.dp, end = 14.dp, bottom = Spacing.s4)
                 .testTag("chatConversationFanEmpty"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -1067,9 +1086,9 @@ private fun FanAutoWelcomeCard(modifier: Modifier = Modifier) {
                 .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("chatFanAutoWelcome"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Row(
             modifier =
@@ -1078,7 +1097,7 @@ private fun FanAutoWelcomeCard(modifier: Modifier = Modifier) {
                     .background(PantopusColors.businessBg)
                     .padding(horizontal = 7.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             PantopusIconImage(icon = PantopusIcon.Sparkles, contentDescription = null, size = 9.dp, tint = PantopusColors.business)
             Text(
@@ -1118,7 +1137,7 @@ private fun FanQuotaHero(entitlement: ChatFanEntitlement) {
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.infoBg)
                 .border(1.dp, PantopusColors.infoLight, RoundedCornerShape(Radii.pill))
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .padding(horizontal = Spacing.s3, vertical = 6.dp)
                 .testTag("chatFanQuotaHero"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1145,7 +1164,7 @@ private fun FanOpeners(onOpenerTap: (String) -> Unit) {
         )
     Column(
         modifier = Modifier.fillMaxWidth().testTag("chatFanOpeners"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         openers.forEachIndexed { index, opener ->
             Row(
@@ -1157,7 +1176,7 @@ private fun FanOpeners(onOpenerTap: (String) -> Unit) {
                         .background(PantopusColors.appSurface)
                         .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                         .clickable { onOpenerTap(opener.third) }
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = Spacing.s3)
                         .testTag("chatFanOpener_$index"),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1233,14 +1252,14 @@ private fun EncryptionPill() {
                 .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurfaceMuted)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         PantopusIconImage(
             icon = PantopusIcon.ShieldCheck,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = PantopusColors.primary600,
         )
         Text(
@@ -1364,7 +1383,7 @@ internal fun PopulatedFrame(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize().testTag("chatConversationContent"),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = Spacing.s3),
     ) {
         item {
             // Top-of-list trigger for cursor pagination backwards.
@@ -1375,7 +1394,7 @@ internal fun PopulatedFrame(
         }
         if (conversationMode == ChatConversationMode.FanThread) {
             item(key = "fan_auto_welcome") {
-                FanAutoWelcomeCard(modifier = Modifier.padding(bottom = 12.dp))
+                FanAutoWelcomeCard(modifier = Modifier.padding(bottom = Spacing.s3))
             }
         }
         items(items = rows, key = { it.rowId }) { row ->
@@ -1406,7 +1425,7 @@ private fun BroadcastReferenceCard(reference: ChatBroadcastReference) {
                 .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.business.copy(alpha = 0.18f), RoundedCornerShape(Radii.xl))
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("chatBroadcastReference_${reference.id}"),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1427,7 +1446,7 @@ private fun BroadcastReferenceCard(reference: ChatBroadcastReference) {
                 tint = PantopusColors.business,
             )
         }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             Text(
                 text = "BROADCAST REFERENCED",
                 fontSize = 10.sp,
@@ -1539,7 +1558,7 @@ private fun BubbleRow(
                         onLockedAction = onLockedAction,
                         contentId = content.id,
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                             PantopusIconImage(
                                 icon = PantopusIcon.File,
                                 contentDescription = null,
@@ -1582,8 +1601,8 @@ private fun BubbleContainer(
 ) {
     val shape =
         RoundedCornerShape(
-            topStart = 16.dp,
-            topEnd = 16.dp,
+            topStart = Radii.xl,
+            topEnd = Radii.xl,
             bottomEnd = if (isOut && hasTail) 4.dp else 16.dp,
             bottomStart = if (!isOut && hasTail) 4.dp else 16.dp,
         )
@@ -1642,7 +1661,7 @@ private fun LockedPaywallOverlay(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 12.dp, tint = PantopusColors.primary600)
+            PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = Radii.lg, tint = PantopusColors.primary600)
             Text(
                 text = "Upgrade to read",
                 fontSize = 12.sp,
@@ -1667,10 +1686,10 @@ private fun PaidSupportFooter(
     Row(
         modifier =
             Modifier
-                .padding(top = 4.dp)
+                .padding(top = Spacing.s1)
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.warningBg)
-                .padding(horizontal = 9.dp, vertical = 4.dp)
+                .padding(horizontal = 9.dp, vertical = Spacing.s1)
                 .testTag("chatPaidSupportFooter_$contentId"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -1720,8 +1739,8 @@ private fun PhotoBubble(
 ) {
     val shape =
         RoundedCornerShape(
-            topStart = 16.dp,
-            topEnd = 16.dp,
+            topStart = Radii.xl,
+            topEnd = Radii.xl,
             bottomEnd = if (isOut && hasTail) 4.dp else 16.dp,
             bottomStart = if (!isOut && hasTail) 4.dp else 16.dp,
         )
@@ -1759,7 +1778,7 @@ private fun PhotoBubble(
 private fun PhotoPlaceholder(modifier: Modifier = Modifier) {
     Box(modifier = modifier.background(PantopusColors.appSurfaceSunken)) {
         Row(
-            modifier = Modifier.fillMaxSize().padding(start = 8.dp),
+            modifier = Modifier.fillMaxSize().padding(start = Spacing.s2),
             horizontalArrangement = Arrangement.spacedBy(9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1783,7 +1802,7 @@ private fun PhotoPlaceholder(modifier: Modifier = Modifier) {
             modifier =
                 Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 10.dp, bottom = 8.dp)
+                    .padding(start = 10.dp, bottom = Spacing.s2)
                     .clip(RoundedCornerShape(Radii.pill))
                     .background(PantopusColors.appSurface.copy(alpha = 0.72f))
                     .padding(horizontal = 7.dp, vertical = 2.dp),
@@ -1809,15 +1828,15 @@ private fun AiReplyBubble(
                 .widthIn(max = 300.dp)
                 .clip(
                     RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomEnd = 16.dp,
+                        topStart = Radii.xl,
+                        topEnd = Radii.xl,
+                        bottomEnd = Radii.xl,
                         bottomStart = if (hasTail) 4.dp else 16.dp,
                     ),
                 )
                 .background(PantopusColors.appSurfaceSunken)
                 .padding(horizontal = 13.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         AiTag()
         Text(text = body.text, fontSize = 14.sp, color = PantopusColors.appText)
@@ -1834,7 +1853,7 @@ private fun AiTag() {
                 .background(PantopusColors.magicBg)
                 .padding(horizontal = 6.dp, vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(icon = PantopusIcon.Bot, contentDescription = null, size = 9.dp, tint = PantopusColors.magic)
         Text(
@@ -1866,13 +1885,13 @@ private fun SystemLinkPill(body: ChatBubbleBody.SystemLink) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp)
+                .padding(vertical = Spacing.s1)
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(bg)
                 .border(1.dp, fg.copy(alpha = 0.2f), RoundedCornerShape(Radii.pill))
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Box(
             modifier =
@@ -1885,7 +1904,7 @@ private fun SystemLinkPill(body: ChatBubbleBody.SystemLink) {
             PantopusIconImage(
                 icon = PantopusIcon.Info,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = PantopusColors.appTextInverse,
             )
         }
@@ -1928,7 +1947,7 @@ private fun StampRow(
             null -> stamp
         }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement =
             if (content.side == ChatMessageSide.Outgoing) Arrangement.End else Arrangement.Start,
@@ -1952,11 +1971,11 @@ private fun StampRow(
                         contentDescription = null,
                         size = 11.dp,
                         tint = PantopusColors.appTextSecondary,
-                        modifier = Modifier.padding(start = 4.dp),
+                        modifier = Modifier.padding(start = Spacing.s1),
                     )
                 ChatDeliveryState.Sending ->
                     CircularProgressIndicator(
-                        modifier = Modifier.padding(start = 4.dp).size(10.dp),
+                        modifier = Modifier.padding(start = Spacing.s1).size(10.dp),
                         strokeWidth = 1.5.dp,
                         color = PantopusColors.appTextSecondary,
                     )
@@ -1991,7 +2010,7 @@ private fun StampRow(
 
 @Composable
 private fun ReadReceipt(timestamp: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
         Text(
             text = "Read $timestamp",
             fontSize = 10.sp,
@@ -2001,7 +2020,7 @@ private fun ReadReceipt(timestamp: String) {
         PantopusIconImage(
             icon = PantopusIcon.CheckCheck,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             strokeWidth = 2.5f,
             tint = PantopusColors.primary600,
         )
@@ -2015,10 +2034,10 @@ internal fun TypingIndicator(initials: String) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(start = 14.dp, top = 8.dp, end = 14.dp, bottom = 6.dp)
+                .padding(start = 14.dp, top = Spacing.s2, end = 14.dp, bottom = 6.dp)
                 .testTag("chatTypingIndicator"),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         MiniAvatar(initials = initials, hidden = false)
         Row(
@@ -2026,10 +2045,10 @@ internal fun TypingIndicator(initials: String) {
                 Modifier
                     .clip(
                         RoundedCornerShape(
-                            topStart = 16.dp,
-                            topEnd = 16.dp,
-                            bottomEnd = 16.dp,
-                            bottomStart = 4.dp,
+                            topStart = Radii.xl,
+                            topEnd = Radii.xl,
+                            bottomEnd = Radii.xl,
+                            bottomStart = Radii.xs,
                         ),
                     )
                     .background(PantopusColors.appSurfaceSunken)
@@ -2037,14 +2056,14 @@ internal fun TypingIndicator(initials: String) {
                         1.dp,
                         PantopusColors.appBorder,
                         RoundedCornerShape(
-                            topStart = 16.dp,
-                            topEnd = 16.dp,
-                            bottomEnd = 16.dp,
-                            bottomStart = 4.dp,
+                            topStart = Radii.xl,
+                            topEnd = Radii.xl,
+                            bottomEnd = Radii.xl,
+                            bottomStart = Radii.xs,
                         ),
                     )
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    .padding(horizontal = Spacing.s3, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
         ) {
             repeat(3) { index ->
                 val opacity by transition.animateFloat(
@@ -2090,9 +2109,9 @@ internal fun Composer(
     Box(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = Spacing.s2, bottom = Spacing.s4),
             verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             Box(
                 modifier =
@@ -2128,9 +2147,9 @@ internal fun Composer(
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appSurfaceSunken)
                         .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
-                        .padding(start = 14.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                        .padding(start = Spacing.s3, end = Spacing.s1, top = 2.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 Box(modifier = Modifier.weight(1f)) {
                     if (text.isEmpty()) {
@@ -2243,8 +2262,8 @@ internal fun AttachmentStripView(
             modifier =
                 Modifier
                     .horizontalScroll(rememberScrollState())
-                    .padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(start = Spacing.s3, end = Spacing.s3, top = 10.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             attachments.forEach { attachment ->
                 AttachmentTile(attachment = attachment, onRemove = onRemove)
@@ -2341,16 +2360,16 @@ internal fun FanTierUpgradePromptSheet(entitlement: ChatFanEntitlement) {
             Modifier
                 .fillMaxWidth()
                 .background(PantopusColors.appSurface)
-                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 24.dp)
+                .padding(start = Spacing.s5, end = Spacing.s5, top = Spacing.s3, bottom = Spacing.s6)
                 .testTag("chatFanUpgradePromptSheet"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
             Box(
                 modifier = Modifier.size(44.dp).clip(CircleShape).background(PantopusColors.primary50),
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 20.dp, tint = PantopusColors.primary600)
+                PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = Radii.xl2, tint = PantopusColors.primary600)
             }
             Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
                 Text(
@@ -2423,7 +2442,7 @@ private fun ErrorFrame(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(Spacing.s6)
                 .testTag("chatConversationError"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

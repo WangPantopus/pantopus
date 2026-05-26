@@ -36,6 +36,8 @@ import app.pantopus.android.ui.screens.shared.wizard.blocks.TimelineStage
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.Spacing
 
 /**
  * T3.6 Status / Waiting — pure presentational. Caller builds a
@@ -67,8 +69,8 @@ fun StatusWaitingScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+                    .padding(Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s5),
         ) {
             Illustration(content.illustration)
             HeadlineBlock(content)
@@ -89,7 +91,7 @@ fun StatusWaitingScreen(
             if (content.explainerBullets.isNotEmpty()) {
                 ExplainerBlock(content.explainerBullets)
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(Spacing.s6))
         }
         if (content.primaryCta != null || content.secondaryCta != null) {
             StickyCtas(
@@ -130,7 +132,7 @@ private fun Illustration(state: StatusIllustration) {
 
 @Composable
 private fun HeadlineBlock(content: StatusWaitingContent) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Text(
             text = content.headline,
             fontSize = 22.sp,
@@ -152,7 +154,7 @@ private fun EtaChip(text: String) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.warningBg)
                 .padding(horizontal = 10.dp, vertical = 6.dp)
                 .testTag("statusEtaChip"),
@@ -162,7 +164,7 @@ private fun EtaChip(text: String) {
         PantopusIconImage(
             icon = PantopusIcon.AlertCircle,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             strokeWidth = 2f,
             tint = PantopusColors.warning,
         )
@@ -184,14 +186,14 @@ private fun ActionCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onTap)
-                .padding(12.dp)
+                .padding(Spacing.s3)
                 .testTag("statusActionCard_${card.id}"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
             modifier = Modifier.size(36.dp).clip(CircleShape).background(PantopusColors.primary50),
@@ -219,7 +221,7 @@ private fun ActionCard(
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
             contentDescription = null,
-            size = 16.dp,
+            size = Radii.xl,
             strokeWidth = 2f,
             tint = PantopusColors.appTextSecondary,
         )
@@ -232,12 +234,12 @@ private fun ExplainerBlock(bullets: List<String>) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(12.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(14.dp)
                 .testTag("statusExplainer"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Text(
             text = "WHAT HAPPENS NEXT",
@@ -249,7 +251,7 @@ private fun ExplainerBlock(bullets: List<String>) {
         bullets.forEach { bullet ->
             Row(
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 PantopusIconImage(
                     icon = PantopusIcon.Check,
@@ -285,8 +287,8 @@ private fun StickyCtas(
                 Modifier
                     .fillMaxWidth()
                     .background(PantopusColors.appSurface)
-                    .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(Spacing.s4),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             secondary?.let { cta ->
                 Box(
@@ -345,7 +347,7 @@ fun StatusWaitingBody(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().testTag("statusWaitingBody"),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s5),
     ) {
         Illustration(content.illustration)
         HeadlineBlock(content)

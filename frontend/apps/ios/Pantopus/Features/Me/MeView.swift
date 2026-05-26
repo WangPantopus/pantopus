@@ -77,7 +77,7 @@ public struct MeView: View {
                     .padding(.horizontal, Spacing.s4)
                 Shimmer(height: 70, cornerRadius: Radii.lg)
                     .padding(.horizontal, Spacing.s4)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s2), count: 3), spacing: Spacing.s2) {
                     ForEach(0..<6, id: \.self) { _ in
                         Shimmer(height: 72, cornerRadius: Radii.md)
                     }
@@ -93,7 +93,7 @@ public struct MeView: View {
 
     private func populatedFrame(_ active: MeIdentityContent) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: Spacing.s0) {
                 MeHeader(
                     content: active
                 ) { viewModel.selectIdentity($0) }
@@ -187,7 +187,7 @@ private struct MeHeader: View {
                         .foregroundStyle(Theme.Color.appTextInverse.opacity(0.85))
                         .lineLimit(1)
                     if let locality = content.locality, !locality.isEmpty {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Spacing.s1) {
                             Icon(.mapPin, size: 11, color: Theme.Color.appTextInverse.opacity(0.85))
                             Text(locality)
                                 .font(.system(size: 12, weight: .medium))
@@ -196,7 +196,7 @@ private struct MeHeader: View {
                         }
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
             }
             if let tagline = content.tagline, !tagline.isEmpty {
                 Text(tagline)
@@ -282,7 +282,7 @@ private struct MeStatsRow: View {
     let stats: [MeStat]
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             ForEach(Array(stats.enumerated()), id: \.element.id) { index, stat in
                 VStack(spacing: 2) {
                     Text(stat.value)
@@ -294,7 +294,7 @@ private struct MeStatsRow: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, Spacing.s3)
                 if index < stats.count - 1 {
                     Rectangle()
                         .fill(Theme.Color.appBorderSubtle)
@@ -322,7 +322,7 @@ private struct MeActionGrid: View {
     let onTap: @MainActor (MeActionTile) -> Void
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s2), count: 3), spacing: Spacing.s2) {
             ForEach(tiles) { tile in
                 Button { onTap(tile) } label: {
                     ZStack(alignment: .topTrailing) {
@@ -375,10 +375,10 @@ private struct MeSectionGroup: View {
                 .tracking(0.4)
                 .foregroundStyle(Theme.Color.appTextMuted)
                 .padding(.leading, Spacing.s1)
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
                     Button { onTap(row) } label: {
-                        HStack(spacing: 12) {
+                        HStack(spacing: Spacing.s3) {
                             Icon(row.icon, size: 17, color: Theme.Color.appTextStrong)
                             Text(row.label)
                                 .font(.system(size: 13.5, weight: .semibold))
@@ -392,7 +392,7 @@ private struct MeSectionGroup: View {
                             Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
                         }
                         .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, Spacing.s3)
                         .frame(minHeight: 48)
                         .contentShape(Rectangle())
                     }
@@ -424,7 +424,7 @@ private struct MeDestructiveCard: View {
 
     var body: some View {
         Button(action: onAction) {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 Icon(icon, size: 17, color: Theme.Color.error)
                 Text(label)
                     .font(.system(size: 13.5, weight: .semibold))

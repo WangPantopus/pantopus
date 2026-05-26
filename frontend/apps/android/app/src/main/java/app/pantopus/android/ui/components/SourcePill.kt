@@ -16,7 +16,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -55,7 +54,7 @@ fun SourcePill(
             modifier
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(tone.background)
-                .padding(horizontal = Spacing.s2, vertical = 4.dp)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
                 .semantics { contentDescription = "$text, ${tone.a11yWord}" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
@@ -64,7 +63,7 @@ fun SourcePill(
             PantopusIconImage(
                 icon = icon,
                 contentDescription = null,
-                size = 12.dp,
+                size = Radii.lg,
                 tint = tone.foreground,
             )
         }

@@ -24,7 +24,7 @@ public struct BlockedUsersView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             SettingsTopBar(title: "Blocked users", onBack: onBack)
                 .accessibilityIdentifier("blockedUsersTopBar")
             ListOfRowsView(dataSource: viewModel)

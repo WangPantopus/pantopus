@@ -316,7 +316,7 @@ private struct OptionRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 TextField("Option \(index + 1)", text: $label)
-                    .font(.system(size: 16, weight: .regular))
+                    .font(Theme.Font.body)
                     .foregroundStyle(Theme.Color.appText)
             }
         }

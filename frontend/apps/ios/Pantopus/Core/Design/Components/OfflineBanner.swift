@@ -56,15 +56,15 @@ private struct OfflineBannerModifier: ViewModifier {
     @State private var dismissed = false
 
     func body(content: Content) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             if isOffline && !dismissed {
                 OfflineBanner { dismissed = true }
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
             content
         }
-        .animation(.easeInOut(duration: 0.2), value: isOffline)
-        .animation(.easeInOut(duration: 0.2), value: dismissed)
+        .pantopusAnimation(.componentState, value: isOffline)
+        .pantopusAnimation(.componentState, value: dismissed)
         .onChange(of: isOffline) { _, online in
             // Reset the dismiss flag whenever connectivity flips back so
             // the banner re-appears on the next offline transition.

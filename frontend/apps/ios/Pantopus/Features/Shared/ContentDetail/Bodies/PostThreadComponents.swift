@@ -114,7 +114,7 @@ struct CommentRow: View {
                             .foregroundStyle(Theme.Color.appTextMuted)
                     }
                     Text(comment.body)
-                        .font(.system(size: 12, weight: .regular))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextStrong)
                         .lineSpacing(3)
                 }
@@ -155,7 +155,7 @@ struct CommentRow: View {
                 }
                 .padding(.leading, Spacing.s1)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.vertical, 2)
     }

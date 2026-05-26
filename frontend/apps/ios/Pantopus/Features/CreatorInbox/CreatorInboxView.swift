@@ -44,7 +44,7 @@ public struct CreatorInboxView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             topBar
             content
         }
@@ -57,7 +57,7 @@ public struct CreatorInboxView: View {
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack(alignment: .center, spacing: 0) {
+        HStack(alignment: .center, spacing: Spacing.s0) {
             Button(action: onBack) {
                 Icon(.chevronLeft, size: 22, color: Theme.Color.appText)
                     .frame(width: 36, height: 36)
@@ -80,7 +80,7 @@ public struct CreatorInboxView: View {
             .frame(maxWidth: .infinity)
             .accessibilityIdentifier("creatorInboxTitle")
 
-            HStack(spacing: 0) {
+            HStack(spacing: Spacing.s0) {
                 Icon(.check, size: 19, color: Theme.Color.appTextStrong)
                     .frame(width: 36, height: 36)
                     .accessibilityHidden(true)
@@ -89,7 +89,7 @@ public struct CreatorInboxView: View {
                     .accessibilityHidden(true)
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Spacing.s2)
         .frame(height: 56)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
@@ -122,20 +122,20 @@ public struct CreatorInboxView: View {
 
     private var loadingFrame: some View {
         ScrollView {
-            VStack(spacing: 12) {
+            VStack(spacing: Spacing.s3) {
                 Shimmer(height: 36, cornerRadius: Radii.sm)
                 Shimmer(height: 44, cornerRadius: Radii.pill)
                 ForEach(0..<5, id: \.self) { _ in
                     Shimmer(height: 68, cornerRadius: Radii.lg)
                 }
             }
-            .padding(16)
+            .padding(Spacing.s4)
         }
         .accessibilityIdentifier("creatorInboxLoading")
     }
 
     private func loadedFrame(_ loaded: CreatorInboxLoaded) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             countsBanner(loaded.counts)
             filterStrip(chips: loaded.chips)
             threadsList(rows: loaded.rows, isCrossPersona: loaded.header.isCrossPersona)
@@ -180,7 +180,7 @@ public struct CreatorInboxView: View {
     private func countsBanner(_ counts: CreatorInboxCounts) -> some View {
         HStack(spacing: 14) {
             Icon(.inbox, size: 15, color: Theme.Color.primary600)
-            HStack(spacing: 0) {
+            HStack(spacing: Spacing.s0) {
                 Text("\(counts.total)")
                     .font(.system(size: 12.5, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
@@ -200,7 +200,7 @@ public struct CreatorInboxView: View {
                     .font(.system(size: 12.5))
                     .foregroundStyle(Theme.Color.appTextStrong)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
             Button(action: onOpenSettings) {
                 HStack(spacing: 2) {
                     Text("Settings")
@@ -212,7 +212,7 @@ public struct CreatorInboxView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("creatorInboxSettingsLink")
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Spacing.s4)
         .padding(.vertical, 10)
         .background(Theme.Color.appSurfaceMuted)
         .overlay(alignment: .bottom) {
@@ -234,9 +234,9 @@ public struct CreatorInboxView: View {
                     filterChip(chip)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Spacing.s4)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, Spacing.s3)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
@@ -283,7 +283,7 @@ public struct CreatorInboxView: View {
                 filteredEmptyState
             } else {
                 ScrollView {
-                    VStack(spacing: 0) {
+                    VStack(spacing: Spacing.s0) {
                         ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                             threadRow(row, isLast: index == rows.count - 1, isCrossPersona: isCrossPersona)
                         }
@@ -294,9 +294,9 @@ public struct CreatorInboxView: View {
                             .stroke(Theme.Color.appBorder, lineWidth: 1)
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 20)
+                    .padding(.horizontal, Spacing.s4)
+                    .padding(.top, Spacing.s3)
+                    .padding(.bottom, Spacing.s5)
                 }
                 .refreshable { await viewModel.refresh() }
                 .accessibilityIdentifier("creatorInboxList")
@@ -305,7 +305,7 @@ public struct CreatorInboxView: View {
     }
 
     private var filteredEmptyState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s2) {
             Spacer()
             Icon(.inbox, size: 32, color: Theme.Color.appTextMuted)
             Text("No threads in this view")
@@ -313,12 +313,12 @@ public struct CreatorInboxView: View {
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
             Text("Try another filter to see the rest of your inbox.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
             Spacer()
         }
-        .padding(20)
+        .padding(Spacing.s5)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("creatorInboxFilteredEmpty")
     }
@@ -327,13 +327,13 @@ public struct CreatorInboxView: View {
 
     private var emptyFrame: some View {
         ScrollView {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 emptyHero
                 emptyPromptList
                 emptyFootnote
             }
             .padding(.horizontal, 28)
-            .padding(.top, 32)
+            .padding(.top, Spacing.s8)
             .padding(.bottom, 60)
             .frame(maxWidth: .infinity)
         }
@@ -348,7 +348,7 @@ public struct CreatorInboxView: View {
                     .frame(width: 88, height: 88)
                 Icon(.inbox, size: 38, strokeWidth: 1.7, color: Theme.Color.primary600)
             }
-            VStack(spacing: 8) {
+            VStack(spacing: Spacing.s2) {
                 Text("No DM threads yet")
                     .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(Theme.Color.appText)
@@ -367,7 +367,7 @@ public struct CreatorInboxView: View {
     }
 
     private var emptyPromptList: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.s2) {
             emptyPromptRow(
                 CreatorInboxPromptContent(
                     id: "broadcast",
@@ -407,7 +407,7 @@ public struct CreatorInboxView: View {
         action: @escaping @MainActor () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.s3) {
                 ZStack {
                     RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
                         .fill(Theme.Color.primary50)
@@ -423,7 +423,7 @@ public struct CreatorInboxView: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(1)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 HStack(spacing: 2) {
                     Text(prompt.cta)
                         .font(.system(size: 11, weight: .bold))
@@ -467,19 +467,19 @@ public struct CreatorInboxView: View {
         Button {
             onOpenThread(row)
         } label: {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: Spacing.s3) {
                 avatar(row)
                 middle(row, isCrossPersona: isCrossPersona)
                 if row.unread {
                     Circle()
                         .fill(Theme.Color.primary600)
                         .frame(width: 8, height: 8)
-                        .padding(.top, 8)
+                        .padding(.top, Spacing.s2)
                         .accessibilityHidden(true)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(minHeight: 56)
             .background(Theme.Color.appSurface)
@@ -538,7 +538,7 @@ public struct CreatorInboxView: View {
                     Icon(.flag, size: 11, strokeWidth: 2.4, color: Theme.Color.warning)
                         .accessibilityLabel("Flagged")
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Text(row.timeAgo)
                     .font(.system(size: 10.5, weight: row.unread ? .bold : .medium))
                     .foregroundStyle(row.unread ? Theme.Color.primary600 : Theme.Color.appTextMuted)

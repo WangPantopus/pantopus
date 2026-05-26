@@ -79,7 +79,7 @@ public struct MailItemDetailShell<
 
     public var body: some View {
         ZStack(alignment: .bottom) {
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 MailItemDetailTopBar(config: topBar)
                 ScrollView {
                     VStack(alignment: .leading, spacing: Spacing.s3) {
@@ -219,7 +219,7 @@ public struct MailItemDetailTopBar: View {
     @ViewBuilder private var backButton: some View {
         if let onBack = config.onBack {
             Button(action: { onBack() }) {
-                HStack(spacing: 0) {
+                HStack(spacing: Spacing.s0) {
                     Icon(.chevronLeft, size: 22, color: Theme.Color.primary600)
                     Text("Mailbox")
                         .font(.system(size: 15, weight: .regular))
@@ -310,7 +310,7 @@ public struct AIElfStripView: View {
                 Icon(.sparkles, size: 13, color: Theme.Color.appTextInverse)
                     .frame(width: 24, height: 24)
                     .background(Theme.Color.primary600)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md))
                 Text(content.headline)
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Theme.Color.primary800)
@@ -365,10 +365,10 @@ public struct AIElfStripView: View {
             )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
+            RoundedRectangle(cornerRadius: Radii.xl)
                 .stroke(Theme.Color.primary100, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl))
     }
 }
 
@@ -381,16 +381,16 @@ private struct AIElfBulletRow: View {
                 .frame(width: 16, height: 16)
                 .background(Theme.Color.appSurface)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: Radii.xs)
                         .stroke(Theme.Color.primary100, lineWidth: 1)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .clipShape(RoundedRectangle(cornerRadius: Radii.xs))
                 .padding(.top, 1)
             (
                 Text(bullet.label).font(.system(size: 12, weight: .bold))
                     .foregroundColor(Theme.Color.appText)
                     + Text(bullet.text.map { " — \($0)" } ?? "")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundColor(Theme.Color.appTextStrong)
             )
             .fixedSize(horizontal: false, vertical: true)
@@ -410,7 +410,7 @@ public struct AttachmentsRowView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
             HStack(spacing: Spacing.s1) {
                 Text(content.title.uppercased())
                     .font(.system(size: 11, weight: .bold))
@@ -438,10 +438,10 @@ public struct AttachmentsRowView: View {
         }
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg)
+            RoundedRectangle(cornerRadius: Radii.xl)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl))
     }
 }
 
@@ -464,7 +464,7 @@ private struct AttachmentRow: View {
                             .lineLimit(1)
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Spacing.s0)
                 Icon(.download, size: 14, color: Theme.Color.appTextStrong)
                     .frame(width: 32, height: 32)
                     .background(Circle().fill(Theme.Color.appSurfaceSunken))
@@ -486,10 +486,10 @@ private struct AttachmentRow: View {
             .frame(width: 36, height: 44)
             .background(tokens.background)
             .overlay(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: Radii.sm)
                     .stroke(tokens.border, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.sm))
     }
 }
 

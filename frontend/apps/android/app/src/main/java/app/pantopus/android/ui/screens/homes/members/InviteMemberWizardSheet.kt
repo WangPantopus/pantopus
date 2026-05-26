@@ -238,7 +238,7 @@ private fun RoleTile(
             PantopusIconImage(
                 icon = PantopusIcon.CheckCircle,
                 contentDescription = null,
-                size = 20.dp,
+                size = Radii.xl2,
                 tint = PantopusColors.home,
             )
         }

@@ -183,7 +183,7 @@ private struct ReviewStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             HeadlineBlock("Review", subtitle: "Double-check the details before adding the bill.")
-            VStack(spacing: 0) {
+            VStack(spacing: Spacing.s0) {
                 reviewRow(label: "Payee", value: viewModel.payee.isEmpty ? "—" : viewModel.payee)
                 divider
                 reviewRow(label: "Amount", value: viewModel.parsedAmount().map(BillsListViewModel.formatCurrency) ?? "—")

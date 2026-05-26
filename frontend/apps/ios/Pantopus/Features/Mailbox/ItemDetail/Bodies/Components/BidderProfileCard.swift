@@ -51,7 +51,7 @@ public struct BidderProfileCard: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .lineLimit(2)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Spacing.s0)
         }
     }
 
@@ -99,7 +99,7 @@ public struct BidderProfileCard: View {
     }
 
     private var statsStrip: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: Spacing.s0) {
             statCell(label: "Rating") {
                 HStack(spacing: 3) {
                     Icon(.star, size: 13, color: Theme.Color.warning)
@@ -156,7 +156,7 @@ public struct BidderProfileCard: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .padding(.horizontal, Spacing.s2)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, Spacing.s1)
                         .background(Theme.Color.appSurface)
                         .overlay(
                             RoundedRectangle(cornerRadius: Radii.pill)

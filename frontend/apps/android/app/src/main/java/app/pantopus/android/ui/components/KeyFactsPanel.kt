@@ -125,7 +125,7 @@ private fun KeyFactRowView(row: KeyFactRow) {
                 PantopusIconImage(
                     icon = if (justCopied) PantopusIcon.Check else PantopusIcon.Copy,
                     contentDescription = null,
-                    size = 16.dp,
+                    size = Radii.xl,
                     tint = PantopusColors.primary600,
                 )
             }

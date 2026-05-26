@@ -210,7 +210,7 @@ private fun BrandTile(
             SubcomposeAsyncImage(
                 model = brandLogoUrl,
                 contentDescription = null,
-                modifier = Modifier.padding(4.dp),
+                modifier = Modifier.padding(Spacing.s1),
                 error = { BrandInitials(brandName) },
             )
         } else {
@@ -252,7 +252,7 @@ private fun StatusPill(isExpired: Boolean) {
         PantopusIconImage(
             icon = if (isExpired) PantopusIcon.AlertCircle else PantopusIcon.Clock,
             contentDescription = null,
-            size = 12.dp,
+            size = Radii.lg,
             tint = foreground,
         )
         Text(
