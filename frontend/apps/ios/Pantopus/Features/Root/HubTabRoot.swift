@@ -255,16 +255,23 @@ public struct HubTabRoot: View {
         if !path.isEmpty { path.removeLast() }
     }
 
-    private func handleListingCreated(_ listingId: String, push: @escaping (HubRoute) -> Void) {
+    private func handleListingCreated(
+        _ listingId: String,
+        push: @escaping @MainActor @Sendable (HubRoute) -> Void
+    ) {
         Task { @MainActor in
             pop()
             push(.listingDetail(listingId: listingId))
         }
     }
 
-    private func listingCreatedHandler(push: @escaping (HubRoute) -> Void) -> (String) -> Void {
+    private func listingCreatedHandler(
+        push: @escaping @MainActor @Sendable (HubRoute) -> Void
+    ) -> @Sendable (String) -> Void {
         { listingId in
-            handleListingCreated(listingId, push: push)
+            Task { @MainActor in
+                handleListingCreated(listingId, push: push)
+            }
         }
     }
 
@@ -498,7 +505,7 @@ public struct HubTabRoot: View {
     @ViewBuilder
     private func destination(
         for route: HubRoute,
-        push: @escaping (HubRoute) -> Void
+        push: @escaping @MainActor @Sendable (HubRoute) -> Void
     ) -> some View {
         switch route {
         case .myHomes:
@@ -590,7 +597,7 @@ public struct HubTabRoot: View {
         case let .logMaintenance(homeId):
             LogMaintenanceFormView(
                 viewModel: LogMaintenanceFormViewModel(homeId: homeId),
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onSubmitted: { taskId in
                     Task { @MainActor in
                         path.removeAll { route in
@@ -605,7 +612,7 @@ public struct HubTabRoot: View {
             MaintenanceDetailView(
                 homeId: homeId,
                 taskId: taskId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onEdit: {
                     Task { @MainActor in
                         push(.editMaintenance(homeId: homeId, taskId: taskId))
@@ -618,7 +625,7 @@ public struct HubTabRoot: View {
                     homeId: homeId,
                     mode: .edit(taskId: taskId)
                 ),
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onSubmitted: { _ in
                     Task { @MainActor in
                         if !path.isEmpty { path.removeLast() }
@@ -633,7 +640,7 @@ public struct HubTabRoot: View {
             BillDetailView(
                 homeId: homeId,
                 billId: billId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onEdit: {
                     Task { @MainActor in
                         push(.addBill(homeId: homeId, billId: billId))
@@ -644,7 +651,7 @@ public struct HubTabRoot: View {
             AddBillWizardView(
                 homeId: homeId,
                 billId: billId,
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onCreated: { newBillId in
                     // Replace the wizard with the new bill's detail so
                     // Back returns to the Bills list, not the success
@@ -659,7 +666,7 @@ public struct HubTabRoot: View {
                     // Edit mode pops back to the bill detail in place
                     // — no new detail to push since the same bill is
                     // already on the stack underneath the wizard.
-                    if !path.isEmpty { path.removeLast() }
+                    Task { @MainActor in pop() }
                 }
             )
         case let .homePolls(homeId):
@@ -670,13 +677,9 @@ public struct HubTabRoot: View {
             PollDetailView(
                 homeId: homeId,
                 pollId: pollId
-            ) {
-                if !path.isEmpty { path.removeLast() }
-            }
+            ) { Task { @MainActor in pop() } }
         case let .startPoll(homeId):
-            StartPollFormView(homeId: homeId) {
-                if !path.isEmpty { path.removeLast() }
-            }
+            StartPollFormView(homeId: homeId) { Task { @MainActor in pop() } }
         case let .accessCodes(homeId, homeName):
             AccessCodesView(
                 viewModel: AccessCodesViewModel(
@@ -716,7 +719,7 @@ public struct HubTabRoot: View {
                             ))
                         }
                     },
-                    onCancel: { if !path.isEmpty { path.removeLast() } }
+                    onCancel: { Task { @MainActor in pop() } }
                 )
             )
         case let .editAccessCode(homeId, secretId, categoryRaw):
@@ -754,7 +757,7 @@ public struct HubTabRoot: View {
                 homeId: homeId,
                 eventId: eventId,
                 prefilledCategory: prefilledCategory,
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onCommitted: { event in
                     switch event {
                     case let .created(newId):
@@ -781,7 +784,7 @@ public struct HubTabRoot: View {
             EventDetailView(
                 homeId: homeId,
                 eventId: eventId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onEdit: { event in
                     Task { @MainActor in
                         push(.addCalendarEvent(
@@ -811,9 +814,7 @@ public struct HubTabRoot: View {
         case let .addEmergencyInfo(homeId):
             AddEmergencyInfoFormView(
                 viewModel: AddEmergencyInfoFormViewModel(homeId: homeId) { _ in
-                    Task { @MainActor in
-                        if !path.isEmpty { path.removeLast() }
-                    }
+                    Task { @MainActor in pop() }
                 }
             )
         case let .emergencyItem(homeId, emergencyId):
@@ -864,7 +865,7 @@ public struct HubTabRoot: View {
         case let .uploadDocument(homeId):
             UploadDocumentFormView(
                 homeId: homeId,
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onUploaded: { _ in
                     Task { @MainActor in
                         path.removeAll { route in
@@ -878,7 +879,7 @@ public struct HubTabRoot: View {
             DocumentDetailView(
                 homeId: homeId,
                 documentId: documentId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onReplace: {
                     Task { @MainActor in
                         push(.uploadDocument(homeId: homeId))
@@ -913,11 +914,11 @@ public struct HubTabRoot: View {
             PackageDetailView(
                 homeId: homeId,
                 packageId: packageId
-            ) { if !path.isEmpty { path.removeLast() } }
+            ) { Task { @MainActor in pop() } }
         case let .logPackage(homeId):
             LogPackageSheetView(
                 homeId: homeId,
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onCreated: { packageId in
                     Task { @MainActor in
                         path.removeAll { route in
@@ -950,7 +951,7 @@ public struct HubTabRoot: View {
         case let .addHouseholdTask(homeId):
             AddHouseholdTaskFormView(
                 homeId: homeId,
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onCreated: { _ in
                     // Pop back to the tasks list; the list refreshes
                     // on `.refreshable` / next visit.
@@ -998,7 +999,7 @@ public struct HubTabRoot: View {
         case let .publicProfile(userId):
             PublicProfileView(
                 userId: userId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onOpenMessages: { profile in
                     Task { @MainActor in
                         push(.chatConversation(InboxConversationDestination(
@@ -1014,7 +1015,7 @@ public struct HubTabRoot: View {
         case let .businessProfile(businessId):
             BusinessProfileDestination(
                 businessId: businessId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
                 onShare: {
                     systemSheet = .share(items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"])
@@ -1068,7 +1069,7 @@ public struct HubTabRoot: View {
                 onCompose: { intent in
                     Task { @MainActor in push(.composePost(intent: intent.rawValue)) }
                 },
-                onBack: { if !path.isEmpty { path.removeLast() } }
+                onBack: { Task { @MainActor in pop() } }
             )
         case let .composePost(intent):
             PulseComposeView(intent: PulseComposeIntent.from(rawValue: intent)) { _ in
@@ -1102,7 +1103,7 @@ public struct HubTabRoot: View {
         case let .gigDetail(gigId):
             GigDetailView(
                 viewModel: GigDetailViewModel(gigId: gigId),
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onMessage: { gig in
                     Task { @MainActor in
                         guard let posterId = gig.userId else { return }
@@ -1157,7 +1158,7 @@ public struct HubTabRoot: View {
                         }
                     }
                 },
-                onBack: { if !path.isEmpty { path.removeLast() } }
+                onBack: { Task { @MainActor in pop() } }
             )
         case .marketplace:
             MarketplaceView(
@@ -1165,12 +1166,12 @@ public struct HubTabRoot: View {
                     Task { @MainActor in push(.listingDetail(listingId: listingId)) }
                 },
                 onCompose: { Task { @MainActor in push(.composeListing) } },
-                onBack: { if !path.isEmpty { path.removeLast() } }
+                onBack: { Task { @MainActor in pop() } }
             )
         case let .listingDetail(listingId):
             ListingDetailView(
                 viewModel: ListingDetailViewModel(listingId: listingId),
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onMessage: { listing in
                     Task { @MainActor in
                         guard let sellerId = listing.userId else { return }
@@ -1231,7 +1232,7 @@ public struct HubTabRoot: View {
         case let .invoiceDetail(invoiceId):
             InvoiceDetailView(
                 viewModel: InvoiceDetailViewModel(invoiceId: invoiceId)
-            ) { if !path.isEmpty { path.removeLast() } }
+            ) { Task { @MainActor in pop() } }
         case .recentActivity:
             RecentActivityView(
                 viewModel: RecentActivityViewModel { destination in
@@ -1248,7 +1249,7 @@ public struct HubTabRoot: View {
         case .notifications:
             NotificationsView(
                 viewModel: NotificationsViewModel()
-            ) { if !path.isEmpty { path.removeLast() } }
+            ) { Task { @MainActor in pop() } }
         case .connections:
             ConnectionsView(
                 viewModel: ConnectionsViewModel(
@@ -1423,12 +1424,11 @@ public struct HubTabRoot: View {
                     counterparty: Self.chatCounterparty(for: dest),
                     currentUserId: currentUserId
                 ),
-                mode: dest.kind,
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+                mode: dest.kind
+            ) { Task { @MainActor in pop() } }
         case .menu:
             SettingsView(
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onEditProfile: { Task { @MainActor in push(.editProfile) } },
                 onOpenReviewClaims: {
                     // Close the settings sheet/screen then push the admin
@@ -1439,7 +1439,7 @@ public struct HubTabRoot: View {
                         push(.reviewClaims)
                     }
                 },
-                onSignedOut: { if !path.isEmpty { path.removeLast() } }
+                onSignedOut: { Task { @MainActor in pop() } }
             )
         case .editProfile:
             // `EditProfileView` reads `@Environment(\.dismiss)` and uses
@@ -1456,7 +1456,7 @@ public struct HubTabRoot: View {
         case let .reviewClaimDetail(claimId):
             ReviewClaimDetailView(
                 viewModel: ReviewClaimDetailViewModel(claimId: claimId)
-            ) { if !path.isEmpty { path.removeLast() } }
+            ) { Task { @MainActor in pop() } }
         case .mailboxSearch:
             MailboxSearchView(
                 viewModel: MailboxSearchViewModel(
@@ -1486,7 +1486,7 @@ public struct HubTabRoot: View {
         case let .propertyDetails(homeId):
             PropertyDetailsView(
                 homeId: homeId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onRequestCorrection: {
                     Task { @MainActor in push(.placeholder(label: "Request correction")) }
                 }
@@ -1555,7 +1555,7 @@ public struct HubTabRoot: View {
 
     private static func billsListViewModel(
         homeId: String,
-        push: @escaping (HubRoute) -> Void
+        push: @escaping @MainActor @Sendable (HubRoute) -> Void
     ) -> BillsListViewModel {
         let openBill: @Sendable (String) -> Void = { billId in
             Task { @MainActor in push(.billDetail(homeId: homeId, billId: billId)) }
@@ -1573,7 +1573,7 @@ public struct HubTabRoot: View {
     private static func packagesListViewModel(
         homeId: String,
         currentUserId: String?,
-        push: @escaping (HubRoute) -> Void
+        push: @escaping @MainActor @Sendable (HubRoute) -> Void
     ) -> PackagesListViewModel {
         let openPackage: @Sendable (String) -> Void = { packageId in
             Task { @MainActor in push(.packageDetail(homeId: homeId, packageId: packageId)) }
@@ -1594,7 +1594,7 @@ public struct HubTabRoot: View {
     /// the FAB + empty-state CTA (P2.5 composer).
     private static func pollsListViewModel(
         homeId: String,
-        push: @escaping (HubRoute) -> Void
+        push: @escaping @MainActor @Sendable (HubRoute) -> Void
     ) -> PollsListViewModel {
         let openPoll: @Sendable (String) -> Void = { pollId in
             Task { @MainActor in push(.pollDetail(homeId: homeId, pollId: pollId)) }

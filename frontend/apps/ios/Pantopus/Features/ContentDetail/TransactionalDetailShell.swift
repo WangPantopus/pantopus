@@ -23,7 +23,7 @@ public struct ContentDetailOverflowItem: Sendable {
     public let label: String
     public let icon: PantopusIcon?
     public let identifier: String
-    public let action: @MainActor () -> Void
+    public let action: @MainActor @Sendable () -> Void
     public let role: ButtonRole?
 
     public init(
@@ -31,7 +31,7 @@ public struct ContentDetailOverflowItem: Sendable {
         icon: PantopusIcon? = nil,
         identifier: String,
         role: ButtonRole? = nil,
-        action: @escaping @MainActor () -> Void
+        action: @escaping @MainActor @Sendable () -> Void
     ) {
         self.label = label
         self.icon = icon

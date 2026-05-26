@@ -151,7 +151,7 @@ private struct OwnershipSummaryCard: View {
             }
             .padding(.trailing, Spacing.s1)
 
-            Text(summaryLine)
+            summaryText
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .lineLimit(3)
@@ -177,19 +177,17 @@ private struct OwnershipSummaryCard: View {
         .accessibilityIdentifier("inviteOwnerOwnershipSummary")
     }
 
-    private var summaryLine: AttributedString {
-        var result = AttributedString("")
+    private var summaryText: Text {
+        var result = Text("")
         for (index, owner) in summary.owners.enumerated() {
-            var name = AttributedString(owner.name)
-            name.foregroundColor = Theme.Color.appText
-            name.font = .system(size: 11, weight: .semibold)
-            var share = AttributedString(" \(owner.sharePercent)%")
-            share.font = .system(size: 11, weight: .regular, design: .monospaced)
-            result += name
-            result += share
-            if index < summary.owners.count - 1 {
-                result += AttributedString(" · ")
-            }
+            let separator = index < summary.owners.count - 1 ? Text(" · ") : Text("")
+            result = result
+                + Text(owner.name)
+                    .foregroundColor(Theme.Color.appText)
+                    .font(.system(size: 11, weight: .semibold))
+                + Text(" \(owner.sharePercent)%")
+                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                + separator
         }
         return result
     }
@@ -297,7 +295,7 @@ private struct OwnershipConflictBlock: View {
             HStack(alignment: .top, spacing: Spacing.s2) {
                 Icon(.alertCircle, size: 14, color: Theme.Color.error)
                     .padding(.top, 1)
-                Text(conflictText)
+                conflictText
                     .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.error)
                     .fixedSize(horizontal: false, vertical: true)
@@ -344,12 +342,15 @@ private struct OwnershipConflictBlock: View {
         .accessibilityIdentifier("inviteOwnerConflictBlock")
     }
 
-    private var conflictText: AttributedString {
-        var text = AttributedString(viewModel.conflictMessage ?? "")
-        if let range = text.range(of: "Total would be \(viewModel.totalAfterGrant)%.") {
-            text[range].font = .system(size: 12, weight: .semibold)
+    private var conflictText: Text {
+        let message = viewModel.conflictMessage ?? ""
+        let emphasized = "Total would be \(viewModel.totalAfterGrant)%."
+        guard let range = message.range(of: emphasized) else {
+            return Text(message)
         }
-        return text
+        return Text(String(message[..<range.lowerBound]))
+            + Text(emphasized).font(.system(size: 12, weight: .semibold))
+            + Text(String(message[range.upperBound...]))
     }
 }
 

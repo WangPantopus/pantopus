@@ -140,7 +140,7 @@ final class LogMaintenanceFormViewModel {
         existing: MaintenanceTaskDTO? = nil,
         api: APIClient = .shared,
         draftStore: MaintenanceDraftStore = .shared,
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.homeId = homeId
         self.mode = mode

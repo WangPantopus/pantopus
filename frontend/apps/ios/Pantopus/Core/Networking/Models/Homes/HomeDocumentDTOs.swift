@@ -48,7 +48,7 @@ public struct HomeDocumentDTO: Decodable, Sendable, Hashable, Identifiable {
         case updatedAt = "updated_at"
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         homeId = try container.decode(String.self, forKey: .homeId)

@@ -316,7 +316,7 @@ public struct ListingComposeFormState: Codable, Sendable, Equatable {
         case locationLabel
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         step = try container.decodeIfPresent(Int.self, forKey: .step) ?? ListingComposeStep.photos.rawValue
         entryMode = try container.decodeIfPresent(ListingComposeEntryMode.self, forKey: .entryMode) ?? .snap

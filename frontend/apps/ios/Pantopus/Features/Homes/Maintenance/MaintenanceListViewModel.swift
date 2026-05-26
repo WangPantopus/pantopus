@@ -160,7 +160,7 @@ final class MaintenanceListViewModel: ListOfRowsDataSource {
         api: APIClient = .shared,
         onOpenTask: @escaping @Sendable (String) -> Void = { _ in },
         onAddTask: @escaping @Sendable () -> Void = {},
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.homeId = homeId
         self.api = api

@@ -68,7 +68,7 @@ final class Observability {
 
     /// Keys whose values get redacted before they leave the device.
     /// Matched case-insensitively against `extra` / `data` keys.
-    private static let piiKeys: Set<String> = [
+    private nonisolated static let piiKeys: Set<String> = [
         "email", "emailaddress", "email_address",
         "phone", "phonenumber", "phone_number", "telephone",
         "address", "street", "streetaddress", "street_address",
@@ -77,7 +77,7 @@ final class Observability {
         "password", "token", "authorization", "auth", "secret"
     ]
 
-    private static let redacted = "[redacted]"
+    private nonisolated static let redacted = "[redacted]"
 
     private nonisolated static func scrubPII(from event: Event) {
         if var extra = event.extra {

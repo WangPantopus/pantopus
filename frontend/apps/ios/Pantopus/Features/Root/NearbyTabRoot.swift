@@ -103,114 +103,138 @@ public struct NearbyTabRoot: View {
     private func destination(for route: NearbyRoute) -> some View {
         switch route {
         case let .entityDetail(kind, id):
-            switch kind {
-            case .gig:
-                GigDetailView(
-                    viewModel: GigDetailViewModel(gigId: id),
-                    onBack: { if !path.isEmpty { path.removeLast() } },
-                    onMessage: { gig in
-                        Task { @MainActor in
-                            guard let posterId = gig.userId else { return }
-                            let name = gig.creator?.name ?? gig.creator?.username ?? gig.title
-                            path.append(.chatConversation(InboxConversationDestination(
-                                mode: .person(otherUserId: posterId),
-                                displayName: name,
-                                initials: Self.initials(from: name),
-                                identityKind: nil,
-                                verified: gig.creator?.verified ?? false
-                            )))
-                        }
-                    }
-                )
-            case .listing:
-                ListingDetailView(
-                    viewModel: ListingDetailViewModel(listingId: id),
-                    onBack: { if !path.isEmpty { path.removeLast() } },
-                    onMessage: { listing in
-                        Task { @MainActor in
-                            guard let sellerId = listing.userId else { return }
-                            let name = listing.title ?? "Seller"
-                            path.append(.chatConversation(InboxConversationDestination(
-                                mode: .person(otherUserId: sellerId),
-                                displayName: name,
-                                initials: Self.initials(from: name),
-                                identityKind: nil,
-                                verified: false
-                            )))
-                        }
-                    },
-                    onViewOffers: { dto in
-                        Task { @MainActor in
-                            path.append(.listingOffers(listingId: dto.id, title: dto.title))
-                        }
-                    },
-                    onEditListing: { dto in
-                        Task { @MainActor in
-                            path.append(.editListing(listingId: dto.id, jumpToStep: nil))
-                        }
-                    }
-                )
-            }
+            entityDestination(kind: kind, id: id)
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
         case let .publicProfile(userId):
-            PublicProfileView(
-                userId: userId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
-                onOpenMessages: { profile in
-                    Task { @MainActor in
-                        path.append(.chatConversation(InboxConversationDestination(
-                            mode: .person(otherUserId: profile.id),
-                            displayName: profile.displayName,
-                            initials: Self.initials(from: profile.displayName),
-                            identityKind: nil,
-                            verified: profile.verified ?? false
-                        )))
-                    }
-                }
-            )
+            publicProfileDestination(userId: userId)
         case let .chatConversation(dest):
-            ChatConversationView(
-                viewModel: ChatConversationViewModel(
-                    mode: Self.chatMode(for: dest.mode),
-                    counterparty: Self.chatCounterparty(for: dest),
-                    currentUserId: currentUserId
-                ),
-                mode: dest.kind,
-                onBack: {
-                    if !path.isEmpty { path.removeLast() }
-                }
-            )
+            chatDestination(dest)
         case let .listingOffers(listingId, titleHint):
-            ListingOffersView(
-                viewModel: ListingOffersViewModel(
-                    listingId: listingId,
-                    listingTitleHint: titleHint,
-                    onShareListing: {
-                        let name = titleHint ?? "this listing"
-                        systemSheet = .share(
-                            items: ["Check out \(name) on Pantopus — \(InviteLinks.downloadURLString)"]
-                        )
-                    },
-                    onOpenBuyer: { buyer in
-                        Task { @MainActor in path.append(.publicProfile(userId: buyer.id)) }
-                    },
-                    onOpenTransaction: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Transaction detail")) }
-                    },
-                    onEditPrice: {
-                        Task { @MainActor in
-                            path.append(.editListing(listingId: listingId, jumpToStep: .price))
-                        }
-                    }
-                )
-            )
+            listingOffersDestination(listingId: listingId, titleHint: titleHint)
         case let .editListing(listingId, jumpToStep):
             ListingComposeWizardView(
                 mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
                 onListingUpdated: popAfterListingUpdate
             )
         }
+    }
+
+    @ViewBuilder
+    private func entityDestination(kind: MapEntityKind, id: String) -> some View {
+        switch kind {
+        case .gig:
+            gigDetailDestination(gigId: id)
+        case .listing:
+            listingDetailDestination(listingId: id)
+        }
+    }
+
+    private func gigDetailDestination(gigId: String) -> some View {
+        GigDetailView(
+            viewModel: GigDetailViewModel(gigId: gigId),
+            onBack: { if !path.isEmpty { path.removeLast() } },
+            onMessage: { gig in
+                Task { @MainActor in
+                    guard let posterId = gig.userId else { return }
+                    let name = gig.creator?.name ?? gig.creator?.username ?? gig.title
+                    path.append(.chatConversation(InboxConversationDestination(
+                        mode: .person(otherUserId: posterId),
+                        displayName: name,
+                        initials: Self.initials(from: name),
+                        identityKind: nil,
+                        verified: gig.creator?.verified ?? false
+                    )))
+                }
+            }
+        )
+    }
+
+    private func listingDetailDestination(listingId: String) -> some View {
+        ListingDetailView(
+            viewModel: ListingDetailViewModel(listingId: listingId),
+            onBack: { if !path.isEmpty { path.removeLast() } },
+            onMessage: { listing in
+                Task { @MainActor in
+                    guard let sellerId = listing.userId else { return }
+                    let name = listing.title ?? "Seller"
+                    path.append(.chatConversation(InboxConversationDestination(
+                        mode: .person(otherUserId: sellerId),
+                        displayName: name,
+                        initials: Self.initials(from: name),
+                        identityKind: nil,
+                        verified: false
+                    )))
+                }
+            },
+            onViewOffers: { dto in
+                Task { @MainActor in
+                    path.append(.listingOffers(listingId: dto.id, title: dto.title))
+                }
+            },
+            onEditListing: { dto in
+                Task { @MainActor in
+                    path.append(.editListing(listingId: dto.id, jumpToStep: nil))
+                }
+            }
+        )
+    }
+
+    private func publicProfileDestination(userId: String) -> some View {
+        PublicProfileView(
+            userId: userId,
+            onBack: { if !path.isEmpty { path.removeLast() } },
+            onOpenMessages: { profile in
+                Task { @MainActor in
+                    path.append(.chatConversation(InboxConversationDestination(
+                        mode: .person(otherUserId: profile.id),
+                        displayName: profile.displayName,
+                        initials: Self.initials(from: profile.displayName),
+                        identityKind: nil,
+                        verified: profile.verified ?? false
+                    )))
+                }
+            }
+        )
+    }
+
+    private func chatDestination(_ dest: InboxConversationDestination) -> some View {
+        ChatConversationView(
+            viewModel: ChatConversationViewModel(
+                mode: Self.chatMode(for: dest.mode),
+                counterparty: Self.chatCounterparty(for: dest),
+                currentUserId: currentUserId
+            ),
+            mode: dest.kind
+        ) {
+            if !path.isEmpty { path.removeLast() }
+        }
+    }
+
+    private func listingOffersDestination(listingId: String, titleHint: String?) -> some View {
+        ListingOffersView(
+            viewModel: ListingOffersViewModel(
+                listingId: listingId,
+                listingTitleHint: titleHint,
+                onShareListing: {
+                    let name = titleHint ?? "this listing"
+                    systemSheet = .share(
+                        items: ["Check out \(name) on Pantopus — \(InviteLinks.downloadURLString)"]
+                    )
+                },
+                onOpenBuyer: { buyer in
+                    Task { @MainActor in path.append(.publicProfile(userId: buyer.id)) }
+                },
+                onOpenTransaction: { _ in
+                    Task { @MainActor in path.append(.placeholder(label: "Transaction detail")) }
+                },
+                onEditPrice: {
+                    Task { @MainActor in
+                        path.append(.editListing(listingId: listingId, jumpToStep: .price))
+                    }
+                }
+            )
+        )
     }
 }
 

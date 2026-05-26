@@ -115,7 +115,7 @@ struct LogMaintenanceFormView: View {
         }
     }
 
-    private func handleReceiptResult(_ result: Result<[URL], Error>) {
+    private func handleReceiptResult(_ result: Result<[URL], any Error>) {
         switch result {
         case let .success(urls):
             guard let url = urls.first else { return }

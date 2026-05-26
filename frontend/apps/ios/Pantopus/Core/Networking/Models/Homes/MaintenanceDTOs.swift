@@ -46,7 +46,7 @@ public struct MaintenanceTaskDTO: Decodable, Sendable, Hashable, Identifiable {
         case createdBy = "created_by"
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         homeId = try container.decode(String.self, forKey: .homeId)
@@ -150,7 +150,7 @@ public struct CreateMaintenanceRequest: Encodable, Sendable {
         self.status = status
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(task, forKey: .task)
         if let vendor { try c.encode(vendor, forKey: .vendor) }
@@ -198,7 +198,7 @@ public struct UpdateMaintenanceRequest: Encodable, Sendable {
         self.status = status
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         if let task { try c.encode(task, forKey: .task) }
         if let vendor { try c.encode(vendor, forKey: .vendor) }

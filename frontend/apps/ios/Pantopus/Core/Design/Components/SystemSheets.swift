@@ -76,7 +76,7 @@ public struct MailDraft: Identifiable, Hashable, Sendable {
     }
 
     /// `true` when the device has at least one Mail account configured.
-    public static var canSendMail: Bool {
+    @MainActor public static var canSendMail: Bool {
         MFMailComposeViewController.canSendMail()
     }
 
@@ -97,9 +97,9 @@ public struct MailDraft: Identifiable, Hashable, Sendable {
 /// `MailDraft.canSendMail` is true; otherwise open `mailtoURL`.
 public struct MailComposeSheet: UIViewControllerRepresentable {
     private let draft: MailDraft
-    private let onFinish: () -> Void
+    private let onFinish: @MainActor @Sendable () -> Void
 
-    public init(draft: MailDraft, onFinish: @escaping () -> Void = {}) {
+    public init(draft: MailDraft, onFinish: @escaping @MainActor @Sendable () -> Void = {}) {
         self.draft = draft
         self.onFinish = onFinish
     }
@@ -119,19 +119,20 @@ public struct MailComposeSheet: UIViewControllerRepresentable {
         Coordinator(onFinish: onFinish)
     }
 
-    public final class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
-        private let onFinish: () -> Void
+    @MainActor public final class Coordinator: NSObject, @MainActor MFMailComposeViewControllerDelegate {
+        private let onFinish: @MainActor @Sendable () -> Void
 
-        init(onFinish: @escaping () -> Void) {
+        init(onFinish: @escaping @MainActor @Sendable () -> Void) {
             self.onFinish = onFinish
         }
 
         public func mailComposeController(
             _ controller: MFMailComposeViewController,
             didFinishWith _: MFMailComposeResult,
-            error _: Error?
+            error _: (any Error)?
         ) {
-            controller.dismiss(animated: true) { self.onFinish() }
+            controller.dismiss(animated: true)
+            onFinish()
         }
     }
 }

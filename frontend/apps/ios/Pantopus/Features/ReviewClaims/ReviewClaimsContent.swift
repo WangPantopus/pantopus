@@ -161,7 +161,7 @@ public enum AdminClaimTimeFormat {
         return Self.longFormatter.string(from: date)
     }
 
-    private nonisolated(unsafe) static let longFormatter: DateFormatter = {
+    private static let longFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "MMM d, yyyy"
         return f

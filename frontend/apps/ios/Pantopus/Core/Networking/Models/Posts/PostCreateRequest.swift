@@ -82,7 +82,7 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
 
     /// Encode dropping `nil` keys so optional fields aren't sent as
     /// `"foo": null` (which `createPostSchema` rejects for some keys).
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(content, forKey: .content)
         try container.encodeIfPresent(title, forKey: .title)
@@ -116,7 +116,7 @@ public struct PostCreateResponse: Decodable, Sendable, Hashable {
         self.postId = postId
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         message = try container.decodeIfPresent(String.self, forKey: .message)
         // The backend's response shape varies — sometimes `post_id`, sometimes a nested

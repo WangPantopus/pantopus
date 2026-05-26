@@ -694,6 +694,11 @@ public struct YouTabRoot: View {
         }
     }
 
+    @MainActor
+    private func pop() {
+        if !path.isEmpty { path.removeLast() }
+    }
+
     /// No-op overlay slot — we previously routed debug affordances via
     /// a 5-tap gesture, but the designed DEBUG section in `MeView` now
     /// surfaces them directly.
@@ -760,7 +765,7 @@ public struct YouTabRoot: View {
                 )
             )
         case .mailboxMap:
-            MailboxMapView { if !path.isEmpty { path.removeLast() } }
+            MailboxMapView { Task { @MainActor in pop() } }
         case .mailboxSearch:
             MailboxSearchView(
                 viewModel: MailboxSearchViewModel(
@@ -780,28 +785,28 @@ public struct YouTabRoot: View {
             // variants that compose the same shell with their own slots.
             MailDetailView(
                 mailId: mailId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onOpenSenderProfile: { userId in
                     Task { @MainActor in path.append(.publicProfile(userId: userId)) }
                 }
             )
         case .settings:
             SettingsView(
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onEditProfile: { showsEditProfile = true },
-                onSignedOut: { if !path.isEmpty { path.removeLast() } }
+                onSignedOut: { Task { @MainActor in pop() } }
             )
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
         case .helpCenter:
-            HelpCenterView { if !path.isEmpty { path.removeLast() } }
+            HelpCenterView { Task { @MainActor in pop() } }
         case .privacySettings:
             GroupedListView(
                 dataSource: PrivacySettingsViewModel()
-            ) { if !path.isEmpty { path.removeLast() } }
+            ) { Task { @MainActor in pop() } }
         case .legal:
             LegalIndexView(
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onSelect: { doc in path.append(.legalContent(doc)) }
             )
         case let .legalContent(doc):
@@ -858,7 +863,7 @@ public struct YouTabRoot: View {
         case let .membershipDetail(personaId):
             MembershipDetailView(
                 viewModel: MembershipDetailViewModel(personaId: personaId),
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onShare: {
                     systemSheet = .share(
                         items: ["Check out this membership on Pantopus — \(InviteLinks.downloadURLString)"]
@@ -881,7 +886,7 @@ public struct YouTabRoot: View {
                 }
             )
         case .professionalProfile:
-            ProfessionalProfileView { if !path.isEmpty { path.removeLast() } }
+            ProfessionalProfileView { Task { @MainActor in pop() } }
         case let .editPersona(personaId):
             EditPersonaView(viewModel: EditPersonaViewModel(personaId: personaId)) {
                 if !path.isEmpty { path.removeLast() }
@@ -912,7 +917,7 @@ public struct YouTabRoot: View {
         case let .gigDetail(gigId):
             GigDetailView(
                 viewModel: GigDetailViewModel(gigId: gigId),
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onMessage: { gig in
                     Task { @MainActor in
                         guard let posterId = gig.userId else { return }
@@ -935,12 +940,12 @@ public struct YouTabRoot: View {
                 onCompose: {
                     Task { @MainActor in path.append(.composeListing) }
                 },
-                onBack: { if !path.isEmpty { path.removeLast() } }
+                onBack: { Task { @MainActor in pop() } }
             )
         case let .listingDetail(listingId):
             ListingDetailView(
                 viewModel: ListingDetailViewModel(listingId: listingId),
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onMessage: { listing in
                     Task { @MainActor in
                         guard let sellerId = listing.userId else { return }
@@ -994,12 +999,10 @@ public struct YouTabRoot: View {
                 )
             )
         case .composeListing:
-            ListingComposeWizardView(
-                onOpenListingDetail: { listingId in
-                    path.removeAll { $0 == .composeListing }
-                    path.append(.listingDetail(listingId: listingId))
-                }
-            )
+            ListingComposeWizardView { listingId in
+                path.removeAll { $0 == .composeListing }
+                path.append(.listingDetail(listingId: listingId))
+            }
         case let .editListing(listingId, jumpToStep):
             ListingComposeWizardView(
                 mode: .edit(listingId: listingId, jumpToStep: jumpToStep),
@@ -1031,7 +1034,7 @@ public struct YouTabRoot: View {
             PulsePostDetailView(
                 postId: postId,
                 currentUserId: currentUserId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onOpenProfile: { userId in
                     Task { @MainActor in path.append(.publicProfile(userId: userId)) }
                 },
@@ -1083,14 +1086,14 @@ public struct YouTabRoot: View {
                 onOpenSearch: {
                     Task { @MainActor in path.append(.gigSearch) }
                 },
-                onBack: { if !path.isEmpty { path.removeLast() } }
+                onBack: { Task { @MainActor in pop() } }
             )
         case .gigSearch:
             GigSearchView(
                 onOpenGig: { gigId in
                     Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
                 },
-                onBack: { if !path.isEmpty { path.removeLast() } }
+                onBack: { Task { @MainActor in pop() } }
             )
         case let .tasksMap(categoryKey):
             NearbyMapView(
@@ -1105,7 +1108,7 @@ public struct YouTabRoot: View {
                         }
                     }
                 },
-                onBack: { if !path.isEmpty { path.removeLast() } }
+                onBack: { Task { @MainActor in pop() } }
             )
         case .myTasks:
             MyTasksView(
@@ -1180,7 +1183,7 @@ public struct YouTabRoot: View {
                     onOpenTrain: { trainId in
                         Task { @MainActor in path.append(.reviewSignups(supportTrainId: trainId)) }
                     },
-                    onCancel: { if !path.isEmpty { path.removeLast() } }
+                    onCancel: { Task { @MainActor in pop() } }
                 )
             )
         case .startSupportTrain:
@@ -1227,7 +1230,7 @@ public struct YouTabRoot: View {
             }
         case .identityCenter:
             IdentityCenterView(
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onOpenIdentity: { card in
                     Task { @MainActor in
                         switch card.kind {
@@ -1243,7 +1246,7 @@ public struct YouTabRoot: View {
             )
         case .audienceProfile:
             AudienceProfileView(
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onOpenFollower: { _ in
                     Task { @MainActor in path.append(.placeholder(label: "Follower")) }
                 },
@@ -1282,7 +1285,7 @@ public struct YouTabRoot: View {
                     seed: card,
                     tierSegments: tierSegments
                 ),
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onOverflow: {
                     Task { @MainActor in path.append(.placeholder(label: "Broadcast actions")) }
                 },
@@ -1298,7 +1301,7 @@ public struct YouTabRoot: View {
             )
         case .creatorInbox:
             CreatorInboxView(
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onOpenThread: { row in
                     Task { @MainActor in
                         let dest = CreatorInboxConversationDestination(
@@ -1337,7 +1340,7 @@ public struct YouTabRoot: View {
                 onOpenAudienceProfile: {
                     path.append(.audienceProfile)
                 },
-                onBack: { if !path.isEmpty { path.removeLast() } }
+                onBack: { Task { @MainActor in pop() } }
             )
         case let .chatConversation(dest):
             ChatConversationView(
@@ -1346,9 +1349,8 @@ public struct YouTabRoot: View {
                     counterparty: Self.chatCounterparty(for: dest),
                     currentUserId: currentUserId ?? ""
                 ),
-                mode: dest.kind,
-                onBack: { if !path.isEmpty { path.removeLast() } }
-            )
+                mode: dest.kind
+            ) { Task { @MainActor in pop() } }
         case let .homeBills(homeId):
             BillsListView(
                 viewModel: BillsListViewModel(
@@ -1365,7 +1367,7 @@ public struct YouTabRoot: View {
             BillDetailView(
                 homeId: homeId,
                 billId: billId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onEdit: {
                     Task { @MainActor in path.append(.addBill(homeId: homeId, billId: billId)) }
                 }
@@ -1374,7 +1376,7 @@ public struct YouTabRoot: View {
             AddBillWizardView(
                 homeId: homeId,
                 billId: billId,
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onCreated: { newBillId in
                     path.removeAll { route in
                         if case .addBill = route { return true }
@@ -1413,7 +1415,7 @@ public struct YouTabRoot: View {
                 homeId: homeId,
                 eventId: eventId,
                 prefilledCategory: prefilledCategory,
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onCommitted: { event in
                     switch event {
                     case let .created(newId):
@@ -1438,7 +1440,7 @@ public struct YouTabRoot: View {
             EventDetailView(
                 homeId: homeId,
                 eventId: eventId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onEdit: { event in
                     Task { @MainActor in
                         path.append(.addCalendarEvent(
@@ -1468,9 +1470,7 @@ public struct YouTabRoot: View {
         case let .addEmergencyInfo(homeId):
             AddEmergencyInfoFormView(
                 viewModel: AddEmergencyInfoFormViewModel(homeId: homeId) { _ in
-                    Task { @MainActor in
-                        if !path.isEmpty { path.removeLast() }
-                    }
+                    Task { @MainActor in pop() }
                 }
             )
         case let .emergencyItem(homeId, emergencyId):
@@ -1516,7 +1516,7 @@ public struct YouTabRoot: View {
         case let .uploadDocument(homeId):
             UploadDocumentFormView(
                 homeId: homeId,
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onUploaded: { _ in
                     Task { @MainActor in
                         path.removeAll { route in
@@ -1530,7 +1530,7 @@ public struct YouTabRoot: View {
             DocumentDetailView(
                 homeId: homeId,
                 documentId: documentId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onReplace: {
                     Task { @MainActor in
                         path.append(.uploadDocument(homeId: homeId))
@@ -1572,11 +1572,11 @@ public struct YouTabRoot: View {
             PackageDetailView(
                 homeId: homeId,
                 packageId: packageId
-            ) { if !path.isEmpty { path.removeLast() } }
+            ) { Task { @MainActor in pop() } }
         case let .logPackage(homeId):
             LogPackageSheetView(
                 homeId: homeId,
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onCreated: { packageId in
                     Task { @MainActor in
                         // Replace the log-package destination with the
@@ -1606,13 +1606,9 @@ public struct YouTabRoot: View {
             PollDetailView(
                 homeId: homeId,
                 pollId: pollId
-            ) {
-                if !path.isEmpty { path.removeLast() }
-            }
+            ) { Task { @MainActor in pop() } }
         case let .startPoll(homeId):
-            StartPollFormView(homeId: homeId) {
-                if !path.isEmpty { path.removeLast() }
-            }
+            StartPollFormView(homeId: homeId) { Task { @MainActor in pop() } }
         case let .accessCodes(homeId, homeName):
             AccessCodesView(
                 viewModel: AccessCodesViewModel(
@@ -1652,7 +1648,7 @@ public struct YouTabRoot: View {
                             ))
                         }
                     },
-                    onCancel: { if !path.isEmpty { path.removeLast() } }
+                    onCancel: { Task { @MainActor in pop() } }
                 )
             )
         case let .editAccessCode(homeId, secretId, categoryRaw):
@@ -1697,11 +1693,11 @@ public struct YouTabRoot: View {
                 )
             )
         case .businessWaitlist:
-            BusinessWaitlistView { if !path.isEmpty { path.removeLast() } }
+            BusinessWaitlistView { Task { @MainActor in pop() } }
         case let .homeDashboard(homeId):
             HomeDashboardView(
                 homeId: homeId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onClaimOwnership: {
                     Task { @MainActor in path.append(.claimOwnership(homeId: homeId)) }
                 },
@@ -1764,7 +1760,7 @@ public struct YouTabRoot: View {
         case let .addHouseholdTask(homeId):
             AddHouseholdTaskFormView(
                 homeId: homeId,
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onCreated: { _ in
                     if !path.isEmpty { path.removeLast() }
                 }
@@ -1793,7 +1789,7 @@ public struct YouTabRoot: View {
         case let .logMaintenance(homeId):
             LogMaintenanceFormView(
                 viewModel: LogMaintenanceFormViewModel(homeId: homeId),
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onSubmitted: { taskId in
                     Task { @MainActor in
                         if !path.isEmpty { path.removeLast() }
@@ -1805,7 +1801,7 @@ public struct YouTabRoot: View {
             MaintenanceDetailView(
                 homeId: homeId,
                 taskId: taskId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onEdit: {
                     Task { @MainActor in
                         path.append(.editMaintenance(homeId: homeId, taskId: taskId))
@@ -1818,7 +1814,7 @@ public struct YouTabRoot: View {
                     homeId: homeId,
                     mode: .edit(taskId: taskId)
                 ),
-                onClose: { if !path.isEmpty { path.removeLast() } },
+                onClose: { Task { @MainActor in pop() } },
                 onSubmitted: { _ in
                     Task { @MainActor in
                         if !path.isEmpty { path.removeLast() }
@@ -1839,7 +1835,7 @@ public struct YouTabRoot: View {
         case let .publicProfile(userId):
             PublicProfileView(
                 userId: userId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onOpenMessages: { profile in
                     Task { @MainActor in
                         path.append(.chatConversation(InboxConversationDestination(
@@ -1855,7 +1851,7 @@ public struct YouTabRoot: View {
         case let .businessProfile(businessId):
             BusinessProfileView(
                 businessId: businessId,
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onOpenMessages: {
                     Task { @MainActor in path.append(.placeholder(label: "Messages")) }
                 },
@@ -1871,7 +1867,7 @@ public struct YouTabRoot: View {
             PrivacyHandshakeWizardView(
                 viewModel: PrivacyHandshakeViewModel(
                     personaHandle: personaHandle
-                ) { if !path.isEmpty { path.removeLast() } }
+                ) { Task { @MainActor in pop() } }
             )
         #if DEBUG
         case .statusWaiting:
@@ -1882,13 +1878,13 @@ public struct YouTabRoot: View {
             )
         case .ceremonialMail:
             CeremonialMailWizardView(
-                onDismiss: { if !path.isEmpty { path.removeLast() } },
+                onDismiss: { Task { @MainActor in pop() } },
                 onOpenMail: { _ in if !path.isEmpty { path.removeLast() } }
             )
         case let .ceremonialMailOpen(mailId):
             CeremonialMailOpenView(
                 viewModel: CeremonialMailOpenViewModel(mailId: mailId),
-                onBack: { if !path.isEmpty { path.removeLast() } },
+                onBack: { Task { @MainActor in pop() } },
                 onWriteBack: { _ in path.append(.ceremonialMail) }
             )
         #endif

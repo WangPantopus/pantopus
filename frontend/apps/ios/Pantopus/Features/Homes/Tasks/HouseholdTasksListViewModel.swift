@@ -195,7 +195,7 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
     private let onOpenTask: @Sendable (String) -> Void
     private let onAddTask: @Sendable () -> Void
     private let onEditRecurring: @Sendable (String) -> Void
-    /// Inject a stable "now" for tests; production uses `Date.init`.
+    /// Inject a stable "now" for tests; production uses `Date()`.
     private let now: @Sendable () -> Date
 
     init(
@@ -204,7 +204,7 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
         onOpenTask: @escaping @Sendable (String) -> Void = { _ in },
         onAddTask: @escaping @Sendable () -> Void = {},
         onEditRecurring: @escaping @Sendable (String) -> Void = { _ in },
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.homeId = homeId
         self.api = api

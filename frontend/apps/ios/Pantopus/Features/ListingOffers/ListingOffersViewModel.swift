@@ -300,7 +300,8 @@ public final class ListingOffersViewModel: ListOfRowsDataSource {
             for: listing,
             offerCount: offers.count,
             sortLabel: sort.label,
-            sortOptions: sortMenuOptions()
+            sortOptions: sortMenuOptions(),
+            onSort: nil
         ) { [weak self] in
             guard let self else { return }
             Task { @MainActor in self.onEditPrice() }

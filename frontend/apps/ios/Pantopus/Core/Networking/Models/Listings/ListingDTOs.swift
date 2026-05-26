@@ -2,7 +2,7 @@
 //  ListingDTOs.swift
 //  Pantopus
 //
-//  Decoder shapes for `/api/listings/*`. Mirrors the
+//  any Decoder shapes for `/api/listings/*`. Mirrors the
 //  `normalizeListingRow` projection in
 //  `backend/services/marketplace/marketplaceService.js:82`.
 //
@@ -277,7 +277,7 @@ public struct UpdateListingRequest: Encodable, Sendable {
         self.isWanted = isWanted
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(title, forKey: .title)
         try container.encodeIfPresent(description, forKey: .description)

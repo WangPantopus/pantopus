@@ -190,7 +190,7 @@ public struct UpdateHomeTaskRequest: Encodable, Sendable {
         self.completedAt = completedAt
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(status, forKey: .status)
         try c.encodeIfPresent(title, forKey: .title)

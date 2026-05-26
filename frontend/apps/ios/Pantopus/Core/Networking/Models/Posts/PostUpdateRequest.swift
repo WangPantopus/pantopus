@@ -56,7 +56,7 @@ public struct PostUpdateRequest: Encodable, Sendable, Hashable {
 
     /// Encode dropping `nil` keys so the wire body only carries the
     /// fields the user actually changed.
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(content, forKey: .content)
         try container.encodeIfPresent(title, forKey: .title)
@@ -90,7 +90,7 @@ public struct PostUpdateResponse: Decodable, Sendable, Hashable {
         let id: String
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         message = try container.decodeIfPresent(String.self, forKey: .message)
         if let nested = try? container.decode(NestedPostId.self, forKey: .post) {

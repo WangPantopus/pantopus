@@ -90,7 +90,7 @@ final class SocketClient {
     ///     // ...
     /// }
     /// ```
-    func events<T: Decodable>(
+    func events<T: Decodable & Sendable>(
         named event: String,
         as _: T.Type = T.self
     ) -> AsyncStream<T> {
